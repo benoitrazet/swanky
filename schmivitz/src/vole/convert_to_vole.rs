@@ -1,8 +1,8 @@
 /*! */
 #![allow(clippy::needless_range_loop)]
-use crate::all_but_one_vc::{commit, open, reconstruct, Decom, Pdecom};
-use crate::crypto_primitives::{Com, Seed, IV, PRG};
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
+use crate::vole::all_but_one_vc::{commit, open, reconstruct, Decom, Pdecom};
+use crate::vole::crypto_primitives::{Com, Seed, IV, PRG};
 use eyre::{bail, Result};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F128b;
@@ -957,9 +957,9 @@ mod test {
         to_field_f128_and_pad, vec_f128b_to_f2, verify, vole_commit, vole_recompose_q,
         vole_reconstruct, B, H1,
     };
-    use crate::convert_to_vole::{chal_dec, vole_open};
-    use crate::crypto_primitives::Seed;
     use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
+    use crate::vole::convert_to_vole::{chal_dec, vole_open};
+    use crate::vole::crypto_primitives::Seed;
     use rand::{thread_rng, RngCore};
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;

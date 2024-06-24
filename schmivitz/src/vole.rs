@@ -14,6 +14,11 @@ use swanky_field_binary::{F128b, F2};
 
 use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 
+// Exposing these modules for benchmarking at the moment.
+pub mod all_but_one_vc;
+pub mod convert_to_vole;
+pub mod crypto_primitives;
+
 /// This defines the behavior needed to create and use non-interactive random VOLEs.
 ///
 /// It's tailored to the specific use case of the VOLE-in-the-head paper[^vole], including

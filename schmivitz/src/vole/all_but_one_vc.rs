@@ -22,7 +22,7 @@ We assume the $`\lambda`$ security parameter in the spec to be 128 as set in
 For convenience we abbreviate "all-but-one vector commitment" to "1-VC".
 */
 #![allow(dead_code)]
-use crate::crypto_primitives::{h0, h1, Com, Key, Seed, H1, IV, PRG};
+use crate::vole::crypto_primitives::{h0, h1, Com, Key, Seed, H1, IV, PRG};
 use eyre::{bail, Result};
 
 /// Hash function hashing a sequence of [`Com`]mitments and returns a hash [`H1`].
