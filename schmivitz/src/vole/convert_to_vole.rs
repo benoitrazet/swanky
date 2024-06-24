@@ -2,7 +2,10 @@
 #![allow(clippy::needless_range_loop)]
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::all_but_one_vc::{commit, open, reconstruct, Decom, Pdecom};
-use crate::vole::crypto_primitives::{Com, Seed, IV, PRG};
+use crate::vole::crypto_primitives::{
+    h1, h3, h_chall1, h_chall2, h_chall3, Chall1, Chall2, Chall3, Com, Seed, CHALL1_LENGTH, H1, H3,
+    IV, PRG,
+};
 use eyre::{bail, Result};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F128b;
@@ -16,86 +19,6 @@ use sha3::{
 };
 use std::sync::mpsc::channel;
 use std::thread;
-
-fn h1_internal(inp: &[u8], out: &mut [u8]) {
-    assert_eq!(out.len(), (SECURITY_PARAM / 8) * 2);
-    let mut hasher = sha3::Shake128::default();
-    hasher.update(inp);
-    hasher.update(&[1u8]);
-    let mut reader = hasher.finalize_xof();
-    reader.read(out);
-}
-
-/// Result of [`h1`] hash function.
-pub type H1 = [u8; (SECURITY_PARAM / 8) * 2];
-
-/// H1 hash function.
-///
-/// It is called at the beginning of the protocol on both sides.
-fn h1(inp: &[u8]) -> H1 {
-    let mut out = H1::default();
-    h1_internal(inp, &mut out);
-    out
-}
-
-/// This is `$H_2^3$` in FAEST spec
-fn h2(inp: &[u8], out: &mut [u8]) {
-    let mut hasher = Shake128::default();
-    hasher.update(inp);
-    hasher.update(&[2u8]);
-    let mut reader = hasher.finalize_xof();
-    reader.read(out);
-}
-
-/// Length of 1st challenge in bytes.
-const CHALL1_LENGTH: usize = (SECURITY_PARAM * 6) / 8;
-/// First challenge
-pub type Chall1 = [u8; CHALL1_LENGTH];
-
-/// This is `$H_2^2$` in FAEST spec.
-fn h_chall1(inp: &[u8]) -> Chall1 {
-    let mut out: Chall1 = [0u8; CHALL1_LENGTH]; // NOTE: default does not work here
-    h2(inp, &mut out);
-    out
-}
-
-/// Length of 2nd challenge in bytes.
-const CHALL2_LENGTH: usize = (SECURITY_PARAM * 3 + 64) / 8;
-/// Second challenge
-pub type Chall2 = [u8; CHALL2_LENGTH];
-
-/// This is `$H_2^2$` in FAEST spec.
-fn h_chall2(inp: &[u8]) -> Chall2 {
-    let mut out: Chall2 = [0u8; CHALL2_LENGTH]; // NOTE: default does not work here
-    h2(inp, &mut out);
-    out
-}
-
-/// Length of 3rd challenge in bytes.
-const CHALL3_LENGTH: usize = SECURITY_PARAM / 8;
-/// Third challenge.
-pub type Chall3 = [u8; CHALL3_LENGTH];
-
-/// This is `$H_2^3$` in FAEST spec.
-fn h_chall3(inp: &[u8]) -> Chall3 {
-    let mut out = Chall3::default();
-    h2(inp, &mut out);
-    out
-}
-
-type H3 = [u8; SECURITY_PARAM / 8 + 128 / 8];
-
-/// H3 function
-fn h3(inp: &[u8]) -> H3 {
-    let mut hasher = Shake128::default();
-    hasher.update(inp);
-    hasher.update(&[3u8]);
-    let mut reader = hasher.finalize_xof();
-
-    let mut out: H3 = Default::default();
-    reader.read(&mut out);
-    out
-}
 
 // Implementation of ConvertToVOLE as in the FAEST spec. It differs from the naive
 // algorithm by using only xor operations.

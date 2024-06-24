@@ -213,3 +213,63 @@ pub fn h1(inp: &[u8]) -> H1 {
     h1_internal(inp, &mut out);
     out
 }
+
+/// This is `$H_2^3$` in FAEST spec
+pub fn h2(inp: &[u8], out: &mut [u8]) {
+    let mut hasher = Shake128::default();
+    hasher.update(inp);
+    hasher.update(&[2u8]);
+    let mut reader = hasher.finalize_xof();
+    reader.read(out);
+}
+
+/// Length of 1st challenge in bytes.
+pub const CHALL1_LENGTH: usize = (SECURITY_PARAM * 6) / 8;
+/// First challenge
+pub type Chall1 = [u8; CHALL1_LENGTH];
+
+/// This is `$H_2^2$` in FAEST spec.
+pub fn h_chall1(inp: &[u8]) -> Chall1 {
+    let mut out: Chall1 = [0u8; CHALL1_LENGTH]; // NOTE: default does not work here
+    h2(inp, &mut out);
+    out
+}
+
+/// Length of 2nd challenge in bytes.
+pub const CHALL2_LENGTH: usize = (SECURITY_PARAM * 3 + 64) / 8;
+/// Second challenge
+pub type Chall2 = [u8; CHALL2_LENGTH];
+
+/// This is `$H_2^2$` in FAEST spec.
+pub fn h_chall2(inp: &[u8]) -> Chall2 {
+    let mut out: Chall2 = [0u8; CHALL2_LENGTH]; // NOTE: default does not work here
+    h2(inp, &mut out);
+    out
+}
+
+/// Length of 3rd challenge in bytes.
+pub const CHALL3_LENGTH: usize = SECURITY_PARAM / 8;
+/// Third challenge.
+pub type Chall3 = [u8; CHALL3_LENGTH];
+
+/// This is `$H_2^3$` in FAEST spec.
+pub fn h_chall3(inp: &[u8]) -> Chall3 {
+    let mut out = Chall3::default();
+    h2(inp, &mut out);
+    out
+}
+
+/// This type is the result of the [`h3`] hash function.
+pub type H3 = [u8; SECURITY_PARAM / 8 + 128 / 8];
+
+/// H3 function
+pub fn h3(inp: &[u8]) -> H3 {
+    let mut hasher = Shake128::default();
+    hasher.update(inp);
+    hasher.update(&[3u8]);
+    let mut reader = hasher.finalize_xof();
+
+    let mut out: H3 = Default::default();
+    reader.read(&mut out);
+    out
+}
