@@ -1,9 +1,8 @@
 #![allow(clippy::needless_range_loop)]
 use schmivitz::circuit::run_prover;
 use schmivitz::parameters::REPETITION_PARAM;
-use schmivitz::vole::convert_to_vole::{
-    bitwise_f128b_from_f8b, bools_to_u8, chal_dec, sign, verify,
-};
+use schmivitz::vole::commit_reconstruct::{bitwise_f128b_from_f8b, bools_to_u8, chal_dec};
+use schmivitz::vole::sign_verify::{sign, verify};
 use std::env;
 use std::path::PathBuf;
 use swanky_field::FiniteRing;

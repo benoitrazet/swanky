@@ -16,8 +16,11 @@ use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 
 // Exposing these modules for benchmarking at the moment.
 pub mod all_but_one_vc;
+pub mod commit_reconstruct;
+pub mod consistency_check;
 pub mod convert_to_vole;
 pub mod crypto_primitives;
+pub mod sign_verify;
 
 /// This defines the behavior needed to create and use non-interactive random VOLEs.
 ///
