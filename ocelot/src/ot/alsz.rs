@@ -15,7 +15,7 @@ use crate::{
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
-use swanky_aes_hash::{AES_HASH, AesHash};
+use swanky_aes_hash::AesHash;
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_bytearray_utils as scutils;
@@ -51,7 +51,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> FixedKeyInitializer for Sender<OT
             .collect::<Vec<AesRng>>();
         Ok(Self {
             _ot: PhantomData::<OT>,
-            hash: AES_HASH,
+            hash: AesHash::fixed_key().clone(),
             s,
             s_: Block::from(s_),
             rngs,
@@ -218,7 +218,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
             .collect::<Vec<(AesRng, AesRng)>>();
         Ok(Self {
             _ot: PhantomData::<OT>,
-            hash: AES_HASH,
+            hash: AesHash::fixed_key().clone(),
             rngs,
         })
     }

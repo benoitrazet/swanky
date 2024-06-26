@@ -7,7 +7,7 @@ use crate::Error;
 use keyed_arena::{AllocationKey, BorrowedAllocation, KeyedArena};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::convert::TryInto;
-use swanky_aes_hash::AES_HASH;
+use swanky_aes_hash::AesHash;
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
@@ -244,6 +244,7 @@ impl KosSender {
         mut incoming_bytes: &[u8],
         mut outgoing_bytes: &mut [u8],
     ) -> Result<KosSenderStage2, Error> {
+        let aes_hash = AesHash::fixed_key();
         let num_inputs = inputs.len();
         let m = if num_inputs % 8 != 0 {
             num_inputs + (8 - num_inputs % 8)
@@ -278,9 +279,9 @@ impl KosSender {
         for (j, (input, q)) in inputs.iter().zip(qs.chunks_exact(16)).enumerate() {
             let q: [u8; 16] = q.try_into().unwrap();
             let q = Block::from(q);
-            let y0 = AES_HASH.tccr_hash(Block::from(j as u128), q) ^ input.0;
+            let y0 = aes_hash.tccr_hash(Block::from(j as u128), q) ^ input.0;
             let q = q ^ Block::from(self.alsz.s);
-            let y1 = AES_HASH.tccr_hash(Block::from(j as u128), q) ^ input.1;
+            let y1 = aes_hash.tccr_hash(Block::from(j as u128), q) ^ input.1;
             outgoing_bytes[0..16].copy_from_slice(bytemuck::bytes_of(&y0));
             outgoing_bytes[16..32].copy_from_slice(bytemuck::bytes_of(&y1));
             outgoing_bytes = &mut outgoing_bytes[32..];
@@ -448,6 +449,7 @@ impl KosReceiverStage2 {
         mut incoming: &[u8],
         outgoing: &mut [u8],
     ) -> Result<BorrowedAllocation<'a, Block>, Error> {
+        let aes_hash = AesHash::fixed_key();
         let choices = arena.borrow_mut(self.choices);
         let ts = arena.borrow_mut(self.ts);
         let r_ = arena.borrow_mut(self.r_);
@@ -478,7 +480,7 @@ impl KosReceiverStage2 {
             // TODO: constant-time
             let y = if b { y1 } else { y0 };
 
-            y ^ AES_HASH.tccr_hash(Block::from(j as u128), Block::from(t))
+            y ^ aes_hash.tccr_hash(Block::from(j as u128), Block::from(t))
         });
         debug_assert!(incoming.is_empty());
         let mut x = Block::default();
