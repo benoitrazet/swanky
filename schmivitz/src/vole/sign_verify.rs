@@ -3,7 +3,7 @@
 use crate::parameters::SECURITY_PARAM;
 use crate::vole::all_but_one_vc::Pdecom;
 use crate::vole::commit_reconstruct::{
-    corrections_to_bytes, l_hat, vole_commit, vole_open, vole_recompose_q, vole_reconstruct,
+    apply_corrections_to_q, corrections_to_bytes, l_hat, vole_commit, vole_open, vole_reconstruct,
     Corrections,
 };
 use crate::vole::commit_reconstruct::{recompose_d, B};
@@ -18,8 +18,11 @@ use swanky_field_binary::F2;
 
 use super::consistency_check::HashConsistency;
 
-/// TODO
-pub fn compute_r_iv(sk: &[u8], mu: &H1) -> (Seed, IV) {
+/// Compute a seed and initialization vection from secret key and hash of statement to prove.
+///
+/// NOTE: `mu` is coming from the FAEST spec but expected to change when doing
+/// more general circuits/polynomials.
+pub fn compute_seed_iv(sk: &[u8], mu: &H1) -> (Seed, IV) {
     let mut h3_inp = vec![];
     h3_inp.extend(sk);
     h3_inp.extend(mu);
@@ -33,17 +36,17 @@ pub fn compute_r_iv(sk: &[u8], mu: &H1) -> (Seed, IV) {
     (r, iv)
 }
 
-/// TODO
-pub fn compute_chall_1(mu: &H1, h_com: &Com, corr: &Corrections, iv: &IV) -> Chall1 {
+/// Compute first challenge.
+pub fn compute_chall_1(mu: &H1, h_com: &Com, corrections: &Corrections, iv: &IV) -> Chall1 {
     let mut inp = vec![];
     inp.extend(mu);
     // TODO: add `h``
-    inp.extend(corrections_to_bytes(corr));
+    inp.extend(corrections_to_bytes(corrections));
     inp.extend(iv);
     h_chall1(&inp)
 }
 
-/// TODO
+/// Compute second challenge.
 pub fn compute_chall_2(chall1: &Chall1 /* TODO remaining parameters*/) -> Chall2 {
     let mut inp = vec![];
     inp.extend(chall1);
@@ -51,7 +54,7 @@ pub fn compute_chall_2(chall1: &Chall1 /* TODO remaining parameters*/) -> Chall2
     h_chall2(&inp)
 }
 
-/// TODO
+/// Compute third challenge.
 pub fn compute_chall_3(chall2: &Chall2 /* TODO remaining parameters*/) -> Chall3 {
     let mut inp = vec![];
     inp.extend(chall2);
@@ -80,7 +83,7 @@ fn bits_to_u8_many(bits: &[F2]) -> Vec<u8> {
     out
 }
 
-// convert the list of `F128b` values in column-major vectors of `F2``
+// convert a list of [`F128b`] values in column-major vectors of [`F2`].
 #[inline(never)]
 fn vec_f128b_to_f2(v: &[F128b]) -> Vec<Vec<F2>> {
     let how_many = v.len();
@@ -118,15 +121,15 @@ pub fn sign(
     let mu: H1 = h1(&pk); // DIFF: the FAEST spec also hashes an input `msg`, but we dont have this here
 
     // line 3
-    let (r, iv) = compute_r_iv(&sk, &mu);
+    let (r, iv) = compute_seed_iv(&sk, &mu);
 
     // lines 4-5
     let t = std::time::Instant::now();
-    let (h, decom, corr, u, v) = vole_commit(r, iv, l_hat(l));
+    let (h, decom, corrections, u, v) = vole_commit(r, iv, l_hat(l));
     log::info!("vole_commit running time: {:?}", t.elapsed());
 
     // lines 6
-    let chall1 = compute_chall_1(&mu, &h, &corr, &iv);
+    let chall1 = compute_chall_1(&mu, &h, &corrections, &iv);
 
     // line 7-8
 
@@ -184,7 +187,7 @@ pub fn sign(
     let pdecom = vole_open(&chall3, decom);
     log::info!("vole_open running time: {:?}", t.elapsed());
 
-    ((corr, u_tilda, pdecom, chall3, iv), u, v)
+    ((corrections, u_tilda, pdecom, chall3, iv), u, v)
 }
 
 /// Adpation of FAEST Verify function Fig. 8.3
@@ -199,7 +202,7 @@ pub fn verify(
     Chall3,     /* for debugging */
 ) {
     // line 1
-    let (corr, u_tilda, pdecom, chall3, iv) = sig;
+    let (corrections, u_tilda, pdecom, chall3, iv) = sig;
 
     // line 2
     let mu: H1 = h1(&pk);
@@ -210,14 +213,14 @@ pub fn verify(
     log::info!("vole_reconstruct running time: {:?}", t.elapsed());
 
     // line 5
-    let chall1 = compute_chall_1(&mu, &h, &corr, &iv);
+    let chall1 = compute_chall_1(&mu, &h, &corrections, &iv);
 
     // lines 6-14
     let t = std::time::Instant::now();
-    let q_f128b = vole_recompose_q(
+    let q_f128b = apply_corrections_to_q(
         q,
         &chall3,
-        corr,
+        corrections,
         l_hat(l), /* TODO: unsure about this value*/
     );
     log::info!("recompose_q running time: {:?}", t.elapsed());

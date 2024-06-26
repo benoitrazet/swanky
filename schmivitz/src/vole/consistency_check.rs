@@ -1,4 +1,7 @@
-/*! */
+/*!
+Implementation of algorithms related to consistency checks.
+ *
+*/
 #![allow(clippy::needless_range_loop)]
 use crate::parameters::SECURITY_PARAM;
 use crate::vole::commit_reconstruct::B;
@@ -44,7 +47,7 @@ fn to_field_f128_and_pad<I: Iterator<Item = F2>>(x: I, x_len: usize) -> Vec<F128
 /// Hash as produced by [`simply_vole_hash`].
 pub type HashConsistency = [F2; SECURITY_PARAM + B];
 
-/// TODO
+/// Function doing linear hashing of vector of boolean field elements.
 #[inline(never)]
 pub fn simply_vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
     seed: &[u8],

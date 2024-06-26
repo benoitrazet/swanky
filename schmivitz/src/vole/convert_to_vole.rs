@@ -1,13 +1,18 @@
-/*! */
+/*!
+Convert vector commitments to VOLEs.
+*/
 #![allow(clippy::needless_range_loop)]
 use crate::vole::crypto_primitives::{Seed, IV, PRG};
 use swanky_field::FiniteRing;
 use swanky_field_binary::F8b;
 use swanky_field_binary::F2;
 
-// Implementation of ConvertToVOLE as in the FAEST spec. It differs from the naive
-// algorithm by using only xor operations.
-/// TODO
+/// This function converts seeds to voles.
+///
+/// It can be used as is for the prover, but for the verifier it is a auxiliary function used by [`convert_to_vole_verifier`].
+/// This implementation corresponds to ConvertToVOLE as in the FAEST spec.
+/// It differs from the naive algorithm by using relying exclusively on xor
+/// operations on packed binary field values.
 pub fn convert_to_vole(seeds: &[Seed], iv: IV, l: usize, is_prover: bool) -> (Vec<F2>, Vec<F8b>) {
     // even if one seed can be bottom, it expects 256 of them.
     assert!(seeds.len() == 256);
@@ -101,6 +106,8 @@ pub fn convert_to_vole(seeds: &[Seed], iv: IV, l: usize, is_prover: bool) -> (Ve
 }
 
 #[cfg(test)]
+/// This function is the naive version of [`convert_to_vole`] that does not
+/// operate on packed boolean field values.
 fn convert_to_vole_prover_naive(seeds: &[Seed], iv: IV, l: usize) -> (Vec<F2>, Vec<F8b>) {
     assert!(seeds.len() == 256);
     let mut u_res = vec![F2::ZERO; l];
@@ -121,8 +128,9 @@ fn convert_to_vole_prover_naive(seeds: &[Seed], iv: IV, l: usize) -> (Vec<F2>, V
     (u_res, v_res)
 }
 
-// The verifier permutes the seeds and calls `convert_to_vole`.
-/// TODO
+/// This function is the verifier version of [`convert_to_vole`].
+///
+/// It permutes the [`seeds`] according to [`delta`] before calling [`convert_to_vole`].
 pub fn convert_to_vole_verifier(seeds: &[Seed], iv: IV, l: usize, delta: u8) -> Vec<F8b> {
     // let's permutate the seeds according to delta, with the permutation
     // i -> i xor delta

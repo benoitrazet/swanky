@@ -1,4 +1,7 @@
-/*! */
+/*!
+Implementation of algorithms to commit, open and reconstruct VOLEs.
+ *
+ */
 #![allow(clippy::needless_range_loop)]
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::all_but_one_vc::{commit, open, reconstruct, Decom, Pdecom};
@@ -16,7 +19,7 @@ use swanky_serialization::CanonicalSerialize;
 /// Parameter used for padding for the security of the consistency check
 pub const B: usize = 16;
 
-/// TODO
+/// Function mapping 8 booleans to [`u8`].
 pub fn bools_to_u8(d: &[bool]) -> u8 {
     debug_assert_eq!(d.len(), 8);
     let mut r: u8 = 0;
@@ -27,10 +30,13 @@ pub fn bools_to_u8(d: &[bool]) -> u8 {
     r
 }
 
-/// Type for corrections
+/// Type for corrections applied to voles.
 pub type Corrections = Vec<Vec<F2>>;
 
-/// Figure 5.4
+/// Function generating the voles with associated commitments.
+///
+/// This corresponds to Figure 5.4 of the FAEST spec.
+/// This function relies on multithreading to improve the time performance.
 #[inline(never)]
 pub fn vole_commit(
     r: IV,
@@ -106,7 +112,25 @@ pub fn vole_commit(
     )
 }
 
-/// steps 20-22 of Fig 8.2
+/// Function to decompose a challenge into boolean values.
+pub fn chal_dec(chal: &[u8], i: usize) -> Vec<bool> {
+    //let mut dec = vec![];
+
+    //assert!(dec.len() == REPETITION_PARAM);
+    //let mut r = vec![false; 8];
+    //r.copy_from_slice(&FIXED_CHALLENGE);
+    //r
+    let b = chal[i];
+    let mut r = vec![false; 8];
+    for i in 0..8 {
+        r[i] = ((b >> i) & 1) != 0;
+    }
+    r
+}
+
+/// Function to open voles and return the associated partial decommitment.
+///
+/// This function implements steps 20-22 of Fig 8.2
 pub fn vole_open(chal: &[u8], decom: Vec<Decom>) -> Vec<Pdecom> {
     let mut pdecom = Vec::with_capacity(REPETITION_PARAM);
     for i in 0..REPETITION_PARAM {
@@ -117,23 +141,9 @@ pub fn vole_open(chal: &[u8], decom: Vec<Decom>) -> Vec<Pdecom> {
     pdecom
 }
 
-/// TODO: remove pub
-pub fn chal_dec(buf: &[u8], i: usize) -> Vec<bool> {
-    //let mut dec = vec![];
-
-    //assert!(dec.len() == REPETITION_PARAM);
-    //let mut r = vec![false; 8];
-    //r.copy_from_slice(&FIXED_CHALLENGE);
-    //r
-    let b = buf[i];
-    let mut r = vec![false; 8];
-    for i in 0..8 {
-        r[i] = ((b >> i) & 1) != 0;
-    }
-    r
-}
-
-/// Figure 5.5 in FAEST spec v1.1
+/// Function to reconstruct voles from a challenge and partial decommitments.
+///
+/// This implements Figure 5.5 in FAEST spec v1.1
 #[inline(never)]
 pub fn vole_reconstruct(
     chal: &[u8], // bytes from fiat-shamir challenge
@@ -193,7 +203,7 @@ pub fn vole_reconstruct(
     )
 }
 
-/// TODO
+/// Function converting a slice of [`F8b`] values into a [`F128b`] value using the underlying bits.
 pub fn bitwise_f128b_from_f8b(v: &[F8b; REPETITION_PARAM]) -> F128b {
     let mut tmp: [u8; REPETITION_PARAM] = [0; REPETITION_PARAM];
     for (i, b) in v.iter().enumerate() {
@@ -202,12 +212,14 @@ pub fn bitwise_f128b_from_f8b(v: &[F8b; REPETITION_PARAM]) -> F128b {
     F128b::from_bytes(&tmp.into()).unwrap()
 }
 
-/// Lines 7-14 of Figure 8.3
+/// This function applies corrections to the verifier part of voles [`q`] using a challenge.
+///
+/// This function implements Lines 7-14 of Figure 8.3 of the FAEST spec.
 #[inline(never)]
-pub fn vole_recompose_q(
+pub fn apply_corrections_to_q(
     q: Vec<Vec<F8b>>,
     chall3: &Chall3,
-    corr: Corrections,
+    corrections: Corrections,
     how_many: usize,
 ) -> Vec<F128b> {
     // Q_0 is the same
@@ -225,7 +237,7 @@ pub fn vole_recompose_q(
         let delta = chal_dec(chall3, tau);
 
         for pos in 0..how_many {
-            let c_tau = corr[tau - 1][pos];
+            let c_tau = corrections[tau - 1][pos];
             let mut delta_times_corr = [F2::default(); 8];
             for (i, d) in delta.iter().enumerate() {
                 let corr = (if *d { F2::ONE } else { F2::ZERO }) * c_tau; // TODO: can optimize that
@@ -246,7 +258,9 @@ pub fn vole_recompose_q(
     q_128b
 }
 
-/// TODO
+/// This function combines a challenge with the hash of [`u`] to be used for the consistency check by the verifier.
+///
+/// This function implements lines 8-11 in Fig 8.3 in the FAEST spec.
 #[inline(never)]
 pub fn recompose_d(chall3: &Chall3, u_tilda: &[F2]) -> Vec<F2> {
     assert_eq!(u_tilda.len(), SECURITY_PARAM + B);
@@ -270,22 +284,23 @@ pub fn recompose_d(chall3: &Chall3, u_tilda: &[F2]) -> Vec<F2> {
     qs
 }
 
-/// TODO
+/// This function takes the size of the extended witness as input and returns
+/// that many more elements necessary based on the parameters of the protocol.
 pub fn l_hat(l: usize) -> usize {
     l + B + 2 * SECURITY_PARAM
 }
 
-/// TODO
+/// Convert corrections to associated bytes.
 #[inline(never)]
-pub fn corrections_to_bytes(corr: &Corrections) -> Vec<u8> {
+pub fn corrections_to_bytes(corrections: &Corrections) -> Vec<u8> {
     // Corrections are a vector containing tau vectors of long size
-    let how_many = corr[0].len();
-    let tau = corr.len();
+    let how_many = corrections[0].len();
+    let tau = corrections.len();
     let mut out = Vec::with_capacity((how_many * tau) / 8);
 
     let mut b = 0u8;
     let mut i = 0;
-    for c in corr.iter() {
+    for c in corrections.iter() {
         for bit in c.iter() {
             b |= if *bit == F2::ZERO { 0 } else { 1 << i };
             if i == 7 {
@@ -303,13 +318,13 @@ pub fn corrections_to_bytes(corr: &Corrections) -> Vec<u8> {
 #[cfg(test)]
 mod test {
     use super::{
-        bitwise_f128b_from_f8b, bools_to_u8, chal_dec, l_hat, vole_commit, vole_open,
-        vole_recompose_q, vole_reconstruct,
+        apply_corrections_to_q, bitwise_f128b_from_f8b, bools_to_u8, chal_dec, l_hat, vole_commit,
+        vole_open, vole_reconstruct,
     };
     use crate::parameters::REPETITION_PARAM;
     use crate::vole::crypto_primitives::{h1, H1};
     use crate::vole::sign_verify::{
-        compute_chall_1, compute_chall_2, compute_chall_3, compute_r_iv,
+        compute_chall_1, compute_chall_2, compute_chall_3, compute_seed_iv,
     };
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F128b, F8b};
@@ -322,7 +337,7 @@ mod test {
         let how_many = l_hat(1_000);
 
         let mu: H1 = h1(&pk);
-        let (r, iv) = compute_r_iv(&sk, &mu);
+        let (r, iv) = compute_seed_iv(&sk, &mu);
 
         let (h, decom, corr, u, v) = vole_commit(r, iv, how_many);
 
@@ -353,7 +368,7 @@ mod test {
         // Change Q_i with the corrections:
         // loop Q_i xor (\delta_0 c_i ... \delta_7 c_7)
         // Q = (Q_0 ... Q_{tau-1})
-        let q_f128b = vole_recompose_q(q, &chall3, corr, how_many);
+        let q_f128b = apply_corrections_to_q(q, &chall3, corr, how_many);
 
         // compute the big delta
         let mut big_delta = [F8b::default(); REPETITION_PARAM];
