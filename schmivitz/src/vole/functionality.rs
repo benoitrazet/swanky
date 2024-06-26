@@ -1,4 +1,6 @@
-/*! */
+/*!
+Implement high-level functionality for VOLE protocol.
+*/
 #![allow(clippy::needless_range_loop)]
 use crate::parameters::SECURITY_PARAM;
 use crate::vole::all_but_one_vc::Pdecom;

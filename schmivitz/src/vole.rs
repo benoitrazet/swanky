@@ -20,7 +20,7 @@ pub mod commit_reconstruct;
 pub mod consistency_check;
 pub mod convert_to_vole;
 pub mod crypto_primitives;
-pub mod sign_verify;
+pub mod functionality;
 
 /// This defines the behavior needed to create and use non-interactive random VOLEs.
 ///
