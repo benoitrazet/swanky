@@ -322,8 +322,7 @@ mod test {
         let how_many = l_hat(1_000);
 
         let mu: H1 = h1(&pk);
-        let rho = [0u8; 16];
-        let (r, iv) = compute_r_iv(&sk, &mu, &rho);
+        let (r, iv) = compute_r_iv(&sk, &mu);
 
         let (h, decom, corr, u, v) = vole_commit(r, iv, how_many);
 

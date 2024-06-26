@@ -19,11 +19,10 @@ use swanky_field_binary::F2;
 use super::consistency_check::HashConsistency;
 
 /// TODO
-pub fn compute_r_iv(sk: &[u8], mu: &H1, rho: &[u8]) -> (Seed, IV) {
+pub fn compute_r_iv(sk: &[u8], mu: &H1) -> (Seed, IV) {
     let mut h3_inp = vec![];
     h3_inp.extend(sk);
     h3_inp.extend(mu);
-    h3_inp.extend(rho);
     let r_iv: H3 = h3(&h3_inp);
 
     // splitting r_iv into r and iv
@@ -115,13 +114,11 @@ pub fn sign(
     Vec<F2>,       /* for debugging */
     Vec<Vec<F8b>>, /* for debugging */
 ) {
-    let rho = [0u8; 16];
-
     // line 2
     let mu: H1 = h1(&pk); // DIFF: the FAEST spec also hashes an input `msg`, but we dont have this here
 
     // line 3
-    let (r, iv) = compute_r_iv(&sk, &mu, &rho);
+    let (r, iv) = compute_r_iv(&sk, &mu);
 
     // lines 4-5
     let t = std::time::Instant::now();
