@@ -97,8 +97,6 @@
             #[derive(Clone)]
             enum Aes{{key_size}}KeySchedule {
                 Variable(aes::Aes{{key_size}}),
-                // TODO: if we care a lot about scalar performance, this could be quite slow.
-                Fixed,
             }
             impl From<aes::Aes{{key_size}}> for Aes{{key_size}}KeySchedule {
                 #[inline(always)]
@@ -110,15 +108,8 @@
                 type Target = aes::Aes{{key_size}};
                 #[inline(always)]
                 fn deref(&self) -> &Self::Target {
-                    lazy_static::lazy_static! {
-                        static ref FIXED_AES_{{key_size}}: aes::Aes{{key_size}} = {
-                            use aes::cipher::{KeyInit, generic_array::GenericArray};
-                            aes::Aes{{key_size}}::new(&GenericArray::from({{ fixed_aes_key(key_size) | list}}))
-                        };
-                    }
                     match self {
                          Self::Variable(aes) => aes,
-                         Self::Fixed => FIXED_AES_{{key_size}}.deref(),
                     }
                 }
             }
@@ -153,38 +144,6 @@
             type EncryptOnly = Aes{{key_size}}EncryptOnly;
             const BLOCK_COUNT_HINT: usize = 4;
         {% endif %}
-            {% if force_scalar_for_test %}pub(super){% endif %}
-            const FIXED_KEY: Self = Self {
-                key: {
-                    {% call(scalar, avx2) visit_backends(block=True) %}
-                    {% call scalar() %}
-                        Aes{{key_size}}KeySchedule::Fixed
-                    {% endcall %}
-                    {% call avx2() %}
-                        {% if encrypt_only %}
-                            [
-                                {% for rk in fixed_encrypt_round_keys %}
-                                    U32x4::from_array({{ rk | list }}),
-                                {% endfor %}
-                            ]
-                        {% else %}
-                            Aes{{key_size}}{{encrypt_only}}KeySchedule {
-                                encrypt_keys: [
-                                    {% for rk in fixed_encrypt_round_keys %}
-                                        U32x4::from_array({{ rk | list }}),
-                                    {% endfor %}
-                                ],
-                                decrypt_keys: [
-                                    {% for rk in fixed_decrypt_round_keys %}
-                                        U32x4::from_array({{ rk | list }}),
-                                    {% endfor %}
-                                ],
-                            }
-                        {% endif %}
-                    {% endcall %}
-                    {% endcall %}
-                },
-            };
 
             {% call(scalar, avx2) fn("new_with_key", {"key": key_ty}, returns="Self", doc_scalar_equiv=False, pub=force_scalar_for_test and "super") %}
             {% call scalar() %}

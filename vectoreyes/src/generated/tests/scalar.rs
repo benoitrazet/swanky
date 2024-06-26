@@ -13108,8 +13108,7 @@ impl U64x2 {
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
 enum Aes128KeySchedule {
-    Variable(aes::Aes128), // TODO: if we care a lot about scalar performance, this could be quite slow.
-    Fixed,
+    Variable(aes::Aes128),
 }
 impl From<aes::Aes128> for Aes128KeySchedule {
     #[inline(always)]
@@ -13121,10 +13120,8 @@ impl Deref for Aes128KeySchedule {
     type Target = aes::Aes128;
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
-        lazy_static::lazy_static! { static ref FIXED_AES_128: aes::Aes128 = { use aes::cipher::{KeyInit, generic_array::GenericArray}; aes::Aes128::new(&GenericArray::from([189, 36, 0, 193, 18, 65, 206, 51, 237, 61, 125, 199, 168, 86, 64, 37])) }; }
         match self {
             Self::Variable(aes) => aes,
-            Self::Fixed => FIXED_AES_128.deref(),
         }
     }
 }
@@ -13140,9 +13137,6 @@ impl std::fmt::Debug for Aes128 {
     }
 }
 impl Aes128 {
-    pub(super) const FIXED_KEY: Self = Self {
-        key: { Aes128KeySchedule::Fixed },
-    };
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_aesimc_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aesimc_si128)\n\n\n * `AESIMC xmm, xmm`\n </li>\n <li>\n\n [**`_mm_aeskeygenassist_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aeskeygenassist_si128)\n\n\n * `AESKEYGENASSIST xmm, xmm, imm8`\n </li>\n </ul>"]
     #[inline(always)]
     pub(super) fn new_with_key(key: U8x16) -> Self {
@@ -13205,9 +13199,6 @@ impl std::fmt::Debug for Aes128EncryptOnly {
     }
 }
 impl Aes128EncryptOnly {
-    pub(super) const FIXED_KEY: Self = Self {
-        key: { Aes128KeySchedule::Fixed },
-    };
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_aeskeygenassist_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aeskeygenassist_si128)\n\n\n * `AESKEYGENASSIST xmm, xmm, imm8`\n </li>\n </ul>"]
     #[inline(always)]
     pub(super) fn new_with_key(key: U8x16) -> Self {
@@ -13237,8 +13228,7 @@ impl Aes128EncryptOnly {
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
 enum Aes256KeySchedule {
-    Variable(aes::Aes256), // TODO: if we care a lot about scalar performance, this could be quite slow.
-    Fixed,
+    Variable(aes::Aes256),
 }
 impl From<aes::Aes256> for Aes256KeySchedule {
     #[inline(always)]
@@ -13250,10 +13240,8 @@ impl Deref for Aes256KeySchedule {
     type Target = aes::Aes256;
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
-        lazy_static::lazy_static! { static ref FIXED_AES_256: aes::Aes256 = { use aes::cipher::{KeyInit, generic_array::GenericArray}; aes::Aes256::new(&GenericArray::from([156, 63, 253, 81, 157, 52, 243, 206, 213, 76, 200, 118, 144, 71, 141, 110, 23, 19, 106, 206, 52, 29, 51, 6, 102, 136, 149, 40, 59, 234, 162, 127])) }; }
         match self {
             Self::Variable(aes) => aes,
-            Self::Fixed => FIXED_AES_256.deref(),
         }
     }
 }
@@ -13269,9 +13257,6 @@ impl std::fmt::Debug for Aes256 {
     }
 }
 impl Aes256 {
-    pub(super) const FIXED_KEY: Self = Self {
-        key: { Aes256KeySchedule::Fixed },
-    };
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_aesimc_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aesimc_si128)\n\n\n * `AESIMC xmm, xmm`\n </li>\n <li>\n\n [**`_mm_aeskeygenassist_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aeskeygenassist_si128)\n\n\n * `AESKEYGENASSIST xmm, xmm, imm8`\n </li>\n </ul>"]
     #[inline(always)]
     pub(super) fn new_with_key(key: U8x32) -> Self {
@@ -13334,9 +13319,6 @@ impl std::fmt::Debug for Aes256EncryptOnly {
     }
 }
 impl Aes256EncryptOnly {
-    pub(super) const FIXED_KEY: Self = Self {
-        key: { Aes256KeySchedule::Fixed },
-    };
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_aeskeygenassist_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aeskeygenassist_si128)\n\n\n * `AESKEYGENASSIST xmm, xmm, imm8`\n </li>\n </ul>"]
     #[inline(always)]
     pub(super) fn new_with_key(key: U8x32) -> Self {

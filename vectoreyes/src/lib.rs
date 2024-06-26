@@ -394,10 +394,6 @@ pub trait AesBlockCipher: 'static + Clone + Sync + Send {
     /// If you don't need to use Aes for decryption, it's faster to only perform key scheduling
     /// for encryption than for both encryption and decryption.
     type EncryptOnly: AesBlockCipher<Key = Self::Key> + From<Self>;
-
-    /// A pre-scheduled Aes block cipher with a compile-time constant key.
-    const FIXED_KEY: Self;
-
     /// Running `encrypt_many` with this many blocks will typically result in good
     /// performance.
     const BLOCK_COUNT_HINT: usize;
