@@ -16,6 +16,8 @@ use swanky_field_binary::F128b;
 use swanky_field_binary::F8b;
 use swanky_field_binary::F2;
 
+use super::consistency_check::HashConsistency;
+
 /// TODO
 pub fn compute_r_iv(sk: &[u8], mu: &H1, rho: &[u8]) -> (Seed, IV) {
     let mut h3_inp = vec![];
@@ -100,9 +102,7 @@ fn vec_f128b_to_f2(v: &[F128b]) -> Vec<Vec<F2>> {
     out
 }
 
-type U_HASH = Vec<F2>;
-
-type Signature = (Corrections, U_HASH, Vec<Pdecom>, Chall3, IV);
+type Signature = (Corrections, HashConsistency, Vec<Pdecom>, Chall3, IV);
 
 /// Adaptation of FAEST Sign function adapted from Fig. 8.2
 #[inline(never)]

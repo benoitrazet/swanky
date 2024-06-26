@@ -1,6 +1,7 @@
 /*! */
 #![allow(clippy::needless_range_loop)]
 use crate::parameters::SECURITY_PARAM;
+use crate::vole::commit_reconstruct::B;
 use crate::vole::crypto_primitives::CHALL1_LENGTH;
 use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::F128b;
@@ -40,6 +41,9 @@ fn to_field_f128_and_pad<I: Iterator<Item = F2>>(x: I, x_len: usize) -> Vec<F128
     out
 }
 
+/// Hash as produced by [`simply_vole_hash`].
+pub type HashConsistency = [F2; SECURITY_PARAM + B];
+
 /// TODO
 #[inline(never)]
 pub fn simply_vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
@@ -48,7 +52,7 @@ pub fn simply_vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
     x0_len: usize,
     x1: I2,
     x1_len: usize,
-) -> Vec<F2> {
+) -> HashConsistency {
     assert_eq!(seed.len(), CHALL1_LENGTH);
     let byte_len: usize = 128 / 8;
     let mut tmp = [u8::default(); 128 / 8];
@@ -93,16 +97,24 @@ pub fn simply_vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
     let h2_bits = h2.bit_decomposition();
     let h3_bits = h3.bit_decomposition();
 
-    let mut all_bits = vec![];
+    let mut all_bits = Vec::with_capacity(SECURITY_PARAM + B);
     all_bits.extend_from_slice(h2_bits.as_slice());
     all_bits.extend_from_slice(h3_bits.as_slice());
 
     all_bits.truncate(x1_len);
-    all_bits
-        .iter()
-        .zip(x1)
-        .map(|(b1, b2)| (if *b1 { F2::ONE } else { F2::ZERO }) + b2)
-        .collect()
+    assert_eq!(all_bits.len(), SECURITY_PARAM + B);
+
+    let mut out = [F2::ZERO; SECURITY_PARAM + B];
+
+    out.copy_from_slice(
+        all_bits
+            .iter()
+            .zip(x1)
+            .map(|(b1, b2)| (if *b1 { F2::ONE } else { F2::ZERO }) + b2)
+            .collect::<Vec<_>>()
+            .as_slice(),
+    );
+    out
 }
 
 /// TODO
