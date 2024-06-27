@@ -16,7 +16,6 @@
 
 #![deny(missing_docs)]
 
-pub mod circuit;
 pub mod parameters;
 pub mod proof;
 pub mod vole;

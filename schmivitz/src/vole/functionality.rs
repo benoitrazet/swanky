@@ -433,7 +433,7 @@ mod test {
     fn test_sign_verify() {
         let how_many = 100;
         let statement_sig = vec![1u8];
-        let vole_creation = create_voleith_prover(statement_sig.clone(), how_many);
+        let vole_creation = create_voleith_prover(&statement_sig, how_many);
         let VoleithProver {
             iv: _,
             decom: __m128i,
@@ -463,7 +463,7 @@ mod test {
             chall3,
             delta,
             a_tilda,
-        } = create_voleith_verifier(statement_sig, sig, how_many);
+        } = create_voleith_verifier(&statement_sig, sig, how_many);
         let b = verify(chall2, chall3, a_tilda, dummy_b_tilda);
 
         let mut vs = Vec::with_capacity(how_many);

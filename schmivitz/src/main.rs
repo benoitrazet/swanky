@@ -1,5 +1,4 @@
 #![allow(clippy::needless_range_loop)]
-use schmivitz::circuit::run_prover;
 use schmivitz::parameters::REPETITION_PARAM;
 use schmivitz::vole::commit_reconstruct::bitwise_f128b_from_f8b;
 use schmivitz::vole::functionality::{
@@ -7,15 +6,14 @@ use schmivitz::vole::functionality::{
     VoleithVerifier,
 };
 use std::env;
-use std::path::PathBuf;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F128b, F8b};
 
-fn test1() {
+fn test_vole() {
     let how_many = 10_000_000;
     let t = std::time::Instant::now();
     let statement_sig = vec![1u8];
-    let vole_creation = create_voleith_prover(statement_sig.clone(), how_many);
+    let vole_creation = create_voleith_prover(&statement_sig, how_many);
     let VoleithProver {
         iv: _,
         decom: _,
@@ -45,7 +43,7 @@ fn test1() {
         chall3,
         delta,
         a_tilda,
-    } = create_voleith_verifier(statement_sig, sig, how_many);
+    } = create_voleith_verifier(&statement_sig, sig, how_many);
     let b = verify(chall2, chall3, a_tilda, dummy_b_tilda);
 
     let mut vs = Vec::with_capacity(how_many);
@@ -72,31 +70,6 @@ fn test1() {
     assert!(b);
 }
 
-#[allow(dead_code)]
-fn run_circuit() {
-    let args: Vec<String> = env::args().collect();
-
-    // Check that two arguments are provided
-    if args.len() != 3 {
-        eprintln!("Usage: {} <inputs> <relation>", args[0]);
-        std::process::exit(1);
-    }
-
-    // Extract the paths provided as arguments
-    let inputs = &args[1];
-    let relation = &args[2];
-
-    // Transform the paths into PathBuf
-    let path_inputs = PathBuf::from(inputs);
-    let path_relation = PathBuf::from(relation);
-
-    // Display the transformed paths
-    println!("Path inputs: {:?}", path_inputs);
-    println!("Path relation: {:?}", path_relation);
-
-    run_prover(path_inputs, path_relation).unwrap();
-}
-
 fn main() {
     // if log-level `RUST_LOG` not already set, then set to info
     match env::var("RUST_LOG") {
@@ -106,5 +79,5 @@ fn main() {
 
     pretty_env_logger::init_timed();
     //grit()
-    test1();
+    test_vole();
 }
