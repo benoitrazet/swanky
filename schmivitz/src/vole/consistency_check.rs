@@ -292,23 +292,23 @@ mod test {
 
         let v0 = simply_vole_hash(
             &seeds,
-            x0.clone().into_iter().take(BOUND),
+            x0.into_iter().take(BOUND),
             BOUND,
-            x0.clone().into_iter().skip(BOUND),
+            x0.into_iter().skip(BOUND),
             LAST,
         );
         let v1 = simply_vole_hash(
             &seeds,
-            x1.clone().into_iter().take(BOUND),
+            x1.into_iter().take(BOUND),
             BOUND,
-            x1.clone().into_iter().skip(BOUND),
+            x1.into_iter().skip(BOUND),
             LAST,
         );
         let v2 = simply_vole_hash(
             &seeds,
-            x2.clone().into_iter().take(BOUND),
+            x2.into_iter().take(BOUND),
             BOUND,
-            x2.clone().into_iter().skip(BOUND),
+            x2.into_iter().skip(BOUND),
             LAST,
         );
         for ((a, b), c) in v0.iter().zip(v1.iter()).zip(v2.iter()) {
@@ -321,7 +321,7 @@ mod test {
         let v: Vec<Vec<F8b>> = vec![vec![2u8.into(), 128u8.into()], vec![0u8.into(), 5.into()]];
         let indices = [2, 2 * 8 - 1, 2 * 8 + 1, 2 * 8 + 5];
 
-        for (i, b) in decompose_bits(&v).into_iter().enumerate() {
+        for (i, b) in decompose_bits(&v).enumerate() {
             if i == indices[0] || i == indices[1] || i == indices[2] || i == indices[3] {
                 assert_eq!(b, F2::ONE);
             } else {
