@@ -2,7 +2,7 @@
 Implement high-level functionality for VOLE protocol.
 */
 #![allow(clippy::needless_range_loop)]
-use crate::parameters::SECURITY_PARAM;
+use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::all_but_one_vc::Pdecom;
 use crate::vole::commit_reconstruct::{
     apply_corrections_to_q, corrections_to_bytes, l_hat, vole_commit, vole_open, vole_reconstruct,
@@ -11,14 +11,22 @@ use crate::vole::commit_reconstruct::{
 use crate::vole::commit_reconstruct::{recompose_d, B};
 use crate::vole::consistency_check::{decompose_bits, simply_vole_hash};
 use crate::vole::crypto_primitives::{
-    h1, h3, h_chall1, h_chall2, h_chall3, Chall1, Chall2, Chall3, Com, Seed, H1, H3, IV,
+    h1, h3, h_chall1, h_chall3, Chall1, Chall2, Chall3, Com, Seed, H1, H3, IV,
+};
+use sha3::{
+    digest::{ExtendableOutput, Update, XofReader},
+    Shake128,
 };
 use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::F128b;
 use swanky_field_binary::F8b;
 use swanky_field_binary::F2;
+use swanky_serialization::CanonicalSerialize;
 
-use super::consistency_check::HashConsistency;
+use super::all_but_one_vc::Decom;
+use super::commit_reconstruct::{bitwise_f128b_from_f8b, bools_to_u8, chal_dec};
+use super::consistency_check::{hash_consistency_to_bytes, HashConsistency};
+use super::crypto_primitives::CHALL2_LENGTH;
 
 /// Compute a seed and initialization vection from secret key and hash of statement to prove.
 ///
@@ -38,29 +46,57 @@ pub fn compute_seed_iv(sk: &[u8], mu: &H1) -> (Seed, IV) {
     (r, iv)
 }
 
-/// Compute first challenge.
+/// Compute first challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
 pub fn compute_chall_1(mu: &H1, h_com: &Com, corrections: &Corrections, iv: &IV) -> Chall1 {
     let mut inp = vec![];
     inp.extend(mu);
     // TODO: add `h``
+    inp.extend(h_com);
     inp.extend(corrections_to_bytes(corrections));
     inp.extend(iv);
     h_chall1(&inp)
 }
 
-/// Compute second challenge.
-pub fn compute_chall_2(chall1: &Chall1 /* TODO remaining parameters*/) -> Chall2 {
-    let mut inp = vec![];
-    inp.extend(chall1);
+/// Compute second challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
+pub fn compute_chall_2(
+    chall1: &Chall1,
+    u_tilda: HashConsistency,
+    h_v: H1,
+    masked_witnesses: &[F2],
+) -> Chall2 {
+    let mut out: Chall2 = [0u8; CHALL2_LENGTH];
+
     // TODO: add more
-    h_chall2(&inp)
+    let mut hasher = Shake128::default();
+    hasher.update(chall1);
+    hasher.update(hash_consistency_to_bytes(&u_tilda).as_slice());
+    hasher.update(&h_v);
+
+    // pack the binary field values into bytes
+    for chunk in masked_witnesses.chunks(8) {
+        let mut byte = 0u8;
+        for (i, &b) in chunk.iter().enumerate() {
+            if b == F2::ONE {
+                byte |= 1 << i;
+            }
+        }
+        // TODO: for performance, accumulate the bytes in say 64 and hash that.
+        hasher.update(&[byte]);
+    }
+
+    hasher.update(&[2u8]);
+    let mut reader = hasher.finalize_xof();
+    reader.read(&mut out);
+    out
 }
 
-/// Compute third challenge.
-pub fn compute_chall_3(chall2: &Chall2 /* TODO remaining parameters*/) -> Chall3 {
-    let mut inp = vec![];
+/// Compute third challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
+pub fn compute_chall_3(chall2: &Chall2, a_tilda: F128b, b_tilda: F128b) -> Chall3 {
+    let mut inp: Vec<u8> = vec![];
     inp.extend(chall2);
-    // TODO: add more
+    inp.extend(a_tilda.to_bytes().as_slice());
+    inp.extend(b_tilda.to_bytes().as_slice());
+
     h_chall3(&inp)
 }
 
@@ -106,24 +142,48 @@ fn vec_f128b_to_f2(v: &[F128b]) -> Vec<Vec<F2>> {
     out
 }
 
-type Signature = (Corrections, HashConsistency, Vec<Pdecom>, Chall3, IV);
+/// Structure of voleith created by the functionality on the prover side.
+#[derive(Clone)]
+pub struct VoleithProver {
+    /// initial vector
+    pub iv: IV,
+    /// Decommitment
+    pub decom: Vec<Decom>,
+    /// Corrections
+    pub corrections: Corrections,
+    /// u
+    pub u: Vec<F2>,
+    /// v
+    pub v: Vec<Vec<F8b>>,
+    /// First challenge
+    pub chall1: Chall1,
+    /// consistency hash of u
+    pub u_tilda: HashConsistency,
+    /// hash of the consistency hash of V        
+    pub h_v: H1,
+}
 
-/// Adaptation of FAEST Sign function adapted from Fig. 8.2
+/// Proof computed by the prover
+pub type Proof = (
+    Corrections,
+    HashConsistency,
+    Vec<F2>, // d
+    F128b,   // a^\tilda
+    Vec<Pdecom>,
+    Chall3,
+    IV,
+);
+
+/// Create VOLEith given a statement signature on the prover side.
+///
+/// Adapted from parts of FAEST.sign from Fig. 8.2
 #[inline(never)]
-pub fn sign(
-    sk: Vec<u8>,
-    pk: Vec<u8>,
-    l: usize,
-) -> (
-    Signature,
-    Vec<F2>,       /* for debugging */
-    Vec<Vec<F8b>>, /* for debugging */
-) {
+pub fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
     // line 2
-    let mu: H1 = h1(&pk); // DIFF: the FAEST spec also hashes an input `msg`, but we dont have this here
+    let mu: H1 = h1(statement_sig); // Hash the signature of the circuit+instance the prover/verifier agree to execute.
 
     // line 3
-    let (r, iv) = compute_seed_iv(&sk, &mu);
+    let (r, iv) = compute_seed_iv(&[], &mu); // NOTE: there is no secret key here, it was only relevant to FAEST.
 
     // lines 4-5
     let t = std::time::Instant::now();
@@ -175,13 +235,44 @@ pub fn sign(
     let h_v = h1(&bits_to_u8_many(&v_tilda));
     println!("h_v {:?}", h_v);
 
-    // TODO: lines 11-12
+    VoleithProver {
+        iv,
+        decom,
+        corrections,
+        u,
+        v,
+        chall1,
+        u_tilda,
+        h_v,
+    }
+}
 
+/// Implements get for the functionality on the prover side
+pub fn prove(
+    r: VoleithProver,
+    masked_witnesses: Vec<F2>,
+    chall2: Chall2,
+    a_tilda: F128b,
+    b_tilda: F128b,
+) -> Proof {
+    let VoleithProver {
+        iv,
+        decom,
+        corrections,
+        u: _,
+        v: _,
+        chall1: _,
+        u_tilda,
+        h_v: _,
+    } = r;
+
+    // OBSOLETE:
+    // TODO: lines 11-12
     // line 13
-    let chall2 = compute_chall_2(&chall1 /*TODO: add more */);
+    //let chall2 = compute_chall_2(&chall1 /*TODO: add more */);
 
     // Line 18
-    let chall3 = compute_chall_3(&chall2 /*TODO: add more */);
+    let chall3 = compute_chall_3(&chall2, a_tilda, b_tilda);
     println!("P chall3:{:?}", chall3);
     // lines 20-22
 
@@ -189,25 +280,56 @@ pub fn sign(
     let pdecom = vole_open(&chall3, decom);
     log::info!("vole_open running time: {:?}", t.elapsed());
 
-    ((corrections, u_tilda, pdecom, chall3, iv), u, v)
+    (
+        corrections,
+        u_tilda,
+        masked_witnesses,
+        a_tilda,
+        pdecom,
+        chall3,
+        iv,
+    )
 }
 
-/// Adpation of FAEST Verify function Fig. 8.3
+/// Compute the secret key delta from a challenge
+fn compute_secret_key(chall3: &Chall3) -> F128b {
+    // compute the big delta
+    let mut big_delta = [F8b::default(); REPETITION_PARAM];
+    for tau in 0..REPETITION_PARAM {
+        let delta_i = chal_dec(chall3, tau);
+        let delta_f8b: F8b = bools_to_u8(&delta_i).into();
+        big_delta[tau] = delta_f8b;
+    }
+    bitwise_f128b_from_f8b(&big_delta)
+}
+
+/// Structure of VOLEith created by the functionality on the verifier side.
+#[derive(Clone)]
+pub struct VoleithVerifier {
+    /// masked values
+    pub d: Vec<F2>,
+    /// correlations on verifier side
+    pub q: Vec<F128b>,
+    /// Second challenge
+    pub chall2: Chall2,
+    /// Third challenge
+    pub chall3: Chall3,
+    /// secret key
+    pub delta: F128b,
+    /// abracadabra
+    pub a_tilda: F128b,
+}
+
+/// Create VOLEith given a statement signature and a proof, on the verifier side.
+///
+/// Adapted from parts of FAEST.verify from Fig. 8.2
 #[inline(never)]
-pub fn verify(
-    pk: Vec<u8>,
-    sig: Signature,
-    l: usize,
-) -> (
-    bool,
-    Vec<F128b>, /* for debugging */
-    Chall3,     /* for debugging */
-) {
+pub fn create_voleith_verifier(statement_sig: &[u8], proof: Proof, l: usize) -> VoleithVerifier {
     // line 1
-    let (corrections, u_tilda, pdecom, chall3, iv) = sig;
+    let (corrections, u_tilda, d, a_tilda, pdecom, chall3, iv) = proof;
 
     // line 2
-    let mu: H1 = h1(&pk);
+    let mu: H1 = h1(statement_sig);
 
     // lines 3-4
     let t = std::time::Instant::now();
@@ -270,19 +392,38 @@ pub fn verify(
     // TODO: line 16
 
     // line 17
-    let chall2 = compute_chall_2(&chall1 /*TODO: add more */);
+    let chall2 = compute_chall_2(&chall1, u_tilda, h_v, &d);
 
+    // compute the secret key
+    let delta = compute_secret_key(&chall3);
+
+    VoleithVerifier {
+        d,
+        q: q_f128b,
+        chall2,
+        chall3,
+        delta,
+        a_tilda,
+    }
+}
+
+/// Adpation of FAEST Verify function Fig. 8.3
+pub fn verify(chall2: Chall2, chall3: Chall3, a_tilda: F128b, b_tilda: F128b) -> bool {
     // Line 20
-    let chall3_prime = compute_chall_3(&chall2 /*TODO: add more */);
+    let chall3_prime = compute_chall_3(&chall2, a_tilda, b_tilda);
 
-    (chall3_prime == chall3, q_f128b, chall3)
+    chall3_prime == chall3
 }
 
 #[cfg(test)]
 mod test {
-    use super::{sign, vec_f128b_to_f2, verify};
+    use super::{
+        create_voleith_prover, create_voleith_verifier, prove, vec_f128b_to_f2, verify,
+        VoleithProver, VoleithVerifier,
+    };
     use crate::parameters::REPETITION_PARAM;
-    use crate::vole::commit_reconstruct::{bitwise_f128b_from_f8b, bools_to_u8, chal_dec};
+    use crate::vole::commit_reconstruct::bitwise_f128b_from_f8b;
+    use crate::vole::functionality::compute_chall_2;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
     use swanky_field_binary::{F128b, F8b};
@@ -291,10 +432,39 @@ mod test {
     #[test]
     fn test_sign_verify() {
         let how_many = 100;
-        let sk = vec![1u8];
-        let pk = vec![1u8];
-        let (sig, u, v) = sign(sk, pk.clone(), how_many);
-        let (b, q, chall3) = verify(pk, sig, how_many);
+        let statement_sig = vec![1u8];
+        let vole_creation = create_voleith_prover(statement_sig.clone(), how_many);
+        let VoleithProver {
+            iv: _,
+            decom: __m128i,
+            corrections: _,
+            u,
+            v,
+            chall1,
+            u_tilda,
+            h_v,
+        } = vole_creation.clone();
+        let dummy_masked = vec![];
+        let dummy_chall2 = compute_chall_2(&chall1, u_tilda, h_v, &dummy_masked);
+        let dummy_a_tilda = F128b::ZERO;
+        let dummy_b_tilda = F128b::ZERO;
+        let sig = prove(
+            vole_creation,
+            dummy_masked,
+            dummy_chall2,
+            dummy_a_tilda,
+            dummy_b_tilda,
+        );
+
+        let VoleithVerifier {
+            d: _,
+            q,
+            chall2,
+            chall3,
+            delta,
+            a_tilda,
+        } = create_voleith_verifier(statement_sig, sig, how_many);
+        let b = verify(chall2, chall3, a_tilda, dummy_b_tilda);
 
         let mut vs = Vec::with_capacity(how_many);
         for _ in 0..how_many {
@@ -312,17 +482,8 @@ mod test {
             v_f128b.push(val);
         }
 
-        // compute the big delta
-        let mut big_delta = [F8b::default(); REPETITION_PARAM];
-        for tau in 0..REPETITION_PARAM {
-            let delta_i = chal_dec(&chall3, tau);
-            let delta_f8b: F8b = bools_to_u8(&delta_i).into();
-            big_delta[tau] = delta_f8b;
-        }
-        let big_delta_f128b = bitwise_f128b_from_f8b(&big_delta);
-
         for pos in 0..how_many {
-            assert_eq!(v_f128b[pos] + u[pos] * big_delta_f128b, q[pos]);
+            assert_eq!(v_f128b[pos] + u[pos] * delta, q[pos]);
         }
 
         assert!(b);

@@ -47,6 +47,21 @@ fn to_field_f128_and_pad<I: Iterator<Item = F2>>(x: I, x_len: usize) -> Vec<F128
 /// Hash as produced by [`simply_vole_hash`].
 pub type HashConsistency = [F2; SECURITY_PARAM + B];
 
+/// Convert a consistency hash to a vector of bytes
+pub fn hash_consistency_to_bytes(h: &HashConsistency) -> Vec<u8> {
+    let mut out = vec![];
+    for chunk in h.chunks(8) {
+        let mut byte = 0u8;
+        for (i, &b) in chunk.iter().enumerate() {
+            if b == F2::ONE {
+                byte |= 1 << i;
+            }
+        }
+        out.push(byte);
+    }
+    out
+}
+
 /// Function doing linear hashing of vector of boolean field elements.
 #[inline(never)]
 pub fn simply_vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(

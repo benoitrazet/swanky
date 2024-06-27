@@ -323,9 +323,7 @@ mod test {
     };
     use crate::parameters::REPETITION_PARAM;
     use crate::vole::crypto_primitives::{h1, H1};
-    use crate::vole::sign_verify::{
-        compute_chall_1, compute_chall_2, compute_chall_3, compute_seed_iv,
-    };
+    use crate::vole::functionality::compute_seed_iv;
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F128b, F8b};
 
@@ -339,11 +337,9 @@ mod test {
         let mu: H1 = h1(&pk);
         let (r, iv) = compute_seed_iv(&sk, &mu);
 
-        let (h, decom, corr, u, v) = vole_commit(r, iv, how_many);
+        let (_h, decom, corr, u, v) = vole_commit(r, iv, how_many);
 
-        let chall1 = compute_chall_1(&mu, &h, &corr, &iv);
-        let chall2 = compute_chall_2(&chall1 /*TODO: add more */);
-        let chall3 = compute_chall_3(&chall2 /*TODO: add more */);
+        let chall3 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
         let pdecom = vole_open(&chall3, decom);
 
@@ -363,7 +359,7 @@ mod test {
             v_f128b.push(val);
         }
 
-        let (h_ver, q) = vole_reconstruct(&chall3, pdecom, iv, how_many);
+        let (_h_ver, q) = vole_reconstruct(&chall3, pdecom, iv, how_many);
 
         // Change Q_i with the corrections:
         // loop Q_i xor (\delta_0 c_i ... \delta_7 c_7)

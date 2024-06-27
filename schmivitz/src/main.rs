@@ -1,8 +1,11 @@
 #![allow(clippy::needless_range_loop)]
 use schmivitz::circuit::run_prover;
 use schmivitz::parameters::REPETITION_PARAM;
-use schmivitz::vole::commit_reconstruct::{bitwise_f128b_from_f8b, bools_to_u8, chal_dec};
-use schmivitz::vole::sign_verify::{sign, verify};
+use schmivitz::vole::commit_reconstruct::bitwise_f128b_from_f8b;
+use schmivitz::vole::functionality::{
+    compute_chall_2, create_voleith_prover, create_voleith_verifier, prove, verify, VoleithProver,
+    VoleithVerifier,
+};
 use std::env;
 use std::path::PathBuf;
 use swanky_field::FiniteRing;
@@ -11,10 +14,39 @@ use swanky_field_binary::{F128b, F8b};
 fn test1() {
     let how_many = 10_000_000;
     let t = std::time::Instant::now();
-    let sk = vec![1u8];
-    let pk = vec![1u8];
-    let (sig, u, v) = sign(sk, pk.clone(), how_many);
-    let (b, q, chall3) = verify(pk, sig, how_many);
+    let statement_sig = vec![1u8];
+    let vole_creation = create_voleith_prover(statement_sig.clone(), how_many);
+    let VoleithProver {
+        iv: _,
+        decom: _,
+        corrections: _,
+        u,
+        v,
+        chall1,
+        u_tilda,
+        h_v,
+    } = vole_creation.clone();
+    let dummy_masked = vec![];
+    let dummy_chall2 = compute_chall_2(&chall1, u_tilda, h_v, &dummy_masked);
+    let dummy_a_tilda = F128b::ZERO;
+    let dummy_b_tilda = F128b::ZERO;
+    let sig = prove(
+        vole_creation,
+        dummy_masked,
+        dummy_chall2,
+        dummy_a_tilda,
+        dummy_b_tilda,
+    );
+
+    let VoleithVerifier {
+        d: _,
+        q,
+        chall2,
+        chall3,
+        delta,
+        a_tilda,
+    } = create_voleith_verifier(statement_sig, sig, how_many);
+    let b = verify(chall2, chall3, a_tilda, dummy_b_tilda);
 
     let mut vs = Vec::with_capacity(how_many);
     for _ in 0..how_many {
@@ -32,17 +64,8 @@ fn test1() {
         v_f128b.push(val);
     }
 
-    // compute the big delta
-    let mut big_delta = [F8b::default(); REPETITION_PARAM];
-    for tau in 0..REPETITION_PARAM {
-        let delta_i = chal_dec(&chall3, tau);
-        let delta_f8b: F8b = bools_to_u8(&delta_i).into();
-        big_delta[tau] = delta_f8b;
-    }
-    let big_delta_f128b = bitwise_f128b_from_f8b(&big_delta);
-
     for pos in 0..how_many {
-        assert_eq!(v_f128b[pos] + u[pos] * big_delta_f128b, q[pos]);
+        assert_eq!(v_f128b[pos] + u[pos] * delta, q[pos]);
     }
 
     println!("VOLE-it-Head completed in: {:?}", t.elapsed());

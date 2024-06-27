@@ -45,6 +45,7 @@ fn h1_on_coms(coms: &[Com]) -> H1 {
 /// in the sequence of nodes at this depth. The mapping between the tree indexing
 /// and the underlying vector indexing follows a breadth-first traversal.
 /// That is the element at depth `d` and position `p`, corresponds to the vector index $`2^d + p-1`$.
+#[derive(Clone)]
 pub struct Keys(Vec<Key>);
 
 impl Keys {
