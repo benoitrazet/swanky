@@ -344,13 +344,13 @@ pub(crate) fn create_voleith_verifier(
     log::info!("vole_reconstruct running time: {:?}", t.elapsed());
 
     // line 5
-    let chall1 = compute_chall_1(&mu, &h, &corrections, &iv);
+    let chall1 = compute_chall_1(&mu, &h, corrections, iv);
 
     // lines 6-14
     let t = std::time::Instant::now();
     let q_f128b = apply_corrections_to_q(
         q,
-        &chall3,
+        chall3,
         corrections,
         l_hat(l), /* TODO: unsure about this value*/
     );
@@ -379,7 +379,7 @@ pub(crate) fn create_voleith_verifier(
     //println!("q_tilda {:?}", q_tilda);
 
     let t = std::time::Instant::now();
-    let big_d = recompose_d(&chall3, u_tilda);
+    let big_d = recompose_d(chall3, u_tilda);
     log::info!("recompose_d running time: {:?}", t.elapsed());
     //let big_d_bits = f128b_to_f2(&big_d);
 
@@ -399,10 +399,10 @@ pub(crate) fn create_voleith_verifier(
     // TODO: line 16
 
     // line 17
-    let chall2 = compute_chall_2(&chall1, *u_tilda, h_v, &d);
+    let chall2 = compute_chall_2(&chall1, *u_tilda, h_v, d);
 
     // compute the secret key
-    let delta = compute_secret_key(&chall3);
+    let delta = compute_secret_key(chall3);
 
     VoleithVerifier {
         q: q_f128b,
