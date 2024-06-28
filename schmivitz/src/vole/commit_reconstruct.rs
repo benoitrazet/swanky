@@ -147,7 +147,7 @@ pub(crate) fn vole_open(chal: &[u8], decom: Vec<Decom>) -> Vec<Pdecom> {
 #[inline(never)]
 pub(crate) fn vole_reconstruct(
     chal: &[u8], // bytes from fiat-shamir challenge
-    pdecom: Vec<Pdecom>,
+    pdecom: &[Pdecom],
     iv: IV,
     l: usize,
 ) -> (Com, Vec<Vec<F8b>>) {
@@ -219,7 +219,7 @@ pub(crate) fn bitwise_f128b_from_f8b(v: &[F8b; REPETITION_PARAM]) -> F128b {
 pub(crate) fn apply_corrections_to_q(
     q: Vec<Vec<F8b>>,
     chall3: &Chall3,
-    corrections: Corrections,
+    corrections: &Corrections,
     how_many: usize,
 ) -> Vec<F128b> {
     // Q_0 is the same
@@ -337,7 +337,7 @@ mod test {
         let mu: H1 = h1(&pk);
         let (r, iv) = compute_seed_iv(&sk, &mu);
 
-        let (_h, decom, corr, u, v) = vole_commit(r, iv, how_many);
+        let (_h, decom, corrections, u, v) = vole_commit(r, iv, how_many);
 
         let chall3 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
@@ -359,12 +359,12 @@ mod test {
             v_f128b.push(val);
         }
 
-        let (_h_ver, q) = vole_reconstruct(&chall3, pdecom, iv, how_many);
+        let (_h_ver, q) = vole_reconstruct(&chall3, &pdecom, iv, how_many);
 
         // Change Q_i with the corrections:
         // loop Q_i xor (\delta_0 c_i ... \delta_7 c_7)
         // Q = (Q_0 ... Q_{tau-1})
-        let q_f128b = apply_corrections_to_q(q, &chall3, corr, how_many);
+        let q_f128b = apply_corrections_to_q(q, &chall3, &corrections, how_many);
 
         // compute the big delta
         let mut big_delta = [F8b::default(); REPETITION_PARAM];

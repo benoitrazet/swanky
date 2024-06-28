@@ -165,15 +165,15 @@ pub(crate) struct VoleithProver {
 }
 
 /// Proof computed by the prover
-pub(crate) type Proof = (
-    Corrections,
-    HashConsistency,
-    Vec<F2>, // d
-    F128b,   // a^\tilda
-    Vec<Pdecom>,
-    Chall3,
-    IV,
-);
+pub(crate) struct Proof {
+    corrections: Corrections,
+    u_tilda: HashConsistency,
+    d: Vec<F2>,     // masked witnesses
+    a_tilda: F128b, // a^\tilda
+    pdecom: Vec<Pdecom>,
+    chall3: Chall3,
+    iv: IV,
+}
 
 /// Create VOLEith given a statement signature on the prover side.
 ///
@@ -281,15 +281,15 @@ pub(crate) fn prove(
     let pdecom = vole_open(&chall3, decom);
     log::info!("vole_open running time: {:?}", t.elapsed());
 
-    (
+    Proof {
         corrections,
         u_tilda,
-        masked_witnesses,
+        d: masked_witnesses,
         a_tilda,
         pdecom,
         chall3,
         iv,
-    )
+    }
 }
 
 /// Compute the secret key delta from a challenge
@@ -307,18 +307,12 @@ fn compute_secret_key(chall3: &Chall3) -> F128b {
 /// Structure of VOLEith created by the functionality on the verifier side.
 #[derive(Clone)]
 pub(crate) struct VoleithVerifier {
-    /// masked values
-    pub(crate) d: Vec<F2>,
     /// correlations on verifier side
     pub(crate) q: Vec<F128b>,
     /// Second challenge
     pub(crate) chall2: Chall2,
-    /// Third challenge
-    pub(crate) chall3: Chall3,
     /// secret key
     pub(crate) delta: F128b,
-    /// abracadabra
-    pub(crate) a_tilda: F128b,
 }
 
 /// Create VOLEith given a statement signature and a proof, on the verifier side.
@@ -327,18 +321,26 @@ pub(crate) struct VoleithVerifier {
 #[inline(never)]
 pub(crate) fn create_voleith_verifier(
     statement_sig: &[u8],
-    proof: Proof,
+    proof: &Proof,
     l: usize,
 ) -> VoleithVerifier {
     // line 1
-    let (corrections, u_tilda, d, a_tilda, pdecom, chall3, iv) = proof;
+    let Proof {
+        corrections,
+        u_tilda,
+        d,
+        a_tilda: _,
+        pdecom,
+        chall3,
+        iv,
+    } = proof;
 
     // line 2
     let mu: H1 = h1(statement_sig);
 
     // lines 3-4
     let t = std::time::Instant::now();
-    let (h, q) = vole_reconstruct(&chall3, pdecom, iv, l_hat(l));
+    let (h, q) = vole_reconstruct(chall3, pdecom, *iv, l_hat(l));
     log::info!("vole_reconstruct running time: {:?}", t.elapsed());
 
     // line 5
@@ -377,7 +379,7 @@ pub(crate) fn create_voleith_verifier(
     //println!("q_tilda {:?}", q_tilda);
 
     let t = std::time::Instant::now();
-    let big_d = recompose_d(&chall3, &u_tilda);
+    let big_d = recompose_d(&chall3, u_tilda);
     log::info!("recompose_d running time: {:?}", t.elapsed());
     //let big_d_bits = f128b_to_f2(&big_d);
 
@@ -397,23 +399,21 @@ pub(crate) fn create_voleith_verifier(
     // TODO: line 16
 
     // line 17
-    let chall2 = compute_chall_2(&chall1, u_tilda, h_v, &d);
+    let chall2 = compute_chall_2(&chall1, *u_tilda, h_v, &d);
 
     // compute the secret key
     let delta = compute_secret_key(&chall3);
 
     VoleithVerifier {
-        d,
         q: q_f128b,
         chall2,
-        chall3,
         delta,
-        a_tilda,
     }
 }
 
 /// Adpation of FAEST Verify function Fig. 8.3
-pub(crate) fn verify(chall2: Chall2, chall3: Chall3, a_tilda: F128b, b_tilda: F128b) -> bool {
+pub(crate) fn verify(proof: &Proof, chall2: Chall2, a_tilda: F128b, b_tilda: F128b) -> bool {
+    let chall3 = proof.chall3;
     // Line 20
     let chall3_prime = compute_chall_3(&chall2, a_tilda, b_tilda);
 
@@ -453,7 +453,7 @@ mod test {
         let dummy_chall2 = compute_chall_2(&chall1, u_tilda, h_v, &dummy_masked);
         let dummy_a_tilda = F128b::ZERO;
         let dummy_b_tilda = F128b::ZERO;
-        let sig = prove(
+        let proof = prove(
             vole_creation,
             dummy_masked,
             dummy_chall2,
@@ -461,15 +461,9 @@ mod test {
             dummy_b_tilda,
         );
 
-        let VoleithVerifier {
-            d: _,
-            q,
-            chall2,
-            chall3,
-            delta,
-            a_tilda,
-        } = create_voleith_verifier(&statement_sig, sig, how_many);
-        let b = verify(chall2, chall3, a_tilda, dummy_b_tilda);
+        let VoleithVerifier { q, chall2, delta } =
+            create_voleith_verifier(&statement_sig, &proof, how_many);
+        let b = verify(&proof, chall2, dummy_a_tilda, dummy_b_tilda);
 
         let mut vs = Vec::with_capacity(how_many);
         for _ in 0..how_many {

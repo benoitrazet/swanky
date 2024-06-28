@@ -32,7 +32,7 @@ fn test_vole() {
     let dummy_chall2 = compute_chall_2(&chall1, u_tilda, h_v, &dummy_masked);
     let dummy_a_tilda = F128b::ZERO;
     let dummy_b_tilda = F128b::ZERO;
-    let sig = prove(
+    let proof = prove(
         vole_creation,
         dummy_masked,
         dummy_chall2,
@@ -40,15 +40,9 @@ fn test_vole() {
         dummy_b_tilda,
     );
 
-    let VoleithVerifier {
-        d: _,
-        q,
-        chall2,
-        chall3,
-        delta,
-        a_tilda,
-    } = create_voleith_verifier(&statement_sig, sig, how_many);
-    let b = verify(chall2, chall3, a_tilda, dummy_b_tilda);
+    let VoleithVerifier { q, chall2, delta } =
+        create_voleith_verifier(&statement_sig, &proof, how_many);
+    let b = verify(&proof, chall2, dummy_a_tilda, dummy_b_tilda);
 
     let mut vs = Vec::with_capacity(how_many);
     for _ in 0..how_many {
