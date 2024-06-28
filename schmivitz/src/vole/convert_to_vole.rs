@@ -15,7 +15,12 @@ use swanky_field_binary::F2;
 /// This implementation corresponds to ConvertToVOLE as in the FAEST spec.
 /// It differs from the naive algorithm by using relying exclusively on xor
 /// operations on packed binary field values.
-pub fn convert_to_vole(seeds: &[Seed], iv: IV, l: usize, is_prover: bool) -> (Vec<F2>, Vec<F8b>) {
+pub(crate) fn convert_to_vole(
+    seeds: &[Seed],
+    iv: IV,
+    l: usize,
+    is_prover: bool,
+) -> (Vec<F2>, Vec<F8b>) {
     // even if one seed can be bottom, it expects 256 of them.
     assert!(seeds.len() == 256);
     let mut u_res = Vec::with_capacity(l);
@@ -132,8 +137,8 @@ fn convert_to_vole_prover_naive(seeds: &[Seed], iv: IV, l: usize) -> (Vec<F2>, V
 
 /// This function is the verifier version of [`convert_to_vole`].
 ///
-/// It permutes the [`seeds`] according to [`delta`] before calling [`convert_to_vole`].
-pub fn convert_to_vole_verifier(seeds: &[Seed], iv: IV, l: usize, delta: u8) -> Vec<F8b> {
+/// It permutes the `seeds` according to `delta` before calling [`convert_to_vole`].
+pub(crate) fn convert_to_vole_verifier(seeds: &[Seed], iv: IV, l: usize, delta: u8) -> Vec<F8b> {
     // let's permutate the seeds according to delta, with the permutation
     // i -> i xor delta
     let mut seeds_permuted = vec![Seed::default(); 256];

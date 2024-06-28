@@ -1,6 +1,8 @@
 /*!
 All-but-one vector commitment implementation.
 
+*/
+/*
 The implementation follows the [the FAEST spec](https://faest.info/faest-spec-v1.1.pdf).
 The elements from the spec that are implemented are the cryptographic primitives
 the FAEST spec, page 16:
@@ -46,7 +48,7 @@ fn h1_on_coms(coms: &[Com]) -> H1 {
 /// and the underlying vector indexing follows a breadth-first traversal.
 /// That is the element at depth `d` and position `p`, corresponds to the vector index $`2^d + p-1`$.
 #[derive(Clone)]
-pub struct Keys(Vec<Key>);
+pub(crate) struct Keys(Vec<Key>);
 
 impl Keys {
     /// Get a key in the tree at `depth` and index `idx` in the associated layer.
@@ -122,7 +124,7 @@ fn tree(iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) {
 /// This also produces the the full decommitment information that a prover can later use to
 /// [`open()`] the commitment and the full set of [`Seed`]s.
 #[inline(never)]
-pub fn commit(r: Key, iv: IV, depth: usize) -> (H1, Decom, Vec<Seed>) {
+pub(crate) fn commit(r: Key, iv: IV, depth: usize) -> (H1, Decom, Vec<Seed>) {
     let (ks, seeds, coms) = tree(iv, r, depth);
 
     // compute the h
@@ -149,7 +151,7 @@ pub(crate) fn num_rec(j: &[bool]) -> usize {
 /// Generates a partial decommitment [`Pdecom`] given a full decommitment `decom`. This
 /// partial decommitment is produced by the prover and will be sent to the verifier to reconstruct
 /// all but one seeds using [`reconstruct`] and verify the commitment using [`verify`].
-pub fn open(decom: &Decom, j: Vec<bool>) -> Pdecom {
+pub(crate) fn open(decom: &Decom, j: Vec<bool>) -> Pdecom {
     assert_eq!(
         decom.1.len(),
         1 << j.len(),

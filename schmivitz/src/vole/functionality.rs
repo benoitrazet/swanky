@@ -1,6 +1,7 @@
 /*!
 Implement high-level functionality for VOLE protocol.
 */
+#![allow(dead_code)]
 #![allow(clippy::needless_range_loop)]
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::all_but_one_vc::Pdecom;
@@ -32,7 +33,7 @@ use super::crypto_primitives::CHALL2_LENGTH;
 ///
 /// NOTE: `mu` is coming from the FAEST spec but expected to change when doing
 /// more general circuits/polynomials.
-pub fn compute_seed_iv(sk: &[u8], mu: &H1) -> (Seed, IV) {
+pub(crate) fn compute_seed_iv(sk: &[u8], mu: &H1) -> (Seed, IV) {
     let mut h3_inp = vec![];
     h3_inp.extend(sk);
     h3_inp.extend(mu);
@@ -47,7 +48,7 @@ pub fn compute_seed_iv(sk: &[u8], mu: &H1) -> (Seed, IV) {
 }
 
 /// Compute first challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
-pub fn compute_chall_1(mu: &H1, h_com: &Com, corrections: &Corrections, iv: &IV) -> Chall1 {
+pub(crate) fn compute_chall_1(mu: &H1, h_com: &Com, corrections: &Corrections, iv: &IV) -> Chall1 {
     let mut inp = vec![];
     inp.extend(mu);
     // TODO: add `h``
@@ -58,7 +59,7 @@ pub fn compute_chall_1(mu: &H1, h_com: &Com, corrections: &Corrections, iv: &IV)
 }
 
 /// Compute second challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
-pub fn compute_chall_2(
+pub(crate) fn compute_chall_2(
     chall1: &Chall1,
     u_tilda: HashConsistency,
     h_v: H1,
@@ -91,7 +92,7 @@ pub fn compute_chall_2(
 }
 
 /// Compute third challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
-pub fn compute_chall_3(chall2: &Chall2, a_tilda: F128b, b_tilda: F128b) -> Chall3 {
+pub(crate) fn compute_chall_3(chall2: &Chall2, a_tilda: F128b, b_tilda: F128b) -> Chall3 {
     let mut inp: Vec<u8> = vec![];
     inp.extend(chall2);
     inp.extend(a_tilda.to_bytes().as_slice());
@@ -144,27 +145,27 @@ fn vec_f128b_to_f2(v: &[F128b]) -> Vec<Vec<F2>> {
 
 /// Structure of voleith created by the functionality on the prover side.
 #[derive(Clone)]
-pub struct VoleithProver {
+pub(crate) struct VoleithProver {
     /// initial vector
-    pub iv: IV,
+    pub(crate) iv: IV,
     /// Decommitment
-    pub decom: Vec<Decom>,
+    pub(crate) decom: Vec<Decom>,
     /// Corrections
-    pub corrections: Corrections,
+    pub(crate) corrections: Corrections,
     /// u
-    pub u: Vec<F2>,
+    pub(crate) u: Vec<F2>,
     /// v
-    pub v: Vec<Vec<F8b>>,
+    pub(crate) v: Vec<Vec<F8b>>,
     /// First challenge
-    pub chall1: Chall1,
+    pub(crate) chall1: Chall1,
     /// consistency hash of u
-    pub u_tilda: HashConsistency,
+    pub(crate) u_tilda: HashConsistency,
     /// hash of the consistency hash of V        
-    pub h_v: H1,
+    pub(crate) h_v: H1,
 }
 
 /// Proof computed by the prover
-pub type Proof = (
+pub(crate) type Proof = (
     Corrections,
     HashConsistency,
     Vec<F2>, // d
@@ -178,7 +179,7 @@ pub type Proof = (
 ///
 /// Adapted from parts of FAEST.sign from Fig. 8.2
 #[inline(never)]
-pub fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
+pub(crate) fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
     // line 2
     let mu: H1 = h1(statement_sig); // Hash the signature of the circuit+instance the prover/verifier agree to execute.
 
@@ -248,7 +249,7 @@ pub fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
 }
 
 /// Implements get for the functionality on the prover side
-pub fn prove(
+pub(crate) fn prove(
     r: VoleithProver,
     masked_witnesses: Vec<F2>,
     chall2: Chall2,
@@ -305,26 +306,30 @@ fn compute_secret_key(chall3: &Chall3) -> F128b {
 
 /// Structure of VOLEith created by the functionality on the verifier side.
 #[derive(Clone)]
-pub struct VoleithVerifier {
+pub(crate) struct VoleithVerifier {
     /// masked values
-    pub d: Vec<F2>,
+    pub(crate) d: Vec<F2>,
     /// correlations on verifier side
-    pub q: Vec<F128b>,
+    pub(crate) q: Vec<F128b>,
     /// Second challenge
-    pub chall2: Chall2,
+    pub(crate) chall2: Chall2,
     /// Third challenge
-    pub chall3: Chall3,
+    pub(crate) chall3: Chall3,
     /// secret key
-    pub delta: F128b,
+    pub(crate) delta: F128b,
     /// abracadabra
-    pub a_tilda: F128b,
+    pub(crate) a_tilda: F128b,
 }
 
 /// Create VOLEith given a statement signature and a proof, on the verifier side.
 ///
 /// Adapted from parts of FAEST.verify from Fig. 8.2
 #[inline(never)]
-pub fn create_voleith_verifier(statement_sig: &[u8], proof: Proof, l: usize) -> VoleithVerifier {
+pub(crate) fn create_voleith_verifier(
+    statement_sig: &[u8],
+    proof: Proof,
+    l: usize,
+) -> VoleithVerifier {
     // line 1
     let (corrections, u_tilda, d, a_tilda, pdecom, chall3, iv) = proof;
 
@@ -408,7 +413,7 @@ pub fn create_voleith_verifier(statement_sig: &[u8], proof: Proof, l: usize) -> 
 }
 
 /// Adpation of FAEST Verify function Fig. 8.3
-pub fn verify(chall2: Chall2, chall3: Chall3, a_tilda: F128b, b_tilda: F128b) -> bool {
+pub(crate) fn verify(chall2: Chall2, chall3: Chall3, a_tilda: F128b, b_tilda: F128b) -> bool {
     // Line 20
     let chall3_prime = compute_chall_3(&chall2, a_tilda, b_tilda);
 

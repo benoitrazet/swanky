@@ -17,10 +17,10 @@ use swanky_field_binary::F2;
 use swanky_serialization::CanonicalSerialize;
 
 /// Parameter used for padding for the security of the consistency check
-pub const B: usize = 16;
+pub(crate) const B: usize = 16;
 
 /// Function mapping 8 booleans to [`u8`].
-pub fn bools_to_u8(d: &[bool]) -> u8 {
+pub(crate) fn bools_to_u8(d: &[bool]) -> u8 {
     debug_assert_eq!(d.len(), 8);
     let mut r: u8 = 0;
     for (i, b) in d.iter().enumerate() {
@@ -31,14 +31,14 @@ pub fn bools_to_u8(d: &[bool]) -> u8 {
 }
 
 /// Type for corrections applied to voles.
-pub type Corrections = Vec<Vec<F2>>;
+pub(crate) type Corrections = Vec<Vec<F2>>;
 
 /// Function generating the voles with associated commitments.
 ///
 /// This corresponds to Figure 5.4 of the FAEST spec.
 /// This function relies on multithreading to improve the time performance.
 #[inline(never)]
-pub fn vole_commit(
+pub(crate) fn vole_commit(
     r: IV,
     iv: IV,
     l: usize,
@@ -113,7 +113,7 @@ pub fn vole_commit(
 }
 
 /// Function to decompose a challenge into boolean values.
-pub fn chal_dec(chal: &[u8], i: usize) -> Vec<bool> {
+pub(crate) fn chal_dec(chal: &[u8], i: usize) -> Vec<bool> {
     //let mut dec = vec![];
 
     //assert!(dec.len() == REPETITION_PARAM);
@@ -131,7 +131,7 @@ pub fn chal_dec(chal: &[u8], i: usize) -> Vec<bool> {
 /// Function to open voles and return the associated partial decommitment.
 ///
 /// This function implements steps 20-22 of Fig 8.2
-pub fn vole_open(chal: &[u8], decom: Vec<Decom>) -> Vec<Pdecom> {
+pub(crate) fn vole_open(chal: &[u8], decom: Vec<Decom>) -> Vec<Pdecom> {
     let mut pdecom = Vec::with_capacity(REPETITION_PARAM);
     for i in 0..REPETITION_PARAM {
         let delta_i = chal_dec(chal, i);
@@ -145,7 +145,7 @@ pub fn vole_open(chal: &[u8], decom: Vec<Decom>) -> Vec<Pdecom> {
 ///
 /// This implements Figure 5.5 in FAEST spec v1.1
 #[inline(never)]
-pub fn vole_reconstruct(
+pub(crate) fn vole_reconstruct(
     chal: &[u8], // bytes from fiat-shamir challenge
     pdecom: Vec<Pdecom>,
     iv: IV,
@@ -204,7 +204,7 @@ pub fn vole_reconstruct(
 }
 
 /// Function converting a slice of [`F8b`] values into a [`F128b`] value using the underlying bits.
-pub fn bitwise_f128b_from_f8b(v: &[F8b; REPETITION_PARAM]) -> F128b {
+pub(crate) fn bitwise_f128b_from_f8b(v: &[F8b; REPETITION_PARAM]) -> F128b {
     let mut tmp: [u8; REPETITION_PARAM] = [0; REPETITION_PARAM];
     for (i, b) in v.iter().enumerate() {
         tmp[i] = b.to_bytes()[0];
@@ -212,11 +212,11 @@ pub fn bitwise_f128b_from_f8b(v: &[F8b; REPETITION_PARAM]) -> F128b {
     F128b::from_bytes(&tmp.into()).unwrap()
 }
 
-/// This function applies corrections to the verifier part of voles [`q`] using a challenge.
+/// This function applies corrections to the verifier part of voles `q` using a challenge.
 ///
 /// This function implements Lines 7-14 of Figure 8.3 of the FAEST spec.
 #[inline(never)]
-pub fn apply_corrections_to_q(
+pub(crate) fn apply_corrections_to_q(
     q: Vec<Vec<F8b>>,
     chall3: &Chall3,
     corrections: Corrections,
@@ -258,11 +258,11 @@ pub fn apply_corrections_to_q(
     q_128b
 }
 
-/// This function combines a challenge with the hash of [`u`] to be used for the consistency check by the verifier.
+/// This function combines a challenge with the hash of `u` to be used for the consistency check by the verifier.
 ///
 /// This function implements lines 8-11 in Fig 8.3 in the FAEST spec.
 #[inline(never)]
-pub fn recompose_d(chall3: &Chall3, u_tilda: &[F2]) -> Vec<F2> {
+pub(crate) fn recompose_d(chall3: &Chall3, u_tilda: &[F2]) -> Vec<F2> {
     assert_eq!(u_tilda.len(), SECURITY_PARAM + B);
     let how_many = u_tilda.len();
     let mut qs = Vec::with_capacity(how_many * REPETITION_PARAM * 8);
@@ -286,13 +286,13 @@ pub fn recompose_d(chall3: &Chall3, u_tilda: &[F2]) -> Vec<F2> {
 
 /// This function takes the size of the extended witness as input and returns
 /// that many more elements necessary based on the parameters of the protocol.
-pub fn l_hat(l: usize) -> usize {
+pub(crate) fn l_hat(l: usize) -> usize {
     l + B + 2 * SECURITY_PARAM
 }
 
 /// Convert corrections to associated bytes.
 #[inline(never)]
-pub fn corrections_to_bytes(corrections: &Corrections) -> Vec<u8> {
+pub(crate) fn corrections_to_bytes(corrections: &Corrections) -> Vec<u8> {
     // Corrections are a vector containing tau vectors of long size
     let how_many = corrections[0].len();
     let tau = corrections.len();

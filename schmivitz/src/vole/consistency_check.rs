@@ -45,10 +45,10 @@ fn to_field_f128_and_pad<I: Iterator<Item = F2>>(x: I, x_len: usize) -> Vec<F128
 }
 
 /// Hash as produced by [`simply_vole_hash`].
-pub type HashConsistency = [F2; SECURITY_PARAM + B];
+pub(crate) type HashConsistency = [F2; SECURITY_PARAM + B];
 
 /// Convert a consistency hash to a vector of bytes
-pub fn hash_consistency_to_bytes(h: &HashConsistency) -> Vec<u8> {
+pub(crate) fn hash_consistency_to_bytes(h: &HashConsistency) -> Vec<u8> {
     let mut out = vec![];
     for chunk in h.chunks(8) {
         let mut byte = 0u8;
@@ -64,7 +64,7 @@ pub fn hash_consistency_to_bytes(h: &HashConsistency) -> Vec<u8> {
 
 /// Function doing linear hashing of vector of boolean field elements.
 #[inline(never)]
-pub fn simply_vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
+pub(crate) fn simply_vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
     seed: &[u8],
     x0: I1,
     x0_len: usize,
@@ -136,7 +136,7 @@ pub fn simply_vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
 }
 
 /// TODO
-pub struct BitDecomposer<'a> {
+pub(crate) struct BitDecomposer<'a> {
     data: &'a Vec<Vec<F8b>>,
     outer_index: usize,
     inner_index: usize,
@@ -191,7 +191,7 @@ impl<'a> Iterator for BitDecomposer<'a> {
 }
 
 /// TODO
-pub fn decompose_bits(data: &Vec<Vec<F8b>>) -> BitDecomposer<'_> {
+pub(crate) fn decompose_bits(data: &Vec<Vec<F8b>>) -> BitDecomposer<'_> {
     BitDecomposer::new(data)
 }
 

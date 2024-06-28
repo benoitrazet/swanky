@@ -1,13 +1,17 @@
 #![allow(clippy::needless_range_loop)]
-use schmivitz::parameters::REPETITION_PARAM;
-use schmivitz::vole::commit_reconstruct::bitwise_f128b_from_f8b;
-use schmivitz::vole::functionality::{
-    compute_chall_2, create_voleith_prover, create_voleith_verifier, prove, verify, VoleithProver,
-    VoleithVerifier,
-};
+
+mod parameters;
+mod vole;
+
+use parameters::REPETITION_PARAM;
 use std::env;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F128b, F8b};
+use vole::commit_reconstruct::bitwise_f128b_from_f8b;
+use vole::functionality::{
+    compute_chall_2, create_voleith_prover, create_voleith_verifier, prove, verify, VoleithProver,
+    VoleithVerifier,
+};
 
 fn test_vole() {
     let how_many = 10_000_000;
