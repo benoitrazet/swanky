@@ -16,6 +16,7 @@ use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 
 // Exposing these modules for benchmarking at the moment.
 pub(crate) mod all_but_one_vc;
+pub(crate) mod bitwise_utils;
 pub(crate) mod commit_reconstruct;
 pub(crate) mod consistency_check;
 pub(crate) mod convert_to_vole;

@@ -322,6 +322,7 @@ mod test {
         vole_open, vole_reconstruct,
     };
     use crate::parameters::REPETITION_PARAM;
+    use crate::vole::bitwise_utils::u8_to_f8b;
     use crate::vole::crypto_primitives::{h1, H1};
     use crate::vole::functionality::compute_seed_iv;
     use swanky_field::FiniteRing;
@@ -370,7 +371,7 @@ mod test {
         let mut big_delta = [F8b::default(); REPETITION_PARAM];
         for tau in 0..REPETITION_PARAM {
             let delta_i = chal_dec(&chall3, tau);
-            let delta_f8b: F8b = bools_to_u8(&delta_i).into();
+            let delta_f8b: F8b = u8_to_f8b(bools_to_u8(&delta_i));
             big_delta[tau] = delta_f8b;
         }
         let big_delta_f128b = bitwise_f128b_from_f8b(&big_delta);

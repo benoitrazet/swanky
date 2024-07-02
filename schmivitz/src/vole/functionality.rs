@@ -25,6 +25,7 @@ use swanky_field_binary::F2;
 use swanky_serialization::CanonicalSerialize;
 
 use super::all_but_one_vc::Decom;
+use super::bitwise_utils::u8_to_f8b;
 use super::commit_reconstruct::{bitwise_f128b_from_f8b, bools_to_u8, chal_dec};
 use super::consistency_check::{hash_consistency_to_bytes, HashConsistency};
 use super::crypto_primitives::CHALL2_LENGTH;
@@ -298,7 +299,7 @@ fn compute_secret_key(chall3: &Chall3) -> F128b {
     let mut big_delta = [F8b::default(); REPETITION_PARAM];
     for tau in 0..REPETITION_PARAM {
         let delta_i = chal_dec(chall3, tau);
-        let delta_f8b: F8b = bools_to_u8(&delta_i).into();
+        let delta_f8b: F8b = u8_to_f8b(bools_to_u8(&delta_i));
         big_delta[tau] = delta_f8b;
     }
     bitwise_f128b_from_f8b(&big_delta)
@@ -496,7 +497,7 @@ mod test {
         assert_eq!(t.to_bytes()[1], 27u8);
 
         let v = 43u8;
-        let v_f8b: F8b = F8b::from(v);
+        let v_f8b: F8b = F8b::from_bytes(&[v].into()).unwrap();
         let v_back: u8 = v_f8b.to_bytes()[0];
         assert_eq!(v_back, 43u8);
     }

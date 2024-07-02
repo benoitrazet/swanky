@@ -2,6 +2,7 @@
 Convert vector commitments to VOLEs.
 */
 #![allow(clippy::needless_range_loop)]
+use crate::vole::bitwise_utils::u8_to_f8b;
 use crate::vole::crypto_primitives::{Seed, IV, PRG};
 #[allow(unused_imports)]
 // WEIRD: rust-analyzer seems to consider `FiniteRing`, but without it, it is not possible to use ZERO/ONE etc.
@@ -82,7 +83,7 @@ pub(crate) fn convert_to_vole(
                 x |= ((v[5] >> i & 1) as u8) << 5;
                 x |= ((v[6] >> i & 1) as u8) << 6;
                 x |= ((v[7] >> i & 1) as u8) << 7;
-                v_res.push(x.into());
+                v_res.push(u8_to_f8b(x));
             }
             remaining -= 64;
         } else {
@@ -98,7 +99,7 @@ pub(crate) fn convert_to_vole(
                 x |= ((v[5] >> i & 1) as u8) << 5;
                 x |= ((v[6] >> i & 1) as u8) << 6;
                 x |= ((v[7] >> i & 1) as u8) << 7;
-                v_res.push(x.into());
+                v_res.push(u8_to_f8b(x));
 
                 remaining -= 1;
                 if remaining == 0 {
@@ -124,7 +125,7 @@ fn convert_to_vole_prover_naive(seeds: &[Seed], iv: IV, l: usize) -> (Vec<F2>, V
     for seed in seeds.iter() {
         let prg = PRG::new(*seed, iv);
         let v = prg.prg(l);
-        let i_f8b: F8b = i.into();
+        let i_f8b: F8b = u8_to_f8b(i);
         for (j, r) in v.iter().enumerate() {
             u_res[j] += r;
             v_res[j] += *r * i_f8b;
@@ -168,8 +169,8 @@ fn convert_to_vole_verifier_naive(seeds: &[Seed], iv: IV, l: usize, delta: u8) -
         if j != delta as usize {
             let prg = PRG::new(*seed, iv);
             let v = prg.prg(l);
-            let i_f8b: F8b = i.into();
-            let delta_f8b: F8b = delta.into();
+            let i_f8b: F8b = u8_to_f8b(i);
+            let delta_f8b: F8b = u8_to_f8b(delta);
             for (j, r) in v.iter().enumerate() {
                 v_res[j] += *r * (delta_f8b - i_f8b);
             }
@@ -185,7 +186,7 @@ fn convert_to_vole_verifier_naive(seeds: &[Seed], iv: IV, l: usize, delta: u8) -
 #[cfg(test)]
 mod test {
     use super::{convert_to_vole, convert_to_vole_prover_naive, convert_to_vole_verifier_naive};
-    use crate::vole::crypto_primitives::Seed;
+    use crate::vole::{bitwise_utils::u8_to_f8b, crypto_primitives::Seed};
     use rand::{thread_rng, RngCore};
     use swanky_field::FiniteRing;
     use swanky_field_binary::F8b;
@@ -227,7 +228,7 @@ mod test {
 
         println!("Minus one {:?}", -(F8b::ONE));
         for ((u, v), q) in u.iter().zip(vs.iter()).zip(qs.iter()) {
-            let delta_f8b: F8b = delta.into();
+            let delta_f8b: F8b = u8_to_f8b(delta);
             assert_eq!(*q, (*u * delta_f8b) - *v);
         }
     }
