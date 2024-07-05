@@ -1,7 +1,6 @@
 /*!
 Implement high-level functionality for VOLE protocol.
 */
-#![allow(dead_code)]
 #![allow(clippy::needless_range_loop)]
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::all_but_one_vc::Pdecom;
@@ -146,27 +145,27 @@ fn vec_f128b_to_f2(v: &[F128b]) -> Vec<Vec<F2>> {
 
 /// Structure of voleith created by the functionality on the prover side.
 #[derive(Clone)]
-pub(crate) struct VoleithProver {
+pub struct VoleithProver {
     /// initial vector
-    pub(crate) iv: IV,
+    pub iv: IV,
     /// Decommitment
-    pub(crate) decom: Vec<Decom>,
+    pub decom: Vec<Decom>,
     /// Corrections
-    pub(crate) corrections: Corrections,
+    pub corrections: Corrections,
     /// u
-    pub(crate) u: Vec<F2>,
+    pub u: Vec<F2>,
     /// v
-    pub(crate) v: Vec<Vec<F8b>>,
+    pub v: Vec<F128b>,
     /// First challenge
-    pub(crate) chall1: Chall1,
+    pub chall1: Chall1,
     /// consistency hash of u
-    pub(crate) u_tilda: HashConsistency,
+    pub u_tilda: HashConsistency,
     /// hash of the consistency hash of V        
-    pub(crate) h_v: H1,
+    pub h_v: H1,
 }
 
 /// Proof computed by the prover
-pub(crate) struct Proof {
+pub struct Proof {
     corrections: Corrections,
     u_tilda: HashConsistency,
     d: Vec<F2>,     // masked witnesses
@@ -180,7 +179,7 @@ pub(crate) struct Proof {
 ///
 /// Adapted from parts of FAEST.sign from Fig. 8.2
 #[inline(never)]
-pub(crate) fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
+pub fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
     // line 2
     let mu: H1 = h1(statement_sig); // Hash the signature of the circuit+instance the prover/verifier agree to execute.
 
@@ -250,31 +249,14 @@ pub(crate) fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithPr
 }
 
 /// Implements get for the functionality on the prover side
-pub(crate) fn prove(
-    r: VoleithProver,
-    masked_witnesses: Vec<F2>,
-    chall2: Chall2,
-    a_tilda: F128b,
-    b_tilda: F128b,
-) -> Proof {
-    let VoleithProver {
-        iv,
-        decom,
-        corrections,
-        u: _,
-        v: _,
-        chall1: _,
-        u_tilda,
-        h_v: _,
-    } = r;
-
+pub fn decommit(decom: &Vec<Decom>, chall3: Chall3) -> Vec<Pdecom> {
     // OBSOLETE:
     // TODO: lines 11-12
     // line 13
     //let chall2 = compute_chall_2(&chall1 /*TODO: add more */);
 
     // Line 18
-    let chall3 = compute_chall_3(&chall2, a_tilda, b_tilda);
+    //let chall3 = compute_chall_3(&chall2, a_tilda, b_tilda);
     println!("P chall3:{:?}", chall3);
     // lines 20-22
 
@@ -282,15 +264,7 @@ pub(crate) fn prove(
     let pdecom = vole_open(&chall3, decom);
     log::info!("vole_open running time: {:?}", t.elapsed());
 
-    Proof {
-        corrections,
-        u_tilda,
-        d: masked_witnesses,
-        a_tilda,
-        pdecom,
-        chall3,
-        iv,
-    }
+    pdecom
 }
 
 /// Compute the secret key delta from a challenge
@@ -307,24 +281,20 @@ fn compute_secret_key(chall3: &Chall3) -> F128b {
 
 /// Structure of VOLEith created by the functionality on the verifier side.
 #[derive(Clone)]
-pub(crate) struct VoleithVerifier {
+pub struct VoleithVerifier {
     /// correlations on verifier side
-    pub(crate) q: Vec<F128b>,
+    pub q: Vec<F128b>,
     /// Second challenge
-    pub(crate) chall2: Chall2,
+    pub chall2: Chall2,
     /// secret key
-    pub(crate) delta: F128b,
+    pub delta: F128b,
 }
 
 /// Create VOLEith given a statement signature and a proof, on the verifier side.
 ///
 /// Adapted from parts of FAEST.verify from Fig. 8.2
 #[inline(never)]
-pub(crate) fn create_voleith_verifier(
-    statement_sig: &[u8],
-    proof: &Proof,
-    l: usize,
-) -> VoleithVerifier {
+pub fn create_voleith_verifier(statement_sig: &[u8], proof: &Proof, l: usize) -> VoleithVerifier {
     // line 1
     let Proof {
         corrections,
@@ -413,7 +383,7 @@ pub(crate) fn create_voleith_verifier(
 }
 
 /// Adpation of FAEST Verify function Fig. 8.3
-pub(crate) fn verify(proof: &Proof, chall2: Chall2, a_tilda: F128b, b_tilda: F128b) -> bool {
+pub fn verify(proof: &Proof, chall2: Chall2, a_tilda: F128b, b_tilda: F128b) -> bool {
     let chall3 = proof.chall3;
     // Line 20
     let chall3_prime = compute_chall_3(&chall2, a_tilda, b_tilda);
@@ -424,26 +394,24 @@ pub(crate) fn verify(proof: &Proof, chall2: Chall2, a_tilda: F128b, b_tilda: F12
 #[cfg(test)]
 mod test {
     use super::{
-        create_voleith_prover, create_voleith_verifier, prove, vec_f128b_to_f2, verify,
+        create_voleith_prover, create_voleith_verifier, decommit, vec_f128b_to_f2, verify,
         VoleithProver, VoleithVerifier,
     };
-    use crate::parameters::REPETITION_PARAM;
-    use crate::vole::commit_reconstruct::bitwise_f128b_from_f8b;
     use crate::vole::functionality::compute_chall_2;
+    use crate::vole::functionality::compute_chall_3;
+    use crate::vole::functionality::Proof;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
     use swanky_field_binary::{F128b, F8b};
     use swanky_serialization::CanonicalSerialize;
 
-    #[test]
-    fn test_sign_verify() {
-        let how_many = 100;
+    fn test_vole_prover_and_verifier(how_many: usize) {
         let statement_sig = vec![1u8];
         let vole_creation = create_voleith_prover(&statement_sig, how_many);
         let VoleithProver {
-            iv: _,
-            decom: __m128i,
-            corrections: _,
+            iv,
+            decom,
+            corrections,
             u,
             v,
             chall1,
@@ -451,42 +419,55 @@ mod test {
             h_v,
         } = vole_creation.clone();
         let dummy_masked = vec![];
-        let dummy_chall2 = compute_chall_2(&chall1, u_tilda, h_v, &dummy_masked);
+        let chall2 = compute_chall_2(&chall1, u_tilda, h_v, &dummy_masked);
         let dummy_a_tilda = F128b::ZERO;
         let dummy_b_tilda = F128b::ZERO;
-        let proof = prove(
-            vole_creation,
-            dummy_masked,
-            dummy_chall2,
-            dummy_a_tilda,
-            dummy_b_tilda,
-        );
+        let chall3 = compute_chall_3(&chall2, dummy_a_tilda, dummy_b_tilda);
+        let pdecom = decommit(&decom, chall3);
 
-        let VoleithVerifier { q, chall2, delta } =
-            create_voleith_verifier(&statement_sig, &proof, how_many);
-        let b = verify(&proof, chall2, dummy_a_tilda, dummy_b_tilda);
-
-        let mut vs = Vec::with_capacity(how_many);
-        for _ in 0..how_many {
-            vs.push([F8b::ZERO; REPETITION_PARAM]);
-        }
-
-        for pos in 0..how_many {
-            for tau in 0..REPETITION_PARAM {
-                vs[pos][tau] = v[tau][pos];
-            }
-        }
-        let mut v_f128b: Vec<F128b> = Vec::with_capacity(how_many);
-        for pos in 0..how_many {
-            let val = bitwise_f128b_from_f8b(&vs[pos]);
-            v_f128b.push(val);
-        }
+        let proof = Proof {
+            corrections,
+            u_tilda,
+            pdecom,
+            d: dummy_masked,
+            a_tilda: dummy_a_tilda,
+            chall3,
+            iv,
+        };
+        let VoleithVerifier {
+            q,
+            chall2: chall2_verifier,
+            delta,
+        } = create_voleith_verifier(&statement_sig, &proof, how_many);
+        let b = verify(&proof, chall2_verifier, dummy_a_tilda, dummy_b_tilda);
 
         for pos in 0..how_many {
-            assert_eq!(v_f128b[pos] + u[pos] * delta, q[pos]);
+            assert_eq!(v[pos] + u[pos] * delta, q[pos]);
         }
 
         assert!(b);
+    }
+
+    #[test]
+    fn test_vole_prover_verifier() {
+        let perf = false; // toggle to true for using this test for performance testing the generation of VOLEs
+        if !perf {
+            test_vole_prover_and_verifier(100);
+        } else {
+            // Same test but more voles drawn and printing the logs to monitor the timing of the different components
+            use std::env;
+
+            // if log-level `RUST_LOG` not already set, then set to info
+            match env::var("RUST_LOG") {
+                Ok(val) => println!("loglvl: {}", val),
+                Err(_) => env::set_var("RUST_LOG", "info"),
+            };
+
+            pretty_env_logger::init_timed();
+            let t = std::time::Instant::now();
+            test_vole_prover_and_verifier(10_000_000);
+            println!("VOLE-it-Head completed in: {:?}", t.elapsed());
+        }
     }
 
     #[test]
