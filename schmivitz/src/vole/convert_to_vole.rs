@@ -164,7 +164,6 @@ fn convert_to_vole_verifier_naive(seeds: &[Seed], iv: IV, l: usize, delta: u8) -
 
     let mut i = 0u8;
 
-    //println!("delta_u8 {}", delta);
     for (j, seed) in seeds.iter().enumerate() {
         if j != delta as usize {
             let prg = PRG::new(*seed, iv);
@@ -226,7 +225,6 @@ mod test {
         let qs_xor = super::convert_to_vole_verifier(&seeds, iv, how_many, delta);
         assert_eq!(qs, qs_xor);
 
-        println!("Minus one {:?}", -(F8b::ONE));
         for ((u, v), q) in u.iter().zip(vs.iter()).zip(qs.iter()) {
             let delta_f8b: F8b = u8_to_f8b(delta);
             assert_eq!(*q, (*u * delta_f8b) - *v);

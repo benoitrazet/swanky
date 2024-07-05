@@ -195,8 +195,7 @@ pub fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
     let chall1 = compute_chall_1(&mu, &h, &corrections, &iv);
 
     // line 7-8
-
-    println!("P chall1:{:?}", chall1);
+    // hash u
     let t = std::time::Instant::now();
     let u_tilda = simply_vole_hash(
         &chall1,
@@ -210,6 +209,7 @@ pub fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
     log::info!("simply_vole_hash(u) running time: {:?}", t.elapsed());
 
     // line 9
+    // hash v column-wise
     let t = std::time::Instant::now();
     let mut v_tilda: Vec<F2> = Vec::with_capacity((SECURITY_PARAM + B) * SECURITY_PARAM);
     let tmp = simply_vole_hash_parallel(
@@ -221,15 +221,10 @@ pub fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
         v_tilda.extend(newt);
     }
     assert_eq!(v_tilda.len(), (SECURITY_PARAM + B) * SECURITY_PARAM);
-
     log::info!("simply_vole_hash(V) running time: {:?}", t.elapsed());
-    // println!("q_tilda {:?}", v_tilda);
-
-    println!("LEN: {}", v_tilda.len());
 
     // line 10
     let h_v = h1(&bits_to_u8_many(&v_tilda));
-    println!("h_v {:?}", h_v);
 
     VoleithProver {
         iv,
@@ -245,16 +240,6 @@ pub fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
 
 /// Implements get for the functionality on the prover side
 pub fn decommit(decom: &[Decom], chall3: Chall3) -> Vec<Pdecom> {
-    // OBSOLETE:
-    // TODO: lines 11-12
-    // line 13
-    //let chall2 = compute_chall_2(&chall1 /*TODO: add more */);
-
-    // Line 18
-    //let chall3 = compute_chall_3(&chall2, a_tilda, b_tilda);
-    println!("P chall3:{:?}", chall3);
-    // lines 20-22
-
     let t = std::time::Instant::now();
     let pdecom = vole_open(&chall3, decom);
     log::info!("vole_open running time: {:?}", t.elapsed());
@@ -322,8 +307,8 @@ pub fn create_voleith_verifier(statement_sig: &[u8], proof: &Proof, l: usize) ->
     );
     log::info!("recompose_q running time: {:?}", t.elapsed());
 
-    println!("V chall1:{:?}", chall1);
-
+    // line 15
+    // hash column-wise Q\tilda + D\tilda
     let t = std::time::Instant::now();
     let mut q_tilda: Vec<F2> = Vec::with_capacity((SECURITY_PARAM + B) * SECURITY_PARAM);
     let tmp = simply_vole_hash_parallel(
@@ -337,13 +322,13 @@ pub fn create_voleith_verifier(statement_sig: &[u8], proof: &Proof, l: usize) ->
     assert_eq!(q_tilda.len(), (SECURITY_PARAM + B) * SECURITY_PARAM);
 
     log::info!("simply_vole_hash(Q) running time: {:?}", t.elapsed());
-    //println!("q_tilda {:?}", q_tilda);
 
+    // line 11
     let t = std::time::Instant::now();
     let big_d = recompose_d(chall3, u_tilda);
     log::info!("recompose_d running time: {:?}", t.elapsed());
-    //let big_d_bits = f128b_to_f2(&big_d);
 
+    // line 16
     let t = std::time::Instant::now();
     let q_xor_d: Vec<F2> = q_tilda
         .iter()
@@ -351,13 +336,8 @@ pub fn create_voleith_verifier(statement_sig: &[u8], proof: &Proof, l: usize) ->
         .map(|(a, b)| *a + *b)
         .collect();
     log::info!("Q + D running time: {:?}", t.elapsed());
-    println!("LEN: {}", q_xor_d.len());
 
     let h_v = h1(&bits_to_u8_many(&q_xor_d));
-    println!("h_q {:?}", h_v);
-
-    // TODO: line 15
-    // TODO: line 16
 
     // line 17
     let chall2 = compute_chall_2(&chall1, *u_tilda, h_v, d);

@@ -62,6 +62,7 @@ pub(crate) fn vole_commit(
     */
 
     // With multithreading
+    let t = std::time::Instant::now();
     let mut txs = Vec::with_capacity(REPETITION_PARAM);
     let mut rxs = Vec::with_capacity(REPETITION_PARAM);
     for _ in 0..REPETITION_PARAM {
@@ -90,9 +91,14 @@ pub(crate) fn vole_commit(
         u.push(u_i);
         v.push(v_i);
     }
+    log::info!(
+        "multithreaded convert_to_vole running time: {:?}",
+        t.elapsed()
+    );
     // End multithreading
 
     // let's compute the corrections
+    let t = std::time::Instant::now();
     let u_0 = u[0].clone(); // TODO: opt transmute here
     let mut corr = Vec::with_capacity(REPETITION_PARAM - 1);
     for i in 1..REPETITION_PARAM {
@@ -105,6 +111,7 @@ pub(crate) fn vole_commit(
         }
         corr.push(ci);
     }
+    log::info!("corrections running time: {:?}", t.elapsed());
     debug_assert_eq!(corr.len(), REPETITION_PARAM - 1);
 
     // Convert Vec<Vec<F8b>> to Vec<F128b> where the size of the outer vec in Vec<Vec<F8b>> is `REPETITION_PARAM`.
@@ -117,7 +124,7 @@ pub(crate) fn vole_commit(
         }
         v_out.push(F128b::from_bytes((&tmp).into()).unwrap());
     }
-    log::info!("pack to F128b: {:?}", t.elapsed());
+    log::info!("pack to F128b running time: {:?}", t.elapsed());
 
     (
         com[0], // TODO H1 all of them
@@ -254,11 +261,9 @@ pub(crate) fn apply_corrections_to_q(
             let mut delta_times_corr = [F2::default(); 8];
             for (i, d) in delta.iter().enumerate() {
                 let corr = (if *d { F2::ONE } else { F2::ZERO }) * c_tau; // TODO: can optimize that
-                                                                          //println!("bit:{:?} corr:{:?}", *d, corr);
                 delta_times_corr[i] = corr;
             }
             let delta_times_corr_f8b: F8b = F2::form_superfield(&delta_times_corr.into());
-            //println!("delta_times:{:?}", delta_times_corr_f8b);
             qs[pos][tau] = q[tau][pos] + delta_times_corr_f8b;
         }
     }
