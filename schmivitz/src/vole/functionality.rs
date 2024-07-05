@@ -9,7 +9,7 @@ use crate::vole::commit_reconstruct::{
     Corrections,
 };
 use crate::vole::commit_reconstruct::{recompose_d, B};
-use crate::vole::consistency_check::{decompose_bits, simply_vole_hash};
+use crate::vole::consistency_check::{simply_vole_hash, simply_vole_hash_parallel};
 use crate::vole::crypto_primitives::{
     h1, h3, h_chall1, h_chall3, Chall1, Chall2, Chall3, Com, Seed, H1, H3, IV,
 };
@@ -211,22 +211,17 @@ pub fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
 
     // line 9
     let t = std::time::Instant::now();
-    let mut v_tilda: Vec<F2> = Vec::with_capacity((l + SECURITY_PARAM) * SECURITY_PARAM);
-    let v_bits: Vec<F2> = decompose_bits(&v).collect();
-    assert_eq!(v_bits.len(), (l_hat(l) * SECURITY_PARAM));
-    let split = l + SECURITY_PARAM; // split between x0 and x1
-    let step = l_hat(l);
-    for i in 0..SECURITY_PARAM {
-        let start = step * i;
-        let newt = simply_vole_hash(
-            &chall1,
-            v_bits[start..start + split].iter().copied(),
-            l + SECURITY_PARAM,
-            v_bits[start + split..start + step].iter().copied(),
-            SECURITY_PARAM + B,
-        );
+    let mut v_tilda: Vec<F2> = Vec::with_capacity((SECURITY_PARAM + B) * SECURITY_PARAM);
+    let tmp = simply_vole_hash_parallel(
+        &chall1,
+        &v[0..l + SECURITY_PARAM],
+        &v[l + SECURITY_PARAM..l_hat(l)],
+    );
+    for newt in tmp {
         v_tilda.extend(newt);
     }
+    assert_eq!(v_tilda.len(), (SECURITY_PARAM + B) * SECURITY_PARAM);
+
     log::info!("simply_vole_hash(V) running time: {:?}", t.elapsed());
     // println!("q_tilda {:?}", v_tilda);
 
@@ -249,7 +244,7 @@ pub fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
 }
 
 /// Implements get for the functionality on the prover side
-pub fn decommit(decom: &Vec<Decom>, chall3: Chall3) -> Vec<Pdecom> {
+pub fn decommit(decom: &[Decom], chall3: Chall3) -> Vec<Pdecom> {
     // OBSOLETE:
     // TODO: lines 11-12
     // line 13
@@ -327,25 +322,20 @@ pub fn create_voleith_verifier(statement_sig: &[u8], proof: &Proof, l: usize) ->
     );
     log::info!("recompose_q running time: {:?}", t.elapsed());
 
-    let t = std::time::Instant::now();
-    let q_bits = vec_f128b_to_f2(&q_f128b);
-    log::info!("vec_f128b_to_f2 running time: {:?}", t.elapsed());
-    //println!("q_bits {:?}", t);
-
     println!("V chall1:{:?}", chall1);
+
     let t = std::time::Instant::now();
-    // TODO: this length seems off with `l`.
-    let mut q_tilda: Vec<F2> = Vec::with_capacity((l + SECURITY_PARAM) * SECURITY_PARAM);
-    for i in 0..SECURITY_PARAM {
-        let newt = simply_vole_hash(
-            &chall1,
-            q_bits[i][0..l + SECURITY_PARAM].iter().copied(),
-            l + SECURITY_PARAM,
-            q_bits[i][l + SECURITY_PARAM..l_hat(l)].iter().copied(),
-            SECURITY_PARAM + B,
-        );
+    let mut q_tilda: Vec<F2> = Vec::with_capacity((SECURITY_PARAM + B) * SECURITY_PARAM);
+    let tmp = simply_vole_hash_parallel(
+        &chall1,
+        &q_f128b[0..l + SECURITY_PARAM],
+        &q_f128b[l + SECURITY_PARAM..l_hat(l)],
+    );
+    for newt in tmp {
         q_tilda.extend(newt);
     }
+    assert_eq!(q_tilda.len(), (SECURITY_PARAM + B) * SECURITY_PARAM);
+
     log::info!("simply_vole_hash(Q) running time: {:?}", t.elapsed());
     //println!("q_tilda {:?}", q_tilda);
 

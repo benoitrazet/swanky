@@ -8,7 +8,6 @@ use crate::vole::commit_reconstruct::B;
 use crate::vole::crypto_primitives::CHALL1_LENGTH;
 use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::F128b;
-use swanky_field_binary::F8b;
 use swanky_field_binary::F2;
 use swanky_serialization::CanonicalSerialize;
 
@@ -27,8 +26,11 @@ fn to_field_f128_and_pad<I: Iterator<Item = F2>>(x: I, x_len: usize) -> Vec<F128
             bit_num = 0; // restart at the beginning of byte
             if byte_num == (128 / 8) - 1 {
                 out.push(F128b::from_bytes(&b_128.into()).unwrap());
+
+                // reset
                 byte_num = 0;
-                b_128 = [0u8; 128 / 8]; // reset
+                // reset
+                b_128 = [0u8; 128 / 8];
             } else {
                 byte_num += 1;
             }
@@ -36,8 +38,53 @@ fn to_field_f128_and_pad<I: Iterator<Item = F2>>(x: I, x_len: usize) -> Vec<F128
             bit_num += 1;
         }
     }
+
+    // Still have to push a last value if the previous loop terminated before processing `SECURITY_PARAMETER` bits.
     if (bit_num != 0) | (byte_num != 0) {
         out.push(F128b::from_bytes(&b_128.into()).unwrap())
+    }
+
+    assert_eq!(out.len(), how_many);
+    out
+}
+
+#[inline(never)]
+fn to_field_f128_and_pad_parallel(x: &[F128b]) -> Vec<[F128b; SECURITY_PARAM]> {
+    let floor = x.len() / 128;
+    let how_many = floor + if (x.len() - (floor) * 128) != 0 { 1 } else { 0 };
+    let mut out = Vec::with_capacity(how_many);
+
+    let mut b_128 = [[0u8; 128 / 8]; 128];
+    let mut byte_num = 0;
+    let mut bit_num: usize = 0;
+    for b in x.iter() {
+        let bs = b.bit_decomposition();
+        for (i, b) in bs.iter().enumerate() {
+            b_128[i][byte_num] |= if !*b { 0 } else { 1 << bit_num };
+        }
+        if bit_num == 7 {
+            bit_num = 0; // restart at the beginning of byte
+            if byte_num == (128 / 8) - 1 {
+                let arr: [F128b; SECURITY_PARAM] =
+                    b_128.map(|v| F128b::from_bytes(&v.into()).unwrap());
+                out.push(arr);
+
+                // reset
+                byte_num = 0;
+                // reset
+                b_128 = [[0u8; 128 / 8]; 128];
+            } else {
+                byte_num += 1;
+            }
+        } else {
+            bit_num += 1;
+        }
+    }
+
+    // Still have to push a last value if the previous loop terminated before processing `SECURITY_PARAMETER` bits.
+    if (bit_num != 0) | (byte_num != 0) {
+        let arr: [F128b; SECURITY_PARAM] = b_128.map(|v| F128b::from_bytes(&v.into()).unwrap());
+        out.push(arr);
     }
 
     assert_eq!(out.len(), how_many);
@@ -72,6 +119,8 @@ pub(crate) fn simply_vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>
     x1_len: usize,
 ) -> HashConsistency {
     assert_eq!(seed.len(), CHALL1_LENGTH);
+    assert_eq!(x1_len, SECURITY_PARAM + B);
+
     let byte_len: usize = 128 / 8;
     let mut tmp = [u8::default(); 128 / 8];
     tmp.copy_from_slice(&seed[0..byte_len]);
@@ -87,7 +136,7 @@ pub(crate) fn simply_vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>
     tmp.copy_from_slice(&seed[byte_len * 5..byte_len * 6]);
     let s1 = F128b::from_bytes(&tmp.into()).unwrap();
 
-    // TODO: we dont need to compute how_many, we could directly use `x0_vec.len()`
+    // TODO: we dont need to compute how_many, we could directly use `x0_vec.len()` defined later.
     let floor = x0_len / SECURITY_PARAM;
     let how_many = floor
         + if (x0_len - floor * SECURITY_PARAM) != 0 {
@@ -135,74 +184,108 @@ pub(crate) fn simply_vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>
     out
 }
 
-/// TODO
-pub(crate) struct BitDecomposer<'a> {
-    data: &'a Vec<Vec<F8b>>,
-    outer_index: usize,
-    inner_index: usize,
-    bit_index: u8,
-}
+/// Function doing linear hashing of the column of bits in parallel.
+///
+/// There are `REPETITION_PARAM` tracks where one group of bits is provided as a [`F128b`] value.
+#[inline(never)]
+pub(crate) fn simply_vole_hash_parallel(
+    seed: &[u8],
+    x0: &[F128b],
+    x1: &[F128b],
+) -> [HashConsistency; SECURITY_PARAM] {
+    assert_eq!(seed.len(), CHALL1_LENGTH);
+    assert_eq!(x1.len(), SECURITY_PARAM + B);
+    let byte_len: usize = 128 / 8;
+    let mut tmp = [u8::default(); 128 / 8];
 
-impl<'a> BitDecomposer<'a> {
-    fn new(data: &'a Vec<Vec<F8b>>) -> Self {
-        Self {
-            data,
-            outer_index: 0,
-            inner_index: 0,
-            bit_index: 0,
-        }
-    }
+    // `r0`,`r1`, `r2`, `r3`, `s0` and `s1` are the same values of every track.
+    tmp.copy_from_slice(&seed[0..byte_len]);
+    let r0 = F128b::from_bytes(&tmp.into()).unwrap();
+    tmp.copy_from_slice(&seed[byte_len..byte_len * 2]);
+    let r1 = F128b::from_bytes(&tmp.into()).unwrap();
+    tmp.copy_from_slice(&seed[byte_len * 2..byte_len * 3]);
+    let r2 = F128b::from_bytes(&tmp.into()).unwrap();
+    tmp.copy_from_slice(&seed[byte_len * 3..byte_len * 4]);
+    let r3 = F128b::from_bytes(&tmp.into()).unwrap();
+    tmp.copy_from_slice(&seed[byte_len * 4..byte_len * 5]);
+    let s0 = F128b::from_bytes(&tmp.into()).unwrap();
+    tmp.copy_from_slice(&seed[byte_len * 5..byte_len * 6]);
+    let s1 = F128b::from_bytes(&tmp.into()).unwrap();
 
-    fn next_position(&mut self) {
-        if self.inner_index == self.data[0].len() - 1 {
-            self.inner_index = 0;
-            if self.bit_index == 7 {
-                self.bit_index = 0;
-                self.outer_index += 1;
-            } else {
-                self.bit_index += 1;
-            }
+    // TODO: we dont need to compute how_many, we could directly use `x0_vec.len()` defined later.
+    let floor = x0.len() / SECURITY_PARAM;
+    let how_many = floor
+        + if (x0.len() - floor * SECURITY_PARAM) != 0 {
+            1
         } else {
-            self.inner_index += 1;
-        }
-    }
-
-    fn is_out_of_range(&self) -> bool {
-        self.outer_index >= self.data.len()
-    }
-}
-
-impl<'a> Iterator for BitDecomposer<'a> {
-    type Item = F2;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.is_out_of_range() {
-            return None;
-        }
-
-        let b = if self.data[self.outer_index][self.inner_index].get_bit(self.bit_index) == 1u8 {
-            F2::ONE
-        } else {
-            F2::ZERO
+            0
         };
-        self.next_position();
-        Some(b)
-    }
-}
 
-/// TODO
-pub(crate) fn decompose_bits(data: &Vec<Vec<F8b>>) -> BitDecomposer<'_> {
-    BitDecomposer::new(data)
+    let x0_vec = to_field_f128_and_pad_parallel(x0);
+    assert_eq!(x0_vec.len(), how_many);
+    let mut h0 = [F128b::ZERO; SECURITY_PARAM];
+    let mut h1 = [F128b::ZERO; SECURITY_PARAM];
+    let mut s0_power = s0;
+    let mut s1_power = s1;
+    for i in 0..how_many {
+        for j in 0..SECURITY_PARAM {
+            // This loop is the parallel part
+            h0[j] += s0_power * x0_vec[i][j];
+            h1[j] += s1_power * x0_vec[i][j];
+        }
+        s0_power *= s0; // TODO: should I do the power in reverse order?? as in the spec.
+                        // The answer was that it does not matter.
+        s1_power *= s1;
+    }
+    let mut h2 = [F128b::ZERO; SECURITY_PARAM];
+    let mut h3 = [F128b::ZERO; SECURITY_PARAM];
+    for j in 0..SECURITY_PARAM {
+        h2[j] = r0 * h0[j] + r1 * h1[j];
+        h3[j] = r2 * h0[j] + r3 * h1[j];
+    }
+
+    let mut out = [[F2::ZERO; SECURITY_PARAM + B]; SECURITY_PARAM];
+
+    for j in 0..SECURITY_PARAM {
+        let h2_bits = h2[j].bit_decomposition();
+        let h3_bits = h3[j].bit_decomposition();
+
+        let mut all_bits = Vec::with_capacity(SECURITY_PARAM + B);
+        all_bits.extend_from_slice(h2_bits.as_slice());
+        all_bits.extend_from_slice(h3_bits.as_slice());
+
+        all_bits.truncate(x1.len());
+        assert_eq!(all_bits.len(), SECURITY_PARAM + B);
+
+        let mut single_out = [F2::ZERO; SECURITY_PARAM + B];
+
+        let mut x1_bits = [false; SECURITY_PARAM + B];
+        for col in 0..SECURITY_PARAM + B {
+            x1_bits[col] = x1[col].bit_decomposition()[j];
+        }
+        single_out.copy_from_slice(
+            all_bits
+                .iter()
+                .zip(x1_bits)
+                .map(|(b1, b2)| {
+                    (if *b1 { F2::ONE } else { F2::ZERO }) + (if b2 { F2::ONE } else { F2::ZERO })
+                })
+                .collect::<Vec<_>>()
+                .as_slice(),
+        );
+        out[j] = single_out;
+    }
+    out
 }
 
 #[cfg(test)]
 mod test {
-    use super::{decompose_bits, simply_vole_hash, to_field_f128_and_pad};
+    use super::{simply_vole_hash, to_field_f128_and_pad};
     use crate::parameters::SECURITY_PARAM;
     use crate::vole::commit_reconstruct::B;
     use swanky_field::FiniteRing;
+    use swanky_field_binary::F128b;
     use swanky_field_binary::F2;
-    use swanky_field_binary::{F128b, F8b};
     use swanky_serialization::CanonicalSerialize;
 
     #[test]
@@ -313,20 +396,6 @@ mod test {
         );
         for ((a, b), c) in v0.iter().zip(v1.iter()).zip(v2.iter()) {
             assert_eq!(*a + *b, *c);
-        }
-    }
-
-    #[test]
-    fn test_bit_decomposer() {
-        let v: Vec<Vec<F8b>> = vec![vec![2u8.into(), 128u8.into()], vec![0u8.into(), 5.into()]];
-        let indices = [2, 2 * 8 - 1, 2 * 8 + 1, 2 * 8 + 5];
-
-        for (i, b) in decompose_bits(&v).enumerate() {
-            if i == indices[0] || i == indices[1] || i == indices[2] || i == indices[3] {
-                assert_eq!(b, F2::ONE);
-            } else {
-                assert_eq!(b, F2::ZERO);
-            }
         }
     }
 }

@@ -42,7 +42,7 @@ pub(crate) fn vole_commit(
     r: IV,
     iv: IV,
     l: usize,
-) -> (Com, Vec<Decom>, Corrections, Vec<F2>, Vec<Vec<F8b>>) {
+) -> (Com, Vec<Decom>, Corrections, Vec<F2>, Vec<F128b>) {
     let prg_seeds = PRG::new(r, iv).generate_prg_seeds(REPETITION_PARAM);
     let mut u = Vec::with_capacity(REPETITION_PARAM);
     let mut v = Vec::with_capacity(REPETITION_PARAM);
@@ -53,7 +53,7 @@ pub(crate) fn vole_commit(
     /*
     for i in 0..REPETITION_PARAM {
         let (com_i, decom_i, seeds) = commit(prg_seeds[i], iv, 8);
-        let (u_i, v_i) = convert_to_vole_xor(&seeds, iv, l, true);
+        let (u_i, v_i) = convert_to_vole(&seeds, iv, l, true);
         com.push(com_i);
         decom.push(decom_i);
         u.push(u_i);
@@ -98,17 +98,30 @@ pub(crate) fn vole_commit(
     for i in 1..REPETITION_PARAM {
         let mut ci = Vec::with_capacity(l);
         debug_assert_eq!(l, u_0.len());
+        let u_i = &u[i];
         for j in 0..l {
-            let c = u_0[j] + u[i][j];
+            let c = u_0[j] + u_i[j];
             ci.push(c);
         }
         corr.push(ci);
     }
     debug_assert_eq!(corr.len(), REPETITION_PARAM - 1);
 
+    // Convert Vec<Vec<F8b>> to Vec<F128b> where the size of the outer vec in Vec<Vec<F8b>> is `REPETITION_PARAM`.
+    let t = std::time::Instant::now();
+    let mut v_out = Vec::with_capacity(l);
+    let mut tmp = [0u8; REPETITION_PARAM];
+    for i in 0..l {
+        for tau in 0..REPETITION_PARAM {
+            tmp[tau] = v[tau][i].to_bytes()[0];
+        }
+        v_out.push(F128b::from_bytes((&tmp).into()).unwrap());
+    }
+    log::info!("pack to F128b: {:?}", t.elapsed());
+
     (
         com[0], // TODO H1 all of them
-        decom, corr, u_0, v, // TODO: not exactly same as V in the FAEST spec
+        decom, corr, u_0, v_out, // TODO: not exactly same as V in the FAEST spec
     )
 }
 
@@ -131,7 +144,7 @@ pub(crate) fn chal_dec(chal: &[u8], i: usize) -> Vec<bool> {
 /// Function to open voles and return the associated partial decommitment.
 ///
 /// This function implements steps 20-22 of Fig 8.2
-pub(crate) fn vole_open(chal: &[u8], decom: Vec<Decom>) -> Vec<Pdecom> {
+pub(crate) fn vole_open(chal: &[u8], decom: &[Decom]) -> Vec<Pdecom> {
     let mut pdecom = Vec::with_capacity(REPETITION_PARAM);
     for i in 0..REPETITION_PARAM {
         let delta_i = chal_dec(chal, i);
@@ -325,8 +338,7 @@ mod test {
     use crate::vole::bitwise_utils::u8_to_f8b;
     use crate::vole::crypto_primitives::{h1, H1};
     use crate::vole::functionality::compute_seed_iv;
-    use swanky_field::FiniteRing;
-    use swanky_field_binary::{F128b, F8b};
+    use swanky_field_binary::F8b;
 
     #[test]
     fn test_vole_commit_reconstruct() {
@@ -342,23 +354,7 @@ mod test {
 
         let chall3 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
-        let pdecom = vole_open(&chall3, decom);
-
-        let mut vs = Vec::with_capacity(how_many);
-        for _ in 0..how_many {
-            vs.push([F8b::ZERO; REPETITION_PARAM]);
-        }
-
-        for pos in 0..how_many {
-            for tau in 0..REPETITION_PARAM {
-                vs[pos][tau] = v[tau][pos];
-            }
-        }
-        let mut v_f128b: Vec<F128b> = Vec::with_capacity(how_many);
-        for pos in 0..how_many {
-            let val = bitwise_f128b_from_f8b(&vs[pos]);
-            v_f128b.push(val);
-        }
+        let pdecom = vole_open(&chall3, &decom);
 
         let (_h_ver, q) = vole_reconstruct(&chall3, &pdecom, iv, how_many);
 
@@ -378,7 +374,7 @@ mod test {
 
         for pos in 0..how_many {
             //assert_eq!(v_f128b[pos], q_f128b[pos]);
-            assert_eq!(v_f128b[pos] + u[pos] * big_delta_f128b, q_f128b[pos]);
+            assert_eq!(v[pos] + u[pos] * big_delta_f128b, q_f128b[pos]);
         }
     }
 }
