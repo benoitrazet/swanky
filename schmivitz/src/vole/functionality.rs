@@ -122,27 +122,6 @@ fn bits_to_u8_many(bits: &[F2]) -> Vec<u8> {
     out
 }
 
-// convert a list of [`F128b`] values in column-major vectors of [`F2`].
-#[inline(never)]
-fn vec_f128b_to_f2(v: &[F128b]) -> Vec<Vec<F2>> {
-    let how_many = v.len();
-    let mut out: Vec<Vec<F2>> = Vec::with_capacity(SECURITY_PARAM);
-
-    for _ in 0..SECURITY_PARAM {
-        out.push(Vec::with_capacity(how_many));
-    }
-
-    for k in 0..how_many {
-        let f128b = v[k].bit_decomposition();
-        for (i, b) in f128b.iter().enumerate() {
-            out[i].push(if *b { F2::ONE } else { F2::ZERO });
-        }
-    }
-
-    assert_eq!(out.len(), SECURITY_PARAM);
-    out
-}
-
 /// Structure of voleith created by the functionality on the prover side.
 #[derive(Clone)]
 pub struct VoleithProver {
@@ -364,8 +343,8 @@ pub fn verify(proof: &Proof, chall2: Chall2, a_tilda: F128b, b_tilda: F128b) -> 
 #[cfg(test)]
 mod test {
     use super::{
-        create_voleith_prover, create_voleith_verifier, decommit, vec_f128b_to_f2, verify,
-        VoleithProver, VoleithVerifier,
+        create_voleith_prover, create_voleith_verifier, decommit, verify, VoleithProver,
+        VoleithVerifier,
     };
     use crate::vole::functionality::compute_chall_2;
     use crate::vole::functionality::compute_chall_3;
@@ -451,23 +430,5 @@ mod test {
         let v_f8b: F8b = F8b::from_bytes(&[v].into()).unwrap();
         let v_back: u8 = v_f8b.to_bytes()[0];
         assert_eq!(v_back, 43u8);
-    }
-
-    #[test]
-    fn test_f128b_to_f2() {
-        let mut part1 = [0u8; 16];
-        let mut part2 = [0u8; 16];
-        part1[0] = 1;
-        part2[0] = 2;
-        part2[1] = 4;
-
-        let t = vec_f128b_to_f2(&[
-            F128b::from_bytes(&part1.into()).unwrap(),
-            F128b::from_bytes(&part2.into()).unwrap(),
-        ]);
-
-        assert_eq!(t[0][0], F2::ONE);
-        assert_eq!(t[1][1], F2::ONE);
-        assert_eq!(t[10][1], F2::ONE);
     }
 }
