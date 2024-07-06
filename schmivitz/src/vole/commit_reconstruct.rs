@@ -33,6 +33,16 @@ pub(crate) fn bools_to_u8(d: &[bool]) -> u8 {
 /// Type for corrections applied to voles.
 pub(crate) type Corrections = Vec<Vec<F2>>;
 
+/// hash the commitments coming from the small-domain VOLE
+fn hash_commitments(com: &[H1]) -> H1 {
+    assert_eq!(com.len(), REPETITION_PARAM);
+    let mut com_bytes = Vec::with_capacity(H1_LENGTH * REPETITION_PARAM);
+    for i in 0..REPETITION_PARAM {
+        com_bytes.extend(com[i]);
+    }
+    h1(&com_bytes)
+}
+
 /// Function generating the voles with associated commitments.
 ///
 /// This corresponds to Figure 5.4 of the FAEST spec.
@@ -126,10 +136,10 @@ pub(crate) fn vole_commit(
     }
     log::info!("pack to F128b running time: {:?}", t.elapsed());
 
-    (
-        com[0], // TODO H1 all of them
-        decom, corr, u_0, v_out, // TODO: not exactly same as V in the FAEST spec
-    )
+    // hash the commitments
+    let h_com = hash_commitments(&com);
+
+    (h_com, decom, corr, u_0, v_out)
 }
 
 /// Function to decompose a challenge into boolean values.
@@ -217,10 +227,10 @@ pub(crate) fn vole_reconstruct(
     }
     // End multithreading
 
-    (
-        com[0], // TODO H1 all of them
-        qs,
-    )
+    // hash the commitments
+    let h_com = hash_commitments(&com);
+
+    (h_com, qs)
 }
 
 /// Function converting a slice of [`F8b`] values into a [`F128b`] value using the underlying bits.

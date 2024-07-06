@@ -51,7 +51,6 @@ pub(crate) fn compute_seed_iv(sk: &[u8], mu: &H1) -> (Seed, IV) {
 pub(crate) fn compute_chall_1(mu: &H1, h_com: &Com, corrections: &Corrections, iv: &IV) -> Chall1 {
     let mut inp = vec![];
     inp.extend(mu);
-    // TODO: add `h``
     inp.extend(h_com);
     inp.extend(corrections_to_bytes(corrections));
     inp.extend(iv);
@@ -167,11 +166,11 @@ pub fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
 
     // lines 4-5
     let t = std::time::Instant::now();
-    let (h, decom, corrections, u, v) = vole_commit(r, iv, l_hat(l));
+    let (h_com, decom, corrections, u, v) = vole_commit(r, iv, l_hat(l));
     log::info!("vole_commit running time: {:?}", t.elapsed());
 
     // lines 6
-    let chall1 = compute_chall_1(&mu, &h, &corrections, &iv);
+    let chall1 = compute_chall_1(&mu, &h_com, &corrections, &iv);
 
     // line 7-8
     // hash u

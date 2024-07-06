@@ -191,10 +191,13 @@ pub(crate) fn h0(x: Key, iv: IV) -> (Seed, Com) {
     (seed, commitment)
 }
 
+/// Length of H1 hash in bytes.
+pub(crate) const H1_LENGTH: usize = (SECURITY_PARAM / 8) * 2;
+
 /// Type for array of bytes with 2 times the `SECURITY_PARAM`.
 ///
 /// This type is the result of the [`h1`] hash function.
-pub(crate) type H1 = [u8; (SECURITY_PARAM / 8) * 2];
+pub(crate) type H1 = [u8; H1_LENGTH];
 
 fn h1_internal(inp: &[u8], out: &mut [u8]) {
     assert_eq!(out.len(), (SECURITY_PARAM / 8) * 2);
