@@ -6,7 +6,7 @@ Implementation of algorithms to commit, open and reconstruct VOLEs.
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::all_but_one_vc::{commit, open, reconstruct, Decom, Pdecom};
 use crate::vole::convert_to_vole::{convert_to_vole, convert_to_vole_verifier};
-use crate::vole::crypto_primitives::{Chall3, Com, IV, PRG};
+use crate::vole::crypto_primitives::{h1, Chall3, Com, H1, H1_LENGTH, IV, PRG};
 use std::sync::mpsc::channel;
 use std::thread;
 use swanky_field::FiniteRing;
