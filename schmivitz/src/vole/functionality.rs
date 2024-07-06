@@ -9,7 +9,7 @@ use crate::vole::commit_reconstruct::{
     Corrections,
 };
 use crate::vole::commit_reconstruct::{recompose_d, B};
-use crate::vole::consistency_check::{simply_vole_hash, simply_vole_hash_parallel};
+use crate::vole::consistency_check::{vole_hash, vole_hash_lockstep};
 use crate::vole::crypto_primitives::{
     h1, h3, h_chall1, h_chall3, Chall1, Chall2, Chall3, Com, Seed, H1, H3, IV,
 };
@@ -17,7 +17,7 @@ use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake128,
 };
-use swanky_field::{FiniteField, FiniteRing};
+use swanky_field::FiniteRing;
 use swanky_field_binary::F128b;
 use swanky_field_binary::F8b;
 use swanky_field_binary::F2;
@@ -175,7 +175,7 @@ pub fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
     // line 7-8
     // hash u
     let t = std::time::Instant::now();
-    let u_tilda = simply_vole_hash(
+    let u_tilda = vole_hash(
         &chall1,
         u[0..l + SECURITY_PARAM].iter().copied(),
         l + SECURITY_PARAM,
@@ -184,13 +184,13 @@ pub fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
             .copied(),
         SECURITY_PARAM + B,
     );
-    log::info!("simply_vole_hash(u) running time: {:?}", t.elapsed());
+    log::info!("vole_hash(u) running time: {:?}", t.elapsed());
 
     // line 9
     // hash v column-wise
     let t = std::time::Instant::now();
     let mut v_tilda: Vec<F2> = Vec::with_capacity((SECURITY_PARAM + B) * SECURITY_PARAM);
-    let tmp = simply_vole_hash_parallel(
+    let tmp = vole_hash_lockstep(
         &chall1,
         &v[0..l + SECURITY_PARAM],
         &v[l + SECURITY_PARAM..l_hat(l)],
@@ -199,7 +199,7 @@ pub fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
         v_tilda.extend(newt);
     }
     assert_eq!(v_tilda.len(), (SECURITY_PARAM + B) * SECURITY_PARAM);
-    log::info!("simply_vole_hash(V) running time: {:?}", t.elapsed());
+    log::info!("vole_hash(V) running time: {:?}", t.elapsed());
 
     // line 10
     let h_v = h1(&bits_to_u8_many(&v_tilda));
@@ -289,7 +289,7 @@ pub fn create_voleith_verifier(statement_sig: &[u8], proof: &Proof, l: usize) ->
     // hash column-wise Q\tilda + D\tilda
     let t = std::time::Instant::now();
     let mut q_tilda: Vec<F2> = Vec::with_capacity((SECURITY_PARAM + B) * SECURITY_PARAM);
-    let tmp = simply_vole_hash_parallel(
+    let tmp = vole_hash_lockstep(
         &chall1,
         &q_f128b[0..l + SECURITY_PARAM],
         &q_f128b[l + SECURITY_PARAM..l_hat(l)],
@@ -299,7 +299,7 @@ pub fn create_voleith_verifier(statement_sig: &[u8], proof: &Proof, l: usize) ->
     }
     assert_eq!(q_tilda.len(), (SECURITY_PARAM + B) * SECURITY_PARAM);
 
-    log::info!("simply_vole_hash(Q) running time: {:?}", t.elapsed());
+    log::info!("vole_hash(Q) running time: {:?}", t.elapsed());
 
     // line 11
     let t = std::time::Instant::now();
@@ -349,7 +349,6 @@ mod test {
     use crate::vole::functionality::compute_chall_3;
     use crate::vole::functionality::Proof;
     use swanky_field::FiniteRing;
-    use swanky_field_binary::F2;
     use swanky_field_binary::{F128b, F8b};
     use swanky_serialization::CanonicalSerialize;
 

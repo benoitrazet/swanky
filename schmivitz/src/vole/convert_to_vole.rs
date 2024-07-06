@@ -187,7 +187,6 @@ mod test {
     use super::{convert_to_vole, convert_to_vole_prover_naive, convert_to_vole_verifier_naive};
     use crate::vole::{bitwise_utils::u8_to_f8b, crypto_primitives::Seed};
     use rand::{thread_rng, RngCore};
-    use swanky_field::FiniteRing;
     use swanky_field_binary::F8b;
 
     #[test]
