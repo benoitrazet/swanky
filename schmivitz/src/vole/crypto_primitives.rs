@@ -178,6 +178,7 @@ pub(crate) fn h0(x: Key, iv: IV) -> (Seed, Com) {
     let mut hasher = Shake128::default();
     hasher.update(&x);
     hasher.update(&iv);
+    hasher.update(&[0u8]);
 
     let mut reader = hasher.finalize_xof();
     let mut seed = [u8::default(); SECURITY_PARAM / 8];
