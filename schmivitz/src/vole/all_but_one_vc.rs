@@ -23,7 +23,6 @@ We assume the $`\lambda`$ security parameter in the spec to be 128 as set in
 
 For convenience we abbreviate "all-but-one vector commitment" to "1-VC".
 */
-#![allow(dead_code)]
 use crate::vole::crypto_primitives::{h0, h1, Com, Key, Seed, H1, IV, PRG};
 use eyre::{bail, Result};
 
@@ -231,6 +230,7 @@ pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (H1, Vec<Seed
 /// Verify the correctness of the full hash of commitments `h_com` using the partial decommitment `pdecom`,
 /// at an index `j`, and the initial vector `iv`. This function is run by the verifier and relies on
 /// [`reconstruct`] for its internal computation.
+#[allow(unused)]
 pub(crate) fn verify(h_com: H1, pdecom: Pdecom, j: Vec<bool>, iv: IV) -> Result<()> {
     assert_eq!(
         pdecom.0.len(),
