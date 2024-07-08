@@ -2,11 +2,11 @@
 Implement high-level functionality for VOLE protocol.
 */
 #![allow(clippy::needless_range_loop)]
-use crate::parameters::SECURITY_PARAM;
+use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::all_but_one_vc::Pdecom;
 use crate::vole::commit_reconstruct::{
     apply_corrections_to_q, corrections_to_bytes, l_hat, vole_commit, vole_open, vole_reconstruct,
-    Corrections,
+    Commit, Corrections,
 };
 use crate::vole::commit_reconstruct::{recompose_d, B};
 use crate::vole::consistency_check::{vole_hash, vole_hash_lockstep};
@@ -124,7 +124,7 @@ pub struct VoleithProver {
     /// initial vector
     pub iv: IV,
     /// Decommitment
-    pub decom: Vec<Decom>,
+    pub decom: [Decom; REPETITION_PARAM],
     /// Corrections
     pub corrections: Corrections,
     /// u
@@ -152,7 +152,13 @@ pub fn create_voleith_prover(statement_sig: &[u8], secret: &[u8], l: usize) -> V
 
     // lines 4-5
     let t = std::time::Instant::now();
-    let (h_com, decom, corrections, u, v) = vole_commit(r, iv, l_hat(l));
+    let Commit {
+        h_com,
+        decom,
+        corrections,
+        u,
+        v,
+    } = vole_commit(r, iv, l_hat(l));
     log::info!("vole_commit running time: {:?}", t.elapsed());
 
     // lines 6

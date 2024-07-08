@@ -50,20 +50,30 @@ fn hash_commitments(com: &[H1]) -> H1 {
     h1(&com_bytes)
 }
 
+/// Vole Commitment
+pub(crate) struct Commit {
+    /// Hash of the commitments from all the small domain voles
+    pub(crate) h_com: Com,
+    /// Decommitment from all the small domain voles
+    pub(crate) decom: [Decom; REPETITION_PARAM],
+    /// Corrections,
+    pub(crate) corrections: Corrections,
+    /// Random masks associated to VOLEs
+    pub(crate) u: Vec<F2>,
+    /// Commitments associated to `u`
+    pub(crate) v: Vec<F128b>,
+}
+
 /// Function generating the voles with associated commitments.
 ///
 /// This corresponds to Figure 5.4 of the FAEST spec.
 /// This function relies on multithreading to improve the time performance.
 #[inline(never)]
-pub(crate) fn vole_commit(
-    r: IV,
-    iv: IV,
-    l: usize,
-) -> (Com, Vec<Decom>, Corrections, Vec<F2>, Vec<F128b>) {
+pub(crate) fn vole_commit(r: IV, iv: IV, l: usize) -> Commit {
     let prg_seeds = PRG::new(r, iv).generate_prg_seeds(REPETITION_PARAM);
     let mut u = Vec::with_capacity(REPETITION_PARAM);
     let mut v = Vec::with_capacity(REPETITION_PARAM);
-    let mut decom = Vec::with_capacity(REPETITION_PARAM);
+    let mut decom: [Decom; REPETITION_PARAM] = Default::default();
     let mut com = Vec::with_capacity(REPETITION_PARAM);
 
     // Without multithreading
@@ -104,7 +114,7 @@ pub(crate) fn vole_commit(
     for i in 0..REPETITION_PARAM {
         let (com_i, decom_i, u_i, v_i) = rxs[i].recv().unwrap();
         com.push(com_i);
-        decom.push(decom_i);
+        decom[i] = decom_i;
         u.push(u_i);
         v.push(v_i);
     }
@@ -146,7 +156,13 @@ pub(crate) fn vole_commit(
     // hash the commitments
     let h_com = hash_commitments(&com);
 
-    (h_com, decom, Corrections(corr), u_0, v_out)
+    Commit {
+        h_com,
+        decom,
+        corrections: Corrections(corr),
+        u: u_0,
+        v: v_out,
+    }
 }
 
 /// Function to decompose a challenge into boolean values.
@@ -369,7 +385,7 @@ pub(crate) fn corrections_to_bytes(corrections: &Corrections) -> Vec<u8> {
 mod test {
     use super::{
         apply_corrections_to_q, bitwise_f128b_from_f8b, bools_to_u8, chal_dec, compute_secret_key,
-        l_hat, vole_commit, vole_open, vole_reconstruct,
+        l_hat, vole_commit, vole_open, vole_reconstruct, Commit,
     };
     use crate::parameters::REPETITION_PARAM;
     use crate::vole::crypto_primitives::{h1, H1};
@@ -415,7 +431,13 @@ mod test {
         let mu: H1 = h1(&pk);
         let (r, iv) = compute_seed_iv(&sk, &mu);
 
-        let (_h, decom, corrections, u, v) = vole_commit(r, iv, how_many);
+        let Commit {
+            h_com: _,
+            decom,
+            corrections,
+            u,
+            v,
+        } = vole_commit(r, iv, how_many);
 
         let chall3 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
