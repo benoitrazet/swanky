@@ -141,27 +141,16 @@ pub struct VoleithProver {
     pub h_v: H1,
 }
 
-/// Proof computed by the prover
-pub struct Proof {
-    corrections: Corrections,
-    u_tilda: HashConsistency,
-    d: Vec<F2>,     // masked witnesses
-    a_tilda: F128b, // a^\tilda
-    pdecom: Vec<Pdecom>,
-    chall3: Chall3,
-    iv: IV,
-}
-
 /// Create VOLEith given a statement signature on the prover side.
 ///
 /// Adapted from parts of FAEST.sign from Fig. 8.2
 #[inline(never)]
-pub fn create_voleith_prover(statement_sig: &[u8], l: usize) -> VoleithProver {
+pub fn create_voleith_prover(statement_sig: &[u8], secret: &[u8], l: usize) -> VoleithProver {
     // line 2
     let mu: H1 = h1(statement_sig); // Hash the signature of the circuit+instance the prover/verifier agree to execute.
 
     // line 3
-    let (r, iv) = compute_seed_iv(&[], &mu); // NOTE: there is no secret key here, it was only relevant to FAEST.
+    let (r, iv) = compute_seed_iv(secret, &mu);
 
     // lines 4-5
     let t = std::time::Instant::now();
@@ -353,7 +342,8 @@ mod test {
 
     fn test_vole_prover_and_verifier(how_many: usize) {
         let statement_sig = vec![1u8];
-        let vole_creation = create_voleith_prover(&statement_sig, how_many);
+        let secret = vec![42u8];
+        let vole_creation = create_voleith_prover(&statement_sig, &secret, how_many);
         let VoleithProver {
             iv,
             decom,
