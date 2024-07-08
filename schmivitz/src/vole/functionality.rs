@@ -24,7 +24,7 @@ use swanky_serialization::CanonicalSerialize;
 
 use super::all_but_one_vc::Decom;
 use super::commit_reconstruct::compute_secret_key;
-use super::consistency_check::{hash_consistency_to_bytes, HashConsistency};
+use super::consistency_check::HashConsistency;
 use super::crypto_primitives::CHALL2_LENGTH;
 
 /// Compute a seed and initialization vection from secret key and hash of statement to prove.
@@ -66,7 +66,7 @@ pub(crate) fn compute_chall_2(
 
     let mut hasher = Shake128::default();
     hasher.update(chall1);
-    hasher.update(hash_consistency_to_bytes(&u_tilda).as_slice());
+    hasher.update(&u_tilda.to_bytes().as_slice());
     hasher.update(&h_v);
 
     // pack the binary field values into bytes
@@ -188,7 +188,7 @@ pub fn create_voleith_prover(statement_sig: &[u8], secret: &[u8], l: usize) -> V
         &v[l + SECURITY_PARAM..l_hat(l)],
     );
     for newt in tmp {
-        v_tilda.extend(newt);
+        v_tilda.extend(newt.0);
     }
     assert_eq!(v_tilda.len(), (SECURITY_PARAM + B) * SECURITY_PARAM);
     log::info!("vole_hash(V) running time: {:?}", t.elapsed());
@@ -288,7 +288,7 @@ pub fn create_voleith_verifier(
         &q_f128b[l + SECURITY_PARAM..l_hat(l)],
     );
     for newt in tmp {
-        q_tilda.extend(newt);
+        q_tilda.extend(newt.0);
     }
     assert_eq!(q_tilda.len(), (SECURITY_PARAM + B) * SECURITY_PARAM);
 
@@ -296,7 +296,7 @@ pub fn create_voleith_verifier(
 
     // line 11
     let t = std::time::Instant::now();
-    let big_d = recompose_d(chall3, u_tilda);
+    let big_d = recompose_d(chall3, &u_tilda);
     log::info!("recompose_d running time: {:?}", t.elapsed());
 
     // line 16
@@ -311,7 +311,7 @@ pub fn create_voleith_verifier(
     let h_v = h1(&bits_to_u8_many(&q_xor_d));
 
     // line 17
-    let chall2 = compute_chall_2(&chall1, *u_tilda, h_v, d);
+    let chall2 = compute_chall_2(&chall1, u_tilda.clone(), h_v, d);
 
     // compute the secret key
     let delta = compute_secret_key(chall3);
@@ -360,7 +360,7 @@ mod test {
             h_v,
         } = vole_creation.clone();
         let dummy_masked = vec![];
-        let chall2 = compute_chall_2(&chall1, u_tilda, h_v, &dummy_masked);
+        let chall2 = compute_chall_2(&chall1, u_tilda.clone(), h_v, &dummy_masked);
         let dummy_a_tilda = F128b::ZERO;
         let dummy_b_tilda = F128b::ZERO;
         let chall3 = compute_chall_3(&chall2, dummy_a_tilda, dummy_b_tilda);

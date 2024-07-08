@@ -16,6 +16,8 @@ use swanky_field_binary::F8b;
 use swanky_field_binary::F2;
 use swanky_serialization::CanonicalSerialize;
 
+use super::consistency_check::HashConsistency;
+
 /// Parameter used for padding for the security of the consistency check
 pub(crate) const B: usize = 16;
 
@@ -328,9 +330,9 @@ pub(crate) fn apply_corrections_to_q(
 ///
 /// This function implements lines 8-11 in Fig 8.3 in the FAEST spec.
 #[inline(never)]
-pub(crate) fn recompose_d(chall3: &Chall3, u_tilda: &[F2]) -> Vec<F2> {
-    assert_eq!(u_tilda.len(), SECURITY_PARAM + B);
-    let how_many = u_tilda.len();
+pub(crate) fn recompose_d(chall3: &Chall3, u_tilda: &HashConsistency) -> Vec<F2> {
+    assert_eq!(u_tilda.0.len(), SECURITY_PARAM + B);
+    let how_many = u_tilda.0.len();
     let mut qs = Vec::with_capacity(how_many * REPETITION_PARAM * 8);
 
     for tau in 0..REPETITION_PARAM {
@@ -340,7 +342,7 @@ pub(crate) fn recompose_d(chall3: &Chall3, u_tilda: &[F2]) -> Vec<F2> {
             .map(|b| if *b { F2::ONE } else { F2::ZERO })
             .collect();
         for b in delta_f2 {
-            for u in u_tilda.iter() {
+            for u in u_tilda.0.iter() {
                 qs.push(b * *u);
             }
         }

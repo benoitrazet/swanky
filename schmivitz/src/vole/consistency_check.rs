@@ -99,21 +99,31 @@ fn to_field_f128_and_pad_lockstep(x: &[F128b]) -> Vec<[F128b; SECURITY_PARAM]> {
 }
 
 /// Hash as produced by [`vole_hash`].
-pub(crate) type HashConsistency = [F2; SECURITY_PARAM + B];
+#[derive(Clone, Copy)]
+#[repr(transparent)]
+pub(crate) struct HashConsistency(pub(crate) [F2; SECURITY_PARAM + B]);
 
-/// Convert a consistency hash to a vector of bytes
-pub(crate) fn hash_consistency_to_bytes(h: &HashConsistency) -> Vec<u8> {
-    let mut out = vec![];
-    for chunk in h.chunks(8) {
-        let mut byte = 0u8;
-        for (i, &b) in chunk.iter().enumerate() {
-            if b == F2::ONE {
-                byte |= 1 << i;
-            }
-        }
-        out.push(byte);
+impl Default for HashConsistency {
+    fn default() -> Self {
+        Self([Default::default(); SECURITY_PARAM + B])
     }
-    out
+}
+
+impl HashConsistency {
+    /// Convert a consistency hash to a vector of bytes
+    pub(crate) fn to_bytes(&self) -> Vec<u8> {
+        let mut out = vec![];
+        for chunk in self.0.chunks(8) {
+            let mut byte = 0u8;
+            for (i, &b) in chunk.iter().enumerate() {
+                if b == F2::ONE {
+                    byte |= 1 << i;
+                }
+            }
+            out.push(byte);
+        }
+        out
+    }
 }
 
 /// Function doing linear hashing of vector of boolean field elements.
@@ -190,7 +200,7 @@ pub(crate) fn vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
             .collect::<Vec<_>>()
             .as_slice(),
     );
-    out
+    HashConsistency(out)
 }
 
 /// Function doing linear hashing of the column of bits in lock-step.
@@ -257,7 +267,7 @@ pub(crate) fn vole_hash_lockstep(
         h3[j] = r2 * h0[j] + r3 * h1[j];
     }
 
-    let mut out = [[F2::ZERO; SECURITY_PARAM + B]; SECURITY_PARAM];
+    let mut out = [HashConsistency::default(); SECURITY_PARAM];
 
     for j in 0..SECURITY_PARAM {
         let h2_bits = h2[j].bit_decomposition();
@@ -284,7 +294,7 @@ pub(crate) fn vole_hash_lockstep(
                 .collect::<Vec<_>>()
                 .as_slice(),
         );
-        out[j] = single_out;
+        out[j] = HashConsistency(single_out);
     }
     out
 }
@@ -341,7 +351,7 @@ mod test {
             x1.into_iter(),
             SECURITY_PARAM + B,
         );
-        for b in v.iter() {
+        for b in v.0.iter() {
             assert_eq!(*b, F2::ZERO);
         }
     }
@@ -363,7 +373,7 @@ mod test {
             x1.into_iter(),
             SECURITY_PARAM + B,
         );
-        for (i, b) in v.iter().enumerate() {
+        for (i, b) in v.0.iter().enumerate() {
             if i == pos {
                 assert_eq!(*b, F2::ONE);
             } else {
@@ -405,7 +415,7 @@ mod test {
             x2.into_iter().skip(BOUND),
             LAST,
         );
-        for ((a, b), c) in v0.iter().zip(v1.iter()).zip(v2.iter()) {
+        for ((a, b), c) in v0.0.iter().zip(v1.0.iter()).zip(v2.0.iter()) {
             assert_eq!(*a + *b, *c);
         }
     }
