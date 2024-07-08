@@ -2,13 +2,17 @@
 Convert vector commitments to VOLEs.
 */
 #![allow(clippy::needless_range_loop)]
-use crate::vole::bitwise_utils::u8_to_f8b;
 use crate::vole::crypto_primitives::{Seed, IV, PRG};
 #[allow(unused_imports)]
 // WEIRD: rust-analyzer seems to consider `FiniteRing`, but without it, it is not possible to use ZERO/ONE etc.
-use swanky_field::FiniteRing;
 use swanky_field_binary::F8b;
 use swanky_field_binary::F2;
+use swanky_serialization::CanonicalSerialize;
+
+fn u8_to_f8b(x: u8) -> F8b {
+    // Safe to unwrap here
+    F8b::from_bytes(&[x].into()).unwrap()
+}
 
 /// This function converts seeds to voles.
 ///
@@ -117,6 +121,7 @@ pub(crate) fn convert_to_vole(
 /// This function is the naive version of [`convert_to_vole`] that does not
 /// operate on packed boolean field values.
 fn convert_to_vole_prover_naive(seeds: &[Seed], iv: IV, l: usize) -> (Vec<F2>, Vec<F8b>) {
+    use swanky_field::FiniteRing;
     assert!(seeds.len() == 256);
     let mut u_res = vec![F2::ZERO; l];
     let mut v_res = vec![F8b::ZERO; l];
@@ -159,6 +164,7 @@ pub(crate) fn convert_to_vole_verifier(seeds: &[Seed], iv: IV, l: usize, delta: 
 // NOTE: the return type is different than ConvertToVOLE in the paper, where is should be a Vec<Vec<F2>>
 #[cfg(test)]
 fn convert_to_vole_verifier_naive(seeds: &[Seed], iv: IV, l: usize, delta: u8) -> Vec<F8b> {
+    use swanky_field::FiniteRing;
     assert_eq!(seeds.len(), 256);
     let mut v_res = vec![F8b::ZERO; l];
 
@@ -184,8 +190,10 @@ fn convert_to_vole_verifier_naive(seeds: &[Seed], iv: IV, l: usize, delta: u8) -
 
 #[cfg(test)]
 mod test {
-    use super::{convert_to_vole, convert_to_vole_prover_naive, convert_to_vole_verifier_naive};
-    use crate::vole::{bitwise_utils::u8_to_f8b, crypto_primitives::Seed};
+    use super::{
+        convert_to_vole, convert_to_vole_prover_naive, convert_to_vole_verifier_naive, u8_to_f8b,
+    };
+    use crate::vole::crypto_primitives::Seed;
     use rand::{thread_rng, RngCore};
     use swanky_field_binary::F8b;
 
