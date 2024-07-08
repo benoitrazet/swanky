@@ -118,32 +118,34 @@ fn bits_to_u8_many(bits: &[F2]) -> Vec<u8> {
     out
 }
 
-/// Structure of voleith created by the functionality on the prover side.
+/// Structure of vole created by the functionality on the prover side.
 #[derive(Clone)]
-pub struct VoleithProver {
+#[allow(unused)]
+pub(crate) struct VoleProver {
     /// initial vector
-    pub iv: IV,
+    pub(crate) iv: IV,
     /// Decommitment
-    pub decom: [Decom; REPETITION_PARAM],
+    pub(crate) decom: [Decom; REPETITION_PARAM],
     /// Corrections
-    pub corrections: Corrections,
+    pub(crate) corrections: Corrections,
     /// u
-    pub u: Vec<F2>,
+    pub(crate) u: Vec<F2>,
     /// v
-    pub v: Vec<F128b>,
+    pub(crate) v: Vec<F128b>,
     /// First challenge
-    pub chall1: Chall1,
+    pub(crate) chall1: Chall1,
     /// consistency hash of u
-    pub u_tilda: HashConsistency,
+    pub(crate) u_tilda: HashConsistency,
     /// hash of the consistency hash of V        
-    pub h_v: H1,
+    pub(crate) h_v: H1,
 }
 
-/// Create VOLEith given a statement signature on the prover side.
+/// Create VOLEs given a statement signature on the prover side.
 ///
 /// Adapted from parts of FAEST.sign from Fig. 8.2
 #[inline(never)]
-pub fn create_voleith_prover(statement_sig: &[u8], secret: &[u8], l: usize) -> VoleithProver {
+#[allow(unused)]
+pub(crate) fn create_vole_prover(statement_sig: &[u8], secret: &[u8], l: usize) -> VoleProver {
     // line 2
     let mu: H1 = h1(statement_sig); // Hash the signature of the circuit+instance the prover/verifier agree to execute.
 
@@ -196,7 +198,7 @@ pub fn create_voleith_prover(statement_sig: &[u8], secret: &[u8], l: usize) -> V
     // line 10
     let h_v = h1(&bits_to_u8_many(&v_tilda));
 
-    VoleithProver {
+    VoleProver {
         iv,
         decom,
         corrections,
@@ -209,7 +211,8 @@ pub fn create_voleith_prover(statement_sig: &[u8], secret: &[u8], l: usize) -> V
 }
 
 /// Implements get for the functionality on the prover side
-pub fn decommit(decom: &[Decom], chall3: Chall3) -> Vec<Pdecom> {
+#[allow(unused)]
+pub(crate) fn decommit(decom: &[Decom], chall3: Chall3) -> Vec<Pdecom> {
     let t = std::time::Instant::now();
     let pdecom = vole_open(&chall3, decom);
     log::info!("vole_open running time: {:?}", t.elapsed());
@@ -217,19 +220,20 @@ pub fn decommit(decom: &[Decom], chall3: Chall3) -> Vec<Pdecom> {
     pdecom
 }
 
-/// Structure of VOLEith created by the functionality on the verifier side.
+/// Structure of VOLE created by the functionality on the verifier side.
 #[derive(Clone)]
-pub struct VoleithVerifier {
+pub(crate) struct VoleVerifier {
     /// correlations on verifier side
-    pub q: Vec<F128b>,
+    pub(crate) q: Vec<F128b>,
     /// Second challenge
-    pub chall2: Chall2,
+    #[allow(unused)]
+    pub(crate) chall2: Chall2,
     /// secret key
-    pub delta: F128b,
+    pub(crate) delta: F128b,
 }
 
-/// Proof computed by the prover
-pub struct VoleVerifierArgs {
+/// Arguments provided to the verifier so that he can create the VOLEs.
+pub(crate) struct VoleVerifierArgs {
     corrections: Corrections,
     u_tilda: HashConsistency,
     d: Vec<F2>, // masked witnesses
@@ -238,15 +242,16 @@ pub struct VoleVerifierArgs {
     iv: IV,
 }
 
-/// Create VOLEith given a statement signature and a proof, on the verifier side.
+/// Create VOLEs given a statement signature and a proof, on the verifier side.
 ///
 /// Adapted from parts of FAEST.verify from Fig. 8.2
 #[inline(never)]
-pub fn create_voleith_verifier(
+#[allow(unused)]
+pub(crate) fn create_vole_verifier(
     statement_sig: &[u8],
     proof: &VoleVerifierArgs,
     l: usize,
-) -> VoleithVerifier {
+) -> VoleVerifier {
     // line 1
     let VoleVerifierArgs {
         corrections,
@@ -316,7 +321,7 @@ pub fn create_voleith_verifier(
     // compute the secret key
     let delta = compute_secret_key(chall3);
 
-    VoleithVerifier {
+    VoleVerifier {
         q: q_f128b,
         chall2,
         delta,
@@ -324,7 +329,13 @@ pub fn create_voleith_verifier(
 }
 
 /// Adpation of FAEST Verify function Fig. 8.3
-pub fn verify(proof: &VoleVerifierArgs, chall2: Chall2, a_tilda: F128b, b_tilda: F128b) -> bool {
+#[allow(unused)]
+pub(crate) fn verify(
+    proof: &VoleVerifierArgs,
+    chall2: Chall2,
+    a_tilda: F128b,
+    b_tilda: F128b,
+) -> bool {
     let chall3 = proof.chall3;
     // Line 20
     let chall3_prime = compute_chall_3(&chall2, a_tilda, b_tilda);
@@ -335,8 +346,7 @@ pub fn verify(proof: &VoleVerifierArgs, chall2: Chall2, a_tilda: F128b, b_tilda:
 #[cfg(test)]
 mod test {
     use super::{
-        create_voleith_prover, create_voleith_verifier, decommit, verify, VoleithProver,
-        VoleithVerifier,
+        create_vole_prover, create_vole_verifier, decommit, verify, VoleProver, VoleVerifier,
     };
     use crate::vole::functionality::compute_chall_2;
     use crate::vole::functionality::compute_chall_3;
@@ -348,8 +358,8 @@ mod test {
     fn test_vole_prover_and_verifier(how_many: usize) {
         let statement_sig = vec![1u8];
         let secret = vec![42u8];
-        let vole_creation = create_voleith_prover(&statement_sig, &secret, how_many);
-        let VoleithProver {
+        let vole_creation = create_vole_prover(&statement_sig, &secret, how_many);
+        let VoleProver {
             iv,
             decom,
             corrections,
@@ -374,11 +384,11 @@ mod test {
             chall3,
             iv,
         };
-        let VoleithVerifier {
+        let VoleVerifier {
             q,
             chall2: chall2_verifier,
             delta,
-        } = create_voleith_verifier(&statement_sig, &proof, how_many);
+        } = create_vole_verifier(&statement_sig, &proof, how_many);
         let b = verify(&proof, chall2_verifier, dummy_a_tilda, dummy_b_tilda);
 
         for pos in 0..how_many {

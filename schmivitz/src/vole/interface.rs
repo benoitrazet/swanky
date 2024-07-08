@@ -1,8 +1,8 @@
 use super::crypto_primitives::{CHALL1_LENGTH, CHALL3_LENGTH};
-use super::functionality::{decommit, VoleithVerifier};
+use super::functionality::{decommit, VoleVerifier};
 use super::{all_but_one_vc::Pdecom, RandomVole};
 use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
-use crate::vole::functionality::{create_voleith_prover, VoleithProver};
+use crate::vole::functionality::{create_vole_prover, VoleProver};
 use eyre::{bail, Result};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
@@ -10,7 +10,7 @@ use swanky_field_binary::{F128b, F2};
 
 // This is a first attempt to connect the VOLE part to the circuit traverser.
 
-impl RandomVole for VoleithProver {
+impl RandomVole for VoleProver {
     type Decommitment = Vec<Pdecom>;
 
     type VoleChallenge = [u8; CHALL1_LENGTH];
@@ -25,7 +25,7 @@ impl RandomVole for VoleithProver {
         let mut statement_sig = [0u8; 16];
         transcript.challenge_bytes(b"statement signature", &mut statement_sig);
         let todo_secret = [42u8];
-        let vole = create_voleith_prover(
+        let vole = create_vole_prover(
             &statement_sig,
             &todo_secret,
             extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM,
@@ -102,7 +102,7 @@ impl RandomVole for VoleithProver {
 
 // The functions in this implementation are the ones from `InsecureCommitments`
 #[allow(unused)]
-impl VoleithVerifier {
+impl VoleVerifier {
     pub(crate) fn extended_witness_length(&self) -> usize {
         self.q.len() - REPETITION_PARAM * VOLE_SIZE_PARAM
     }
