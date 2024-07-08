@@ -31,7 +31,14 @@ pub(crate) fn bools_to_u8(d: &[bool]) -> u8 {
 }
 
 /// Type for corrections applied to voles.
-pub(crate) type Corrections = Vec<Vec<F2>>;
+#[derive(Clone)]
+pub(crate) struct Corrections([Vec<F2>; REPETITION_PARAM - 1]);
+
+impl Default for Corrections {
+    fn default() -> Self {
+        Corrections(Default::default())
+    }
+}
 
 /// hash the commitments coming from the small-domain VOLE
 fn hash_commitments(com: &[H1]) -> H1 {
@@ -110,7 +117,7 @@ pub(crate) fn vole_commit(
     // let's compute the corrections
     let t = std::time::Instant::now();
     let u_0 = u[0].clone(); // TODO: opt transmute here
-    let mut corr = Vec::with_capacity(REPETITION_PARAM - 1);
+    let mut corr: [Vec<F2>; REPETITION_PARAM - 1] = Default::default();
     for i in 1..REPETITION_PARAM {
         let mut ci = Vec::with_capacity(l);
         debug_assert_eq!(l, u_0.len());
@@ -119,7 +126,7 @@ pub(crate) fn vole_commit(
             let c = u_0[j] + u_i[j];
             ci.push(c);
         }
-        corr.push(ci);
+        corr[i - 1] = ci;
     }
     log::info!("corrections running time: {:?}", t.elapsed());
     debug_assert_eq!(corr.len(), REPETITION_PARAM - 1);
@@ -139,7 +146,7 @@ pub(crate) fn vole_commit(
     // hash the commitments
     let h_com = hash_commitments(&com);
 
-    (h_com, decom, corr, u_0, v_out)
+    (h_com, decom, Corrections(corr), u_0, v_out)
 }
 
 /// Function to decompose a challenge into boolean values.
@@ -267,10 +274,10 @@ pub(crate) fn apply_corrections_to_q(
         let delta = chal_dec(chall3, tau);
 
         for pos in 0..how_many {
-            let c_tau = corrections[tau - 1][pos];
+            let c_tau = corrections.0[tau - 1][pos];
             let mut delta_times_corr = [F2::default(); 8];
             for (i, d) in delta.iter().enumerate() {
-                let corr = (if *d { F2::ONE } else { F2::ZERO }) * c_tau; // TODO: can optimize that
+                let corr = F2::from(*d) * c_tau; // TODO: optimize this
                 delta_times_corr[i] = corr;
             }
             let delta_times_corr_f8b: F8b = F2::form_superfield(&delta_times_corr.into());
@@ -322,13 +329,13 @@ pub(crate) fn l_hat(l: usize) -> usize {
 #[inline(never)]
 pub(crate) fn corrections_to_bytes(corrections: &Corrections) -> Vec<u8> {
     // Corrections are a vector containing tau vectors of long size
-    let how_many = corrections[0].len();
-    let tau = corrections.len();
+    let how_many = corrections.0[0].len();
+    let tau = corrections.0.len();
     let mut out = Vec::with_capacity((how_many * tau) / 8);
 
     let mut b = 0u8;
     let mut i = 0;
-    for c in corrections.iter() {
+    for c in corrections.0.iter() {
         for bit in c.iter() {
             b |= if *bit == F2::ZERO { 0 } else { 1 << i };
             if i == 7 {
