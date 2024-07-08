@@ -236,17 +236,30 @@ pub struct VoleithVerifier {
     pub delta: F128b,
 }
 
+/// Proof computed by the prover
+pub struct VoleVerifierArgs {
+    corrections: Corrections,
+    u_tilda: HashConsistency,
+    d: Vec<F2>, // masked witnesses
+    pdecom: Vec<Pdecom>,
+    chall3: Chall3,
+    iv: IV,
+}
+
 /// Create VOLEith given a statement signature and a proof, on the verifier side.
 ///
 /// Adapted from parts of FAEST.verify from Fig. 8.2
 #[inline(never)]
-pub fn create_voleith_verifier(statement_sig: &[u8], proof: &Proof, l: usize) -> VoleithVerifier {
+pub fn create_voleith_verifier(
+    statement_sig: &[u8],
+    proof: &VoleVerifierArgs,
+    l: usize,
+) -> VoleithVerifier {
     // line 1
-    let Proof {
+    let VoleVerifierArgs {
         corrections,
         u_tilda,
         d,
-        a_tilda: _,
         pdecom,
         chall3,
         iv,
@@ -271,7 +284,7 @@ pub fn create_voleith_verifier(statement_sig: &[u8], proof: &Proof, l: usize) ->
         corrections,
         l_hat(l), /* TODO: unsure about this value*/
     );
-    log::info!("recompose_q running time: {:?}", t.elapsed());
+    log::info!("apply_corrections_to_q running time: {:?}", t.elapsed());
 
     // line 15
     // hash column-wise Q\tilda + D\tilda
@@ -319,7 +332,7 @@ pub fn create_voleith_verifier(statement_sig: &[u8], proof: &Proof, l: usize) ->
 }
 
 /// Adpation of FAEST Verify function Fig. 8.3
-pub fn verify(proof: &Proof, chall2: Chall2, a_tilda: F128b, b_tilda: F128b) -> bool {
+pub fn verify(proof: &VoleVerifierArgs, chall2: Chall2, a_tilda: F128b, b_tilda: F128b) -> bool {
     let chall3 = proof.chall3;
     // Line 20
     let chall3_prime = compute_chall_3(&chall2, a_tilda, b_tilda);
@@ -335,7 +348,7 @@ mod test {
     };
     use crate::vole::functionality::compute_chall_2;
     use crate::vole::functionality::compute_chall_3;
-    use crate::vole::functionality::Proof;
+    use crate::vole::functionality::VoleVerifierArgs;
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F128b, F8b};
     use swanky_serialization::CanonicalSerialize;
@@ -361,12 +374,11 @@ mod test {
         let chall3 = compute_chall_3(&chall2, dummy_a_tilda, dummy_b_tilda);
         let pdecom = decommit(&decom, chall3);
 
-        let proof = Proof {
+        let proof = VoleVerifierArgs {
             corrections,
             u_tilda,
             pdecom,
             d: dummy_masked,
-            a_tilda: dummy_a_tilda,
             chall3,
             iv,
         };

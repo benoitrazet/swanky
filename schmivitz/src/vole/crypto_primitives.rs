@@ -244,7 +244,7 @@ pub(crate) const CHALL2_LENGTH: usize = (SECURITY_PARAM * 3 + 64) / 8;
 pub(crate) type Chall2 = [u8; CHALL2_LENGTH];
 
 /// This is `$H_2^2$` in FAEST spec.
-#[allow(dead_code)]
+#[allow(unused)]
 pub(crate) fn h_chall2(inp: &[u8]) -> Chall2 {
     let mut out: Chall2 = [0u8; CHALL2_LENGTH]; // NOTE: default does not work here
     h2(inp, &mut out);
