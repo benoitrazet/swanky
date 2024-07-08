@@ -66,7 +66,6 @@ pub(crate) fn compute_chall_2(
 ) -> Chall2 {
     let mut out: Chall2 = [0u8; CHALL2_LENGTH];
 
-    // TODO: add more
     let mut hasher = Shake128::default();
     hasher.update(chall1);
     hasher.update(hash_consistency_to_bytes(&u_tilda).as_slice());

@@ -217,7 +217,7 @@ pub(crate) fn h1(inp: &[u8]) -> H1 {
     out
 }
 
-/// This is `$H_2^3$` in FAEST spec
+/// This is `$H_2^j$` in FAEST spec
 pub(crate) fn h2(inp: &[u8], out: &mut [u8]) {
     let mut hasher = Shake128::default();
     hasher.update(inp);
@@ -231,7 +231,7 @@ pub(crate) const CHALL1_LENGTH: usize = (SECURITY_PARAM * 6) / 8;
 /// First challenge
 pub(crate) type Chall1 = [u8; CHALL1_LENGTH];
 
-/// This is `$H_2^2$` in FAEST spec.
+/// This is `$H_2^1$` in FAEST spec.
 pub(crate) fn h_chall1(inp: &[u8]) -> Chall1 {
     let mut out: Chall1 = [0u8; CHALL1_LENGTH]; // NOTE: default does not work here
     h2(inp, &mut out);
