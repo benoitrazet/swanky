@@ -21,6 +21,7 @@ pub(crate) mod consistency_check;
 pub(crate) mod convert_to_vole;
 pub(crate) mod crypto_primitives;
 pub mod functionality;
+pub(crate) mod interface;
 
 /// This defines the behavior needed to create and use non-interactive random VOLEs.
 ///
