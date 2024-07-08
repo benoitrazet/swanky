@@ -35,10 +35,7 @@ impl PRG {
         let key: GenericArray<u8, _> = GenericArray::from(seed);
         let aes0 = Aes128::new(&key);
 
-        let mut counter = 0;
-        for b in iv {
-            counter = (counter << 8) + (b as u128);
-        }
+        let counter = u128::from_le_bytes(iv);
         Self { aes0, counter }
     }
 
