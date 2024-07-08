@@ -2,7 +2,7 @@
 Implement high-level functionality for VOLE protocol.
 */
 #![allow(clippy::needless_range_loop)]
-use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
+use crate::parameters::SECURITY_PARAM;
 use crate::vole::all_but_one_vc::Pdecom;
 use crate::vole::commit_reconstruct::{
     apply_corrections_to_q, corrections_to_bytes, l_hat, vole_commit, vole_open, vole_reconstruct,
@@ -19,13 +19,11 @@ use sha3::{
 };
 use swanky_field::FiniteRing;
 use swanky_field_binary::F128b;
-use swanky_field_binary::F8b;
 use swanky_field_binary::F2;
 use swanky_serialization::CanonicalSerialize;
 
 use super::all_but_one_vc::Decom;
-use super::bitwise_utils::u8_to_f8b;
-use super::commit_reconstruct::{bitwise_f128b_from_f8b, bools_to_u8, chal_dec};
+use super::commit_reconstruct::compute_secret_key;
 use super::consistency_check::{hash_consistency_to_bytes, HashConsistency};
 use super::crypto_primitives::CHALL2_LENGTH;
 
@@ -211,18 +209,6 @@ pub fn decommit(decom: &[Decom], chall3: Chall3) -> Vec<Pdecom> {
     log::info!("vole_open running time: {:?}", t.elapsed());
 
     pdecom
-}
-
-/// Compute the secret key delta from a challenge
-fn compute_secret_key(chall3: &Chall3) -> F128b {
-    // compute the big delta
-    let mut big_delta = [F8b::default(); REPETITION_PARAM];
-    for tau in 0..REPETITION_PARAM {
-        let delta_i = chal_dec(chall3, tau);
-        let delta_f8b: F8b = u8_to_f8b(bools_to_u8(&delta_i));
-        big_delta[tau] = delta_f8b;
-    }
-    bitwise_f128b_from_f8b(&big_delta)
 }
 
 /// Structure of VOLEith created by the functionality on the verifier side.

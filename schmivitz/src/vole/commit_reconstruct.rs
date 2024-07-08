@@ -241,12 +241,27 @@ pub(crate) fn vole_reconstruct(
 }
 
 /// Function converting a slice of [`F8b`] values into a [`F128b`] value using the underlying bits.
-pub(crate) fn bitwise_f128b_from_f8b(v: &[F8b; REPETITION_PARAM]) -> F128b {
+///
+/// This function is only used when applying the corrections to Q where the underlying values are
+/// in `F8b`, but to reconstruct the values in `F128b`, the `F8b` are interpreted as bytes.
+fn bitwise_f128b_from_f8b(v: &[F8b; REPETITION_PARAM]) -> F128b {
     let mut tmp: [u8; REPETITION_PARAM] = [0; REPETITION_PARAM];
     for (i, b) in v.iter().enumerate() {
         tmp[i] = b.to_bytes()[0];
     }
     F128b::from_bytes(&tmp.into()).unwrap()
+}
+
+// Compute the secret key delta from a challenge
+pub(crate) fn compute_secret_key(chall3: &Chall3) -> F128b {
+    // compute the big delta
+    let mut big_delta = [u8::default(); REPETITION_PARAM];
+    for tau in 0..REPETITION_PARAM {
+        let delta_i = chal_dec(chall3, tau);
+        big_delta[tau] = bools_to_u8(&delta_i);
+    }
+    // safe to unwrap here be the dimensions of arrays match.
+    F128b::from_bytes(&big_delta.into()).unwrap()
 }
 
 /// This function applies corrections to the verifier part of voles `q` using a challenge.
@@ -353,14 +368,42 @@ pub(crate) fn corrections_to_bytes(corrections: &Corrections) -> Vec<u8> {
 #[cfg(test)]
 mod test {
     use super::{
-        apply_corrections_to_q, bitwise_f128b_from_f8b, bools_to_u8, chal_dec, l_hat, vole_commit,
-        vole_open, vole_reconstruct,
+        apply_corrections_to_q, bitwise_f128b_from_f8b, bools_to_u8, chal_dec, compute_secret_key,
+        l_hat, vole_commit, vole_open, vole_reconstruct,
     };
     use crate::parameters::REPETITION_PARAM;
-    use crate::vole::bitwise_utils::u8_to_f8b;
     use crate::vole::crypto_primitives::{h1, H1};
     use crate::vole::functionality::compute_seed_iv;
+    use swanky_field::FiniteRing;
     use swanky_field_binary::F8b;
+    use swanky_serialization::CanonicalSerialize;
+
+    #[test]
+    fn test_bitwise_f128b_from_f8b() {
+        let values: [u8; REPETITION_PARAM] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+
+        let mut values_f8b = [F8b::ZERO; REPETITION_PARAM];
+        for i in 0..REPETITION_PARAM {
+            values_f8b[i] = F8b::from_bytes(&[values[i]].into()).unwrap();
+        }
+
+        let f = bitwise_f128b_from_f8b(&values_f8b);
+        let bytes = f.to_bytes();
+        for i in 0..REPETITION_PARAM {
+            assert_eq!(bytes[i], values[i]);
+        }
+    }
+
+    #[test]
+    fn test_compute_secret_key_and_chall_dec() {
+        let chall3 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let secret_key = compute_secret_key(&chall3);
+
+        let bytes_secret_key = secret_key.to_bytes();
+        for i in 0..REPETITION_PARAM {
+            assert_eq!(bytes_secret_key[i], bools_to_u8(&chal_dec(&chall3, i)));
+        }
+    }
 
     #[test]
     fn test_vole_commit_reconstruct() {
@@ -386,13 +429,7 @@ mod test {
         let q_f128b = apply_corrections_to_q(q, &chall3, &corrections, how_many);
 
         // compute the big delta
-        let mut big_delta = [F8b::default(); REPETITION_PARAM];
-        for tau in 0..REPETITION_PARAM {
-            let delta_i = chal_dec(&chall3, tau);
-            let delta_f8b: F8b = u8_to_f8b(bools_to_u8(&delta_i));
-            big_delta[tau] = delta_f8b;
-        }
-        let big_delta_f128b = bitwise_f128b_from_f8b(&big_delta);
+        let big_delta_f128b = compute_secret_key(&chall3);
 
         for pos in 0..how_many {
             //assert_eq!(v_f128b[pos], q_f128b[pos]);
