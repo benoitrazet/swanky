@@ -210,14 +210,27 @@ pub(crate) fn create_vole_prover(statement_sig: &[u8], secret: &[u8], l: usize) 
     }
 }
 
+/// Partial decommitment produced by the prover.
+pub(crate) struct PartialDecommitment {
+    pdecom: Vec<Pdecom>,
+    corrections: Corrections,
+    iv: IV,
+    u_tilda: HashConsistency,
+}
+
 /// Implements get for the functionality on the prover side
 #[allow(unused)]
-pub(crate) fn decommit(decom: &[Decom], chall3: Chall3) -> Vec<Pdecom> {
+pub(crate) fn decommit(vole: VoleProver, chall3: Chall3) -> PartialDecommitment {
     let t = std::time::Instant::now();
-    let pdecom = vole_open(&chall3, decom);
+    let pdecom = vole_open(&chall3, &vole.decom);
     log::info!("vole_open running time: {:?}", t.elapsed());
 
-    pdecom
+    PartialDecommitment {
+        pdecom,
+        corrections: vole.corrections,
+        iv: vole.iv,
+        u_tilda: vole.u_tilda,
+    }
 }
 
 /// Structure of VOLE created by the functionality on the verifier side.
@@ -232,16 +245,6 @@ pub(crate) struct VoleVerifier {
     pub(crate) delta: F128b,
 }
 
-/// Arguments provided to the verifier so that he can create the VOLEs.
-pub(crate) struct VoleVerifierArgs {
-    corrections: Corrections,
-    u_tilda: HashConsistency,
-    d: Vec<F2>, // masked witnesses
-    pdecom: Vec<Pdecom>,
-    chall3: Chall3,
-    iv: IV,
-}
-
 /// Create VOLEs given a statement signature and a proof, on the verifier side.
 ///
 /// Adapted from parts of FAEST.verify from Fig. 8.2
@@ -249,18 +252,18 @@ pub(crate) struct VoleVerifierArgs {
 #[allow(unused)]
 pub(crate) fn create_vole_verifier(
     statement_sig: &[u8],
-    proof: &VoleVerifierArgs,
+    decommitment_prover: &PartialDecommitment,
+    d: &[F2],
+    chall3: &Chall3,
     l: usize,
 ) -> VoleVerifier {
     // line 1
-    let VoleVerifierArgs {
+    let PartialDecommitment {
         corrections,
         u_tilda,
-        d,
         pdecom,
-        chall3,
         iv,
-    } = proof;
+    } = decommitment_prover;
 
     // line 2
     let mu: H1 = h1(statement_sig);
@@ -330,27 +333,18 @@ pub(crate) fn create_vole_verifier(
 
 /// Adpation of FAEST Verify function Fig. 8.3
 #[allow(unused)]
-pub(crate) fn verify(
-    proof: &VoleVerifierArgs,
-    chall2: Chall2,
-    a_tilda: F128b,
-    b_tilda: F128b,
-) -> bool {
-    let chall3 = proof.chall3;
+pub(crate) fn verify(chall3: &Chall3, chall2: Chall2, a_tilda: F128b, b_tilda: F128b) -> bool {
     // Line 20
     let chall3_prime = compute_chall_3(&chall2, a_tilda, b_tilda);
 
-    chall3_prime == chall3
+    chall3_prime == *chall3
 }
 
 #[cfg(test)]
 mod test {
-    use super::{
-        create_vole_prover, create_vole_verifier, decommit, verify, VoleProver, VoleVerifier,
-    };
+    use super::{create_vole_prover, create_vole_verifier, decommit, verify, VoleVerifier};
     use crate::vole::functionality::compute_chall_2;
     use crate::vole::functionality::compute_chall_3;
-    use crate::vole::functionality::VoleVerifierArgs;
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F128b, F8b};
     use swanky_serialization::CanonicalSerialize;
@@ -358,38 +352,36 @@ mod test {
     fn test_vole_prover_and_verifier(how_many: usize) {
         let statement_sig = vec![1u8];
         let secret = vec![42u8];
-        let vole_creation = create_vole_prover(&statement_sig, &secret, how_many);
-        let VoleProver {
-            iv,
-            decom,
-            corrections,
-            u,
-            v,
-            chall1,
-            u_tilda,
-            h_v,
-        } = vole_creation.clone();
+        let vole_prover = create_vole_prover(&statement_sig, &secret, how_many);
+
+        // Let's clone u and v so that we can test the VOLE fundamental equality at the end.
+        let u = vole_prover.u.clone();
+        let v = vole_prover.v.clone();
+
         let dummy_masked = vec![];
-        let chall2 = compute_chall_2(&chall1, u_tilda.clone(), h_v, &dummy_masked);
+        let chall2 = compute_chall_2(
+            &vole_prover.chall1,
+            vole_prover.u_tilda.clone(),
+            vole_prover.h_v,
+            &dummy_masked,
+        );
         let dummy_a_tilda = F128b::ZERO;
         let dummy_b_tilda = F128b::ZERO;
         let chall3 = compute_chall_3(&chall2, dummy_a_tilda, dummy_b_tilda);
-        let pdecom = decommit(&decom, chall3);
+        let decommitment_prover = decommit(vole_prover, chall3);
 
-        let proof = VoleVerifierArgs {
-            corrections,
-            u_tilda,
-            pdecom,
-            d: dummy_masked,
-            chall3,
-            iv,
-        };
         let VoleVerifier {
             q,
             chall2: chall2_verifier,
             delta,
-        } = create_vole_verifier(&statement_sig, &proof, how_many);
-        let b = verify(&proof, chall2_verifier, dummy_a_tilda, dummy_b_tilda);
+        } = create_vole_verifier(
+            &statement_sig,
+            &decommitment_prover,
+            &dummy_masked,
+            &chall3,
+            how_many,
+        );
+        let b = verify(&chall3, chall2_verifier, dummy_a_tilda, dummy_b_tilda);
 
         for pos in 0..how_many {
             assert_eq!(v[pos] + u[pos] * delta, q[pos]);
@@ -416,7 +408,7 @@ mod test {
             pretty_env_logger::init_timed();
             let t = std::time::Instant::now();
             test_vole_prover_and_verifier(10_000_000);
-            println!("VOLE-it-Head completed in: {:?}", t.elapsed());
+            log::info!("VOLE-it-Head completed in: {:?}", t.elapsed());
         }
     }
 

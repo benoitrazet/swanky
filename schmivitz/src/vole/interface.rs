@@ -1,8 +1,8 @@
 use super::crypto_primitives::{CHALL1_LENGTH, CHALL3_LENGTH};
 use super::functionality::{decommit, VoleVerifier};
-use super::{all_but_one_vc::Pdecom, RandomVole};
+use super::RandomVole;
 use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
-use crate::vole::functionality::{create_vole_prover, VoleProver};
+use crate::vole::functionality::{create_vole_prover, PartialDecommitment, VoleProver};
 use eyre::{bail, Result};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
@@ -11,7 +11,7 @@ use swanky_field_binary::{F128b, F2};
 // This is a first attempt to connect the VOLE part to the circuit traverser.
 
 impl RandomVole for VoleProver {
-    type Decommitment = Vec<Pdecom>;
+    type Decommitment = PartialDecommitment;
 
     type VoleChallenge = [u8; CHALL1_LENGTH];
 
@@ -94,7 +94,7 @@ impl RandomVole for VoleProver {
     ) -> (Self::Decommitment, Self::VoleDecommitmentChallenge) {
         let decommitment_challenge = Self::extract_decommitment_challenge(transcript);
         (
-            decommit(&self.decom, decommitment_challenge),
+            decommit(self, decommitment_challenge),
             decommitment_challenge,
         )
     }
