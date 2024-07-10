@@ -111,7 +111,9 @@ impl Default for HashConsistency {
 
 impl HashConsistency {
     /// Convert a consistency hash to a vector of bytes
-    pub(crate) fn to_bytes(&self) -> Vec<u8> {
+    ///
+    /// packing the `F2` values in `u8`.
+    pub(crate) fn pack_to_bytes(&self) -> Vec<u8> {
         let mut out = vec![];
         for chunk in self.0.chunks(8) {
             let mut byte = 0u8;

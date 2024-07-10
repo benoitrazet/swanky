@@ -33,14 +33,8 @@ pub(crate) fn bools_to_u8(d: &[bool]) -> u8 {
 }
 
 /// Type for corrections applied to voles.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub(crate) struct Corrections([Vec<F2>; REPETITION_PARAM - 1]);
-
-impl Default for Corrections {
-    fn default() -> Self {
-        Corrections(Default::default())
-    }
-}
 
 /// hash the commitments coming from the small-domain VOLE
 fn hash_commitments(com: &[H1]) -> H1 {

@@ -66,7 +66,7 @@ pub(crate) fn compute_chall_2(
 
     let mut hasher = Shake128::default();
     hasher.update(chall1);
-    hasher.update(&u_tilda.to_bytes().as_slice());
+    hasher.update(u_tilda.pack_to_bytes().as_slice());
     hasher.update(&h_v);
 
     // pack the binary field values into bytes
@@ -304,7 +304,7 @@ pub(crate) fn create_vole_verifier(
 
     // line 11
     let t = std::time::Instant::now();
-    let big_d = recompose_d(chall3, &u_tilda);
+    let big_d = recompose_d(chall3, u_tilda);
     log::info!("recompose_d running time: {:?}", t.elapsed());
 
     // line 16
@@ -319,7 +319,7 @@ pub(crate) fn create_vole_verifier(
     let h_v = h1(&bits_to_u8_many(&q_xor_d));
 
     // line 17
-    let chall2 = compute_chall_2(&chall1, u_tilda.clone(), h_v, d);
+    let chall2 = compute_chall_2(&chall1, *u_tilda, h_v, d);
 
     // compute the secret key
     let delta = compute_secret_key(chall3);
@@ -361,7 +361,7 @@ mod test {
         let dummy_masked = vec![];
         let chall2 = compute_chall_2(
             &vole_prover.chall1,
-            vole_prover.u_tilda.clone(),
+            vole_prover.u_tilda,
             vole_prover.h_v,
             &dummy_masked,
         );
