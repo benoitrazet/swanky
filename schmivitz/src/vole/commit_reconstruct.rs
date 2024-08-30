@@ -78,7 +78,7 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l: usize) -> Commit {
         let (com_i, decom_i, seeds) = commit(prg_seeds[i], iv, 8);
         let (u_i, v_i) = convert_to_vole(&seeds, iv, l, true);
         com.push(com_i);
-        decom.push(decom_i);
+        decom[i] = decom_i;
         u.push(u_i);
         v.push(v_i)
     }
