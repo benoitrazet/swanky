@@ -1,12 +1,13 @@
-//! This module defines polynomials (and their operations) over finite fields.
+//! This crate defines polynomials (and their operations) over finite fields.
 
-use crate::field::FiniteField;
+#![deny(missing_docs)]
 use rand::RngCore;
 use std::{
     fmt::Debug,
     ops::{AddAssign, Index, IndexMut, MulAssign, SubAssign},
 };
 use subtle::{Choice, ConstantTimeEq};
+use swanky_field::FiniteField;
 
 // TODO: a lot of these algorithms are the naive implementations. We should improve them if speed
 // becomes an issue.
@@ -363,9 +364,12 @@ impl<F: FiniteField> NewtonPolynomial<F> {
         assert!(coefficients.len() <= self.points.len());
         let mut result = F::ZERO;
         let mut product = F::ONE;
-        for i in 0..coefficients.len() - 1 {
-            result += coefficients[i] * product;
-            product *= point - self.points[i];
+        for (coeff, self_point) in coefficients[0..coefficients.len() - 1]
+            .iter()
+            .zip(self.points.iter())
+        {
+            result += *coeff * product;
+            product *= point - *self_point;
         }
         result + *coefficients.last().unwrap() * product
     }

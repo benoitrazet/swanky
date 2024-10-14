@@ -1,5 +1,6 @@
 use proptest::strategy::Strategy;
-use swanky_field::{polynomial::Polynomial, FiniteField};
+use swanky_field::FiniteField;
+use swanky_polynomial::Polynomial;
 
 use crate::arbitrary_ring;
 
@@ -21,7 +22,7 @@ pub fn arbitrary_polynomial<FE: FiniteField>() -> impl Strategy<Value = Polynomi
 /// arbitrary module name used to namespace the tests, and `MyFunField` is the field to test.
 #[macro_export]
 macro_rules! test_field {
-    ($tests_name:ident, $fe:ty) => {
+    ($tests_name:ident, $fe:ty, $polynomial_modulus:path) => {
         mod $tests_name {
             use super::*;
             type FE = $fe;
@@ -33,7 +34,8 @@ macro_rules! test_field {
                 use $crate::__internal_macro_exports::*;
                 use proptest::prelude::*;
                 use generic_array::{GenericArray, ArrayLength, typenum::Unsigned};
-                use swanky_field::{Degree, FiniteField, FiniteRing, PrimeFiniteField, polynomial::Polynomial};
+                use swanky_field::{Degree, FiniteField, FiniteRing, PrimeFiniteField};
+                use swanky_polynomial::Polynomial;
                 use swanky_serialization::CanonicalSerialize;
 
                 type PF = <FE as FiniteField>::PrimeField;
@@ -67,10 +69,10 @@ macro_rules! test_field {
 
                 proptest! {
                     #[test]
-                    fn crypto_bigint_into_int_consistent(a in any_prime_fe()) {
+                    fn crypto_bigint_as_int_consistent(a in any_prime_fe()) {
                         type PF = <FE as FiniteField>::PrimeField;
-                        let wider_int = PF::into_int::<{PF::MIN_LIMBS_NEEDED + 1}>(&a);
-                        let narrower_int = PF::into_int::<{PF::MIN_LIMBS_NEEDED}>(&a);
+                        let wider_int = PF::as_int::<{PF::MIN_LIMBS_NEEDED + 1}>(&a);
+                        let narrower_int = PF::as_int::<{PF::MIN_LIMBS_NEEDED}>(&a);
                         prop_assert_eq!(wider_int, narrower_int.resize())
                     }
                 }
@@ -78,7 +80,7 @@ macro_rules! test_field {
                     #[test]
                     fn crypto_bigint_min_limbs_roundtrip(a in any_prime_fe()) {
                         type PF = <FE as FiniteField>::PrimeField;
-                        let b = PF::try_from_int(PF::into_int::<{PF::MIN_LIMBS_NEEDED}>(&a)).unwrap();
+                        let b = PF::try_from_int(PF::as_int::<{PF::MIN_LIMBS_NEEDED}>(&a)).unwrap();
                         prop_assert_eq!(a, b);
                     }
                 }
@@ -86,7 +88,7 @@ macro_rules! test_field {
                     #[test]
                     fn crypto_bigint_min_limbs_1_roundtrip(a in any_prime_fe()) {
                         type PF = <FE as FiniteField>::PrimeField;
-                        let b = PF::try_from_int(PF::into_int::<{PF::MIN_LIMBS_NEEDED + 1}>(&a)).unwrap();
+                        let b = PF::try_from_int(PF::as_int::<{PF::MIN_LIMBS_NEEDED + 1}>(&a)).unwrap();
                         prop_assert_eq!(a, b);
                     }
                 }
@@ -94,7 +96,7 @@ macro_rules! test_field {
                     #[test]
                     fn crypto_bigint_min_limbs_2_roundtrip(a in any_prime_fe()) {
                         type PF = <FE as FiniteField>::PrimeField;
-                        let b = PF::try_from_int(PF::into_int::<{PF::MIN_LIMBS_NEEDED + 2}>(&a)).unwrap();
+                        let b = PF::try_from_int(PF::as_int::<{PF::MIN_LIMBS_NEEDED + 2}>(&a)).unwrap();
                         prop_assert_eq!(a, b);
                     }
                 }
@@ -132,7 +134,7 @@ macro_rules! test_field {
                     fn polynomial_mul(a in any_fe(), b in any_fe()) {
                         let mut poly = make_polynomial(a.decompose::<<FE as FiniteField>::PrimeField>());
                         poly *= &make_polynomial(b.decompose::<<FE as FiniteField>::PrimeField>());
-                        let (_, remainder) = poly.divmod(&FE::polynomial_modulus());
+                        let (_, remainder) = poly.divmod(&$polynomial_modulus());
                         prop_assert_eq!(
                             FE::from_subfield(&make_polynomial_coefficients(&remainder)),
                             a * b
@@ -155,7 +157,7 @@ macro_rules! test_field {
                     fn lifted_polynomial_mul(a in any_fe(), b in any_prime_fe()) {
                         let mut poly = make_polynomial(a.decompose::<<FE as FiniteField>::PrimeField>());
                         poly *= &make_polynomial(b.decompose::<<FE as FiniteField>::PrimeField>());
-                        let (_, remainder) = poly.divmod(&<FE>::polynomial_modulus());
+                        let (_, remainder) = poly.divmod(&$polynomial_modulus());
                         prop_assert_eq!(
                             <FE>::from_subfield(&make_polynomial_coefficients(&remainder)),
                             b * a

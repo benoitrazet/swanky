@@ -4,7 +4,7 @@ use rand::Rng;
 use std::iter::FromIterator;
 use std::ops::{AddAssign, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
-use swanky_field::{polynomial::Polynomial, FiniteField, FiniteRing, IsSubFieldOf, IsSubRingOf};
+use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf, IsSubRingOf};
 use swanky_serialization::{BytesDeserializationCannotFail, CanonicalSerialize};
 use vectoreyes::{SimdBase, U64x2};
 
@@ -12,13 +12,30 @@ use vectoreyes::{SimdBase, U64x2};
 #[derive(Debug, Clone, Copy, Hash, Eq)]
 pub struct F64b(u64);
 
+#[cfg(test)]
+use swanky_polynomial::Polynomial;
+
+/// Return the reduction polynomial for the field `F64b`.
+#[cfg(test)]
+#[allow(clippy::eq_op)]
+fn polynomial_modulus_f64b() -> Polynomial<F2> {
+    let mut coefficients = vec![F2::ZERO; 64];
+    coefficients[64 - 1] = F2::ONE;
+    coefficients[19 - 1] = F2::ONE;
+    coefficients[16 - 1] = F2::ONE;
+    coefficients[1 - 1] = F2::ONE;
+    Polynomial {
+        constant: F2::ONE,
+        coefficients,
+    }
+}
+
 impl F64b {
     #[inline(always)]
     fn reduce(product: U64x2) -> Self {
         // TODO: This can almost certainly be optimized.
         let product: u128 = bytemuck::cast(product);
-        let result = ((product >> 0)
-            & 0b1111111111111111111111111111111111111111111111111111111111111111)
+        let result = (product & 0b1111111111111111111111111111111111111111111111111111111111111111)
             ^ ((product >> 45)
                 & 0b1111111111111111111111111111111111111111111110000000000000000000)
             ^ ((product >> 48)
@@ -65,12 +82,14 @@ impl ConditionallySelectable for F64b {
 
 impl<'a> AddAssign<&'a F64b> for F64b {
     #[inline]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, rhs: &'a Self) {
         self.0 ^= rhs.0;
     }
 }
 impl<'a> SubAssign<&'a F64b> for F64b {
     #[inline]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: &'a Self) {
         // The additive inverse of GF(2^64) is the identity
         *self += rhs;
@@ -118,18 +137,6 @@ impl FiniteRing for F64b {
 
 impl FiniteField for F64b {
     type PrimeField = F2;
-
-    fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
-        let mut coefficients = vec![F2::ZERO; 64];
-        coefficients[64 - 1] = F2::ONE;
-        coefficients[19 - 1] = F2::ONE;
-        coefficients[16 - 1] = F2::ONE;
-        coefficients[1 - 1] = F2::ONE;
-        Polynomial {
-            constant: F2::ONE,
-            coefficients,
-        }
-    }
 
     type NumberOfBitsInBitDecomposition = generic_array::typenum::U64;
 
@@ -188,5 +195,5 @@ impl IsSubFieldOf<F64b> for F2 {
 #[cfg(test)]
 mod tests {
     use super::F64b;
-    swanky_field_test::test_field!(test_field, F64b);
+    swanky_field_test::test_field!(test_field, F64b, crate::f64b::polynomial_modulus_f64b);
 }
