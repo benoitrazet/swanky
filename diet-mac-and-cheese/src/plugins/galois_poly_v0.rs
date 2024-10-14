@@ -335,16 +335,17 @@ mod tests {
     use mac_n_cheese_sieve_parser::Number;
     use rand::Rng;
     use scuttlebutt::{
-        field::{polynomial::Polynomial, F61p, PrimeFiniteField},
+        field::{F61p, PrimeFiniteField},
         ring::FiniteRing,
         AesRng,
     };
+    use swanky_polynomial::Polynomial;
 
     fn convert_poly<F: PrimeFiniteField>(p: Polynomial<F>) -> Vec<Number> {
         let mut coeffs = p.coefficients;
         coeffs.reverse();
         coeffs.push(p.constant);
-        coeffs.into_iter().map(|c| c.into_int()).collect()
+        coeffs.into_iter().map(|c| c.as_int()).collect()
     }
 
     fn get_product_triple<R: Rng, F: PrimeFiniteField>(
@@ -375,7 +376,7 @@ mod tests {
         let q = Polynomial::<F>::interpolate(&points);
         assert!(q.degree() == n);
 
-        (convert_poly(p), vec![c.into_int()], convert_poly(q))
+        (convert_poly(p), vec![c.as_int()], convert_poly(q))
     }
 
     #[test]
@@ -440,7 +441,7 @@ mod tests {
             vec![p0]
         } else {
             vec![(0..p0_size + p1_size)
-                .map(|_| F61p::random(&mut rng).into_int())
+                .map(|_| F61p::random(&mut rng).as_int())
                 .collect()]
         };
         let instances = vec![q];
@@ -514,7 +515,7 @@ mod tests {
             vec![p0]
         } else {
             vec![(0..p_size + 1)
-                .map(|_| F61p::random(&mut rng).into_int())
+                .map(|_| F61p::random(&mut rng).as_int())
                 .collect()]
         };
         let instances = vec![q];

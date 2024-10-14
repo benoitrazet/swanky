@@ -1,6 +1,8 @@
 /*!
 All-but-one vector commitment implementation.
 
+*/
+/*
 The implementation follows the [the FAEST spec](https://faest.info/faest-spec-v1.1.pdf).
 The elements from the spec that are implemented are the cryptographic primitives
 the FAEST spec, page 16:
@@ -14,6 +16,7 @@ scheme the FAEST spec, Figure 5.1, page 27:
    * `VC.Open()`, implemented as [`open`]
    * `VC.Reconstruct()`, implemented as [`reconstruct`]
    * `VC.Verify()`, implemented as [`verify`]
+
 It also implements the helper function `num_rec` Fig 3.2, page 16.
 
 We assume the $`\lambda`$ security parameter in the spec to be 128 as set in
@@ -21,8 +24,7 @@ We assume the $`\lambda`$ security parameter in the spec to be 128 as set in
 
 For convenience we abbreviate "all-but-one vector commitment" to "1-VC".
 */
-#![allow(dead_code)]
-use crate::crypto_primitives::{h0, h1, Com, Key, Seed, H1, IV, PRG};
+use crate::vole::crypto_primitives::{h0, h1, Com, Key, Seed, H1, IV, PRG};
 use eyre::{bail, Result};
 
 /// Hash function hashing a sequence of [`Com`]mitments and returns a hash [`H1`].
@@ -45,7 +47,8 @@ fn h1_on_coms(coms: &[Com]) -> H1 {
 /// in the sequence of nodes at this depth. The mapping between the tree indexing
 /// and the underlying vector indexing follows a breadth-first traversal.
 /// That is the element at depth `d` and position `p`, corresponds to the vector index $`2^d + p-1`$.
-pub struct Keys(Vec<Key>);
+#[derive(Clone, Default)]
+pub(crate) struct Keys(Vec<Key>);
 
 impl Keys {
     /// Get a key in the tree at `depth` and index `idx` in the associated layer.
@@ -121,7 +124,7 @@ fn tree(iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) {
 /// This also produces the the full decommitment information that a prover can later use to
 /// [`open()`] the commitment and the full set of [`Seed`]s.
 #[inline(never)]
-pub fn commit(r: Key, iv: IV, depth: usize) -> (H1, Decom, Vec<Seed>) {
+pub(crate) fn commit(r: Key, iv: IV, depth: usize) -> (H1, Decom, Vec<Seed>) {
     let (ks, seeds, coms) = tree(iv, r, depth);
 
     // compute the h
@@ -148,7 +151,7 @@ pub(crate) fn num_rec(j: &[bool]) -> usize {
 /// Generates a partial decommitment [`Pdecom`] given a full decommitment `decom`. This
 /// partial decommitment is produced by the prover and will be sent to the verifier to reconstruct
 /// all but one seeds using [`reconstruct`] and verify the commitment using [`verify`].
-pub fn open(decom: &Decom, j: Vec<bool>) -> Pdecom {
+pub(crate) fn open(decom: &Decom, j: Vec<bool>) -> Pdecom {
     assert_eq!(
         decom.1.len(),
         1 << j.len(),
@@ -228,6 +231,7 @@ pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (H1, Vec<Seed
 /// Verify the correctness of the full hash of commitments `h_com` using the partial decommitment `pdecom`,
 /// at an index `j`, and the initial vector `iv`. This function is run by the verifier and relies on
 /// [`reconstruct`] for its internal computation.
+#[allow(unused)]
 pub(crate) fn verify(h_com: H1, pdecom: Pdecom, j: Vec<bool>, iv: IV) -> Result<()> {
     assert_eq!(
         pdecom.0.len(),

@@ -1,10 +1,12 @@
-#![allow(clippy::all)]
+//! This crate contains [`F61p`], an implementation of $`\mathbb{F}_{2^{61}-1}`$
+
+#![deny(missing_docs)]
 use crypto_bigint::Uint;
 use generic_array::GenericArray;
 use rand::Rng;
 use std::ops::{AddAssign, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, ConstantTimeLess, CtOption};
-use swanky_field::{polynomial::Polynomial, FiniteField, FiniteRing, PrimeFiniteField};
+use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField};
 use swanky_serialization::{BiggerThanModulus, CanonicalSerialize};
 
 /// A finite field over the Mersenne Prime 2^61 - 1
@@ -75,10 +77,6 @@ impl FiniteField for F61p {
     type PrimeField = Self;
 
     const GENERATOR: Self = F61p(37);
-
-    fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
-        Polynomial::x()
-    }
 
     type NumberOfBitsInBitDecomposition = generic_array::typenum::U61;
 
@@ -153,7 +151,7 @@ impl std::iter::Sum for F61p {
         for e in iter {
             out += u128::from(e.0);
         }
-        return F61p(reduce(out));
+        F61p(reduce(out))
     }
 }
 
@@ -178,7 +176,7 @@ impl PrimeFiniteField for F61p {
         Uint::from_u64(MODULUS)
     }
 
-    fn into_int<const LIMBS: usize>(&self) -> Uint<LIMBS> {
+    fn as_int<const LIMBS: usize>(&self) -> Uint<LIMBS> {
         assert!(LIMBS >= Self::MIN_LIMBS_NEEDED);
 
         Uint::from_u64(self.0)
@@ -207,7 +205,7 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
 
-    swanky_field_test::test_field!(test_field, F61p);
+    swanky_field_test::test_field!(test_field, F61p, Polynomial::x);
 
     #[cfg(test)]
     proptest! {
@@ -221,6 +219,6 @@ mod tests {
     fn test_sum_overflow() {
         let neg1 = F61p::ZERO - F61p::ONE;
         let x = [neg1; 2];
-        assert_eq!(x.iter().map(|x| *x).sum::<F61p>(), neg1 + neg1);
+        assert_eq!(x.iter().copied().sum::<F61p>(), neg1 + neg1);
     }
 }
