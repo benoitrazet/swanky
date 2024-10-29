@@ -1,6 +1,7 @@
 with import ./pkgs.nix { };
-let isLinux = !builtins.isNull (builtins.match "^.*linux$" system);
-in (mkShell.override { stdenv = llvmPackages_16.stdenv; }) {
+let swankyLlvm = import ./llvm.nix;
+in
+(mkShell.override { stdenv = swankyLlvm.stdenv; }) {
   shellHook = ''
     export SSL_CERT_FILE="${cacert}/etc/ssl/certs/ca-bundle.crt"
     export NIX_SSL_CERT_FILE="${cacert}/etc/ssl/certs/ca-bundle.crt"
@@ -11,9 +12,10 @@ in (mkShell.override { stdenv = llvmPackages_16.stdenv; }) {
     cargo-deny
     cargo-edit
     cargo-depgraph
-    llvmPackages_16.bintools
+    swankyLlvm.bintools
+    mold
     git
-    (python311.withPackages (py: [
+    (python312.withPackages (py: [
       py.black
       py.cbor2
       py.click
@@ -24,10 +26,10 @@ in (mkShell.override { stdenv = llvmPackages_16.stdenv; }) {
       py.toml
       py.mypy
       py.types-toml
-      py.py-tree-sitter
+      py.tree-sitter
       py.pytest
+      py.xattr
     ]))
-    sccache
     cacert
     niv
     nix

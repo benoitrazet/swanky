@@ -14,7 +14,6 @@ use rand::{
     CryptoRng, Rng, SeedableRng,
 };
 use scuttlebutt::{
-    commitment::{Commitment, ShaCommitment},
     field::{Degree, FiniteField as FF},
     ring::FiniteRing,
     utils::unpack_bits,
@@ -53,9 +52,7 @@ fn eq_send<C: AbstractChannel, FE: FF>(channel: &mut C, x: FE) -> Result<bool, E
     channel.read_bytes(&mut seed)?;
     let y = channel.read_serializable::<FE>()?;
 
-    let mut commit = ShaCommitment::new(seed);
-    commit.input(&y.to_bytes());
-    if commit.finish() == com {
+    if blake3::keyed_hash(&seed, &y.to_bytes()) == com {
         Ok(x == y)
     } else {
         Err(Error::InvalidOpening)
@@ -70,11 +67,9 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng + Rng, FE: FF>(
     y: FE,
 ) -> Result<bool, Error> {
     let seed = rng.gen::<[u8; 32]>();
-    let mut h = ShaCommitment::new(seed);
-    h.input(&y.to_bytes());
-    let com = h.finish();
+    let com = blake3::keyed_hash(&seed, &y.to_bytes());
 
-    channel.write_bytes(&com)?;
+    channel.write_bytes(com.as_bytes())?;
     channel.flush()?;
 
     let x = channel.read_serializable::<FE>()?;
@@ -99,8 +94,8 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         let seed0 = rng.gen::<Block>();
         let seed1 = rng.gen::<Block>();
         let seeds = scuttlebutt::cointoss::send(channel, &[seed0, seed1])?;
-        let aes0 = Aes128EncryptOnly::new_with_key(seeds[0].0);
-        let aes1 = Aes128EncryptOnly::new_with_key(seeds[1].0);
+        let aes0 = Aes128EncryptOnly::new_with_key(seeds[0]);
+        let aes1 = Aes128EncryptOnly::new_with_key(seeds[1]);
         Ok(Self {
             pows,
             ot,
@@ -256,8 +251,8 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         let seed0 = rng.gen::<Block>();
         let seed1 = rng.gen::<Block>();
         let seeds = scuttlebutt::cointoss::receive(channel, &[seed0, seed1])?;
-        let aes0 = Aes128EncryptOnly::new_with_key(seeds[0].0);
-        let aes1 = Aes128EncryptOnly::new_with_key(seeds[1].0);
+        let aes0 = Aes128EncryptOnly::new_with_key(seeds[0]);
+        let aes1 = Aes128EncryptOnly::new_with_key(seeds[1]);
         Ok(Self {
             pows,
             delta,
@@ -289,7 +284,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         }
         let mut keys = Vec::with_capacity(t * nbits);
         for i in 0..t {
-            let seed = rng.gen::<Block>().0;
+            let seed = rng.gen::<Block>();
             self.ggm_temporary_storage
                 .resize(ggm_temporary_storage_size(nbits), U8x16::default());
             ggm(

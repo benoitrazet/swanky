@@ -7,8 +7,9 @@
 //     the current megabin handling is an artifact of older bugs that stalled the system for large sets
 
 use crate::Error;
-use scuttlebutt::{Aes128, Block};
+use scuttlebutt::Block;
 use std::fmt::Debug;
+use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 #[derive(Clone, Debug)]
 pub(crate) struct CuckooItem {
@@ -122,7 +123,7 @@ impl CuckooHash {
 
     /// Output the bin number for a given hash output `hash` and hash index `hidx`.
     pub fn bin(hash: Block, hidx: usize, nbins: usize) -> usize {
-        let aes = Aes128::new(hash);
+        let aes = Aes128EncryptOnly::new_with_key(hash);
         let h = aes.encrypt(Block::from(hidx as u128));
         (u128::from(h) % (nbins as u128)) as usize
     }
@@ -190,30 +191,5 @@ mod tests {
                 assert!(bin.iter().any(|bin_elem| *bin_elem == item.entry));
             }
         }
-    }
-}
-
-#[cfg(all(feature = "nightly", test))]
-mod benchmarks {
-    extern crate test;
-    use super::*;
-    use test::Bencher;
-
-    const SETSIZE: usize = 1 << 16;
-
-    #[bench]
-    fn bench_build(b: &mut Bencher) {
-        let inputs = (0..SETSIZE)
-            .map(|_| rand::random::<Block>())
-            .collect::<Vec<Block>>();
-        b.iter(|| CuckooHash::new(&inputs, 3));
-    }
-
-    #[bench]
-    fn bench_bin(b: &mut Bencher) {
-        let input = rand::random::<Block>();
-        let hidx = rand::random::<usize>() % 4;
-        let range = 53;
-        b.iter(|| CuckooHash::bin(input, hidx, range));
     }
 }

@@ -1,9 +1,12 @@
-#![allow(clippy::all)]
+//! This crate contains base types and traits for our finite field types.
+//!
+//! See [`FiniteField`] and [`FiniteRing`] to get started.
+
+#![deny(missing_docs)]
 mod field;
 mod ring;
 pub use field::*;
 pub use ring::*;
-pub mod polynomial;
 
 /// Dependent crates might not neccessarily depend on `num_traits`, for example, themsevles.
 /// Nonetheless, macros written in _this_ crate need to be able to access `num_traits`, even when

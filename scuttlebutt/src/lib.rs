@@ -5,23 +5,21 @@
 
 //! Scuttlebutt provides many utility functions for cryptographic applications.
 
-mod aes;
-mod block;
+/// This is a legacy alias for `U8x16`
+pub type Block = vectoreyes::U8x16;
+
 mod block512;
-pub mod bloomfilter;
 /// Module for encapsulating communication channels for `swanky`.
 pub mod channel;
 pub mod cointoss;
-pub mod commitment;
 mod hash_aes;
-mod rand_aes;
 pub use swanky_serialization as serialization;
 pub mod utils;
 
 /// A polyfill for the `swanky-field*` family of crates.
 pub mod field {
     pub use swanky_field::{
-        field_ops, polynomial, Degree, DegreeModulo, FiniteField, IsSubFieldOf, PrimeFiniteField,
+        field_ops, Degree, DegreeModulo, FiniteField, IsSubFieldOf, PrimeFiniteField,
     };
     pub use swanky_field_binary::*;
     pub use swanky_field_f61p::*;
@@ -34,16 +32,11 @@ pub mod ring {
 }
 
 pub use crate::{
-    aes::{
-        aes128::{Aes128, FIXED_KEY_AES128},
-        aes256::Aes256,
-    },
-    block::Block,
     block512::Block512,
     channel::{AbstractChannel, Channel, HashChannel, SymChannel, SyncChannel, TrackChannel},
     hash_aes::{AesHash, AES_HASH},
-    rand_aes::{vectorized::UniformIntegersUnderBound, AesRng},
 };
+pub use swanky_aes_rng::{AesRng, UniformIntegersUnderBound};
 
 #[cfg(unix)]
 pub use crate::channel::{

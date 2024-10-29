@@ -8,6 +8,9 @@
 # contents of the binary along with its arguments. To help avoid the binary
 # accessing files which aren't part of the cache key, the binary is run with a
 # temporary directory as the working directory.
+#
+# If the environment variable SWANKY_CACHING_TEST_RUNNER_QEMU is set, then the subprocess will be
+# run like `$SWANKY_CACHING_TEST_RUNNER_QEMU target/deps/debug/asdf --exact my_test`
 import datetime
 import os
 import subprocess
@@ -19,71 +22,30 @@ from pathlib import Path
 from typing import IO, Optional
 from uuid import uuid4
 
-import cbor2  # type: ignore
+import cbor2
+
+sys.path.append(str(Path(__file__).parent.parent.parent.parent))
+
+from etc.ci.xattr_hash import cached_blake2b
+
+SWANKY_CACHING_TEST_RUNNER_QEMU = os.environ.get("SWANKY_CACHING_TEST_RUNNER_QEMU")
 
 CACHE_DIR = Path(os.environ["SWANKY_CACHE_DIR"]) / "cached-tests-v1"
 TEST_RESULTS = CACHE_DIR / "test-results"
 TEST_RESULTS.mkdir(exist_ok=True, parents=True)
 
-exe = Path(sys.argv[1])
+exe = Path(sys.argv[1]).resolve()
 args = sys.argv[2:]
 assert exe.exists()
 
 
-# os.getxattr and os.setxattr only exist on Linux. These stubs exist so that this file can
-# typecheck on macOS, even if it's not supposed to run on the mac.
-def getxattr(path: Path, attr: str) -> bytes:
-    if sys.platform == "linux":
-        return os.getxattr(path, attr)
-    else:
-        assert False
+exe_hash = cached_blake2b(exe)
 
+cache_key = "\n".join(args).encode("ascii") + b"\n@$@$||\n" + exe_hash
+if SWANKY_CACHING_TEST_RUNNER_QEMU:
+    cache_key += SWANKY_CACHING_TEST_RUNNER_QEMU.encode("ascii")
 
-def setxattr(path: Path, attr: str, value: bytes) -> None:
-    if sys.platform == "linux":
-        os.setxattr(path, attr, value)
-    else:
-        assert False
-
-
-def cached_hash(exe: Path) -> bytes:
-    """
-    Some of our test executables, especially with debug symbols, can be in the
-    hundreds of megabytes. Constantly re-reading and hashing them can be slow.
-    To avoid this, we set an xattr attribute on the binary with a cache of its
-    hash. We use https://apenwarr.ca/log/20181113 to set the cache key for the
-    hash.
-    """
-    stat = exe.stat()
-    stat_data = [
-        stat.st_mtime,
-        stat.st_size,
-        stat.st_ino,
-        stat.st_mode,
-        stat.st_uid,
-        stat.st_gid,
-    ]
-    attr = "user.caching_test_runner_hash_cache"
-    try:
-        raw_data = getxattr(exe, attr)
-    except:
-        raw_data = None
-    if raw_data is not None:
-        cbor_hash, read_stat_data = cbor2.loads(raw_data)
-        if read_stat_data == stat_data:
-            assert isinstance(cbor_hash, bytes)
-            return cbor_hash
-    out = sha256(exe.read_bytes()).digest()
-    setxattr(exe, attr, cbor2.dumps((out, stat_data)))
-    return out
-
-
-exe_hash = cached_hash(exe)
-
-test_output = (
-    TEST_RESULTS
-    / sha256("\n".join(args).encode("ascii") + b"\n@$@$||\n" + exe_hash).hexdigest()
-)
+test_output = TEST_RESULTS / sha256(cache_key).hexdigest()
 if test_output.exists():
     data = cbor2.loads(test_output.read_bytes())
     sys.stderr.write(data["cache_info"])
@@ -97,6 +59,8 @@ else:
     data = {
         "cache_info": f"CACHE HIT {exe} at {datetime.datetime.now().isoformat()} with {args}\n",
     }
+    if SWANKY_CACHING_TEST_RUNNER_QEMU:
+        data["cache_info"] += f"emulator={SWANKY_CACHING_TEST_RUNNER_QEMU}\n"
     lock = threading.Lock()
     output = []
 
@@ -113,13 +77,27 @@ else:
             dst.write(buf)
             dst.flush()
 
-    print(f"TEST CACHE MISS {exe} with {args}", file=sys.stderr)
+    print(
+        f"TEST CACHE MISS {exe} with {args}"
+        + (
+            f" emulator={SWANKY_CACHING_TEST_RUNNER_QEMU}"
+            if SWANKY_CACHING_TEST_RUNNER_QEMU
+            else ""
+        ),
+        file=sys.stderr,
+    )
     with tempfile.TemporaryDirectory() as tmp_str:
         # try to sandbox by changing the cwd
         tmp = Path(tmp_str)
         # We use the this dir so that we can hard link
         proc = subprocess.Popen(
-            [str(exe)] + args,
+            (
+                [SWANKY_CACHING_TEST_RUNNER_QEMU]
+                if SWANKY_CACHING_TEST_RUNNER_QEMU
+                else []
+            )
+            + [str(exe)]
+            + args,
             cwd=tmp,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

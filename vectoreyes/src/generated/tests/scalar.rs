@@ -15,9 +15,6 @@ macro_rules! constify_imm { ($func:path => ( $($normal_args:expr,)* @@ [0..256] 
  match $imm_arg { 0 => $func($($normal_args,)* 0), 1 => $func($($normal_args,)* 1), 2 => $func($($normal_args,)* 2), 3 => $func($($normal_args,)* 3), _ => panic!("Invalid immediate: {}. Expected immediate to satisfy: 0..4", $imm_arg), } }; ($func:path => ( $($normal_args:expr,)* @@ [0..2] $imm_arg:expr )) => { // Hopefully this gets optimized out...
  match $imm_arg { 0 => $func($($normal_args,)* 0), 1 => $func($($normal_args,)* 1), _ => panic!("Invalid immediate: {}. Expected immediate to satisfy: 0..2", $imm_arg), } }; ($func:path => ( $($normal_args:expr,)* @@ [[1, 2, 4, 8]] $imm_arg:expr )) => { // Hopefully this gets optimized out...
  match $imm_arg { 1 => $func($($normal_args,)* 1), 2 => $func($($normal_args,)* 2), 4 => $func($($normal_args,)* 4), 8 => $func($($normal_args,)* 8), _ => panic!("Invalid immediate: {}. Expected immediate to satisfy: [1, 2, 4, 8]", $imm_arg), } }; }
-#[doc = "The backend that is used to evaluate vector operations."]
-#[allow(dead_code)]
-pub const VECTOR_BACKEND: crate::VectorBackend = { crate::VectorBackend::Scalar };
 type I8x16Internal = [i8; 16];
 #[doc = "`[i8; 16]` as a vector."]
 #[repr(transparent)]
@@ -65,6 +62,25 @@ impl subtle::ConditionallySelectable for I8x16 {
             *out = <i8 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<I8x16> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> I8x16 {
+        let mut out = I8x16::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
+impl AsRef<[i8]> for I8x16 {
+    fn as_ref(&self) -> &[i8] {
+        let arr: &[i8; 16] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[i8]> for I8x16 {
+    fn as_mut(&mut self) -> &mut [i8] {
+        let arr: &mut [i8; 16] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for I8x16 {
@@ -907,6 +923,25 @@ impl subtle::ConditionallySelectable for I8x32 {
             *out = <i8 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<I8x32> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> I8x32 {
+        let mut out = I8x32::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
+impl AsRef<[i8]> for I8x32 {
+    fn as_ref(&self) -> &[i8] {
+        let arr: &[i8; 32] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[i8]> for I8x32 {
+    fn as_mut(&mut self) -> &mut [i8] {
+        let arr: &mut [i8; 32] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for I8x32 {
@@ -2133,6 +2168,25 @@ impl subtle::ConditionallySelectable for I16x8 {
         Self::from(out)
     }
 }
+impl rand::distributions::Distribution<I16x8> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> I16x8 {
+        let mut out = I16x8::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
+impl AsRef<[i16]> for I16x8 {
+    fn as_ref(&self) -> &[i16] {
+        let arr: &[i16; 8] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[i16]> for I16x8 {
+    fn as_mut(&mut self) -> &mut [i16] {
+        let arr: &mut [i16; 8] = bytemuck::cast_mut(self);
+        arr
+    }
+}
 impl serde::Serialize for I16x8 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -2820,6 +2874,25 @@ impl subtle::ConditionallySelectable for I16x16 {
             *out = <i16 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<I16x16> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> I16x16 {
+        let mut out = I16x16::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
+impl AsRef<[i16]> for I16x16 {
+    fn as_ref(&self) -> &[i16] {
+        let arr: &[i16; 16] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[i16]> for I16x16 {
+    fn as_mut(&mut self) -> &mut [i16] {
+        let arr: &mut [i16; 16] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for I16x16 {
@@ -3737,6 +3810,25 @@ impl subtle::ConditionallySelectable for I32x4 {
         Self::from(out)
     }
 }
+impl rand::distributions::Distribution<I32x4> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> I32x4 {
+        let mut out = I32x4::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
+impl AsRef<[i32]> for I32x4 {
+    fn as_ref(&self) -> &[i32] {
+        let arr: &[i32; 4] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[i32]> for I32x4 {
+    fn as_mut(&mut self) -> &mut [i32] {
+        let arr: &mut [i32; 4] = bytemuck::cast_mut(self);
+        arr
+    }
+}
 impl serde::Serialize for I32x4 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -4405,6 +4497,25 @@ impl subtle::ConditionallySelectable for I32x8 {
             *out = <i32 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<I32x8> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> I32x8 {
+        let mut out = I32x8::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
+impl AsRef<[i32]> for I32x8 {
+    fn as_ref(&self) -> &[i32] {
+        let arr: &[i32; 8] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[i32]> for I32x8 {
+    fn as_mut(&mut self) -> &mut [i32] {
+        let arr: &mut [i32; 8] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for I32x8 {
@@ -5182,6 +5293,25 @@ impl subtle::ConditionallySelectable for I64x2 {
         Self::from(out)
     }
 }
+impl rand::distributions::Distribution<I64x2> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> I64x2 {
+        let mut out = I64x2::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
+impl AsRef<[i64]> for I64x2 {
+    fn as_ref(&self) -> &[i64] {
+        let arr: &[i64; 2] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[i64]> for I64x2 {
+    fn as_mut(&mut self) -> &mut [i64] {
+        let arr: &mut [i64; 2] = bytemuck::cast_mut(self);
+        arr
+    }
+}
 impl serde::Serialize for I64x2 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -5725,6 +5855,25 @@ impl subtle::ConditionallySelectable for I64x4 {
             *out = <i64 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<I64x4> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> I64x4 {
+        let mut out = I64x4::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
+impl AsRef<[i64]> for I64x4 {
+    fn as_ref(&self) -> &[i64] {
+        let arr: &[i64; 4] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[i64]> for I64x4 {
+    fn as_mut(&mut self) -> &mut [i64] {
+        let arr: &mut [i64; 4] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for I64x4 {
@@ -6460,6 +6609,25 @@ impl subtle::ConditionallySelectable for U8x16 {
             *out = <u8 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<U8x16> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> U8x16 {
+        let mut out = U8x16::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
+impl AsRef<[u8]> for U8x16 {
+    fn as_ref(&self) -> &[u8] {
+        let arr: &[u8; 16] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[u8]> for U8x16 {
+    fn as_mut(&mut self) -> &mut [u8] {
+        let arr: &mut [u8; 16] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for U8x16 {
@@ -7292,6 +7460,25 @@ impl subtle::ConditionallySelectable for U8x32 {
             *out = <u8 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<U8x32> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> U8x32 {
+        let mut out = U8x32::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
+impl AsRef<[u8]> for U8x32 {
+    fn as_ref(&self) -> &[u8] {
+        let arr: &[u8; 32] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[u8]> for U8x32 {
+    fn as_mut(&mut self) -> &mut [u8] {
+        let arr: &mut [u8; 32] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for U8x32 {
@@ -8508,6 +8695,25 @@ impl subtle::ConditionallySelectable for U16x8 {
         Self::from(out)
     }
 }
+impl rand::distributions::Distribution<U16x8> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> U16x8 {
+        let mut out = U16x8::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
+impl AsRef<[u16]> for U16x8 {
+    fn as_ref(&self) -> &[u16] {
+        let arr: &[u16; 8] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[u16]> for U16x8 {
+    fn as_mut(&mut self) -> &mut [u16] {
+        let arr: &mut [u16; 8] = bytemuck::cast_mut(self);
+        arr
+    }
+}
 impl serde::Serialize for U16x8 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -9185,6 +9391,25 @@ impl subtle::ConditionallySelectable for U16x16 {
             *out = <u16 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<U16x16> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> U16x16 {
+        let mut out = U16x16::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
+impl AsRef<[u16]> for U16x16 {
+    fn as_ref(&self) -> &[u16] {
+        let arr: &[u16; 16] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[u16]> for U16x16 {
+    fn as_mut(&mut self) -> &mut [u16] {
+        let arr: &mut [u16; 16] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for U16x16 {
@@ -10092,6 +10317,25 @@ impl subtle::ConditionallySelectable for U32x4 {
         Self::from(out)
     }
 }
+impl rand::distributions::Distribution<U32x4> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> U32x4 {
+        let mut out = U32x4::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
+impl AsRef<[u32]> for U32x4 {
+    fn as_ref(&self) -> &[u32] {
+        let arr: &[u32; 4] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[u32]> for U32x4 {
+    fn as_mut(&mut self) -> &mut [u32] {
+        let arr: &mut [u32; 4] = bytemuck::cast_mut(self);
+        arr
+    }
+}
 impl serde::Serialize for U32x4 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -10750,6 +10994,25 @@ impl subtle::ConditionallySelectable for U32x8 {
             *out = <u32 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<U32x8> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> U32x8 {
+        let mut out = U32x8::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
+impl AsRef<[u32]> for U32x8 {
+    fn as_ref(&self) -> &[u32] {
+        let arr: &[u32; 8] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[u32]> for U32x8 {
+    fn as_mut(&mut self) -> &mut [u32] {
+        let arr: &mut [u32; 8] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for U32x8 {
@@ -11517,6 +11780,25 @@ impl subtle::ConditionallySelectable for U64x2 {
         Self::from(out)
     }
 }
+impl rand::distributions::Distribution<U64x2> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> U64x2 {
+        let mut out = U64x2::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
+impl AsRef<[u64]> for U64x2 {
+    fn as_ref(&self) -> &[u64] {
+        let arr: &[u64; 2] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[u64]> for U64x2 {
+    fn as_mut(&mut self) -> &mut [u64] {
+        let arr: &mut [u64; 2] = bytemuck::cast_mut(self);
+        arr
+    }
+}
 impl serde::Serialize for U64x2 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -12050,6 +12332,25 @@ impl subtle::ConditionallySelectable for U64x4 {
             *out = <u64 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<U64x4> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> U64x4 {
+        let mut out = U64x4::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
+impl AsRef<[u64]> for U64x4 {
+    fn as_ref(&self) -> &[u64] {
+        let arr: &[u64; 4] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[u64]> for U64x4 {
+    fn as_mut(&mut self) -> &mut [u64] {
+        let arr: &mut [u64; 4] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for U64x4 {
@@ -12729,7 +13030,7 @@ impl crate::SimdBase4x64 for U64x4 {
     }
 }
 impl U64x2 {
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n #     <\n #             const HI_OTHER: bool,\n #             const HI_SELF: bool,\n #     >\n # (\n #         &self  ,\n #         other  : U64x2  ,\n # )  -> U64x2\n # ;}\n # impl SomeTraitForDoc for U64x2 {\n # fn the_doc_function\n #     <\n #             const HI_OTHER: bool,\n #             const HI_SELF: bool,\n #     >\n # (\n #         &self  ,\n #         other  : U64x2  ,\n # )  -> U64x2\n # {\n  let x = if HI_SELF { self.as_array()[1] } else { self.as_array()[0] };\n  let y = if HI_OTHER { other.as_array()[1] } else { other.as_array()[0] };\n // This software carryless-multplication implementation is from https://github.com/RustCrypto/universal-hashes/blob/2e8a948dbb25bc2ac6c712b4bdc21b158527ca70/polyval/src/backend/soft64.rs\n // That code is MIT/Apache dual-licensed.\n #[inline(always)]\n fn bmul64(x: u64, y: u64) -> u64 {\n     use std::num::Wrapping;\n     let x0 = Wrapping(x & 0x1111_1111_1111_1111);\n     let x1 = Wrapping(x & 0x2222_2222_2222_2222);\n     let x2 = Wrapping(x & 0x4444_4444_4444_4444);\n     let x3 = Wrapping(x & 0x8888_8888_8888_8888);\n     let y0 = Wrapping(y & 0x1111_1111_1111_1111);\n     let y1 = Wrapping(y & 0x2222_2222_2222_2222);\n     let y2 = Wrapping(y & 0x4444_4444_4444_4444);\n     let y3 = Wrapping(y & 0x8888_8888_8888_8888);\n     let mut z0 = ((x0 * y0) ^ (x1 * y3) ^ (x2 * y2) ^ (x3 * y1)).0;\n     let mut z1 = ((x0 * y1) ^ (x1 * y0) ^ (x2 * y3) ^ (x3 * y2)).0;\n     let mut z2 = ((x0 * y2) ^ (x1 * y1) ^ (x2 * y0) ^ (x3 * y3)).0;\n     let mut z3 = ((x0 * y3) ^ (x1 * y2) ^ (x2 * y1) ^ (x3 * y0)).0;\n     z0 &= 0x1111_1111_1111_1111;\n     z1 &= 0x2222_2222_2222_2222;\n     z2 &= 0x4444_4444_4444_4444;\n     z3 &= 0x8888_8888_8888_8888;\n     z0 | z1 | z2 | z3\n }\n #[inline(always)]\n fn rev64(mut x: u64) -> u64 {\n     x = ((x & 0x5555_5555_5555_5555) << 1) | ((x >> 1) & 0x5555_5555_5555_5555);\n     x = ((x & 0x3333_3333_3333_3333) << 2) | ((x >> 2) & 0x3333_3333_3333_3333);\n     x = ((x & 0x0f0f_0f0f_0f0f_0f0f) << 4) | ((x >> 4) & 0x0f0f_0f0f_0f0f_0f0f);\n     x = ((x & 0x00ff_00ff_00ff_00ff) << 8) | ((x >> 8) & 0x00ff_00ff_00ff_00ff);\n     x = ((x & 0xffff_0000_ffff) << 16) | ((x >> 16) & 0xffff_0000_ffff);\n     (x << 32) | (x >> 32)\n }\n U64x2::from([\n     bmul64(x, y),\n     rev64(bmul64(rev64(x), rev64(y))) >> 1,\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_clmulepi64_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_clmulepi64_si128)\n\n\n * `PCLMULQDQ xmm, xmm, imm8`\n </li>\n </ul>"]
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n #     <\n #             const HI_OTHER: bool,\n #             const HI_SELF: bool,\n #     >\n # (\n #         &self  ,\n #         other  : U64x2  ,\n # )  -> U64x2\n # ;}\n # impl SomeTraitForDoc for U64x2 {\n # fn the_doc_function\n #     <\n #             const HI_OTHER: bool,\n #             const HI_SELF: bool,\n #     >\n # (\n #         &self  ,\n #         other  : U64x2  ,\n # )  -> U64x2\n # {\n  let x = if HI_SELF { self.as_array()[1] } else { self.as_array()[0] };\n  let y = if HI_OTHER { other.as_array()[1] } else { other.as_array()[0] };\n // This software carryless-multplication implementation is from https://github.com/RustCrypto/universal-hashes/blob/2e8a948dbb25bc2ac6c712b4bdc21b158527ca70/polyval/src/backend/soft64.rs\n // That code is MIT/Apache dual-licensed.\n #[inline(always)]\n fn bmul64(x: u64, y: u64) -> u64 {\n     use std::num::Wrapping;\n     let x0 = Wrapping(x & 0x1111_1111_1111_1111);\n     let x1 = Wrapping(x & 0x2222_2222_2222_2222);\n     let x2 = Wrapping(x & 0x4444_4444_4444_4444);\n     let x3 = Wrapping(x & 0x8888_8888_8888_8888);\n     let y0 = Wrapping(y & 0x1111_1111_1111_1111);\n     let y1 = Wrapping(y & 0x2222_2222_2222_2222);\n     let y2 = Wrapping(y & 0x4444_4444_4444_4444);\n     let y3 = Wrapping(y & 0x8888_8888_8888_8888);\n     let mut z0 = ((x0 * y0) ^ (x1 * y3) ^ (x2 * y2) ^ (x3 * y1)).0;\n     let mut z1 = ((x0 * y1) ^ (x1 * y0) ^ (x2 * y3) ^ (x3 * y2)).0;\n     let mut z2 = ((x0 * y2) ^ (x1 * y1) ^ (x2 * y0) ^ (x3 * y3)).0;\n     let mut z3 = ((x0 * y3) ^ (x1 * y2) ^ (x2 * y1) ^ (x3 * y0)).0;\n     z0 &= 0x1111_1111_1111_1111;\n     z1 &= 0x2222_2222_2222_2222;\n     z2 &= 0x4444_4444_4444_4444;\n     z3 &= 0x8888_8888_8888_8888;\n     z0 | z1 | z2 | z3\n }\n #[inline(always)]\n fn rev64(mut x: u64) -> u64 {\n     x = ((x & 0x5555_5555_5555_5555) << 1) | ((x >> 1) & 0x5555_5555_5555_5555);\n     x = ((x & 0x3333_3333_3333_3333) << 2) | ((x >> 2) & 0x3333_3333_3333_3333);\n     x = ((x & 0x0f0f_0f0f_0f0f_0f0f) << 4) | ((x >> 4) & 0x0f0f_0f0f_0f0f_0f0f);\n     x = ((x & 0x00ff_00ff_00ff_00ff) << 8) | ((x >> 8) & 0x00ff_00ff_00ff_00ff);\n     x = ((x & 0xffff_0000_ffff) << 16) | ((x >> 16) & 0xffff_0000_ffff);\n     x.rotate_right(32)\n }\n U64x2::from([\n     bmul64(x, y),\n     rev64(bmul64(rev64(x), rev64(y))) >> 1,\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_clmulepi64_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_clmulepi64_si128)\n\n\n * `PCLMULQDQ xmm, xmm, imm8`\n </li>\n </ul>"]
     #[inline(always)]
     pub fn carryless_mul<const HI_OTHER: bool, const HI_SELF: bool>(&self, other: U64x2) -> U64x2 {
         let x = if HI_SELF {
@@ -12771,7 +13072,7 @@ impl U64x2 {
             x = ((x & 0x0f0f_0f0f_0f0f_0f0f) << 4) | ((x >> 4) & 0x0f0f_0f0f_0f0f_0f0f);
             x = ((x & 0x00ff_00ff_00ff_00ff) << 8) | ((x >> 8) & 0x00ff_00ff_00ff_00ff);
             x = ((x & 0xffff_0000_ffff) << 16) | ((x >> 16) & 0xffff_0000_ffff);
-            (x << 32) | (x >> 32)
+            x.rotate_right(32)
         }
         U64x2::from([bmul64(x, y), rev64(bmul64(rev64(x), rev64(y))) >> 1])
     }

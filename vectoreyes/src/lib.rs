@@ -4,23 +4,14 @@
 //! # Backends
 //! VectorEyes chooses what backend to execute vector operations with at compile-time.
 //! ## AVX2
-//! CPUs that support the `AVX`, `AVX2`, `SSE4.1`, `AES`, `SSE4.2`, and `PCLMULQDQ` features will
-//! use the `AVX2` backend.
+//! x86-64 CPUs that support the `AVX`, `AVX2`, `SSE4.1`, `AES`, `SSE4.2`, and `PCLMULQDQ` features
+//! will use the `AVX2` backend.
 //!
-//! In addition, we have embedded specific latency numbers for:
+//! ## Neon
+//! This is available on aarch64/arm64 machines with `neon` and `aes` features.
 //!
-//! * `skylake`
-//! * `skylake-avx512`
-//! * `cascadelake`
-//! * `znver1`
-//! * `znver2`
-//! * `znver3`
-//!
-//! As a result, `vectoreyes` will be more efficient on these platforms. You can add specific
-//! latency numbers for more targets in `avx2.py`.
 //! ## Scalar
-//! At the moment, this is the only alternative to the `AVX2` backend. It is not particularly
-//! optimized.
+//! This is a fallback implementation that works on all CPUs. It's not particularlly performant.
 //!
 //! # Cargo Configuration
 //! ## Native CPU Setup
@@ -46,29 +37,7 @@
 //! consult the Intel documentation to see if a non-implemented intrinsic would
 //! more directly accomplish your goal, and we can add it!
 
-// TODO: support more fine-grained cpu features?
-
 use std::ops::*;
-
-/// What CPU micro architecture is being targeted?
-#[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum MicroArchitecture {
-    /// <https://en.wikichip.org/wiki/intel/microarchitectures/skylake_(client)>
-    Skylake,
-    /// <https://en.wikichip.org/wiki/intel/microarchitectures/skylake_(server)>
-    SkylakeAvx512,
-    /// <https://en.wikichip.org/wiki/cascade_lake>
-    CascadeLake,
-    /// <https://en.wikichip.org/wiki/amd_zen>
-    AmdZenVer1,
-    /// <https://en.wikichip.org/wiki/amd/microarchitectures/zen_2>
-    AmdZenVer2,
-    /// <https://en.wikichip.org/wiki/amd/microarchitectures/zen_3>
-    AmdZenVer3,
-    /// A microarchitecture not on this list.
-    Unknown,
-}
 
 /// What backend will be used when targeting the current CPU?
 #[non_exhaustive]
@@ -77,10 +46,26 @@ pub enum VectorBackend {
     /// The fallback scalar backend (doesn't use vector instructions)
     Scalar,
     /// A vector backend targeting [AVX2](https://en.wikipedia.org/wiki/Advanced_Vector_Extensions#Advanced_Vector_Extensions_2)
-    Avx2 {
-        /// The selected (or detected) microarchitecture to target.
-        micro_architecture: MicroArchitecture,
-    },
+    Avx2,
+    /// A vector backend targeting [ARM Neon](https://developer.arm.com/Architectures/Neon).
+    Neon,
+}
+
+/// The vector backend that this process is using.
+pub const VECTOR_BACKEND: VectorBackend = current_vector_backend();
+
+/// Panic if the current binary uses features unsupported by the current CPU.
+///
+/// Vectoreyes uses compile-time flags to select which backend to use and which CPU features to
+/// require. If this backend is used on an unsupported CPU, it will result in an "Illegal
+/// instruction" error (technically, _all_ Rust code--not even just vectoreyes code--may result in
+/// undefined behavior if run on a CPU that doesn't support the compile-time selected feature
+/// flags).
+///
+/// It would be advisable to call this in the `main()` function of executables to try to catch
+/// these errors early.
+pub fn assert_cpu_features() {
+    vector_backend_check_cpu()
 }
 
 /// A scalar that can live in the lane of a vector.
@@ -174,6 +159,8 @@ pub trait SimdBase:
     + Shr<Self, Output = Self>
     + subtle::ConstantTimeEq
     + subtle::ConditionallySelectable
+    + AsRef<[Self::Scalar]>
+    + AsMut<[Self::Scalar]>
 {
     /// The number of elements of this vector.
     ///
@@ -410,10 +397,8 @@ pub trait AesBlockCipher: 'static + Clone + Sync + Send {
     /// A pre-scheduled Aes block cipher with a compile-time constant key.
     const FIXED_KEY: Self;
 
-    /// Running `encrypt_many` with this many blocks will result in the best performance.
-    ///
-    /// When using hardware AES instructions, if the AES encrypt instructions all have a
-    /// throughput of 1, then this constant will be equal to the instruction latency.
+    /// Running `encrypt_many` with this many blocks will typically result in good
+    /// performance.
     const BLOCK_COUNT_HINT: usize;
 
     /// If you need to AES with a particular key, be careful about endianness issues.
@@ -444,6 +429,8 @@ pub trait AesBlockCipherDecrypt: AesBlockCipher {
 }
 
 pub mod array_utils;
+mod utils;
+
 // We want to allow `which_lane * 0 + 0` expressions.
 // These also allow for simpler generated code. For example, sometimes we have code which looks
 // like:

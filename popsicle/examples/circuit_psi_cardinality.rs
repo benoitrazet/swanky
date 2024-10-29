@@ -1,8 +1,5 @@
 use popsicle::circuit_psi::{
-    base_psi::{receiver::OpprfReceiver, sender::OpprfSender},
-    circuits::*,
-    utils::*,
-    {evaluator::PsiEvaluator, garbler::PsiGarbler, CircuitPsi},
+    circuits::*, evaluator::OpprfPsiEvaluator, garbler::OpprfPsiGarbler, utils::*, CircuitPsi,
 };
 
 use fancy_garbling::Fancy;
@@ -18,20 +15,28 @@ pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {
             let mut rng = AesRng::new();
             let mut channel = setup_channel(sender);
             let mut gb_psi =
-                PsiGarbler::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>())).unwrap();
+                OpprfPsiGarbler::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>()))
+                    .unwrap();
 
-            gb_psi.intersect::<OpprfSender>(set_a, &[]).unwrap();
-            let res = fancy_cardinality(&mut gb_psi.gb, &gb_psi.intersection.existence_bit_vector)
-                .unwrap();
+            let intersection_results = gb_psi.intersect(set_a).unwrap();
+            let res = fancy_cardinality(
+                &mut gb_psi.gb,
+                &intersection_results.intersection.existence_bit_vector,
+            )
+            .unwrap();
             gb_psi.gb.outputs(res.wires()).unwrap();
         });
         let mut rng = AesRng::new();
         let mut channel = setup_channel(receiver);
         let mut ev_psi =
-            PsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>())).unwrap();
-        ev_psi.intersect::<OpprfReceiver>(set_b, &[]).unwrap();
-        let res =
-            fancy_cardinality(&mut ev_psi.ev, &ev_psi.intersection.existence_bit_vector).unwrap();
+            OpprfPsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>()))
+                .unwrap();
+        let intersection_results = ev_psi.intersect(set_b).unwrap();
+        let res = fancy_cardinality(
+            &mut ev_psi.ev,
+            &intersection_results.intersection.existence_bit_vector,
+        )
+        .unwrap();
         let res_out = ev_psi
             .ev
             .outputs(res.wires())

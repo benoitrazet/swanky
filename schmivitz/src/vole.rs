@@ -14,6 +14,15 @@ use swanky_field_binary::{F128b, F2};
 
 use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 
+// Exposing these modules for benchmarking at the moment.
+pub(crate) mod all_but_one_vc;
+pub(crate) mod commit_reconstruct;
+pub(crate) mod consistency_check;
+pub(crate) mod convert_to_vole;
+pub(crate) mod crypto_primitives;
+pub mod functionality;
+pub(crate) mod integration;
+
 /// This defines the behavior needed to create and use non-interactive random VOLEs.
 ///
 /// It's tailored to the specific use case of the VOLE-in-the-head paper[^vole], including
@@ -33,6 +42,7 @@ use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 /// [^vole]: Carsten Baum, Lennart Braun, Cyprien Delpech de Saint Guilhem, Michael Klooß,
 /// Emmanuela Orsini, Lawrence Roy, and Peter Scholl. [Publicly Verifiable Zero-Knowledge and
 /// Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
+#[allow(dead_code)]
 pub trait RandomVole
 where
     Self: Sized,

@@ -23,6 +23,7 @@
 - **`schmivitz`**: A library for zero-knowledge protocols using VOLE-in-the-head
 - **`scuttlebutt`**: A library of useful multi-party computation utilities
 - **`simple-arith-circuit`**: Simple arithmetic circuit library
+- **`swanky-aes-rng`**: A random number generator based on AES-CTR.
 - **`swanky-channel`**: A channel abstraction to let users avoid manual flushing
 - **`swanky-field`**: Definitions of the core `FiniteField` and `FiniteRing` traits
 - **`swanky-field-binary`**: Binary finite (extension) fields
@@ -32,6 +33,7 @@
 - **`swanky-field-test`**: Utilitites for testing correctness of finite field implementations
 - **`swanky-flatbuffer-build`**: Tooling to automate compiling flatbuffer schemas
 - **`swanky-party`**: Support for types indexed by a party.
+- **`swanky-polynomial`**: Support for various representations of polynomials over finite fields
 - **`swanky-serialization`**: Traits and utilities for compact serialization into a canonical byte representation
 - **`vectoreyes`**: Cross-platform SIMD types and functions
 - **`web-mac-n-cheese-wasm`**: Web Mac'n'Cheese, the wasm part
@@ -81,7 +83,7 @@ LTO in your release builds (`lto = true` in your `Cargo.toml` file).
 
 To compile Swanky, you should install and use Rust via [rustup](https://rustup.rs/). The swanky repo will direct rustup to use the correct version of Rust.
 
-The `./swanky` tool automates some tasks in the codebase. For example, `./swanky lint` will run the Swanky linting checks. In order to use this tool, you need to [install the Nix package manager](https://nixos.org/download).
+The `./swanky` tool automates some tasks in the codebase. For example, `./swanky lint` will run the Swanky linting checks. In order to use this tool, you need to [install the Nix package manager](https://nixos.org/download). You'll also need a python3 installation (no packages other than the standard library are required).
 
 # Citing `swanky`
 
@@ -114,4 +116,4 @@ material are those of the author(s) and do not necessarily reflect the views of
 the ARO, SSC Pacific, IARPA and DARPA. Distribution Statement ``A'' (Approved
 for Public Release, Distribution Unlimited).
 
-Copyright © 2019-2022 Galois, Inc.
+Copyright © 2019-2024 Galois, Inc.
