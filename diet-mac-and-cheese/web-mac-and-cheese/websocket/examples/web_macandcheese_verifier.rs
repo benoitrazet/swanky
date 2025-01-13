@@ -59,7 +59,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
     let msg = websocket.read().unwrap();
     match msg {
         Message::Text(m) => {
-            if m == *"init" {
+            if m.as_str() == "init" {
                 println!("INIT");
             }
         }
