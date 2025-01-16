@@ -1,13 +1,16 @@
 /*! Cryptographic primitives used for VOLE-it-HEAD */
 use crate::parameters::SECURITY_PARAM;
+use crate::vole::commit_reconstruct::{corrections_to_bytes, Corrections};
 use aes::cipher::{generic_array::GenericArray, BlockEncrypt, KeyInit};
 use aes::Aes128;
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake128,
 };
+use swanky_field_binary::F128b;
 #[cfg(test)]
 use swanky_field_binary::F2;
+use swanky_serialization::CanonicalSerialize;
 
 /// Initialization Vector.
 pub type IV = [u8; 16];
@@ -215,24 +218,42 @@ pub(crate) fn h1(inp: &[u8]) -> H1 {
     out
 }
 
+/// Hash function for the Fiat-Shamir challenges generated in the protocol.
+///
 /// This is `$H_2^j$` in FAEST spec
-pub(crate) fn h2(inp: &[u8], out: &mut [u8]) {
-    let mut hasher = Shake128::default();
-    hasher.update(inp);
-    hasher.update(&[2u8]);
-    let mut reader = hasher.finalize_xof();
-    reader.read(out);
+#[derive(Default)]
+struct H2Hasher(Shake128);
+
+impl H2Hasher {
+    fn update(&mut self, data: &[u8]) {
+        self.0.update(data);
+    }
+
+    fn finalize(mut self, out: &mut [u8]) {
+        self.0.update(&[2u8]);
+        self.0.finalize_xof_into(out);
+    }
 }
 
 /// Length of 1st challenge in bytes.
 pub(crate) const CHALL1_LENGTH: usize = (SECURITY_PARAM * 6) / 8;
+
 /// First challenge
 pub(crate) type Chall1 = [u8; CHALL1_LENGTH];
 
-/// This is `$H_2^1$` in FAEST spec.
-pub(crate) fn h_chall1(inp: &[u8]) -> Chall1 {
-    let mut out: Chall1 = [0u8; CHALL1_LENGTH]; // NOTE: default does not work here
-    h2(inp, &mut out);
+/// Make the first Fiat-Shamir challenge.
+///
+/// This computes `$H_2^1$` in FAEST spec.
+pub(crate) fn h2_chall1(mu: &H1, hcom: &Com, corrections: &Corrections, iv: &IV) -> Chall1 {
+    let mut hasher = H2Hasher::default();
+
+    hasher.update(mu);
+    hasher.update(hcom);
+    hasher.update(&corrections_to_bytes(corrections));
+    hasher.update(iv);
+
+    let mut out = [0u8; CHALL1_LENGTH];
+    hasher.finalize(&mut out);
     out
 }
 
@@ -244,8 +265,12 @@ pub(crate) type Chall2 = [u8; CHALL2_LENGTH];
 /// This is `$H_2^2$` in FAEST spec.
 #[allow(unused)]
 pub(crate) fn h_chall2(inp: &[u8]) -> Chall2 {
+    let mut hasher = H2Hasher::default();
+
+    hasher.update(inp);
+
     let mut out: Chall2 = [0u8; CHALL2_LENGTH]; // NOTE: default does not work here
-    h2(inp, &mut out);
+    hasher.finalize(&mut out);
     out
 }
 
@@ -254,10 +279,18 @@ pub(crate) const CHALL3_LENGTH: usize = SECURITY_PARAM / 8;
 /// Third challenge.
 pub(crate) type Chall3 = [u8; CHALL3_LENGTH];
 
-/// This is `$H_2^3$` in FAEST spec.
-pub(crate) fn h_chall3(inp: &[u8]) -> Chall3 {
+/// Makes the third Fiat-Shamir challenge.
+///
+/// This computes `$H_2^3$` in FAEST spec.
+pub(crate) fn h2_chall3(chall2: &Chall2, a_tilde: &F128b, b_tilde: &F128b) -> Chall3 {
+    let mut hasher = H2Hasher::default();
+
+    hasher.update(chall2);
+    hasher.update(&a_tilde.to_bytes());
+    hasher.update(&b_tilde.to_bytes());
+
     let mut out = Chall3::default();
-    h2(inp, &mut out);
+    hasher.finalize(&mut out);
     out
 }
 
@@ -266,7 +299,7 @@ pub(crate) fn h_chall3(inp: &[u8]) -> Chall3 {
 /// This should incorporate secret information or randomness (e.g. that only
 /// the verifier knows), to derive secret, per-proof values.
 #[derive(Clone, Default)]
-pub(crate) struct H3([u8; SECURITY_PARAM / 8 + 128 / 8]);
+pub(crate) struct H3([u8; (SECURITY_PARAM + 128) / 8]);
 
 impl H3 {
     /// Derive the [`H3`] hash from an input.

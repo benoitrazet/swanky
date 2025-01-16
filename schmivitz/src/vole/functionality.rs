@@ -5,14 +5,11 @@ Implement high-level functionality for VOLE protocol.
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::all_but_one_vc::Pdecom;
 use crate::vole::commit_reconstruct::{
-    apply_corrections_to_q, corrections_to_bytes, l_hat, vole_commit, vole_open, vole_reconstruct,
-    Commit, Corrections,
+    apply_corrections_to_q, l_hat, vole_commit, vole_open, vole_reconstruct, Commit, Corrections,
 };
 use crate::vole::commit_reconstruct::{recompose_d, B};
 use crate::vole::consistency_check::{vole_hash, vole_hash_lockstep};
-use crate::vole::crypto_primitives::{
-    h1, h_chall1, h_chall3, Chall1, Chall2, Chall3, Com, Seed, H1, H3, IV,
-};
+use crate::vole::crypto_primitives::{h1, Chall1, Chall2, Chall3, Com, Seed, H1, H3, IV};
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake128,
@@ -20,37 +17,33 @@ use sha3::{
 use swanky_field::FiniteRing;
 use swanky_field_binary::F128b;
 use swanky_field_binary::F2;
-use swanky_serialization::CanonicalSerialize;
 
 use super::all_but_one_vc::Decom;
 use super::commit_reconstruct::compute_secret_key;
 use super::consistency_check::HashConsistency;
-use super::crypto_primitives::CHALL2_LENGTH;
+use super::crypto_primitives::{h2_chall1, h2_chall3, CHALL2_LENGTH};
 
-/// Compute a seed and initialization vection from secret key and hash of statement to prove.
+/// Compute a seed and initialization vection from secret key and hash of
+/// statement to prove.
 ///
 /// NOTE: `mu` is coming from the FAEST spec but expected to change when doing
-/// more general circuits/polynomials.
+/// more general circuits/polynomials. It's supposed to be a representation
+/// of the public components of the computation.
 pub(crate) fn compute_seed_iv(mut secret_stream: Shake128, mu: &H1) -> (Seed, IV) {
     secret_stream.update(mu);
     let r_iv: H3 = H3::from_xof(secret_stream);
 
-    // splitting r_iv into r and iv
-    let mut r: [u8; 16] = [0u8; SECURITY_PARAM / 8];
-    r.copy_from_slice(&r_iv.as_ref()[0..SECURITY_PARAM / 8]);
-    let mut iv: [u8; 16] = [0u8; 128 / 8];
-    iv.copy_from_slice(&r_iv.as_ref()[SECURITY_PARAM / 8..(SECURITY_PARAM + 128) / 8]);
+    // Split hash digest into `r` and `iv`. These unwraps are safe because the
+    // lengths are fixed.
+    let (r_slice, iv_slice) = r_iv.as_ref().split_at(SECURITY_PARAM / 8);
+    let r = r_slice.try_into().unwrap();
+    let iv = iv_slice.try_into().unwrap();
     (r, iv)
 }
 
 /// Compute first challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
 pub(crate) fn compute_chall_1(mu: &H1, h_com: &Com, corrections: &Corrections, iv: &IV) -> Chall1 {
-    let mut inp = vec![];
-    inp.extend(mu);
-    inp.extend(h_com);
-    inp.extend(corrections_to_bytes(corrections));
-    inp.extend(iv);
-    h_chall1(&inp)
+    h2_chall1(mu, h_com, corrections, iv)
 }
 
 /// Compute second challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
@@ -87,12 +80,7 @@ pub(crate) fn compute_chall_2(
 
 /// Compute third challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
 pub(crate) fn compute_chall_3(chall2: &Chall2, a_tilda: F128b, b_tilda: F128b) -> Chall3 {
-    let mut inp: Vec<u8> = vec![];
-    inp.extend(chall2);
-    inp.extend(a_tilda.to_bytes().as_slice());
-    inp.extend(b_tilda.to_bytes().as_slice());
-
-    h_chall3(&inp)
+    h2_chall3(chall2, &a_tilda, &b_tilda)
 }
 
 fn bits_to_u8_many(bits: &[F2]) -> Vec<u8> {
