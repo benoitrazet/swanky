@@ -24,7 +24,7 @@ We assume the $`\lambda`$ security parameter in the spec to be 128 as set in
 
 For convenience we abbreviate "all-but-one vector commitment" to "1-VC".
 */
-use crate::vole::crypto_primitives::{h0, h1, Com, Key, Seed, H1, IV, PRG};
+use crate::vole::crypto_primitives::{h0, Com, Key, Seed, H1, IV, PRG};
 use eyre::{bail, Result};
 
 /// Hash function hashing a sequence of [`Com`]mitments and returns a hash [`H1`].
@@ -37,7 +37,7 @@ fn h1_on_coms(coms: &[Com]) -> H1 {
         inp.extend(com);
     }
 
-    h1(&inp)
+    H1::from_bytes(&inp)
 }
 
 /// Type storing all the [`Key`]s associated with the Tree-PRG/GGM-tree.
@@ -124,11 +124,11 @@ fn tree(iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) {
 /// This also produces the the full decommitment information that a prover can later use to
 /// [`open()`] the commitment and the full set of [`Seed`]s.
 #[inline(never)]
-pub(crate) fn commit(r: Key, iv: IV, depth: usize) -> (H1, Decom, Vec<Seed>) {
+pub(crate) fn commit(r: Key, iv: IV, depth: usize) -> (Com, Decom, Vec<Seed>) {
     let (ks, seeds, coms) = tree(iv, r, depth);
 
     // compute the h
-    let h = h1_on_coms(&coms);
+    let h = h1_on_coms(&coms).into_com();
 
     (h, (ks, coms), seeds)
 }
@@ -183,10 +183,10 @@ pub(crate) fn open(decom: &Decom, j: Vec<bool>) -> Pdecom {
 
 /// Reconstruct algorithm for the 1-VC scheme (VC.Reconstruct from Fig. 5.1 in the spec).
 ///
-/// Generates a full hash [`H1`] and all-but-one seeds given a [`Pdecom`] and index `j` and
+/// Generates a full hash commitment [`Com`] and all-but-one seeds given a [`Pdecom`] and index `j` and
 /// an initial vector `iv`. The seeds are used later in the VOLE-it-HEAD protocol to generate VOLEs.
 /// This function is used by the verifier after receiving the [`Pdecom`] from the prover.
-pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (H1, Vec<Seed>) {
+pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (Com, Vec<Seed>) {
     assert_eq!(
         pdecom.0.len(),
         j.len(),
@@ -220,7 +220,7 @@ pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (H1, Vec<Seed
     coms[pos] = com_j;
 
     // compute the hash using H1
-    let h_computed = h1_on_coms(&coms);
+    let h_computed = h1_on_coms(&coms).into_com();
 
     debug_assert_eq!(seeds.len(), (1 << d));
     (h_computed, seeds)
@@ -232,7 +232,7 @@ pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (H1, Vec<Seed
 /// at an index `j`, and the initial vector `iv`. This function is run by the verifier and relies on
 /// [`reconstruct`] for its internal computation.
 #[allow(unused)]
-pub(crate) fn verify(h_com: H1, pdecom: Pdecom, j: Vec<bool>, iv: IV) -> Result<()> {
+pub(crate) fn verify(h_com: Com, pdecom: Pdecom, j: Vec<bool>, iv: IV) -> Result<()> {
     assert_eq!(
         pdecom.0.len(),
         j.len(),

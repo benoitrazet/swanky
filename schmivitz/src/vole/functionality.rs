@@ -9,7 +9,7 @@ use crate::vole::commit_reconstruct::{
 };
 use crate::vole::commit_reconstruct::{recompose_d, B};
 use crate::vole::consistency_check::{vole_hash, vole_hash_lockstep};
-use crate::vole::crypto_primitives::{h1, Chall1, Chall2, Chall3, Com, Seed, H1, H3, IV};
+use crate::vole::crypto_primitives::{Chall1, Chall2, Chall3, Com, Seed, H1, H3, IV};
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake128,
@@ -30,7 +30,7 @@ use super::crypto_primitives::{h2_chall1, h2_chall3, CHALL2_LENGTH};
 /// more general circuits/polynomials. It's supposed to be a representation
 /// of the public components of the computation.
 pub(crate) fn compute_seed_iv(mut secret_stream: Shake128, mu: &H1) -> (Seed, IV) {
-    secret_stream.update(mu);
+    secret_stream.update(mu.as_ref());
     let r_iv: H3 = H3::from_xof(secret_stream);
 
     // Split hash digest into `r` and `iv`. These unwraps are safe because the
@@ -58,7 +58,7 @@ pub(crate) fn compute_chall_2(
     let mut hasher = Shake128::default();
     hasher.update(chall1);
     hasher.update(u_tilda.pack_to_bytes().as_slice());
-    hasher.update(&h_v);
+    hasher.update(h_v.as_ref());
 
     // pack the binary field values into bytes
     for chunk in masked_witnesses.chunks(8) {
@@ -137,7 +137,7 @@ pub(crate) fn create_vole_prover(
     l: usize,
 ) -> VoleProver {
     // line 2
-    let mu: H1 = h1(statement_sig); // Hash the signature of the circuit+instance the prover/verifier agree to execute.
+    let mu: H1 = H1::from_bytes(statement_sig); // Hash the signature of the circuit+instance the prover/verifier agree to execute.
 
     // line 3
     let (r, iv) = compute_seed_iv(secret_stream, &mu);
@@ -186,7 +186,7 @@ pub(crate) fn create_vole_prover(
     log::info!("vole_hash(V) running time: {:?}", t.elapsed());
 
     // line 10
-    let h_v = h1(&bits_to_u8_many(&v_tilda));
+    let h_v = H1::from_bytes(&bits_to_u8_many(&v_tilda));
 
     VoleProver {
         iv,
@@ -256,7 +256,7 @@ pub(crate) fn create_vole_verifier(
     } = decommitment_prover;
 
     // line 2
-    let mu: H1 = h1(statement_sig);
+    let mu: H1 = H1::from_bytes(statement_sig);
 
     // lines 3-4
     let t = std::time::Instant::now();
@@ -306,7 +306,7 @@ pub(crate) fn create_vole_verifier(
         .collect();
     log::info!("Q + D running time: {:?}", t.elapsed());
 
-    let h_v = h1(&bits_to_u8_many(&q_xor_d));
+    let h_v = H1::from_bytes(&bits_to_u8_many(&q_xor_d));
 
     // line 17
     let chall2 = compute_chall_2(&chall1, *u_tilda, h_v, d);

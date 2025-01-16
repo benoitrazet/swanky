@@ -6,7 +6,7 @@ Implementation of algorithms to commit, open and reconstruct VOLEs.
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::all_but_one_vc::{commit, open, reconstruct, Decom, Pdecom};
 use crate::vole::convert_to_vole::{convert_to_vole, convert_to_vole_verifier};
-use crate::vole::crypto_primitives::{h1, Chall3, Com, H1, H1_LENGTH, IV, PRG};
+use crate::vole::crypto_primitives::{Chall3, Com, H1, H1_LENGTH, IV, PRG};
 use std::sync::mpsc::channel;
 use std::thread;
 use swanky_field::FiniteRing;
@@ -37,13 +37,13 @@ pub(crate) fn bools_to_u8(d: &[bool]) -> u8 {
 pub(crate) struct Corrections([Vec<F2>; REPETITION_PARAM - 1]);
 
 /// hash the commitments coming from the small-domain VOLE
-fn hash_commitments(com: &[H1]) -> H1 {
+fn hash_commitments(com: &[Com]) -> Com {
     assert_eq!(com.len(), REPETITION_PARAM);
     let mut com_bytes = Vec::with_capacity(H1_LENGTH * REPETITION_PARAM);
     for i in 0..REPETITION_PARAM {
-        com_bytes.extend(com[i]);
+        com_bytes.extend(com[i].as_ref());
     }
-    h1(&com_bytes)
+    H1::from_bytes(&com_bytes).into_com()
 }
 
 /// Vole Commitment
@@ -384,7 +384,7 @@ mod test {
         l_hat, vole_commit, vole_open, vole_reconstruct, Commit,
     };
     use crate::parameters::REPETITION_PARAM;
-    use crate::vole::crypto_primitives::{h1, H1};
+    use crate::vole::crypto_primitives::H1;
     use crate::vole::functionality::compute_seed_iv;
     use sha3::{digest::Update, Shake128};
     use swanky_field::FiniteRing;
@@ -426,7 +426,7 @@ mod test {
 
         let how_many = l_hat(1_000);
 
-        let mu: H1 = h1(&pk);
+        let mu: H1 = H1::from_bytes(&pk);
         let (r, iv) = compute_seed_iv(secret_stream, &mu);
 
         let Commit {

@@ -195,27 +195,35 @@ pub(crate) fn h0(x: Key, iv: IV) -> (Seed, Com) {
 /// Length of H1 hash in bytes.
 pub(crate) const H1_LENGTH: usize = (SECURITY_PARAM / 8) * 2;
 
-/// Type for array of bytes with 2 times the `SECURITY_PARAM`.
+/// Hash digest for a collision-resistant hash function.
 ///
-/// This type is the result of the [`h1`] hash function.
-pub(crate) type H1 = [u8; H1_LENGTH];
+/// This is used for various purposes throughout the protocol.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct H1([u8; H1_LENGTH]);
 
-fn h1_internal(inp: &[u8], out: &mut [u8]) {
-    assert_eq!(out.len(), (SECURITY_PARAM / 8) * 2);
-    let mut hasher = Shake128::default();
-    hasher.update(inp);
-    hasher.update(&[1u8]);
-    let mut reader = hasher.finalize_xof();
-    reader.read(out);
+impl H1 {
+    /// Compute the [`H1`] hash from input bytes.
+    pub(crate) fn from_bytes(inp: &[u8]) -> H1 {
+        let mut out = H1::default();
+
+        let mut hasher = Shake128::default();
+        hasher.update(inp);
+        hasher.update(&[1u8]);
+
+        hasher.finalize_xof_into(&mut out.0);
+        out
+    }
+
+    /// Treat this hash digest as a commitment.
+    pub(crate) fn into_com(self) -> Com {
+        self.0
+    }
 }
 
-/// Hash function returning returning a hash of type [`H1`].
-///
-/// This function operates on a slice of bytes.
-pub(crate) fn h1(inp: &[u8]) -> H1 {
-    let mut out = H1::default();
-    h1_internal(inp, &mut out);
-    out
+impl AsRef<[u8; H1_LENGTH]> for H1 {
+    fn as_ref(&self) -> &[u8; H1_LENGTH] {
+        &self.0
+    }
 }
 
 /// Hash function for the Fiat-Shamir challenges generated in the protocol.
@@ -247,7 +255,7 @@ pub(crate) type Chall1 = [u8; CHALL1_LENGTH];
 pub(crate) fn h2_chall1(mu: &H1, hcom: &Com, corrections: &Corrections, iv: &IV) -> Chall1 {
     let mut hasher = H2Hasher::default();
 
-    hasher.update(mu);
+    hasher.update(&mu.0);
     hasher.update(hcom);
     hasher.update(&corrections_to_bytes(corrections));
     hasher.update(iv);
