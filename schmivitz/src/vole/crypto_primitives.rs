@@ -261,17 +261,49 @@ pub(crate) fn h_chall3(inp: &[u8]) -> Chall3 {
     out
 }
 
-/// This type is the result of the [`h3`] hash function.
-pub(crate) type H3 = [u8; SECURITY_PARAM / 8 + 128 / 8];
+/// Hash digest for randomness and IV generation.
+///
+/// This should incorporate secret information or randomness (e.g. that only
+/// the verifier knows), to derive secret, per-proof values.
+#[derive(Clone, Default)]
+pub(crate) struct H3([u8; SECURITY_PARAM / 8 + 128 / 8]);
 
-/// H3 function
-pub(crate) fn h3(inp: &[u8]) -> H3 {
-    let mut hasher = Shake128::default();
-    hasher.update(inp);
-    hasher.update(&[3u8]);
-    let mut reader = hasher.finalize_xof();
+impl H3 {
+    /// Derive the [`H3`] hash from an input.
+    pub(crate) fn from_input(inp: &[u8]) -> Self {
+        let mut hasher = Shake128::default();
+        hasher.update(inp);
 
-    let mut out: H3 = Default::default();
-    reader.read(&mut out);
-    out
+        // Append 0x3 for domain separation
+        hasher.update(&[3u8]);
+        let mut reader = hasher.finalize_xof();
+
+        let mut out: H3 = Default::default();
+        reader.read(out.as_mut());
+        out
+    }
+
+    /// Derive the [`H3`] hash from an instance of `Shake128`, which we assume
+    /// has already been updated with all relevant secret information.
+    #[allow(unused)]
+    pub(crate) fn from_xof(mut xof: Shake128) -> Self {
+        // Append 0x3 for domain separation
+        xof.update(&[3u8]);
+
+        let mut out: H3 = Default::default();
+        xof.finalize_xof_into(out.as_mut());
+        out
+    }
+}
+
+impl AsRef<[u8; SECURITY_PARAM / 8 + 128 / 8]> for H3 {
+    fn as_ref(&self) -> &[u8; SECURITY_PARAM / 8 + 128 / 8] {
+        &self.0
+    }
+}
+
+impl AsMut<[u8; SECURITY_PARAM / 8 + 128 / 8]> for H3 {
+    fn as_mut(&mut self) -> &mut [u8; SECURITY_PARAM / 8 + 128 / 8] {
+        &mut self.0
+    }
 }

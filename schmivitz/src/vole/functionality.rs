@@ -11,7 +11,7 @@ use crate::vole::commit_reconstruct::{
 use crate::vole::commit_reconstruct::{recompose_d, B};
 use crate::vole::consistency_check::{vole_hash, vole_hash_lockstep};
 use crate::vole::crypto_primitives::{
-    h1, h3, h_chall1, h_chall3, Chall1, Chall2, Chall3, Com, Seed, H1, H3, IV,
+    h1, h_chall1, h_chall3, Chall1, Chall2, Chall3, Com, Seed, H1, H3, IV,
 };
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
@@ -35,13 +35,13 @@ pub(crate) fn compute_seed_iv(sk: &[u8], mu: &H1) -> (Seed, IV) {
     let mut h3_inp = vec![];
     h3_inp.extend(sk);
     h3_inp.extend(mu);
-    let r_iv: H3 = h3(&h3_inp);
+    let r_iv: H3 = H3::from_input(&h3_inp);
 
     // splitting r_iv into r and iv
     let mut r: [u8; 16] = [0u8; SECURITY_PARAM / 8];
-    r.copy_from_slice(&r_iv[0..SECURITY_PARAM / 8]);
+    r.copy_from_slice(&r_iv.as_ref()[0..SECURITY_PARAM / 8]);
     let mut iv: [u8; 16] = [0u8; 128 / 8];
-    iv.copy_from_slice(&r_iv[SECURITY_PARAM / 8..(SECURITY_PARAM + 128) / 8]);
+    iv.copy_from_slice(&r_iv.as_ref()[SECURITY_PARAM / 8..(SECURITY_PARAM + 128) / 8]);
     (r, iv)
 }
 
