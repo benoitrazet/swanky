@@ -6,6 +6,7 @@ use crate::vole::functionality::{create_vole_prover, PartialDecommitment, VolePr
 use eyre::{bail, Result};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
+use sha3::Shake128;
 use swanky_field_binary::{F128b, F2};
 
 // This is a first attempt to connect the VOLE part to the circuit traverser.
@@ -20,14 +21,14 @@ impl RandomVole for VoleProver {
     fn create(
         extended_witness_length: usize,
         transcript: &mut Transcript,
+        secret_stream: Shake128,
         _rng: &mut (impl CryptoRng + RngCore),
     ) -> (Self, Self::VoleChallenge) {
         let mut statement_sig = [0u8; 16];
         transcript.challenge_bytes(b"statement signature", &mut statement_sig);
-        let todo_secret = [42u8];
         let vole = create_vole_prover(
             &statement_sig,
-            &todo_secret,
+            secret_stream,
             extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM,
         );
         let chall = vole.chall1;

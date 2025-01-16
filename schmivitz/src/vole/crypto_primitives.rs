@@ -270,6 +270,7 @@ pub(crate) struct H3([u8; SECURITY_PARAM / 8 + 128 / 8]);
 
 impl H3 {
     /// Derive the [`H3`] hash from an input.
+    #[allow(unused)]
     pub(crate) fn from_input(inp: &[u8]) -> Self {
         let mut hasher = Shake128::default();
         hasher.update(inp);
@@ -285,7 +286,6 @@ impl H3 {
 
     /// Derive the [`H3`] hash from an instance of `Shake128`, which we assume
     /// has already been updated with all relevant secret information.
-    #[allow(unused)]
     pub(crate) fn from_xof(mut xof: Shake128) -> Self {
         // Append 0x3 for domain separation
         xof.update(&[3u8]);

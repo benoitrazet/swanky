@@ -386,6 +386,7 @@ mod test {
     use crate::parameters::REPETITION_PARAM;
     use crate::vole::crypto_primitives::{h1, H1};
     use crate::vole::functionality::compute_seed_iv;
+    use sha3::{digest::Update, Shake128};
     use swanky_field::FiniteRing;
     use swanky_field_binary::F8b;
     use swanky_serialization::CanonicalSerialize;
@@ -419,13 +420,14 @@ mod test {
 
     #[test]
     fn test_vole_commit_reconstruct() {
-        let sk = vec![1u8];
+        let mut secret_stream = Shake128::default();
+        secret_stream.update(b"this is a secret!");
         let pk = vec![1u8];
 
         let how_many = l_hat(1_000);
 
         let mu: H1 = h1(&pk);
-        let (r, iv) = compute_seed_iv(&sk, &mu);
+        let (r, iv) = compute_seed_iv(secret_stream, &mu);
 
         let Commit {
             h_com: _,

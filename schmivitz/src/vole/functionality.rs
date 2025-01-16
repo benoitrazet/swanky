@@ -31,11 +31,9 @@ use super::crypto_primitives::CHALL2_LENGTH;
 ///
 /// NOTE: `mu` is coming from the FAEST spec but expected to change when doing
 /// more general circuits/polynomials.
-pub(crate) fn compute_seed_iv(sk: &[u8], mu: &H1) -> (Seed, IV) {
-    let mut h3_inp = vec![];
-    h3_inp.extend(sk);
-    h3_inp.extend(mu);
-    let r_iv: H3 = H3::from_input(&h3_inp);
+pub(crate) fn compute_seed_iv(mut secret_stream: Shake128, mu: &H1) -> (Seed, IV) {
+    secret_stream.update(mu);
+    let r_iv: H3 = H3::from_xof(secret_stream);
 
     // splitting r_iv into r and iv
     let mut r: [u8; 16] = [0u8; SECURITY_PARAM / 8];
@@ -136,7 +134,7 @@ pub(crate) struct VoleProver {
     pub(crate) chall1: Chall1,
     /// consistency hash of u
     pub(crate) u_tilda: HashConsistency,
-    /// hash of the consistency hash of V        
+    /// hash of the consistency hash of V
     pub(crate) h_v: H1,
 }
 
@@ -145,12 +143,16 @@ pub(crate) struct VoleProver {
 /// Adapted from parts of FAEST.sign from Fig. 8.2
 #[inline(never)]
 #[allow(unused)]
-pub(crate) fn create_vole_prover(statement_sig: &[u8], secret: &[u8], l: usize) -> VoleProver {
+pub(crate) fn create_vole_prover(
+    statement_sig: &[u8],
+    secret_stream: Shake128,
+    l: usize,
+) -> VoleProver {
     // line 2
     let mu: H1 = h1(statement_sig); // Hash the signature of the circuit+instance the prover/verifier agree to execute.
 
     // line 3
-    let (r, iv) = compute_seed_iv(secret, &mu);
+    let (r, iv) = compute_seed_iv(secret_stream, &mu);
 
     // lines 4-5
     let t = std::time::Instant::now();
@@ -345,14 +347,18 @@ mod test {
     use super::{create_vole_prover, create_vole_verifier, decommit, verify, VoleVerifier};
     use crate::vole::functionality::compute_chall_2;
     use crate::vole::functionality::compute_chall_3;
+    use sha3::digest::Update;
+    use sha3::Shake128;
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F128b, F8b};
     use swanky_serialization::CanonicalSerialize;
 
     fn test_vole_prover_and_verifier(how_many: usize) {
         let statement_sig = vec![1u8];
-        let secret = vec![42u8];
-        let vole_prover = create_vole_prover(&statement_sig, &secret, how_many);
+        let mut secret_stream = Shake128::default();
+        secret_stream.update(b"this is a secret!");
+
+        let vole_prover = create_vole_prover(&statement_sig, secret_stream, how_many);
 
         // Let's clone u and v so that we can test the VOLE fundamental equality at the end.
         let u = vole_prover.u.clone();

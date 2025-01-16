@@ -11,6 +11,7 @@ use eyre::{bail, Result};
 use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, Type};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
+use sha3::{digest::Update, Shake128};
 use std::{
     io::{Read, Seek},
     iter::zip,
@@ -78,8 +79,13 @@ impl<Vole: RandomVole> Proof<Vole> {
         // Update transcript with general public information
         transcript.append_public_values();
 
+        // Hash the secret witness into an XOF stream
+        let mut secret_stream = Shake128::default();
+        secret_stream.update(&witness.iter().map(|b| (*b).into()).collect::<Vec<u8>>());
+
         // Get a set of random VOLEs, one for each value in the extended witness
-        let (voles, vole_challenge) = Vole::create(witness.len(), transcript.as_mut(), rng);
+        let (voles, vole_challenge) =
+            Vole::create(witness.len(), transcript.as_mut(), secret_stream, rng);
 
         // Commit to extended witness (`d` in the paper)
         let witness_commitment: Vec<F2> = zip(witness, voles.witness_mask())

@@ -10,6 +10,7 @@ pub(crate) mod insecure;
 use eyre::Result;
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
+use sha3::Shake128;
 use swanky_field_binary::{F128b, F2};
 
 use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
@@ -73,9 +74,13 @@ where
     /// any external context provided at the application level.
     /// Internally, it must incorporate any additional public parameters defined by this
     /// instantiation of `RandomVole` before generating the [`RandomVole::VoleChallenge`].
+    ///
+    /// The `secret_stream` should incorporate private information known only to the verifier.
+    /// It can be used to generate randomness, IVs, and other proof-specific fields.
     fn create(
         extended_witness_length: usize,
         transcript: &mut Transcript,
+        secret_stream: Shake128,
         rng: &mut (impl CryptoRng + RngCore),
     ) -> (Self, Self::VoleChallenge);
 

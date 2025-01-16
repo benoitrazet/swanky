@@ -10,6 +10,7 @@ use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 use eyre::{bail, Result};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
+use sha3::Shake128;
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F8b, F2};
 
@@ -60,6 +61,7 @@ impl RandomVole for InsecureVole {
     fn create(
         extended_witness_length: usize,
         transcript: &mut merlin::Transcript,
+        _secret_stream: Shake128,
         rng: &mut (impl CryptoRng + RngCore),
     ) -> (Self, Self::VoleChallenge) {
         // In a secure version of VOLE, we would populate the transcript with more useful
@@ -266,6 +268,7 @@ impl InsecureCommitments {
 mod tests {
     use merlin::Transcript;
     use rand::thread_rng;
+    use sha3::{digest::Update, Shake128};
 
     use crate::{
         parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM},
@@ -276,9 +279,11 @@ mod tests {
     fn everything_is_the_expected_size() {
         let rng = &mut thread_rng();
         let transcript = &mut Transcript::new(b"testing");
+        let mut secret_stream = Shake128::default();
+        secret_stream.update(b"this is a secret!");
 
         let witness = 100;
-        let (voles, _challenge) = InsecureVole::create(witness, transcript, rng);
+        let (voles, _challenge) = InsecureVole::create(witness, transcript, secret_stream, rng);
 
         assert_eq!(voles.count(), witness + REPETITION_PARAM * VOLE_SIZE_PARAM);
         assert_eq!(voles.witness_mask().len(), witness);
