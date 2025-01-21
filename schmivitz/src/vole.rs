@@ -1,4 +1,4 @@
-//! Defines the overarching trait for VOLE and includes various implementations.
+//! Defines the overarching trait for non-interactive VOLE and includes various implementations.
 //!
 //! Expected implementations:
 //! - Dummy insecure version for non-blocking development
@@ -32,7 +32,7 @@ pub trait AsSecretBytes {
     fn as_bytes(&self) -> Vec<u8>;
 }
 
-/// This defines the behavior needed to create and use non-interactive random VOLEs.
+/// Methods for a prover to create and decommit to an instance of VOLE.
 ///
 /// It's tailored to the specific use case of the VOLE-in-the-head paper[^vole], including
 /// hardcoding some lengths and field sizes based on the [fixed parameters](crate::parameters)
@@ -183,4 +183,38 @@ where
         self,
         transcript: &mut Transcript,
     ) -> (Self::Decommitment, Self::VoleDecommitmentChallenge);
+}
+
+/// Methods for a verifier to reconstruct / verify and use an instance of VOLE.
+pub trait RandomVoleV {
+    /// Decommitment information for the random VOLE.
+    ///
+    /// This must only contain information that is safe to be sent to the verifier at the end of
+    /// the protocol.
+    type Decommitment;
+
+    /// Reconstruct the VOLE material from a decommitment in a proof.
+    ///
+    /// In the ideal functionality, this corresponds to the `get` function.
+    /// In practice, this "expands" the decommitment information, performs
+    /// any checks, corrections, challenge evaluations, and any other details
+    /// that need to happen before the VOLE key ∆ and the VOLE value tags `Q`
+    /// are computed.
+    fn reconstruct(decom: Self::Decommitment) -> Self;
+
+    /// Get the length of the extended witness.
+    fn extended_witness_length(&self) -> usize;
+
+    /// Get the verifier key array $`\Delta`$.
+    fn verifier_key_array(&self) -> &F128b;
+
+    /// Get the value tags corresponding to the witness $`\mathbf Q_{[0..\ell)}`$,
+    /// where $`\ell`$ is the [`Self::extended_witness_length`].
+    fn witness_voles(&self) -> &[F128b];
+
+    /// Get the value tags corresponding to the mask
+    /// $`\mathbf Q_{[\ell..\ell + \lambda)}`$, where $`\ell`$ is the
+    /// [`Self::extended_witness_length`] and $`\lambda`$ is the security
+    /// parameter (and equal to [`REPETITION_PARAM`]` * `[`VOLE_SIZE_PARAM`]).
+    fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
 }
