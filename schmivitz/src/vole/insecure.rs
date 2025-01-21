@@ -231,7 +231,7 @@ impl InsecureCommitments {
 impl RandomVoleV for InsecureCommitments {
     type Decommitment = InsecureCommitments;
 
-    fn reconstruct(decom: &Self::Decommitment) -> Self {
+    fn reconstruct(decom: &Self::Decommitment, _transcript: &mut Transcript) -> Self {
         decom.clone()
     }
 

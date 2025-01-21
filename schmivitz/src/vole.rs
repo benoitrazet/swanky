@@ -200,7 +200,7 @@ pub trait RandomVoleV {
     /// any checks, corrections, challenge evaluations, and any other details
     /// that need to happen before the VOLE key ∆ and the VOLE value tags `Q`
     /// are computed.
-    fn reconstruct(decom: &Self::Decommitment) -> Self;
+    fn reconstruct(decom: &Self::Decommitment, transcript: &mut Transcript) -> Self;
 
     /// Get the length of the extended witness.
     fn extended_witness_length(&self) -> usize;

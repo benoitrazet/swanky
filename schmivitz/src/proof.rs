@@ -193,10 +193,10 @@ where
         <VoleP as RandomVole>::VoleChallenge: PartialEq<[u8; 16]>,
         <VoleP as RandomVole>::VoleDecommitmentChallenge: PartialEq<[u8; 16]>,
     {
-        let reconstructed_voles = VoleV::reconstruct(&self.partial_decommitment);
-
-        self.validate_proof(&reconstructed_voles)?;
         let mut transcript = transcript::Transcript::from(transcript);
+
+        let reconstructed_voles = VoleV::reconstruct(&self.partial_decommitment, transcript.as_mut());
+        self.validate_proof(&reconstructed_voles)?;
 
         // Add public values to transcript for both the overall proof...
         transcript.append_public_values();
