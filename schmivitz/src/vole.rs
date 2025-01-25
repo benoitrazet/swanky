@@ -10,7 +10,6 @@ pub(crate) mod insecure;
 use eyre::Result;
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
-use sha3::Shake128;
 use swanky_field_binary::{F128b, F2};
 
 use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
@@ -23,6 +22,15 @@ pub(crate) mod convert_to_vole;
 pub(crate) mod crypto_primitives;
 pub mod functionality;
 pub(crate) mod integration;
+
+/// The prover's secret must have a bytes-wise representation.
+///
+/// Note: Ideally this would not require new allocation into a `Vec` but
+/// I can't figure out how to do it for our secret type.
+pub trait AsSecretBytes {
+    /// Byte-wise representation of the secret.
+    fn as_bytes(&self) -> Vec<u8>;
+}
 
 /// This defines the behavior needed to create and use non-interactive random VOLEs.
 ///
@@ -77,10 +85,10 @@ where
     ///
     /// The `secret_stream` should incorporate private information known only to the verifier.
     /// It can be used to generate randomness, IVs, and other proof-specific fields.
-    fn create(
+    fn create<Secret: AsSecretBytes>(
         extended_witness_length: usize,
         transcript: &mut Transcript,
-        secret_stream: Shake128,
+        secret: &Secret,
         rng: &mut (impl CryptoRng + RngCore),
     ) -> (Self, Self::VoleChallenge);
 

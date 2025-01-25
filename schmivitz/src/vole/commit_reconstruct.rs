@@ -379,6 +379,8 @@ pub(crate) fn corrections_to_bytes(corrections: &Corrections) -> Vec<u8> {
 
 #[cfg(test)]
 mod test {
+    use std::iter::repeat_with;
+
     use super::{
         apply_corrections_to_q, bitwise_f128b_from_f8b, bools_to_u8, chal_dec, compute_secret_key,
         l_hat, vole_commit, vole_open, vole_reconstruct, Commit,
@@ -386,9 +388,9 @@ mod test {
     use crate::parameters::REPETITION_PARAM;
     use crate::vole::crypto_primitives::H1;
     use crate::vole::functionality::compute_seed_iv;
-    use sha3::{digest::Update, Shake128};
+    use rand::thread_rng;
     use swanky_field::FiniteRing;
-    use swanky_field_binary::F8b;
+    use swanky_field_binary::{F8b, F2};
     use swanky_serialization::CanonicalSerialize;
 
     #[test]
@@ -420,14 +422,16 @@ mod test {
 
     #[test]
     fn test_vole_commit_reconstruct() {
-        let mut secret_stream = Shake128::default();
-        secret_stream.update(b"this is a secret!");
+        let rng = &mut thread_rng();
+        let secret = repeat_with(|| F2::random(rng))
+            .take(100)
+            .collect::<Vec<F2>>();
         let pk = vec![1u8];
 
         let how_many = l_hat(1_000);
 
         let mu: H1 = H1::from_bytes(&pk);
-        let (r, iv) = compute_seed_iv(secret_stream, &mu);
+        let (r, iv) = compute_seed_iv(&secret, &mu);
 
         let Commit {
             h_com: _,

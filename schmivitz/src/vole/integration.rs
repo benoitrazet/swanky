@@ -1,12 +1,11 @@
 use super::crypto_primitives::{CHALL1_LENGTH, CHALL3_LENGTH};
 use super::functionality::{decommit, VoleVerifier};
-use super::RandomVole;
+use super::{AsSecretBytes, RandomVole};
 use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 use crate::vole::functionality::{create_vole_prover, PartialDecommitment, VoleProver};
 use eyre::{bail, Result};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
-use sha3::Shake128;
 use swanky_field_binary::{F128b, F2};
 
 // This is a first attempt to connect the VOLE part to the circuit traverser.
@@ -18,17 +17,17 @@ impl RandomVole for VoleProver {
 
     type VoleDecommitmentChallenge = [u8; CHALL3_LENGTH];
 
-    fn create(
+    fn create<Secret: AsSecretBytes>(
         extended_witness_length: usize,
         transcript: &mut Transcript,
-        secret_stream: Shake128,
+        secret: &Secret,
         _rng: &mut (impl CryptoRng + RngCore),
     ) -> (Self, Self::VoleChallenge) {
         let mut statement_sig = [0u8; 16];
         transcript.challenge_bytes(b"statement signature", &mut statement_sig);
         let vole = create_vole_prover(
             &statement_sig,
-            secret_stream,
+            secret,
             extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM,
         );
         let chall = vole.chall1;
