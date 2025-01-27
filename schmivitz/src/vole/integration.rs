@@ -1,6 +1,6 @@
 use super::crypto_primitives::{CHALL1_LENGTH, CHALL3_LENGTH};
 use super::functionality::{decommit, VoleVerifier};
-use super::RandomVole;
+use super::{AsSecretBytes, RandomVole};
 use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 use crate::vole::functionality::{create_vole_prover, PartialDecommitment, VoleProver};
 use eyre::{bail, Result};
@@ -17,17 +17,17 @@ impl RandomVole for VoleProver {
 
     type VoleDecommitmentChallenge = [u8; CHALL3_LENGTH];
 
-    fn create(
+    fn create<Secret: AsSecretBytes>(
         extended_witness_length: usize,
         transcript: &mut Transcript,
+        secret: &Secret,
         _rng: &mut (impl CryptoRng + RngCore),
     ) -> (Self, Self::VoleChallenge) {
         let mut statement_sig = [0u8; 16];
         transcript.challenge_bytes(b"statement signature", &mut statement_sig);
-        let todo_secret = [42u8];
         let vole = create_vole_prover(
             &statement_sig,
-            &todo_secret,
+            secret,
             extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM,
         );
         let chall = vole.chall1;

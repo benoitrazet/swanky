@@ -23,6 +23,15 @@ pub(crate) mod crypto_primitives;
 pub mod functionality;
 pub(crate) mod integration;
 
+/// The prover's secret must have a bytes-wise representation.
+///
+/// Note: Ideally this would not require new allocation into a `Vec` but
+/// I can't figure out how to do it for our secret type.
+pub trait AsSecretBytes {
+    /// Byte-wise representation of the secret.
+    fn as_bytes(&self) -> Vec<u8>;
+}
+
 /// This defines the behavior needed to create and use non-interactive random VOLEs.
 ///
 /// It's tailored to the specific use case of the VOLE-in-the-head paper[^vole], including
@@ -73,9 +82,13 @@ where
     /// any external context provided at the application level.
     /// Internally, it must incorporate any additional public parameters defined by this
     /// instantiation of `RandomVole` before generating the [`RandomVole::VoleChallenge`].
-    fn create(
+    ///
+    /// The `secret_stream` should incorporate private information known only to the verifier.
+    /// It can be used to generate randomness, IVs, and other proof-specific fields.
+    fn create<Secret: AsSecretBytes>(
         extended_witness_length: usize,
         transcript: &mut Transcript,
+        secret: &Secret,
         rng: &mut (impl CryptoRng + RngCore),
     ) -> (Self, Self::VoleChallenge);
 

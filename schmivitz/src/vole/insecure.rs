@@ -13,7 +13,7 @@ use rand::{CryptoRng, RngCore};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F8b, F2};
 
-use super::RandomVole;
+use super::{AsSecretBytes, RandomVole};
 
 #[derive(Clone)]
 pub(crate) struct InsecureVole {
@@ -57,9 +57,10 @@ impl RandomVole for InsecureVole {
         challenge
     }
 
-    fn create(
+    fn create<Secret: AsSecretBytes>(
         extended_witness_length: usize,
         transcript: &mut merlin::Transcript,
+        _secret: &Secret,
         rng: &mut (impl CryptoRng + RngCore),
     ) -> (Self, Self::VoleChallenge) {
         // In a secure version of VOLE, we would populate the transcript with more useful
@@ -266,6 +267,7 @@ impl InsecureCommitments {
 mod tests {
     use merlin::Transcript;
     use rand::thread_rng;
+    use swanky_field_binary::F2;
 
     use crate::{
         parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM},
@@ -276,9 +278,10 @@ mod tests {
     fn everything_is_the_expected_size() {
         let rng = &mut thread_rng();
         let transcript = &mut Transcript::new(b"testing");
+        let secret: Vec<F2> = Vec::new();
 
         let witness = 100;
-        let (voles, _challenge) = InsecureVole::create(witness, transcript, rng);
+        let (voles, _challenge) = InsecureVole::create(witness, transcript, &secret, rng);
 
         assert_eq!(voles.count(), witness + REPETITION_PARAM * VOLE_SIZE_PARAM);
         assert_eq!(voles.witness_mask().len(), witness);

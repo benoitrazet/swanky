@@ -5,14 +5,11 @@ Implement high-level functionality for VOLE protocol.
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::all_but_one_vc::Pdecom;
 use crate::vole::commit_reconstruct::{
-    apply_corrections_to_q, corrections_to_bytes, l_hat, vole_commit, vole_open, vole_reconstruct,
-    Commit, Corrections,
+    apply_corrections_to_q, l_hat, vole_commit, vole_open, vole_reconstruct, Commit, Corrections,
 };
 use crate::vole::commit_reconstruct::{recompose_d, B};
 use crate::vole::consistency_check::{vole_hash, vole_hash_lockstep};
-use crate::vole::crypto_primitives::{
-    h1, h3, h_chall1, h_chall3, Chall1, Chall2, Chall3, Com, Seed, H1, H3, IV,
-};
+use crate::vole::crypto_primitives::{Chall1, Chall2, Chall3, Com, Seed, H1, H3, IV};
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake128,
@@ -20,39 +17,37 @@ use sha3::{
 use swanky_field::FiniteRing;
 use swanky_field_binary::F128b;
 use swanky_field_binary::F2;
-use swanky_serialization::CanonicalSerialize;
 
 use super::all_but_one_vc::Decom;
 use super::commit_reconstruct::compute_secret_key;
 use super::consistency_check::HashConsistency;
-use super::crypto_primitives::CHALL2_LENGTH;
+use super::crypto_primitives::{h2_chall1, h2_chall3, CHALL2_LENGTH};
+use super::AsSecretBytes;
 
-/// Compute a seed and initialization vection from secret key and hash of statement to prove.
+/// Compute a seed and initialization vection from secret key and hash of
+/// statement to prove.
 ///
 /// NOTE: `mu` is coming from the FAEST spec but expected to change when doing
-/// more general circuits/polynomials.
-pub(crate) fn compute_seed_iv(sk: &[u8], mu: &H1) -> (Seed, IV) {
-    let mut h3_inp = vec![];
-    h3_inp.extend(sk);
-    h3_inp.extend(mu);
-    let r_iv: H3 = h3(&h3_inp);
+/// more general circuits/polynomials. It's supposed to be a representation
+/// of the public components of the computation.
+pub(crate) fn compute_seed_iv<Secret: AsSecretBytes>(secret: &Secret, mu: &H1) -> (Seed, IV) {
+    let mut hasher = Shake128::default();
 
-    // splitting r_iv into r and iv
-    let mut r: [u8; 16] = [0u8; SECURITY_PARAM / 8];
-    r.copy_from_slice(&r_iv[0..SECURITY_PARAM / 8]);
-    let mut iv: [u8; 16] = [0u8; 128 / 8];
-    iv.copy_from_slice(&r_iv[SECURITY_PARAM / 8..(SECURITY_PARAM + 128) / 8]);
+    hasher.update(secret.as_bytes().as_ref());
+    hasher.update(mu.as_ref());
+    let r_iv: H3 = H3::from_xof(hasher);
+
+    // Split hash digest into `r` and `iv`. These unwraps are safe because the
+    // lengths are fixed.
+    let (r_slice, iv_slice) = r_iv.as_ref().split_at(SECURITY_PARAM / 8);
+    let r = r_slice.try_into().unwrap();
+    let iv = iv_slice.try_into().unwrap();
     (r, iv)
 }
 
 /// Compute first challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
 pub(crate) fn compute_chall_1(mu: &H1, h_com: &Com, corrections: &Corrections, iv: &IV) -> Chall1 {
-    let mut inp = vec![];
-    inp.extend(mu);
-    inp.extend(h_com);
-    inp.extend(corrections_to_bytes(corrections));
-    inp.extend(iv);
-    h_chall1(&inp)
+    h2_chall1(mu, h_com, corrections, iv)
 }
 
 /// Compute second challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
@@ -67,7 +62,7 @@ pub(crate) fn compute_chall_2(
     let mut hasher = Shake128::default();
     hasher.update(chall1);
     hasher.update(u_tilda.pack_to_bytes().as_slice());
-    hasher.update(&h_v);
+    hasher.update(h_v.as_ref());
 
     // pack the binary field values into bytes
     for chunk in masked_witnesses.chunks(8) {
@@ -89,12 +84,7 @@ pub(crate) fn compute_chall_2(
 
 /// Compute third challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
 pub(crate) fn compute_chall_3(chall2: &Chall2, a_tilda: F128b, b_tilda: F128b) -> Chall3 {
-    let mut inp: Vec<u8> = vec![];
-    inp.extend(chall2);
-    inp.extend(a_tilda.to_bytes().as_slice());
-    inp.extend(b_tilda.to_bytes().as_slice());
-
-    h_chall3(&inp)
+    h2_chall3(chall2, &a_tilda, &b_tilda)
 }
 
 fn bits_to_u8_many(bits: &[F2]) -> Vec<u8> {
@@ -136,7 +126,7 @@ pub(crate) struct VoleProver {
     pub(crate) chall1: Chall1,
     /// consistency hash of u
     pub(crate) u_tilda: HashConsistency,
-    /// hash of the consistency hash of V        
+    /// hash of the consistency hash of V
     pub(crate) h_v: H1,
 }
 
@@ -145,9 +135,13 @@ pub(crate) struct VoleProver {
 /// Adapted from parts of FAEST.sign from Fig. 8.2
 #[inline(never)]
 #[allow(unused)]
-pub(crate) fn create_vole_prover(statement_sig: &[u8], secret: &[u8], l: usize) -> VoleProver {
+pub(crate) fn create_vole_prover<Secret: AsSecretBytes>(
+    statement_sig: &[u8],
+    secret: &Secret,
+    l: usize,
+) -> VoleProver {
     // line 2
-    let mu: H1 = h1(statement_sig); // Hash the signature of the circuit+instance the prover/verifier agree to execute.
+    let mu: H1 = H1::from_bytes(statement_sig); // Hash the signature of the circuit+instance the prover/verifier agree to execute.
 
     // line 3
     let (r, iv) = compute_seed_iv(secret, &mu);
@@ -196,7 +190,7 @@ pub(crate) fn create_vole_prover(statement_sig: &[u8], secret: &[u8], l: usize) 
     log::info!("vole_hash(V) running time: {:?}", t.elapsed());
 
     // line 10
-    let h_v = h1(&bits_to_u8_many(&v_tilda));
+    let h_v = H1::from_bytes(&bits_to_u8_many(&v_tilda));
 
     VoleProver {
         iv,
@@ -266,7 +260,7 @@ pub(crate) fn create_vole_verifier(
     } = decommitment_prover;
 
     // line 2
-    let mu: H1 = h1(statement_sig);
+    let mu: H1 = H1::from_bytes(statement_sig);
 
     // lines 3-4
     let t = std::time::Instant::now();
@@ -316,7 +310,7 @@ pub(crate) fn create_vole_verifier(
         .collect();
     log::info!("Q + D running time: {:?}", t.elapsed());
 
-    let h_v = h1(&bits_to_u8_many(&q_xor_d));
+    let h_v = H1::from_bytes(&bits_to_u8_many(&q_xor_d));
 
     // line 17
     let chall2 = compute_chall_2(&chall1, *u_tilda, h_v, d);
@@ -342,16 +336,25 @@ pub(crate) fn verify(chall3: &Chall3, chall2: Chall2, a_tilda: F128b, b_tilda: F
 
 #[cfg(test)]
 mod test {
+    use std::iter::repeat_with;
+
     use super::{create_vole_prover, create_vole_verifier, decommit, verify, VoleVerifier};
     use crate::vole::functionality::compute_chall_2;
     use crate::vole::functionality::compute_chall_3;
+    use rand::thread_rng;
     use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
     use swanky_field_binary::{F128b, F8b};
     use swanky_serialization::CanonicalSerialize;
 
     fn test_vole_prover_and_verifier(how_many: usize) {
+        let rng = &mut thread_rng();
+
         let statement_sig = vec![1u8];
-        let secret = vec![42u8];
+        let secret = repeat_with(|| F2::random(rng))
+            .take(1000)
+            .collect::<Vec<F2>>();
+
         let vole_prover = create_vole_prover(&statement_sig, &secret, how_many);
 
         // Let's clone u and v so that we can test the VOLE fundamental equality at the end.

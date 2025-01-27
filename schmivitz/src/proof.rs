@@ -22,7 +22,7 @@ use swanky_field_binary::{F128b, F8b, F2};
 use crate::{
     parameters::FIELD_SIZE,
     proof::{prover_preparer::ProverPreparer, prover_traverser::ProverTraverser},
-    vole::{insecure::InsecureVole, RandomVole},
+    vole::{insecure::InsecureVole, AsSecretBytes, RandomVole},
 };
 
 use self::verifier_traverser::VerifierTraverser;
@@ -79,7 +79,8 @@ impl<Vole: RandomVole> Proof<Vole> {
         transcript.append_public_values();
 
         // Get a set of random VOLEs, one for each value in the extended witness
-        let (voles, vole_challenge) = Vole::create(witness.len(), transcript.as_mut(), rng);
+        let (voles, vole_challenge) =
+            Vole::create(witness.len(), transcript.as_mut(), &witness, rng);
 
         // Commit to extended witness (`d` in the paper)
         let witness_commitment: Vec<F2> = zip(witness, voles.witness_mask())
@@ -286,6 +287,13 @@ fn combine(values: [F128b; 128]) -> F128b {
         power *= F128b::GENERATOR;
     }
     acc
+}
+
+/// The secret material for the prover is the extended witness.
+impl AsSecretBytes for Vec<F2> {
+    fn as_bytes(&self) -> Vec<u8> {
+        self.iter().map(|b| (*b).into()).collect()
+    }
 }
 
 #[cfg(test)]

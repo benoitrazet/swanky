@@ -1,13 +1,16 @@
 /*! Cryptographic primitives used for VOLE-it-HEAD */
 use crate::parameters::SECURITY_PARAM;
+use crate::vole::commit_reconstruct::{corrections_to_bytes, Corrections};
 use aes::cipher::{generic_array::GenericArray, BlockEncrypt, KeyInit};
 use aes::Aes128;
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake128,
 };
+use swanky_field_binary::F128b;
 #[cfg(test)]
 use swanky_field_binary::F2;
+use swanky_serialization::CanonicalSerialize;
 
 /// Initialization Vector.
 pub type IV = [u8; 16];
@@ -192,47 +195,73 @@ pub(crate) fn h0(x: Key, iv: IV) -> (Seed, Com) {
 /// Length of H1 hash in bytes.
 pub(crate) const H1_LENGTH: usize = (SECURITY_PARAM / 8) * 2;
 
-/// Type for array of bytes with 2 times the `SECURITY_PARAM`.
+/// Hash digest for a collision-resistant hash function.
 ///
-/// This type is the result of the [`h1`] hash function.
-pub(crate) type H1 = [u8; H1_LENGTH];
+/// This is used for various purposes throughout the protocol.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct H1([u8; H1_LENGTH]);
 
-fn h1_internal(inp: &[u8], out: &mut [u8]) {
-    assert_eq!(out.len(), (SECURITY_PARAM / 8) * 2);
-    let mut hasher = Shake128::default();
-    hasher.update(inp);
-    hasher.update(&[1u8]);
-    let mut reader = hasher.finalize_xof();
-    reader.read(out);
+impl H1 {
+    /// Compute the [`H1`] hash from input bytes.
+    pub(crate) fn from_bytes(inp: &[u8]) -> H1 {
+        let mut out = H1::default();
+
+        let mut hasher = Shake128::default();
+        hasher.update(inp);
+        hasher.update(&[1u8]);
+
+        hasher.finalize_xof_into(&mut out.0);
+        out
+    }
+
+    /// Treat this hash digest as a commitment.
+    pub(crate) fn into_com(self) -> Com {
+        self.0
+    }
 }
 
-/// Hash function returning returning a hash of type [`H1`].
-///
-/// This function operates on a slice of bytes.
-pub(crate) fn h1(inp: &[u8]) -> H1 {
-    let mut out = H1::default();
-    h1_internal(inp, &mut out);
-    out
+impl AsRef<[u8; H1_LENGTH]> for H1 {
+    fn as_ref(&self) -> &[u8; H1_LENGTH] {
+        &self.0
+    }
 }
 
+/// Hash function for the Fiat-Shamir challenges generated in the protocol.
+///
 /// This is `$H_2^j$` in FAEST spec
-pub(crate) fn h2(inp: &[u8], out: &mut [u8]) {
-    let mut hasher = Shake128::default();
-    hasher.update(inp);
-    hasher.update(&[2u8]);
-    let mut reader = hasher.finalize_xof();
-    reader.read(out);
+#[derive(Default)]
+struct H2Hasher(Shake128);
+
+impl H2Hasher {
+    fn update(&mut self, data: &[u8]) {
+        self.0.update(data);
+    }
+
+    fn finalize(mut self, out: &mut [u8]) {
+        self.0.update(&[2u8]);
+        self.0.finalize_xof_into(out);
+    }
 }
 
 /// Length of 1st challenge in bytes.
 pub(crate) const CHALL1_LENGTH: usize = (SECURITY_PARAM * 6) / 8;
+
 /// First challenge
 pub(crate) type Chall1 = [u8; CHALL1_LENGTH];
 
-/// This is `$H_2^1$` in FAEST spec.
-pub(crate) fn h_chall1(inp: &[u8]) -> Chall1 {
-    let mut out: Chall1 = [0u8; CHALL1_LENGTH]; // NOTE: default does not work here
-    h2(inp, &mut out);
+/// Make the first Fiat-Shamir challenge.
+///
+/// This computes `$H_2^1$` in FAEST spec.
+pub(crate) fn h2_chall1(mu: &H1, hcom: &Com, corrections: &Corrections, iv: &IV) -> Chall1 {
+    let mut hasher = H2Hasher::default();
+
+    hasher.update(&mu.0);
+    hasher.update(hcom);
+    hasher.update(&corrections_to_bytes(corrections));
+    hasher.update(iv);
+
+    let mut out = [0u8; CHALL1_LENGTH];
+    hasher.finalize(&mut out);
     out
 }
 
@@ -244,8 +273,12 @@ pub(crate) type Chall2 = [u8; CHALL2_LENGTH];
 /// This is `$H_2^2$` in FAEST spec.
 #[allow(unused)]
 pub(crate) fn h_chall2(inp: &[u8]) -> Chall2 {
+    let mut hasher = H2Hasher::default();
+
+    hasher.update(inp);
+
     let mut out: Chall2 = [0u8; CHALL2_LENGTH]; // NOTE: default does not work here
-    h2(inp, &mut out);
+    hasher.finalize(&mut out);
     out
 }
 
@@ -254,24 +287,64 @@ pub(crate) const CHALL3_LENGTH: usize = SECURITY_PARAM / 8;
 /// Third challenge.
 pub(crate) type Chall3 = [u8; CHALL3_LENGTH];
 
-/// This is `$H_2^3$` in FAEST spec.
-pub(crate) fn h_chall3(inp: &[u8]) -> Chall3 {
+/// Makes the third Fiat-Shamir challenge.
+///
+/// This computes `$H_2^3$` in FAEST spec.
+pub(crate) fn h2_chall3(chall2: &Chall2, a_tilde: &F128b, b_tilde: &F128b) -> Chall3 {
+    let mut hasher = H2Hasher::default();
+
+    hasher.update(chall2);
+    hasher.update(&a_tilde.to_bytes());
+    hasher.update(&b_tilde.to_bytes());
+
     let mut out = Chall3::default();
-    h2(inp, &mut out);
+    hasher.finalize(&mut out);
     out
 }
 
-/// This type is the result of the [`h3`] hash function.
-pub(crate) type H3 = [u8; SECURITY_PARAM / 8 + 128 / 8];
+/// Hash digest for randomness and IV generation.
+///
+/// This should incorporate secret information or randomness (e.g. that only
+/// the verifier knows), to derive secret, per-proof values.
+#[derive(Clone, Default)]
+pub(crate) struct H3([u8; (SECURITY_PARAM + 128) / 8]);
 
-/// H3 function
-pub(crate) fn h3(inp: &[u8]) -> H3 {
-    let mut hasher = Shake128::default();
-    hasher.update(inp);
-    hasher.update(&[3u8]);
-    let mut reader = hasher.finalize_xof();
+impl H3 {
+    /// Derive the [`H3`] hash from an input.
+    #[allow(unused)]
+    pub(crate) fn from_input(inp: &[u8]) -> Self {
+        let mut hasher = Shake128::default();
+        hasher.update(inp);
 
-    let mut out: H3 = Default::default();
-    reader.read(&mut out);
-    out
+        // Append 0x3 for domain separation
+        hasher.update(&[3u8]);
+        let mut reader = hasher.finalize_xof();
+
+        let mut out: H3 = Default::default();
+        reader.read(out.as_mut());
+        out
+    }
+
+    /// Derive the [`H3`] hash from an instance of `Shake128`, which we assume
+    /// has already been updated with all relevant secret information.
+    pub(crate) fn from_xof(mut xof: Shake128) -> Self {
+        // Append 0x3 for domain separation
+        xof.update(&[3u8]);
+
+        let mut out: H3 = Default::default();
+        xof.finalize_xof_into(out.as_mut());
+        out
+    }
+}
+
+impl AsRef<[u8; SECURITY_PARAM / 8 + 128 / 8]> for H3 {
+    fn as_ref(&self) -> &[u8; SECURITY_PARAM / 8 + 128 / 8] {
+        &self.0
+    }
+}
+
+impl AsMut<[u8; SECURITY_PARAM / 8 + 128 / 8]> for H3 {
+    fn as_mut(&mut self) -> &mut [u8; SECURITY_PARAM / 8 + 128 / 8] {
+        &mut self.0
+    }
 }
