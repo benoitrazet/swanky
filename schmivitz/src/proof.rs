@@ -35,8 +35,6 @@ mod verifier_traverser;
 /// Zero-knowledge proof of knowledge of a circuit.
 #[derive(Debug, Clone)]
 pub struct Proof<Vole: RandomVole, VoleV: RandomVoleV> {
-    /// Challenge generated in VOLE creation.
-    vole_challenge: Vole::VoleChallenge,
     /// Commitment to the extended witness ($`d`$ in the paper).
     witness_commitment: Vec<F2>,
     /// Challenges generated after committing to the witness
@@ -83,7 +81,7 @@ where
         transcript.append_public_values();
 
         // Get a set of random VOLEs, one for each value in the extended witness
-        let (voles, vole_challenge) =
+        let (voles, _vole_challenge) =
             VoleP::create(witness.len(), transcript.as_mut(), &witness, rng);
 
         // Commit to extended witness (`d` in the paper)
@@ -119,7 +117,6 @@ where
 
         // Form the proof
         Ok(Self {
-            vole_challenge,
             witness_commitment,
             witness_challenges,
             degree_0_commitment,
@@ -127,10 +124,6 @@ where
             decommitment_challenge,
             partial_decommitment,
         })
-    }
-
-    fn extended_witness_length(&self) -> usize {
-        self.witness_commitment.len()
     }
 
     /// Validate that the circuit can be processed by the system, according to the header info.
@@ -194,21 +187,12 @@ where
         <VoleP as RandomVole>::VoleDecommitmentChallenge: PartialEq<[u8; 16]>,
     {
         let mut transcript = transcript::Transcript::from(transcript);
-
-        let reconstructed_voles = VoleV::reconstruct(&self.partial_decommitment, transcript.as_mut());
-        self.validate_proof(&reconstructed_voles)?;
-
-        // Add public values to transcript for both the overall proof...
         transcript.append_public_values();
 
-        // ...and the specific VOLE instantiation, and get the VOLE challenge
-        let expected_vole_challenge = InsecureVole::extract_vole_challenge(
-            transcript.as_mut(),
-            self.extended_witness_length(),
-        );
-        if self.vole_challenge != expected_vole_challenge {
-            bail!("Verification failed: Vole challenge did not match expected value");
-        }
+        // Reconstruct VOLEs and update transcript with any necessary components.
+        let reconstructed_voles =
+            VoleV::reconstruct(&self.partial_decommitment, transcript.as_mut());
+        self.validate_proof(&reconstructed_voles)?;
 
         // Add witness commitment to transcript and generate challenges for each polynomial
         transcript.append_witness_commitment(self.witness_commitment.as_slice());

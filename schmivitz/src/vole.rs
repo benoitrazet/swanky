@@ -92,18 +92,6 @@ where
         rng: &mut (impl CryptoRng + RngCore),
     ) -> (Self, Self::VoleChallenge);
 
-    /// Update the transcript with the extended witness length, plus any additional public
-    /// parameters or public information known at time of creation, and generate the challenge
-    /// used to create the random VOLE instances.
-    ///
-    /// It's implemented as a separate method so that a verifier can independently update the
-    /// transcript without creating any VOLEs. A reasonable implementation would also call this
-    /// method directly in the [`RandomVole::create()`] method.
-    fn extract_vole_challenge(
-        transcript: &mut Transcript,
-        extended_witness_length: usize,
-    ) -> Self::VoleChallenge;
-
     /// Get the total number of VOLE correlations supported by this random VOLE instance.
     ///
     /// This should be $`\ell + r\tau`$, where $`\ell`$ is the `extended_witness_length` parameter

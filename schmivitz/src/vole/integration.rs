@@ -34,13 +34,6 @@ impl RandomVole for VoleProver {
         (vole, chall)
     }
 
-    fn extract_vole_challenge(
-        _transcript: &mut Transcript,
-        _extended_witness_length: usize,
-    ) -> Self::VoleChallenge {
-        unimplemented!("not totally sure here. func only used on the verifier side")
-    }
-
     fn count(&self) -> usize {
         self.u.len()
     }

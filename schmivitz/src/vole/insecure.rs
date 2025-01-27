@@ -35,27 +35,27 @@ pub(crate) struct InsecureVole {
     /// [`VOLE_SIZE_PARAM`] and $`\tau`$ is the [`REPETITION_PARAM`].
     masks: Vec<[F8b; REPETITION_PARAM]>,
 }
+
+/// Updates transcript with public material available at VOLE creation and VOLE reconstruction
+/// and extracts a challenge.
+fn update_transcript(transcript: &mut Transcript, extended_witness_length: usize) -> [u8; 16] {
+    transcript.append_message(
+        b"VOLE type",
+        format!(
+            "Creating {} totally local & insecure VOLEs!!",
+            extended_witness_length
+        )
+        .as_bytes(),
+    );
+    let mut challenge = [0; 16];
+    transcript.challenge_bytes(b"insecure VOLE creation challenge", &mut challenge);
+    challenge
+}
+
 impl RandomVole for InsecureVole {
     type Decommitment = InsecureCommitments;
     type VoleChallenge = [u8; 16];
     type VoleDecommitmentChallenge = [u8; 16];
-
-    fn extract_vole_challenge(
-        transcript: &mut Transcript,
-        extended_witness_length: usize,
-    ) -> Self::VoleChallenge {
-        transcript.append_message(
-            b"VOLE type",
-            format!(
-                "Creating {} totally local & insecure VOLEs!!",
-                extended_witness_length
-            )
-            .as_bytes(),
-        );
-        let mut challenge = [0; 16];
-        transcript.challenge_bytes(b"insecure VOLE creation challenge", &mut challenge);
-        challenge
-    }
 
     fn create<Secret: AsSecretBytes>(
         extended_witness_length: usize,
@@ -65,7 +65,7 @@ impl RandomVole for InsecureVole {
     ) -> (Self, Self::VoleChallenge) {
         // In a secure version of VOLE, we would populate the transcript with more useful
         // or relevant context about the VOLE instantiation.
-        let challenge = Self::extract_vole_challenge(transcript, extended_witness_length);
+        let challenge = update_transcript(transcript, extended_witness_length);
 
         let total_vole_count = extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM;
 
@@ -231,7 +231,8 @@ impl InsecureCommitments {
 impl RandomVoleV for InsecureCommitments {
     type Decommitment = InsecureCommitments;
 
-    fn reconstruct(decom: &Self::Decommitment, _transcript: &mut Transcript) -> Self {
+    fn reconstruct(decom: &Self::Decommitment, transcript: &mut Transcript) -> Self {
+        update_transcript(transcript, decom.extended_witness_length);
         decom.clone()
     }
 
