@@ -22,7 +22,7 @@ use swanky_field_binary::{F128b, F8b, F2};
 use crate::{
     parameters::FIELD_SIZE,
     proof::{prover_preparer::ProverPreparer, prover_traverser::ProverTraverser},
-    vole::{insecure::InsecureVole, AsSecretBytes, RandomVole},
+    vole::{insecure::InsecureVole, AsSecretBytes, RandomVole, RandomVoleV},
 };
 
 use self::verifier_traverser::VerifierTraverser;

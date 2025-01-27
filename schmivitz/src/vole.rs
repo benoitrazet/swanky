@@ -10,7 +10,7 @@ pub(crate) mod insecure;
 use eyre::Result;
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
-use swanky_field_binary::{F128b, F2};
+use swanky_field_binary::{F128b, F8b, F2};
 
 use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 
@@ -134,7 +134,7 @@ where
     fn aggregate_commitment_values(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
 
     /// Gets the VOLE masks ($`v_i \text{ for } i \in [\ell + 1..\ell + r\tau]`$ in the paper),
-    /// lifted into [`F128b`] from `[`[F8b](swanky_field_binary::F8b)`; 16]`.
+    /// lifted into [`F128b`] from `[`[`F8b`]`; 16]`.
     ///
     /// In the paper, this is defined in Figure 7, Round 1, step 2 and used in Round 3, step 2.
     /// These are combined into a mask for the aggregated commitment $`\tilde b`$.
@@ -144,7 +144,7 @@ where
     fn aggregate_commitment_masks(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
 
     /// Get the `i`th component of the VOLE mask (`v` in the paper), lifted into [`F128b`] from
-    /// a [$`\tau`$](crate::parameters::REPETITION_PARAM)-length vector in [`F8b`](swanky_field_binary::F8b).
+    /// a [$`\tau`$](crate::parameters::REPETITION_PARAM)-length vector in [`F8b`].
     ///
     /// In the paper, this is defined in Figure 7, Round 1, step 3 and used in Round 3, steps 1
     /// and 2.
@@ -200,17 +200,20 @@ pub trait RandomVoleV {
     /// any checks, corrections, challenge evaluations, and any other details
     /// that need to happen before the VOLE key ∆ and the VOLE value tags `Q`
     /// are computed.
-    fn reconstruct(decom: Self::Decommitment) -> Self;
+    fn reconstruct(decom: &Self::Decommitment) -> Self;
 
     /// Get the length of the extended witness.
     fn extended_witness_length(&self) -> usize;
 
-    /// Get the verifier key array $`\Delta`$.
-    fn verifier_key_array(&self) -> &F128b;
+    /// Get the verifier key array $`\mathbf \Delta`$.
+    fn verifier_key_array(&self) -> &[F8b; REPETITION_PARAM];
+
+    /// Get the lifted verifier key $`\Delta`$.
+    fn verifier_key(&self) -> F128b;
 
     /// Get the value tags corresponding to the witness $`\mathbf Q_{[0..\ell)}`$,
     /// where $`\ell`$ is the [`Self::extended_witness_length`].
-    fn witness_voles(&self) -> &[F128b];
+    fn witness_voles(&self) -> &[[F8b; REPETITION_PARAM]];
 
     /// Get the value tags corresponding to the mask
     /// $`\mathbf Q_{[\ell..\ell + \lambda)}`$, where $`\ell`$ is the

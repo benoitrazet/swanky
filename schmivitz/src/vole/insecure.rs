@@ -13,7 +13,7 @@ use rand::{CryptoRng, RngCore};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F8b, F2};
 
-use super::{AsSecretBytes, RandomVole};
+use super::{AsSecretBytes, RandomVole, RandomVoleV};
 
 #[derive(Clone)]
 pub(crate) struct InsecureVole {
@@ -209,9 +209,10 @@ pub(crate) struct InsecureCommitments {
     verifier_commitments: Vec<[F8b; REPETITION_PARAM]>,
 }
 
-#[allow(unused)]
 impl InsecureCommitments {
     /// Validate that the partial decommitment is correctly formed with respect to itself.
+    /// TODO: put this inline somewhere -- maybe in `reconstruct`.
+    #[allow(unused)]
     pub(crate) fn validate_commitments(&self) -> Result<()> {
         let expected_num_commitments =
             self.extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM;
@@ -225,32 +226,40 @@ impl InsecureCommitments {
 
         Ok(())
     }
+}
+
+impl RandomVoleV for InsecureCommitments {
+    type Decommitment = InsecureCommitments;
+
+    fn reconstruct(decom: &Self::Decommitment) -> Self {
+        decom.clone()
+    }
 
     /// Get the length of the extended witness (e.g. the number of VOLEs requested).
-    pub(crate) fn extended_witness_length(&self) -> usize {
+    fn extended_witness_length(&self) -> usize {
         self.extended_witness_length
     }
 
     /// Get verifier key ($`\bf\Delta`$ in the paper).
-    pub(crate) fn verifier_key_array(&self) -> &[F8b; REPETITION_PARAM] {
+    fn verifier_key_array(&self) -> &[F8b; REPETITION_PARAM] {
         &self.verifier_key
     }
 
     /// Get the lifted verifier key ($`\Delta`$ in the paper).
-    pub(crate) fn verifier_key(&self) -> F128b {
+    fn verifier_key(&self) -> F128b {
         F8b::form_superfield(&self.verifier_key.into())
     }
 
     /// Get the VOLEs corresponding to the witness ($`\bf Q_{[1..\ell]}`$ in the paper).
     ///
     /// The output is guaranteed to be [`Self::extended_witness_length()`].
-    pub(crate) fn witness_voles(&self) -> &[[F8b; REPETITION_PARAM]] {
+    fn witness_voles(&self) -> &[[F8b; REPETITION_PARAM]] {
         &self.verifier_commitments[0..self.extended_witness_length]
     }
 
     /// Get the lifted VOLEs corresponding to the mask for the aggregate commitment
     /// ($`q_{\ell+1}, \dots, q_{\ell + r\tau}`$ in the paper).
-    pub(crate) fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+    fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
         // Lift the commitments -- we only want the last $`r\tau`$ of them, so we skip the first ones.
         // This will panic if we constructed the type with the wrong length.
         self.verifier_commitments
@@ -271,7 +280,7 @@ mod tests {
 
     use crate::{
         parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM},
-        vole::{insecure::InsecureVole, RandomVole},
+        vole::{insecure::InsecureVole, RandomVole, RandomVoleV},
     };
 
     #[test]
