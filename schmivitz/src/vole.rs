@@ -12,7 +12,7 @@ use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
 use swanky_field_binary::{F128b, F8b, F2};
 
-use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
+use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
 
 // Exposing these modules for benchmarking at the moment.
 pub(crate) mod all_but_one_vc;
@@ -141,16 +141,6 @@ where
     /// value returned by [`RandomVole::extended_witness_length()`].
     fn vole_mask(&self, i: usize) -> Result<F128b>;
 
-    /// This method extracts a challenge used to decommit to the VOLEs.
-    ///
-    /// It's implemented as a separate method so that a verifier can independently derive the
-    /// challenge without acutally calling the `decommit()` method (which is the responsibility of
-    /// the prover). A reasonable implementation would also call this
-    /// method directly in the [`RandomVole::decommit()`] method.
-    fn extract_decommitment_challenge(
-        transcript: &mut Transcript,
-    ) -> Self::VoleDecommitmentChallenge;
-
     /// Compute a partial decommitment to this set of random VOLEs.
     ///
     /// This method simulates the verifier revealing their choice bits and receiving the
@@ -164,13 +154,9 @@ where
     /// written interactively; in this implementation, this will be called by the prover and the
     /// output incorporated into the proof.
     ///
-    /// The [`Transcript`] passed to this method must incorporate all public information contained
-    /// in the proof, including the commitment to the de-randomized VOLEs ($`\tilde a`$ and
-    /// $`\tilde b`$ in the paper).
-    fn decommit(
-        self,
-        transcript: &mut Transcript,
-    ) -> (Self::Decommitment, Self::VoleDecommitmentChallenge);
+    /// The challenge must incorporate all public information, including the degree 0 and 1
+    /// commitments and all previous challenges.
+    fn decommit(self, decom_challenge: &[u8; SECURITY_PARAM / 8]) -> Self::Decommitment;
 }
 
 /// Methods for a verifier to reconstruct / verify and use an instance of VOLE.

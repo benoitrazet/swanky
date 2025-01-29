@@ -6,7 +6,7 @@
 
 use std::iter::{repeat_with, zip};
 
-use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
+use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
 use eyre::{bail, Result};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
@@ -147,23 +147,7 @@ impl RandomVole for InsecureVole {
         Ok(F8b::form_superfield(&self.masks[i].into()))
     }
 
-    fn extract_decommitment_challenge(
-        transcript: &mut Transcript,
-    ) -> Self::VoleDecommitmentChallenge {
-        let mut challenge = [0; 16];
-        transcript.challenge_bytes(b"insecure VOLE decommitment challenge", &mut challenge);
-        challenge
-    }
-
-    fn decommit(
-        self,
-        transcript: &mut merlin::Transcript,
-    ) -> (Self::Decommitment, Self::VoleDecommitmentChallenge) {
-        // NB: in a real protocol, we would decommit based on a challenge pulled from the
-        // transcript. In the insecure version, we don't actually use this challenge to
-        // determine anything about the decommitment, but we still generate it for fun.
-        let challenge = Self::extract_decommitment_challenge(transcript);
-
+    fn decommit(self, _challenge: &[u8; SECURITY_PARAM / 8]) -> Self::Decommitment {
         // Compute uΔ^T (where Δ^T is the transpose of the verifier key)
         let u_delta = self
             .values
@@ -183,14 +167,11 @@ impl RandomVole for InsecureVole {
             })
             .collect::<Vec<_>>();
 
-        (
-            Self::Decommitment {
-                extended_witness_length: self.extended_witness_length,
-                verifier_key: self.verifier_key,
-                verifier_commitments,
-            },
-            challenge,
-        )
+        Self::Decommitment {
+            extended_witness_length: self.extended_witness_length,
+            verifier_key: self.verifier_key,
+            verifier_commitments,
+        }
     }
 }
 
@@ -280,7 +261,7 @@ mod tests {
     use swanky_field_binary::F2;
 
     use crate::{
-        parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM},
+        parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM},
         vole::{insecure::InsecureVole, RandomVole, RandomVoleV},
     };
 
@@ -307,7 +288,8 @@ mod tests {
             }
         }
 
-        let (decom, _challenge) = voles.decommit(transcript);
+        // Note: the challenge passed here is invalid because it's not drawn from transcript.
+        let decom = voles.decommit(&[0; SECURITY_PARAM / 8]);
 
         assert_eq!(decom.extended_witness_length(), witness);
         assert_eq!(decom.witness_voles().len(), witness);

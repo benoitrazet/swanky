@@ -214,9 +214,9 @@ pub(crate) struct PartialDecommitment {
 
 /// Implements get for the functionality on the prover side
 #[allow(unused)]
-pub(crate) fn decommit(vole: VoleProver, chall3: Chall3) -> PartialDecommitment {
+pub(crate) fn decommit(vole: VoleProver, chall3: &Chall3) -> PartialDecommitment {
     let t = std::time::Instant::now();
-    let pdecom = vole_open(&chall3, &vole.decom);
+    let pdecom = vole_open(chall3, &vole.decom);
     log::info!("vole_open running time: {:?}", t.elapsed());
 
     PartialDecommitment {
@@ -371,7 +371,7 @@ mod test {
         let dummy_a_tilda = F128b::ZERO;
         let dummy_b_tilda = F128b::ZERO;
         let chall3 = compute_chall_3(&chall2, dummy_a_tilda, dummy_b_tilda);
-        let decommitment_prover = decommit(vole_prover, chall3);
+        let decommitment_prover = decommit(vole_prover, &chall3);
 
         let VoleVerifier {
             q,

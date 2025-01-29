@@ -1,7 +1,7 @@
 use super::crypto_primitives::{CHALL1_LENGTH, CHALL3_LENGTH};
 use super::functionality::{decommit, VoleVerifier};
 use super::{AsSecretBytes, RandomVole};
-use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
+use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
 use crate::vole::functionality::{create_vole_prover, PartialDecommitment, VoleProver};
 use eyre::{bail, Result};
 use merlin::Transcript;
@@ -75,21 +75,9 @@ impl RandomVole for VoleProver {
             );
         }
     }
-    fn extract_decommitment_challenge(
-        _transcript: &mut Transcript,
-    ) -> Self::VoleDecommitmentChallenge {
-        unimplemented!("not totally sure here")
-    }
 
-    fn decommit(
-        self,
-        transcript: &mut Transcript,
-    ) -> (Self::Decommitment, Self::VoleDecommitmentChallenge) {
-        let decommitment_challenge = Self::extract_decommitment_challenge(transcript);
-        (
-            decommit(self, decommitment_challenge),
-            decommitment_challenge,
-        )
+    fn decommit(self, challenge: &[u8; SECURITY_PARAM / 8]) -> Self::Decommitment {
+        decommit(self, challenge)
     }
 }
 

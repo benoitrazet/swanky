@@ -14,15 +14,16 @@ use rand::{CryptoRng, RngCore};
 use std::{
     io::{Read, Seek},
     iter::zip,
+    marker::PhantomData,
     path::Path,
 };
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F8b, F2};
 
 use crate::{
-    parameters::FIELD_SIZE,
+    parameters::{FIELD_SIZE, SECURITY_PARAM},
     proof::{prover_preparer::ProverPreparer, prover_traverser::ProverTraverser},
-    vole::{insecure::InsecureVole, AsSecretBytes, RandomVole, RandomVoleV},
+    vole::{AsSecretBytes, RandomVole, RandomVoleV},
 };
 
 use self::verifier_traverser::VerifierTraverser;
@@ -46,9 +47,12 @@ pub struct Proof<Vole: RandomVole, VoleV: RandomVoleV> {
     /// ($`\tilde a`$ in the paper).
     degree_1_commitment: F128b,
     /// Challenge generated to decommit to the VOLEs after committing to the degree coefficients.
-    decommitment_challenge: Vole::VoleDecommitmentChallenge,
+    decommitment_challenge: [u8; SECURITY_PARAM / 8],
     /// Partial decommitment of the VOLEs.
     partial_decommitment: VoleV::Decommitment,
+
+    // This ties the proof to the VOLE implementation used to create it.
+    vole: PhantomData<Vole>,
 }
 
 impl<VoleP, VoleV> Proof<VoleP, VoleV>
@@ -111,9 +115,10 @@ where
 
         // Add aggregated responses to transcript
         transcript.append_polynomial_commitments(&degree_0_commitment, &degree_1_commitment);
+        let decommitment_challenge = transcript.extract_decommitment_challenge();
 
         // Decommit the VOLEs
-        let (partial_decommitment, decommitment_challenge) = voles.decommit(transcript.as_mut());
+        let partial_decommitment = voles.decommit(&decommitment_challenge);
 
         // Form the proof
         Ok(Self {
@@ -123,6 +128,7 @@ where
             degree_1_commitment,
             decommitment_challenge,
             partial_decommitment,
+            vole: PhantomData,
         })
     }
 
@@ -207,9 +213,8 @@ where
             .append_polynomial_commitments(&self.degree_0_commitment, &self.degree_1_commitment);
 
         // Get the VOLE decommitment challenge and make sure it's valid
-        let expected_decommitment_challenge =
-            InsecureVole::extract_decommitment_challenge(transcript.as_mut());
-        if self.decommitment_challenge != expected_decommitment_challenge {
+        let decommitment_challenge = transcript.extract_decommitment_challenge();
+        if self.decommitment_challenge != decommitment_challenge {
             bail!("Verification failed: VOLE challenge did not match expected value");
         }
 
