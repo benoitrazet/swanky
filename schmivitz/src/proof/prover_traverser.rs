@@ -185,7 +185,7 @@ impl<Vole: RandomVole> ProverTraverser<Vole> {
     /// The components that were passed to [`Self::new()`] are returned unchanged.
     ///
     /// This will fail if there were unused challenges or VOLEs.
-    pub(crate) fn into_parts(self) -> Result<(F128b, F128b, Vole, Vec<F128b>)> {
+    pub(crate) fn into_parts(self) -> Result<(F128b, F128b, Vole)> {
         if self.challenge_count != self.challenges.len() {
             bail!(
                 "Traversal contained more challenges than it needed! Had {}, used {}",
@@ -200,12 +200,7 @@ impl<Vole: RandomVole> ProverTraverser<Vole> {
                 self.vole_assignment_count
             );
         }
-        Ok((
-            self.aggregate_degree_0,
-            self.aggregate_degree_1,
-            self.voles,
-            self.challenges,
-        ))
+        Ok((self.aggregate_degree_0, self.aggregate_degree_1, self.voles))
     }
 }
 
