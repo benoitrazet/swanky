@@ -183,8 +183,11 @@ where
         transcript.append_public_values();
 
         // Reconstruct VOLEs and update transcript with any necessary components.
-        let reconstructed_voles =
-            VoleV::reconstruct(&self.partial_decommitment, transcript.as_mut());
+        let reconstructed_voles = VoleV::reconstruct(
+            &self.partial_decommitment,
+            &self.decommitment_challenge,
+            transcript.as_mut(),
+        );
         self.validate_proof(&reconstructed_voles)?;
 
         // TODO:

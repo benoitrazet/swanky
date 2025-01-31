@@ -1,8 +1,10 @@
 use super::crypto_primitives::{CHALL1_LENGTH, CHALL3_LENGTH};
 use super::functionality::{decommit, VoleVerifier};
-use super::{AsSecretBytes, RandomVoleP};
+use super::{AsSecretBytes, Chall3, RandomVoleP, RandomVoleV};
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
-use crate::vole::functionality::{create_vole_prover, PartialDecommitment, VoleProver};
+use crate::vole::functionality::{
+    create_vole_prover, create_vole_verifier, PartialDecommitment, VoleProver,
+};
 use eyre::{bail, Result};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
@@ -25,6 +27,7 @@ impl RandomVoleP for VoleProver {
     ) -> (Self, Self::VoleChallenge) {
         let mut statement_sig = [0u8; 16];
         transcript.challenge_bytes(b"statement signature", &mut statement_sig);
+
         let vole = create_vole_prover(
             &statement_sig,
             secret,
@@ -78,6 +81,41 @@ impl RandomVoleP for VoleProver {
 
     fn decommit(self, challenge: &[u8; SECURITY_PARAM / 8]) -> Self::Decommitment {
         decommit(self, challenge)
+    }
+}
+
+impl RandomVoleV for VoleVerifier {
+    type Decommitment = PartialDecommitment;
+
+    fn reconstruct(
+        decom: &Self::Decommitment,
+        chall3: &Chall3,
+        transcript: &mut Transcript,
+    ) -> Self {
+        let mut statement_sig = [0u8; 32];
+        transcript.challenge_bytes(b"statement signature", &mut statement_sig);
+
+        create_vole_verifier(&statement_sig, decom, chall3)
+    }
+
+    fn extended_witness_length(&self) -> usize {
+        todo!()
+    }
+
+    fn verifier_key_array(&self) -> &[swanky_field_binary::F8b; REPETITION_PARAM] {
+        todo!()
+    }
+
+    fn verifier_key(&self) -> F128b {
+        todo!()
+    }
+
+    fn witness_voles(&self) -> &[[swanky_field_binary::F8b; REPETITION_PARAM]] {
+        todo!()
+    }
+
+    fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+        todo!()
     }
 }
 
