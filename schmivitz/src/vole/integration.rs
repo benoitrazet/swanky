@@ -99,7 +99,7 @@ impl RandomVoleV for VoleVerifier {
     }
 
     fn extended_witness_length(&self) -> usize {
-        todo!()
+        self.l
     }
 
     fn verifier_key_array(&self) -> &[swanky_field_binary::F8b; REPETITION_PARAM] {

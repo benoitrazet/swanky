@@ -211,6 +211,8 @@ pub(crate) struct VoleVerifier {
     h_v: H1,
     /// secret key
     pub(crate) delta: F128b,
+    /// Size of extended witness. `ell` in the paper.
+    pub(crate) l: usize,
 }
 
 /// Create VOLEs given a statement signature and a proof, on the verifier side.
@@ -293,6 +295,7 @@ pub(crate) fn create_vole_verifier(
         u_tilda: *u_tilda,
         h_v,
         delta,
+        l: *l,
     }
 }
 
