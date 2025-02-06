@@ -23,7 +23,7 @@ use swanky_field_binary::{F128b, F8b, F2};
 use crate::{
     parameters::{FIELD_SIZE, SECURITY_PARAM},
     proof::{prover_preparer::ProverPreparer, prover_traverser::ProverTraverser},
-    vole::{AsSecretBytes, RandomVole, RandomVoleV},
+    vole::{AsSecretBytes, RandomVoleP, RandomVoleV},
 };
 
 use self::verifier_traverser::VerifierTraverser;
@@ -35,10 +35,10 @@ mod verifier_traverser;
 
 /// Zero-knowledge proof of knowledge of a circuit.
 #[derive(Debug, Clone)]
-pub struct Proof<Vole: RandomVole, VoleV: RandomVoleV> {
+pub struct Proof<Vole: RandomVoleP, VoleV: RandomVoleV> {
     /// Commitment to the extended witness ($`d`$ in the paper).
     witness_commitment: Vec<F2>,
-    second_challenge_length: usize,
+    polynomial_count: usize,
     /// Aggregated commitment to the degree-1 term coefficients for each gate in the circuit
     /// ($`\tilde a`$ in the paper).
     degree_1_commitment: F128b,
@@ -53,7 +53,7 @@ pub struct Proof<Vole: RandomVole, VoleV: RandomVoleV> {
 
 impl<VoleP, VoleV> Proof<VoleP, VoleV>
 where
-    VoleP: RandomVole,
+    VoleP: RandomVoleP,
     VoleV: RandomVoleV<Decommitment = VoleP::Decommitment>,
 {
     /// Create a proof of knowledge of a witness that satisfies the given circuit.
@@ -75,7 +75,7 @@ where
         // Evaluate the circuit in the clear to get the full witness and all wire values
         let mut circuit_preparer = ProverPreparer::new_from_path(private_input)?;
         reader.read(&mut circuit_preparer)?;
-        let (witness, wire_values, challenge_count) = circuit_preparer.into_parts();
+        let (witness, wire_values, polynomial_count) = circuit_preparer.into_parts();
 
         // Update transcript with general public information
         transcript.append_public_values();
@@ -95,7 +95,7 @@ where
 
         // Add witness commitment to the transcript and generate a challenge for each polynomial
         transcript.append_witness_commitment(witness_commitment.as_slice());
-        let witness_challenges = transcript.extract_witness_challenges(challenge_count);
+        let witness_challenges = transcript.extract_witness_challenges(polynomial_count);
 
         // Traverse circuit to compute the coefficients for the degree 0 and 1 terms for each
         // gate / polynomial (`A_i0` and `A_i1` in the paper) and start to aggregate these with
@@ -123,7 +123,7 @@ where
         Ok(Self {
             witness_commitment,
             degree_1_commitment,
-            second_challenge_length: challenge_count,
+            polynomial_count,
             decommitment_challenge,
             partial_decommitment,
             vole: PhantomData,
@@ -176,8 +176,8 @@ where
     where
         T: Read + Seek + Clone,
         // TODO: The way we store challenges has to change; this is a temporary fix.
-        <VoleP as RandomVole>::VoleChallenge: PartialEq<[u8; 16]>,
-        <VoleP as RandomVole>::VoleDecommitmentChallenge: PartialEq<[u8; 16]>,
+        <VoleP as RandomVoleP>::VoleChallenge: PartialEq<[u8; 16]>,
+        <VoleP as RandomVoleP>::VoleDecommitmentChallenge: PartialEq<[u8; 16]>,
     {
         let mut transcript = transcript::Transcript::from(transcript);
         transcript.append_public_values();
@@ -194,8 +194,7 @@ where
         // Add `d` to transcript and generate challenges for each polynomial
         transcript.append_witness_commitment(self.witness_commitment.as_slice());
         // TODO: Should we be doing something with these challenges?
-        let witness_challenges =
-            transcript.extract_witness_challenges(self.second_challenge_length);
+        let witness_challenges = transcript.extract_witness_challenges(self.polynomial_count);
 
         // Compute masked witnesses Q' = Q[..l] + d * Delta
         let d_delta = self
@@ -526,8 +525,7 @@ mod tests {
 
         // Adding an extra challenge should fail
         let mut too_many_challenges = proof.clone();
-        too_many_challenges.second_challenge_length =
-            too_many_challenges.second_challenge_length + 1;
+        too_many_challenges.polynomial_count = too_many_challenges.polynomial_count + 1;
 
         assert!(too_many_challenges
             .verify(&mut small_circuit.clone(), &mut transcript())
@@ -535,7 +533,7 @@ mod tests {
 
         // Not having enough challenges should fail
         let mut too_few_challenges = proof.clone();
-        too_few_challenges.second_challenge_length = too_few_challenges.second_challenge_length + 1;
+        too_few_challenges.polynomial_count = too_few_challenges.polynomial_count + 1;
         assert!(too_few_challenges
             .verify(small_circuit, &mut transcript())
             .is_err());
