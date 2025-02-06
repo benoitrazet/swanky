@@ -8,7 +8,7 @@ use mac_n_cheese_sieve_parser::{
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F128b, F2};
 
-use crate::vole::RandomVole;
+use crate::vole::RandomVoleP;
 
 /// A [`ProverTraverser`] allows the prover to execute the gate-by-gate evaluation portion of the
 /// VOLE-in-the-head protocol.
@@ -48,7 +48,7 @@ pub(crate) struct ProverTraverser<Vole> {
     aggregate_degree_1: F128b,
 }
 
-impl<Vole: RandomVole> ProverTraverser<Vole> {
+impl<Vole: RandomVoleP> ProverTraverser<Vole> {
     /// Create a new circuit traverser.
     ///
     /// Requirements on inputs:
@@ -185,7 +185,7 @@ impl<Vole: RandomVole> ProverTraverser<Vole> {
     /// The components that were passed to [`Self::new()`] are returned unchanged.
     ///
     /// This will fail if there were unused challenges or VOLEs.
-    pub(crate) fn into_parts(self) -> Result<(F128b, F128b, Vole, Vec<F128b>)> {
+    pub(crate) fn into_parts(self) -> Result<(F128b, F128b, Vole)> {
         if self.challenge_count != self.challenges.len() {
             bail!(
                 "Traversal contained more challenges than it needed! Had {}, used {}",
@@ -200,16 +200,11 @@ impl<Vole: RandomVole> ProverTraverser<Vole> {
                 self.vole_assignment_count
             );
         }
-        Ok((
-            self.aggregate_degree_0,
-            self.aggregate_degree_1,
-            self.voles,
-            self.challenges,
-        ))
+        Ok((self.aggregate_degree_0, self.aggregate_degree_1, self.voles))
     }
 }
 
-impl<Vole: RandomVole> FunctionBodyVisitor for ProverTraverser<Vole> {
+impl<Vole: RandomVoleP> FunctionBodyVisitor for ProverTraverser<Vole> {
     fn new(&mut self, __ty: TypeId, _first: WireId, _last: WireId) -> Result<()> {
         bail!("Invalid input: VOLE-in-the-head does not support `new` gates");
     }
@@ -303,7 +298,7 @@ impl<Vole: RandomVole> FunctionBodyVisitor for ProverTraverser<Vole> {
     }
 }
 
-impl<Vole: RandomVole> RelationVisitor for ProverTraverser<Vole> {
+impl<Vole: RandomVoleP> RelationVisitor for ProverTraverser<Vole> {
     type FBV<'a> = Self;
     fn define_function<BodyCb>(
         &mut self,
@@ -339,7 +334,7 @@ mod tests {
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F128b, F2};
 
-    use crate::vole::{insecure::InsecureVole, RandomVole};
+    use crate::vole::{insecure::InsecureVole, RandomVoleP};
 
     use super::ProverTraverser;
 

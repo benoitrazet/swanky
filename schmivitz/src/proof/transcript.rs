@@ -88,4 +88,11 @@ impl<'a> Transcript<'a> {
         self.0
             .append_message(b"a~: degree 1 commitment", &degree_1_commitment.to_bytes());
     }
+
+    pub(crate) fn extract_decommitment_challenge(&mut self) -> [u8; SECURITY_PARAM / 8] {
+        let mut challenge = [0u8; SECURITY_PARAM / 8];
+        self.0
+            .challenge_bytes(b"decommitment challenge", &mut challenge);
+        challenge
+    }
 }

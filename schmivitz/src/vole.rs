@@ -1,4 +1,4 @@
-//! Defines the overarching trait for VOLE and includes various implementations.
+//! Defines the overarching trait for non-interactive VOLE and includes various implementations.
 //!
 //! Expected implementations:
 //! - Dummy insecure version for non-blocking development
@@ -10,9 +10,9 @@ pub(crate) mod insecure;
 use eyre::Result;
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
-use swanky_field_binary::{F128b, F2};
+use swanky_field_binary::{F128b, F8b, F2};
 
-use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
+use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
 
 // Exposing these modules for benchmarking at the moment.
 pub(crate) mod all_but_one_vc;
@@ -32,7 +32,7 @@ pub trait AsSecretBytes {
     fn as_bytes(&self) -> Vec<u8>;
 }
 
-/// This defines the behavior needed to create and use non-interactive random VOLEs.
+/// Methods for a prover to create and decommit to an instance of VOLE.
 ///
 /// It's tailored to the specific use case of the VOLE-in-the-head paper[^vole], including
 /// hardcoding some lengths and field sizes based on the [fixed parameters](crate::parameters)
@@ -52,7 +52,7 @@ pub trait AsSecretBytes {
 /// Emmanuela Orsini, Lawrence Roy, and Peter Scholl. [Publicly Verifiable Zero-Knowledge and
 /// Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
 #[allow(dead_code)]
-pub trait RandomVole
+pub trait RandomVoleP
 where
     Self: Sized,
 {
@@ -92,18 +92,6 @@ where
         rng: &mut (impl CryptoRng + RngCore),
     ) -> (Self, Self::VoleChallenge);
 
-    /// Update the transcript with the extended witness length, plus any additional public
-    /// parameters or public information known at time of creation, and generate the challenge
-    /// used to create the random VOLE instances.
-    ///
-    /// It's implemented as a separate method so that a verifier can independently update the
-    /// transcript without creating any VOLEs. A reasonable implementation would also call this
-    /// method directly in the [`RandomVole::create()`] method.
-    fn extract_vole_challenge(
-        transcript: &mut Transcript,
-        extended_witness_length: usize,
-    ) -> Self::VoleChallenge;
-
     /// Get the total number of VOLE correlations supported by this random VOLE instance.
     ///
     /// This should be $`\ell + r\tau`$, where $`\ell`$ is the `extended_witness_length` parameter
@@ -134,7 +122,7 @@ where
     fn aggregate_commitment_values(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
 
     /// Gets the VOLE masks ($`v_i \text{ for } i \in [\ell + 1..\ell + r\tau]`$ in the paper),
-    /// lifted into [`F128b`] from `[`[F8b](swanky_field_binary::F8b)`; 16]`.
+    /// lifted into [`F128b`] from `[`[`F8b`]`; 16]`.
     ///
     /// In the paper, this is defined in Figure 7, Round 1, step 2 and used in Round 3, step 2.
     /// These are combined into a mask for the aggregated commitment $`\tilde b`$.
@@ -144,7 +132,7 @@ where
     fn aggregate_commitment_masks(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
 
     /// Get the `i`th component of the VOLE mask (`v` in the paper), lifted into [`F128b`] from
-    /// a [$`\tau`$](crate::parameters::REPETITION_PARAM)-length vector in [`F8b`](swanky_field_binary::F8b).
+    /// a [$`\tau`$](crate::parameters::REPETITION_PARAM)-length vector in [`F8b`].
     ///
     /// In the paper, this is defined in Figure 7, Round 1, step 3 and used in Round 3, steps 1
     /// and 2.
@@ -152,16 +140,6 @@ where
     /// The index `i` must be in the range $`[0, \ell)`$, where $`\ell`$ is the
     /// value returned by [`RandomVole::extended_witness_length()`].
     fn vole_mask(&self, i: usize) -> Result<F128b>;
-
-    /// This method extracts a challenge used to decommit to the VOLEs.
-    ///
-    /// It's implemented as a separate method so that a verifier can independently derive the
-    /// challenge without acutally calling the `decommit()` method (which is the responsibility of
-    /// the prover). A reasonable implementation would also call this
-    /// method directly in the [`RandomVole::decommit()`] method.
-    fn extract_decommitment_challenge(
-        transcript: &mut Transcript,
-    ) -> Self::VoleDecommitmentChallenge;
 
     /// Compute a partial decommitment to this set of random VOLEs.
     ///
@@ -176,11 +154,44 @@ where
     /// written interactively; in this implementation, this will be called by the prover and the
     /// output incorporated into the proof.
     ///
-    /// The [`Transcript`] passed to this method must incorporate all public information contained
-    /// in the proof, including the commitment to the de-randomized VOLEs ($`\tilde a`$ and
-    /// $`\tilde b`$ in the paper).
-    fn decommit(
-        self,
-        transcript: &mut Transcript,
-    ) -> (Self::Decommitment, Self::VoleDecommitmentChallenge);
+    /// The challenge must incorporate all public information, including the degree 0 and 1
+    /// commitments and all previous challenges.
+    fn decommit(self, decom_challenge: &[u8; SECURITY_PARAM / 8]) -> Self::Decommitment;
+}
+
+/// Methods for a verifier to reconstruct / verify and use an instance of VOLE.
+pub trait RandomVoleV {
+    /// Decommitment information for the random VOLE.
+    ///
+    /// This must only contain information that is safe to be sent to the verifier at the end of
+    /// the protocol.
+    type Decommitment;
+
+    /// Reconstruct the VOLE material from a decommitment in a proof.
+    ///
+    /// In the ideal functionality, this corresponds to the `get` function.
+    /// In practice, this "expands" the decommitment information, performs
+    /// any checks, corrections, challenge evaluations, and any other details
+    /// that need to happen before the VOLE key ∆ and the VOLE value tags `Q`
+    /// are computed.
+    fn reconstruct(decom: &Self::Decommitment, transcript: &mut Transcript) -> Self;
+
+    /// Get the length of the extended witness.
+    fn extended_witness_length(&self) -> usize;
+
+    /// Get the verifier key array $`\mathbf \Delta`$.
+    fn verifier_key_array(&self) -> &[F8b; REPETITION_PARAM];
+
+    /// Get the lifted verifier key $`\Delta`$.
+    fn verifier_key(&self) -> F128b;
+
+    /// Get the value tags corresponding to the witness $`\mathbf Q_{[0..\ell)}`$,
+    /// where $`\ell`$ is the [`Self::extended_witness_length`].
+    fn witness_voles(&self) -> &[[F8b; REPETITION_PARAM]];
+
+    /// Get the value tags corresponding to the mask
+    /// $`\mathbf Q_{[\ell..\ell + \lambda)}`$, where $`\ell`$ is the
+    /// [`Self::extended_witness_length`] and $`\lambda`$ is the security
+    /// parameter (and equal to [`REPETITION_PARAM`]` * `[`VOLE_SIZE_PARAM`]).
+    fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
 }

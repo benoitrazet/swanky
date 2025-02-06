@@ -14,15 +14,16 @@ use rand::{CryptoRng, RngCore};
 use std::{
     io::{Read, Seek},
     iter::zip,
+    marker::PhantomData,
     path::Path,
 };
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F8b, F2};
 
 use crate::{
-    parameters::FIELD_SIZE,
+    parameters::{FIELD_SIZE, SECURITY_PARAM},
     proof::{prover_preparer::ProverPreparer, prover_traverser::ProverTraverser},
-    vole::{insecure::InsecureVole, AsSecretBytes, RandomVole},
+    vole::{AsSecretBytes, RandomVoleP, RandomVoleV},
 };
 
 use self::verifier_traverser::VerifierTraverser;
@@ -34,26 +35,27 @@ mod verifier_traverser;
 
 /// Zero-knowledge proof of knowledge of a circuit.
 #[derive(Debug, Clone)]
-pub struct Proof<Vole: RandomVole> {
-    /// Challenge generated in VOLE creation.
-    vole_challenge: Vole::VoleChallenge,
+pub struct Proof<Vole: RandomVoleP, VoleV: RandomVoleV> {
     /// Commitment to the extended witness ($`d`$ in the paper).
     witness_commitment: Vec<F2>,
-    /// Challenges generated after committing to the witness
-    witness_challenges: Vec<F128b>,
-    /// Aggregated commitment to the degree-0 term coefficients for each gate in the circuit
-    /// ($`\tilde b`$ in the paper).
-    degree_0_commitment: F128b,
+    polynomial_count: usize,
     /// Aggregated commitment to the degree-1 term coefficients for each gate in the circuit
     /// ($`\tilde a`$ in the paper).
     degree_1_commitment: F128b,
     /// Challenge generated to decommit to the VOLEs after committing to the degree coefficients.
-    decommitment_challenge: Vole::VoleDecommitmentChallenge,
+    decommitment_challenge: [u8; SECURITY_PARAM / 8],
     /// Partial decommitment of the VOLEs.
-    partial_decommitment: Vole::Decommitment,
+    partial_decommitment: VoleV::Decommitment,
+
+    // This ties the proof to the VOLE implementation used to create it.
+    vole: PhantomData<Vole>,
 }
 
-impl<Vole: RandomVole> Proof<Vole> {
+impl<VoleP, VoleV> Proof<VoleP, VoleV>
+where
+    VoleP: RandomVoleP,
+    VoleV: RandomVoleV<Decommitment = VoleP::Decommitment>,
+{
     /// Create a proof of knowledge of a witness that satisfies the given circuit.
     pub fn prove<T, R>(
         circuit: &mut T,
@@ -73,31 +75,34 @@ impl<Vole: RandomVole> Proof<Vole> {
         // Evaluate the circuit in the clear to get the full witness and all wire values
         let mut circuit_preparer = ProverPreparer::new_from_path(private_input)?;
         reader.read(&mut circuit_preparer)?;
-        let (witness, wire_values, challenge_count) = circuit_preparer.into_parts();
+        let (witness, wire_values, polynomial_count) = circuit_preparer.into_parts();
 
         // Update transcript with general public information
         transcript.append_public_values();
 
         // Get a set of random VOLEs, one for each value in the extended witness
-        let (voles, vole_challenge) =
-            Vole::create(witness.len(), transcript.as_mut(), &witness, rng);
+        let (voles, _vole_challenge) =
+            VoleP::create(witness.len(), transcript.as_mut(), &witness, rng);
 
         // Commit to extended witness (`d` in the paper)
         let witness_commitment: Vec<F2> = zip(witness, voles.witness_mask())
             .map(|(w, u)| w - u)
             .collect();
 
+        // TODO:
+        // Add u~ to the transcript
+        // Add hV to the transcript
+
         // Add witness commitment to the transcript and generate a challenge for each polynomial
         transcript.append_witness_commitment(witness_commitment.as_slice());
-        let witness_challenges = transcript.extract_witness_challenges(challenge_count);
+        let witness_challenges = transcript.extract_witness_challenges(polynomial_count);
 
         // Traverse circuit to compute the coefficients for the degree 0 and 1 terms for each
         // gate / polynomial (`A_i0` and `A_i1` in the paper) and start to aggregate these with
         // the challenges.
         let mut circuit_traverser = ProverTraverser::new(wire_values, witness_challenges, voles)?;
         RelationReader::new(circuit)?.read(&mut circuit_traverser)?;
-        let (degree_0_aggregation, degree_1_aggregation, voles, witness_challenges) =
-            circuit_traverser.into_parts()?;
+        let (degree_0_aggregation, degree_1_aggregation, voles) = circuit_traverser.into_parts()?;
 
         // Compute masks for the aggregated coefficients (`v*`, `u*` in the paper)
         let degree_0_mask = combine(voles.aggregate_commitment_masks());
@@ -109,24 +114,20 @@ impl<Vole: RandomVole> Proof<Vole> {
 
         // Add aggregated responses to transcript
         transcript.append_polynomial_commitments(&degree_0_commitment, &degree_1_commitment);
+        let decommitment_challenge = transcript.extract_decommitment_challenge();
 
         // Decommit the VOLEs
-        let (partial_decommitment, decommitment_challenge) = voles.decommit(transcript.as_mut());
+        let partial_decommitment = voles.decommit(&decommitment_challenge);
 
         // Form the proof
         Ok(Self {
-            vole_challenge,
             witness_commitment,
-            witness_challenges,
-            degree_0_commitment,
             degree_1_commitment,
+            polynomial_count,
             decommitment_challenge,
             partial_decommitment,
+            vole: PhantomData,
         })
-    }
-
-    fn extended_witness_length(&self) -> usize {
-        self.witness_commitment.len()
     }
 
     /// Validate that the circuit can be processed by the system, according to the header info.
@@ -156,31 +157,17 @@ impl<Vole: RandomVole> Proof<Vole> {
 
         Ok(())
     }
-}
 
-impl Proof<InsecureVole> {
     /// This makes sure the proof is correctly formed e.g. everything is the right length.
-    fn validate_proof(&self) -> Result<()> {
+    fn validate_proof(&self, voles: &VoleV) -> Result<()> {
         // There should be one witness commitment for every element in the extended witness
         // The proof and the decommitted VOLEs should agree on what this size is
-        if self.witness_commitment.len() != self.partial_decommitment.extended_witness_length() {
+        if self.witness_commitment.len() != voles.extended_witness_length() {
             bail!("Invalid proof: Did not commit to the same number of witnesses {} as there are VOLEs {}",
-                self.witness_commitment.len(), self.partial_decommitment.extended_witness_length())
+                self.witness_commitment.len(), voles.extended_witness_length())
         }
 
-        // There should be one challenge for every polynomial in the circuit. We can't tell
-        // exactly how many that is without traversing the circuit, but it should be the total
-        // number of witnesses less the public inputs
-        if self.witness_challenges.len() > self.witness_commitment.len() {
-            bail!(
-                "Invalid proof: More challenges {} than we have witnesses to commit to {}",
-                self.witness_challenges.len(),
-                self.witness_commitment.len()
-            )
-        }
-
-        // The partial decommitment must also be valid
-        self.partial_decommitment.validate_commitments()
+        Ok(())
     }
 
     /// Verify the proof.
@@ -188,40 +175,26 @@ impl Proof<InsecureVole> {
     pub fn verify<T>(&self, circuit: &mut T, transcript: &mut Transcript) -> Result<()>
     where
         T: Read + Seek + Clone,
+        // TODO: The way we store challenges has to change; this is a temporary fix.
+        <VoleP as RandomVoleP>::VoleChallenge: PartialEq<[u8; 16]>,
+        <VoleP as RandomVoleP>::VoleDecommitmentChallenge: PartialEq<[u8; 16]>,
     {
-        self.validate_proof()?;
         let mut transcript = transcript::Transcript::from(transcript);
-
-        // Add public values to transcript for both the overall proof...
         transcript.append_public_values();
 
-        // ...and the specific VOLE instantiation, and get the VOLE challenge
-        let expected_vole_challenge = InsecureVole::extract_vole_challenge(
-            transcript.as_mut(),
-            self.extended_witness_length(),
-        );
-        if self.vole_challenge != expected_vole_challenge {
-            bail!("Verification failed: Vole challenge did not match expected value");
-        }
+        // Reconstruct VOLEs and update transcript with any necessary components.
+        let reconstructed_voles =
+            VoleV::reconstruct(&self.partial_decommitment, transcript.as_mut());
+        self.validate_proof(&reconstructed_voles)?;
 
-        // Add witness commitment to transcript and generate challenges for each polynomial
+        // TODO:
+        // Add u~ from the proof into the transcript
+        // Add hV (from VOLE) to the transcript
+
+        // Add `d` to transcript and generate challenges for each polynomial
         transcript.append_witness_commitment(self.witness_commitment.as_slice());
-        let expected_witness_challenges =
-            transcript.extract_witness_challenges(self.witness_challenges.len());
-        if expected_witness_challenges != self.witness_challenges {
-            bail!("Verification failed: Witness challenges did not match expected values");
-        }
-
-        // Add aggregated responses to the transcript
-        transcript
-            .append_polynomial_commitments(&self.degree_0_commitment, &self.degree_1_commitment);
-
-        // Get the VOLE decommitment challenge and make sure it's valid
-        let expected_decommitment_challenge =
-            InsecureVole::extract_decommitment_challenge(transcript.as_mut());
-        if self.decommitment_challenge != expected_decommitment_challenge {
-            bail!("Verification failed: VOLE challenge did not match expected value");
-        }
+        // TODO: Should we be doing something with these challenges?
+        let witness_challenges = transcript.extract_witness_challenges(self.polynomial_count);
 
         // Compute masked witnesses Q' = Q[..l] + d * Delta
         let d_delta = self
@@ -229,12 +202,12 @@ impl Proof<InsecureVole> {
             .iter()
             .map(|witness_com| {
                 let witness_com = F8b::from(*witness_com);
-                self.partial_decommitment
+                reconstructed_voles
                     .verifier_key_array()
                     .map(|key| witness_com * key)
             })
             .collect::<Vec<_>>();
-        let masked_witnesses = zip(self.partial_decommitment.witness_voles(), d_delta)
+        let masked_witnesses = zip(reconstructed_voles.witness_voles(), d_delta)
             .map(|(qs, dds)| {
                 // NB: This unwrap is safe because we know the two input arrays are each exactly length 16.
                 let masked_witness: [F8b; 16] = zip(qs, dds)
@@ -247,12 +220,12 @@ impl Proof<InsecureVole> {
             .collect::<Vec<_>>();
 
         // Combine mask VOLEs to get q*
-        let validation_mask = combine(self.partial_decommitment.mask_voles());
+        let validation_mask = combine(reconstructed_voles.mask_voles());
 
         // Run circuit traversal and get the aggregate value (part of c~)
         let mut verifier_traverser = VerifierTraverser::new(
-            self.witness_challenges.clone(),
-            self.partial_decommitment.verifier_key(),
+            witness_challenges,
+            reconstructed_voles.verifier_key(),
             masked_witnesses,
         )?;
         let reader = RelationReader::new(circuit)?;
@@ -261,13 +234,18 @@ impl Proof<InsecureVole> {
 
         // Finally, compute c~ = aggregate + q*
         let validation = validation_aggregate + validation_mask;
+        let degree_0_commitment =
+            validation - self.degree_1_commitment * reconstructed_voles.verifier_key();
 
-        // Check the main constraint of the proof!!
-        let actual_validation = self.degree_1_commitment * self.partial_decommitment.verifier_key()
-            + self.degree_0_commitment;
-        if validation != actual_validation {
-            bail!("Verification failed: proof responses were not consistent with decommited VOLEs and masked witnesses");
+        // Add aggregated responses to the transcript
+        transcript.append_polynomial_commitments(&degree_0_commitment, &self.degree_1_commitment);
+
+        // Get the VOLE decommitment challenge and make sure it's valid
+        let decommitment_challenge = transcript.extract_decommitment_challenge();
+        if self.decommitment_challenge != decommitment_challenge {
+            bail!("Verification failed: VOLE challenge did not match expected value");
         }
+
         Ok(())
     }
 }
@@ -305,11 +283,9 @@ mod tests {
     use merlin::Transcript;
     use rand::thread_rng;
     use std::io::Write;
-    use swanky_field::FiniteRing;
-    use swanky_field_binary::F128b;
     use tempfile::tempdir;
 
-    use crate::vole::insecure::InsecureVole;
+    use crate::vole::insecure::{InsecureCommitments, InsecureVole};
 
     use super::Proof;
 
@@ -323,7 +299,9 @@ mod tests {
             @end ";
         let plugin_cursor = &mut Cursor::new(plugin.as_bytes());
         let reader = RelationReader::new(plugin_cursor).unwrap();
-        assert!(Proof::<InsecureVole>::validate_circuit_header(&reader).is_err());
+        assert!(
+            Proof::<InsecureVole, InsecureCommitments>::validate_circuit_header(&reader).is_err()
+        );
     }
 
     #[test]
@@ -337,7 +315,9 @@ mod tests {
             @end ";
         let conversion_cursor = &mut Cursor::new(trivial_conversion.as_bytes());
         let reader = RelationReader::new(conversion_cursor).unwrap();
-        assert!(Proof::<InsecureVole>::validate_circuit_header(&reader).is_err());
+        assert!(
+            Proof::<InsecureVole, InsecureCommitments>::validate_circuit_header(&reader).is_err()
+        );
     }
 
     #[test]
@@ -349,7 +329,9 @@ mod tests {
             @end ";
         let big_field_cursor = &mut Cursor::new(big_field.as_bytes());
         let reader = RelationReader::new(big_field_cursor).unwrap();
-        assert!(Proof::<InsecureVole>::validate_circuit_header(&reader).is_err());
+        assert!(
+            Proof::<InsecureVole, InsecureCommitments>::validate_circuit_header(&reader).is_err()
+        );
 
         let extra_field = "version 2.0.0;
             circuit;
@@ -359,7 +341,9 @@ mod tests {
             @end ";
         let extra_field_cursor = &mut Cursor::new(extra_field.as_bytes());
         let reader = RelationReader::new(extra_field_cursor).unwrap();
-        assert!(Proof::<InsecureVole>::validate_circuit_header(&reader).is_err());
+        assert!(
+            Proof::<InsecureVole, InsecureCommitments>::validate_circuit_header(&reader).is_err()
+        );
     }
 
     #[test]
@@ -371,7 +355,9 @@ mod tests {
             @end ";
         let tiny_header_cursor = &mut Cursor::new(tiny_header.as_bytes());
         let reader = RelationReader::new(tiny_header_cursor)?;
-        assert!(Proof::<InsecureVole>::validate_circuit_header(&reader).is_ok());
+        assert!(
+            Proof::<InsecureVole, InsecureCommitments>::validate_circuit_header(&reader).is_ok()
+        );
         Ok(())
     }
 
@@ -384,7 +370,10 @@ mod tests {
     fn create_proof(
         circuit_bytes: &'static str,
         private_input_bytes: &'static str,
-    ) -> (Result<Proof<InsecureVole>>, Cursor<&'static [u8]>) {
+    ) -> (
+        Result<Proof<InsecureVole, InsecureCommitments>>,
+        Cursor<&'static [u8]>,
+    ) {
         let circuit = Cursor::new(circuit_bytes.as_bytes());
 
         let dir = tempdir().unwrap();
@@ -395,7 +384,7 @@ mod tests {
         let rng = &mut thread_rng();
 
         (
-            Proof::<InsecureVole>::prove::<_, _>(
+            Proof::<InsecureVole, InsecureCommitments>::prove::<_, _>(
                 &mut circuit.clone(),
                 &private_input_path,
                 &mut transcript(),
@@ -527,7 +516,7 @@ mod tests {
 
         let rng = &mut thread_rng();
 
-        let proof = Proof::<InsecureVole>::prove::<_, _>(
+        let proof = Proof::<InsecureVole, InsecureCommitments>::prove::<_, _>(
             &mut small_circuit.clone(),
             &private_input_path,
             &mut transcript(),
@@ -536,16 +525,15 @@ mod tests {
 
         // Adding an extra challenge should fail
         let mut too_many_challenges = proof.clone();
-        too_many_challenges
-            .witness_challenges
-            .push(F128b::random(rng));
+        too_many_challenges.polynomial_count = too_many_challenges.polynomial_count + 1;
+
         assert!(too_many_challenges
             .verify(&mut small_circuit.clone(), &mut transcript())
             .is_err());
 
         // Not having enough challenges should fail
         let mut too_few_challenges = proof.clone();
-        too_few_challenges.witness_challenges.pop();
+        too_few_challenges.polynomial_count = too_few_challenges.polynomial_count + 1;
         assert!(too_few_challenges
             .verify(small_circuit, &mut transcript())
             .is_err());
