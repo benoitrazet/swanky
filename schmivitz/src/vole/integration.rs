@@ -96,11 +96,13 @@ impl RandomVoleV for VoleVerifier {
         let mut statement_sig = [0u8; 32];
         transcript.challenge_bytes(b"statement signature", &mut statement_sig);
 
-        create_vole_verifier(&statement_sig, decom, chall3)
+        let verifier = create_vole_verifier(&statement_sig, decom, chall3);
+        assert_eq!(verifier.q.len(), verifier.l + SECURITY_PARAM);
+        verifier
     }
 
     fn extended_witness_length(&self) -> usize {
-        //self.q.len() - REPETITION_PARAM * VOLE_SIZE_PARAM
+        // by definition, this should be the same as self.q.len() - REPETITION_PARAM * VOLE_SIZE_PARAM
         self.l
     }
 
@@ -114,12 +116,12 @@ impl RandomVoleV for VoleVerifier {
 
     fn witness_voles(&self) -> &[[F8b; REPETITION_PARAM]] {
         let count = self.q.len();
-        &self.q[0..count - REPETITION_PARAM * VOLE_SIZE_PARAM]
+        &self.q[0..count - SECURITY_PARAM]
     }
 
     fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
         let count = self.q.len();
-        self.q[count - REPETITION_PARAM * VOLE_SIZE_PARAM..]
+        self.q[count - SECURITY_PARAM..]
             .iter()
             .map(|qi| F8b::form_superfield(qi.into()))
             .collect::<Vec<_>>()

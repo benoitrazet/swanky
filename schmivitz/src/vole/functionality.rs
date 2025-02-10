@@ -203,7 +203,7 @@ pub(crate) fn decommit(vole: VoleProver, chall3: &Chall3) -> PartialDecommitment
 /// Structure of VOLE created by the functionality on the verifier side.
 #[derive(Clone)]
 pub(crate) struct VoleVerifier {
-    /// correlations on verifier side
+    /// correlations on verifier side. This should have length `l + SECURITY_PARAM`.
     pub(crate) q: Vec<[F8b; REPETITION_PARAM]>,
     /// Consistency check. TODO: update challenge appropriately!!
     #[allow(unused)]
@@ -288,11 +288,15 @@ pub(crate) fn create_vole_verifier(
 
     let h_v = H1::from_bytes(&bits_to_u8_many(&q_xor_d));
 
-    // compute the secret key
+    // compute the secret key (AESVerify, line 1)
     let delta = compute_secret_key(chall3);
 
+    // Truncate the qs (part of line 19)
+    let mut q = q_f8arrs;
+    q.truncate(l + SECURITY_PARAM);
+
     VoleVerifier {
-        q: q_f8arrs,
+        q,
         u_tilda: *u_tilda,
         h_v,
         delta,
@@ -315,6 +319,7 @@ mod test {
 
     use super::{create_vole_prover, create_vole_verifier, decommit, verify};
     use super::{Chall1, Chall2, HashConsistency, H1};
+    use crate::parameters::SECURITY_PARAM;
     use crate::vole::crypto_primitives::CHALL2_LENGTH;
     use crate::vole::functionality::compute_chall_3;
     use rand::thread_rng;
@@ -384,6 +389,8 @@ mod test {
         let decommitment_prover = decommit(vole_prover, &chall3);
 
         let vole_v = create_vole_verifier(&statement_sig, &decommitment_prover, &chall3);
+
+        assert_eq!(vole_v.q.len(), vole_v.l + SECURITY_PARAM);
 
         let b = verify(&chall3, chall2, dummy_a_tilda, dummy_b_tilda);
 
