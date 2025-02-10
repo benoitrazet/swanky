@@ -272,7 +272,10 @@ pub(crate) fn apply_corrections_to_q(
     chall3: &Chall3,
     corrections: &Corrections,
     how_many: usize,
-) -> Vec<F128b> {
+) -> Vec<[F8b; REPETITION_PARAM]> {
+    // Dimensions of `q`: \tau x l_hat x r = 16 x l_hat x 8.
+    debug_assert!(q.len() == REPETITION_PARAM && q[0].len() == how_many);
+
     // Q_0 is the same
     // Change Q_i with the corrections:
     // loop Q_i xor (\delta_0 c_i ... \delta_7 c_7)
@@ -284,27 +287,28 @@ pub(crate) fn apply_corrections_to_q(
     for pos in 0..how_many {
         qs[pos][0] = q[0][pos];
     }
+
+    // Apply the corrections. This also transposes the output relative to `q`.
     for tau in 1..REPETITION_PARAM {
-        let delta = chal_dec(chall3, tau);
+        // Get challenge, and convert bools into `F2`. The unwrap should be safe because `chal_dec`
+        // is supposed to return an 8-bit decomposition.
+        let delta: [F2; 8] = chal_dec(chall3, tau)
+            .into_iter()
+            .map(F2::from)
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
 
         for pos in 0..how_many {
             let c_tau = corrections.0[tau - 1][pos];
-            let mut delta_times_corr = [F2::default(); 8];
-            for (i, d) in delta.iter().enumerate() {
-                let corr = F2::from(*d) * c_tau; // TODO: optimize this
-                delta_times_corr[i] = corr;
-            }
+
+            let delta_times_corr = delta.map(|d_i| d_i * c_tau);
             let delta_times_corr_f8b: F8b = F2::form_superfield(&delta_times_corr.into());
+
             qs[pos][tau] = q[tau][pos] + delta_times_corr_f8b;
         }
     }
-
-    let mut q_128b: Vec<F128b> = Vec::with_capacity(how_many);
-    for pos in 0..how_many {
-        let val = F8b::form_superfield(&qs[pos].into());
-        q_128b.push(val);
-    }
-    q_128b
+    qs
 }
 
 /// This function combines a challenge with the hash of `u` to be used for the consistency check by the verifier.
@@ -418,7 +422,10 @@ mod test {
 
         for pos in 0..how_many {
             //assert_eq!(v_f128b[pos], q_f128b[pos]);
-            assert_eq!(v[pos] + u[pos] * big_delta_f128b, q_f128b[pos]);
+            assert_eq!(
+                v[pos] + u[pos] * big_delta_f128b,
+                F8b::form_superfield(&q_f128b[pos].into())
+            );
         }
     }
 }

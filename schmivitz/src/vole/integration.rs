@@ -100,6 +100,7 @@ impl RandomVoleV for VoleVerifier {
     }
 
     fn extended_witness_length(&self) -> usize {
+        //self.q.len() - REPETITION_PARAM * VOLE_SIZE_PARAM
         self.l
     }
 
@@ -112,33 +113,16 @@ impl RandomVoleV for VoleVerifier {
     }
 
     fn witness_voles(&self) -> &[[F8b; REPETITION_PARAM]] {
-        todo!()
-    }
-
-    fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
-        todo!()
-    }
-}
-
-// The functions in this implementation are the ones from `InsecureCommitments`
-#[allow(unused)]
-impl VoleVerifier {
-    pub(crate) fn extended_witness_length(&self) -> usize {
-        self.q.len() - REPETITION_PARAM * VOLE_SIZE_PARAM
-    }
-
-    pub(crate) fn verifier_key_array(&self) -> F128b {
-        F8b::form_superfield(&self.delta)
-    }
-
-    pub(crate) fn witness_voles(&self) -> &[F128b] {
         let count = self.q.len();
         &self.q[0..count - REPETITION_PARAM * VOLE_SIZE_PARAM]
     }
 
-    pub(crate) fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+    fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
         let count = self.q.len();
-        self.q[count - REPETITION_PARAM * VOLE_SIZE_PARAM..count]
+        self.q[count - REPETITION_PARAM * VOLE_SIZE_PARAM..]
+            .iter()
+            .map(|qi| F8b::form_superfield(qi.into()))
+            .collect::<Vec<_>>()
             .try_into()
             .unwrap()
     }

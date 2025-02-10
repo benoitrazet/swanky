@@ -13,7 +13,7 @@ use crate::vole::crypto_primitives::{Chall1, Chall2, Chall3, Com, Seed, H1, H3, 
 use generic_array::typenum::U16;
 use generic_array::GenericArray;
 use sha3::{digest::Update, Shake128};
-use swanky_field::FiniteRing;
+use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F2;
 use swanky_field_binary::{F128b, F8b};
 
@@ -204,7 +204,7 @@ pub(crate) fn decommit(vole: VoleProver, chall3: &Chall3) -> PartialDecommitment
 #[derive(Clone)]
 pub(crate) struct VoleVerifier {
     /// correlations on verifier side
-    pub(crate) q: Vec<F128b>,
+    pub(crate) q: Vec<[F8b; REPETITION_PARAM]>,
     /// Consistency check. TODO: update challenge appropriately!!
     #[allow(unused)]
     u_tilda: HashConsistency,
@@ -249,7 +249,11 @@ pub(crate) fn create_vole_verifier(
 
     // lines 6-14
     let t = std::time::Instant::now();
-    let q_f128b = apply_corrections_to_q(q, chall3, corrections, l_hat(*l));
+    let q_f8arrs = apply_corrections_to_q(q, chall3, corrections, l_hat(*l));
+    let q_f128b: Vec<F128b> = q_f8arrs
+        .iter()
+        .map(|qi| F8b::form_superfield(qi.into()))
+        .collect();
     log::info!("apply_corrections_to_q running time: {:?}", t.elapsed());
 
     // line 15
@@ -288,7 +292,7 @@ pub(crate) fn create_vole_verifier(
     let delta = compute_secret_key(chall3);
 
     VoleVerifier {
-        q: q_f128b,
+        q: q_f8arrs,
         u_tilda: *u_tilda,
         h_v,
         delta,
@@ -384,8 +388,13 @@ mod test {
         let b = verify(&chall3, chall2, dummy_a_tilda, dummy_b_tilda);
 
         let delta_lifted: F128b = F8b::form_superfield(&vole_v.delta);
+        let q_lifted: Vec<F128b> = vole_v
+            .q
+            .iter()
+            .map(|qi| F8b::form_superfield(qi.into()))
+            .collect();
         for pos in 0..how_many {
-            assert_eq!(v[pos] + u[pos] * delta_lifted, vole_v.q[pos]);
+            assert_eq!(v[pos] + u[pos] * delta_lifted, q_lifted[pos]);
         }
 
         assert!(b);
