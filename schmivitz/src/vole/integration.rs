@@ -103,15 +103,15 @@ impl RandomVoleV for VoleVerifier {
         self.l
     }
 
-    fn verifier_key_array(&self) -> &[swanky_field_binary::F8b; REPETITION_PARAM] {
-        todo!()
+    fn verifier_key_array(&self) -> &[F8b; REPETITION_PARAM] {
+        self.delta.as_ref()
     }
 
     fn verifier_key(&self) -> F128b {
-        todo!()
+        F8b::form_superfield(&self.delta)
     }
 
-    fn witness_voles(&self) -> &[[swanky_field_binary::F8b; REPETITION_PARAM]] {
+    fn witness_voles(&self) -> &[[F8b; REPETITION_PARAM]] {
         todo!()
     }
 
