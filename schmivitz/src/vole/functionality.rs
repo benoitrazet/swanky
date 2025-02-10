@@ -10,10 +10,12 @@ use crate::vole::commit_reconstruct::{
 use crate::vole::commit_reconstruct::{recompose_d, B};
 use crate::vole::consistency_check::{vole_hash, vole_hash_lockstep};
 use crate::vole::crypto_primitives::{Chall1, Chall2, Chall3, Com, Seed, H1, H3, IV};
+use generic_array::typenum::U16;
+use generic_array::GenericArray;
 use sha3::{digest::Update, Shake128};
 use swanky_field::FiniteRing;
-use swanky_field_binary::F128b;
 use swanky_field_binary::F2;
+use swanky_field_binary::{F128b, F8b};
 
 use super::all_but_one_vc::Decom;
 use super::commit_reconstruct::compute_secret_key;
@@ -210,7 +212,7 @@ pub(crate) struct VoleVerifier {
     #[allow(unused)]
     h_v: H1,
     /// secret key
-    pub(crate) delta: F128b,
+    pub(crate) delta: GenericArray<F8b, U16>,
     /// Size of extended witness. `ell` in the paper.
     pub(crate) l: usize,
 }
@@ -319,7 +321,7 @@ mod test {
     use rand::thread_rng;
     use sha3::digest::{ExtendableOutput, Update, XofReader};
     use sha3::Shake128;
-    use swanky_field::FiniteRing;
+    use swanky_field::{FiniteRing, IsSubFieldOf};
     use swanky_field_binary::F2;
     use swanky_field_binary::{F128b, F8b};
     use swanky_serialization::CanonicalSerialize;
@@ -386,8 +388,9 @@ mod test {
 
         let b = verify(&chall3, chall2, dummy_a_tilda, dummy_b_tilda);
 
+        let delta_lifted: F128b = F8b::form_superfield(&vole_v.delta);
         for pos in 0..how_many {
-            assert_eq!(v[pos] + u[pos] * vole_v.delta, vole_v.q[pos]);
+            assert_eq!(v[pos] + u[pos] * delta_lifted, vole_v.q[pos]);
         }
 
         assert!(b);

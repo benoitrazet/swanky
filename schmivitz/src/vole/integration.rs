@@ -8,7 +8,8 @@ use crate::vole::functionality::{
 use eyre::{bail, Result};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
-use swanky_field_binary::{F128b, F2};
+use swanky_field::IsSubFieldOf;
+use swanky_field_binary::{F128b, F8b, F2};
 
 // This is a first attempt to connect the VOLE part to the circuit traverser.
 
@@ -126,8 +127,8 @@ impl VoleVerifier {
         self.q.len() - REPETITION_PARAM * VOLE_SIZE_PARAM
     }
 
-    pub(crate) fn verifier_key_array(&self) -> &F128b {
-        &self.delta
+    pub(crate) fn verifier_key_array(&self) -> F128b {
+        F8b::form_superfield(&self.delta)
     }
 
     pub(crate) fn witness_voles(&self) -> &[F128b] {
