@@ -62,7 +62,7 @@ pub(crate) struct Commit {
 /// This corresponds to Figure 5.4 of the FAEST spec.
 /// This function relies on multithreading to improve the time performance.
 #[inline(never)]
-pub(crate) fn vole_commit(r: IV, iv: IV, l: usize) -> Commit {
+pub(crate) fn vole_commit(r: IV, iv: IV, l_hat: usize) -> Commit {
     let prg_seeds = PRG::new(r, iv).generate_prg_seeds(REPETITION_PARAM);
     let mut u = Vec::with_capacity(REPETITION_PARAM);
     let mut v = Vec::with_capacity(REPETITION_PARAM);
@@ -97,7 +97,7 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l: usize) -> Commit {
         let prg_seeds_i = prg_seeds[i];
         let handle = thread::spawn(move || {
             let (com_i, decom_i, seeds) = commit(prg_seeds_i, iv, 8);
-            let (u_i, v_i) = convert_to_vole(&seeds, iv, l, true);
+            let (u_i, v_i) = convert_to_vole(&seeds, iv, l_hat, true);
 
             tx.send((com_i, decom_i, u_i, v_i)).unwrap();
         });
@@ -122,10 +122,10 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l: usize) -> Commit {
     let u_0 = u[0].clone(); // TODO: opt transmute here
     let mut corr: [Vec<F2>; REPETITION_PARAM - 1] = Default::default();
     for i in 1..REPETITION_PARAM {
-        let mut ci = Vec::with_capacity(l);
-        debug_assert_eq!(l, u_0.len());
+        let mut ci = Vec::with_capacity(l_hat);
+        debug_assert_eq!(l_hat, u_0.len());
         let u_i = &u[i];
-        for j in 0..l {
+        for j in 0..l_hat {
             let c = u_0[j] + u_i[j];
             ci.push(c);
         }
@@ -136,9 +136,9 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l: usize) -> Commit {
 
     // Convert Vec<Vec<F8b>> to Vec<F128b> where the size of the outer vec in Vec<Vec<F8b>> is `REPETITION_PARAM`.
     let t = std::time::Instant::now();
-    let mut v_out = Vec::with_capacity(l);
+    let mut v_out = Vec::with_capacity(l_hat);
     let mut tmp = [F8b::ZERO; REPETITION_PARAM];
-    for i in 0..l {
+    for i in 0..l_hat {
         for tau in 0..REPETITION_PARAM {
             tmp[tau] = v[tau][i];
         }
@@ -189,13 +189,14 @@ pub(crate) fn vole_open(chal: &[u8], decom: &[Decom]) -> Vec<Pdecom> {
 
 /// Function to reconstruct voles from a challenge and partial decommitments.
 ///
-/// This implements Figure 5.5 in FAEST spec v1.1
+/// This implements Figure 5.5 in FAEST spec v1.1. The parameter `k_b` in that
+/// spec is always our [`parameters::VOLE_SIZE_PARAM`].
 #[inline(never)]
 pub(crate) fn vole_reconstruct(
     chal: &[u8], // bytes from fiat-shamir challenge
     pdecom: &[Pdecom],
     iv: IV,
-    l: usize,
+    l_hat: usize,
 ) -> (Com, Vec<Vec<F8b>>) {
     assert_eq!(pdecom.len(), REPETITION_PARAM);
     assert_eq!(chal.len(), REPETITION_PARAM);
@@ -231,7 +232,7 @@ pub(crate) fn vole_reconstruct(
 
         let tx = txs[i].clone();
         let handle = thread::spawn(move || {
-            let q_i = convert_to_vole_verifier(&seeds, iv, l, bools_to_u8(&delta));
+            let q_i = convert_to_vole_verifier(&seeds, iv, l_hat, bools_to_u8(&delta));
             tx.send(q_i).unwrap();
         });
         handles.push(handle);
@@ -264,6 +265,7 @@ pub(crate) fn compute_secret_key(chall3: &Chall3) -> GenericArray<F8b, U16> {
 /// This function applies corrections to the verifier part of voles `q` using a challenge.
 ///
 /// This function implements Lines 7-14 of Figure 8.3 of the FAEST spec.
+/// `how_many` must be $`\hat \ell = \ell + B + 2\lambda`$.
 #[inline(never)]
 pub(crate) fn apply_corrections_to_q(
     q: Vec<Vec<F8b>>,
@@ -331,6 +333,8 @@ pub(crate) fn recompose_d(chall3: &Chall3, u_tilda: &HashConsistency) -> Vec<F2>
     qs
 }
 
+/// Extended witness padded to support the protocol: $`\ell + B + 2\lambda`$.
+///
 /// This function takes the size of the extended witness as input and returns
 /// that many more elements necessary based on the parameters of the protocol.
 pub(crate) fn l_hat(l: usize) -> usize {

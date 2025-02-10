@@ -249,12 +249,7 @@ pub(crate) fn create_vole_verifier(
 
     // lines 6-14
     let t = std::time::Instant::now();
-    let q_f128b = apply_corrections_to_q(
-        q,
-        chall3,
-        corrections,
-        l_hat(*l), /* TODO: unsure about this value*/
-    );
+    let q_f128b = apply_corrections_to_q(q, chall3, corrections, l_hat(*l));
     log::info!("apply_corrections_to_q running time: {:?}", t.elapsed());
 
     // line 15

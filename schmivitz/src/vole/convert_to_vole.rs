@@ -23,22 +23,22 @@ fn u8_to_f8b(x: u8) -> F8b {
 pub(crate) fn convert_to_vole(
     seeds: &[Seed],
     iv: IV,
-    l: usize,
+    l_hat: usize,
     is_prover: bool,
 ) -> (Vec<F2>, Vec<F8b>) {
     // even if one seed can be bottom, it expects 256 of them.
     assert!(seeds.len() == 256);
-    let mut u_res = Vec::with_capacity(l);
-    let mut v_res = Vec::with_capacity(l);
+    let mut u_res = Vec::with_capacity(l_hat);
+    let mut v_res = Vec::with_capacity(l_hat);
 
     // u64 packs 64 bits/booleans.
     let mut prgs: Vec<Vec<u64>> = vec![];
     for (idx, seed) in seeds.iter().enumerate() {
         if idx == 0 && !is_prover {
-            prgs.push(vec![0u64; (l / 64) + 1]);
+            prgs.push(vec![0u64; (l_hat / 64) + 1]);
         } else {
             let prg = PRG::new(*seed, iv);
-            let v = prg.prg_compact(l);
+            let v = prg.prg_compact(l_hat);
             prgs.push(v);
         }
     }
@@ -47,8 +47,8 @@ pub(crate) fn convert_to_vole(
     // Only 2 layers are used using a swap operation in the loop.
     // Again, u64 to do 64 boolean/bit operations at once.
     let mut r = [[0_u64; 256]; 2];
-    let mut remaining = l;
-    for pos in 0..(l / 64) + 1 {
+    let mut remaining = l_hat;
+    for pos in 0..(l_hat / 64) + 1 {
         // possibly more but does not matter for performance.
 
         let mut v = [0_u64; 8];
@@ -107,29 +107,29 @@ pub(crate) fn convert_to_vole(
 
                 remaining -= 1;
                 if remaining == 0 {
-                    debug_assert_eq!(u_res.len(), l);
+                    debug_assert_eq!(u_res.len(), l_hat);
                     return (u_res, v_res);
                 }
             }
         }
     }
-    debug_assert_eq!(u_res.len(), l);
+    debug_assert_eq!(u_res.len(), l_hat);
     (u_res, v_res)
 }
 
 #[cfg(test)]
 /// This function is the naive version of [`convert_to_vole`] that does not
 /// operate on packed boolean field values.
-fn convert_to_vole_prover_naive(seeds: &[Seed], iv: IV, l: usize) -> (Vec<F2>, Vec<F8b>) {
+fn convert_to_vole_prover_naive(seeds: &[Seed], iv: IV, l_hat: usize) -> (Vec<F2>, Vec<F8b>) {
     use swanky_field::FiniteRing;
     assert!(seeds.len() == 256);
-    let mut u_res = vec![F2::ZERO; l];
-    let mut v_res = vec![F8b::ZERO; l];
+    let mut u_res = vec![F2::ZERO; l_hat];
+    let mut v_res = vec![F8b::ZERO; l_hat];
 
     let mut i = 0u8;
     for seed in seeds.iter() {
         let prg = PRG::new(*seed, iv);
-        let v = prg.prg(l);
+        let v = prg.prg(l_hat);
         let i_f8b: F8b = u8_to_f8b(i);
         for (j, r) in v.iter().enumerate() {
             u_res[j] += r;
@@ -144,7 +144,12 @@ fn convert_to_vole_prover_naive(seeds: &[Seed], iv: IV, l: usize) -> (Vec<F2>, V
 /// This function is the verifier version of [`convert_to_vole`].
 ///
 /// It permutes the `seeds` according to `delta` before calling [`convert_to_vole`].
-pub(crate) fn convert_to_vole_verifier(seeds: &[Seed], iv: IV, l: usize, delta: u8) -> Vec<F8b> {
+pub(crate) fn convert_to_vole_verifier(
+    seeds: &[Seed],
+    iv: IV,
+    l_hat: usize,
+    delta: u8,
+) -> Vec<F8b> {
     // let's permutate the seeds according to delta, with the permutation
     // i -> i xor delta
     let mut seeds_permuted = vec![Seed::default(); 256];
@@ -157,23 +162,23 @@ pub(crate) fn convert_to_vole_verifier(seeds: &[Seed], iv: IV, l: usize, delta: 
         i = i.wrapping_add(1);
     }
 
-    let (_, v) = convert_to_vole(&seeds_permuted, iv, l, false);
+    let (_, v) = convert_to_vole(&seeds_permuted, iv, l_hat, false);
     v
 }
 
 // NOTE: the return type is different than ConvertToVOLE in the paper, where is should be a Vec<Vec<F2>>
 #[cfg(test)]
-fn convert_to_vole_verifier_naive(seeds: &[Seed], iv: IV, l: usize, delta: u8) -> Vec<F8b> {
+fn convert_to_vole_verifier_naive(seeds: &[Seed], iv: IV, l_hat: usize, delta: u8) -> Vec<F8b> {
     use swanky_field::FiniteRing;
     assert_eq!(seeds.len(), 256);
-    let mut v_res = vec![F8b::ZERO; l];
+    let mut v_res = vec![F8b::ZERO; l_hat];
 
     let mut i = 0u8;
 
     for (j, seed) in seeds.iter().enumerate() {
         if j != delta as usize {
             let prg = PRG::new(*seed, iv);
-            let v = prg.prg(l);
+            let v = prg.prg(l_hat);
             let i_f8b: F8b = u8_to_f8b(i);
             let delta_f8b: F8b = u8_to_f8b(delta);
             for (j, r) in v.iter().enumerate() {
