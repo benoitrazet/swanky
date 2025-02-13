@@ -78,7 +78,7 @@ fn bits_to_u8_many(bits: &[F2]) -> Vec<u8> {
 /// Structure of vole created by the functionality on the prover side.
 #[derive(Clone)]
 #[allow(unused)]
-pub(crate) struct VoleProver {
+pub struct VoleProver {
     /// initial vector
     pub(crate) iv: IV,
     /// Decommitment
@@ -180,7 +180,7 @@ pub(crate) fn create_vole_prover<Secret: AsSecretBytes>(
 }
 
 /// Partial decommitment produced by the prover.
-pub(crate) struct PartialDecommitment {
+pub struct PartialDecommitment {
     pdecom: Vec<Pdecom>,
     corrections: Corrections,
     iv: IV,
@@ -207,7 +207,7 @@ pub(crate) fn decommit(vole: VoleProver, chall3: &Chall3) -> PartialDecommitment
 
 /// Structure of VOLE created by the functionality on the verifier side.
 #[derive(Clone)]
-pub(crate) struct VoleVerifier {
+pub struct VoleVerifier {
     /// correlations on verifier side. This should have length `l + SECURITY_PARAM`.
     pub(crate) q: Vec<[F8b; REPETITION_PARAM]>,
     /// Consistency check. TODO: update challenge appropriately!!
