@@ -68,3 +68,39 @@ fn prove_doesnt_explode() -> Result<()> {
 
     Ok(())
 }
+
+const SMALL_CIRCUIT: &str = "version 2.0.0;
+    circuit;
+    @type field 2;
+    @begin
+      $0 ... $4 <- @private(0);
+      $5 <- @add(0: $0, $0);
+      $6 <- @add(0: $0, $1);
+      $7 <- @add(0: $0, $2);
+      $8 <- @add(0: $0, $3);
+      $9 <- @add(0: $0, $4);
+      $10 <- @mul(0: $0, $5);
+      $11 <- @mul(0: $0, $6);
+      $12 <- @mul(0: $0, $7);
+      $13 <- @mul(0: $0, $8);
+      $14 <- @mul(0: $0, $9);
+    @end ";
+
+#[test]
+fn prove_works_on_slightly_larger_circuit() -> Result<()> {
+    let private_input_bytes = "version 2.0.0;
+        private_input;
+        @type field 2;
+        @begin
+            < 1 >;
+            < 1 >;
+            < 1 >;
+            < 0 >;
+            < 0 >;
+        @end ";
+
+    let (proof, mut small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes);
+    assert!(proof?.verify(&mut small_circuit, &mut transcript()).is_ok());
+
+    Ok(())
+}
