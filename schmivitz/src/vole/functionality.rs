@@ -161,12 +161,17 @@ pub(crate) fn create_vole_prover<Secret: AsSecretBytes>(
     // line 10
     let h_v = H1::from_bytes(&bits_to_u8_many(&v_tilda));
 
+    // Truncate `u` and `v`.
+    let (mut u_mut, mut v_mut) = (u, v);
+    u_mut.truncate(l + SECURITY_PARAM);
+    v_mut.truncate(l + SECURITY_PARAM);
+
     VoleProver {
         iv,
         decom,
         corrections,
-        u,
-        v,
+        u: u_mut,
+        v: v_mut,
         chall1,
         u_tilda,
         h_v,

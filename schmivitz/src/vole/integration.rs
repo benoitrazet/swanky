@@ -32,7 +32,7 @@ impl RandomVoleP for VoleProver {
         let vole = create_vole_prover(
             &statement_sig,
             secret,
-            extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM,
+            extended_witness_length,
         );
         let chall = vole.chall1;
         (vole, chall)

@@ -80,7 +80,7 @@ where
         // Update transcript with general public information
         transcript.append_public_values();
 
-        // Get a set of random VOLEs, one for each value in the extended witness
+        // Get a set of (l + SECURITY_PARAM) random VOLEs
         let (voles, _vole_challenge) =
             VoleP::create(witness.len(), transcript.as_mut(), &witness, rng);
 
