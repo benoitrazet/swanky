@@ -55,7 +55,6 @@ fn update_transcript(transcript: &mut Transcript, extended_witness_length: usize
 impl RandomVoleP for InsecureVole {
     type Decommitment = InsecureCommitments;
     type VoleChallenge = [u8; 16];
-    type VoleDecommitmentChallenge = [u8; 16];
 
     fn create<Secret: AsSecretBytes>(
         extended_witness_length: usize,

@@ -1,4 +1,4 @@
-use super::crypto_primitives::{CHALL1_LENGTH, CHALL3_LENGTH};
+use super::crypto_primitives::CHALL1_LENGTH;
 use super::functionality::{decommit, VoleVerifier};
 use super::{AsSecretBytes, Chall3, RandomVoleP, RandomVoleV};
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
@@ -17,8 +17,6 @@ impl RandomVoleP for VoleProver {
     type Decommitment = PartialDecommitment;
 
     type VoleChallenge = [u8; CHALL1_LENGTH];
-
-    type VoleDecommitmentChallenge = [u8; CHALL3_LENGTH];
 
     fn create<Secret: AsSecretBytes>(
         extended_witness_length: usize,

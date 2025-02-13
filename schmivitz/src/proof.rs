@@ -175,9 +175,6 @@ where
     pub fn verify<T>(&self, circuit: &mut T, transcript: &mut Transcript) -> Result<()>
     where
         T: Read + Seek + Clone,
-        // TODO: The way we store challenges has to change; this is a temporary fix.
-        <VoleP as RandomVoleP>::VoleChallenge: PartialEq<[u8; 16]>,
-        <VoleP as RandomVoleP>::VoleDecommitmentChallenge: PartialEq<[u8; 16]>,
     {
         let mut transcript = transcript::Transcript::from(transcript);
         transcript.append_public_values();

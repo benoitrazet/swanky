@@ -66,9 +66,6 @@ where
     /// Type of the challenge generated when creating the VOLEs.
     type VoleChallenge;
 
-    /// Type of the challenge generated when decommitting the VOLEs.
-    type VoleDecommitmentChallenge;
-
     /// Create a set of random VOLEs.
     ///
     /// This is particular to the protocol by Baum et al., so the total number of VOLEs created
