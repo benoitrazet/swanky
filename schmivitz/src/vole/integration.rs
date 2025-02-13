@@ -24,7 +24,7 @@ impl RandomVoleP for VoleProver {
         secret: &Secret,
         _rng: &mut (impl CryptoRng + RngCore),
     ) -> (Self, Self::VoleChallenge) {
-        let mut statement_sig = [0u8; 16];
+        let mut statement_sig = [0u8; SECURITY_PARAM];
         transcript.challenge_bytes(b"statement signature", &mut statement_sig);
 
         let vole = create_vole_prover(
@@ -91,7 +91,7 @@ impl RandomVoleV for VoleVerifier {
         chall3: &Chall3,
         transcript: &mut Transcript,
     ) -> Self {
-        let mut statement_sig = [0u8; 32];
+        let mut statement_sig = [0u8; SECURITY_PARAM];
         transcript.challenge_bytes(b"statement signature", &mut statement_sig);
 
         let verifier = create_vole_verifier(&statement_sig, decom, chall3);
