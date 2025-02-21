@@ -80,7 +80,7 @@ where
         // Update transcript with general public information
         transcript.append_public_values();
 
-        // Get a set of random VOLEs, one for each value in the extended witness
+        // Get a set of (l + SECURITY_PARAM) random VOLEs
         let (voles, _vole_challenge) =
             VoleP::create(witness.len(), transcript.as_mut(), &witness, rng);
 
@@ -175,16 +175,16 @@ where
     pub fn verify<T>(&self, circuit: &mut T, transcript: &mut Transcript) -> Result<()>
     where
         T: Read + Seek + Clone,
-        // TODO: The way we store challenges has to change; this is a temporary fix.
-        <VoleP as RandomVoleP>::VoleChallenge: PartialEq<[u8; 16]>,
-        <VoleP as RandomVoleP>::VoleDecommitmentChallenge: PartialEq<[u8; 16]>,
     {
         let mut transcript = transcript::Transcript::from(transcript);
         transcript.append_public_values();
 
         // Reconstruct VOLEs and update transcript with any necessary components.
-        let reconstructed_voles =
-            VoleV::reconstruct(&self.partial_decommitment, transcript.as_mut());
+        let reconstructed_voles = VoleV::reconstruct(
+            &self.partial_decommitment,
+            &self.decommitment_challenge,
+            transcript.as_mut(),
+        );
         self.validate_proof(&reconstructed_voles)?;
 
         // TODO:

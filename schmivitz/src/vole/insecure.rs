@@ -13,7 +13,7 @@ use rand::{CryptoRng, RngCore};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F8b, F2};
 
-use super::{AsSecretBytes, RandomVoleP, RandomVoleV};
+use super::{AsSecretBytes, Chall3, RandomVoleP, RandomVoleV};
 
 #[derive(Clone)]
 pub(crate) struct InsecureVole {
@@ -55,7 +55,6 @@ fn update_transcript(transcript: &mut Transcript, extended_witness_length: usize
 impl RandomVoleP for InsecureVole {
     type Decommitment = InsecureCommitments;
     type VoleChallenge = [u8; 16];
-    type VoleDecommitmentChallenge = [u8; 16];
 
     fn create<Secret: AsSecretBytes>(
         extended_witness_length: usize,
@@ -212,7 +211,11 @@ impl InsecureCommitments {
 impl RandomVoleV for InsecureCommitments {
     type Decommitment = InsecureCommitments;
 
-    fn reconstruct(decom: &Self::Decommitment, transcript: &mut Transcript) -> Self {
+    fn reconstruct(
+        decom: &Self::Decommitment,
+        _chall3: &Chall3,
+        transcript: &mut Transcript,
+    ) -> Self {
         // The output of this function is ignored since, in this insecure implementation,
         // it is not used for anything.
         update_transcript(transcript, decom.extended_witness_length);

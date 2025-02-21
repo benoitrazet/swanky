@@ -10,18 +10,17 @@ use crate::vole::commit_reconstruct::{
 use crate::vole::commit_reconstruct::{recompose_d, B};
 use crate::vole::consistency_check::{vole_hash, vole_hash_lockstep};
 use crate::vole::crypto_primitives::{Chall1, Chall2, Chall3, Com, Seed, H1, H3, IV};
-use sha3::{
-    digest::{ExtendableOutput, Update, XofReader},
-    Shake128,
-};
-use swanky_field::FiniteRing;
-use swanky_field_binary::F128b;
+use generic_array::typenum::U16;
+use generic_array::GenericArray;
+use sha3::{digest::Update, Shake128};
+use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F2;
+use swanky_field_binary::{F128b, F8b};
 
 use super::all_but_one_vc::Decom;
 use super::commit_reconstruct::compute_secret_key;
 use super::consistency_check::HashConsistency;
-use super::crypto_primitives::{h2_chall1, h2_chall3, CHALL2_LENGTH};
+use super::crypto_primitives::{h2_chall1, h2_chall3};
 use super::AsSecretBytes;
 
 /// Compute a seed and initialization vection from secret key and hash of
@@ -48,38 +47,6 @@ pub(crate) fn compute_seed_iv<Secret: AsSecretBytes>(secret: &Secret, mu: &H1) -
 /// Compute first challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
 pub(crate) fn compute_chall_1(mu: &H1, h_com: &Com, corrections: &Corrections, iv: &IV) -> Chall1 {
     h2_chall1(mu, h_com, corrections, iv)
-}
-
-/// Compute second challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
-pub(crate) fn compute_chall_2(
-    chall1: &Chall1,
-    u_tilda: HashConsistency,
-    h_v: H1,
-    masked_witnesses: &[F2],
-) -> Chall2 {
-    let mut out: Chall2 = [0u8; CHALL2_LENGTH];
-
-    let mut hasher = Shake128::default();
-    hasher.update(chall1);
-    hasher.update(u_tilda.pack_to_bytes().as_slice());
-    hasher.update(h_v.as_ref());
-
-    // pack the binary field values into bytes
-    for chunk in masked_witnesses.chunks(8) {
-        let mut byte = 0u8;
-        for (i, &b) in chunk.iter().enumerate() {
-            if b == F2::ONE {
-                byte |= 1 << i;
-            }
-        }
-        // TODO: for performance, accumulate the bytes in say 64 and hash that.
-        hasher.update(&[byte]);
-    }
-
-    hasher.update(&[2u8]);
-    let mut reader = hasher.finalize_xof();
-    reader.read(&mut out);
-    out
 }
 
 /// Compute third challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
@@ -111,7 +78,7 @@ fn bits_to_u8_many(bits: &[F2]) -> Vec<u8> {
 /// Structure of vole created by the functionality on the prover side.
 #[derive(Clone)]
 #[allow(unused)]
-pub(crate) struct VoleProver {
+pub struct VoleProver {
     /// initial vector
     pub(crate) iv: IV,
     /// Decommitment
@@ -128,6 +95,8 @@ pub(crate) struct VoleProver {
     pub(crate) u_tilda: HashConsistency,
     /// hash of the consistency hash of V
     pub(crate) h_v: H1,
+    /// Size of the extended witness.
+    l: usize,
 }
 
 /// Create VOLEs given a statement signature on the prover side.
@@ -192,24 +161,32 @@ pub(crate) fn create_vole_prover<Secret: AsSecretBytes>(
     // line 10
     let h_v = H1::from_bytes(&bits_to_u8_many(&v_tilda));
 
+    // Truncate `u` and `v`.
+    let (mut u_mut, mut v_mut) = (u, v);
+    u_mut.truncate(l + SECURITY_PARAM);
+    v_mut.truncate(l + SECURITY_PARAM);
+
     VoleProver {
         iv,
         decom,
         corrections,
-        u,
-        v,
+        u: u_mut,
+        v: v_mut,
         chall1,
         u_tilda,
         h_v,
+        l,
     }
 }
 
 /// Partial decommitment produced by the prover.
-pub(crate) struct PartialDecommitment {
+pub struct PartialDecommitment {
     pdecom: Vec<Pdecom>,
     corrections: Corrections,
     iv: IV,
     u_tilda: HashConsistency,
+    /// Size of extended witness. `ell` in the paper.
+    l: usize,
 }
 
 /// Implements get for the functionality on the prover side
@@ -224,19 +201,25 @@ pub(crate) fn decommit(vole: VoleProver, chall3: &Chall3) -> PartialDecommitment
         corrections: vole.corrections,
         iv: vole.iv,
         u_tilda: vole.u_tilda,
+        l: vole.l,
     }
 }
 
 /// Structure of VOLE created by the functionality on the verifier side.
 #[derive(Clone)]
-pub(crate) struct VoleVerifier {
-    /// correlations on verifier side
-    pub(crate) q: Vec<F128b>,
-    /// Second challenge
+pub struct VoleVerifier {
+    /// correlations on verifier side. This should have length `l + SECURITY_PARAM`.
+    pub(crate) q: Vec<[F8b; REPETITION_PARAM]>,
+    /// Consistency check. TODO: update challenge appropriately!!
     #[allow(unused)]
-    pub(crate) chall2: Chall2,
+    u_tilda: HashConsistency,
+    /// Consistency check. TODO: update challenge appropriately!!
+    #[allow(unused)]
+    h_v: H1,
     /// secret key
-    pub(crate) delta: F128b,
+    pub(crate) delta: GenericArray<F8b, U16>,
+    /// Size of extended witness. `ell` in the paper.
+    pub(crate) l: usize,
 }
 
 /// Create VOLEs given a statement signature and a proof, on the verifier side.
@@ -247,9 +230,7 @@ pub(crate) struct VoleVerifier {
 pub(crate) fn create_vole_verifier(
     statement_sig: &[u8],
     decommitment_prover: &PartialDecommitment,
-    d: &[F2],
     chall3: &Chall3,
-    l: usize,
 ) -> VoleVerifier {
     // line 1
     let PartialDecommitment {
@@ -257,6 +238,7 @@ pub(crate) fn create_vole_verifier(
         u_tilda,
         pdecom,
         iv,
+        l,
     } = decommitment_prover;
 
     // line 2
@@ -264,7 +246,7 @@ pub(crate) fn create_vole_verifier(
 
     // lines 3-4
     let t = std::time::Instant::now();
-    let (h, q) = vole_reconstruct(chall3, pdecom, *iv, l_hat(l));
+    let (h, q) = vole_reconstruct(chall3, pdecom, *iv, l_hat(*l));
     log::info!("vole_reconstruct running time: {:?}", t.elapsed());
 
     // line 5
@@ -272,12 +254,11 @@ pub(crate) fn create_vole_verifier(
 
     // lines 6-14
     let t = std::time::Instant::now();
-    let q_f128b = apply_corrections_to_q(
-        q,
-        chall3,
-        corrections,
-        l_hat(l), /* TODO: unsure about this value*/
-    );
+    let q_f8arrs = apply_corrections_to_q(q, chall3, corrections, l_hat(*l));
+    let q_f128b: Vec<F128b> = q_f8arrs
+        .iter()
+        .map(|qi| F8b::form_superfield(qi.into()))
+        .collect();
     log::info!("apply_corrections_to_q running time: {:?}", t.elapsed());
 
     // line 15
@@ -287,7 +268,7 @@ pub(crate) fn create_vole_verifier(
     let tmp = vole_hash_lockstep(
         &chall1,
         &q_f128b[0..l + SECURITY_PARAM],
-        &q_f128b[l + SECURITY_PARAM..l_hat(l)],
+        &q_f128b[l + SECURITY_PARAM..l_hat(*l)],
     );
     for newt in tmp {
         q_tilda.extend(newt.0);
@@ -312,16 +293,19 @@ pub(crate) fn create_vole_verifier(
 
     let h_v = H1::from_bytes(&bits_to_u8_many(&q_xor_d));
 
-    // line 17
-    let chall2 = compute_chall_2(&chall1, *u_tilda, h_v, d);
-
-    // compute the secret key
+    // compute the secret key (AESVerify, line 1)
     let delta = compute_secret_key(chall3);
 
+    // Truncate the qs (part of line 19)
+    let mut q = q_f8arrs;
+    q.truncate(l + SECURITY_PARAM);
+
     VoleVerifier {
-        q: q_f128b,
-        chall2,
+        q,
+        u_tilda: *u_tilda,
+        h_v,
         delta,
+        l: *l,
     }
 }
 
@@ -338,14 +322,50 @@ pub(crate) fn verify(chall3: &Chall3, chall2: Chall2, a_tilda: F128b, b_tilda: F
 mod test {
     use std::iter::repeat_with;
 
-    use super::{create_vole_prover, create_vole_verifier, decommit, verify, VoleVerifier};
-    use crate::vole::functionality::compute_chall_2;
+    use super::{create_vole_prover, create_vole_verifier, decommit, verify};
+    use super::{Chall1, Chall2, HashConsistency, H1};
+    use crate::parameters::SECURITY_PARAM;
+    use crate::vole::crypto_primitives::CHALL2_LENGTH;
     use crate::vole::functionality::compute_chall_3;
     use rand::thread_rng;
-    use swanky_field::FiniteRing;
+    use sha3::digest::{ExtendableOutput, Update, XofReader};
+    use sha3::Shake128;
+    use swanky_field::{FiniteRing, IsSubFieldOf};
     use swanky_field_binary::F2;
     use swanky_field_binary::{F128b, F8b};
     use swanky_serialization::CanonicalSerialize;
+
+    /// Compute second challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
+    pub(crate) fn compute_chall_2(
+        chall1: &Chall1,
+        u_tilda: HashConsistency,
+        h_v: H1,
+        masked_witnesses: &[F2],
+    ) -> Chall2 {
+        let mut out: Chall2 = [0u8; CHALL2_LENGTH];
+
+        let mut hasher = Shake128::default();
+        hasher.update(chall1);
+        hasher.update(u_tilda.pack_to_bytes().as_slice());
+        hasher.update(h_v.as_ref());
+
+        // pack the binary field values into bytes
+        for chunk in masked_witnesses.chunks(8) {
+            let mut byte = 0u8;
+            for (i, &b) in chunk.iter().enumerate() {
+                if b == F2::ONE {
+                    byte |= 1 << i;
+                }
+            }
+            // TODO: for performance, accumulate the bytes in say 64 and hash that.
+            hasher.update(&[byte]);
+        }
+
+        hasher.update(&[2u8]);
+        let mut reader = hasher.finalize_xof();
+        reader.read(&mut out);
+        out
+    }
 
     fn test_vole_prover_and_verifier(how_many: usize) {
         let rng = &mut thread_rng();
@@ -373,21 +393,20 @@ mod test {
         let chall3 = compute_chall_3(&chall2, dummy_a_tilda, dummy_b_tilda);
         let decommitment_prover = decommit(vole_prover, &chall3);
 
-        let VoleVerifier {
-            q,
-            chall2: chall2_verifier,
-            delta,
-        } = create_vole_verifier(
-            &statement_sig,
-            &decommitment_prover,
-            &dummy_masked,
-            &chall3,
-            how_many,
-        );
-        let b = verify(&chall3, chall2_verifier, dummy_a_tilda, dummy_b_tilda);
+        let vole_v = create_vole_verifier(&statement_sig, &decommitment_prover, &chall3);
 
+        assert_eq!(vole_v.q.len(), vole_v.l + SECURITY_PARAM);
+
+        let b = verify(&chall3, chall2, dummy_a_tilda, dummy_b_tilda);
+
+        let delta_lifted: F128b = F8b::form_superfield(&vole_v.delta);
+        let q_lifted: Vec<F128b> = vole_v
+            .q
+            .iter()
+            .map(|qi| F8b::form_superfield(qi.into()))
+            .collect();
         for pos in 0..how_many {
-            assert_eq!(v[pos] + u[pos] * delta, q[pos]);
+            assert_eq!(v[pos] + u[pos] * delta_lifted, q_lifted[pos]);
         }
 
         assert!(b);

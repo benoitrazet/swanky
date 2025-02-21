@@ -7,6 +7,7 @@
 
 pub(crate) mod insecure;
 
+use crypto_primitives::Chall3;
 use eyre::Result;
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
@@ -64,9 +65,6 @@ where
 
     /// Type of the challenge generated when creating the VOLEs.
     type VoleChallenge;
-
-    /// Type of the challenge generated when decommitting the VOLEs.
-    type VoleDecommitmentChallenge;
 
     /// Create a set of random VOLEs.
     ///
@@ -174,7 +172,11 @@ pub trait RandomVoleV {
     /// any checks, corrections, challenge evaluations, and any other details
     /// that need to happen before the VOLE key ∆ and the VOLE value tags `Q`
     /// are computed.
-    fn reconstruct(decom: &Self::Decommitment, transcript: &mut Transcript) -> Self;
+    fn reconstruct(
+        decom: &Self::Decommitment,
+        chall3: &Chall3,
+        transcript: &mut Transcript,
+    ) -> Self;
 
     /// Get the length of the extended witness.
     fn extended_witness_length(&self) -> usize;

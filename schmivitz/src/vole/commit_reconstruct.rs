@@ -7,13 +7,10 @@ use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::all_but_one_vc::{commit, open, reconstruct, Decom, Pdecom};
 use crate::vole::convert_to_vole::{convert_to_vole, convert_to_vole_verifier};
 use crate::vole::crypto_primitives::{Chall3, Com, H1, H1_LENGTH, IV, PRG};
-use std::sync::mpsc::channel;
-use std::thread;
-use swanky_field::FiniteRing;
-use swanky_field::IsSubFieldOf;
-use swanky_field_binary::F128b;
-use swanky_field_binary::F8b;
-use swanky_field_binary::F2;
+use generic_array::{arr, typenum::U16, GenericArray};
+use std::{sync::mpsc::channel, thread};
+use swanky_field::{FiniteRing, IsSubFieldOf};
+use swanky_field_binary::{F128b, F8b, F2};
 use swanky_serialization::CanonicalSerialize;
 
 use super::consistency_check::HashConsistency;
@@ -65,7 +62,7 @@ pub(crate) struct Commit {
 /// This corresponds to Figure 5.4 of the FAEST spec.
 /// This function relies on multithreading to improve the time performance.
 #[inline(never)]
-pub(crate) fn vole_commit(r: IV, iv: IV, l: usize) -> Commit {
+pub(crate) fn vole_commit(r: IV, iv: IV, l_hat: usize) -> Commit {
     let prg_seeds = PRG::new(r, iv).generate_prg_seeds(REPETITION_PARAM);
     let mut u = Vec::with_capacity(REPETITION_PARAM);
     let mut v = Vec::with_capacity(REPETITION_PARAM);
@@ -100,7 +97,7 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l: usize) -> Commit {
         let prg_seeds_i = prg_seeds[i];
         let handle = thread::spawn(move || {
             let (com_i, decom_i, seeds) = commit(prg_seeds_i, iv, 8);
-            let (u_i, v_i) = convert_to_vole(&seeds, iv, l, true);
+            let (u_i, v_i) = convert_to_vole(&seeds, iv, l_hat, true);
 
             tx.send((com_i, decom_i, u_i, v_i)).unwrap();
         });
@@ -125,10 +122,10 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l: usize) -> Commit {
     let u_0 = u[0].clone(); // TODO: opt transmute here
     let mut corr: [Vec<F2>; REPETITION_PARAM - 1] = Default::default();
     for i in 1..REPETITION_PARAM {
-        let mut ci = Vec::with_capacity(l);
-        debug_assert_eq!(l, u_0.len());
+        let mut ci = Vec::with_capacity(l_hat);
+        debug_assert_eq!(l_hat, u_0.len());
         let u_i = &u[i];
-        for j in 0..l {
+        for j in 0..l_hat {
             let c = u_0[j] + u_i[j];
             ci.push(c);
         }
@@ -139,13 +136,13 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l: usize) -> Commit {
 
     // Convert Vec<Vec<F8b>> to Vec<F128b> where the size of the outer vec in Vec<Vec<F8b>> is `REPETITION_PARAM`.
     let t = std::time::Instant::now();
-    let mut v_out = Vec::with_capacity(l);
-    let mut tmp = [0u8; REPETITION_PARAM];
-    for i in 0..l {
+    let mut v_out = Vec::with_capacity(l_hat);
+    let mut tmp = [F8b::ZERO; REPETITION_PARAM];
+    for i in 0..l_hat {
         for tau in 0..REPETITION_PARAM {
-            tmp[tau] = v[tau][i].to_bytes()[0];
+            tmp[tau] = v[tau][i];
         }
-        v_out.push(F128b::from_bytes((&tmp).into()).unwrap());
+        v_out.push(F8b::form_superfield(&tmp.into()));
     }
     log::info!("pack to F128b running time: {:?}", t.elapsed());
 
@@ -192,13 +189,14 @@ pub(crate) fn vole_open(chal: &[u8], decom: &[Decom]) -> Vec<Pdecom> {
 
 /// Function to reconstruct voles from a challenge and partial decommitments.
 ///
-/// This implements Figure 5.5 in FAEST spec v1.1
+/// This implements Figure 5.5 in FAEST spec v1.1. The parameter `k_b` in that
+/// spec is always our [`parameters::VOLE_SIZE_PARAM`].
 #[inline(never)]
 pub(crate) fn vole_reconstruct(
     chal: &[u8], // bytes from fiat-shamir challenge
     pdecom: &[Pdecom],
     iv: IV,
-    l: usize,
+    l_hat: usize,
 ) -> (Com, Vec<Vec<F8b>>) {
     assert_eq!(pdecom.len(), REPETITION_PARAM);
     assert_eq!(chal.len(), REPETITION_PARAM);
@@ -234,7 +232,7 @@ pub(crate) fn vole_reconstruct(
 
         let tx = txs[i].clone();
         let handle = thread::spawn(move || {
-            let q_i = convert_to_vole_verifier(&seeds, iv, l, bools_to_u8(&delta));
+            let q_i = convert_to_vole_verifier(&seeds, iv, l_hat, bools_to_u8(&delta));
             tx.send(q_i).unwrap();
         });
         handles.push(handle);
@@ -252,40 +250,32 @@ pub(crate) fn vole_reconstruct(
     (h_com, qs)
 }
 
-/// Function converting a slice of [`F8b`] values into a [`F128b`] value using the underlying bits.
-///
-/// This function is only used when applying the corrections to Q where the underlying values are
-/// in `F8b`, but to reconstruct the values in `F128b`, the `F8b` are interpreted as bytes.
-fn bitwise_f128b_from_f8b(v: &[F8b; REPETITION_PARAM]) -> F128b {
-    let mut tmp: [u8; REPETITION_PARAM] = [0; REPETITION_PARAM];
-    for (i, b) in v.iter().enumerate() {
-        tmp[i] = b.to_bytes()[0];
-    }
-    F128b::from_bytes(&tmp.into()).unwrap()
-}
-
 // Compute the secret key delta from a challenge
-pub(crate) fn compute_secret_key(chall3: &Chall3) -> F128b {
+pub(crate) fn compute_secret_key(chall3: &Chall3) -> GenericArray<F8b, U16> {
     // compute the big delta
-    let mut big_delta = [u8::default(); REPETITION_PARAM];
-    for tau in 0..REPETITION_PARAM {
-        let delta_i = chal_dec(chall3, tau);
-        big_delta[tau] = bools_to_u8(&delta_i);
-    }
-    // safe to unwrap here be the dimensions of arrays match.
-    F128b::from_bytes(&big_delta.into()).unwrap()
+    (0..REPETITION_PARAM)
+        .map(|tau| {
+            let delta_i = chal_dec(chall3, tau);
+            F8b::from_bytes(&arr![bools_to_u8(&delta_i)])
+        })
+        .collect::<Result<GenericArray<F8b, U16>, _>>()
+        .unwrap()
 }
 
 /// This function applies corrections to the verifier part of voles `q` using a challenge.
 ///
 /// This function implements Lines 7-14 of Figure 8.3 of the FAEST spec.
+/// `how_many` must be $`\hat \ell = \ell + B + 2\lambda`$.
 #[inline(never)]
 pub(crate) fn apply_corrections_to_q(
     q: Vec<Vec<F8b>>,
     chall3: &Chall3,
     corrections: &Corrections,
     how_many: usize,
-) -> Vec<F128b> {
+) -> Vec<[F8b; REPETITION_PARAM]> {
+    // Dimensions of `q`: \tau x l_hat x r = 16 x l_hat x 8.
+    debug_assert!(q.len() == REPETITION_PARAM && q[0].len() == how_many);
+
     // Q_0 is the same
     // Change Q_i with the corrections:
     // loop Q_i xor (\delta_0 c_i ... \delta_7 c_7)
@@ -297,27 +287,28 @@ pub(crate) fn apply_corrections_to_q(
     for pos in 0..how_many {
         qs[pos][0] = q[0][pos];
     }
+
+    // Apply the corrections. This also transposes the output relative to `q`.
     for tau in 1..REPETITION_PARAM {
-        let delta = chal_dec(chall3, tau);
+        // Get challenge, and convert bools into `F2`. The unwrap should be safe because `chal_dec`
+        // is supposed to return an 8-bit decomposition.
+        let delta: [F2; 8] = chal_dec(chall3, tau)
+            .into_iter()
+            .map(F2::from)
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
 
         for pos in 0..how_many {
             let c_tau = corrections.0[tau - 1][pos];
-            let mut delta_times_corr = [F2::default(); 8];
-            for (i, d) in delta.iter().enumerate() {
-                let corr = F2::from(*d) * c_tau; // TODO: optimize this
-                delta_times_corr[i] = corr;
-            }
+
+            let delta_times_corr = delta.map(|d_i| d_i * c_tau);
             let delta_times_corr_f8b: F8b = F2::form_superfield(&delta_times_corr.into());
+
             qs[pos][tau] = q[tau][pos] + delta_times_corr_f8b;
         }
     }
-
-    let mut q_128b: Vec<F128b> = Vec::with_capacity(how_many);
-    for pos in 0..how_many {
-        let val = bitwise_f128b_from_f8b(&qs[pos]);
-        q_128b.push(val);
-    }
-    q_128b
+    qs
 }
 
 /// This function combines a challenge with the hash of `u` to be used for the consistency check by the verifier.
@@ -346,6 +337,8 @@ pub(crate) fn recompose_d(chall3: &Chall3, u_tilda: &HashConsistency) -> Vec<F2>
     qs
 }
 
+/// Extended witness padded to support the protocol: $`\ell + B + 2\lambda`$.
+///
 /// This function takes the size of the extended witness as input and returns
 /// that many more elements necessary based on the parameters of the protocol.
 pub(crate) fn l_hat(l: usize) -> usize {
@@ -382,43 +375,14 @@ mod test {
     use std::iter::repeat_with;
 
     use super::{
-        apply_corrections_to_q, bitwise_f128b_from_f8b, bools_to_u8, chal_dec, compute_secret_key,
-        l_hat, vole_commit, vole_open, vole_reconstruct, Commit,
+        apply_corrections_to_q, compute_secret_key, l_hat, vole_commit, vole_open,
+        vole_reconstruct, Commit,
     };
-    use crate::parameters::REPETITION_PARAM;
     use crate::vole::crypto_primitives::H1;
     use crate::vole::functionality::compute_seed_iv;
     use rand::thread_rng;
-    use swanky_field::FiniteRing;
-    use swanky_field_binary::{F8b, F2};
-    use swanky_serialization::CanonicalSerialize;
-
-    #[test]
-    fn test_bitwise_f128b_from_f8b() {
-        let values: [u8; REPETITION_PARAM] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-
-        let mut values_f8b = [F8b::ZERO; REPETITION_PARAM];
-        for i in 0..REPETITION_PARAM {
-            values_f8b[i] = F8b::from_bytes(&[values[i]].into()).unwrap();
-        }
-
-        let f = bitwise_f128b_from_f8b(&values_f8b);
-        let bytes = f.to_bytes();
-        for i in 0..REPETITION_PARAM {
-            assert_eq!(bytes[i], values[i]);
-        }
-    }
-
-    #[test]
-    fn test_compute_secret_key_and_chall_dec() {
-        let chall3 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-        let secret_key = compute_secret_key(&chall3);
-
-        let bytes_secret_key = secret_key.to_bytes();
-        for i in 0..REPETITION_PARAM {
-            assert_eq!(bytes_secret_key[i], bools_to_u8(&chal_dec(&chall3, i)));
-        }
-    }
+    use swanky_field::{FiniteRing, IsSubFieldOf};
+    use swanky_field_binary::{F128b, F8b, F2};
 
     #[test]
     fn test_vole_commit_reconstruct() {
@@ -453,11 +417,15 @@ mod test {
         let q_f128b = apply_corrections_to_q(q, &chall3, &corrections, how_many);
 
         // compute the big delta
-        let big_delta_f128b = compute_secret_key(&chall3);
+        let big_delta = compute_secret_key(&chall3);
+        let big_delta_f128b: F128b = F8b::form_superfield(&big_delta);
 
         for pos in 0..how_many {
             //assert_eq!(v_f128b[pos], q_f128b[pos]);
-            assert_eq!(v[pos] + u[pos] * big_delta_f128b, q_f128b[pos]);
+            assert_eq!(
+                v[pos] + u[pos] * big_delta_f128b,
+                F8b::form_superfield(&q_f128b[pos].into())
+            );
         }
     }
 }
