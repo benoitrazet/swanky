@@ -99,7 +99,7 @@ fn to_field_f128_and_pad_lockstep(x: &[F128b]) -> Vec<[F128b; SECURITY_PARAM]> {
 }
 
 /// Hash as produced by [`vole_hash`].
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub(crate) struct HashConsistency(pub(crate) [F2; SECURITY_PARAM + B]);
 
@@ -126,6 +126,11 @@ impl HashConsistency {
             out.push(byte);
         }
         out
+    }
+
+    /// Convert a [`HashConsistency`] to a list of bytes, without packing.
+    pub(crate) fn as_bytes(&self) -> [u8; SECURITY_PARAM + B] {
+        self.0.map(|f2| f2.to_bytes()[0])
     }
 }
 

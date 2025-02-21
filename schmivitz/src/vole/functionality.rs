@@ -210,8 +210,7 @@ pub(crate) fn decommit(vole: VoleProver, chall3: &Chall3) -> PartialDecommitment
 pub struct VoleVerifier {
     /// correlations on verifier side. This should have length `l + SECURITY_PARAM`.
     pub(crate) q: Vec<[F8b; REPETITION_PARAM]>,
-    /// Consistency check. TODO: update challenge appropriately!!
-    #[allow(unused)]
+    /// Consistency check.
     u_tilda: HashConsistency,
     /// Consistency check. TODO: update challenge appropriately!!
     #[allow(unused)]
@@ -220,6 +219,12 @@ pub struct VoleVerifier {
     pub(crate) delta: GenericArray<F8b, U16>,
     /// Size of extended witness. `ell` in the paper.
     pub(crate) l: usize,
+}
+
+impl VoleVerifier {
+    pub(crate) fn u_tilda(&self) -> &HashConsistency {
+        &self.u_tilda
+    }
 }
 
 /// Create VOLEs given a statement signature and a proof, on the verifier side.
