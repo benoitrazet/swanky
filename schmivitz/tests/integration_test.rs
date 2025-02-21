@@ -3,7 +3,10 @@ use std::{fs::File, io::Cursor};
 use eyre::Result;
 use merlin::Transcript;
 use rand::thread_rng;
-use schmivitz::{vole::functionality::{VoleProver, VoleVerifier}, Proof};
+use schmivitz::{
+    vole::functionality::{VoleProver, VoleVerifier},
+    Proof,
+};
 use std::io::Write;
 use tempfile::tempdir;
 
@@ -59,12 +62,7 @@ fn prove_doesnt_explode() -> Result<()> {
 
     let (proof, mut mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
     let verif = proof?.verify(&mut mini_circuit, &mut transcript());
-
-    let failed = match verif {
-        Ok(_) => { println!("yay!"); true} ,
-        Err(ohno) => {println!("{}", ohno); false},
-    };
-    assert!(failed);
+    assert!(verif.is_ok());
 
     Ok(())
 }

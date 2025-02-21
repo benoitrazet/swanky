@@ -27,11 +27,7 @@ impl RandomVoleP for VoleProver {
         let mut statement_sig = [0u8; SECURITY_PARAM];
         transcript.challenge_bytes(b"statement signature", &mut statement_sig);
 
-        let vole = create_vole_prover(
-            &statement_sig,
-            secret,
-            extended_witness_length,
-        );
+        let vole = create_vole_prover(&statement_sig, secret, extended_witness_length);
         let chall = vole.chall1;
         (vole, chall)
     }
