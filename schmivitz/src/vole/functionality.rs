@@ -153,7 +153,7 @@ pub(crate) fn create_vole_prover<Secret: AsSecretBytes>(
         &v[l + SECURITY_PARAM..l_hat(l)],
     );
     for newt in tmp {
-        v_tilda.extend(newt.0);
+        v_tilda.extend(&newt);
     }
     assert_eq!(v_tilda.len(), (SECURITY_PARAM + B) * SECURITY_PARAM);
     log::info!("vole_hash(V) running time: {:?}", t.elapsed());
@@ -276,7 +276,7 @@ pub(crate) fn create_vole_verifier(
         &q_f128b[l + SECURITY_PARAM..l_hat(*l)],
     );
     for newt in tmp {
-        q_tilda.extend(newt.0);
+        q_tilda.extend(&newt);
     }
     assert_eq!(q_tilda.len(), (SECURITY_PARAM + B) * SECURITY_PARAM);
 

@@ -316,19 +316,17 @@ pub(crate) fn apply_corrections_to_q(
 /// This function implements lines 8-11 in Fig 8.3 in the FAEST spec.
 #[inline(never)]
 pub(crate) fn recompose_d(chall3: &Chall3, u_tilda: &HashConsistency) -> Vec<F2> {
-    assert_eq!(u_tilda.0.len(), SECURITY_PARAM + B);
-    let how_many = u_tilda.0.len();
+    assert_eq!(u_tilda.len(), SECURITY_PARAM + B);
+    let how_many = u_tilda.len();
     let mut qs = Vec::with_capacity(how_many * REPETITION_PARAM * 8);
 
-    for tau in 0..REPETITION_PARAM {
-        let delta = chal_dec(chall3, tau);
-        let delta_f2: Vec<_> = delta
-            .iter()
-            .map(|b| if *b { F2::ONE } else { F2::ZERO })
-            .collect();
+    for i in 0..REPETITION_PARAM {
+        // Length of this must be $r$ = `VOLE_SIZE_PARAM`.
+        let delta = chal_dec(chall3, i);
+        let delta_f2: Vec<_> = delta.iter().map(|b| F2::from(*b)).collect();
         for b in delta_f2 {
-            for u in u_tilda.0.iter() {
-                qs.push(b * *u);
+            for u in u_tilda.into_iter() {
+                qs.push(b * u);
             }
         }
     }

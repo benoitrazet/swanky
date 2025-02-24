@@ -101,7 +101,7 @@ fn to_field_f128_and_pad_lockstep(x: &[F128b]) -> Vec<[F128b; SECURITY_PARAM]> {
 /// Hash as produced by [`vole_hash`].
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
-pub(crate) struct HashConsistency(pub(crate) [F2; SECURITY_PARAM + B]);
+pub(crate) struct HashConsistency([F2; SECURITY_PARAM + B]);
 
 impl Default for HashConsistency {
     fn default() -> Self {
@@ -109,7 +109,20 @@ impl Default for HashConsistency {
     }
 }
 
+impl IntoIterator for &HashConsistency {
+    type Item = F2;
+    type IntoIter = <[F2; SECURITY_PARAM + B] as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 impl HashConsistency {
+    pub(crate) fn len(&self) -> usize {
+        SECURITY_PARAM + B
+    }
+
     /// Convert a consistency hash to a vector of bytes
     ///
     /// packing the `F2` values in `u8`.
