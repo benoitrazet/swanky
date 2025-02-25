@@ -162,16 +162,22 @@ pub(crate) fn create_vole_prover<Secret: AsSecretBytes>(
     let h_v = H1::from_bytes(&bits_to_u8_many(&v_tilda));
 
     // Truncate `u` and `v`.
-    let (mut u_mut, mut v_mut) = (u, v);
+    let mut u_mut = u;
     u_mut.truncate(l + SECURITY_PARAM);
-    v_mut.truncate(l + SECURITY_PARAM);
+
+    // Line 16 and FAEST.AES.AESProve Line 2.
+    let v_lifted = v
+        .into_iter()
+        .take(l + SECURITY_PARAM)
+        .map(|vi| F8b::form_superfield(&vi.into()))
+        .collect();
 
     VoleProver {
         iv,
         decom,
         corrections,
         u: u_mut,
-        v: v_mut,
+        v: v_lifted,
         chall1,
         u_tilda,
         h_v,
@@ -225,6 +231,9 @@ impl VoleVerifier {
     pub(crate) fn u_tilda(&self) -> &HashConsistency {
         &self.u_tilda
     }
+    pub(crate) fn h_v(&self) -> &H1 {
+        &self.h_v
+    }
 }
 
 /// Create VOLEs given a statement signature and a proof, on the verifier side.
@@ -260,10 +269,6 @@ pub(crate) fn create_vole_verifier(
     // lines 6-14
     let t = std::time::Instant::now();
     let q_f8arrs = apply_corrections_to_q(q, chall3, corrections, l_hat(*l));
-    let q_f128b: Vec<F128b> = q_f8arrs
-        .iter()
-        .map(|qi| F8b::form_superfield(qi.into()))
-        .collect();
     log::info!("apply_corrections_to_q running time: {:?}", t.elapsed());
 
     // line 15
@@ -272,8 +277,8 @@ pub(crate) fn create_vole_verifier(
     let mut q_tilda: Vec<F2> = Vec::with_capacity((SECURITY_PARAM + B) * SECURITY_PARAM);
     let tmp = vole_hash_lockstep(
         &chall1,
-        &q_f128b[0..l + SECURITY_PARAM],
-        &q_f128b[l + SECURITY_PARAM..l_hat(*l)],
+        &q_f8arrs[0..l + SECURITY_PARAM],
+        &q_f8arrs[l + SECURITY_PARAM..l_hat(*l)],
     );
     for newt in tmp {
         q_tilda.extend(&newt);

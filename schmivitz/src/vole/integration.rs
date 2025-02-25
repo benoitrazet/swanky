@@ -32,6 +32,7 @@ impl RandomVoleP for VoleProver {
 
         // Part of line 13.
         transcript.append_message(b"u_tilda", &vole.u_tilda.as_bytes());
+        transcript.append_message(b"h_V", vole.h_v.as_ref());
 
         (vole, chall)
     }
@@ -98,6 +99,7 @@ impl RandomVoleV for VoleVerifier {
         assert_eq!(verifier.q.len(), verifier.l + SECURITY_PARAM);
 
         transcript.append_message(b"u_tilda", &verifier.u_tilda().as_bytes());
+        transcript.append_message(b"h_V", verifier.h_v().as_ref());
 
         verifier
     }
