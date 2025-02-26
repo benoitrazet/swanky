@@ -48,7 +48,6 @@ pub(crate) struct VerifierTraverser {
 }
 
 impl VerifierTraverser {
-    #[allow(unused)]
     pub(crate) fn new(
         challenges: Vec<F128b>,
         verifier_key: F128b,

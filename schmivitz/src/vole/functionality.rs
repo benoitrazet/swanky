@@ -3,25 +3,22 @@ Implement high-level functionality for VOLE protocol.
 */
 #![allow(clippy::needless_range_loop)]
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
-use crate::vole::all_but_one_vc::Pdecom;
+use crate::vole::all_but_one_vc::{Decom, Pdecom};
 use crate::vole::commit_reconstruct::{
     apply_corrections_to_q, l_hat, vole_commit, vole_open, vole_reconstruct, Commit, Corrections,
 };
-use crate::vole::commit_reconstruct::{recompose_d, B};
-use crate::vole::consistency_check::{vole_hash, vole_hash_lockstep};
-use crate::vole::crypto_primitives::{Chall1, Chall2, Chall3, Com, Seed, H1, H3, IV};
+use crate::vole::commit_reconstruct::{compute_secret_key, recompose_d, B};
+use crate::vole::consistency_check::{vole_hash, vole_hash_lockstep, HashConsistency};
+use crate::vole::crypto_primitives::{h2_chall1, Chall1, Chall3, Com, Seed, H1, H3, IV};
+use crate::vole::AsSecretBytes;
 use generic_array::typenum::U16;
 use generic_array::GenericArray;
 use sha3::{digest::Update, Shake128};
 use swanky_field::{FiniteRing, IsSubFieldOf};
-use swanky_field_binary::F2;
-use swanky_field_binary::{F128b, F8b};
+use swanky_field_binary::{F128b, F8b, F2};
 
-use super::all_but_one_vc::Decom;
-use super::commit_reconstruct::compute_secret_key;
-use super::consistency_check::HashConsistency;
-use super::crypto_primitives::{h2_chall1, h2_chall3};
-use super::AsSecretBytes;
+#[cfg(test)]
+use crate::vole::crypto_primitives::{h2_chall3, Chall2};
 
 /// Compute a seed and initialization vection from secret key and hash of
 /// statement to prove.
@@ -50,6 +47,7 @@ pub(crate) fn compute_chall_1(mu: &H1, h_com: &Com, corrections: &Corrections, i
 }
 
 /// Compute third challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
+#[cfg(test)]
 pub(crate) fn compute_chall_3(chall2: &Chall2, a_tilda: F128b, b_tilda: F128b) -> Chall3 {
     h2_chall3(chall2, &a_tilda, &b_tilda)
 }
@@ -77,7 +75,6 @@ fn bits_to_u8_many(bits: &[F2]) -> Vec<u8> {
 
 /// Structure of vole created by the functionality on the prover side.
 #[derive(Clone)]
-#[allow(unused)]
 pub struct VoleProver {
     /// initial vector
     pub(crate) iv: IV,
@@ -103,7 +100,6 @@ pub struct VoleProver {
 ///
 /// Adapted from parts of FAEST.sign from Fig. 8.2
 #[inline(never)]
-#[allow(unused)]
 pub(crate) fn create_vole_prover<Secret: AsSecretBytes>(
     statement_sig: &[u8],
     secret: &Secret,
@@ -196,7 +192,6 @@ pub struct PartialDecommitment {
 }
 
 /// Implements get for the functionality on the prover side
-#[allow(unused)]
 pub(crate) fn decommit(vole: VoleProver, chall3: &Chall3) -> PartialDecommitment {
     let t = std::time::Instant::now();
     let pdecom = vole_open(chall3, &vole.decom);
@@ -219,7 +214,6 @@ pub struct VoleVerifier {
     /// Consistency check.
     u_tilda: HashConsistency,
     /// Consistency check. TODO: update challenge appropriately!!
-    #[allow(unused)]
     h_v: H1,
     /// secret key
     pub(crate) delta: GenericArray<F8b, U16>,
@@ -240,7 +234,6 @@ impl VoleVerifier {
 ///
 /// Adapted from parts of FAEST.verify from Fig. 8.2
 #[inline(never)]
-#[allow(unused)]
 pub(crate) fn create_vole_verifier(
     statement_sig: &[u8],
     decommitment_prover: &PartialDecommitment,
@@ -320,7 +313,7 @@ pub(crate) fn create_vole_verifier(
 }
 
 /// Adpation of FAEST Verify function Fig. 8.3
-#[allow(unused)]
+#[cfg(test)]
 pub(crate) fn verify(chall3: &Chall3, chall2: Chall2, a_tilda: F128b, b_tilda: F128b) -> bool {
     // Line 20
     let chall3_prime = compute_chall_3(&chall2, a_tilda, b_tilda);

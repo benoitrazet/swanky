@@ -58,7 +58,6 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
     ///   be no greater than the length of the extended witness (as defined by the [`RandomVole`]);
     /// - The [`RandomVole::extended_witness_length()`] must be large enough to have a VOLE
     ///   corresponding to every gate in the extended witness.
-    #[allow(unused)]
     pub(crate) fn new(
         wire_values: HashMap<WireId, F2>,
         challenges: Vec<F128b>,

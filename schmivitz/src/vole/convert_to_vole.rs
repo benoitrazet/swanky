@@ -3,8 +3,6 @@ Convert vector commitments to VOLEs.
 */
 #![allow(clippy::needless_range_loop)]
 use crate::vole::crypto_primitives::{Seed, IV, PRG};
-#[allow(unused_imports)]
-// WEIRD: rust-analyzer seems to consider `FiniteRing`, but without it, it is not possible to use ZERO/ONE etc.
 use swanky_field_binary::F8b;
 use swanky_field_binary::F2;
 use swanky_serialization::CanonicalSerialize;

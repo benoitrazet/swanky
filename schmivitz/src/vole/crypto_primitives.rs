@@ -290,6 +290,7 @@ pub(crate) type Chall3 = [u8; CHALL3_LENGTH];
 /// Makes the third Fiat-Shamir challenge.
 ///
 /// This computes `$H_2^3$` in FAEST spec.
+#[allow(unused)]
 pub(crate) fn h2_chall3(chall2: &Chall2, a_tilde: &F128b, b_tilde: &F128b) -> Chall3 {
     let mut hasher = H2Hasher::default();
 
