@@ -79,7 +79,7 @@ where
     /// any public inputs to the circuit; and
     /// any external context provided at the application level.
     /// Internally, it must incorporate any additional public parameters defined by this
-    /// instantiation of `RandomVole` before generating the [`RandomVole::VoleChallenge`].
+    /// instantiation of `RandomVole` before generating the [`RandomVoleP::VoleChallenge`].
     ///
     /// The `secret_stream` should incorporate private information known only to the verifier.
     /// It can be used to generate randomness, IVs, and other proof-specific fields.
@@ -93,7 +93,7 @@ where
     /// Get the total number of VOLE correlations supported by this random VOLE instance.
     ///
     /// This should be $`\ell + r\tau`$, where $`\ell`$ is the `extended_witness_length` parameter
-    /// passed to [`RandomVole::create()`];
+    /// passed to [`RandomVoleP::create()`];
     /// $`r`$ is the [`VOLE_SIZE_PARAM`]; and $`\tau`$ is the [`REPETITION_PARAM`].
     fn count(&self) -> usize;
 
@@ -101,12 +101,12 @@ where
     fn extended_witness_length(&self) -> usize;
 
     /// Get the mask for the witness; this is $`\bf u_{[1..\ell]}`$ in the paper, where
-    /// $`\ell`$ is the value returned by [`RandomVole::extended_witness_length()`].
+    /// $`\ell`$ is the value returned by [`RandomVoleP::extended_witness_length()`].
     ///
     /// In the paper, this is used in Figure 7, Round 1, step 1.
     ///
     /// Important: the values returned from this method must not overlap with those returned by
-    /// [`RandomVole::aggregate_commitment_values()`].
+    /// [`RandomVoleP::aggregate_commitment_values()`].
     fn witness_mask(&self) -> &[F2];
 
     /// Gets the VOLE values ($`u_i \text{ for } i \in [\ell + 1..\ell + r\tau]`$ in the paper),
@@ -116,7 +116,7 @@ where
     /// These are combined into a mask for the aggregated commitment $`\tilde a`$.
     ///
     /// Important: the values returned from this method must not overlap with those returned by
-    /// [`RandomVole::witness_mask()`].
+    /// [`RandomVoleP::witness_mask()`].
     fn aggregate_commitment_values(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
 
     /// Gets the VOLE masks ($`v_i \text{ for } i \in [\ell + 1..\ell + r\tau]`$ in the paper),
@@ -126,7 +126,7 @@ where
     /// These are combined into a mask for the aggregated commitment $`\tilde b`$.
     ///
     /// Important: the values returned from this method must not overlap with those returned by
-    /// [`RandomVole::witness_mask()`].
+    /// [`RandomVoleP::witness_mask()`].
     fn aggregate_commitment_masks(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
 
     /// Get the `i`th component of the VOLE mask (`v` in the paper), lifted into [`F128b`] from
@@ -136,7 +136,7 @@ where
     /// and 2.
     ///
     /// The index `i` must be in the range $`[0, \ell)`$, where $`\ell`$ is the
-    /// value returned by [`RandomVole::extended_witness_length()`].
+    /// value returned by [`RandomVoleP::extended_witness_length()`].
     fn vole_mask(&self, i: usize) -> Result<F128b>;
 
     /// Compute a partial decommitment to this set of random VOLEs.
@@ -144,9 +144,7 @@ where
     /// This method simulates the verifier revealing their choice bits and receiving the
     /// decommitments to the VOLEs. As mentioned above, this must consume the VOLEs because
     /// it would be insecure for the prover to make any further computations based on the random
-    /// VOLEs after the verifier "reveals" their choice bits. The "verifier's choice" is simulated
-    /// via the [`RandomVole::VoleDecommitmentChallenge`] type, which must also be returned from
-    /// this function so it can be encoded into the proof.
+    /// VOLEs after the verifier "reveals" their choice bits.
     ///
     /// In the paper, this is implicit in Figure 7, Verification, step 1. However, the paper is
     /// written interactively; in this implementation, this will be called by the prover and the
