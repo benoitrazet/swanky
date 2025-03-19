@@ -33,7 +33,7 @@ fn pack_f128b(arrs: &[[F8b; REPETITION_PARAM]]) -> Vec<F128b> {
 ///
 /// This implements a specialization of ToField Fig 3.1 in FAEST spec
 #[inline(never)]
-fn to_field_f128_and_pad<I: Iterator<Item = F2>>(x: I, x_len: usize) -> Vec<F128b> {
+fn to_field_f128_and_pad(x: &[F2], x_len: usize) -> Vec<F128b> {
     let floor = x_len / 128;
     let how_many = floor + if (x_len - (floor) * 128) != 0 { 1 } else { 0 };
     let mut out = Vec::with_capacity(how_many);
@@ -42,7 +42,7 @@ fn to_field_f128_and_pad<I: Iterator<Item = F2>>(x: I, x_len: usize) -> Vec<F128
     let mut byte_num = 0;
     let mut bit_num: usize = 0;
     for b in x.into_iter() {
-        b_128[byte_num] |= if b == F2::ZERO { 0 } else { 1 << bit_num };
+        b_128[byte_num] |= if *b == F2::ZERO { 0 } else { 1 << bit_num };
         if bit_num == 7 {
             bit_num = 0; // restart at the beginning of byte
             if byte_num == (128 / 8) - 1 {
@@ -175,6 +175,7 @@ pub(crate) struct VoleHasher {
     r3: F128b,
     s0_powers: Vec<F128b>,
     s1_powers: Vec<F128b>,
+    ell: usize,
 }
 
 impl VoleHasher {
@@ -225,53 +226,46 @@ impl VoleHasher {
 
             s0_powers,
             s1_powers,
+
+            ell,
         }
     }
-}
 
-/// Function doing linear hashing of vector of boolean field elements.
-#[inline(never)]
-pub(crate) fn vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
-    seed: &[u8],
-    x0: I1,
-    x0_len: usize,
-    x1: I2,
-    x1_len: usize,
-) -> HashConsistency {
-    let hasher = VoleHasher::from_seed(seed.try_into().unwrap(), x0_len - SECURITY_PARAM);
+    pub(crate) fn hash(&self, x: &[F2]) -> HashConsistency {
+        assert_eq!(x.len(), self.ell + 2 * SECURITY_PARAM + B);
+        let (x0, x1) = x.split_at(self.ell + SECURITY_PARAM);
 
-    assert_eq!(x1_len, SECURITY_PARAM + B);
+        // Line 7.
+        let x0_vec = to_field_f128_and_pad(x0, self.ell + SECURITY_PARAM);
 
-    // Line 7.
-    let x0_vec = to_field_f128_and_pad(x0, x0_len);
+        // Lines 10 - 11.
+        let mut h0 = F128b::ZERO;
+        let mut h1 = F128b::ZERO;
+        for (x0_i, s0_i, s1_i) in izip!(x0_vec, &self.s0_powers, &self.s1_powers) {
+            h0 += s0_i * x0_i;
+            h1 += s1_i * x0_i;
+        }
 
-    // Lines 10 - 11.
-    let mut h0 = F128b::ZERO;
-    let mut h1 = F128b::ZERO;
-    for (x0_i, s0_i, s1_i) in izip!(x0_vec, hasher.s0_powers, hasher.s1_powers) {
-        h0 += s0_i * x0_i;
-        h1 += s1_i * x0_i;
+        // Line 13.
+        let h2 = self.r0 * h0 + self.r1 * h1;
+        let h3 = self.r2 * h0 + self.r3 * h1;
+
+        // Line 14 (call ToBits and truncate).
+        let h2_bits = h2.bit_decomposition();
+        let (h3_bits, _unused): (GenericArray<bool, U16>, _) = h3.bit_decomposition().split();
+
+        // Line 14 (append).
+        let all_bits: [bool; SECURITY_PARAM + B] = h2_bits.concat(h3_bits).into();
+
+        // Line 14 (XOR with x1). This unwrap is safe because the two inputs must be the expected length.
+        let out: [F2; SECURITY_PARAM + B] = izip!(all_bits, x1)
+            .map(|(b1, b2)| (F2::from(b1) + b2))
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+
+        HashConsistency(out)
     }
-
-    // Line 13.
-    let h2 = hasher.r0 * h0 + hasher.r1 * h1;
-    let h3 = hasher.r2 * h0 + hasher.r3 * h1;
-
-    // Line 14 (call ToBits and truncate).
-    let h2_bits = h2.bit_decomposition();
-    let (h3_bits, _unused): (GenericArray<bool, U16>, _) = h3.bit_decomposition().split();
-
-    // Line 14 (append).
-    let all_bits: [bool; SECURITY_PARAM + B] = h2_bits.concat(h3_bits).into();
-
-    // Line 14 (XOR with x1). This unwrap is safe because the two inputs must be the expected length.
-    let out: [F2; SECURITY_PARAM + B] = izip!(all_bits, x1)
-        .map(|(b1, b2)| (F2::from(b1) + b2))
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap() ;
-
-    HashConsistency(out)
 }
 
 /// Function doing linear hashing of the column of bits in lock-step.
@@ -326,10 +320,10 @@ pub(crate) fn vole_hash_lockstep(
 
         // Line 14 (XOR with x1).
         let single_out = izip!(all_bits, x1_bits)
-                .map(|(b1, b2)| F2::from(b1) + F2::from(b2))
-                .collect::<Vec<_>>()
-                .try_into()
-                .unwrap();
+            .map(|(b1, b2)| F2::from(b1) + F2::from(b2))
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
         out[j] = HashConsistency(single_out);
     }
     out
@@ -337,9 +331,15 @@ pub(crate) fn vole_hash_lockstep(
 
 #[cfg(test)]
 mod test {
-    use super::{to_field_f128_and_pad, vole_hash};
+    use std::iter::repeat_with;
+    use std::iter::zip;
+
+    use super::to_field_f128_and_pad;
     use crate::parameters::SECURITY_PARAM;
+    use crate::vole::commit_reconstruct::l_hat;
     use crate::vole::commit_reconstruct::B;
+    use crate::vole::consistency_check::VoleHasher;
+    use rand::thread_rng;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F128b;
     use swanky_field_binary::F2;
@@ -348,21 +348,21 @@ mod test {
     #[test]
     fn test_padding_of_to_field_f128_and_pad() {
         let v = vec![F2::ZERO; 1000];
-        let t = to_field_f128_and_pad(v.into_iter(), 1000);
+        let t = to_field_f128_and_pad(&v, 1000);
         assert_eq!(t.len(), 1000 / 128 + 1);
 
         let v = vec![F2::ZERO; 128];
-        let t = to_field_f128_and_pad(v.into_iter(), 128);
+        let t = to_field_f128_and_pad(&v, 128);
         assert_eq!(t.len(), 1);
 
         let v = vec![F2::ZERO; 129];
-        let t = to_field_f128_and_pad(v.into_iter(), 129);
+        let t = to_field_f128_and_pad(&v, 129);
         assert_eq!(t.len(), 2);
 
         let mut v = vec![F2::ZERO; 130];
         v[0] = F2::ONE;
         v[129] = F2::ONE;
-        let t = to_field_f128_and_pad(v.into_iter(), 129);
+        let t = to_field_f128_and_pad(&v, 129);
         let mut res1 = [0u8; 16];
         res1[0] = 1u8;
         assert_eq!(t[0], F128b::from_bytes(&res1.into()).unwrap());
@@ -378,15 +378,11 @@ mod test {
         let seeds = [0u8; (SECURITY_PARAM * 6) / 8];
 
         const HOW_MANY: usize = 1000;
-        let x0 = [F2::ZERO; HOW_MANY + SECURITY_PARAM];
-        let x1 = [F2::ZERO; SECURITY_PARAM + B];
-        let v = vole_hash(
-            &seeds,
-            x0.into_iter(),
-            HOW_MANY + SECURITY_PARAM,
-            x1.into_iter(),
-            SECURITY_PARAM + B,
-        );
+        let x = [F2::ZERO; HOW_MANY + 2 * SECURITY_PARAM + B];
+
+        let hasher = VoleHasher::from_seed(seeds, HOW_MANY);
+        let v = hasher.hash(&x);
+
         for b in v.0.iter() {
             assert_eq!(*b, F2::ZERO);
         }
@@ -398,17 +394,13 @@ mod test {
         let seeds = [0u8; (SECURITY_PARAM * 6) / 8];
 
         const HOW_MANY: usize = 1000;
-        let x0 = [F2::ZERO; HOW_MANY + SECURITY_PARAM];
-        let mut x1 = [F2::ZERO; SECURITY_PARAM + B];
+        let mut x = [F2::ZERO; HOW_MANY + 2 * SECURITY_PARAM + B];
         let pos = 13;
-        x1[pos] = F2::ONE;
-        let v = vole_hash(
-            &seeds,
-            x0.into_iter(),
-            HOW_MANY + SECURITY_PARAM,
-            x1.into_iter(),
-            SECURITY_PARAM + B,
-        );
+        x[HOW_MANY + SECURITY_PARAM + pos] = F2::ONE;
+
+        let hasher = VoleHasher::from_seed(seeds, HOW_MANY);
+        let v = hasher.hash(&x);
+
         for (i, b) in v.0.iter().enumerate() {
             if i == pos {
                 assert_eq!(*b, F2::ONE);
@@ -421,36 +413,24 @@ mod test {
     // Test the xor part at the end of [`vole_hash`]
     #[test]
     fn test_vole_hash_is_linear() {
+        let rng = &mut thread_rng();
+
         let seeds = [1u8; (SECURITY_PARAM * 6) / 8];
 
         const HOW_MANY: usize = 1000;
-        const BOUND: usize = HOW_MANY + SECURITY_PARAM;
-        const LAST: usize = SECURITY_PARAM + B;
-        let x0 = [F2::ONE; HOW_MANY + 2 * SECURITY_PARAM + B];
-        let x1 = [F2::ZERO; HOW_MANY + 2 * SECURITY_PARAM + B];
-        let x2 = [F2::ONE; HOW_MANY + 2 * SECURITY_PARAM + B];
+        let x0: Vec<F2> = repeat_with(|| F2::random(rng))
+            .take(l_hat(HOW_MANY))
+            .collect();
+        let x1: Vec<F2> = repeat_with(|| F2::random(rng))
+            .take(l_hat(HOW_MANY))
+            .collect();
+        let x2: Vec<F2> = zip(&x0, &x1).map(|(a, b)| a + b).collect();
 
-        let v0 = vole_hash(
-            &seeds,
-            x0.into_iter().take(BOUND),
-            BOUND,
-            x0.into_iter().skip(BOUND),
-            LAST,
-        );
-        let v1 = vole_hash(
-            &seeds,
-            x1.into_iter().take(BOUND),
-            BOUND,
-            x1.into_iter().skip(BOUND),
-            LAST,
-        );
-        let v2 = vole_hash(
-            &seeds,
-            x2.into_iter().take(BOUND),
-            BOUND,
-            x2.into_iter().skip(BOUND),
-            LAST,
-        );
+        let hasher = VoleHasher::from_seed(seeds, HOW_MANY);
+        let v0 = hasher.hash(&x0);
+        let v1 = hasher.hash(&x1);
+        let v2 = hasher.hash(&x2);
+
         for ((a, b), c) in v0.0.iter().zip(v1.0.iter()).zip(v2.0.iter()) {
             assert_eq!(*a + *b, *c);
         }
