@@ -274,6 +274,8 @@ pub(crate) fn vole_hash_lockstep(
             0
         };
 
+    // NOTE (optimize): This packed `f128b` of `x0` is a convenient holder for bits, and should
+    // not be treated like a field element.
     let x0_vec = to_field_f128_and_pad_lockstep(&pack_f128b(x0));
     // NOTE: we dont need to compute how_many, we could directly use `x0_vec.len()`.
     assert_eq!(x0_vec.len(), how_many);
