@@ -266,67 +266,65 @@ impl VoleHasher {
 
         HashConsistency(out)
     }
-}
 
-/// Function doing linear hashing of the column of bits in lock-step.
-///
-/// There are `REPETITION_PARAM` tracks where one group of bits is provided as a [`F128b`] value.
-#[inline(never)]
-pub(crate) fn vole_hash_lockstep(
-    seed: &[u8],
-    x0: &[[F8b; REPETITION_PARAM]],
-    x1: &[[F8b; REPETITION_PARAM]],
-) -> [HashConsistency; SECURITY_PARAM] {
-    assert_eq!(x1.len(), SECURITY_PARAM + B);
+    /// Function doing linear hashing of the column of bits in lock-step.
+    ///
+    /// There are `REPETITION_PARAM` tracks where one group of bits is provided as a [`F128b`] value.
+    pub(crate) fn hash_matrix(
+        &self,
+        xs: &[[F8b; REPETITION_PARAM]],
+    ) -> [HashConsistency; SECURITY_PARAM] {
+        assert_eq!(xs.len(), self.ell + 2 * SECURITY_PARAM + B);
+        let (x0, x1) = xs.split_at(self.ell + SECURITY_PARAM);
 
-    let hasher = VoleHasher::from_seed(seed.try_into().unwrap(), x0.len() - SECURITY_PARAM);
+        // NOTE (optimize): This packed `f128b` of `x0` is a convenient holder for bits, and should
+        // not be treated like a field element.
+        let x0_vec = to_field_f128_and_pad_lockstep(&pack_f128b(x0));
 
-    // NOTE (optimize): This packed `f128b` of `x0` is a convenient holder for bits, and should
-    // not be treated like a field element.
-    let x0_vec = to_field_f128_and_pad_lockstep(&pack_f128b(x0));
-
-    let mut h0 = [F128b::ZERO; SECURITY_PARAM];
-    let mut h1 = [F128b::ZERO; SECURITY_PARAM];
-    for (x0_i, s0_i, s1_i) in izip!(x0_vec, hasher.s0_powers, hasher.s1_powers) {
+        let mut h0 = [F128b::ZERO; SECURITY_PARAM];
+        let mut h1 = [F128b::ZERO; SECURITY_PARAM];
+        for (x0_i, s0_i, s1_i) in izip!(x0_vec, &self.s0_powers, &self.s1_powers) {
+            for j in 0..SECURITY_PARAM {
+                // This loop is the parallel part
+                h0[j] += s0_i * x0_i[j];
+                h1[j] += s1_i * x0_i[j];
+            }
+        }
+        let mut h2 = [F128b::ZERO; SECURITY_PARAM];
+        let mut h3 = [F128b::ZERO; SECURITY_PARAM];
         for j in 0..SECURITY_PARAM {
-            // This loop is the parallel part
-            h0[j] += s0_i * x0_i[j];
-            h1[j] += s1_i * x0_i[j];
-        }
-    }
-    let mut h2 = [F128b::ZERO; SECURITY_PARAM];
-    let mut h3 = [F128b::ZERO; SECURITY_PARAM];
-    for j in 0..SECURITY_PARAM {
-        h2[j] = hasher.r0 * h0[j] + hasher.r1 * h1[j];
-        h3[j] = hasher.r2 * h0[j] + hasher.r3 * h1[j];
-    }
-
-    let mut out = [HashConsistency::default(); SECURITY_PARAM];
-
-    let x1_packed = pack_f128b(x1);
-
-    for j in 0..SECURITY_PARAM {
-        // Line 14 (call ToBits and truncate).
-        let h2_bits = h2[j].bit_decomposition();
-        let (h3_bits, _unused): (GenericArray<bool, U16>, _) = h3[j].bit_decomposition().split();
-
-        // Line 14 (append).
-        let all_bits: [bool; SECURITY_PARAM + B] = h2_bits.concat(h3_bits).into();
-
-        let mut x1_bits = [false; SECURITY_PARAM + B];
-        for col in 0..SECURITY_PARAM + B {
-            x1_bits[col] = x1_packed[col].bit_decomposition()[j];
+            h2[j] = self.r0 * h0[j] + self.r1 * h1[j];
+            h3[j] = self.r2 * h0[j] + self.r3 * h1[j];
         }
 
-        // Line 14 (XOR with x1).
-        let single_out = izip!(all_bits, x1_bits)
-            .map(|(b1, b2)| F2::from(b1) + F2::from(b2))
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
-        out[j] = HashConsistency(single_out);
+        let mut out = [HashConsistency::default(); SECURITY_PARAM];
+
+        let x1_packed = pack_f128b(x1);
+
+        for j in 0..SECURITY_PARAM {
+            // Line 14 (call ToBits and truncate).
+            let h2_bits = h2[j].bit_decomposition();
+            let (h3_bits, _unused): (GenericArray<bool, U16>, _) =
+                h3[j].bit_decomposition().split();
+
+            // Line 14 (append).
+            let all_bits: [bool; SECURITY_PARAM + B] = h2_bits.concat(h3_bits).into();
+
+            let mut x1_bits = [false; SECURITY_PARAM + B];
+            for col in 0..SECURITY_PARAM + B {
+                x1_bits[col] = x1_packed[col].bit_decomposition()[j];
+            }
+
+            // Line 14 (XOR with x1).
+            let single_out = izip!(all_bits, x1_bits)
+                .map(|(b1, b2)| F2::from(b1) + F2::from(b2))
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap();
+            out[j] = HashConsistency(single_out);
+        }
+        out
     }
-    out
 }
 
 #[cfg(test)]
