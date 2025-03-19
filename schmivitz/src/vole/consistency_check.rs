@@ -3,14 +3,17 @@ Implementation of algorithms related to consistency checks.
  *
 */
 #![allow(clippy::needless_range_loop)]
-use crate::parameters::REPETITION_PARAM;
-use crate::parameters::SECURITY_PARAM;
+use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::commit_reconstruct::B;
 use crate::vole::crypto_primitives::CHALL1_LENGTH;
+use generic_array::{
+    sequence::Split,
+    typenum::{U16, U32, U48, U64, U80, U96},
+    GenericArray,
+};
+use itertools::izip;
 use swanky_field::{FiniteField, FiniteRing};
-use swanky_field_binary::F128b;
-use swanky_field_binary::F8b;
-use swanky_field_binary::F2;
+use swanky_field_binary::{F128b, F8b, F2};
 use swanky_serialization::CanonicalSerialize;
 
 /// Packs bits of the input into `F128b`s. This does not do a field-to-field transformation;
@@ -161,6 +164,65 @@ impl HashConsistency {
     }
 }
 
+pub(crate) struct VoleHasher {
+    r0: F128b,
+    r1: F128b,
+    r2: F128b,
+    r3: F128b,
+    s0_powers: Vec<F128b>,
+    s1_powers: Vec<F128b>,
+}
+
+impl VoleHasher {
+    pub(crate) fn from_seed(seed: [u8; CHALL1_LENGTH], ell: usize) -> Self {
+        // Line 2.
+        let seed_ga: GenericArray<u8, U96> = GenericArray::from(seed);
+        let (r0_bytes, rest): (GenericArray<u8, U16>, GenericArray<u8, U80>) = seed_ga.split();
+        let (r1_bytes, rest): (GenericArray<u8, U16>, GenericArray<u8, U64>) = rest.split();
+        let (r2_bytes, rest): (GenericArray<u8, U16>, GenericArray<u8, U48>) = rest.split();
+        let (r3_bytes, rest): (GenericArray<u8, U16>, GenericArray<u8, U32>) = rest.split();
+        let (s_bytes, t_bytes): (GenericArray<u8, U16>, GenericArray<u8, U16>) = rest.split();
+
+        // Lines 3 - 5.
+        let r0 = F128b::from_bytes(&r0_bytes).unwrap();
+        let r1 = F128b::from_bytes(&r1_bytes).unwrap();
+        let r2 = F128b::from_bytes(&r2_bytes).unwrap();
+        let r3 = F128b::from_bytes(&r3_bytes).unwrap();
+        let s0 = F128b::from_bytes(&s_bytes).unwrap();
+        let s1 = F128b::from_bytes(&t_bytes).unwrap();
+
+        // Line 6.
+        let ell_prime = SECURITY_PARAM * (ell + SECURITY_PARAM).div_ceil(SECURITY_PARAM);
+
+        // Precomputation: This is part of Line 10.
+        // This differs from the FAEST spec where the powers are in reverse order; this is also valid!
+        let mut s0_powers = Vec::with_capacity(ell_prime / SECURITY_PARAM - 1);
+        s0_powers.push(s0);
+        for i in 1..ell_prime / SECURITY_PARAM - 1 {
+            s0_powers.push(s0_powers[i - 1] * s0);
+        }
+
+        // Precomputation: This is part of Line 11.
+        // This differs from the FAEST spec where the powers are in reverse order; this is also valid!
+        // This differs from the FAEST spec because it uses a different field.
+        let mut s1_powers = Vec::with_capacity((ell_prime / 64) - 1);
+        s1_powers.push(s1);
+        for i in 1..ell_prime / 64 - 1 {
+            s1_powers.push(s1_powers[i - 1] * s1);
+        }
+
+        Self {
+            r0,
+            r1,
+            r2,
+            r3,
+
+            s0_powers,
+            s1_powers,
+        }
+    }
+}
+
 /// Function doing linear hashing of vector of boolean field elements.
 #[inline(never)]
 pub(crate) fn vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
@@ -170,50 +232,22 @@ pub(crate) fn vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
     x1: I2,
     x1_len: usize,
 ) -> HashConsistency {
-    assert_eq!(seed.len(), CHALL1_LENGTH);
+    let hasher = VoleHasher::from_seed(seed.try_into().unwrap(), x0_len - SECURITY_PARAM);
+
     assert_eq!(x1_len, SECURITY_PARAM + B);
 
-    let byte_len: usize = 128 / 8;
-    let mut tmp = [u8::default(); 128 / 8];
-    tmp.copy_from_slice(&seed[0..byte_len]);
-    let r0 = F128b::from_bytes(&tmp.into()).unwrap();
-    tmp.copy_from_slice(&seed[byte_len..byte_len * 2]);
-    let r1 = F128b::from_bytes(&tmp.into()).unwrap();
-    tmp.copy_from_slice(&seed[byte_len * 2..byte_len * 3]);
-    let r2 = F128b::from_bytes(&tmp.into()).unwrap();
-    tmp.copy_from_slice(&seed[byte_len * 3..byte_len * 4]);
-    let r3 = F128b::from_bytes(&tmp.into()).unwrap();
-    tmp.copy_from_slice(&seed[byte_len * 4..byte_len * 5]);
-    let s0 = F128b::from_bytes(&tmp.into()).unwrap();
-    tmp.copy_from_slice(&seed[byte_len * 5..byte_len * 6]);
-    let s1 = F128b::from_bytes(&tmp.into()).unwrap();
-
-    let floor = x0_len / SECURITY_PARAM;
-    let how_many = floor
-        + if (x0_len - floor * SECURITY_PARAM) != 0 {
-            1
-        } else {
-            0
-        };
-
     let x0_vec = to_field_f128_and_pad(x0, x0_len);
-    // NOTE: we dont need to compute how_many, we could directly use `x0_vec.len()`.
-    assert_eq!(x0_vec.len(), how_many);
 
     let mut h0 = F128b::ZERO;
     let mut h1 = F128b::ZERO;
-    let mut s0_power = s0;
-    let mut s1_power = s1;
-    for i in 0..how_many {
-        h0 += s0_power * x0_vec[i];
-        h1 += s1_power * x0_vec[i];
-        // NOTE: difference from FAEST spec where the powers are in
-        // reverse order, this is also valid.
-        s0_power *= s0;
-        s1_power *= s1;
+
+    for (x0_i, s0_i, s1_i) in izip!(x0_vec, hasher.s0_powers, hasher.s1_powers) {
+        h0 += s0_i * x0_i;
+        h1 += s1_i * x0_i;
     }
-    let h2 = r0 * h0 + r1 * h1;
-    let h3 = r2 * h0 + r3 * h1;
+
+    let h2 = hasher.r0 * h0 + hasher.r1 * h1;
+    let h3 = hasher.r2 * h0 + hasher.r3 * h1;
 
     let h2_bits = h2.bit_decomposition();
     let h3_bits = h3.bit_decomposition();
@@ -247,61 +281,30 @@ pub(crate) fn vole_hash_lockstep(
     x0: &[[F8b; REPETITION_PARAM]],
     x1: &[[F8b; REPETITION_PARAM]],
 ) -> [HashConsistency; SECURITY_PARAM] {
-    assert_eq!(seed.len(), CHALL1_LENGTH);
     assert_eq!(x1.len(), SECURITY_PARAM + B);
-    let byte_len: usize = 128 / 8;
-    let mut tmp = [u8::default(); 128 / 8];
 
-    // `r0`,`r1`, `r2`, `r3`, `s0` and `s1` are the same values of every track.
-    tmp.copy_from_slice(&seed[0..byte_len]);
-    let r0 = F128b::from_bytes(&tmp.into()).unwrap();
-    tmp.copy_from_slice(&seed[byte_len..byte_len * 2]);
-    let r1 = F128b::from_bytes(&tmp.into()).unwrap();
-    tmp.copy_from_slice(&seed[byte_len * 2..byte_len * 3]);
-    let r2 = F128b::from_bytes(&tmp.into()).unwrap();
-    tmp.copy_from_slice(&seed[byte_len * 3..byte_len * 4]);
-    let r3 = F128b::from_bytes(&tmp.into()).unwrap();
-    tmp.copy_from_slice(&seed[byte_len * 4..byte_len * 5]);
-    let s0 = F128b::from_bytes(&tmp.into()).unwrap();
-    tmp.copy_from_slice(&seed[byte_len * 5..byte_len * 6]);
-    let s1 = F128b::from_bytes(&tmp.into()).unwrap();
-
-    let floor = x0.len() / SECURITY_PARAM;
-    let how_many = floor
-        + if (x0.len() - floor * SECURITY_PARAM) != 0 {
-            1
-        } else {
-            0
-        };
+    let hasher = VoleHasher::from_seed(seed.try_into().unwrap(), x0.len() - SECURITY_PARAM);
 
     // NOTE (optimize): This packed `f128b` of `x0` is a convenient holder for bits, and should
     // not be treated like a field element.
     let x0_vec = to_field_f128_and_pad_lockstep(&pack_f128b(x0));
-    // NOTE: we dont need to compute how_many, we could directly use `x0_vec.len()`.
-    assert_eq!(x0_vec.len(), how_many);
 
     let mut h0 = [F128b::ZERO; SECURITY_PARAM];
     let mut h1 = [F128b::ZERO; SECURITY_PARAM];
-    let mut s0_power = s0;
-    let mut s1_power = s1;
-    for i in 0..how_many {
+    for (x0_i, s0_i, s1_i) in izip!(x0_vec, hasher.s0_powers, hasher.s1_powers) {
         // This is where performing in lockstep is beneficial, saving on
         // computing `s0_power`/`s1_power` only once for every row.
         for j in 0..SECURITY_PARAM {
             // This loop is the parallel part
-            h0[j] += s0_power * x0_vec[i][j];
-            h1[j] += s1_power * x0_vec[i][j];
+            h0[j] += s0_i * x0_i[j];
+            h1[j] += s1_i * x0_i[j];
         }
-        // NOTE: difference from FAEST spec where the powers are in
-        // reverse order, this is also valid.
-        s0_power *= s0;
-        s1_power *= s1;
     }
     let mut h2 = [F128b::ZERO; SECURITY_PARAM];
     let mut h3 = [F128b::ZERO; SECURITY_PARAM];
     for j in 0..SECURITY_PARAM {
-        h2[j] = r0 * h0[j] + r1 * h1[j];
-        h3[j] = r2 * h0[j] + r3 * h1[j];
+        h2[j] = hasher.r0 * h0[j] + hasher.r1 * h1[j];
+        h3[j] = hasher.r2 * h0[j] + hasher.r3 * h1[j];
     }
 
     let mut out = [HashConsistency::default(); SECURITY_PARAM];
