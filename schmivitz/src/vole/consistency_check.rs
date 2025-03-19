@@ -3,13 +3,27 @@ Implementation of algorithms related to consistency checks.
  *
 */
 #![allow(clippy::needless_range_loop)]
+use crate::parameters::REPETITION_PARAM;
 use crate::parameters::SECURITY_PARAM;
 use crate::vole::commit_reconstruct::B;
 use crate::vole::crypto_primitives::CHALL1_LENGTH;
 use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::F128b;
+use swanky_field_binary::F8b;
 use swanky_field_binary::F2;
 use swanky_serialization::CanonicalSerialize;
+
+/// Packs bits of the input into `F128b`s. This does not do a field-to-field transformation;
+/// it uses `F128b` as a representation of 128 bits, not as a polynomial!
+fn pack_f128b(arrs: &[[F8b; REPETITION_PARAM]]) -> Vec<F128b> {
+    arrs.iter()
+        .map(|xi| {
+            let xi_bytes = xi.map(|xij| xij.to_bytes()[0]);
+            F128b::from_bytes(&xi_bytes.into())
+        })
+        .collect::<Result<_, _>>()
+        .unwrap()
+}
 
 /// Take a sequence of boolean field values and pack them into `F128b` values. It padds the last values in the sequence if necessary.
 ///
@@ -99,9 +113,9 @@ fn to_field_f128_and_pad_lockstep(x: &[F128b]) -> Vec<[F128b; SECURITY_PARAM]> {
 }
 
 /// Hash as produced by [`vole_hash`].
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
-pub(crate) struct HashConsistency(pub(crate) [F2; SECURITY_PARAM + B]);
+pub(crate) struct HashConsistency([F2; SECURITY_PARAM + B]);
 
 impl Default for HashConsistency {
     fn default() -> Self {
@@ -109,7 +123,20 @@ impl Default for HashConsistency {
     }
 }
 
+impl IntoIterator for &HashConsistency {
+    type Item = F2;
+    type IntoIter = <[F2; SECURITY_PARAM + B] as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 impl HashConsistency {
+    pub(crate) fn len(&self) -> usize {
+        SECURITY_PARAM + B
+    }
+
     /// Convert a consistency hash to a vector of bytes
     ///
     /// packing the `F2` values in `u8`.
@@ -126,6 +153,11 @@ impl HashConsistency {
             out.push(byte);
         }
         out
+    }
+
+    /// Convert a [`HashConsistency`] to a list of bytes, without packing.
+    pub(crate) fn as_bytes(&self) -> [u8; SECURITY_PARAM + B] {
+        self.0.map(|f2| f2.to_bytes()[0])
     }
 }
 
@@ -212,8 +244,8 @@ pub(crate) fn vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
 #[inline(never)]
 pub(crate) fn vole_hash_lockstep(
     seed: &[u8],
-    x0: &[F128b],
-    x1: &[F128b],
+    x0: &[[F8b; REPETITION_PARAM]],
+    x1: &[[F8b; REPETITION_PARAM]],
 ) -> [HashConsistency; SECURITY_PARAM] {
     assert_eq!(seed.len(), CHALL1_LENGTH);
     assert_eq!(x1.len(), SECURITY_PARAM + B);
@@ -242,7 +274,9 @@ pub(crate) fn vole_hash_lockstep(
             0
         };
 
-    let x0_vec = to_field_f128_and_pad_lockstep(x0);
+    // NOTE (optimize): This packed `f128b` of `x0` is a convenient holder for bits, and should
+    // not be treated like a field element.
+    let x0_vec = to_field_f128_and_pad_lockstep(&pack_f128b(x0));
     // NOTE: we dont need to compute how_many, we could directly use `x0_vec.len()`.
     assert_eq!(x0_vec.len(), how_many);
 
@@ -272,6 +306,8 @@ pub(crate) fn vole_hash_lockstep(
 
     let mut out = [HashConsistency::default(); SECURITY_PARAM];
 
+    let x1_packed = pack_f128b(x1);
+
     for j in 0..SECURITY_PARAM {
         let h2_bits = h2[j].bit_decomposition();
         let h3_bits = h3[j].bit_decomposition();
@@ -287,7 +323,7 @@ pub(crate) fn vole_hash_lockstep(
 
         let mut x1_bits = [false; SECURITY_PARAM + B];
         for col in 0..SECURITY_PARAM + B {
-            x1_bits[col] = x1[col].bit_decomposition()[j];
+            x1_bits[col] = x1_packed[col].bit_decomposition()[j];
         }
         single_out.copy_from_slice(
             all_bits

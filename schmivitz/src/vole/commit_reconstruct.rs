@@ -10,7 +10,7 @@ use crate::vole::crypto_primitives::{Chall3, Com, H1, H1_LENGTH, IV, PRG};
 use generic_array::{arr, typenum::U16, GenericArray};
 use std::{sync::mpsc::channel, thread};
 use swanky_field::{FiniteRing, IsSubFieldOf};
-use swanky_field_binary::{F128b, F8b, F2};
+use swanky_field_binary::{F8b, F2};
 use swanky_serialization::CanonicalSerialize;
 
 use super::consistency_check::HashConsistency;
@@ -53,8 +53,8 @@ pub(crate) struct Commit {
     pub(crate) corrections: Corrections,
     /// Random masks associated to VOLEs
     pub(crate) u: Vec<F2>,
-    /// Commitments associated to `u`
-    pub(crate) v: Vec<F128b>,
+    /// Commitments associated to `u`. These are "packed" bit vectors.
+    pub(crate) v: Vec<[F8b; REPETITION_PARAM]>,
 }
 
 /// Function generating the voles with associated commitments.
@@ -134,17 +134,13 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l_hat: usize) -> Commit {
     log::info!("corrections running time: {:?}", t.elapsed());
     debug_assert_eq!(corr.len(), REPETITION_PARAM - 1);
 
-    // Convert Vec<Vec<F8b>> to Vec<F128b> where the size of the outer vec in Vec<Vec<F8b>> is `REPETITION_PARAM`.
+    // Convert to a row-wise, fixed-size representation.
     let t = std::time::Instant::now();
     let mut v_out = Vec::with_capacity(l_hat);
-    let mut tmp = [F8b::ZERO; REPETITION_PARAM];
     for i in 0..l_hat {
-        for tau in 0..REPETITION_PARAM {
-            tmp[tau] = v[tau][i];
-        }
-        v_out.push(F8b::form_superfield(&tmp.into()));
+        v_out.push(core::array::from_fn(|tau| v[tau][i]));
     }
-    log::info!("pack to F128b running time: {:?}", t.elapsed());
+    log::info!("pack to F8b running time: {:?}", t.elapsed());
 
     // hash the commitments
     let h_com = hash_commitments(&com);
@@ -316,19 +312,17 @@ pub(crate) fn apply_corrections_to_q(
 /// This function implements lines 8-11 in Fig 8.3 in the FAEST spec.
 #[inline(never)]
 pub(crate) fn recompose_d(chall3: &Chall3, u_tilda: &HashConsistency) -> Vec<F2> {
-    assert_eq!(u_tilda.0.len(), SECURITY_PARAM + B);
-    let how_many = u_tilda.0.len();
+    assert_eq!(u_tilda.len(), SECURITY_PARAM + B);
+    let how_many = u_tilda.len();
     let mut qs = Vec::with_capacity(how_many * REPETITION_PARAM * 8);
 
-    for tau in 0..REPETITION_PARAM {
-        let delta = chal_dec(chall3, tau);
-        let delta_f2: Vec<_> = delta
-            .iter()
-            .map(|b| if *b { F2::ONE } else { F2::ZERO })
-            .collect();
+    for i in 0..REPETITION_PARAM {
+        // Length of this must be $r$ = `VOLE_SIZE_PARAM`.
+        let delta = chal_dec(chall3, i);
+        let delta_f2: Vec<_> = delta.iter().map(|b| F2::from(*b)).collect();
         for b in delta_f2 {
-            for u in u_tilda.0.iter() {
-                qs.push(b * *u);
+            for u in u_tilda.into_iter() {
+                qs.push(b * u);
             }
         }
     }
@@ -421,9 +415,9 @@ mod test {
         let big_delta_f128b: F128b = F8b::form_superfield(&big_delta);
 
         for pos in 0..how_many {
-            //assert_eq!(v_f128b[pos], q_f128b[pos]);
+            let v_f128b: F128b = F8b::form_superfield(&v[pos].into());
             assert_eq!(
-                v[pos] + u[pos] * big_delta_f128b,
+                v_f128b + u[pos] * big_delta_f128b,
                 F8b::form_superfield(&q_f128b[pos].into())
             );
         }

@@ -29,6 +29,11 @@ impl RandomVoleP for VoleProver {
 
         let vole = create_vole_prover(&statement_sig, secret, extended_witness_length);
         let chall = vole.chall1;
+
+        // Part of line 13.
+        transcript.append_message(b"u_tilda", &vole.u_tilda.as_bytes());
+        transcript.append_message(b"h_V", vole.h_v.as_ref());
+
         (vole, chall)
     }
 
@@ -92,6 +97,10 @@ impl RandomVoleV for VoleVerifier {
 
         let verifier = create_vole_verifier(&statement_sig, decom, chall3);
         assert_eq!(verifier.q.len(), verifier.l + SECURITY_PARAM);
+
+        transcript.append_message(b"u_tilda", &verifier.u_tilda().as_bytes());
+        transcript.append_message(b"h_V", verifier.h_v().as_ref());
+
         verifier
     }
 
