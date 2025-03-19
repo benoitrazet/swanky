@@ -3,6 +3,8 @@ Implementation of algorithms related to consistency checks.
  *
 */
 #![allow(clippy::needless_range_loop)]
+use std::iter::repeat;
+
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::commit_reconstruct::B;
 use crate::vole::crypto_primitives::CHALL1_LENGTH;
@@ -13,7 +15,7 @@ use generic_array::{
     GenericArray,
 };
 use itertools::izip;
-use swanky_field::{FiniteField, FiniteRing};
+use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F8b, F2};
 use swanky_serialization::CanonicalSerialize;
 
@@ -29,49 +31,9 @@ fn pack_f128b(arrs: &[[F8b; REPETITION_PARAM]]) -> Vec<F128b> {
         .unwrap()
 }
 
-/// Take a sequence of boolean field values and pack them into `F128b` values. It padds the last values in the sequence if necessary.
-///
-/// This implements a specialization of ToField Fig 3.1 in FAEST spec
-#[inline(never)]
-fn to_field_f128_and_pad(x: &[F2], x_len: usize) -> Vec<F128b> {
-    let floor = x_len / 128;
-    let how_many = floor + if (x_len - (floor) * 128) != 0 { 1 } else { 0 };
-    let mut out = Vec::with_capacity(how_many);
-
-    let mut b_128 = [0u8; 128 / 8];
-    let mut byte_num = 0;
-    let mut bit_num: usize = 0;
-    for b in x.into_iter() {
-        b_128[byte_num] |= if *b == F2::ZERO { 0 } else { 1 << bit_num };
-        if bit_num == 7 {
-            bit_num = 0; // restart at the beginning of byte
-            if byte_num == (128 / 8) - 1 {
-                out.push(F128b::from_bytes(&b_128.into()).unwrap());
-
-                // reset
-                byte_num = 0;
-                // reset
-                b_128 = [0u8; 128 / 8];
-            } else {
-                byte_num += 1;
-            }
-        } else {
-            bit_num += 1;
-        }
-    }
-
-    // Still have to push a last value if the previous loop terminated before processing `SECURITY_PARAMETER` bits.
-    if (bit_num != 0) | (byte_num != 0) {
-        out.push(F128b::from_bytes(&b_128.into()).unwrap())
-    }
-
-    assert_eq!(out.len(), how_many);
-    out
-}
-
 /// Take a sequence of [`F128b`] values, interpret every value into its bit decomposition,
 /// that becomes a n*128 boolean matrix where n is the length of the sequence.
-/// Apply `to_field_f128_and_pad` to every column in lock step and emit a sequence of
+/// Apply `to_field_f128` (which includes padding) to every column in lock step and emit a sequence of
 /// 128 [`F128b`] values.
 #[inline(never)]
 fn to_field_f128_and_pad_lockstep(x: &[F128b]) -> Vec<[F128b; SECURITY_PARAM]> {
@@ -176,6 +138,7 @@ pub(crate) struct VoleHasher {
     s0_powers: Vec<F128b>,
     s1_powers: Vec<F128b>,
     ell: usize,
+    ell_prime: usize,
 }
 
 impl VoleHasher {
@@ -228,6 +191,7 @@ impl VoleHasher {
             s1_powers,
 
             ell,
+            ell_prime,
         }
     }
 
@@ -235,8 +199,8 @@ impl VoleHasher {
         assert_eq!(x.len(), self.ell + 2 * SECURITY_PARAM + B);
         let (x0, x1) = x.split_at(self.ell + SECURITY_PARAM);
 
-        // Line 7.
-        let x0_vec = to_field_f128_and_pad(x0, self.ell + SECURITY_PARAM);
+        // Line 7. This pads and converts to a field -- it is called `y_hat` in the spec.
+        let x0_vec = self.to_field_128(x0);
 
         // Lines 10 - 11.
         let mut h0 = F128b::ZERO;
@@ -265,6 +229,28 @@ impl VoleHasher {
             .unwrap();
 
         HashConsistency(out)
+    }
+
+    // Padding plus ToField (Fig 3.1) from FAEST, where `k` is fixed to the security parameter (128).
+    fn to_field_128(&self, x: &[F2]) -> Vec<F128b> {
+        let padding = repeat(F2::ZERO)
+            .take(self.ell_prime - (self.ell + SECURITY_PARAM))
+            .collect::<Vec<_>>();
+
+        let x_padded = [x, &padding].concat();
+
+        // We should never hit this because we just padded.
+        if x_padded.len() % 128 != 0 {
+            panic!("Expected a multiple of 128, but got {}", x_padded.len());
+        }
+
+        x_padded
+            .chunks(SECURITY_PARAM)
+            .map(|xi| {
+                assert_eq!(SECURITY_PARAM, xi.len());
+                F2::form_superfield(xi.try_into().unwrap())
+            })
+            .collect()
     }
 
     /// Function doing linear hashing of the column of bits in lock-step.
@@ -332,11 +318,11 @@ mod test {
     use std::iter::repeat_with;
     use std::iter::zip;
 
-    use super::to_field_f128_and_pad;
     use crate::parameters::SECURITY_PARAM;
     use crate::vole::commit_reconstruct::l_hat;
     use crate::vole::commit_reconstruct::B;
     use crate::vole::consistency_check::VoleHasher;
+    use crate::vole::crypto_primitives::CHALL1_LENGTH;
     use rand::thread_rng;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F128b;
@@ -346,21 +332,25 @@ mod test {
     #[test]
     fn test_padding_of_to_field_f128_and_pad() {
         let v = vec![F2::ZERO; 1000];
-        let t = to_field_f128_and_pad(&v, 1000);
+        let hasher = VoleHasher::from_seed([0; CHALL1_LENGTH], 1000);
+        let t = hasher.to_field_128(&v);
         assert_eq!(t.len(), 1000 / 128 + 1);
 
         let v = vec![F2::ZERO; 128];
-        let t = to_field_f128_and_pad(&v, 128);
+        let hasher = VoleHasher::from_seed([0; CHALL1_LENGTH], 128);
+        let t = hasher.to_field_128(&v);
         assert_eq!(t.len(), 1);
 
         let v = vec![F2::ZERO; 129];
-        let t = to_field_f128_and_pad(&v, 129);
+        let hasher = VoleHasher::from_seed([0; CHALL1_LENGTH], 129);
+        let t = hasher.to_field_128(&v);
         assert_eq!(t.len(), 2);
 
         let mut v = vec![F2::ZERO; 130];
         v[0] = F2::ONE;
         v[129] = F2::ONE;
-        let t = to_field_f128_and_pad(&v, 129);
+        let hasher = VoleHasher::from_seed([0; CHALL1_LENGTH], 130);
+        let t = hasher.to_field_128(&v);
         let mut res1 = [0u8; 16];
         res1[0] = 1u8;
         assert_eq!(t[0], F128b::from_bytes(&res1.into()).unwrap());
