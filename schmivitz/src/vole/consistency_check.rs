@@ -6,6 +6,7 @@ Implementation of algorithms related to consistency checks.
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::commit_reconstruct::B;
 use crate::vole::crypto_primitives::CHALL1_LENGTH;
+use generic_array::sequence::Concat;
 use generic_array::{
     sequence::Split,
     typenum::{U16, U32, U48, U64, U80, U96},
@@ -164,6 +165,9 @@ impl HashConsistency {
     }
 }
 
+/// Precomputation for the VOLE-Hash.
+///
+/// Drawn from FAEST spec v1.1, Fig 4.4, with some modifications (noted inline).
 pub(crate) struct VoleHasher {
     r0: F128b,
     r1: F128b,
@@ -181,6 +185,7 @@ impl VoleHasher {
         let (r1_bytes, rest): (GenericArray<u8, U16>, GenericArray<u8, U64>) = rest.split();
         let (r2_bytes, rest): (GenericArray<u8, U16>, GenericArray<u8, U48>) = rest.split();
         let (r3_bytes, rest): (GenericArray<u8, U16>, GenericArray<u8, U32>) = rest.split();
+        // Note: In the spec, `t` is 64 bits; here it's called `s1` and has 128 bits.
         let (s_bytes, t_bytes): (GenericArray<u8, U16>, GenericArray<u8, U16>) = rest.split();
 
         // Lines 3 - 5.
@@ -188,6 +193,7 @@ impl VoleHasher {
         let r1 = F128b::from_bytes(&r1_bytes).unwrap();
         let r2 = F128b::from_bytes(&r2_bytes).unwrap();
         let r3 = F128b::from_bytes(&r3_bytes).unwrap();
+        // Note: These are called `s` and `t` in the spec.
         let s0 = F128b::from_bytes(&s_bytes).unwrap();
         let s1 = F128b::from_bytes(&t_bytes).unwrap();
 
@@ -236,39 +242,35 @@ pub(crate) fn vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
 
     assert_eq!(x1_len, SECURITY_PARAM + B);
 
+    // Line 7.
     let x0_vec = to_field_f128_and_pad(x0, x0_len);
 
+    // Lines 10 - 11.
     let mut h0 = F128b::ZERO;
     let mut h1 = F128b::ZERO;
-
     for (x0_i, s0_i, s1_i) in izip!(x0_vec, hasher.s0_powers, hasher.s1_powers) {
         h0 += s0_i * x0_i;
         h1 += s1_i * x0_i;
     }
 
+    // Line 13.
     let h2 = hasher.r0 * h0 + hasher.r1 * h1;
     let h3 = hasher.r2 * h0 + hasher.r3 * h1;
 
+    // Line 14 (call ToBits and truncate).
     let h2_bits = h2.bit_decomposition();
-    let h3_bits = h3.bit_decomposition();
+    let (h3_bits, _unused): (GenericArray<bool, U16>, _) = h3.bit_decomposition().split();
 
-    let mut all_bits = Vec::with_capacity(SECURITY_PARAM + B);
-    all_bits.extend_from_slice(h2_bits.as_slice());
-    all_bits.extend_from_slice(h3_bits.as_slice());
+    // Line 14 (append).
+    let all_bits: [bool; SECURITY_PARAM + B] = h2_bits.concat(h3_bits).into();
 
-    all_bits.truncate(x1_len);
-    assert_eq!(all_bits.len(), SECURITY_PARAM + B);
+    // Line 14 (XOR with x1). This unwrap is safe because the two inputs must be the expected length.
+    let out: [F2; SECURITY_PARAM + B] = izip!(all_bits, x1)
+        .map(|(b1, b2)| (F2::from(b1) + b2))
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap() ;
 
-    let mut out = [F2::ZERO; SECURITY_PARAM + B];
-
-    out.copy_from_slice(
-        all_bits
-            .iter()
-            .zip(x1)
-            .map(|(b1, b2)| (F2::from(*b1) + b2))
-            .collect::<Vec<_>>()
-            .as_slice(),
-    );
     HashConsistency(out)
 }
 
@@ -292,8 +294,6 @@ pub(crate) fn vole_hash_lockstep(
     let mut h0 = [F128b::ZERO; SECURITY_PARAM];
     let mut h1 = [F128b::ZERO; SECURITY_PARAM];
     for (x0_i, s0_i, s1_i) in izip!(x0_vec, hasher.s0_powers, hasher.s1_powers) {
-        // This is where performing in lockstep is beneficial, saving on
-        // computing `s0_power`/`s1_power` only once for every row.
         for j in 0..SECURITY_PARAM {
             // This loop is the parallel part
             h0[j] += s0_i * x0_i[j];
@@ -312,30 +312,24 @@ pub(crate) fn vole_hash_lockstep(
     let x1_packed = pack_f128b(x1);
 
     for j in 0..SECURITY_PARAM {
+        // Line 14 (call ToBits and truncate).
         let h2_bits = h2[j].bit_decomposition();
-        let h3_bits = h3[j].bit_decomposition();
+        let (h3_bits, _unused): (GenericArray<bool, U16>, _) = h3[j].bit_decomposition().split();
 
-        let mut all_bits = Vec::with_capacity(SECURITY_PARAM + B);
-        all_bits.extend_from_slice(h2_bits.as_slice());
-        all_bits.extend_from_slice(h3_bits.as_slice());
-
-        all_bits.truncate(x1.len());
-        assert_eq!(all_bits.len(), SECURITY_PARAM + B);
-
-        let mut single_out = [F2::ZERO; SECURITY_PARAM + B];
+        // Line 14 (append).
+        let all_bits: [bool; SECURITY_PARAM + B] = h2_bits.concat(h3_bits).into();
 
         let mut x1_bits = [false; SECURITY_PARAM + B];
         for col in 0..SECURITY_PARAM + B {
             x1_bits[col] = x1_packed[col].bit_decomposition()[j];
         }
-        single_out.copy_from_slice(
-            all_bits
-                .iter()
-                .zip(x1_bits)
-                .map(|(b1, b2)| F2::from(*b1) + F2::from(b2))
+
+        // Line 14 (XOR with x1).
+        let single_out = izip!(all_bits, x1_bits)
+                .map(|(b1, b2)| F2::from(b1) + F2::from(b2))
                 .collect::<Vec<_>>()
-                .as_slice(),
-        );
+                .try_into()
+                .unwrap();
         out[j] = HashConsistency(single_out);
     }
     out
