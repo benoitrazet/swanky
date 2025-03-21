@@ -103,7 +103,6 @@ use mac_n_cheese_sieve_parser::Number;
 
 /// Convert a [`Number`] into `Some(u64)` if it'll fit, `None` otherwise.
 pub(crate) fn number_to_u64(x: &Number) -> eyre::Result<u64> {
-    use crypto_bigint::SplitMixed;
     let (hi, lo): (_, crypto_bigint::U64) = x.split_mixed();
     if hi == crypto_bigint::Uint::ZERO {
         Ok(u64::from(lo))
