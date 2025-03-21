@@ -99,7 +99,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
 fn main() {
     match env::var("RUST_LOG") {
         Ok(val) => println!("loglvl: {}", val),
-        Err(_) => env::set_var("RUST_LOG", "info"),
+        Err(_) => unsafe { env::set_var("RUST_LOG", "info") },
     };
     pretty_env_logger::init_timed();
 

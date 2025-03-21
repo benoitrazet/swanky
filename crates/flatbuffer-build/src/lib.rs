@@ -77,7 +77,7 @@ pub fn compile_flatbuffer(src: &str, dst: &str) {
             panic!("{dst:?} is out of date for source {src:?}. Refusing to regenerate flatbuffers because 'SWANKY_FLATBUFFER_DO_NOT_GENERATE' is set.");
         }
         let src_contents = std::fs::read(src).unwrap();
-        std::env::set_var("PWD", std::env::current_dir().unwrap());
+        unsafe { std::env::set_var("PWD", std::env::current_dir().unwrap()) };
         let actual_flatc_version = String::from_utf8(
             Command::new("flatc")
                 .arg("--version")
