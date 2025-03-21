@@ -22,7 +22,7 @@ pub struct TaskQueueEntry<T> {
     pub metadata: T,
 }
 impl<T> TaskQueueEntry<T> {
-    fn sort_key(&self) -> impl Ord {
+    fn sort_key(&self) -> impl Ord + use<T> {
         // We want high priority, low task ID tasks to go first
         (self.id.priority, std::cmp::Reverse(self.id.task_id))
     }
