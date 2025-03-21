@@ -150,10 +150,8 @@ pub struct RelationReader {
 
 fn bytes2number(bytes: &[u8]) -> eyre::Result<Number> {
     // We need to use the crypto_bigint version of generic_array.
-    let mut buf = crypto_bigint::generic_array::GenericArray::<
-        u8,
-        <Number as ArrayEncoding>::ByteSize,
-    >::default();
+    let mut buf =
+        crypto_bigint::hybrid_array::Array::<u8, <Number as ArrayEncoding>::ByteSize>::default();
     let to_take = buf.len().min(bytes.len());
     buf[..to_take].copy_from_slice(&bytes[..to_take]);
     eyre::ensure!(

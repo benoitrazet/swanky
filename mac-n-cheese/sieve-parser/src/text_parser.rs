@@ -296,7 +296,7 @@ impl<T: Read + Seek> ParseState<T> {
                 self.read_while(|byte| {
                     if let Some(new_nibble) = Self::decode_hex_nibble(byte) {
                         num_nibbles += 1;
-                        if num_nibbles > LIMBS * (Limb::BITS / 4) {
+                        if num_nibbles > LIMBS * ((Limb::BITS as usize) / 4) {
                             eyre::bail!("hex number overflow");
                         }
                         out <<= 4;
