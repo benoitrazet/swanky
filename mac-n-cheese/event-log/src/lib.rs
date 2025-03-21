@@ -216,22 +216,22 @@ pub mod internal {
     impl ThreadLocal {
         pub fn new(global: &GlobalStateHandle) -> Option<Self> {
             let global = global.read();
-            match global.deref()
-            { GlobalState::Open {
-                system_start,
-                new_buffers,
-                ..
-            } => {
-                let dst = Arc::new(Mutex::new(Vec::with_capacity(DEFAULT_CAPACITY)));
-                new_buffers.push(dst.clone());
-                Some(ThreadLocal {
-                    last_timestamp: Cell::new(*system_start),
-                    next_event_id: Cell::new(0),
-                    dst,
-                })
-            } _ => {
-                None
-            }}
+            match global.deref() {
+                GlobalState::Open {
+                    system_start,
+                    new_buffers,
+                    ..
+                } => {
+                    let dst = Arc::new(Mutex::new(Vec::with_capacity(DEFAULT_CAPACITY)));
+                    new_buffers.push(dst.clone());
+                    Some(ThreadLocal {
+                        last_timestamp: Cell::new(*system_start),
+                        next_event_id: Cell::new(0),
+                        dst,
+                    })
+                }
+                _ => None,
+            }
         }
         // Returns event ID
         pub fn submit_raw(&self, now: Instant, args: &[u32]) -> u64 {
@@ -327,19 +327,21 @@ pub mod internal {
         };
         std::thread::spawn(move || loop {
             let gs = gs_handle.read();
-            match &*gs
-            { GlobalState::Open {
-                system_start: _,
-                new_buffers,
-                writer,
-            } => {
-                writer
-                    .lock()
-                    .flush(new_buffers)
-                    .expect("Failed to flush event log");
-            } _ => {
-                break;
-            }}
+            match &*gs {
+                GlobalState::Open {
+                    system_start: _,
+                    new_buffers,
+                    writer,
+                } => {
+                    writer
+                        .lock()
+                        .flush(new_buffers)
+                        .expect("Failed to flush event log");
+                }
+                _ => {
+                    break;
+                }
+            }
             std::thread::sleep(EVENT_LOG_POLL_DURATION);
         });
         Ok(())

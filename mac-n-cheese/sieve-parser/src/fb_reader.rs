@@ -62,52 +62,54 @@ impl MessageReader {
     }
     fn next_root(&mut self) -> eyre::Result<Option<fb::Root>> {
         while !self.paths.is_empty() || self.current_file.is_some() {
-            match self.current_file.as_mut() { Some(file) => {
-                let pos = file.stream_position()?;
-                // This isn't the most efficient way to check this, but it's easy!
-                // This gets called infrequently enough that we don't care.
-                if pos == file.seek(std::io::SeekFrom::End(0))? {
-                    self.current_file = None;
-                    continue;
+            match self.current_file.as_mut() {
+                Some(file) => {
+                    let pos = file.stream_position()?;
+                    // This isn't the most efficient way to check this, but it's easy!
+                    // This gets called infrequently enough that we don't care.
+                    if pos == file.seek(std::io::SeekFrom::End(0))? {
+                        self.current_file = None;
+                        continue;
+                    }
+                    file.seek(std::io::SeekFrom::Start(pos))?;
+                    let (len, len_buf) = {
+                        let mut len_buf = [0; 4];
+                        file.read_exact(&mut len_buf)
+                            .context("Reading flatbuffer length")?;
+                        (u32::from_le_bytes(len_buf) as usize, len_buf)
+                    };
+                    self.buf.resize(len + 4, 0);
+                    self.buf[..4].copy_from_slice(&len_buf);
+                    file.read_exact(&mut self.buf[4..])
+                        .context("Reading flatbuffer root message")?;
+                    return Ok(Some(
+                        fb::size_prefixed_root_as_root_with_opts(
+                            &flatbuffers::VerifierOptions {
+                                max_tables: u32::MAX as usize,
+                                ..flatbuffers::VerifierOptions::default()
+                            },
+                            &self.buf,
+                        )
+                        .context("failed to verify flatbuffer root buffer")?,
+                    ));
                 }
-                file.seek(std::io::SeekFrom::Start(pos))?;
-                let (len, len_buf) = {
-                    let mut len_buf = [0; 4];
-                    file.read_exact(&mut len_buf)
-                        .context("Reading flatbuffer length")?;
-                    (u32::from_le_bytes(len_buf) as usize, len_buf)
-                };
-                self.buf.resize(len + 4, 0);
-                self.buf[..4].copy_from_slice(&len_buf);
-                file.read_exact(&mut self.buf[4..])
-                    .context("Reading flatbuffer root message")?;
-                return Ok(Some(
-                    fb::size_prefixed_root_as_root_with_opts(
-                        &flatbuffers::VerifierOptions {
-                            max_tables: u32::MAX as usize,
-                            ..flatbuffers::VerifierOptions::default()
-                        },
-                        &self.buf,
-                    )
-                    .context("failed to verify flatbuffer root buffer")?,
-                ));
-            } _ => {
-                // If current_file is None, then paths can't be empty, by the above condition.
-                let path = self.paths.pop().unwrap();
-                self.current_file =
-                    Some(File::open(&path).with_context(|| format!("Opening file {path:?}"))?);
-            }}
+                _ => {
+                    // If current_file is None, then paths can't be empty, by the above condition.
+                    let path = self.paths.pop().unwrap();
+                    self.current_file =
+                        Some(File::open(&path).with_context(|| format!("Opening file {path:?}"))?);
+                }
+            }
         }
         Ok(None)
     }
     fn next_relation(&mut self) -> eyre::Result<Option<fb::Relation>> {
-        match self.next_root()? { Some(root) => {
-            Ok(Some(root.message_as_relation().with_context(|| {
+        match self.next_root()? {
+            Some(root) => Ok(Some(root.message_as_relation().with_context(|| {
                 format!("wanted relation, got {:?}", root.message_type())
-            })?))
-        } _ => {
-            Ok(None)
-        }}
+            })?)),
+            _ => Ok(None),
+        }
     }
     fn next_inputs(
         &mut self,
@@ -118,28 +120,29 @@ impl MessageReader {
             Option<flatbuffers::Vector<flatbuffers::ForwardsUOffset<fb::Value>>>,
         )>,
     > {
-        match self.next_root()? { Some(root) => {
-            if let Some(values) = root.message_as_public_inputs() {
-                Ok(Some((
-                    ValueStreamKind::Public,
-                    values.type_(),
-                    values.inputs(),
-                )))
-            } else if let Some(values) = root.message_as_private_inputs() {
-                Ok(Some((
-                    ValueStreamKind::Private,
-                    values.type_(),
-                    values.inputs(),
-                )))
-            } else {
-                eyre::bail!(
-                    "Expected public or private inputs, got {:?}",
-                    root.message_type()
-                );
+        match self.next_root()? {
+            Some(root) => {
+                if let Some(values) = root.message_as_public_inputs() {
+                    Ok(Some((
+                        ValueStreamKind::Public,
+                        values.type_(),
+                        values.inputs(),
+                    )))
+                } else if let Some(values) = root.message_as_private_inputs() {
+                    Ok(Some((
+                        ValueStreamKind::Private,
+                        values.type_(),
+                        values.inputs(),
+                    )))
+                } else {
+                    eyre::bail!(
+                        "Expected public or private inputs, got {:?}",
+                        root.message_type()
+                    );
+                }
             }
-        } _ => {
-            Ok(None)
-        }}
+            _ => Ok(None),
+        }
     }
 }
 
@@ -552,27 +555,30 @@ impl super::ValueStreamReader for ValueStreamReader {
                 let mut reader = MessageReader::new(inputs);
                 if let Err(e) = (|| -> eyre::Result<()> {
                     loop {
-                        match reader.next_inputs()? { Some((_, _, values)) => {
-                            const CHUNK_SIZE: usize = 8192;
-                            let mut chunk = Vec::with_capacity(CHUNK_SIZE);
-                            for value in values.into_iter().flat_map(|x| x.iter()) {
-                                let value = bytes2number(
-                                    value.value().context("values must have values")?.bytes(),
-                                )?;
-                                chunk.push(value);
-                                if chunk.len() >= CHUNK_SIZE {
-                                    if s.send(Ok(chunk)).is_err() {
-                                        return Ok(());
+                        match reader.next_inputs()? {
+                            Some((_, _, values)) => {
+                                const CHUNK_SIZE: usize = 8192;
+                                let mut chunk = Vec::with_capacity(CHUNK_SIZE);
+                                for value in values.into_iter().flat_map(|x| x.iter()) {
+                                    let value = bytes2number(
+                                        value.value().context("values must have values")?.bytes(),
+                                    )?;
+                                    chunk.push(value);
+                                    if chunk.len() >= CHUNK_SIZE {
+                                        if s.send(Ok(chunk)).is_err() {
+                                            return Ok(());
+                                        }
+                                        chunk = Vec::with_capacity(CHUNK_SIZE);
                                     }
-                                    chunk = Vec::with_capacity(CHUNK_SIZE);
+                                }
+                                if !chunk.is_empty() && s.send(Ok(chunk)).is_err() {
+                                    return Ok(());
                                 }
                             }
-                            if !chunk.is_empty() && s.send(Ok(chunk)).is_err() {
+                            _ => {
                                 return Ok(());
                             }
-                        } _ => {
-                            return Ok(());
-                        }}
+                        }
                     }
                 })() {
                     let _ = s.send(Err(e));

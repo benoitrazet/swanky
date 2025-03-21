@@ -73,14 +73,19 @@ impl Resolver {
                 u32::try_from(cm.constant_data.len()).unwrap()
             } else if tid == cm.linear_id {
                 u32::try_from(cm.linear_data.len()).unwrap()
-            } else { match cm.finished_tasks.get(&tid) { Some(task) => {
-                task.outputs(IrType::Mac(FE::FIELD_TYPE.field_mac_type()))
-                    .len()
-            } _ => { match cm.linear_protos.get(&tid) { Some((proto, _)) => {
-                proto.outputs()[0].count()
-            } _ => {
-                panic!("cannot find task id {tid}");
-            }}}}};
+            } else {
+                match cm.finished_tasks.get(&tid) {
+                    Some(task) => task
+                        .outputs(IrType::Mac(FE::FIELD_TYPE.field_mac_type()))
+                        .len(),
+                    _ => match cm.linear_protos.get(&tid) {
+                        Some((proto, _)) => proto.outputs()[0].count(),
+                        _ => {
+                            panic!("cannot find task id {tid}");
+                        }
+                    },
+                }
+            };
             out.mapping.insert(tid, (new_id, sz));
             out.input_sizes.push(sz);
         }

@@ -153,7 +153,8 @@ mod tests {
         let set_a = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
         let set_b = enum_ids(SET_SIZE, 1, PRIMARY_KEY_SIZE);
 
-        let cardinality = psty_cardinality(&set_a, &set_b, rng.r#gen(), rng.r#gen()).unwrap() as usize;
+        let cardinality =
+            psty_cardinality(&set_a, &set_b, rng.r#gen(), rng.r#gen()).unwrap() as usize;
         assert!(
             cardinality == (SET_SIZE - 1),
             "The PSI Cardinality on primary_keys with one different item is wrong! The result was {} and should be {}",
@@ -170,7 +171,8 @@ mod tests {
         let set_a = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
         let set_b = enum_ids(SET_SIZE, SET_SIZE as u64, PRIMARY_KEY_SIZE);
 
-        let cardinality = psty_cardinality(&set_a, &set_b, rng.r#gen(), rng.r#gen()).unwrap() as usize;
+        let cardinality =
+            psty_cardinality(&set_a, &set_b, rng.r#gen(), rng.r#gen()).unwrap() as usize;
         assert!(
             cardinality == 0,
             "The PSI Cardinality on disjoint primary_keys is wrong! The result was {} and should be {}",
@@ -187,7 +189,8 @@ mod tests {
         let set_a = rand_u8_vec(SET_SIZE, 2u128.pow(PRIMARY_KEY_SIZE as u32 * 8), &mut rng);
         let set_b = rand_u8_vec(SET_SIZE, 2u128.pow(PRIMARY_KEY_SIZE as u32 * 8), &mut rng);
 
-        let cardinality = psty_cardinality(&set_a, &set_b, rng.r#gen(), rng.r#gen()).unwrap() as usize;
+        let cardinality =
+            psty_cardinality(&set_a, &set_b, rng.r#gen(), rng.r#gen()).unwrap() as usize;
 
         let cardinality_in_clear = cardinality_in_clear(&set_a, &set_b);
         assert!(

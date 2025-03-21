@@ -366,20 +366,23 @@ impl<P: Party> Reactor<P> for ThreadPoolReactor<P> {
         // Request data from disk
         let new_task_data = if let Some(addr) = req.want_task_data {
             let frr = FileReadRequest::Public(PublicReadRequest { chunk: addr });
-            match self.disk_cache.get(&frr) { Some(data) => {
-                event_log::DiskCacheHitOnRequest {
-                    task_id: task_id.task_id,
-                    priority: task_id.priority,
+            match self.disk_cache.get(&frr) {
+                Some(data) => {
+                    event_log::DiskCacheHitOnRequest {
+                        task_id: task_id.task_id,
+                        priority: task_id.priority,
+                    }
+                    .submit();
+                    Some(data)
                 }
-                .submit();
-                Some(data)
-            } _ => {
-                self.file_read_requests.enqueue(TaskQueueEntry {
-                    id: task_id,
-                    metadata: frr,
-                });
-                None
-            }}
+                _ => {
+                    self.file_read_requests.enqueue(TaskQueueEntry {
+                        id: task_id,
+                        metadata: frr,
+                    });
+                    None
+                }
+            }
         } else {
             None
         };

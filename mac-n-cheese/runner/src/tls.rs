@@ -167,13 +167,16 @@ pub fn initiate_tls<P: Party>(
             }
             let mut connections = Vec::with_capacity(num_connections);
             for (i, c) in sorted_connections.into_iter().enumerate() {
-                match c { Some(c) => {
-                    connections.push(c);
-                } _ => {
-                    // We panic here since this situation shouldn't ever occur.
-                    // We've put every connection into a slot with no duplicates.
-                    panic!("Connection {i} is missing");
-                }}
+                match c {
+                    Some(c) => {
+                        connections.push(c);
+                    }
+                    _ => {
+                        // We panic here since this situation shouldn't ever occur.
+                        // We've put every connection into a slot with no duplicates.
+                        panic!("Connection {i} is missing");
+                    }
+                }
             }
             root_conn.flush()?;
             (

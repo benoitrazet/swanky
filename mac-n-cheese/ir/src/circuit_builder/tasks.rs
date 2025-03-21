@@ -240,11 +240,14 @@ impl<'a> super::CircuitBuilder<'a> {
                 'outer: while let Some(chunk) = wires.next() {
                     buf.push(chunk);
                     for _ in 0..3 {
-                        match wires.next() { Some(chunk) => {
-                            buf.push(chunk);
-                        } _ => {
-                            break 'outer;
-                        }}
+                        match wires.next() {
+                            Some(chunk) => {
+                                buf.push(chunk);
+                            }
+                            _ => {
+                                break 'outer;
+                            }
+                        }
                     }
                     let chunks = std::mem::take(&mut buf)
                         .into_inner()

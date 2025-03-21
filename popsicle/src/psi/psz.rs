@@ -84,7 +84,9 @@ impl Sender {
         let inputs = utils::compress_and_hash_inputs(inputs, key);
         let nbins = channel.read_usize()?;
         let seeds = self.oprf.send(channel, nbins, rng)?;
-        let payloads = (0..inputs.len()).map(|_| rng.r#gen::<Block>()).collect_vec();
+        let payloads = (0..inputs.len())
+            .map(|_| rng.r#gen::<Block>())
+            .collect_vec();
 
         // For each hash function `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x ||
         // i) | x ∈ X)}`, randomly permute it, and send it to the receiver.

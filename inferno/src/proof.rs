@@ -105,11 +105,10 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
             })
             .collect();
         log::info!("Verification time: {:?}", time.elapsed());
-        match results.into_iter().find_map(|r| r.err()) { Some(err) => {
-            Err(err)
-        } _ => {
-            Ok(())
-        }}
+        match results.into_iter().find_map(|r| r.err()) {
+            Some(err) => Err(err),
+            _ => Ok(()),
+        }
     }
 }
 

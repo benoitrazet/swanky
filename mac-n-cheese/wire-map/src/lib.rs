@@ -116,30 +116,31 @@ impl<'parent, T> WireMap<'parent, T> {
         wire: WireId,
     ) -> Option<WirePosition<'a, 'parent, T>> {
         LOOKUP_MISSES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        match self.storage.range_mut(..=wire).next_back() { Some((&start, allocation)) => {
-            debug_assert!(start <= wire);
-            let allocation_len = allocation.len();
-            if wire - start >= allocation_len as u64 {
-                return None;
+        match self.storage.range_mut(..=wire).next_back() {
+            Some((&start, allocation)) => {
+                debug_assert!(start <= wire);
+                let allocation_len = allocation.len();
+                if wire - start >= allocation_len as u64 {
+                    return None;
+                }
+                let allocation = match std::mem::replace(
+                    allocation,
+                    Cell::InCache {
+                        len: allocation_len,
+                    },
+                ) {
+                    Cell::Uncached { allocation } => allocation,
+                    Cell::InCache { len: _ } => panic!("Allocation is already in the cache"),
+                };
+                let allocation = self.insert_into_cache(start, allocation);
+                let pos_in_allocation = (wire - start) as usize;
+                Some(WirePosition {
+                    allocation,
+                    pos_in_allocation,
+                })
             }
-            let allocation = match std::mem::replace(
-                allocation,
-                Cell::InCache {
-                    len: allocation_len,
-                },
-            ) {
-                Cell::Uncached { allocation } => allocation,
-                Cell::InCache { len: _ } => panic!("Allocation is already in the cache"),
-            };
-            let allocation = self.insert_into_cache(start, allocation);
-            let pos_in_allocation = (wire - start) as usize;
-            Some(WirePosition {
-                allocation,
-                pos_in_allocation,
-            })
-        } _ => {
-            None
-        }}
+            _ => None,
+        }
     }
     /// We assume that the allocation doesn't conflict with any other allocation.
     fn insert_into_cache(

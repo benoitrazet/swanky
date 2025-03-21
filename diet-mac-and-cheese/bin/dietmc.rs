@@ -61,12 +61,15 @@ fn start_connection_verifier(addresses: &[String]) -> Result<Vec<TcpStream>> {
 
     for addr in addresses.iter() {
         let listener = TcpListener::bind(addr.clone())?;
-        match listener.accept() { Ok((stream, _addr)) => {
-            tcp_streams.push(stream);
-            info!("accept connections on {:?}", addr);
-        } _ => {
-            bail!("Error binding addr: {:?}", addr);
-        }}
+        match listener.accept() {
+            Ok((stream, _addr)) => {
+                tcp_streams.push(stream);
+                info!("accept connections on {:?}", addr);
+            }
+            _ => {
+                bail!("Error binding addr: {:?}", addr);
+            }
+        }
     }
 
     Ok(tcp_streams)
@@ -130,22 +133,24 @@ impl<P: Party> Iterator
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(addr) = self.next_address() {
             match P::WHICH {
-                WhichParty::Verifier(_ev) => {
-                    match TcpListener::bind(&addr) { Ok(listener) => {
-                        match listener.accept() { Ok((stream, _addr)) => {
+                WhichParty::Verifier(_ev) => match TcpListener::bind(&addr) {
+                    Ok(listener) => match listener.accept() {
+                        Ok((stream, _addr)) => {
                             info!("accept connection on {}", addr);
                             let reader = BufReader::new(stream.try_clone().unwrap());
                             let writer = BufWriter::new(stream);
                             Some(SyncChannel::new(reader, writer))
-                        } _ => {
+                        }
+                        _ => {
                             info!("Error accepting addr {}", addr);
                             None
-                        }}
-                    } _ => {
+                        }
+                    },
+                    _ => {
                         log::error!("Error binding addr {}", addr);
                         None
-                    }}
-                }
+                    }
+                },
                 WhichParty::Prover(_) => loop {
                     let c = TcpStream::connect(&addr);
                     if let Ok(stream) = c {
@@ -330,11 +335,12 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
             >::new(&addresses);
 
             // This is the channel for the main thread
-            let mut channel = match channels.next() { Some(c) => {
-                c
-            } _ => {
-                bail!("cannot open first channel");
-            }};
+            let mut channel = match channels.next() {
+                Some(c) => c,
+                _ => {
+                    bail!("cannot open first channel");
+                }
+            };
 
             let init_time = Instant::now();
             let total_time = Instant::now();
@@ -392,11 +398,12 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
             >::new(&addresses);
 
             // This is the channel for the main thread
-            let mut channel = match channels.next() { Some(c) => {
-                c
-            } _ => {
-                bail!("cannot open first channel");
-            }};
+            let mut channel = match channels.next() {
+                Some(c) => c,
+                _ => {
+                    bail!("cannot open first channel");
+                }
+            };
 
             let init_time = Instant::now();
             let total_time = Instant::now();

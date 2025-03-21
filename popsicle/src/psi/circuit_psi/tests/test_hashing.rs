@@ -343,7 +343,8 @@ sender.state.opprf_payloads_in.len(), sender.state.opprf_payloads_out.len(),
             let mut rng = AesRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
-            let (_, receiver, _, _) = psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
+            let (_, receiver, _, _) =
+                psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
             assert!(
                 receiver.state.opprf_payloads_in.len() == receiver.state.opprf_primary_keys_in.len(),
                 "PSTY Cuckoo Hashing: the payloads and sets hash tables have different sizes, payloads: {}, set {}",
