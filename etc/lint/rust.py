@@ -234,7 +234,7 @@ def _tree_sitter_rust_language() -> tree_sitter.Language:
     lib = ctypes.cdll.LoadLibrary(os.path.join(so_paths[0], "parser"))
     getter_function = lib.tree_sitter_rust
     getter_function.restype = ctypes.c_void_p
-    return tree_sitter.Language(getter_function(), "rust")
+    return tree_sitter.Language(getter_function())
 
 
 _MISSING_DOCS_QUERY_OBJ: Optional["tree_sitter.Query"] = None
@@ -249,8 +249,7 @@ def _contains_deny_missing_docs(code: bytes) -> bool:
     with _MISSING_DOCS_QUERY_LOCK:
         if _MISSING_DOCS_QUERY_OBJ is None:
             lang = _tree_sitter_rust_language()
-            _MISSING_DOCS_PARSER = tree_sitter.Parser()
-            _MISSING_DOCS_PARSER.set_language(lang)
+            _MISSING_DOCS_PARSER = tree_sitter.Parser(lang)
             _MISSING_DOCS_QUERY_OBJ = lang.query(_MISSING_DOCS_QUERY)
         assert _MISSING_DOCS_PARSER is not None
         return (
