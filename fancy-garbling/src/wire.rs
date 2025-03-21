@@ -336,13 +336,13 @@ impl WireLabel for AllWire {
     }
     fn plus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self {
         match (&mut *self, other) {
-            (AllWire::Mod2(ref mut x), AllWire::Mod2(y)) => {
+            (AllWire::Mod2(x), AllWire::Mod2(y)) => {
                 x.plus_eq(y);
             }
-            (AllWire::Mod3(ref mut x), AllWire::Mod3(y)) => {
+            (AllWire::Mod3(x), AllWire::Mod3(y)) => {
                 x.plus_eq(y);
             }
-            (AllWire::ModN(ref mut x), AllWire::ModN(y)) => {
+            (AllWire::ModN(x), AllWire::ModN(y)) => {
                 x.plus_eq(y);
             }
             _ => {
@@ -358,13 +358,13 @@ impl WireLabel for AllWire {
 
     fn cmul_eq(&mut self, c: u16) -> &mut Self {
         match &mut *self {
-            AllWire::Mod2(ref mut x) => {
+            AllWire::Mod2(x) => {
                 x.cmul_eq(c);
             }
-            AllWire::Mod3(ref mut x) => {
+            AllWire::Mod3(x) => {
                 x.cmul_eq(c);
             }
-            AllWire::ModN(ref mut x) => {
+            AllWire::ModN(x) => {
                 x.cmul_eq(c);
             }
         };
@@ -372,13 +372,13 @@ impl WireLabel for AllWire {
     }
     fn negate_eq(&mut self) -> &mut Self {
         match &mut *self {
-            AllWire::Mod2(ref mut x) => {
+            AllWire::Mod2(x) => {
                 x.negate_eq();
             }
-            AllWire::Mod3(ref mut x) => {
+            AllWire::Mod3(x) => {
                 x.negate_eq();
             }
-            AllWire::ModN(ref mut x) => {
+            AllWire::ModN(x) => {
                 x.negate_eq();
             }
         };

@@ -729,7 +729,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                     }
 
                                     // Multiply the results
-                                    let (mut g_i, mut g_i_v) =
+                                    let &(mut g_i, mut g_i_v) =
                                         xors.get(0).context("Mux condition empty")?;
                                     for &(xor, xor_v) in &xors[1..] {
                                         (g_i, g_i_v) = mul(
@@ -790,7 +790,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
 
                         // For strict mode, assert sum(g_i) = 1
                         if let Permissiveness::Strict = self.permissiveness {
-                            let (mut sum, _) = g.get(0).context("Mux has no branches")?;
+                            let &(mut sum, _) = g.get(0).context("Mux has no branches")?;
 
                             // sum(g_i)
                             for &(g_i, _) in &g[1..] {

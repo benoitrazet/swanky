@@ -131,7 +131,7 @@ impl<C: AbstractChannel> FancyBinary for Evaluator<C, AllWire> {
     }
 
     fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        if let (AllWire::Mod2(ref A), AllWire::Mod2(ref B)) = (x, y) {
+        if let (AllWire::Mod2(A), AllWire::Mod2(B)) = (x, y) {
             let gate0 = self.channel.read_block()?;
             let gate1 = self.channel.read_block()?;
             return Ok(AllWire::Mod2(self.evaluate_and_gate(A, B, &gate0, &gate1)));
