@@ -61,12 +61,12 @@ fn start_connection_verifier(addresses: &[String]) -> Result<Vec<TcpStream>> {
 
     for addr in addresses.iter() {
         let listener = TcpListener::bind(addr.clone())?;
-        if let Ok((stream, _addr)) = listener.accept() {
+        match listener.accept() { Ok((stream, _addr)) => {
             tcp_streams.push(stream);
             info!("accept connections on {:?}", addr);
-        } else {
+        } _ => {
             bail!("Error binding addr: {:?}", addr);
-        }
+        }}
     }
 
     Ok(tcp_streams)
@@ -131,20 +131,20 @@ impl<P: Party> Iterator
         if let Some(addr) = self.next_address() {
             match P::WHICH {
                 WhichParty::Verifier(_ev) => {
-                    if let Ok(listener) = TcpListener::bind(&addr) {
-                        if let Ok((stream, _addr)) = listener.accept() {
+                    match TcpListener::bind(&addr) { Ok(listener) => {
+                        match listener.accept() { Ok((stream, _addr)) => {
                             info!("accept connection on {}", addr);
                             let reader = BufReader::new(stream.try_clone().unwrap());
                             let writer = BufWriter::new(stream);
                             Some(SyncChannel::new(reader, writer))
-                        } else {
+                        } _ => {
                             info!("Error accepting addr {}", addr);
                             None
-                        }
-                    } else {
+                        }}
+                    } _ => {
                         log::error!("Error binding addr {}", addr);
                         None
-                    }
+                    }}
                 }
                 WhichParty::Prover(_) => loop {
                     let c = TcpStream::connect(&addr);
@@ -330,11 +330,11 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
             >::new(&addresses);
 
             // This is the channel for the main thread
-            let mut channel = if let Some(c) = channels.next() {
+            let mut channel = match channels.next() { Some(c) => {
                 c
-            } else {
+            } _ => {
                 bail!("cannot open first channel");
-            };
+            }};
 
             let init_time = Instant::now();
             let total_time = Instant::now();
@@ -392,11 +392,11 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
             >::new(&addresses);
 
             // This is the channel for the main thread
-            let mut channel = if let Some(c) = channels.next() {
+            let mut channel = match channels.next() { Some(c) => {
                 c
-            } else {
+            } _ => {
                 bail!("cannot open first channel");
-            };
+            }};
 
             let init_time = Instant::now();
             let total_time = Instant::now();

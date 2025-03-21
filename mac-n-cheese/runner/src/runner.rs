@@ -257,7 +257,7 @@ impl<P: Party> RunnerThread<P> {
             "incoming data size mismatch"
         );
         let mut outgoing_data = OwnedAlignedBytes::zeroed(sizes.outgoing);
-        let tr = if let Some(task_continuation) = task_continuation {
+        let tr = match task_continuation { Some(task_continuation) => {
             defn.continue_task(
                 task_continuation,
                 &mut ctx,
@@ -265,9 +265,9 @@ impl<P: Party> RunnerThread<P> {
                 incoming_data,
                 outgoing_data.as_mut(),
             )?
-        } else {
+        } _ => {
             defn.start_task(&mut ctx, &task_input, incoming_data, outgoing_data.as_mut())?
-        };
+        }};
         if !outgoing_data.is_empty() {
             // It's important that we submit any outgoing data _before_ launching any other tasks.
             // That way we can ensure that outgoing data is sent in topological order.

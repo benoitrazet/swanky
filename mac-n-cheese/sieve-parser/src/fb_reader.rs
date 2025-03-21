@@ -62,7 +62,7 @@ impl MessageReader {
     }
     fn next_root(&mut self) -> eyre::Result<Option<fb::Root>> {
         while !self.paths.is_empty() || self.current_file.is_some() {
-            if let Some(file) = self.current_file.as_mut() {
+            match self.current_file.as_mut() { Some(file) => {
                 let pos = file.stream_position()?;
                 // This isn't the most efficient way to check this, but it's easy!
                 // This gets called infrequently enough that we don't care.
@@ -91,23 +91,23 @@ impl MessageReader {
                     )
                     .context("failed to verify flatbuffer root buffer")?,
                 ));
-            } else {
+            } _ => {
                 // If current_file is None, then paths can't be empty, by the above condition.
                 let path = self.paths.pop().unwrap();
                 self.current_file =
                     Some(File::open(&path).with_context(|| format!("Opening file {path:?}"))?);
-            }
+            }}
         }
         Ok(None)
     }
     fn next_relation(&mut self) -> eyre::Result<Option<fb::Relation>> {
-        if let Some(root) = self.next_root()? {
+        match self.next_root()? { Some(root) => {
             Ok(Some(root.message_as_relation().with_context(|| {
                 format!("wanted relation, got {:?}", root.message_type())
             })?))
-        } else {
+        } _ => {
             Ok(None)
-        }
+        }}
     }
     fn next_inputs(
         &mut self,
@@ -118,7 +118,7 @@ impl MessageReader {
             Option<flatbuffers::Vector<flatbuffers::ForwardsUOffset<fb::Value>>>,
         )>,
     > {
-        if let Some(root) = self.next_root()? {
+        match self.next_root()? { Some(root) => {
             if let Some(values) = root.message_as_public_inputs() {
                 Ok(Some((
                     ValueStreamKind::Public,
@@ -137,9 +137,9 @@ impl MessageReader {
                     root.message_type()
                 );
             }
-        } else {
+        } _ => {
             Ok(None)
-        }
+        }}
     }
 }
 
@@ -552,7 +552,7 @@ impl super::ValueStreamReader for ValueStreamReader {
                 let mut reader = MessageReader::new(inputs);
                 if let Err(e) = (|| -> eyre::Result<()> {
                     loop {
-                        if let Some((_, _, values)) = reader.next_inputs()? {
+                        match reader.next_inputs()? { Some((_, _, values)) => {
                             const CHUNK_SIZE: usize = 8192;
                             let mut chunk = Vec::with_capacity(CHUNK_SIZE);
                             for value in values.into_iter().flat_map(|x| x.iter()) {
@@ -570,9 +570,9 @@ impl super::ValueStreamReader for ValueStreamReader {
                             if !chunk.is_empty() && s.send(Ok(chunk)).is_err() {
                                 return Ok(());
                             }
-                        } else {
+                        } _ => {
                             return Ok(());
-                        }
+                        }}
                     }
                 })() {
                     let _ = s.send(Err(e));

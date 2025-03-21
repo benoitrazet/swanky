@@ -108,15 +108,15 @@ impl<T: Read + Seek> ParseState<T> {
             // any good reason for us to double-check that someone didn't sneak a bell
             // character into the source.
             self.read_while(|x| Ok(x <= 32))?;
-            if let Some(b'/') = self.inner.fill_buf()?.first().copied() {
+            match self.inner.fill_buf()?.first().copied() { Some(b'/') => {
                 // Currently, if we see a '/', then it must be the beginning of a comment. We
                 // don't see a '/' in any other circumstance.
                 // Consume through the slash.
                 self.inner.read_exact(&mut [0])?;
                 self.skip_comment_after_slash()?;
-            } else {
+            } _ => {
                 return Ok(());
-            }
+            }}
         }
     }
 
@@ -668,11 +668,11 @@ impl<T: Read + Seek> RelationReader<T> {
                                     fbv.mulc(ty, dst, left, &right)?;
                                 }
                                 b"public" => {
-                                    let ty = if let Some(b')') = self.ps.peek()? {
+                                    let ty = match self.ps.peek()? { Some(b')') => {
                                         0
-                                    } else {
+                                    } _ => {
                                         self.ps.u8()?
-                                    };
+                                    }};
                                     self.ps.expect_byte(b')')?;
                                     self.ps.semi()?;
                                     fbv.public_input(
@@ -681,11 +681,11 @@ impl<T: Read + Seek> RelationReader<T> {
                                     )?;
                                 }
                                 b"private" => {
-                                    let ty = if let Some(b')') = self.ps.peek()? {
+                                    let ty = match self.ps.peek()? { Some(b')') => {
                                         0
-                                    } else {
+                                    } _ => {
                                         self.ps.u8()?
-                                    };
+                                    }};
                                     self.ps.expect_byte(b')')?;
                                     self.ps.semi()?;
                                     fbv.private_input(
@@ -767,7 +767,7 @@ impl<T: Read + Seek> RelationReader<T> {
                     let src_type_id = self.ps.u8()?;
                     self.ps.colon()?;
                     let src = self.read_wire_range()?;
-                    let semantics = if let Some(b',') = self.ps.peek()? {
+                    let semantics = match self.ps.peek()? { Some(b',') => {
                         self.ps.expect_byte(b',')?;
                         self.ps.at()?;
                         self.ps.token(&mut buf)?;
@@ -776,9 +776,9 @@ impl<T: Read + Seek> RelationReader<T> {
                             b"modulus" => ConversionSemantics::Modulus,
                             _ => eyre::bail!("unexpected token {:?}", ascii_str(&buf)),
                         }
-                    } else {
+                    } _ => {
                         ConversionSemantics::NoModulus
-                    };
+                    }};
                     self.ps.expect_byte(b')')?;
                     self.ps.semi()?;
                     fbv.convert(
@@ -985,7 +985,7 @@ impl<T: Read + Seek> ValueStreamReader<T> {
         })
     }
     fn next_inner(&mut self) -> eyre::Result<Option<Number>> {
-        if let Some(ps) = self.ps.as_mut() {
+        match self.ps.as_mut() { Some(ps) => {
             match ps.peek()? {
                 Some(b'@') => {
                     let mut buf = Vec::with_capacity(128);
@@ -1005,9 +1005,9 @@ impl<T: Read + Seek> ValueStreamReader<T> {
                 }
                 ch => eyre::bail!("Expected '@' or '<'. Got {ch:?}"),
             }
-        } else {
+        } _ => {
             Ok(None)
-        }
+        }}
     }
     pub fn modulus(&self) -> &Number {
         &self.modulus

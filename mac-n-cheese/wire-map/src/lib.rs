@@ -116,7 +116,7 @@ impl<'parent, T> WireMap<'parent, T> {
         wire: WireId,
     ) -> Option<WirePosition<'a, 'parent, T>> {
         LOOKUP_MISSES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        if let Some((&start, allocation)) = self.storage.range_mut(..=wire).next_back() {
+        match self.storage.range_mut(..=wire).next_back() { Some((&start, allocation)) => {
             debug_assert!(start <= wire);
             let allocation_len = allocation.len();
             if wire - start >= allocation_len as u64 {
@@ -137,9 +137,9 @@ impl<'parent, T> WireMap<'parent, T> {
                 allocation,
                 pos_in_allocation,
             })
-        } else {
+        } _ => {
             None
-        }
+        }}
     }
     /// We assume that the allocation doesn't conflict with any other allocation.
     fn insert_into_cache(

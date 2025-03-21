@@ -69,13 +69,13 @@ impl<T> TaskQueue<T> {
             queue_name: self.name,
         }
         .lock(&self.queue);
-        if let Some(queue) = guard.as_mut() {
+        match guard.as_mut() { Some(queue) => {
             queue.push(item);
             self.queue_changed.notify_one();
-        } else {
+        } _ => {
             std::mem::drop(guard);
             eprintln!("Dropping value attempted to enqueue on closed task queue");
-        }
+        }}
     }
     pub fn blocking_dequeue(&self) -> Option<TaskQueueEntry<T>> {
         // TODO: make the event log support condition variables.
@@ -85,15 +85,15 @@ impl<T> TaskQueue<T> {
         .start();
         let mut guard = self.queue.lock();
         let entry = loop {
-            if let Some(queue) = guard.as_mut() {
+            match guard.as_mut() { Some(queue) => {
                 if let Some(entry) = queue.pop() {
                     break entry;
                 }
                 self.queue_changed.wait(&mut guard);
-            } else {
+            } _ => {
                 // We intentionally don't finish the span.
                 return None;
-            }
+            }}
         };
         std::mem::drop(guard);
         span.finish();

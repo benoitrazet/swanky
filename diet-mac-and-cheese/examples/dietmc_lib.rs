@@ -39,12 +39,12 @@ fn field_to_number<F: FiniteField>(v: F) -> Number {
 
 fn start_connection_verifier(addr: &String) -> Result<TcpStream> {
     let listener = TcpListener::bind(addr.clone())?;
-    if let Ok((stream, _addr)) = listener.accept() {
+    match listener.accept() { Ok((stream, _addr)) => {
         println!("accept connections on {:?}", addr);
         Ok(stream)
-    } else {
+    } _ => {
         bail!("Error binding addr: {:?}", addr);
-    }
+    }}
 }
 
 fn start_connection_prover(addr: &String) -> Result<TcpStream> {

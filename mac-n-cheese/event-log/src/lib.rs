@@ -216,12 +216,12 @@ pub mod internal {
     impl ThreadLocal {
         pub fn new(global: &GlobalStateHandle) -> Option<Self> {
             let global = global.read();
-            if let GlobalState::Open {
+            match global.deref()
+            { GlobalState::Open {
                 system_start,
                 new_buffers,
                 ..
-            } = global.deref()
-            {
+            } => {
                 let dst = Arc::new(Mutex::new(Vec::with_capacity(DEFAULT_CAPACITY)));
                 new_buffers.push(dst.clone());
                 Some(ThreadLocal {
@@ -229,9 +229,9 @@ pub mod internal {
                     next_event_id: Cell::new(0),
                     dst,
                 })
-            } else {
+            } _ => {
                 None
-            }
+            }}
         }
         // Returns event ID
         pub fn submit_raw(&self, now: Instant, args: &[u32]) -> u64 {
@@ -327,19 +327,19 @@ pub mod internal {
         };
         std::thread::spawn(move || loop {
             let gs = gs_handle.read();
-            if let GlobalState::Open {
+            match &*gs
+            { GlobalState::Open {
                 system_start: _,
                 new_buffers,
                 writer,
-            } = &*gs
-            {
+            } => {
                 writer
                     .lock()
                     .flush(new_buffers)
                     .expect("Failed to flush event log");
-            } else {
+            } _ => {
                 break;
-            }
+            }}
             std::thread::sleep(EVENT_LOG_POLL_DURATION);
         });
         Ok(())

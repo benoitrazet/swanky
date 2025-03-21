@@ -74,13 +74,13 @@ impl InputText {
     /// Load more instances or witnesses into the internal queue
     fn load_more_in_queue(&mut self) -> Result<Option<()>> {
         for i in 0..(1 << 16) {
-            if let Some(v) = self.reader.next()? {
+            match self.reader.next()? { Some(v) => {
                 self.queue.push_back(v);
-            } else if i > 0 {
+            } _ => if i > 0 {
                 return Ok(Some(()));
             } else {
                 return Ok(None);
-            }
+            }}
         }
         Ok(Some(()))
     }
