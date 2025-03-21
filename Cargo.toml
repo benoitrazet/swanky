@@ -31,7 +31,7 @@ members = [
 [workspace.package]
 authors = ["swanky authors <swanky@galois.com>"]
 license = "MIT"
-edition = "2021"
+edition = "2024"
 publish = false
 version = "0.6.0"
 
