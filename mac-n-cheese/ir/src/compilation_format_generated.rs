@@ -1,4 +1,4 @@
-// CACHE KEY 66b5000fbc2fc3b1395c26edf10e8e0728b5fbe4e8f137234236ab6a39caa96b
+// CACHE KEY f98984e7ff2da86a6a9e13332477d28a2dbc95a401937e81aee6c9229877472f
 #![cfg_attr(rustfmt, rustfmt_skip)]
 #![allow(clippy::all)]
 #![allow(unused_imports)]
@@ -134,8 +134,12 @@ impl<'b> flatbuffers::Push for Type {
     type Output = Type;
     #[inline]
     unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
-        let src = ::core::slice::from_raw_parts(self as *const Type as *const u8, Self::size());
+        let src = ::core::slice::from_raw_parts(self as *const Type as *const u8, <Self as flatbuffers::Push>::size());
         dst.copy_from_slice(src);
+    }
+    #[inline]
+    fn alignment() -> flatbuffers::PushAlignment {
+        flatbuffers::PushAlignment::new(2)
     }
 }
 
@@ -226,8 +230,12 @@ impl<'b> flatbuffers::Push for TaskId {
     type Output = TaskId;
     #[inline]
     unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
-        let src = ::core::slice::from_raw_parts(self as *const TaskId as *const u8, Self::size());
+        let src = ::core::slice::from_raw_parts(self as *const TaskId as *const u8, <Self as flatbuffers::Push>::size());
         dst.copy_from_slice(src);
+    }
+    #[inline]
+    fn alignment() -> flatbuffers::PushAlignment {
+        flatbuffers::PushAlignment::new(4)
     }
 }
 
@@ -321,8 +329,12 @@ impl<'b> flatbuffers::Push for DataChunkAddress {
     type Output = DataChunkAddress;
     #[inline]
     unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
-        let src = ::core::slice::from_raw_parts(self as *const DataChunkAddress as *const u8, Self::size());
+        let src = ::core::slice::from_raw_parts(self as *const DataChunkAddress as *const u8, <Self as flatbuffers::Push>::size());
         dst.copy_from_slice(src);
+    }
+    #[inline]
+    fn alignment() -> flatbuffers::PushAlignment {
+        flatbuffers::PushAlignment::new(8)
     }
 }
 
@@ -507,8 +519,12 @@ impl<'b> flatbuffers::Push for Shape {
     type Output = Shape;
     #[inline]
     unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
-        let src = ::core::slice::from_raw_parts(self as *const Shape as *const u8, Self::size());
+        let src = ::core::slice::from_raw_parts(self as *const Shape as *const u8, <Self as flatbuffers::Push>::size());
         dst.copy_from_slice(src);
+    }
+    #[inline]
+    fn alignment() -> flatbuffers::PushAlignment {
+        flatbuffers::PushAlignment::new(4)
     }
 }
 
@@ -614,8 +630,12 @@ impl<'b> flatbuffers::Push for TaskCommunicationRound {
     type Output = TaskCommunicationRound;
     #[inline]
     unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
-        let src = ::core::slice::from_raw_parts(self as *const TaskCommunicationRound as *const u8, Self::size());
+        let src = ::core::slice::from_raw_parts(self as *const TaskCommunicationRound as *const u8, <Self as flatbuffers::Push>::size());
         dst.copy_from_slice(src);
+    }
+    #[inline]
+    fn alignment() -> flatbuffers::PushAlignment {
+        flatbuffers::PushAlignment::new(4)
     }
 }
 
@@ -740,8 +760,12 @@ impl<'b> flatbuffers::Push for TaskInput {
     type Output = TaskInput;
     #[inline]
     unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
-        let src = ::core::slice::from_raw_parts(self as *const TaskInput as *const u8, Self::size());
+        let src = ::core::slice::from_raw_parts(self as *const TaskInput as *const u8, <Self as flatbuffers::Push>::size());
         dst.copy_from_slice(src);
+    }
+    #[inline]
+    fn alignment() -> flatbuffers::PushAlignment {
+        flatbuffers::PushAlignment::new(4)
     }
 }
 
@@ -893,8 +917,12 @@ impl<'b> flatbuffers::Push for TaskInputTributary {
     type Output = TaskInputTributary;
     #[inline]
     unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
-        let src = ::core::slice::from_raw_parts(self as *const TaskInputTributary as *const u8, Self::size());
+        let src = ::core::slice::from_raw_parts(self as *const TaskInputTributary as *const u8, <Self as flatbuffers::Push>::size());
         dst.copy_from_slice(src);
+    }
+    #[inline]
+    fn alignment() -> flatbuffers::PushAlignment {
+        flatbuffers::PushAlignment::new(4)
     }
 }
 

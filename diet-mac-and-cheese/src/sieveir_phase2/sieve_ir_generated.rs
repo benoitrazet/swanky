@@ -1,4 +1,4 @@
-// CACHE KEY 71f550fb9ea2424e47b81ca642dfc71e9a827d5f2b53f4d753302ffdb51d108b
+// CACHE KEY 2ccc0cf476ba92713c7b32f23cc2e1407a8f5884a9ff728e8bdd664a7cf2ce29
 #![cfg_attr(rustfmt, rustfmt_skip)]
 #![allow(clippy::all)]
 #![allow(unused_imports)]
@@ -570,8 +570,12 @@ impl<'b> flatbuffers::Push for Count {
     type Output = Count;
     #[inline]
     unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
-        let src = ::core::slice::from_raw_parts(self as *const Count as *const u8, Self::size());
+        let src = ::core::slice::from_raw_parts(self as *const Count as *const u8, <Self as flatbuffers::Push>::size());
         dst.copy_from_slice(src);
+    }
+    #[inline]
+    fn alignment() -> flatbuffers::PushAlignment {
+        flatbuffers::PushAlignment::new(8)
     }
 }
 
@@ -694,8 +698,12 @@ impl<'b> flatbuffers::Push for Conversion {
     type Output = Conversion;
     #[inline]
     unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
-        let src = ::core::slice::from_raw_parts(self as *const Conversion as *const u8, Self::size());
+        let src = ::core::slice::from_raw_parts(self as *const Conversion as *const u8, <Self as flatbuffers::Push>::size());
         dst.copy_from_slice(src);
+    }
+    #[inline]
+    fn alignment() -> flatbuffers::PushAlignment {
+        flatbuffers::PushAlignment::new(8)
     }
 }
 
@@ -784,8 +792,12 @@ impl<'b> flatbuffers::Push for WireRange {
     type Output = WireRange;
     #[inline]
     unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
-        let src = ::core::slice::from_raw_parts(self as *const WireRange as *const u8, Self::size());
+        let src = ::core::slice::from_raw_parts(self as *const WireRange as *const u8, <Self as flatbuffers::Push>::size());
         dst.copy_from_slice(src);
+    }
+    #[inline]
+    fn alignment() -> flatbuffers::PushAlignment {
+        flatbuffers::PushAlignment::new(8)
     }
 }
 
