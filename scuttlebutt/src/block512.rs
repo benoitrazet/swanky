@@ -75,10 +75,10 @@ impl std::fmt::Display for Block512 {
 impl rand::distributions::Distribution<Block512> for rand::distributions::Standard {
     #[inline]
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Block512 {
-        let b1 = rng.gen::<Block>();
-        let b2 = rng.gen::<Block>();
-        let b3 = rng.gen::<Block>();
-        let b4 = rng.gen::<Block>();
+        let b1 = rng.r#gen::<Block>();
+        let b2 = rng.r#gen::<Block>();
+        let b3 = rng.r#gen::<Block>();
+        let b4 = rng.r#gen::<Block>();
         Block512([b1, b2, b3, b4])
     }
 }

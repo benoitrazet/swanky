@@ -7,7 +7,7 @@ use std::time::Duration;
 fn bench_tweak(c: &mut Criterion) {
     c.bench_function("util::tweak", move |b| {
         let rng = &mut rand::thread_rng();
-        let i = rng.gen::<usize>();
+        let i = rng.r#gen::<usize>();
         b.iter(|| {
             let block = util::tweak(i);
             criterion::black_box(block);
@@ -18,8 +18,8 @@ fn bench_tweak(c: &mut Criterion) {
 fn bench_tweak2(c: &mut Criterion) {
     c.bench_function("util::tweak2", move |b| {
         let rng = &mut rand::thread_rng();
-        let i = rng.gen::<u64>();
-        let j = rng.gen::<u64>();
+        let i = rng.r#gen::<u64>();
+        let j = rng.r#gen::<u64>();
         b.iter(|| {
             let block = util::tweak2(i, j);
             criterion::black_box(block);
@@ -30,8 +30,8 @@ fn bench_tweak2(c: &mut Criterion) {
 fn bench_output_tweak(c: &mut Criterion) {
     c.bench_function("util::output_tweak", move |b| {
         let rng = &mut rand::thread_rng();
-        let i = rng.gen::<usize>();
-        let k = rng.gen::<u16>();
+        let i = rng.r#gen::<usize>();
+        let k = rng.r#gen::<u16>();
         b.iter(|| {
             let block = util::output_tweak(i, k);
             criterion::black_box(block);
@@ -42,9 +42,9 @@ fn bench_output_tweak(c: &mut Criterion) {
 fn base_q_add_eq(c: &mut Criterion, q: u16) {
     c.bench_function(&format!("util::as_base_q_add_eq ({})", q), move |b| {
         let rng = &mut rand::thread_rng();
-        let x = rng.gen::<u128>();
+        let x = rng.r#gen::<u128>();
         let mut xs = util::as_base_q_u128(x, q);
-        let y = rng.gen::<u128>();
+        let y = rng.r#gen::<u128>();
         let ys = util::as_base_q_u128(y, q);
         b.iter(|| {
             util::base_q_add_eq(&mut xs, &ys, q);
@@ -55,7 +55,7 @@ fn base_q_add_eq(c: &mut Criterion, q: u16) {
 fn as_base_q_u128(c: &mut Criterion, q: u16) {
     c.bench_function(&format!("util::as_base_q_u128 ({})", q), move |b| {
         let rng = &mut rand::thread_rng();
-        let x = rng.gen::<u128>();
+        let x = rng.r#gen::<u128>();
         b.iter(|| {
             let ds = util::as_base_q_u128(x, q);
             criterion::black_box(ds);
@@ -66,7 +66,7 @@ fn as_base_q_u128(c: &mut Criterion, q: u16) {
 fn from_base_q(c: &mut Criterion, q: u16) {
     c.bench_function(&format!("util::from_base_q ({})", q), move |b| {
         let rng = &mut rand::thread_rng();
-        let x = rng.gen::<u128>();
+        let x = rng.r#gen::<u128>();
         let ds = util::as_base_q_u128(x, q);
         b.iter(|| {
             let v = util::from_base_q(&ds, q);
@@ -78,7 +78,7 @@ fn from_base_q(c: &mut Criterion, q: u16) {
 fn u128_to_bits(c: &mut Criterion, n: usize) {
     c.bench_function(&format!("util::u128_to_bits ({})", n), move |b| {
         let rng = &mut rand::thread_rng();
-        let x = rng.gen::<u128>();
+        let x = rng.r#gen::<u128>();
         b.iter(|| {
             let bits = util::u128_to_bits(x, n);
             criterion::black_box(bits);
@@ -89,7 +89,7 @@ fn u128_to_bits(c: &mut Criterion, n: usize) {
 fn u128_from_bits(c: &mut Criterion, n: usize) {
     c.bench_function(&format!("util::u128_from_bits ({})", n), move |b| {
         let rng = &mut rand::thread_rng();
-        let x = rng.gen::<u128>();
+        let x = rng.r#gen::<u128>();
         let bits = util::u128_to_bits(x, n);
         b.iter(|| {
             let x = util::u128_from_bits(&bits);

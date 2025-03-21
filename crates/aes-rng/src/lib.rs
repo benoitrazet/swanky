@@ -65,7 +65,7 @@ impl AesRng {
     /// Create a new RNG using a random seed from this one.
     #[inline]
     pub fn fork(&mut self) -> Self {
-        let seed = self.gen::<U8x16>();
+        let seed = self.r#gen::<U8x16>();
         AesRng::from_seed(seed)
     }
 
@@ -161,8 +161,8 @@ mod tests {
     #[test]
     fn test_generate() {
         let mut rng = AesRng::new();
-        let a = rng.gen::<[U8x16; 8]>();
-        let b = rng.gen::<[U8x16; 8]>();
+        let a = rng.r#gen::<[U8x16; 8]>();
+        let b = rng.r#gen::<[U8x16; 8]>();
         assert_ne!(a, b);
     }
 }

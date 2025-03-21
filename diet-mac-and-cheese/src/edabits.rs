@@ -704,7 +704,7 @@ impl<
                 channel.read_block()?
             }
             WhichParty::Verifier(_) => {
-                let seed = rng.gen::<Block>();
+                let seed = rng.r#gen::<Block>();
                 channel.write_block(&seed)?;
                 channel.flush()?;
                 seed
@@ -1005,7 +1005,7 @@ impl<
         let seed = match P::WHICH {
             WhichParty::Prover(_) => channel.read_block()?,
             WhichParty::Verifier(_) => {
-                let seed = rng.gen::<Block>();
+                let seed = rng.r#gen::<Block>();
                 channel.write_block(&seed)?;
                 channel.flush()?;
                 seed

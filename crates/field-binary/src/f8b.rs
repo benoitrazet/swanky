@@ -102,7 +102,7 @@ impl FiniteRing for F8b {
     }
 
     fn random<R: rand::prelude::Rng + ?Sized>(rng: &mut R) -> Self {
-        let x: u8 = rng.gen();
+        let x: u8 = rng.r#gen();
         Self(x)
     }
     const ZERO: Self = Self(0);

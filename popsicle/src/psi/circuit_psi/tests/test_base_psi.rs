@@ -112,7 +112,7 @@ mod tests {
             let primary_keys = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (result_sender, _) =
-                psty_base_psi(&primary_keys, &payloads, rng.gen(), DEFAULT_SEED);
+                psty_base_psi(&primary_keys, &payloads, rng.r#gen(), DEFAULT_SEED);
             assert!(
                 !result_sender.is_err(),
                 "PSTY's Base Psi failed on the sender side"
@@ -158,7 +158,7 @@ mod tests {
             let primary_keys = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, result_receiver) =
-                psty_base_psi(&primary_keys, &payloads, DEFAULT_SEED, rng.gen());
+                psty_base_psi(&primary_keys, &payloads, DEFAULT_SEED, rng.r#gen());
             assert!(
                 !result_receiver.is_err(),
                 "PSTY's Base Psi failed on the receiver side"

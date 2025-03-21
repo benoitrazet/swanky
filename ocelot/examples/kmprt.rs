@@ -13,7 +13,7 @@ fn run(ninputs: usize, npoints: usize) {
     let inputs = rand_block_vec(ninputs);
     let mut rng = AesRng::new();
     let points = (0..npoints)
-        .map(|_| (rng.gen(), rng.gen()))
+        .map(|_| (rng.r#gen(), rng.r#gen()))
         .collect::<Vec<(Block, Block512)>>();
     let (mut sender, mut receiver) = track_unix_channel_pair();
     let total = SystemTime::now();

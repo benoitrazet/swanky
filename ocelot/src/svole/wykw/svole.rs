@@ -251,7 +251,7 @@ impl<T: FiniteField> Sender<T> {
             &mut AesRng::from_rng(&mut rng).expect("random number generation shouldn't fail"),
         )?;
         let spsvole = SpsSender::<T>::init(channel, pows, rng)?;
-        let seed = rng.gen::<Block>();
+        let seed = rng.r#gen::<Block>();
         let seed = scuttlebutt::cointoss::receive(channel, &[seed])?[0];
         let lpn_rng = AesRng::from_seed(seed);
         let mut sender = Self {
@@ -428,7 +428,7 @@ impl<T: FiniteField> Receiver<T> {
             base_receiver.receive(channel, compute_num_saved::<T>(lpn_setup), rng)?;
         let delta = base_receiver.delta();
         let spsvole = SpsReceiver::<T>::init(channel, pows, delta, rng)?;
-        let seed = rng.gen::<Block>();
+        let seed = rng.r#gen::<Block>();
         let seed = scuttlebutt::cointoss::send(channel, &[seed])?[0];
         let lpn_rng = AesRng::from_seed(seed);
         let mut receiver = Self {

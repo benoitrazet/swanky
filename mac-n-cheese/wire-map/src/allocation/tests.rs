@@ -83,7 +83,7 @@ mod random_tests {
             assert_eq!(alloc.get_mut(i).as_deref(), expected.as_ref());
         }
     }
-    fn rnd_test<T: std::fmt::Debug + Eq + Clone, Gen>(seed: u32, len: usize, gen: Gen)
+    fn rnd_test<T: std::fmt::Debug + Eq + Clone, Gen>(seed: u32, len: usize, r#gen: Gen)
     where
         for<'a> Gen: Fn(&'a mut StdRng) -> T,
     {
@@ -93,7 +93,7 @@ mod random_tests {
         check(&mut alloc, &canonical);
         for _ in 0..len * 2 {
             let idx = rng.gen_range(0..len);
-            let value = gen(&mut rng);
+            let value = r#gen(&mut rng);
             assert_eq!(alloc.insert(idx, value.clone()), canonical[idx].is_none());
             canonical[idx] = Some(value);
             check(&mut alloc, &canonical);
@@ -115,7 +115,7 @@ mod random_tests {
         });
     }
     fn test_u8(trial: u32, len: usize) {
-        rnd_test::<u8, _>(0xcafe000 + trial, len, |x| x.gen());
+        rnd_test::<u8, _>(0xcafe000 + trial, len, |x| x.r#gen());
     }
     fn test_unit(trial: u32, len: usize) {
         rnd_test::<(), _>(0x7777000 + trial, len, |_| ());

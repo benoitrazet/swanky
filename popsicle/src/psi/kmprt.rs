@@ -171,7 +171,7 @@ fn secret_sharing_of_zero<R: Rng>(nparties: usize, rng: &mut R) -> Vec<Block512>
     let mut sum = Block512::default();
     let mut shares = (0..nparties - 1)
         .map(|_| {
-            let b = rng.gen();
+            let b = rng.r#gen();
             sum ^= b;
             b
         })
@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn test_secret_sharing_of_zero() {
         let mut rng = AesRng::new();
-        let nparties = (rng.gen::<usize>() % 98) + 2;
+        let nparties = (rng.r#gen::<usize>() % 98) + 2;
         let shares = secret_sharing_of_zero(nparties, &mut rng);
         assert!(shares.len() == nparties);
         let mut sum = Block512::default();
@@ -210,14 +210,14 @@ mod tests {
 
         let nparties = 3;
         let set_size = 1 << 6;
-        let intersection_size = rng.gen::<usize>() % set_size;
+        let intersection_size = rng.r#gen::<usize>() % set_size;
         let intersection = (0..intersection_size)
-            .map(|_| rng.gen::<Block>())
+            .map(|_| rng.r#gen::<Block>())
             .collect_vec();
         let mut set1 = intersection.clone();
         let mut set2 = intersection.clone();
-        set1.extend((intersection_size..set_size).map(|_| rng.gen::<Block>()));
-        set2.extend((intersection_size..set_size).map(|_| rng.gen::<Block>()));
+        set1.extend((intersection_size..set_size).map(|_| rng.r#gen::<Block>()));
+        set2.extend((intersection_size..set_size).map(|_| rng.r#gen::<Block>()));
 
         // create channels
         let mut channels = (0..nparties)

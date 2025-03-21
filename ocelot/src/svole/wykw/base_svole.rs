@@ -105,7 +105,7 @@ impl<FE: FF> Receiver<FE> {
     ) -> Result<Vec<FE>, Error> {
         let r = Degree::<FE>::USIZE;
         let mut v: Vec<FE> = vec![FE::ZERO; len];
-        let seed = rng.gen();
+        let seed = rng.r#gen();
         let mut rng_chi = AesRng::from_seed(seed);
         let mut y: FE = FE::ZERO;
         for i in 0..len {

@@ -496,7 +496,7 @@ impl WireLabel for WireMod2 {
             panic!("[WireMod2::rand] Expected modulo 2. Got {}", q);
         }
 
-        Self { val: rng.gen() }
+        Self { val: rng.r#gen() }
     }
 
     fn hash_to_mod(hash: Block, q: u16) -> Self {
@@ -595,7 +595,7 @@ impl WireLabel for WireMod3 {
         }
         let mut lsb = 0u64;
         let mut msb = 0u64;
-        for (i, v) in (0..64).map(|_| rng.gen::<u8>() % 3).enumerate() {
+        for (i, v) in (0..64).map(|_| rng.r#gen::<u8>() % 3).enumerate() {
             lsb |= ((v & 1) as u64) << i;
             msb |= (((v >> 1) & 1) as u64) << i;
         }
@@ -716,7 +716,7 @@ impl WireLabel for WireModQ {
             panic!("[WireModQ::rand] Modulus must be at least 2. Got {}", q);
         }
         let ds = (0..util::digits_per_u128(q))
-            .map(|_| rng.gen::<u16>() % q)
+            .map(|_| rng.r#gen::<u16>() % q)
             .collect();
         Self { q, ds }
     }
@@ -1027,9 +1027,9 @@ mod tests {
         let mut rng = thread_rng();
 
         for _ in 0..16 {
-            let mut q: u16 = rng.gen();
+            let mut q: u16 = rng.r#gen();
             while q < 2 {
-                q = rng.gen();
+                q = rng.r#gen();
             }
             let w = WireModQ::rand(&mut rng, q);
             let serialized = serde_json::to_string(&w).unwrap();
@@ -1043,9 +1043,9 @@ mod tests {
     #[test]
     fn test_serialize_bad_modQ_mod() {
         let mut rng = thread_rng();
-        let mut q: u16 = rng.gen();
+        let mut q: u16 = rng.r#gen();
         while q < 2 {
-            q = rng.gen();
+            q = rng.r#gen();
         }
 
         let mut w = WireModQ::rand(&mut rng, q);

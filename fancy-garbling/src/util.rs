@@ -360,31 +360,31 @@ pub fn generate_deltas<Wire: WireLabel>(primes: &[u16]) -> HashMap<u16, Wire> {
 pub trait RngExt: rand::Rng + Sized {
     /// Randomly generate a `bool`.
     fn gen_bool(&mut self) -> bool {
-        self.gen()
+        self.r#gen()
     }
     /// Randomly generate a `u16`.
     fn gen_u16(&mut self) -> u16 {
-        self.gen()
+        self.r#gen()
     }
     /// Randomly generate a `u32`.
     fn gen_u32(&mut self) -> u32 {
-        self.gen()
+        self.r#gen()
     }
     /// Randomly generate a `u64`.
     fn gen_u64(&mut self) -> u64 {
-        self.gen()
+        self.r#gen()
     }
     /// Randomly generate a `usize`.
     fn gen_usize(&mut self) -> usize {
-        self.gen()
+        self.r#gen()
     }
     /// Randomly generate a `u128`.
     fn gen_u128(&mut self) -> u128 {
-        self.gen()
+        self.r#gen()
     }
     /// Randomly generate a `Block`.
     fn gen_block(&mut self) -> Block {
-        self.gen()
+        self.r#gen()
     }
     /// Randomly generate a valid `Block`.
     fn gen_usable_block(&mut self, modulus: u16) -> Block {
@@ -400,11 +400,11 @@ pub trait RngExt: rand::Rng + Sized {
     }
     /// Randomly generate a prime (among the set of supported primes).
     fn gen_prime(&mut self) -> u16 {
-        PRIMES[self.gen::<usize>() % NPRIMES]
+        PRIMES[self.r#gen::<usize>() % NPRIMES]
     }
     /// Randomly generate a (supported) modulus.
     fn gen_modulus(&mut self) -> u16 {
-        2 + (self.gen::<u16>() % 111)
+        2 + (self.r#gen::<u16>() % 111)
     }
     /// Randomly generate a valid composite modulus.
     fn gen_usable_composite_modulus(&mut self) -> u128 {
@@ -416,7 +416,7 @@ pub trait RngExt: rand::Rng + Sized {
         PRIMES[..25]
             .iter()
             .cloned()
-            .filter(|_| self.gen()) // randomly take this prime
+            .filter(|_| self.r#gen()) // randomly take this prime
             .take_while(|&q| {
                 // make sure that we don't overflow!
                 match x.checked_mul(q as u128) {

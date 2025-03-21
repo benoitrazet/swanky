@@ -83,7 +83,7 @@ pub(crate) fn cuckoo_place_ids<RNG: RngCore + CryptoRng + SeedableRng>(
         .iter()
         .map(|opt_item| match opt_item {
             Some(item) => item.entry_with_hindex(),
-            None => rng.gen(),
+            None => rng.r#gen(),
         })
         .collect::<Vec<Block>>()
 }
@@ -97,7 +97,7 @@ pub(crate) fn cuckoo_place_payloads<RNG: RngCore + CryptoRng + SeedableRng>(
         .iter()
         .map(|opt_item| match opt_item {
             Some(item) => payloads[item.input_index],
-            None => rng.gen::<Block512>(),
+            None => rng.r#gen::<Block512>(),
         })
         .collect::<Vec<Block512>>()
 }

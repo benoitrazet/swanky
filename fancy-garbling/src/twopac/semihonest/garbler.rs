@@ -37,7 +37,7 @@ impl<
     pub fn new(mut channel: C, mut rng: RNG) -> Result<Self, TwopacError> {
         let ot = OT::init(&mut channel, &mut rng)?;
 
-        let garbler = Gb::new(channel, RNG::from_seed(rng.gen()));
+        let garbler = Gb::new(channel, RNG::from_seed(rng.r#gen()));
         Ok(Garbler { garbler, ot, rng })
     }
 

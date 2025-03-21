@@ -349,7 +349,7 @@ mod tests {
 
         let (voles, _) = InsecureVole::create(len, transcript, rng);
         let challenges = repeat_with(|| F128b::random(rng)).take(len).collect();
-        let wire_ids = repeat_with(|| (rng.gen(), F2::random(rng))).take(len);
+        let wire_ids = repeat_with(|| (rng.r#gen(), F2::random(rng))).take(len);
         ProverTraverser::new(HashMap::from_iter(wire_ids), challenges, voles).unwrap()
     }
 

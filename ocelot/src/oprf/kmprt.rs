@@ -213,7 +213,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
 
         assert!(points.len() <= npoints);
 
-        let mut v = rng.gen::<Block>();
+        let mut v = rng.r#gen::<Block>();
         let mut aes = Aes128EncryptOnly::new_with_key(v);
         let mut map = HashSet::with_capacity(points.len());
         // Store compute `y`s and `h`s for later use.
@@ -243,7 +243,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                     break;
                 }
                 // Try again.
-                v = rng.gen::<Block>();
+                v = rng.r#gen::<Block>();
                 aes = Aes128EncryptOnly::new_with_key(v);
                 map.clear();
             }
@@ -263,7 +263,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         // Fill rest of table with random elements.
         for entry in table.iter_mut() {
             if *entry == Block512::default() {
-                *entry = rng.gen::<Block512>();
+                *entry = rng.r#gen::<Block512>();
             }
         }
         // Send `v` and `table` to the receiver.
@@ -332,7 +332,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
 
         loop {
             let hashkeys = (0..params.h1 + params.h2)
-                .map(|_| rng.gen())
+                .map(|_| rng.r#gen())
                 .collect::<Vec<Block>>();
             // Build a cuckoo hash table using `hashkeys`.
             if let Ok(table_) = cuckoo::CuckooHash::build(
@@ -362,7 +362,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
                 if let Some(item) = item {
                     item.entry
                 } else {
-                    rng.gen::<Block>()
+                    rng.r#gen::<Block>()
                 }
             })
             .collect::<Vec<Block>>();
@@ -405,7 +405,7 @@ mod tests {
         assert!(npoints <= npoints_bound);
         let mut rng = AesRng::new();
         let points = (0..npoints)
-            .map(|_| (rng.gen::<Block>(), rng.gen()))
+            .map(|_| (rng.r#gen::<Block>(), rng.r#gen()))
             .collect::<Vec<(Block, Block512)>>();
         let xs = points[0..ninputs]
             .iter()

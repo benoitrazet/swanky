@@ -343,7 +343,7 @@ mod tests {
         let mut traverser = dummy_traverser(len);
 
         // Form a random set of unique wire ids (might be smaller than 25 due to repeats)
-        let wire_ids: HashSet<_> = repeat_with(|| rng.gen::<u8>() as u64).take(len).collect();
+        let wire_ids: HashSet<_> = repeat_with(|| rng.r#gen::<u8>() as u64).take(len).collect();
 
         for wid in wire_ids {
             // If the wire ID doesn't have an associated computed masked witness, retrieval fails

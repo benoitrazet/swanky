@@ -190,7 +190,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
                 AesRng::from_seed(seed)
             }
             WhichParty::Verifier(_) => {
-                let seed = rng.gen::<Block>();
+                let seed = rng.r#gen::<Block>();
                 channel.write_block(&seed)?;
                 channel.flush()?;
                 AesRng::from_seed(seed)
@@ -472,7 +472,7 @@ where
         let seed = match P::WHICH {
             WhichParty::Prover(_) => channel.read_block()?,
             WhichParty::Verifier(_) => {
-                let seed = rng.gen::<Block>();
+                let seed = rng.r#gen::<Block>();
                 channel.write_block(&seed)?;
                 channel.flush()?;
                 seed

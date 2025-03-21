@@ -191,7 +191,7 @@ fn random_tests() {
             while allocations.len() < 16 {
                 let len = rng.gen_range(1..=128);
                 // We probably won't intersect any exising allocation. about (2^-39)
-                let start: u64 = rng.gen();
+                let start: u64 = rng.r#gen();
                 allocations.push((start, len, false));
             }
             for _ in 0..500_000 {
@@ -208,7 +208,7 @@ fn random_tests() {
                     }
                 } else {
                     let idx: WireId = if rng.gen_ratio(1, 128) {
-                        rng.gen()
+                        rng.r#gen()
                     } else {
                         // This distribution isn't weigthed by the size of each allocation.
                         let (start, len, _alloc) = allocations[rng.gen_range(0..allocations.len())];
