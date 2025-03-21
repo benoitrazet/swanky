@@ -147,7 +147,7 @@ pub trait PrimeFiniteField:
     /// The minimum number of word-sized limbs needed to represent the modulus
     /// of the `PrimeFiniteField`.
     const MIN_LIMBS_NEEDED: usize =
-        Self::NumberOfBitsInBitDecomposition::USIZE.div_ceil(Limb::BITS);
+        Self::NumberOfBitsInBitDecomposition::USIZE.div_ceil(Limb::BITS as usize);
 
     /// Return the modulus of this `PrimeFiniteField` as a `Uint`.
     ///
