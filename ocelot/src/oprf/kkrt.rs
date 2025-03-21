@@ -222,7 +222,7 @@ mod tests {
         let mut input = [0u8; 64];
         rng.fill_bytes(&mut input);
         let seed = Block512::from(input);
-        assert_eq!(seed.as_ref(), input.as_ref());
+        assert_eq!(seed.as_ref(), input.as_slice());
     }
 
     fn rand_block_vec(size: usize) -> Vec<Block> {
