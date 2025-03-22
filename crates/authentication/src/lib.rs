@@ -1,6 +1,6 @@
 use std::io::{Read, Write};
 use swanky_party::{
-    either::PartyEitherCopy, private::VerifierPrivate, IsParty, Party, Prover, Verifier,
+    either::PartyEitherCopy, private::VerifierPrivate, IsParty, Party, Prover, Verifier, WhichParty,
 };
 use vectoreyes::U8x16;
 
@@ -54,9 +54,24 @@ struct AuthBitGenerator<P: Party> {
 }
 
 impl<P: Party> AuthBitGenerator<P> {
-    // Create a new `AuthBitGenerator`.
-    pub fn new(delta: VerifierPrivate<P, Option<U8x16>>) -> Self {
-        todo!()
+    /// Create a new `AuthBitGenerator` based on the type of
+    /// the party. In the case of the `Verifier`, store the
+    /// `delta` value.
+    pub fn new(delta: VerifierPrivate<P, U8x16>) -> Self {
+        match P::WHICH {
+            WhichParty::Prover(pr) => {
+                return AuthBitGenerator {
+                    data: vec![],
+                    delta: None,
+                }
+            }
+            WhichParty::Verifier(ev) => {
+                return AuthBitGenerator {
+                    data: vec![],
+                    delta: Some(delta),
+                }
+            }
+        }
     }
     // Generate `count` authenticated bits. These are stored in `output`.
     pub fn generate<C: Read + Write>(
