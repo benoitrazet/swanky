@@ -95,7 +95,23 @@ impl<P: Party> AuthBitGenerator<P> {
     // XOR two authenticated bits. Linear operations on authenticated bits are "free"
     // (i.e. can be done locally).
     pub fn xor(&self, a: AuthBit<P>, b: AuthBit<P>) -> AuthBit<P> {
-        todo!()
+        match P::WHICH {
+            WhichParty::Prover(pr) => {
+                return PartyEitherCopy::prover_new(
+                    pr,
+                    ProverAuthBit {
+                        mac: a.prover_into(pr).mac ^ b.prover_into(pr).mac,
+                        bit: a.prover_into(pr).bit ^ b.prover_into(pr).bit,
+                    },
+                )
+            }
+            WhichParty::Verifier(ev) => PartyEitherCopy::verifier_new(
+                ev,
+                VerifierAuthBit {
+                    key: a.verifier_into(ev).key ^ b.verifier_into(ev).key,
+                },
+            ),
+        }
     }
     /// This outputs the verifier's Delta value.
     pub fn delta(&self, ev: IsParty<P, Verifier>) -> U8x16 {
