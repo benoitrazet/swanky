@@ -1,6 +1,7 @@
 use std::io::{Read, Write};
 use swanky_party::{
-    either::PartyEitherCopy, private::VerifierPrivate, IsParty, Party, Prover, Verifier, WhichParty,
+    either::PartyEitherCopy, private::VerifierPrivateCopy, IsParty, Party, Prover, Verifier,
+    WhichParty,
 };
 use vectoreyes::U8x16;
 
@@ -41,7 +42,6 @@ struct VerifierAuthBit {
 /// When `P = Prover`, this value is `ProverAuthBit`
 /// When `P = Verifier`, this value is `VerifierAuthBit`
 type AuthBit<P> = PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>;
-
 /// A struct which contains multiple generated authentication bit
 ///
 /// When `P = Verifier`, this struct also stores the verifier's
@@ -50,25 +50,25 @@ struct AuthBitGenerator<P: Party> {
     /// A vector of authenticated bit.
     data: Vec<AuthBit<P>>,
     /// The verifier's global key.
-    delta: Option<VerifierPrivate<P, U8x16>>,
+    delta: PartyEitherCopy<P, (), VerifierPrivateCopy<P, U8x16>>,
 }
 
 impl<P: Party> AuthBitGenerator<P> {
     /// Create a new `AuthBitGenerator` based on the type of
     /// the party. In the case of the `Verifier`, store the
     /// `delta` value.
-    pub fn new(delta: VerifierPrivate<P, U8x16>) -> Self {
+    pub fn new(delta: VerifierPrivateCopy<P, U8x16>) -> Self {
         match P::WHICH {
             WhichParty::Prover(pr) => {
                 return AuthBitGenerator {
                     data: vec![],
-                    delta: None,
+                    delta: PartyEitherCopy::prover_new(pr, ()),
                 }
             }
             WhichParty::Verifier(ev) => {
                 return AuthBitGenerator {
                     data: vec![],
-                    delta: Some(delta),
+                    delta: PartyEitherCopy::verifier_new(ev, delta),
                 }
             }
         }
