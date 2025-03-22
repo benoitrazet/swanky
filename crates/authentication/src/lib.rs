@@ -99,14 +99,14 @@ impl<P: Party> AuthBitGenerator<P> {
     }
     /// This outputs the verifier's Delta value.
     pub fn delta(&self, ev: IsParty<P, Verifier>) -> U8x16 {
-        todo!()
+        return self.delta.verifier_into(ev).into_inner(ev);
     }
     /// This outputs the key associated with the AuthBit
     pub fn key(&self, bit: &AuthBit<P>, ev: IsParty<P, Verifier>) -> U8x16 {
-        todo!()
+        return bit.verifier_into(ev).key;
     }
     /// Output the mac associated with the `AuthBit`
     pub fn mac(&self, bit: &AuthBit<P>, ev: IsParty<P, Prover>) -> U8x16 {
-        todo!()
+        return bit.prover_into(ev).mac;
     }
 }
