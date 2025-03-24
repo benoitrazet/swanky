@@ -32,14 +32,15 @@ fn commit_vec<
     V: IsSubFieldOf<F>,
     F: FiniteField,
     C: AbstractChannel + Clone,
+    I: IntoIterator<Item = V>,
     SvoleF: SvoleT<P, V, F>,
 >(
     backend: &mut FCom<P, V, F, SvoleF>,
     channel: &mut C,
     rng: &mut AesRng,
-    sec: ProverPrivate<P, impl IntoIterator<Item = V>>, // secret values
-    len: usize,                                         // padded length
-) -> Result<impl Iterator<Item = Mac<P, V, F>>>
+    sec: ProverPrivate<P, I>, // secret values
+    len: usize,               // padded length
+) -> Result<impl Iterator<Item = Mac<P, V, F>> + use<P, V, F, C, I, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
