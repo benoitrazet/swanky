@@ -397,11 +397,13 @@ impl<P: Party> TaskInput<P> {
                 #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
                 unsafe fn gather_pointers(ptrs: U64x4) -> U64x4 {
                     use std::arch::x86_64::_mm256_i64gather_epi64;
-                    bytemuck::cast(_mm256_i64gather_epi64(
-                        std::ptr::null(),
-                        bytemuck::cast(ptrs),
-                        1,
-                    ))
+                    unsafe {
+                        bytemuck::cast(_mm256_i64gather_epi64(
+                            std::ptr::null(),
+                            bytemuck::cast(ptrs),
+                            1,
+                        ))
+                    }
                 }
                 #[cfg(not(all(target_arch = "x86_64", target_feature = "avx2")))]
                 unsafe fn gather_pointers(ptrs: U64x4) -> U64x4 {
