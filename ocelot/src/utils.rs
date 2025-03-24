@@ -83,12 +83,12 @@ unsafe fn _transpose(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64) {
     assert!(nrows >= 16);
     assert_eq!(nrows % 8, 0);
     assert_eq!(ncols % 8, 0);
-    sse_trans(out, inp, nrows, ncols)
+    unsafe { sse_trans(out, inp, nrows, ncols) }
 }
 
 #[link(name = "transpose")]
 #[cfg(target_arch = "x86_64")]
-extern "C" {
+unsafe extern "C" {
     fn sse_trans(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64);
 }
 
