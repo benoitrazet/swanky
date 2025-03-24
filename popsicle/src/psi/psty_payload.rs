@@ -33,9 +33,9 @@ use crate::{
     utils,
 };
 use fancy_garbling::{
-    twopac::semihonest::{Evaluator, Garbler},
     AllWire, ArithmeticBundleGadgets, BinaryBundle, Bundle, CrtBundle, CrtGadgets, Fancy,
     FancyBinary, FancyInput,
+    twopac::semihonest::{Evaluator, Garbler},
 };
 
 use itertools::Itertools;

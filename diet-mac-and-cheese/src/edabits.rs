@@ -1,9 +1,9 @@
 //! Field switching functionality based on protocol with Edabits.
 
-use crate::homcom::{FCom, MultCheckState, ZeroCheckState, BATCH_SIZE};
+use crate::homcom::{BATCH_SIZE, FCom, MultCheckState, ZeroCheckState};
 use crate::mac::Mac;
-use crate::svole_trait::{field_name, SvoleT};
-use eyre::{bail, ensure, eyre, Result};
+use crate::svole_trait::{SvoleT, field_name};
+use eyre::{Result, bail, ensure, eyre};
 use generic_array::typenum::Unsigned;
 use log::info;
 use rand::{Rng, SeedableRng};
@@ -12,7 +12,7 @@ use std::io::{BufReader, BufWriter};
 use std::net::TcpStream;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
 use swanky_field::{FiniteField, FiniteRing};
-use swanky_field_binary::{F40b, F2};
+use swanky_field_binary::{F2, F40b};
 use swanky_party::either::{PartyEither, PartyEitherCopy};
 use swanky_party::private::{ProverPrivate, ProverPrivateCopy, VerifierPrivate};
 use swanky_party::{IsParty, Party, Prover, WhichParty};
@@ -130,11 +130,11 @@ pub struct Conv<P: Party, FE: Copy, SvoleF2: SvoleT<P, F2, F40b>, SvoleFE: Svole
 /// The Finite field is required to be a prime field because of the fdabit
 /// protocol working only for prime finite fields.
 impl<
-        P: Party,
-        FE: FiniteField<PrimeField = FE>,
-        SvoleF2: SvoleT<P, F2, F40b>,
-        SvoleFE: SvoleT<P, FE, FE>,
-    > Conv<P, FE, SvoleF2, SvoleFE>
+    P: Party,
+    FE: FiniteField<PrimeField = FE>,
+    SvoleF2: SvoleT<P, F2, F40b>,
+    SvoleFE: SvoleT<P, FE, FE>,
+> Conv<P, FE, SvoleF2, SvoleFE>
 {
     /// Initialize provided the commitment functionalities.
     pub fn init_with_fcoms(
@@ -868,11 +868,7 @@ impl<
         self.fcom_fe
             .quicksilver_check_multiply(channel, rng, &triples)?;
 
-        if res {
-            Ok(())
-        } else {
-            bail!("fail fdabit")
-        }
+        if res { Ok(()) } else { bail!("fail fdabit") }
     }
 
     // The conversion loop requires all of these parameters to function
@@ -1072,14 +1068,14 @@ impl<
 #[cfg(test)]
 mod tests {
     use super::super::mac::Mac;
-    use super::{f2_to_fe, Conv, Dabit, Edabits};
+    use super::{Conv, Dabit, Edabits, f2_to_fe};
     use crate::homcom::FCom;
     use crate::svole_trait::Svole;
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use scuttlebutt::ring::FiniteRing;
     use scuttlebutt::{
-        field::{F61p, FiniteField, F2},
         AesRng, Channel,
+        field::{F2, F61p, FiniteField},
     };
     use std::{
         io::{BufReader, BufWriter},
@@ -1087,7 +1083,7 @@ mod tests {
     };
     use swanky_party::either::PartyEither;
     use swanky_party::private::{ProverPrivateCopy, VerifierPrivate};
-    use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
+    use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier};
 
     const DEFAULT_NUM_BUCKET: usize = 5;
     const DEFAULT_NUM_CUT: usize = 5;

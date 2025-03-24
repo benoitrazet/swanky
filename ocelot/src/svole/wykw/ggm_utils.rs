@@ -2,7 +2,7 @@
 
 use scuttlebutt::field::{FiniteField, IsSubFieldOf};
 use vectoreyes::{
-    array_utils::ArrayUnrolledExt, Aes128EncryptOnly, AesBlockCipher, SimdBase, U8x16,
+    Aes128EncryptOnly, AesBlockCipher, SimdBase, U8x16, array_utils::ArrayUnrolledExt,
 };
 
 /// How many `U8x16`s must fit in the `tmp_storage` slice?
@@ -331,7 +331,7 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
     use scuttlebutt::{
-        field::{F128b, F61p, F63b, FiniteField, F2},
+        field::{F2, F61p, F63b, F128b, FiniteField},
         utils::unpack_bits,
     };
 

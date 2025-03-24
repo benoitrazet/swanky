@@ -1,6 +1,6 @@
 use bytemuck::{TransparentWrapper, Zeroable};
 use party::IS_PROVER;
-use scuttlebutt::field::{FiniteField, IsSubFieldOf, SmallBinaryField, F2};
+use scuttlebutt::field::{F2, FiniteField, IsSubFieldOf, SmallBinaryField};
 use scuttlebutt::ring::FiniteRing;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 use swanky_party as party;

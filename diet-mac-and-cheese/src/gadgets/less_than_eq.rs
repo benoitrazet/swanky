@@ -69,10 +69,10 @@ mod tests {
     use rand::SeedableRng;
     use scuttlebutt::{AesRng, Channel};
     use swanky_field::FiniteRing;
-    use swanky_field_binary::{F40b, F2};
+    use swanky_field_binary::{F2, F40b};
     use swanky_party::{Prover, Verifier};
 
-    use crate::{backend_trait::BackendT, svole_trait::Svole, DietMacAndCheese};
+    use crate::{DietMacAndCheese, backend_trait::BackendT, svole_trait::Svole};
 
     use super::less_than_eq_with_public;
 

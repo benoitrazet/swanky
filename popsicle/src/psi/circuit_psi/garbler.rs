@@ -3,7 +3,7 @@ use crate::{
     errors::Error,
     psi::circuit_psi::{circuits::*, *},
 };
-use fancy_garbling::{twopac::semihonest::Garbler, WireMod2};
+use fancy_garbling::{WireMod2, twopac::semihonest::Garbler};
 use ocelot::ot::AlszSender as OtSender;
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 use std::marker::PhantomData;

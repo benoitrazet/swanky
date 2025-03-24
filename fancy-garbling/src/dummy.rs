@@ -4,10 +4,9 @@
 //! creating any circuits.
 
 use crate::{
-    check_binary, derive_binary,
+    FancyArithmetic, FancyBinary, check_binary, derive_binary,
     errors::{DummyError, FancyError},
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
-    FancyArithmetic, FancyBinary,
 };
 
 /// Simple struct that performs the fancy computation over `u16`.

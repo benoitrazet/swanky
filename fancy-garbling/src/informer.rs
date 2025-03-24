@@ -1,8 +1,8 @@
 //! `Informer` runs a fancy computation and learns information from it.
 
 use crate::{
-    fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
     FancyArithmetic, FancyBinary,
+    fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
 };
 use std::collections::{HashMap, HashSet};
 

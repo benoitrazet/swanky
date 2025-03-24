@@ -3,13 +3,13 @@
 
 use crate::{cuckoo::CuckooHash, errors::Error, utils};
 use aes_gcm::{
-    aead::{Aead, KeyInit},
     Aes256Gcm, Key, Nonce,
+    aead::{Aead, KeyInit},
 };
 
 use fancy_garbling::{
-    twopac::semihonest::{Evaluator, Garbler},
     AllWire, BinaryBundle, BinaryBundleGadgets, BinaryGadgets, Fancy, FancyBinary, FancyInput,
+    twopac::semihonest::{Evaluator, Garbler},
 };
 use itertools::Itertools;
 use ocelot::{

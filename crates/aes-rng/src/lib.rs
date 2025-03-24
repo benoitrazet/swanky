@@ -5,8 +5,8 @@
 use rand::{CryptoRng, Error, Rng, RngCore, SeedableRng};
 use rand_core::block::{BlockRng64, BlockRngCore};
 use vectoreyes::{
+    Aes128EncryptOnly, AesBlockCipher, SimdBase, U8x16, U64x2,
     array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
-    Aes128EncryptOnly, AesBlockCipher, SimdBase, U64x2, U8x16,
 };
 
 mod vectorized;

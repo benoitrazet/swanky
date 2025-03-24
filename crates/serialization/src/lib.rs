@@ -3,7 +3,7 @@
 
 use generic_array::typenum::Unsigned;
 use generic_array::{ArrayLength, GenericArray};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::{
     io::{Read, Write},
     marker::PhantomData,

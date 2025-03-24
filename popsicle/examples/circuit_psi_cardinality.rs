@@ -1,5 +1,5 @@
 use popsicle::circuit_psi::{
-    circuits::*, evaluator::OpprfPsiEvaluator, garbler::OpprfPsiGarbler, utils::*, CircuitPsi,
+    CircuitPsi, circuits::*, evaluator::OpprfPsiEvaluator, garbler::OpprfPsiGarbler, utils::*,
 };
 
 use fancy_garbling::Fancy;

@@ -1,8 +1,8 @@
 use keyed_arena::KeyedArena;
 use rand::SeedableRng;
 use scuttlebutt::{
-    field::{F128p, F56b, F61p, F63b, FiniteField, IsSubFieldOf, F2},
     AbstractChannel, AesRng, Block,
+    field::{F2, F56b, F61p, F63b, F128p, FiniteField, IsSubFieldOf},
 };
 use swanky_party::{IS_PROVER, IS_VERIFIER};
 

@@ -3,7 +3,7 @@
 mod tests {
     use crate::errors::Error;
     use crate::psi::circuit_psi::{
-        base_psi::{receiver::OpprfReceiver, sender::OpprfSender, BasePsi},
+        base_psi::{BasePsi, receiver::OpprfReceiver, sender::OpprfSender},
         tests::{utils::*, *},
         utils::*,
         *,
@@ -187,9 +187,10 @@ mod tests {
             let intersection = psty_check_opprf_set(sender, receiver);
 
             assert!(
-            intersection
-                    == SET_SIZE,
-                "PSTY OpprfSender did not preserve the original set, the intersection of the tables is {} and should be {}", intersection, SET_SIZE
+                intersection == SET_SIZE,
+                "PSTY OpprfSender did not preserve the original set, the intersection of the tables is {} and should be {}",
+                intersection,
+                SET_SIZE
             );
         }
     }
@@ -204,9 +205,10 @@ mod tests {
             let intersection = psty_check_opprf_set(sender, receiver);
 
             assert!(
-            intersection
-                    == SET_SIZE,
-                "PSTY OpprfSender did not preserve the original set, the intersection of the tables is {} and should be {}", intersection, SET_SIZE
+                intersection == SET_SIZE,
+                "PSTY OpprfSender did not preserve the original set, the intersection of the tables is {} and should be {}",
+                intersection,
+                SET_SIZE
             );
         }
     }
@@ -222,9 +224,10 @@ mod tests {
             let intersection = psty_check_opprf_set(sender, receiver);
 
             assert!(
-            intersection
-                    == SET_SIZE,
-                "PSTY OpprfSender did not preserve the original set, the intersection of the tables is {} and should be {}", intersection, SET_SIZE
+                intersection == SET_SIZE,
+                "PSTY OpprfSender did not preserve the original set, the intersection of the tables is {} and should be {}",
+                intersection,
+                SET_SIZE
             );
         }
     }

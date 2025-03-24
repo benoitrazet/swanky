@@ -1,7 +1,7 @@
 use crate::{
+    FancyArithmetic, FancyBinary,
     errors::FancyError,
     fancy::{Fancy, HasModulus},
-    FancyArithmetic, FancyBinary,
 };
 use itertools::Itertools;
 use std::ops::Index;

@@ -1,6 +1,6 @@
 use popsicle::circuit_psi::{
-    circuits::*, evaluator::OpprfPsiEvaluator, garbler::OpprfPsiGarbler, utils::*, CircuitPsi,
-    PAYLOAD_SIZE,
+    CircuitPsi, PAYLOAD_SIZE, circuits::*, evaluator::OpprfPsiEvaluator, garbler::OpprfPsiGarbler,
+    utils::*,
 };
 
 use fancy_garbling::Fancy;

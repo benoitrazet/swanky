@@ -4,9 +4,9 @@ use mac_n_cheese_vole::specialization::{
     FiniteFieldSpecialization, NoSpecialization, SmallBinaryFieldSpecialization,
 };
 use rustc_hash::FxHashMap;
-use scuttlebutt::field::{F128p, F61p, F63b, FiniteField, IsSubFieldOf, SmallBinaryField, F2};
+use scuttlebutt::field::{F2, F61p, F63b, F128p, FiniteField, IsSubFieldOf, SmallBinaryField};
 use std::{
-    any::{type_name, TypeId},
+    any::{TypeId, type_name},
     fs::File,
     io::{Read, Seek},
     os::unix::prelude::FileExt,
@@ -439,7 +439,12 @@ impl Manifest {
         f.seek(std::io::SeekFrom::End(-8 * 4))?;
         let mut footer = [0_u64; 4];
         f.read_exact(bytemuck::bytes_of_mut(&mut footer))?;
-        let [manifest_start, manifest_decompressed_len, manifest_hash, version] = footer;
+        let [
+            manifest_start,
+            manifest_decompressed_len,
+            manifest_hash,
+            version,
+        ] = footer;
         eyre::ensure!(
             version == MAC_N_CHEESE_VERSION,
             "Manifest has version {version}, not {MAC_N_CHEESE_VERSION}"

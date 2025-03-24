@@ -2,10 +2,10 @@
 //! circuit without streaming.
 
 use crate::{
+    WireLabel,
     circuit::EvaluableCircuit,
     errors::{EvaluatorError, GarblerError},
     garble::{Evaluator, Garbler},
-    WireLabel,
 };
 use itertools::Itertools;
 use scuttlebutt::{AesRng, Block, Channel};

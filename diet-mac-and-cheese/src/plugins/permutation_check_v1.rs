@@ -28,7 +28,7 @@ use crate::{
     mac::MacT,
     number_to_u64,
 };
-use eyre::{bail, ensure, Result};
+use eyre::{Result, bail, ensure};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
 use swanky_field_binary::F2;
 

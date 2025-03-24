@@ -5,15 +5,15 @@ use std::{
 };
 
 use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
-use scuttlebutt::{field::F61p, ring::FiniteRing, AesRng, Channel};
-use swanky_party::{private::ProverPrivateCopy, Prover, Verifier, IS_VERIFIER};
+use scuttlebutt::{AesRng, Channel, field::F61p, ring::FiniteRing};
+use swanky_party::{IS_VERIFIER, Prover, Verifier, private::ProverPrivateCopy};
 
-use crate::{backend_trait::BackendT, circuit_ir::WireCount};
 use crate::{
+    DietMacAndCheese,
     dora::{Clause, DisjGate},
     svole_trait::Svole,
-    DietMacAndCheese,
 };
+use crate::{backend_trait::BackendT, circuit_ir::WireCount};
 use rand::{Rng, SeedableRng};
 
 use super::*;

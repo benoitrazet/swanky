@@ -2,7 +2,7 @@ use super::{Plugin, PluginExecution};
 use crate::circuit_ir::{
     FunStore, FunctionBody, GateM, GatesBody, TypeId, TypeIdMapping, TypeStore, WireCount,
 };
-use eyre::{bail, ensure, eyre, Result};
+use eyre::{Result, bail, ensure, eyre};
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 
 use std::sync::atomic::{AtomicUsize, Ordering};

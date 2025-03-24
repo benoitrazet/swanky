@@ -1,6 +1,6 @@
 use crate::{
-    errors::TwopacError, wire::WireLabel, AllWire, ArithmeticWire, Evaluator as Ev, Fancy,
-    FancyArithmetic, FancyBinary, FancyInput, FancyReveal, WireMod2,
+    AllWire, ArithmeticWire, Evaluator as Ev, Fancy, FancyArithmetic, FancyBinary, FancyInput,
+    FancyReveal, WireMod2, errors::TwopacError, wire::WireLabel,
 };
 use ocelot::ot::Receiver as OtReceiver;
 use rand::{CryptoRng, Rng};
@@ -16,11 +16,11 @@ pub struct Evaluator<C, RNG, OT, Wire> {
 impl<C, RNG, OT, Wire> Evaluator<C, RNG, OT, Wire> {}
 
 impl<
-        C: AbstractChannel,
-        RNG: CryptoRng + Rng,
-        OT: OtReceiver<Msg = Block> + SemiHonest,
-        Wire: WireLabel,
-    > Evaluator<C, RNG, OT, Wire>
+    C: AbstractChannel,
+    RNG: CryptoRng + Rng,
+    OT: OtReceiver<Msg = Block> + SemiHonest,
+    Wire: WireLabel,
+> Evaluator<C, RNG, OT, Wire>
 {
     /// Make a new `Evaluator`.
     pub fn new(mut channel: C, mut rng: RNG) -> Result<Self, TwopacError> {
@@ -42,11 +42,11 @@ impl<
 }
 
 impl<
-        C: AbstractChannel,
-        RNG: CryptoRng + Rng,
-        OT: OtReceiver<Msg = Block> + SemiHonest,
-        Wire: WireLabel,
-    > FancyInput for Evaluator<C, RNG, OT, Wire>
+    C: AbstractChannel,
+    RNG: CryptoRng + Rng,
+    OT: OtReceiver<Msg = Block> + SemiHonest,
+    Wire: WireLabel,
+> FancyInput for Evaluator<C, RNG, OT, Wire>
 {
     type Item = Wire;
     type Error = TwopacError;

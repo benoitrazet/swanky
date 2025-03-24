@@ -2,8 +2,8 @@
 //! based on fixed-key AES.
 
 use vectoreyes::{
-    array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
     Aes128EncryptOnly, AesBlockCipher,
+    array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
 };
 
 use crate::Block;

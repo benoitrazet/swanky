@@ -44,9 +44,11 @@ impl<P: Party, T: 'static + Copy + Send + Sync> TaskDefinition<P> for CopyTask<P
         _incoming_data: crate::alloc::OwnedAlignedBytes,
         _outgoing_data: crate::alloc::AlignedBytesMut,
     ) -> eyre::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
-        input.simple_wire_task::<1, 1, T, _>(ctx, CopyPrototypeWireFormat::default(), |[(x, ())]| {
-            Ok([x])
-        })
+        input.simple_wire_task::<1, 1, T, _>(
+            ctx,
+            CopyPrototypeWireFormat::default(),
+            |[(x, ())]| Ok([x]),
+        )
     }
 
     fn continue_task(

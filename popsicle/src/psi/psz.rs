@@ -5,13 +5,14 @@
 //! The current implementation does not hash the output of the (relaxed) OPRF.
 
 use crate::{
-    cuckoo::{compute_masksize, CuckooHash},
-    utils, Error,
+    Error,
+    cuckoo::{CuckooHash, compute_masksize},
+    utils,
 };
 use itertools::Itertools;
 use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
-use rand::{seq::SliceRandom, CryptoRng, Rng, RngCore};
-use scuttlebutt::{cointoss, AbstractChannel, Block, Block512, SemiHonest};
+use rand::{CryptoRng, Rng, RngCore, seq::SliceRandom};
+use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest, cointoss};
 use std::collections::{HashMap, HashSet};
 
 const NHASHES: usize = 3;

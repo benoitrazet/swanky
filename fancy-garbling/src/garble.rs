@@ -12,14 +12,14 @@ pub use crate::garble::{evaluator::Evaluator, garbler::Garbler};
 #[cfg(test)]
 mod nonstreaming {
     use crate::{
-        circuit::{eval_plain, ArithmeticCircuit, CircuitBuilder, CircuitType},
+        AllWire, FancyArithmetic, FancyBinary,
+        circuit::{ArithmeticCircuit, CircuitBuilder, CircuitType, eval_plain},
         classic::garble,
         fancy::{ArithmeticBundleGadgets, Bundle, BundleGadgets, Fancy},
         util::{self, RngExt},
-        AllWire, FancyArithmetic, FancyBinary,
     };
     use itertools::Itertools;
-    use rand::{thread_rng, SeedableRng};
+    use rand::{SeedableRng, thread_rng};
     use scuttlebutt::{AesRng, Block};
 
     // helper
@@ -282,13 +282,13 @@ mod nonstreaming {
 #[cfg(test)]
 mod streaming {
     use crate::{
+        AllWire, Evaluator, FancyArithmetic, FancyInput, Garbler, WireLabel,
         dummy::{Dummy, DummyVal},
         util::RngExt,
-        AllWire, Evaluator, FancyArithmetic, FancyInput, Garbler, WireLabel,
     };
     use itertools::Itertools;
     use rand::thread_rng;
-    use scuttlebutt::{unix_channel_pair, AesRng, UnixChannel};
+    use scuttlebutt::{AesRng, UnixChannel, unix_channel_pair};
 
     // helper - checks that Streaming evaluation of a fancy function equals Dummy
     // evaluation of the same function
@@ -436,12 +436,12 @@ mod streaming {
 #[cfg(test)]
 mod complex {
     use crate::{
-        dummy::Dummy, util::RngExt, AllWire, CrtBundle, CrtGadgets, Evaluator, FancyArithmetic,
-        FancyBinary, FancyInput, Garbler,
+        AllWire, CrtBundle, CrtGadgets, Evaluator, FancyArithmetic, FancyBinary, FancyInput,
+        Garbler, dummy::Dummy, util::RngExt,
     };
     use itertools::Itertools;
     use rand::thread_rng;
-    use scuttlebutt::{unix_channel_pair, AesRng};
+    use scuttlebutt::{AesRng, unix_channel_pair};
 
     fn complex_gadget<F: FancyArithmetic + FancyBinary>(
         b: &mut F,

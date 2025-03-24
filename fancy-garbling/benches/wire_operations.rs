@@ -1,6 +1,6 @@
 #![allow(clippy::all)]
-use criterion::{criterion_group, criterion_main, Criterion};
-use fancy_garbling::{util::RngExt, AllWire};
+use criterion::{Criterion, criterion_group, criterion_main};
+use fancy_garbling::{AllWire, util::RngExt};
 use scuttlebutt::{AesRng, Block};
 use std::time::Duration;
 

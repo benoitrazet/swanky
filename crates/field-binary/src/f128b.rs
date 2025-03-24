@@ -103,7 +103,7 @@ mod multiply {
     #[cfg(test)]
     mod test {
         use super::super::polynomial_modulus_f128b;
-        use crate::{F128b, F2};
+        use crate::{F2, F128b};
         use proptest::prelude::*;
         use swanky_field::FiniteField;
         use swanky_polynomial::Polynomial;

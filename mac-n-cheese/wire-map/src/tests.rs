@@ -256,9 +256,10 @@ fn test_alloc_range_if_unallocated() {
         .unwrap();
     assert_eq!(wm.insert(u64::MAX - 1, 5), InsertResult::PreviouslyUnset);
     assert_eq!(wm.insert(u64::MAX, 785), InsertResult::PreviouslyUnset);
-    assert!(wm
-        .alloc_range_if_unallocated(u64::MAX - 2, u64::MAX)
-        .is_err());
+    assert!(
+        wm.alloc_range_if_unallocated(u64::MAX - 2, u64::MAX)
+            .is_err()
+    );
     wm.alloc_range_if_unallocated(15, 475).unwrap();
     wm.alloc_range_if_unallocated(15, 475).unwrap();
     wm.alloc_range_if_unallocated(75, 100).unwrap();

@@ -7,8 +7,8 @@
 //! Emmanuela Orsini, Lawrence Roy, and Peter Scholl. [Publicly Verifiable Zero-Knowledge and
 //! Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
 //!
-use eyre::{bail, Result};
-use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, Type};
+use eyre::{Result, bail};
+use mac_n_cheese_sieve_parser::{Number, Type, text_parser::RelationReader};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
 use std::{
@@ -17,12 +17,12 @@ use std::{
     path::Path,
 };
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
-use swanky_field_binary::{F128b, F8b, F2};
+use swanky_field_binary::{F2, F8b, F128b};
 
 use crate::{
     parameters::FIELD_SIZE,
     proof::{prover_preparer::ProverPreparer, prover_traverser::ProverTraverser},
-    vole::{insecure::InsecureVole, RandomVole},
+    vole::{RandomVole, insecure::InsecureVole},
 };
 
 use self::verifier_traverser::VerifierTraverser;
@@ -163,8 +163,11 @@ impl Proof<InsecureVole> {
         // There should be one witness commitment for every element in the extended witness
         // The proof and the decommitted VOLEs should agree on what this size is
         if self.witness_commitment.len() != self.partial_decommitment.extended_witness_length() {
-            bail!("Invalid proof: Did not commit to the same number of witnesses {} as there are VOLEs {}",
-                self.witness_commitment.len(), self.partial_decommitment.extended_witness_length())
+            bail!(
+                "Invalid proof: Did not commit to the same number of witnesses {} as there are VOLEs {}",
+                self.witness_commitment.len(),
+                self.partial_decommitment.extended_witness_length()
+            )
         }
 
         // There should be one challenge for every polynomial in the circuit. We can't tell
@@ -265,7 +268,9 @@ impl Proof<InsecureVole> {
         let actual_validation = self.degree_1_commitment * self.partial_decommitment.verifier_key()
             + self.degree_0_commitment;
         if validation != actual_validation {
-            bail!("Verification failed: proof responses were not consistent with decommited VOLEs and masked witnesses");
+            bail!(
+                "Verification failed: proof responses were not consistent with decommited VOLEs and masked witnesses"
+            );
         }
         Ok(())
     }
@@ -531,16 +536,20 @@ mod tests {
         too_many_challenges
             .witness_challenges
             .push(F128b::random(rng));
-        assert!(too_many_challenges
-            .verify(&mut small_circuit.clone(), &mut transcript())
-            .is_err());
+        assert!(
+            too_many_challenges
+                .verify(&mut small_circuit.clone(), &mut transcript())
+                .is_err()
+        );
 
         // Not having enough challenges should fail
         let mut too_few_challenges = proof.clone();
         too_few_challenges.witness_challenges.pop();
-        assert!(too_few_challenges
-            .verify(small_circuit, &mut transcript())
-            .is_err());
+        assert!(
+            too_few_challenges
+                .verify(small_circuit, &mut transcript())
+                .is_err()
+        );
 
         Ok(())
     }

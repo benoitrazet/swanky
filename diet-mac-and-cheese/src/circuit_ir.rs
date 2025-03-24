@@ -11,10 +11,10 @@ by other means.
 validity (e.g. wires are SSA) as defined by the SIEVE IR specification!
 */
 use crate::{
-    fields::{extension_field_to_type_id, modulus_to_type_id, SieveIrDeserialize},
+    fields::{SieveIrDeserialize, extension_field_to_type_id, modulus_to_type_id},
     plugins::{Plugin, PluginExecution, PluginType, RamArithV0, RamArithV1, RamBoolV0, RamBoolV1},
 };
-use eyre::{bail, ensure, eyre, Result};
+use eyre::{Result, bail, ensure, eyre};
 use log::debug;
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use std::{

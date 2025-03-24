@@ -3,7 +3,7 @@ use clap::Parser;
 use inferno::Proof;
 use rand::SeedableRng;
 use scuttlebutt::field::F64b;
-use scuttlebutt::{field::FiniteField, AesRng};
+use scuttlebutt::{AesRng, field::FiniteField};
 use simple_arith_circuit::Circuit;
 use std::io::Write;
 use std::path::{Path, PathBuf};

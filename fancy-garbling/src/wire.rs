@@ -3,11 +3,11 @@
 use crate::{fancy::HasModulus, util};
 use fancy_garbling_base_conversion as base_conversion;
 use rand::{CryptoRng, Rng, RngCore};
-use scuttlebutt::{Block, AES_HASH};
+use scuttlebutt::{AES_HASH, Block};
 use subtle::ConditionallySelectable;
 use vectoreyes::{
-    array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
     SimdBase,
+    array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
 };
 
 #[cfg(feature = "serde")]

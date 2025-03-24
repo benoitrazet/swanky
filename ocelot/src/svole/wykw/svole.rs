@@ -6,13 +6,13 @@ use super::{
 use crate::errors::Error;
 use generic_array::typenum::Unsigned;
 use rand::{
-    distributions::{Distribution, Uniform},
     Rng, SeedableRng,
+    distributions::{Distribution, Uniform},
 };
 use scuttlebutt::{
+    AbstractChannel, AesRng, Block, Malicious, SemiHonest,
     field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf},
     ring::FiniteRing,
-    AbstractChannel, AesRng, Block, Malicious, SemiHonest,
 };
 
 // LPN parameters used in the protocol. We use three stages, two sets of LPN
@@ -517,10 +517,10 @@ impl<FF: FiniteField> Malicious for Receiver<FF> {}
 
 #[cfg(test)]
 mod tests {
-    use super::{Receiver, Sender, LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
+    use super::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL, Receiver, Sender};
     use scuttlebutt::{
-        field::{F128b, F40b, F61p, FiniteField, IsSubFieldOf, F2},
         AesRng, Channel,
+        field::{F2, F40b, F61p, F128b, FiniteField, IsSubFieldOf},
     };
     use std::{
         io::{BufReader, BufWriter},

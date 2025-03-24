@@ -325,24 +325,26 @@ pub mod internal {
                 sources_second_buffer: Vec::new(),
             }),
         };
-        std::thread::spawn(move || loop {
-            let gs = gs_handle.read();
-            match &*gs {
-                GlobalState::Open {
-                    system_start: _,
-                    new_buffers,
-                    writer,
-                } => {
-                    writer
-                        .lock()
-                        .flush(new_buffers)
-                        .expect("Failed to flush event log");
+        std::thread::spawn(move || {
+            loop {
+                let gs = gs_handle.read();
+                match &*gs {
+                    GlobalState::Open {
+                        system_start: _,
+                        new_buffers,
+                        writer,
+                    } => {
+                        writer
+                            .lock()
+                            .flush(new_buffers)
+                            .expect("Failed to flush event log");
+                    }
+                    _ => {
+                        break;
+                    }
                 }
-                _ => {
-                    break;
-                }
+                std::thread::sleep(EVENT_LOG_POLL_DURATION);
             }
-            std::thread::sleep(EVENT_LOG_POLL_DURATION);
         });
         Ok(())
     }

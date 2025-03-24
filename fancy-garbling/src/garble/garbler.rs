@@ -1,10 +1,10 @@
 use crate::{
+    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireLabel, WireMod2,
     check_binary,
     errors::{FancyError, GarblerError},
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal},
     hash_wires,
-    util::{output_tweak, tweak, tweak2, RngExt},
-    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireLabel, WireMod2,
+    util::{RngExt, output_tweak, tweak, tweak2},
 };
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::{AbstractChannel, Block};

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use scuttlebutt::{field::FiniteField, AbstractChannel};
+use scuttlebutt::{AbstractChannel, field::FiniteField};
 
 // handling of (FS) transcripts
 mod tx;
@@ -34,7 +34,7 @@ type WireId = usize;
 pub use disjunction::Disjunction;
 pub use protocol::Dora;
 use swanky_field::IsSubFieldOf;
-use swanky_party::{private::ProverPrivate, Party};
+use swanky_party::{Party, private::ProverPrivate};
 use translate::translate;
 
 use crate::{

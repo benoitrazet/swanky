@@ -1,10 +1,10 @@
 #![allow(clippy::all)]
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
+    AllWire, FancyArithmetic,
     circuit::{ArithmeticCircuit as Circuit, CircuitBuilder, CircuitType},
     classic::garble,
     util::RngExt,
-    AllWire, FancyArithmetic,
 };
 use std::time::Duration;
 

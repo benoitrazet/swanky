@@ -1,9 +1,10 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     iter,
 };
 
 use crate::{
+    DietMacAndCheese,
     backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT, BackendRamT, RamId},
     backend_trait::BackendT,
     circuit_ir::{FieldInputs, FunStore},
@@ -14,14 +15,13 @@ use crate::{
     plugins::DisjunctionBody,
     ram::BooleanRam,
     svole_trait::SvoleT,
-    DietMacAndCheese,
 };
 use eyre::Result;
 use generic_array::GenericArray;
 use scuttlebutt::{AbstractChannel, AesRng};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
-use swanky_field_binary::{F40b, F2};
-use swanky_party::{private::ProverPrivate, Party, WhichParty};
+use swanky_field_binary::{F2, F40b};
+use swanky_party::{Party, WhichParty, private::ProverPrivate};
 
 pub(crate) struct DietMacAndCheeseExtField<
     P: Party,
@@ -39,12 +39,12 @@ pub(crate) struct DietMacAndCheeseExtField<
 }
 
 impl<
-        P: Party,
-        T: FiniteField<PrimeField = F2>,
-        C: AbstractChannel + Clone,
-        SVOLE1: SvoleT<P, F2, T>,
-        SVOLE2: SvoleT<P, T, T>,
-    > DietMacAndCheeseExtField<P, T, C, SVOLE1, SVOLE2>
+    P: Party,
+    T: FiniteField<PrimeField = F2>,
+    C: AbstractChannel + Clone,
+    SVOLE1: SvoleT<P, F2, T>,
+    SVOLE2: SvoleT<P, T, T>,
+> DietMacAndCheeseExtField<P, T, C, SVOLE1, SVOLE2>
 where
     F2: IsSubFieldOf<T>,
 {
@@ -67,12 +67,12 @@ where
 }
 
 impl<
-        P: Party,
-        T: FiniteField<PrimeField = F2>,
-        C: AbstractChannel + Clone,
-        SVOLE1: SvoleT<P, F2, T>,
-        SVOLE2: SvoleT<P, T, T>,
-    > BackendT for DietMacAndCheeseExtField<P, T, C, SVOLE1, SVOLE2>
+    P: Party,
+    T: FiniteField<PrimeField = F2>,
+    C: AbstractChannel + Clone,
+    SVOLE1: SvoleT<P, F2, T>,
+    SVOLE2: SvoleT<P, T, T>,
+> BackendT for DietMacAndCheeseExtField<P, T, C, SVOLE1, SVOLE2>
 where
     F2: IsSubFieldOf<T>,
 {
@@ -124,11 +124,11 @@ where
 }
 
 impl<
-        P: Party,
-        C: AbstractChannel + Clone,
-        SVOLE1: SvoleT<P, F2, F40b>,
-        SVOLE2: SvoleT<P, F40b, F40b>,
-    > BackendConvT<P> for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
+    P: Party,
+    C: AbstractChannel + Clone,
+    SVOLE1: SvoleT<P, F2, F40b>,
+    SVOLE2: SvoleT<P, F40b, F40b>,
+> BackendConvT<P> for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
 {
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
         self.dmc.assert_conv_to_bits(w)
@@ -144,11 +144,11 @@ impl<
 }
 
 impl<
-        P: Party,
-        C: AbstractChannel + Clone,
-        SVOLE1: SvoleT<P, F2, F40b>,
-        SVOLE2: SvoleT<P, F40b, F40b>,
-    > BackendDisjunctionT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
+    P: Party,
+    C: AbstractChannel + Clone,
+    SVOLE1: SvoleT<P, F2, F40b>,
+    SVOLE2: SvoleT<P, F40b, F40b>,
+> BackendDisjunctionT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
 {
     fn disjunction(
         &mut self,
@@ -283,11 +283,11 @@ impl<
 }
 
 impl<
-        P: Party,
-        C: AbstractChannel + Clone,
-        SVOLE1: SvoleT<P, F2, F40b>,
-        SVOLE2: SvoleT<P, F40b, F40b>,
-    > BackendLiftT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
+    P: Party,
+    C: AbstractChannel + Clone,
+    SVOLE1: SvoleT<P, F2, F40b>,
+    SVOLE2: SvoleT<P, F40b, F40b>,
+> BackendLiftT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
 {
     type LiftedBackend = DietMacAndCheese<P, F40b, F40b, C, SVOLE2>;
 
@@ -297,11 +297,11 @@ impl<
 }
 
 impl<
-        P: Party,
-        C: AbstractChannel + Clone,
-        SVOLE1: SvoleT<P, F2, F40b>,
-        SVOLE2: SvoleT<P, F40b, F40b>,
-    > BackendRamT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
+    P: Party,
+    C: AbstractChannel + Clone,
+    SVOLE1: SvoleT<P, F2, F40b>,
+    SVOLE2: SvoleT<P, F40b, F40b>,
+> BackendRamT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
 {
     fn init_ram(
         &mut self,
@@ -352,7 +352,7 @@ mod test {
     use crate::svole_trait::Svole;
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
-    use scuttlebutt::field::{F40b, F2};
+    use scuttlebutt::field::{F2, F40b};
     use scuttlebutt::{AesRng, Channel};
     use std::thread::JoinHandle;
     use std::{

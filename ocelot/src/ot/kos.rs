@@ -5,14 +5,14 @@ use crate::{
     errors::Error,
     ot::FixedKeyInitializer,
     ot::{
-        alsz::{Receiver as AlszReceiver, Sender as AlszSender},
         CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
         Sender as OtSender,
+        alsz::{Receiver as AlszReceiver, Sender as AlszSender},
     },
     utils,
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{cointoss, AbstractChannel, AesRng, Block, Malicious, SemiHonest};
+use scuttlebutt::{AbstractChannel, AesRng, Block, Malicious, SemiHonest, cointoss};
 use std::io::ErrorKind;
 
 // The statistical security parameter.

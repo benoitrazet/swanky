@@ -3,14 +3,14 @@
 mod tests {
     use crate::errors::Error;
     use crate::psi::circuit_psi::{
-        base_psi::{receiver::OpprfReceiver, sender::OpprfSender, BasePsi},
+        base_psi::{BasePsi, receiver::OpprfReceiver, sender::OpprfSender},
         tests::{utils::*, *},
         utils::*,
         *,
     };
     use fancy_garbling::{
-        twopac::semihonest::{Evaluator, Garbler},
         WireMod2,
+        twopac::semihonest::{Evaluator, Garbler},
     };
 
     use ocelot::{ot::AlszReceiver as OtReceiver, ot::AlszSender as OtSender};

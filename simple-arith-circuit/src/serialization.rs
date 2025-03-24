@@ -32,9 +32,9 @@ pub mod serde_index {
 
 #[cfg(test)]
 mod tests {
-    use crate::{circuitgen::random_circuit, Circuit};
+    use crate::{Circuit, circuitgen::random_circuit};
     use proptest::prelude::*;
-    use rand::{distributions::Uniform, prelude::Distribution, SeedableRng};
+    use rand::{SeedableRng, distributions::Uniform, prelude::Distribution};
     use scuttlebutt::{AesRng, Block};
 
     fn any_seed() -> impl Strategy<Value = Block> {

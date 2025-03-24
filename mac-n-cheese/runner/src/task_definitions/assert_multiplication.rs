@@ -1,21 +1,21 @@
 use crate::task_framework::{GlobalVolesNeeded, NoContinuation, TaskDefinition, TaskResult};
 use crate::types::RandomMac;
-use generic_array::typenum::Unsigned;
 use generic_array::GenericArray;
+use generic_array::typenum::Unsigned;
+use mac_n_cheese_ir::compilation_format::FieldMacType;
 use mac_n_cheese_ir::compilation_format::wire_format::{
     AssertMultiplyPrototypeNoSpecWireFormat, AssertMultiplyPrototypeSmallBinaryWireFormat,
 };
-use mac_n_cheese_ir::compilation_format::FieldMacType;
 use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
 use mac_n_cheese_vole::specialization::SmallBinaryFieldSpecialization;
 use parking_lot::Mutex;
 use party::either::PartyEitherCopy;
 use party::{IsParty, Party, WhichParty};
 use rand::SeedableRng;
-use scuttlebutt::field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf, SmallBinaryField, F2};
+use scuttlebutt::AesRng;
+use scuttlebutt::field::{Degree, DegreeModulo, F2, FiniteField, IsSubFieldOf, SmallBinaryField};
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::serialization::CanonicalSerialize;
-use scuttlebutt::AesRng;
 use swanky_party as party;
 
 use std::io::Read;

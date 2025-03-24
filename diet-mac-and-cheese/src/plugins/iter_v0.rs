@@ -1,10 +1,10 @@
 use super::{Plugin, PluginExecution};
 use crate::circuit_ir::{
-    first_unused_wire_id, FunStore, FuncDecl, GateM, GatesBody, TypeId, TypeStore, WireCount,
-    WireId, WireRange,
+    FunStore, FuncDecl, GateM, GatesBody, TypeId, TypeStore, WireCount, WireId, WireRange,
+    first_unused_wire_id,
 };
 use crate::number_to_u64;
-use eyre::{bail, ensure, eyre, Context, Result};
+use eyre::{Context, Result, bail, ensure, eyre};
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 
 pub(crate) struct IterV0;
@@ -126,10 +126,10 @@ impl Plugin for IterV0 {
             );
 
             ensure!(
-            wc == wc_f,
-            "{}: The input at position {i} must have exactly the same count as the corresponding input of {func_name}: {wc} != {wc_f}.",
-            Self::NAME,
-        );
+                wc == wc_f,
+                "{}: The input at position {i} must have exactly the same count as the corresponding input of {func_name}: {wc} != {wc_f}.",
+                Self::NAME,
+            );
         }
 
         let input_start = if enumerated {
@@ -241,7 +241,7 @@ mod tests {
 
     use crate::{
         backend_multifield::tests::{
-            minus_four, minus_one, minus_three, minus_two, test_circuit, zero, FF0,
+            FF0, minus_four, minus_one, minus_three, minus_two, test_circuit, zero,
         },
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
         fields::F61P_MODULUS,

@@ -9,9 +9,9 @@ use crate::errors::Error;
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
+    AbstractChannel, AesRng,
     field::{Degree, FiniteField as FF},
     ring::FiniteRing,
-    AbstractChannel, AesRng,
 };
 
 /// The base VOLE sender
@@ -136,8 +136,8 @@ impl<FE: FF> Receiver<FE> {
 mod tests {
     use super::{super::utils::Powers, Receiver, Sender};
     use scuttlebutt::{
-        field::{F128b, F40b, F61p, FiniteField as FF},
         AesRng, Channel,
+        field::{F40b, F61p, F128b, FiniteField as FF},
     };
     use std::{
         io::{BufReader, BufWriter},

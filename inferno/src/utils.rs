@@ -8,11 +8,7 @@ pub(crate) fn nrounds<F: FiniteField>(circuit: &Circuit<F>, compression_factor: 
     let nrounds = (circuit.nmuls() as f64)
         .log(compression_factor as f64)
         .floor() as usize;
-    if nrounds > 0 {
-        nrounds - 1
-    } else {
-        nrounds
-    }
+    if nrounds > 0 { nrounds - 1 } else { nrounds }
 }
 
 /// Validates that the number of parties, compression factor, and number of

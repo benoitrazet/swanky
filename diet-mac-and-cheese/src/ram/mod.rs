@@ -11,7 +11,7 @@ use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F2;
 use swanky_party::Party;
 
-use crate::{backend_trait::BackendT, mac::Mac, svole_trait::SvoleT, DietMacAndCheese};
+use crate::{DietMacAndCheese, backend_trait::BackendT, mac::Mac, svole_trait::SvoleT};
 
 const ARITHMETIC_CHALLENGE_SIZE: usize = 2;
 const BOOLEAN_CHALLENGE_SIZE: usize = 40;
@@ -134,12 +134,12 @@ pub struct ArithmeticRam<
 }
 
 impl<
-        P: Party,
-        V: IsSubFieldOf<F>,
-        F: FiniteField,
-        C: AbstractChannel + Clone,
-        SVOLE: SvoleT<P, V, F>,
-    > ArithmeticRam<P, V, F, C, SVOLE>
+    P: Party,
+    V: IsSubFieldOf<F>,
+    F: FiniteField,
+    C: AbstractChannel + Clone,
+    SVOLE: SvoleT<P, V, F>,
+> ArithmeticRam<P, V, F, C, SVOLE>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
@@ -326,12 +326,8 @@ pub struct BooleanRam<
     dora: Option<DoraRam<P, F2, T, C, Boolean, SVOLE>>,
 }
 
-impl<
-        P: Party,
-        T: FiniteField<PrimeField = F2>,
-        C: AbstractChannel + Clone,
-        SVOLE: SvoleT<P, F2, T>,
-    > BooleanRam<P, T, C, SVOLE>
+impl<P: Party, T: FiniteField<PrimeField = F2>, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, T>>
+    BooleanRam<P, T, C, SVOLE>
 where
     F2: IsSubFieldOf<T>,
 {

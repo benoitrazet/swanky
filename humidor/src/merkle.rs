@@ -113,7 +113,7 @@ pub fn make_tree<Field: FiniteField, H: CryptoDigest>(m: ArrayView2<Field>) -> T
 }
 
 #[cfg(test)]
-use crate::util::{arb_test_field, TestField};
+use crate::util::{TestField, arb_test_field};
 #[cfg(test)]
 use proptest::{collection::vec as pvec, *};
 

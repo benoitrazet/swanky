@@ -2,12 +2,12 @@ use std::marker::PhantomData;
 
 use mac_n_cheese_ir::compilation_format::{FieldMacType, FieldTypeMacVisitor, TaskKind};
 use mac_n_cheese_vole::{mac::MacTypes, specialization::SmallBinaryFieldSpecialization};
-use scuttlebutt::field::{IsSubFieldOf, SmallBinaryField, F2};
+use scuttlebutt::field::{F2, IsSubFieldOf, SmallBinaryField};
 use swanky_party::Party;
 
 use crate::{
     task_framework::TaskDefinition,
-    types::{visit_type, TypeVisitor},
+    types::{TypeVisitor, visit_type},
 };
 
 mod add;

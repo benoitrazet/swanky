@@ -6,7 +6,7 @@ use std::fmt::Write;
 use super::types::{IntType, VectorType};
 
 use super::Docs;
-use super::{cfg::Cfg, VectorBackend};
+use super::{VectorBackend, cfg::Cfg};
 
 const REQUIRED_FEATURES: &[&str] = &["neon", "aes"];
 
@@ -33,7 +33,9 @@ impl Builder<'_> {
             .unwrap_or_else(|| panic!("unknown intrinsic {name:?}"));
         for feature in intrinsic.required_features.iter() {
             if !REQUIRED_FEATURES.contains(&feature.to_lowercase().as_str()) {
-                panic!("intrinsic {name:?} requires cpu feature {feature:?} which the avx2 backend doesn't require");
+                panic!(
+                    "intrinsic {name:?} requires cpu feature {feature:?} which the avx2 backend doesn't require"
+                );
             }
         }
         self.intrinsics_used.insert(intrinsic);

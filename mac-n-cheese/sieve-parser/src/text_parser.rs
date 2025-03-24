@@ -3,7 +3,7 @@ use std::{
     io::{BufRead, BufReader, Read, Seek},
 };
 
-use crypto_bigint::{CheckedAdd, CheckedMul, Limb, Uint, U64};
+use crypto_bigint::{CheckedAdd, CheckedMul, Limb, U64, Uint};
 use eyre::{Context, ContextCompat};
 
 use crate::{

@@ -1,7 +1,7 @@
 #![allow(clippy::all)]
 //! Private set intersection (PSZ) benchmarks using `criterion`.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use popsicle::psz;
 use scuttlebutt::{AesRng, Channel};
 use std::{

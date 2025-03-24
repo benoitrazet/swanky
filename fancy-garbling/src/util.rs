@@ -5,7 +5,7 @@
 use itertools::Itertools;
 use scuttlebutt::Block;
 use std::collections::HashMap;
-use vectoreyes::{SimdBase, U64x2, U8x16};
+use vectoreyes::{SimdBase, U8x16, U64x2};
 
 use crate::WireLabel;
 

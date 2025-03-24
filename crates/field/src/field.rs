@@ -3,7 +3,7 @@
 use crate::ring::{FiniteRing, IsSubRingOf};
 use crypto_bigint::{Limb, Uint};
 use generic_array::typenum;
-use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
+use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
 use std::ops::{Div, DivAssign};
 use subtle::CtOption;
 

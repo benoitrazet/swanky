@@ -1,7 +1,7 @@
 use std::fmt::Write;
 
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens, TokenStreamExt};
+use quote::{ToTokens, TokenStreamExt, quote};
 
 /// A helper for generating code blocks for documentation.
 ///

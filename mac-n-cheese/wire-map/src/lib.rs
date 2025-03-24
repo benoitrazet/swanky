@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, sync::atomic::AtomicU64};
 
 use allocation::Allocation;
 use eyre::ContextCompat;
-use vectoreyes::{SimdBase, SimdBase8, SimdSaturatingArithmetic, U16x16, U64x4, U8x32};
+use vectoreyes::{SimdBase, SimdBase8, SimdSaturatingArithmetic, U8x32, U16x16, U64x4};
 
 pub type WireId = u64;
 type AllocationStartId = u64;
@@ -162,10 +162,12 @@ impl<'parent, T> WireMap<'parent, T> {
             .unwrap();
         // Assert that no valid cache entry shares this start (a valid cache entry has a non-zero
         // length).
-        debug_assert!(!cache_starts
-            .iter()
-            .zip(cache_lens_and_last_useds.iter())
-            .any(|(s, l)| *s == start && ((l >> 16) > 0)));
+        debug_assert!(
+            !cache_starts
+                .iter()
+                .zip(cache_lens_and_last_useds.iter())
+                .any(|(s, l)| *s == start && ((l >> 16) > 0))
+        );
         let evicted_start = cache_starts[victim_idx];
         let alloc_len = alloc.len();
         let evicted_allocation = std::mem::replace(&mut self.cached_allocations[victim_idx], alloc);

@@ -6,8 +6,8 @@ use std::{
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
-use swanky_field_binary::{F40b, F2};
-use swanky_party::{private::ProverPrivateCopy, IsParty, Party, Prover, WhichParty};
+use swanky_field_binary::{F2, F40b};
+use swanky_party::{IsParty, Party, Prover, WhichParty, private::ProverPrivateCopy};
 
 pub(crate) fn make_x_i<V: IsSubFieldOf<T>, T: FiniteField>(i: usize) -> T {
     let mut v: GenericArray<V, DegreeModulo<V, T>> = GenericArray::default();
@@ -203,8 +203,8 @@ mod tests {
     use generic_array::GenericArray;
     use scuttlebutt::AesRng;
     use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
-    use swanky_field_binary::{F40b, F2};
-    use swanky_party::{private::ProverPrivateCopy, Prover, Verifier, IS_VERIFIER};
+    use swanky_field_binary::{F2, F40b};
+    use swanky_party::{IS_VERIFIER, Prover, Verifier, private::ProverPrivateCopy};
 
     use crate::mac::validate;
 

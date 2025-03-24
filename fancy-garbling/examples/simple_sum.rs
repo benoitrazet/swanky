@@ -1,9 +1,10 @@
 //! An example that adds two secret numbers in a binary garbled circuit
 //! using fancy-garbling.
 use fancy_garbling::{
-    twopac::semihonest::{Evaluator, Garbler},
-    util, AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyInput,
+    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyInput,
     FancyReveal,
+    twopac::semihonest::{Evaluator, Garbler},
+    util,
 };
 
 use ocelot::{ot::AlszReceiver as OtReceiver, ot::AlszSender as OtSender};

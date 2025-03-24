@@ -3,7 +3,7 @@
 mod tests {
     use crate::errors::Error;
     use crate::psi::circuit_psi::{
-        base_psi::{receiver::OpprfReceiver, sender::OpprfSender, BasePsi},
+        base_psi::{BasePsi, receiver::OpprfReceiver, sender::OpprfSender},
         tests::{utils::*, *},
         utils::*,
         *,
@@ -302,7 +302,8 @@ mod tests {
             assert!(
                 sender.state.opprf_payloads_in.len() == sender.state.opprf_primary_keys_in.len(),
                 "PSTY Simple Hashing: the payloads and sets hash tables have different sizes, payloads: {}, set: {}",
-                sender.state.opprf_payloads_in.len(), sender.state.opprf_primary_keys_in.len(),
+                sender.state.opprf_payloads_in.len(),
+                sender.state.opprf_primary_keys_in.len(),
             );
         }
     }
@@ -317,7 +318,8 @@ mod tests {
             assert!(
                 sender.state.opprf_payloads_in.len() == sender.state.opprf_payloads_out.len(),
                 "PSTY Simple Hashing: the payloads and payload mask tables have different sizes, payloads {}, masks {} ",
-sender.state.opprf_payloads_in.len(), sender.state.opprf_payloads_out.len(),
+                sender.state.opprf_payloads_in.len(),
+                sender.state.opprf_payloads_out.len(),
             );
         }
     }
@@ -330,9 +332,11 @@ sender.state.opprf_payloads_in.len(), sender.state.opprf_payloads_out.len(),
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, _, _, _) = psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
             assert!(
-                sender.state.opprf_primary_keys_in.len() == sender.state.opprf_primary_keys_out.len(),
+                sender.state.opprf_primary_keys_in.len()
+                    == sender.state.opprf_primary_keys_out.len(),
                 "PSTY Simple Hashing: the set and set programs tables have different sizes, set in {} set out {}",
-                sender.state.opprf_primary_keys_in.len(), sender.state.opprf_primary_keys_out.len(),
+                sender.state.opprf_primary_keys_in.len(),
+                sender.state.opprf_primary_keys_out.len(),
             );
         }
     }
@@ -346,7 +350,8 @@ sender.state.opprf_payloads_in.len(), sender.state.opprf_payloads_out.len(),
             let (_, receiver, _, _) =
                 psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
             assert!(
-                receiver.state.opprf_payloads_in.len() == receiver.state.opprf_primary_keys_in.len(),
+                receiver.state.opprf_payloads_in.len()
+                    == receiver.state.opprf_primary_keys_in.len(),
                 "PSTY Cuckoo Hashing: the payloads and sets hash tables have different sizes, payloads: {}, set {}",
                 receiver.state.opprf_payloads_in.len(),
                 receiver.state.opprf_primary_keys_in.len(),
@@ -363,11 +368,11 @@ sender.state.opprf_payloads_in.len(), sender.state.opprf_payloads_out.len(),
             let (sender, receiver, _, _) =
                 psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
             assert!(
-                sender.state.opprf_primary_keys_in.len() == receiver.state.opprf_primary_keys_in.len(),
+                sender.state.opprf_primary_keys_in.len()
+                    == receiver.state.opprf_primary_keys_in.len(),
                 "PSTY Hashing: the sender and receicver have differently sized set hashing tables, sender: {}, receiver: {}",
                 sender.state.opprf_primary_keys_in.len(),
                 receiver.state.opprf_primary_keys_in.len(),
-
             );
         }
     }

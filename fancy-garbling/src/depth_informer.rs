@@ -1,9 +1,9 @@
 //! Fancy object to compute the multiplicative depth of a computation.
 
 use crate::{
+    FancyArithmetic, FancyBinary,
     errors::FancyError,
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
-    FancyArithmetic, FancyBinary,
 };
 use std::cmp::max;
 

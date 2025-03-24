@@ -1,5 +1,5 @@
 #![allow(clippy::all)]
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::util;
 use rand::Rng;
 use std::time::Duration;

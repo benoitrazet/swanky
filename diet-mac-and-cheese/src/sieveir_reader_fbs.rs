@@ -20,8 +20,8 @@ use crate::{
 use crate::{
     fields::modulus_to_type_id, sieveir_phase2::sieve_ir_generated::sieve_ir::DirectiveSet as ds,
 };
-use eyre::{ensure, eyre, Result};
-use flatbuffers::{read_scalar_at, UOffsetT, SIZE_UOFFSET};
+use eyre::{Result, ensure, eyre};
+use flatbuffers::{SIZE_UOFFSET, UOffsetT, read_scalar_at};
 use log::info;
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg, ValueStreamKind};
 use std::collections::VecDeque;

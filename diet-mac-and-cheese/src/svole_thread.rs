@@ -1,11 +1,11 @@
 //! Multithreading Svole.
 
-use crate::svole_trait::{field_name, SvoleStopSignal, SvoleT};
-use eyre::{ensure, eyre, Result};
+use crate::svole_trait::{SvoleStopSignal, SvoleT, field_name};
+use eyre::{Result, ensure, eyre};
 use log::{debug, info};
 use ocelot::svole::{LpnParams, Receiver, Sender};
 use scuttlebutt::field::IsSubFieldOf;
-use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng};
+use scuttlebutt::{AbstractChannel, AesRng, field::FiniteField};
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::rc::Rc;
@@ -410,7 +410,7 @@ mod test {
         os::unix::net::UnixStream,
     };
     use swanky_party::either::PartyEither;
-    use swanky_party::{Verifier, IS_VERIFIER};
+    use swanky_party::{IS_VERIFIER, Verifier};
 
     fn produce(s: &SvoleAtomic<Verifier, u32, u32>, v: u32) {
         loop {

@@ -1,9 +1,9 @@
 #![allow(clippy::all)]
-use ocelot::svole::{Receiver, Sender};
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
+use ocelot::svole::{Receiver, Sender};
 use scuttlebutt::{
-    field::{F40b, F2},
     AbstractChannel, AesRng,
+    field::{F2, F40b},
 };
 use std::io::{Read, Write};
 use std::{

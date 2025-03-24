@@ -4,25 +4,26 @@ use std::{
 
 use eyre::{Context, ContextCompat};
 use mac_n_cheese_ir::circuit_builder::{
-    build_circuit, vole_supplier::VoleSupplier, CircuitBuilder, PrivateBuilder, TaskOutputRef,
-    TaskPrototypeRef,
+    CircuitBuilder, PrivateBuilder, TaskOutputRef, TaskPrototypeRef, build_circuit,
+    vole_supplier::VoleSupplier,
 };
 use mac_n_cheese_sieve_parser::ValueStreamReader;
 use mac_n_cheese_wire_map::WireMap;
 use rustc_hash::FxHashMap;
 use scuttlebutt::field::F2;
 use swanky_party::{
-    private::{ProverPrivate, ProverPrivateCopy},
     Party, WhichParty,
+    private::{ProverPrivate, ProverPrivateCopy},
 };
 
 use super::{
+    Inputs,
     circuit_ir::{
         FieldInstruction, FieldInstructions, FieldInstructionsTy, FunctionDefinition, FunctionId,
     },
     put,
     supported_fields::{FieldType, InvariantType},
-    to_fe, to_k_bits, to_k_flipped_bits, Inputs,
+    to_fe, to_k_bits, to_k_flipped_bits,
 };
 use crate::sieve_compiler::{
     circuit_ir::{CircuitChunk, CounterInfo, Instruction, Permissiveness, WireRange},
@@ -31,8 +32,8 @@ use crate::sieve_compiler::{
         FieldGenericType, FieldIndexedArray,
     },
 };
-use mac_n_cheese_ir::compilation_format::wire_format::Wire as IrWire;
 use mac_n_cheese_ir::compilation_format::Type as IrType;
+use mac_n_cheese_ir::compilation_format::wire_format::Wire as IrWire;
 
 #[derive(Clone, Copy, Debug)]
 struct WireRef {
@@ -775,11 +776,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                         let x = cm.linear(self.cb, cond, FE::ONE, one, -i)?;
 
                                         let x_prime_v = x_v.map(|x| {
-                                            if x != FE::ZERO {
-                                                x.inverse()
-                                            } else {
-                                                FE::ZERO
-                                            }
+                                            if x != FE::ZERO { x.inverse() } else { FE::ZERO }
                                         });
                                         let x_prime =
                                             cm.fix(self.cb, self.vs, self.pb, x_prime_v)?;

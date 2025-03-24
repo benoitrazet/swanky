@@ -1,4 +1,4 @@
-use quote::{format_ident, quote, ToTokens, TokenStreamExt};
+use quote::{ToTokens, TokenStreamExt, format_ident, quote};
 
 #[derive(Clone)]
 /// A representation of a [`cfg`](https://doc.rust-lang.org/rust-by-example/attribute/cfg.html)

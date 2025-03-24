@@ -14,11 +14,11 @@ use clap::Parser;
 use eyre::{Context, ContextCompat};
 use mac_n_cheese_ir::compilation_format::fb::{self, DataChunkAddress};
 use mac_n_cheese_ir::compilation_format::{
-    read_private_manifest, AtomicGraphDegreeCount, Manifest, Type,
+    AtomicGraphDegreeCount, Manifest, Type, read_private_manifest,
 };
 use party::either::PartyEitherCopy;
 use party::private::{ProverPrivate, ProverPrivateCopy};
-use party::{WhichParty, IS_PROVER, IS_VERIFIER};
+use party::{IS_PROVER, IS_VERIFIER, WhichParty};
 use rand::SeedableRng;
 use scuttlebutt::AesRng;
 use swanky_party as party;
@@ -27,7 +27,7 @@ use types::visit_type;
 
 use crate::runner::RunQueue;
 
-use crate::task_queue::{TaskQueue, QUEUE_NAME_RUN_QUEUE};
+use crate::task_queue::{QUEUE_NAME_RUN_QUEUE, TaskQueue};
 use crate::thread_spawner::ThreadSpawner;
 use crate::types::TypeVisitor;
 

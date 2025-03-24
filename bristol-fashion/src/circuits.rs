@@ -1,6 +1,6 @@
 // TODO(isweet): Define cache according to Stuart's suggested macro, see https://gist.github.com/Isweet/22c598b7e9b19c84750f585319dddf7a
 
-use crate::{read, Circuit};
+use crate::{Circuit, read};
 
 use std::io::Cursor;
 

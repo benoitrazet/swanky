@@ -11,9 +11,9 @@ fn test_arithmetic_ram() {
     use swanky_field_f61p::F61p;
     use swanky_party::{Prover, Verifier};
 
-    use crate::{backend_trait::BackendT, svole_trait::Svole, DietMacAndCheese};
+    use crate::{DietMacAndCheese, backend_trait::BackendT, svole_trait::Svole};
 
-    use super::{protocol::DoraRam, Arithmetic};
+    use super::{Arithmetic, protocol::DoraRam};
 
     const RAM_SIZE: usize = 100;
     const RAM_STEPS: usize = 100;
@@ -91,12 +91,12 @@ fn test_boolean_ram() {
     use rand::SeedableRng;
     use scuttlebutt::{AesRng, Channel};
     use swanky_field::FiniteRing;
-    use swanky_field_binary::{F40b, F2};
+    use swanky_field_binary::{F2, F40b};
     use swanky_party::{Prover, Verifier};
 
-    use crate::{backend_trait::BackendT, svole_trait::Svole, DietMacAndCheese};
+    use crate::{DietMacAndCheese, backend_trait::BackendT, svole_trait::Svole};
 
-    use super::{protocol::DoraRam, Boolean};
+    use super::{Boolean, protocol::DoraRam};
 
     const RAM_SIZE: usize = 100;
     const RAM_STEPS: usize = 100;

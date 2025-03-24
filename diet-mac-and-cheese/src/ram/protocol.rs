@@ -1,21 +1,21 @@
 use std::{collections::hash_map::Entry, iter, marker::PhantomData};
 
-use eyre::{ensure, Result};
+use eyre::{Result, ensure};
 use rustc_hash::FxHashMap;
 
 use scuttlebutt::AbstractChannel;
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::{
-    private::{ProverPrivate, ProverPrivateCopy},
     Party, WhichParty,
+    private::{ProverPrivate, ProverPrivateCopy},
 };
 
 use crate::{
-    backend_trait::BackendT, dora::perm::permutation, mac::Mac, ram::collapse_vec,
-    svole_trait::SvoleT, DietMacAndCheese,
+    DietMacAndCheese, backend_trait::BackendT, dora::perm::permutation, mac::Mac,
+    ram::collapse_vec, svole_trait::SvoleT,
 };
 
-use super::{tx::TxChannel, MemorySpace};
+use super::{MemorySpace, tx::TxChannel};
 
 /// The Dora RAM protocol state.
 ///
@@ -72,13 +72,13 @@ where
 }
 
 impl<
-        P: Party,
-        V: IsSubFieldOf<F>,
-        F: FiniteField,
-        C: AbstractChannel + Clone,
-        M: MemorySpace<V>,
-        SVOLE: SvoleT<P, V, F>,
-    > DoraRam<P, V, F, C, M, SVOLE>
+    P: Party,
+    V: IsSubFieldOf<F>,
+    F: FiniteField,
+    C: AbstractChannel + Clone,
+    M: MemorySpace<V>,
+    SVOLE: SvoleT<P, V, F>,
+> DoraRam<P, V, F, C, M, SVOLE>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {

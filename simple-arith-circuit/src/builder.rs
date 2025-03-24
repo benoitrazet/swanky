@@ -1,7 +1,7 @@
 //! This module implements functions for building / extending circuits.
 
 use crate::{Circuit, Op};
-use scuttlebutt::field::{FiniteField, F2};
+use scuttlebutt::field::{F2, FiniteField};
 use scuttlebutt::ring::FiniteRing;
 
 /// Adds an equality check to `circuit` such that the new circuit

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use eyre::{bail, eyre, Result};
+use eyre::{Result, bail, eyre};
 use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
     TypeId, TypedCount, TypedWireRange, WireId, WireRange,
@@ -296,7 +296,7 @@ mod tests {
     use std::{collections::HashSet, iter::repeat_with};
 
     use eyre::Result;
-    use rand::{thread_rng, Rng};
+    use rand::{Rng, thread_rng};
     use swanky_field::FiniteRing;
     use swanky_field_binary::F128b;
 
@@ -387,9 +387,11 @@ mod tests {
 
             // You shouldn't be able to also "compute" & assign a witness to the wire
             let witness = F128b::random(rng);
-            assert!(traverser
-                .save_computed_masked_witness(wid, witness)
-                .is_err());
+            assert!(
+                traverser
+                    .save_computed_masked_witness(wid, witness)
+                    .is_err()
+            );
         }
 
         Ok(())

@@ -8,7 +8,7 @@ use crate::{
     plugins::DisjunctionBody,
 };
 
-use super::{r1cs::R1CS, Clause};
+use super::{Clause, r1cs::R1CS};
 
 #[derive(Debug, Clone)]
 pub struct Disjunction<F: FiniteField> {

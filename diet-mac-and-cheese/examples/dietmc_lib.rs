@@ -11,20 +11,20 @@ This shows how to run a simple circuit using the library API.
  ```
  */
 
-use eyre::{bail, Result};
+use eyre::{Result, bail};
 use std::env;
 use std::io::{BufReader, BufWriter};
 use std::net::{TcpListener, TcpStream};
 
-use diet_mac_and_cheese::circuit_ir::{CircInputs, FunStore, GateM, TypeStore};
-use diet_mac_and_cheese::svole_trait::Svole;
 use diet_mac_and_cheese::EvaluatorCirc;
 use diet_mac_and_cheese::LpnSize;
+use diet_mac_and_cheese::circuit_ir::{CircInputs, FunStore, GateM, TypeStore};
+use diet_mac_and_cheese::svole_trait::Svole;
 use mac_n_cheese_sieve_parser::Number;
 use scuttlebutt::field::F61p;
 use scuttlebutt::{AesRng, Channel};
 use swanky_field::{FiniteField, FiniteRing};
-use swanky_field_binary::{F40b, F2};
+use swanky_field_binary::{F2, F40b};
 use swanky_party::{Prover, Verifier};
 
 fn field_to_number<F: FiniteField>(v: F) -> Number {

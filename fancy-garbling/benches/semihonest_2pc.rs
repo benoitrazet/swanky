@@ -1,11 +1,11 @@
 #![allow(clippy::all)]
 //! Benchmarks for semi-honest 2PC using `fancy-garbling`.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
+    FancyInput, WireMod2,
     circuit::{BinaryCircuit as Circuit, EvaluableCircuit},
     twopac::semihonest::{Evaluator, Garbler},
-    FancyInput, WireMod2,
 };
 use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
 use scuttlebutt::{AesRng, Channel};

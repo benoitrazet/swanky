@@ -13,12 +13,12 @@ use mac_n_cheese_sieve_parser::{
 use rustc_hash::FxHashMap;
 
 use crate::sieve_compiler::{
+    Inputs,
     circuit_ir::{CounterInfo, FieldInstruction, FieldInstructions, FunctionId, Type, WireRange},
     supported_fields::{
         CompilerField, CompilerFieldVisitor, FieldGenericCoproduct, FieldIndexedArray, FieldType,
         InvariantType,
     },
-    Inputs,
 };
 
 use super::{
@@ -130,9 +130,9 @@ impl<S: InstructionSink> Visitor<S> {
     fn per_field<CFV>(&mut self, ty: TypeId, v: CFV) -> eyre::Result<()>
     where
         for<'a> CFV: CompilerFieldVisitor<
-            &'a mut FieldInstructionsTy,
-            Output = InvariantType<eyre::Result<()>>,
-        >,
+                &'a mut FieldInstructionsTy,
+                Output = InvariantType<eyre::Result<()>>,
+            >,
     {
         match self.lookup_type(ty)? {
             Type::Field(field) => {
@@ -140,9 +140,9 @@ impl<S: InstructionSink> Visitor<S> {
                 impl<'a, S: InstructionSink, T> CompilerFieldVisitor<()> for V<'a, S, T>
                 where
                     for<'b> T: CompilerFieldVisitor<
-                        &'b mut FieldInstructionsTy,
-                        Output = InvariantType<eyre::Result<()>>,
-                    >,
+                            &'b mut FieldInstructionsTy,
+                            Output = InvariantType<eyre::Result<()>>,
+                        >,
                 {
                     type Output = InvariantType<eyre::Result<()>>;
                     fn visit<FE: crate::sieve_compiler::supported_fields::CompilerField>(
@@ -671,18 +671,24 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                 );
 
                 let PluginTypeArg::String(func_name) = args[0].clone() else {
-                    eyre::bail!("map and map_enumerated expect a function name as the first plugin-binding argument")
+                    eyre::bail!(
+                        "map and map_enumerated expect a function name as the first plugin-binding argument"
+                    )
                 };
 
                 // NOTE: We assume the Number arguments fit in u64s for iter
                 let num_env = match args[1] {
                     PluginTypeArg::Number(x) => x.as_words()[0],
-                    _ => eyre::bail!("map and map_enumerated a number (the number of closure wire ranges) as the second plugin-binding argument")
+                    _ => eyre::bail!(
+                        "map and map_enumerated a number (the number of closure wire ranges) as the second plugin-binding argument"
+                    ),
                 };
 
                 let iter_count = match args[2] {
                     PluginTypeArg::Number(x) => x.as_words()[0],
-                    _ => eyre::bail!("map and map_enumerated expects a number (the number of iterations) as the second plugin-binding argument")
+                    _ => eyre::bail!(
+                        "map and map_enumerated expects a number (the number of iterations) as the second plugin-binding argument"
+                    ),
                 };
 
                 // Check basic input/output compatibility
@@ -712,7 +718,10 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                     // condition to have here.
 
                     // plugin_output_count should be iter_count * func_output_count
-                    eyre::ensure!(plugin_output.count == func_output_count * iter_count, "map and map enumerated expect that each output count is #iterations * closure output count");
+                    eyre::ensure!(
+                        plugin_output.count == func_output_count * iter_count,
+                        "map and map enumerated expect that each output count is #iterations * closure output count"
+                    );
                 }
 
                 eyre::ensure!(
@@ -725,14 +734,20 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                         .iter()
                         .zip(&func.input_sizes[..num_env as usize])
                     {
-                        eyre::ensure!(plugin_input.count == *func_input_count, "map and map enumerated expect that each environment wire range count is closure input count");
+                        eyre::ensure!(
+                            plugin_input.count == *func_input_count,
+                            "map and map enumerated expect that each environment wire range count is closure input count"
+                        );
                     }
 
                     for (plugin_input, (_, func_input_count)) in inputs[num_env as usize..]
                         .iter()
                         .zip(&func.input_sizes[num_env as usize + 1..])
                     {
-                        eyre::ensure!(plugin_input.count == func_input_count * iter_count, "map and map enumerated expext that each non-environment input count is #iterations * closure input count");
+                        eyre::ensure!(
+                            plugin_input.count == func_input_count * iter_count,
+                            "map and map enumerated expext that each non-environment input count is #iterations * closure input count"
+                        );
                     }
                 } else {
                     for (i, (plugin_input, (_, func_input_count))) in
@@ -741,11 +756,20 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                         // For the first num_env, the counts should match exactly.
                         // For the rest, counts should be multiples as for outputs.
                         if i < num_env as usize {
-                            eyre::ensure!(plugin_input.count == *func_input_count, "map and map enumerated expect that each environment wire range count is closure input count");
+                            eyre::ensure!(
+                                plugin_input.count == *func_input_count,
+                                "map and map enumerated expect that each environment wire range count is closure input count"
+                            );
                         } else if i == num_env as usize && enumerated {
-                            eyre::ensure!(plugin_input.count == *func_input_count, "map enumerated expects that the index wire range count is closure input count")
+                            eyre::ensure!(
+                                plugin_input.count == *func_input_count,
+                                "map enumerated expects that the index wire range count is closure input count"
+                            )
                         } else {
-                            eyre::ensure!(plugin_input.count == func_input_count * iter_count, "map and map enumerated expext that each non-environment input count is #iterations * closure input count");
+                            eyre::ensure!(
+                                plugin_input.count == func_input_count * iter_count,
+                                "map and map enumerated expext that each non-environment input count is #iterations * closure input count"
+                            );
                         }
                     }
                 }

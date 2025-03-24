@@ -3,7 +3,7 @@
 mod tests {
 
     use crate::psi::circuit_psi::{
-        base_psi::{receiver::OpprfReceiver, sender::OpprfSender, BasePsi},
+        base_psi::{BasePsi, receiver::OpprfReceiver, sender::OpprfSender},
         tests::*,
         utils::*,
     };

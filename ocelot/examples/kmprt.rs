@@ -1,7 +1,7 @@
 #![allow(clippy::all)]
 use ocelot::oprf::{KmprtReceiver, KmprtSender};
 use rand::Rng;
-use scuttlebutt::{channel::track_unix_channel_pair, AesRng, Block, Block512};
+use scuttlebutt::{AesRng, Block, Block512, channel::track_unix_channel_pair};
 use std::time::SystemTime;
 
 fn rand_block_vec(size: usize) -> Vec<Block> {

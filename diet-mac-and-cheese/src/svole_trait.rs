@@ -4,7 +4,7 @@ use eyre::Result;
 use log::{debug, info};
 use ocelot::svole::{LpnParams, Receiver, Sender};
 use scuttlebutt::field::IsSubFieldOf;
-use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng};
+use scuttlebutt::{AbstractChannel, AesRng, field::FiniteField};
 use std::any::type_name;
 use std::marker::PhantomData;
 use std::time::Instant;

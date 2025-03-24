@@ -2,7 +2,7 @@ use super::{Plugin, PluginExecution};
 use crate::backend_trait::BackendT;
 use crate::circuit_ir::{FunStore, TypeId, TypeSpecification, TypeStore, WireCount};
 use crate::memory::Memory;
-use eyre::{bail, ensure, Result};
+use eyre::{Result, bail, ensure};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
 use swanky_field::FiniteRing;
@@ -227,7 +227,7 @@ impl MuxV0 {
             let sum_ys_minus_one = backend.sub(&one, &sum_ys)?;
             backend.assert_zero(&sum_ys_minus_one)?;
         } // 4) b) otherwise permissive
-          // no check
+        // no check
         Ok(ys)
     }
 
@@ -430,7 +430,7 @@ mod tests {
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
     };
     use scuttlebutt::{
-        field::{F61p, PrimeFiniteField, F2},
+        field::{F2, F61p, PrimeFiniteField},
         ring::FiniteRing,
     };
 

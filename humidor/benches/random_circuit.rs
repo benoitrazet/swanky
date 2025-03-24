@@ -1,7 +1,7 @@
 #![allow(clippy::all)]
 use core::time::Duration;
-use criterion::{criterion_group, criterion_main};
 use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput};
+use criterion::{criterion_group, criterion_main};
 use humidor::ligero::noninteractive;
 use rand::SeedableRng;
 use scuttlebutt::AesRng;

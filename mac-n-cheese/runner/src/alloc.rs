@@ -9,8 +9,8 @@ use std::{
     ops::{Deref, DerefMut},
     ptr::NonNull,
     sync::{
-        atomic::{AtomicPtr, Ordering},
         Arc,
+        atomic::{AtomicPtr, Ordering},
     },
     time::{Duration, Instant},
 };

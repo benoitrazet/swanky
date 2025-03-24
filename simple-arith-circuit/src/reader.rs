@@ -371,9 +371,19 @@ impl Circuit<F2> {
             let trace_mapping3 = || {
                 if trace.mapping {
                     log::debug!(
-                    "i: {}; gk: {:?}; wire1: {} {:?} [{}]; wire2: {} {:?} [{}]; wire3: {} {:?} [{}]",
-                    i, gl[i].0, wire1, wk1, wl[wire1].0, wire2, wk2, wl[wire2].0, wire3, wk3, wl[wire3].0,
-                );
+                        "i: {}; gk: {:?}; wire1: {} {:?} [{}]; wire2: {} {:?} [{}]; wire3: {} {:?} [{}]",
+                        i,
+                        gl[i].0,
+                        wire1,
+                        wk1,
+                        wl[wire1].0,
+                        wire2,
+                        wk2,
+                        wl[wire2].0,
+                        wire3,
+                        wk3,
+                        wl[wire3].0,
+                    );
                 };
             };
             match gl[i].0 {

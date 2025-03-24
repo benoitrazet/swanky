@@ -1,22 +1,22 @@
 use std::{
-    any::{type_name, Any},
+    any::{Any, type_name},
     io::Write,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 
 use bumpalo::Bump;
 use eyre::{Context, ContextCompat};
 use mac_n_cheese_ir::compilation_format::{
-    fb, AtomicGraphDegreeCount, Manifest, NumericalEnumType, PrivatesManifest, TaskId, TaskKind,
-    Type,
+    AtomicGraphDegreeCount, Manifest, NumericalEnumType, PrivatesManifest, TaskId, TaskKind, Type,
+    fb,
 };
 use parking_lot::{Condvar, Mutex, RwLock};
 use rustc_hash::FxHashMap;
 use scuttlebutt::AesRng;
-use swanky_party::{private::ProverPrivate, Party, WhichParty};
+use swanky_party::{Party, WhichParty, private::ProverPrivate};
 
 use crate::{
     alloc::OwnedAlignedBytes,
@@ -24,14 +24,14 @@ use crate::{
     event_log,
     flatbuffers_ext::FbVectorExt,
     reactor::{Reactor, ReactorRequest, ReactorResponse},
-    task_definitions::{visit_task_definition, TaskDefinitionVisitor},
+    task_definitions::{TaskDefinitionVisitor, visit_task_definition},
     task_framework::{
         GlobalVolesNeeded, TaskContext, TaskDefinition, TaskInput, TaskOutput, TaskResult,
     },
     task_queue::{RunningTaskId, TaskQueue, TaskQueueEntry},
     thread_spawner::ThreadSpawner,
     tls::TlsConnection,
-    types::{visit_type, TypeVisitor},
+    types::{TypeVisitor, visit_type},
 };
 
 use self::{erased_task_definition::ErasedTaskDefinition, limited_use_arcs::LimitedUseArcs};

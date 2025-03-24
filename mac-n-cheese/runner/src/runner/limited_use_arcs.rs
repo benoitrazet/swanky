@@ -2,7 +2,7 @@ use arc_swap::ArcSwapOption;
 use mac_n_cheese_ir::compilation_format::{AtomicGraphDegreeCount, TaskId};
 use std::{
     marker::PhantomData,
-    sync::{atomic::Ordering, Arc},
+    sync::{Arc, atomic::Ordering},
 };
 
 use crate::event_log::event_log;

@@ -9,11 +9,11 @@ of the extra memory cost from storing the 'main' relation gates!
 */
 use crate::circuit_ir::TapeT;
 use crate::circuit_ir::{FunStore, FuncDecl, GateM, TypeStore};
-use eyre::{bail, Result};
+use eyre::{Result, bail};
 use log::info;
-use mac_n_cheese_sieve_parser::text_parser::ValueStreamReader;
 use mac_n_cheese_sieve_parser::ValueStreamKind;
 use mac_n_cheese_sieve_parser::ValueStreamReader as VSR;
+use mac_n_cheese_sieve_parser::text_parser::ValueStreamReader;
 use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
     TypeId, TypedCount, TypedWireRange, WireId, WireRange,

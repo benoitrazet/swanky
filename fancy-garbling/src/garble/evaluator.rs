@@ -1,13 +1,12 @@
 use std::marker::PhantomData;
 
 use crate::{
-    check_binary,
+    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireMod2, check_binary,
     errors::{EvaluatorError, FancyError},
     fancy::{Fancy, FancyReveal},
     hash_wires,
     util::{output_tweak, tweak, tweak2},
     wire::WireLabel,
-    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireMod2,
 };
 use scuttlebutt::{AbstractChannel, Block};
 use subtle::ConditionallySelectable;

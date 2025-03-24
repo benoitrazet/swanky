@@ -1,7 +1,7 @@
 //! Types for describing integers and vectors of integers.
 
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens, TokenStreamExt};
+use quote::{ToTokens, TokenStreamExt, format_ident, quote};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Signedness {

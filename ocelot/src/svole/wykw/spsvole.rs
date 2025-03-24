@@ -10,14 +10,14 @@ use crate::{
 };
 use generic_array::typenum::Unsigned;
 use rand::{
-    distributions::{Distribution, Uniform},
     CryptoRng, Rng, SeedableRng,
+    distributions::{Distribution, Uniform},
 };
 use scuttlebutt::{
+    AbstractChannel, AesRng, Block, Malicious,
     field::{Degree, FiniteField as FF},
     ring::FiniteRing,
     utils::unpack_bits,
-    AbstractChannel, AesRng, Block, Malicious,
 };
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
@@ -218,11 +218,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         channel.flush()?;
 
         let b = eq_send(channel, va)?;
-        if b {
-            Ok(())
-        } else {
-            Err(Error::EqCheckFailed)
-        }
+        if b { Ok(()) } else { Err(Error::EqCheckFailed) }
     }
 
     pub(super) fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -370,8 +366,8 @@ mod test {
     };
     use generic_array::typenum::Unsigned;
     use scuttlebutt::{
-        field::{Degree, F128b, F40b, F61p, FiniteField as FF},
         AesRng, Channel,
+        field::{Degree, F40b, F61p, F128b, FiniteField as FF},
     };
     use std::{
         io::{BufReader, BufWriter},

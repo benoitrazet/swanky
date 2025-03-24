@@ -2,7 +2,7 @@
 //! Private set intersection (PSTY) benchmarks using `criterion`.
 
 use popsicle::psty::{Receiver, Sender};
-use scuttlebutt::{channel::track_unix_channel_pair, AesRng};
+use scuttlebutt::{AesRng, channel::track_unix_channel_pair};
 use std::time::SystemTime;
 
 const NBYTES: usize = 16;

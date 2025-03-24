@@ -19,7 +19,7 @@ pub mod utils;
 /// A polyfill for the `swanky-field*` family of crates.
 pub mod field {
     pub use swanky_field::{
-        field_ops, Degree, DegreeModulo, FiniteField, IsSubFieldOf, PrimeFiniteField,
+        Degree, DegreeModulo, FiniteField, IsSubFieldOf, PrimeFiniteField, field_ops,
     };
     pub use swanky_field_binary::*;
     pub use swanky_field_f61p::*;
@@ -28,19 +28,19 @@ pub mod field {
 }
 /// A polyfill for the ring functionality inside of `swanky-field`.
 pub mod ring {
-    pub use swanky_field::{ring_ops, FiniteRing, IsSubRingOf};
+    pub use swanky_field::{FiniteRing, IsSubRingOf, ring_ops};
 }
 
 pub use crate::{
     block512::Block512,
     channel::{AbstractChannel, Channel, HashChannel, SymChannel, SyncChannel, TrackChannel},
-    hash_aes::{AesHash, AES_HASH},
+    hash_aes::{AES_HASH, AesHash},
 };
 pub use swanky_aes_rng::{AesRng, UniformIntegersUnderBound};
 
 #[cfg(unix)]
 pub use crate::channel::{
-    track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel,
+    TrackUnixChannel, UnixChannel, track_unix_channel_pair, unix_channel_pair,
 };
 
 /// A marker trait denoting that the given scheme is semi-honest secure.

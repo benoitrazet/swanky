@@ -1,19 +1,19 @@
 use arrayvec::ArrayVec;
 use bytemuck::TransparentWrapper;
 use eyre::Context;
-use generic_array::{typenum::Unsigned, GenericArray};
+use generic_array::{GenericArray, typenum::Unsigned};
 use keyed_arena::{AllocationKey, KeyedArena};
 use ocelot::ot::explicit_round::{KosReceiver, KosReceiverStage2, KosSender, KosSenderStage2};
 use ocelot::svole::ggm_utils::*;
-use party::{Party, IS_PROVER, IS_VERIFIER};
+use party::{IS_PROVER, IS_VERIFIER, Party};
 use rand::prelude::Distribution;
-use rand::{distributions::Uniform, CryptoRng, Rng, SeedableRng};
+use rand::{CryptoRng, Rng, SeedableRng, distributions::Uniform};
 use scuttlebutt::field::DegreeModulo;
 use scuttlebutt::{
+    AbstractChannel, AesRng, Block,
     field::{Degree, FiniteField},
     ring::FiniteRing,
     serialization::CanonicalSerialize,
-    AbstractChannel, AesRng, Block,
 };
 use std::{marker::PhantomData, ops::Deref};
 use swanky_party as party;
@@ -22,7 +22,7 @@ mod lpn_params;
 mod sizes;
 
 pub use sizes::VoleSizes;
-use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U64x2, U8x16};
+use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16, U64x2};
 
 use crate::{
     mac::{Mac, MacTypes},
