@@ -5,13 +5,13 @@
 //! These functionalities are used for diet Mac'n'Cheese and in the edabits
 //! conversion protocol for field-switching.
 use crate::{mac::Mac, svole_trait::SvoleT};
-use eyre::{bail, ensure, Result};
+use eyre::{Result, bail, ensure};
 use generic_array::GenericArray;
 use log::{debug, warn};
 use ocelot::svole::LpnParams;
 use rand::{Rng, SeedableRng};
 use scuttlebutt::field::{DegreeModulo, IsSubFieldOf};
-use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
+use scuttlebutt::{AbstractChannel, AesRng, Block, field::FiniteField};
 use swanky_party::either::PartyEither;
 use swanky_party::private::{
     ProverPrivate, ProverPrivateCopy, VerifierPrivate, VerifierPrivateCopy,
@@ -190,7 +190,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
                 AesRng::from_seed(seed)
             }
             WhichParty::Verifier(_) => {
-                let seed = rng.gen::<Block>();
+                let seed = rng.r#gen::<Block>();
                 channel.write_block(&seed)?;
                 channel.flush()?;
                 AesRng::from_seed(seed)
@@ -472,7 +472,7 @@ where
         let seed = match P::WHICH {
             WhichParty::Prover(_) => channel.read_block()?,
             WhichParty::Verifier(_) => {
-                let seed = rng.gen::<Block>();
+                let seed = rng.r#gen::<Block>();
                 channel.write_block(&seed)?;
                 channel.flush()?;
                 seed
@@ -687,15 +687,15 @@ mod tests {
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     use scuttlebutt::{
-        field::{F40b, F61p, FiniteField, IsSubFieldOf, F2},
         AbstractChannel, AesRng, Channel, SyncChannel,
+        field::{F2, F40b, F61p, FiniteField, IsSubFieldOf},
     };
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
     use swanky_party::private::{ProverPrivateCopy, VerifierPrivate};
-    use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
+    use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier};
 
     fn test_fcom_random<V: IsSubFieldOf<T>, T: FiniteField>()
     where

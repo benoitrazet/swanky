@@ -3,13 +3,13 @@
 //! Note: Any fields added here need to also be added to
 //! `backend_multifield::load_backend`!
 
-use eyre::{bail, ensure, Result};
-use generic_array::{typenum::Unsigned, GenericArray};
+use eyre::{Result, bail, ensure};
+use generic_array::{GenericArray, typenum::Unsigned};
 use mac_n_cheese_sieve_parser::Number;
 use scuttlebutt::serialization::CanonicalSerialize;
-use std::any::{type_name, TypeId};
+use std::any::{TypeId, type_name};
 use swanky_field::PrimeFiniteField;
-use swanky_field_binary::{F40b, F63b, F2};
+use swanky_field_binary::{F2, F40b, F63b};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F127p, F128p, F384p, F384q, Secp256k1, Secp256k1order};
 
@@ -22,23 +22,29 @@ pub const F2_MODULUS: Number = Number::from_u64(2);
 /// The modulus for [`F61p`], as a [`Number`].
 pub const F61P_MODULUS: Number = Number::from_u64((1 << 61) - 1);
 /// The modulus for [`F127p`], as a [`Number`].
-pub const F127P_MODULUS: Number =
-    Number::from_be_hex("00000000000000000000000000000000000000000000000000000000000000007FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+pub const F127P_MODULUS: Number = Number::from_be_hex(
+    "00000000000000000000000000000000000000000000000000000000000000007FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+);
 /// The modulus for [`F128p`], as a [`Number`].
-pub const F128P_MODULUS: Number =
-    Number::from_be_hex("0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffff61");
+pub const F128P_MODULUS: Number = Number::from_be_hex(
+    "0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffff61",
+);
 /// The modulus for [`Secp256k1`], as a [`Number`].
-pub const SECP256K1_MODULUS: Number =
-    Number::from_be_hex("00000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f");
+pub const SECP256K1_MODULUS: Number = Number::from_be_hex(
+    "00000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+);
 /// The modulus for [`Secp256k1order`], as a [`Number`].
-pub const SECP256K1ORDER_MODULUS: Number =
-    Number::from_be_hex("00000000000000000000000000000000fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141");
+pub const SECP256K1ORDER_MODULUS: Number = Number::from_be_hex(
+    "00000000000000000000000000000000fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",
+);
 /// The modulus for [`F384p`], as a [`Number`].
-pub const F384P_MODULUS: Number =
-    Number::from_be_hex("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeffffffff0000000000000000ffffffff");
+pub const F384P_MODULUS: Number = Number::from_be_hex(
+    "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeffffffff0000000000000000ffffffff",
+);
 /// The modulus for [`F384q`], as a [`Number`].
-pub const F384Q_MODULUS: Number =
-    Number::from_be_hex("ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52973");
+pub const F384Q_MODULUS: Number = Number::from_be_hex(
+    "ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52973",
+);
 
 #[test]
 fn f2_modulus_is_correct() {

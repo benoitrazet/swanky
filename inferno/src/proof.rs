@@ -13,8 +13,8 @@ use crate::cache::Cache;
 use crate::proof_single::ProofSingle;
 use anyhow::anyhow;
 use rayon::prelude::*;
-use scuttlebutt::field::FiniteField;
 use scuttlebutt::AesRng;
+use scuttlebutt::field::FiniteField;
 use simple_arith_circuit::Circuit;
 
 /// The inferno proof. `N` denotes the number of parties in each MPC execution.
@@ -81,7 +81,9 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
         assert!(N.is_power_of_two() && N <= 256);
         assert_eq!(circuit.noutputs(), 1);
         if !crate::utils::validate_parameters::<F>(N, compression_factor, repetitions) {
-            return Err(anyhow!("Invalid parameters: ({N}, {compression_factor}, {repetitions}) do not match acceptable settings"));
+            return Err(anyhow!(
+                "Invalid parameters: ({N}, {compression_factor}, {repetitions}) do not match acceptable settings"
+            ));
         }
         let time = std::time::Instant::now();
         let cache = Cache::new(circuit, compression_factor, false);
@@ -105,10 +107,9 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
             })
             .collect();
         log::info!("Verification time: {:?}", time.elapsed());
-        if let Some(err) = results.into_iter().find_map(|r| r.err()) {
-            Err(err)
-        } else {
-            Ok(())
+        match results.into_iter().find_map(|r| r.err()) {
+            Some(err) => Err(err),
+            _ => Ok(()),
         }
     }
 }

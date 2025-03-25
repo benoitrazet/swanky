@@ -31,7 +31,7 @@ impl<Stream: Read + Write> WsChannel<Stream> {
             let msg = self.websocket.read().unwrap();
             match msg {
                 Message::Binary(m) => {
-                    self.read_buffer = m;
+                    self.read_buffer = m.to_vec();
                     self.curr = 0;
                 }
                 _ => {
@@ -54,7 +54,7 @@ impl<Stream: Read + Write> WsChannel<Stream> {
 
     fn internal_flush(&mut self) {
         if !self.write_buffer.is_empty() {
-            let msg = Message::binary(&self.write_buffer[0..self.write_buffer_len]);
+            let msg = Message::binary(self.write_buffer[0..self.write_buffer_len].to_vec());
             self.websocket.write(msg).unwrap();
             self.websocket.flush().unwrap();
         }

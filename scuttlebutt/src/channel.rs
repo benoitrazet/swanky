@@ -9,9 +9,9 @@ pub use sync_channel::SyncChannel;
 pub use track_channel::TrackChannel;
 
 #[cfg(unix)]
-pub use unix_channel::{track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel};
+pub use unix_channel::{TrackUnixChannel, UnixChannel, track_unix_channel_pair, unix_channel_pair};
 
-use crate::{serialization::CanonicalSerialize, Block, Block512};
+use crate::{Block, Block512, serialization::CanonicalSerialize};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use generic_array::GenericArray;
 use std::{

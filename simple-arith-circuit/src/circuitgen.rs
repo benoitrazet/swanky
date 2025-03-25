@@ -2,10 +2,10 @@
 
 use crate::circuit::{Circuit, Index, Op};
 use rand::{
-    distributions::{Distribution, Uniform},
     Rng,
+    distributions::{Distribution, Uniform},
 };
-use scuttlebutt::field::{FiniteField, F2};
+use scuttlebutt::field::{F2, FiniteField};
 use scuttlebutt::ring::FiniteRing;
 
 fn rand_ix_pair(rng: &mut impl Rng, min: Index, max: Index) -> (Index, Index) {

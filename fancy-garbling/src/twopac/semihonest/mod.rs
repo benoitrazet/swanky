@@ -10,15 +10,15 @@ pub use garbler::Garbler;
 mod tests {
     use super::*;
     use crate::{
-        circuit::{eval_plain, BinaryCircuit, CircuitInfo, EvaluableCircuit},
-        dummy::Dummy,
-        util::RngExt,
         AllWire, CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary, FancyInput, WireLabel,
         WireMod2,
+        circuit::{BinaryCircuit, CircuitInfo, EvaluableCircuit, eval_plain},
+        dummy::Dummy,
+        util::RngExt,
     };
     use itertools::Itertools;
     use ocelot::ot::{ChouOrlandiReceiver, ChouOrlandiSender};
-    use scuttlebutt::{unix_channel_pair, AesRng, UnixChannel};
+    use scuttlebutt::{AesRng, UnixChannel, unix_channel_pair};
 
     fn addition<F: FancyArithmetic>(
         f: &mut F,

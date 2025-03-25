@@ -13,7 +13,7 @@ pub fn lookup_defined_for_mod(q: u16) -> bool {
     unsafe { c_num_digits(q, 0) > 0 }
 }
 
-extern "C" {
+unsafe extern "C" {
     fn c_get_table(q: u16, pos: usize) -> *const u16;
     fn c_num_digits(q: u16, pos: usize) -> usize;
 }

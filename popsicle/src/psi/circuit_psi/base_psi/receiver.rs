@@ -58,7 +58,7 @@ impl BasePsi for OpprfReceiver {
         // The key used during hashing is known to both
         // parties and allows them to hash the same inputs
         // to the same outputs.
-        let key = rng.gen();
+        let key = rng.r#gen();
         channel.write_block(&key)?;
         channel.flush()?;
 
@@ -97,7 +97,7 @@ impl BasePsi for OpprfReceiver {
             match CuckooHash::new(&hashed_inputs, NHASHES) {
                 Ok(res) => break res,
                 Err(_e) => {
-                    self.key = rng.gen();
+                    self.key = rng.r#gen();
                     hashed_inputs = compress_and_hash_inputs(primary_keys, self.key);
                 }
             }

@@ -1,4 +1,5 @@
 #![deny(missing_docs)]
+#![allow(unsafe_op_in_unsafe_fn)]
 //! VectorEyes is a (almost entirely) safe wrapper library around vectorized operations.
 //!
 //! # Backends

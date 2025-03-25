@@ -2,15 +2,16 @@
 //! using fancy-garbling.
 
 use fancy_garbling::{
-    twopac::semihonest::{Evaluator, Garbler},
-    util, AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyInput,
+    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyInput,
     FancyReveal,
+    twopac::semihonest::{Evaluator, Garbler},
+    util,
 };
 
 use ocelot::{ot::AlszReceiver as OtReceiver, ot::AlszSender as OtSender};
 use scuttlebutt::{AbstractChannel, AesRng, Channel};
 
-use std::cmp::{max, Ordering};
+use std::cmp::{Ordering, max};
 use std::fmt::Debug;
 use std::{
     io::{BufReader, BufWriter},

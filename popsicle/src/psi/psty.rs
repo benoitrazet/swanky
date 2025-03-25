@@ -3,13 +3,13 @@
 
 use crate::{cuckoo::CuckooHash, errors::Error, utils};
 use aes_gcm::{
-    aead::{Aead, KeyInit},
     Aes256Gcm, Key, Nonce,
+    aead::{Aead, KeyInit},
 };
 
 use fancy_garbling::{
-    twopac::semihonest::{Evaluator, Garbler},
     AllWire, BinaryBundle, BinaryBundleGadgets, BinaryGadgets, Fancy, FancyBinary, FancyInput,
+    twopac::semihonest::{Evaluator, Garbler},
 };
 use itertools::Itertools;
 use ocelot::{
@@ -98,12 +98,12 @@ impl Sender {
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
             // table2[j].
             if bins.iter().skip(1).all(|&x| x == bins[0]) {
-                table[bins[0]].push(rng.gen());
+                table[bins[0]].push(rng.r#gen());
             }
         }
 
         // select the target values
-        let ts = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
+        let ts = (0..nbins).map(|_| rng.r#gen::<Block512>()).collect_vec();
 
         let points = table
             .into_iter()
@@ -138,8 +138,10 @@ impl SenderState {
         C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let mut gb =
-            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
+        let mut gb = Garbler::<C, RNG, OtSender, AllWire>::new(
+            channel.clone(),
+            RNG::from_seed(rng.r#gen()),
+        )?;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
         let mods = vec![2; my_input_bits.len()]; // all binary moduli
         let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
@@ -219,7 +221,7 @@ impl Receiver {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<ReceiverState, Error> {
-        let key = rng.gen();
+        let key = rng.r#gen();
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
 
@@ -235,7 +237,7 @@ impl Receiver {
             .iter()
             .map(|opt_item| match opt_item {
                 Some(item) => item.entry_with_hindex(),
-                None => rng.gen(),
+                None => rng.r#gen(),
             })
             .collect::<Vec<Block>>();
 
@@ -272,7 +274,7 @@ impl ReceiverState {
 
         let mut ev = Evaluator::<C, RNG, OtReceiver, AllWire>::new(
             channel.clone(),
-            RNG::from_seed(rng.gen()),
+            RNG::from_seed(rng.r#gen()),
         )?;
 
         let mods = vec![2; nbins * HASH_SIZE * 8];

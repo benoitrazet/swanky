@@ -19,10 +19,9 @@ fn flatbuffer_version() -> &'static str {
 
 const PREFIX: &[u8] = b"// CACHE KEY ";
 const HEADER: &[u8] =
-    b"#![cfg_attr(rustfmt, rustfmt_skip)]\n#![allow(clippy::all)]\n#![allow(unused_imports)]\n";
+    b"#![cfg_attr(rustfmt, rustfmt_skip)]\n#![allow(clippy::all)]\n#![allow(unused_imports, unsafe_op_in_unsafe_fn)]\n";
 
-const FLATC_VERSION_MSG: &str =
-    "Running `flatc --version' failed. Do you have flatbuffer installed? Or, did you \
+const FLATC_VERSION_MSG: &str = "Running `flatc --version' failed. Do you have flatbuffer installed? Or, did you \
     untentionally change a .fbs file or a _generated.rs file?";
 
 fn compute_hash(full_src: &[u8], dst_excluding_cache_key: &[u8]) -> blake3::Hash {
@@ -74,10 +73,12 @@ pub fn compile_flatbuffer(src: &str, dst: &str) {
     if needs_recompile(src, dst) {
         // We don't need to tell cargo to rerun if this env var has changed.
         if std::env::var_os("SWANKY_FLATBUFFER_DO_NOT_GENERATE").is_some() {
-            panic!("{dst:?} is out of date for source {src:?}. Refusing to regenerate flatbuffers because 'SWANKY_FLATBUFFER_DO_NOT_GENERATE' is set.");
+            panic!(
+                "{dst:?} is out of date for source {src:?}. Refusing to regenerate flatbuffers because 'SWANKY_FLATBUFFER_DO_NOT_GENERATE' is set."
+            );
         }
         let src_contents = std::fs::read(src).unwrap();
-        std::env::set_var("PWD", std::env::current_dir().unwrap());
+        unsafe { std::env::set_var("PWD", std::env::current_dir().unwrap()) };
         let actual_flatc_version = String::from_utf8(
             Command::new("flatc")
                 .arg("--version")

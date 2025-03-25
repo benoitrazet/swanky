@@ -191,7 +191,7 @@ fn random_tests() {
             while allocations.len() < 16 {
                 let len = rng.gen_range(1..=128);
                 // We probably won't intersect any exising allocation. about (2^-39)
-                let start: u64 = rng.gen();
+                let start: u64 = rng.r#gen();
                 allocations.push((start, len, false));
             }
             for _ in 0..500_000 {
@@ -208,7 +208,7 @@ fn random_tests() {
                     }
                 } else {
                     let idx: WireId = if rng.gen_ratio(1, 128) {
-                        rng.gen()
+                        rng.r#gen()
                     } else {
                         // This distribution isn't weigthed by the size of each allocation.
                         let (start, len, _alloc) = allocations[rng.gen_range(0..allocations.len())];
@@ -256,9 +256,10 @@ fn test_alloc_range_if_unallocated() {
         .unwrap();
     assert_eq!(wm.insert(u64::MAX - 1, 5), InsertResult::PreviouslyUnset);
     assert_eq!(wm.insert(u64::MAX, 785), InsertResult::PreviouslyUnset);
-    assert!(wm
-        .alloc_range_if_unallocated(u64::MAX - 2, u64::MAX)
-        .is_err());
+    assert!(
+        wm.alloc_range_if_unallocated(u64::MAX - 2, u64::MAX)
+            .is_err()
+    );
     wm.alloc_range_if_unallocated(15, 475).unwrap();
     wm.alloc_range_if_unallocated(15, 475).unwrap();
     wm.alloc_range_if_unallocated(75, 100).unwrap();

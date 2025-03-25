@@ -162,9 +162,9 @@ impl BinaryCircuit {
 #[cfg(test)]
 mod tests {
     use crate::{
-        circuit::{eval_plain, BinaryCircuit as Circuit},
-        classic::garble,
         WireMod2,
+        circuit::{BinaryCircuit as Circuit, eval_plain},
+        classic::garble,
     };
 
     #[test]
@@ -176,27 +176,35 @@ mod tests {
         let key = vec![0u16; 128];
         let pt = vec![0u16; 128];
         let output = eval_plain(&circ, &pt, &key).unwrap();
-        assert_eq!(output.iter().map(|i| i.to_string()).collect::<String>(),
-                   "01100110111010010100101111010100111011111000101000101100001110111000100001001100111110100101100111001010001101000010101100101110");
+        assert_eq!(
+            output.iter().map(|i| i.to_string()).collect::<String>(),
+            "01100110111010010100101111010100111011111000101000101100001110111000100001001100111110100101100111001010001101000010101100101110"
+        );
         let key = vec![1u16; 128];
         let pt = vec![0u16; 128];
         let output = eval_plain(&circ, &pt, &key).unwrap();
-        assert_eq!(output.iter().map(|i| i.to_string()).collect::<String>(),
-                   "10100001111101100010010110001100100001110111110101011111110011011000100101100100010010000100010100111000101111111100100100101100");
+        assert_eq!(
+            output.iter().map(|i| i.to_string()).collect::<String>(),
+            "10100001111101100010010110001100100001110111110101011111110011011000100101100100010010000100010100111000101111111100100100101100"
+        );
         let mut key = vec![0u16; 128];
         for i in 0..8 {
             key[i] = 1;
         }
         let pt = vec![0u16; 128];
         let output = eval_plain(&circ, &pt, &key).unwrap();
-        assert_eq!(output.iter().map(|i| i.to_string()).collect::<String>(),
-                   "10110001110101110101100000100101011010110010100011111101100001010000101011010100100101000100001000001000110011110001000101010101");
+        assert_eq!(
+            output.iter().map(|i| i.to_string()).collect::<String>(),
+            "10110001110101110101100000100101011010110010100011111101100001010000101011010100100101000100001000001000110011110001000101010101"
+        );
         let mut key = vec![0u16; 128];
         key[7] = 1;
         let pt = vec![0u16; 128];
         let output = eval_plain(&circ, &pt, &key).unwrap();
-        assert_eq!(output.iter().map(|i| i.to_string()).collect::<String>(),
-                   "11011100000011101101100001011101111110010110000100011010101110110111001001001001110011011101000101101000110001010100011001111110");
+        assert_eq!(
+            output.iter().map(|i| i.to_string()).collect::<String>(),
+            "11011100000011101101100001011101111110010110000100011010101110110111001001001001110011011101000101101000110001010100011001111110"
+        );
     }
 
     #[test]

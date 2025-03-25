@@ -1,10 +1,11 @@
 use crate::{
+    FancyBinary,
     errors::FancyError,
     fancy::{
-        bundle::{Bundle, BundleGadgets},
         HasModulus,
+        bundle::{Bundle, BundleGadgets},
     },
-    util, FancyBinary,
+    util,
 };
 use itertools::Itertools;
 use std::ops::{Deref, DerefMut};

@@ -8,7 +8,7 @@ use scuttlebutt::field::FiniteField;
 
 use crate::{backend_trait::BackendT, circuit_ir::WireCount};
 
-use super::{acc::Accumulator, DisjGate};
+use super::{DisjGate, acc::Accumulator};
 
 // position in extended witness fixed to 1
 const CONSTANT_IDX: usize = 0;

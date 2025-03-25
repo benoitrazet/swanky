@@ -5,17 +5,17 @@ use crate::{
     backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT, BackendRamT, RamId},
     backend_trait::BackendT,
     circuit_ir::{FieldInputs, FunStore},
-    mac::{make_x_i, Mac, MacT},
+    mac::{Mac, MacT, make_x_i},
     plugins::DisjunctionBody,
 };
 
-use eyre::{bail, Result};
+use eyre::{Result, bail};
 use generic_array::GenericArray;
 use scuttlebutt::AesRng;
 use std::marker::PhantomData;
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField};
-use swanky_field_binary::{F40b, F2};
-use swanky_party::{private::ProverPrivateCopy, Party, WhichParty};
+use swanky_field_binary::{F2, F40b};
+use swanky_party::{Party, WhichParty, private::ProverPrivateCopy};
 
 // This file provides an implementation of the Plaintext backend.
 // `DietMacAndCheePlaintext<V,T>` is the main struct for this backend.

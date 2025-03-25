@@ -22,7 +22,7 @@ pub struct TaskQueueEntry<T> {
     pub metadata: T,
 }
 impl<T> TaskQueueEntry<T> {
-    fn sort_key(&self) -> impl Ord {
+    fn sort_key(&self) -> impl Ord + use<T> {
         // We want high priority, low task ID tasks to go first
         (self.id.priority, std::cmp::Reverse(self.id.task_id))
     }
@@ -69,12 +69,15 @@ impl<T> TaskQueue<T> {
             queue_name: self.name,
         }
         .lock(&self.queue);
-        if let Some(queue) = guard.as_mut() {
-            queue.push(item);
-            self.queue_changed.notify_one();
-        } else {
-            std::mem::drop(guard);
-            eprintln!("Dropping value attempted to enqueue on closed task queue");
+        match guard.as_mut() {
+            Some(queue) => {
+                queue.push(item);
+                self.queue_changed.notify_one();
+            }
+            _ => {
+                std::mem::drop(guard);
+                eprintln!("Dropping value attempted to enqueue on closed task queue");
+            }
         }
     }
     pub fn blocking_dequeue(&self) -> Option<TaskQueueEntry<T>> {
@@ -85,14 +88,17 @@ impl<T> TaskQueue<T> {
         .start();
         let mut guard = self.queue.lock();
         let entry = loop {
-            if let Some(queue) = guard.as_mut() {
-                if let Some(entry) = queue.pop() {
-                    break entry;
+            match guard.as_mut() {
+                Some(queue) => {
+                    if let Some(entry) = queue.pop() {
+                        break entry;
+                    }
+                    self.queue_changed.wait(&mut guard);
                 }
-                self.queue_changed.wait(&mut guard);
-            } else {
-                // We intentionally don't finish the span.
-                return None;
+                _ => {
+                    // We intentionally don't finish the span.
+                    return None;
+                }
             }
         };
         std::mem::drop(guard);

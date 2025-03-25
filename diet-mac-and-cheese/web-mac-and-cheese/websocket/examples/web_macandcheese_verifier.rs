@@ -1,15 +1,15 @@
 use clap::{Arg, Command};
 use core::fmt::Debug;
-use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
-use diet_mac_and_cheese::svole_trait::Svole;
 use diet_mac_and_cheese::EvaluatorCirc;
 use diet_mac_and_cheese::LpnSize;
+use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
+use diet_mac_and_cheese::svole_trait::Svole;
 use eyre::Result;
 use log::info;
-use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
 use mac_n_cheese_sieve_parser::RelationReader as RR;
 use mac_n_cheese_sieve_parser::ValueStreamKind;
 use mac_n_cheese_sieve_parser::ValueStreamReader as VSR;
+use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
 use rustls::{ServerConfig, ServerConnection};
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use scuttlebutt::{AesRng, TrackChannel};
@@ -24,10 +24,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 use std::time::Instant;
-use swanky_field_binary::{F40b, F2};
+use swanky_field_binary::{F2, F40b};
 use swanky_party::Verifier;
-use tungstenite::accept;
 use tungstenite::Message;
+use tungstenite::accept;
 use web_mac_n_cheese_websocket::channel_websocket::WsChannel;
 
 fn do_it<Stream: Read + Write + Debug + 'static>(
@@ -59,7 +59,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
     let msg = websocket.read().unwrap();
     match msg {
         Message::Text(m) => {
-            if m == *"init" {
+            if m.as_str() == "init" {
                 println!("INIT");
             }
         }
@@ -99,7 +99,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
 fn main() {
     match env::var("RUST_LOG") {
         Ok(val) => println!("loglvl: {}", val),
-        Err(_) => env::set_var("RUST_LOG", "info"),
+        Err(_) => unsafe { env::set_var("RUST_LOG", "info") },
     };
     pretty_env_logger::init_timed();
 

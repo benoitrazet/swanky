@@ -1,8 +1,8 @@
-use scuttlebutt::{field::FiniteField, AesRng};
+use scuttlebutt::{AesRng, field::FiniteField};
 use std::convert::TryFrom;
 use vectoreyes::{
-    array_utils::ArrayUnrolledExt, SimdBase, SimdBase32, SimdBase4x64, SimdBase8, SimdBase8x,
-    U16x16, U16x8, U32x8, U64x4, U8x32,
+    SimdBase, SimdBase4x64, SimdBase8, SimdBase8x, SimdBase32, U8x32, U16x8, U16x16, U32x8, U64x4,
+    array_utils::ArrayUnrolledExt,
 };
 
 #[inline(always)] // since it's using SIMD

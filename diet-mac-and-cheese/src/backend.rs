@@ -1,11 +1,11 @@
 use std::marker::PhantomData;
 
 use crate::backend_trait::BackendT;
-use crate::homcom::{FCom, MultCheckState, ZeroCheckState, BATCH_SIZE};
+use crate::homcom::{BATCH_SIZE, FCom, MultCheckState, ZeroCheckState};
 use crate::mac::Mac;
-use crate::svole_trait::field_name;
 use crate::svole_trait::SvoleT;
-use eyre::{bail, Result};
+use crate::svole_trait::field_name;
+use eyre::{Result, bail};
 use log::{debug, info, warn};
 use ocelot::svole::LpnParams;
 use scuttlebutt::{AbstractChannel, AesRng};
@@ -146,12 +146,12 @@ pub struct DietMacAndCheese<
 }
 
 impl<
-        P: Party,
-        V: IsSubFieldOf<T>,
-        T: FiniteField,
-        C: AbstractChannel + Clone,
-        SVOLE: SvoleT<P, V, T>,
-    > DietMacAndCheese<P, V, T, C, SVOLE>
+    P: Party,
+    V: IsSubFieldOf<T>,
+    T: FiniteField,
+    C: AbstractChannel + Clone,
+    SVOLE: SvoleT<P, V, T>,
+> DietMacAndCheese<P, V, T, C, SVOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
@@ -305,29 +305,31 @@ where
 }
 
 impl<
-        P: Party,
-        V: IsSubFieldOf<T>,
-        T: FiniteField,
-        C: AbstractChannel + Clone,
-        SVOLE: SvoleT<P, V, T>,
-    > Drop for DietMacAndCheese<P, V, T, C, SVOLE>
+    P: Party,
+    V: IsSubFieldOf<T>,
+    T: FiniteField,
+    C: AbstractChannel + Clone,
+    SVOLE: SvoleT<P, V, T>,
+> Drop for DietMacAndCheese<P, V, T, C, SVOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
     fn drop(&mut self) {
         if self.zero_check_state.count() != 0 || self.mult_check_state.count() != 0 {
-            warn!("Dropped in unexpected state: either `finalize()` has not been called or an error occured earlier.");
+            warn!(
+                "Dropped in unexpected state: either `finalize()` has not been called or an error occured earlier."
+            );
         }
     }
 }
 
 impl<
-        P: Party,
-        V: IsSubFieldOf<T>,
-        T: FiniteField,
-        C: AbstractChannel + Clone,
-        SVOLE: SvoleT<P, V, T>,
-    > BackendT for DietMacAndCheese<P, V, T, C, SVOLE>
+    P: Party,
+    V: IsSubFieldOf<T>,
+    T: FiniteField,
+    C: AbstractChannel + Clone,
+    SVOLE: SvoleT<P, V, T>,
+> BackendT for DietMacAndCheese<P, V, T, C, SVOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
@@ -472,16 +474,16 @@ mod tests {
     use crate::{backend::DietMacAndCheese, backend_trait::BackendT, mac::validate};
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
-    use scuttlebutt::field::{F40b, IsSubFieldOf, F2};
+    use scuttlebutt::field::{F2, F40b, IsSubFieldOf};
     use scuttlebutt::{
-        field::{F61p, FiniteField},
         AesRng, Channel,
+        field::{F61p, FiniteField},
     };
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
+    use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier};
 
     fn test<V: IsSubFieldOf<T>, T: FiniteField>()
     where

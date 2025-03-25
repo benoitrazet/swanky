@@ -1,10 +1,10 @@
-use eyre::{ensure, Result};
+use eyre::{Result, ensure};
 
-use scuttlebutt::{field::FiniteField, AbstractChannel};
+use scuttlebutt::{AbstractChannel, field::FiniteField};
 use swanky_field::IsSubFieldOf;
 use swanky_party::{IsParty, Party, Prover};
 
-use crate::{backend_trait::BackendT, svole_trait::SvoleT, DietMacAndCheese};
+use crate::{DietMacAndCheese, backend_trait::BackendT, svole_trait::SvoleT};
 
 use super::{
     comm::{CommittedCrossTerms, CommittedWitness},
@@ -104,12 +104,12 @@ impl<B: BackendT> ComittedAcc<B> {
 }
 
 impl<
-        P: Party,
-        V: IsSubFieldOf<F>,
-        F: FiniteField,
-        C: AbstractChannel + Clone,
-        SvoleF: SvoleT<P, V, F>,
-    > ComittedAcc<DietMacAndCheese<P, V, F, C, SvoleF>>
+    P: Party,
+    V: IsSubFieldOf<F>,
+    F: FiniteField,
+    C: AbstractChannel + Clone,
+    SvoleF: SvoleT<P, V, F>,
+> ComittedAcc<DietMacAndCheese<P, V, F, C, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {

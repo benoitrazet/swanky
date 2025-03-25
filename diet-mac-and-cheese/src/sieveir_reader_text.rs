@@ -9,11 +9,11 @@ of the extra memory cost from storing the 'main' relation gates!
 */
 use crate::circuit_ir::TapeT;
 use crate::circuit_ir::{FunStore, FuncDecl, GateM, TypeStore};
-use eyre::{bail, Result};
+use eyre::{Result, bail};
 use log::info;
-use mac_n_cheese_sieve_parser::text_parser::ValueStreamReader;
 use mac_n_cheese_sieve_parser::ValueStreamKind;
 use mac_n_cheese_sieve_parser::ValueStreamReader as VSR;
+use mac_n_cheese_sieve_parser::text_parser::ValueStreamReader;
 use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
     TypeId, TypedCount, TypedWireRange, WireId, WireRange,
@@ -74,12 +74,17 @@ impl InputText {
     /// Load more instances or witnesses into the internal queue
     fn load_more_in_queue(&mut self) -> Result<Option<()>> {
         for i in 0..(1 << 16) {
-            if let Some(v) = self.reader.next()? {
-                self.queue.push_back(v);
-            } else if i > 0 {
-                return Ok(Some(()));
-            } else {
-                return Ok(None);
+            match self.reader.next()? {
+                Some(v) => {
+                    self.queue.push_back(v);
+                }
+                _ => {
+                    if i > 0 {
+                        return Ok(Some(()));
+                    } else {
+                        return Ok(None);
+                    }
+                }
             }
         }
         Ok(Some(()))

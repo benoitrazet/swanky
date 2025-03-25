@@ -1,7 +1,7 @@
 #![allow(clippy::all)]
 use std::path::Path;
 
-use mac_n_cheese_sieve_parser::{fb_reader, PrintingVisitor, RelationReader};
+use mac_n_cheese_sieve_parser::{PrintingVisitor, RelationReader, fb_reader};
 
 fn main() -> eyre::Result<()> {
     let args = std::env::args().collect::<Vec<_>>();

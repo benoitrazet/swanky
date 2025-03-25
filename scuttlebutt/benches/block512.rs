@@ -1,5 +1,5 @@
 #![allow(clippy::all)]
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use rand::Rng;
 use scuttlebutt::{AesRng, Block512};
 
@@ -7,7 +7,7 @@ fn bench_rand(c: &mut Criterion) {
     c.bench_function("Block512::rand", |b| {
         let mut rng = AesRng::new();
         b.iter(|| {
-            let block = rng.gen::<Block512>();
+            let block = rng.r#gen::<Block512>();
             black_box(block)
         });
     });

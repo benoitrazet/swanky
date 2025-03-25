@@ -3,20 +3,20 @@ use eyre::Result;
 use scuttlebutt::AbstractChannel;
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::{
-    private::{ProverPrivate, ProverPrivateCopy},
     Party, WhichParty,
+    private::{ProverPrivate, ProverPrivateCopy},
 };
 
-use crate::{dora::comm::CommittedWitness, mac::Mac, svole_trait::SvoleT, DietMacAndCheese};
+use crate::{DietMacAndCheese, dora::comm::CommittedWitness, mac::Mac, svole_trait::SvoleT};
 
 use super::{
-    acc::{collapse_trace, Accumulator, ComittedAcc, Trace},
+    COMPACT_MIN, COMPACT_MUL,
+    acc::{Accumulator, ComittedAcc, Trace, collapse_trace},
     comm::CommittedCrossTerms,
     disjunction::Disjunction,
     fiat_shamir,
     perm::permutation,
     tx::TxChannel,
-    COMPACT_MIN, COMPACT_MUL,
 };
 
 pub struct Dora<
@@ -38,12 +38,12 @@ pub struct Dora<
 }
 
 impl<
-        P: Party,
-        V: IsSubFieldOf<F>,
-        F: FiniteField,
-        C: AbstractChannel + Clone,
-        SvoleF: SvoleT<P, V, F>,
-    > Dora<P, V, F, C, SvoleF>
+    P: Party,
+    V: IsSubFieldOf<F>,
+    F: FiniteField,
+    C: AbstractChannel + Clone,
+    SvoleF: SvoleT<P, V, F>,
+> Dora<P, V, F, C, SvoleF>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {

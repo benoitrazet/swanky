@@ -1,14 +1,14 @@
 use eyre::Result;
-use scuttlebutt::{field::FiniteField, ring::FiniteRing, AbstractChannel, AesRng};
+use scuttlebutt::{AbstractChannel, AesRng, field::FiniteField, ring::FiniteRing};
 use std::iter;
 use swanky_field::IsSubFieldOf;
 use swanky_party::{
-    private::{ProverPrivate, ProverPrivateCopy},
     IsParty, Party, Prover, WhichParty,
+    private::{ProverPrivate, ProverPrivateCopy},
 };
 
 use crate::{
-    backend_trait::BackendT, homcom::FCom, mac::Mac, svole_trait::SvoleT, DietMacAndCheese,
+    DietMacAndCheese, backend_trait::BackendT, homcom::FCom, mac::Mac, svole_trait::SvoleT,
 };
 
 use super::{
@@ -32,14 +32,15 @@ fn commit_vec<
     V: IsSubFieldOf<F>,
     F: FiniteField,
     C: AbstractChannel + Clone,
+    I: IntoIterator<Item = V>,
     SvoleF: SvoleT<P, V, F>,
 >(
     backend: &mut FCom<P, V, F, SvoleF>,
     channel: &mut C,
     rng: &mut AesRng,
-    sec: ProverPrivate<P, impl IntoIterator<Item = V>>, // secret values
-    len: usize,                                         // padded length
-) -> Result<impl Iterator<Item = Mac<P, V, F>>>
+    sec: ProverPrivate<P, I>, // secret values
+    len: usize,               // padded length
+) -> Result<impl Iterator<Item = Mac<P, V, F>> + use<P, V, F, C, I, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
@@ -73,13 +74,13 @@ where
 }
 
 impl<
-        'a,
-        P: Party,
-        V: IsSubFieldOf<F>,
-        F: FiniteField,
-        C: AbstractChannel + Clone,
-        SvoleF: SvoleT<P, V, F>,
-    > CommittedWitness<'a, DietMacAndCheese<P, V, F, C, SvoleF>>
+    'a,
+    P: Party,
+    V: IsSubFieldOf<F>,
+    F: FiniteField,
+    C: AbstractChannel + Clone,
+    SvoleF: SvoleT<P, V, F>,
+> CommittedWitness<'a, DietMacAndCheese<P, V, F, C, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
@@ -161,12 +162,12 @@ pub(super) struct CommittedCrossTerms<B: BackendT> {
 }
 
 impl<
-        P: Party,
-        V: IsSubFieldOf<F>,
-        F: FiniteField,
-        C: AbstractChannel + Clone,
-        SvoleF: SvoleT<P, V, F>,
-    > CommittedCrossTerms<DietMacAndCheese<P, V, F, C, SvoleF>>
+    P: Party,
+    V: IsSubFieldOf<F>,
+    F: FiniteField,
+    C: AbstractChannel + Clone,
+    SvoleF: SvoleT<P, V, F>,
+> CommittedCrossTerms<DietMacAndCheese<P, V, F, C, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
@@ -189,12 +190,12 @@ where
 }
 
 impl<
-        P: Party,
-        V: IsSubFieldOf<F>,
-        F: FiniteField,
-        C: AbstractChannel + Clone,
-        SvoleF: SvoleT<P, V, F>,
-    > ComittedAcc<DietMacAndCheese<P, V, F, C, SvoleF>>
+    P: Party,
+    V: IsSubFieldOf<F>,
+    F: FiniteField,
+    C: AbstractChannel + Clone,
+    SvoleF: SvoleT<P, V, F>,
+> ComittedAcc<DietMacAndCheese<P, V, F, C, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {

@@ -14,12 +14,12 @@ use crate::sieve_compiler::{
 };
 
 use super::{
+    Inputs, SieveArgs,
     circuit_ir::{
         FieldInstruction, FieldInstructions, FieldInstructionsTy, FunctionDefinition, FunctionId,
     },
     put,
     supported_fields::{FieldType, InvariantType},
-    Inputs, SieveArgs,
 };
 
 struct EvaluateFieldInstructions<'a, 'b, VSR: ValueStreamReader> {
@@ -309,7 +309,10 @@ fn eval<VSR: ValueStreamReader>(
                                         }
                                     }
                                 }
-                                Permissiveness::Strict => eyre::bail!("Strict mux failed: selector value {cond} >= number of branches {}", num_branches)
+                                Permissiveness::Strict => eyre::bail!(
+                                    "Strict mux failed: selector value {cond} >= number of branches {}",
+                                    num_branches
+                                ),
                             }
                         } else {
                             let in_ranges_to_output: &[WireRange] = branch_inputs

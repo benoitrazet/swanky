@@ -1,7 +1,7 @@
 use super::WireSize;
 use crate::circuit_builder::PrototypeBuilder;
-use generic_array::typenum::Unsigned;
 use generic_array::GenericArray;
+use generic_array::typenum::Unsigned;
 use scuttlebutt::serialization::CanonicalSerialize;
 use std::{io::Write, marker::PhantomData};
 use vectoreyes::array_utils::ArrayUnrolledExt;
@@ -23,11 +23,7 @@ impl Wire {
     // None means own wire
     pub fn which_input(&self) -> Option<WireSize> {
         let x = (self.0 >> 32) as u32;
-        if (x >> 31) == 0 {
-            Some(x)
-        } else {
-            None
-        }
+        if (x >> 31) == 0 { Some(x) } else { None }
     }
 }
 impl std::fmt::Debug for Wire {
@@ -172,8 +168,8 @@ pub mod simple {
 
 pub mod simd_batched {
     use vectoreyes::{
-        array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
         U32x4,
+        array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
     };
 
     use super::*;

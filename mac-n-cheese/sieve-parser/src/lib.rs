@@ -227,7 +227,7 @@ pub trait FunctionBodyVisitor {
         semantics: ConversionSemantics,
     ) -> eyre::Result<()>;
     fn call(&mut self, dst: &[WireRange], name: Identifier, args: &[WireRange])
-        -> eyre::Result<()>;
+    -> eyre::Result<()>;
 }
 pub trait RelationVisitor: FunctionBodyVisitor {
     type FBV<'a>: FunctionBodyVisitor;

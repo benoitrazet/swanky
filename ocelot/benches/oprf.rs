@@ -1,9 +1,9 @@
 #![allow(clippy::all)]
 //! Oblivious pseudorandom function benchmarks using `criterion`.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use ocelot::{
-    oprf::{self, kkrt, kmprt, Receiver as OprfReceiver, Sender as OprfSender},
+    oprf::{self, Receiver as OprfReceiver, Sender as OprfSender, kkrt, kmprt},
     ot::chou_orlandi,
 };
 use scuttlebutt::{AesRng, Block, Block512, Channel};

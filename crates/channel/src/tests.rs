@@ -1,7 +1,7 @@
 use proptest::collection::vec as pvec;
 use proptest::prelude::*;
 
-use crate::{local::LocalSocket, BufferSizes, Channel};
+use crate::{BufferSizes, Channel, local::LocalSocket};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Sender {

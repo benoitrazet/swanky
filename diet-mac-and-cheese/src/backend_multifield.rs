@@ -20,14 +20,14 @@ use crate::sieveir_reader_fbs::BufRelation;
 use crate::sieveir_reader_text::TextRelation;
 use crate::svole_thread::SvoleAtomicRoundRobin;
 use crate::svole_trait::{Svole, SvoleStopSignal, SvoleT};
+use crate::{DietMacAndCheese, number_to_u64};
+use crate::{LpnSize, mapping_lpn_size, mapping_lpn_size_large_field};
 use crate::{backend_trait::BackendT, circuit_ir::FunctionBody};
 use crate::{
     dora::{Disjunction, Dora},
     gadgets::less_than_eq_with_public,
 };
-use crate::{mapping_lpn_size, mapping_lpn_size_large_field, LpnSize};
-use crate::{number_to_u64, DietMacAndCheese};
-use eyre::{bail, ensure, OptionExt, Result};
+use eyre::{OptionExt, Result, bail, ensure};
 use generic_array::typenum::Unsigned;
 use log::{debug, info, warn};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
@@ -43,7 +43,7 @@ use std::iter;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField, StatisticallySecureField};
-use swanky_field_binary::{F40b, F2};
+use swanky_field_binary::{F2, F40b};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F127p, F128p, F384p, F384q, Secp256k1, Secp256k1order};
 use swanky_party::private::{ProverPrivate, ProverPrivateCopy};
@@ -114,12 +114,12 @@ pub trait BackendLiftT: BackendT {
 }
 
 impl<
-        P: Party,
-        T: PrimeFiniteField,
-        C: AbstractChannel + Clone,
-        SVOLE1: SvoleT<P, F2, F40b>,
-        SVOLE2: SvoleT<P, T, T>,
-    > BackendLiftT for DietMacAndCheeseConv<P, T, C, SVOLE1, SVOLE2>
+    P: Party,
+    T: PrimeFiniteField,
+    C: AbstractChannel + Clone,
+    SVOLE1: SvoleT<P, F2, F40b>,
+    SVOLE2: SvoleT<P, T, T>,
+> BackendLiftT for DietMacAndCheeseConv<P, T, C, SVOLE1, SVOLE2>
 {
     type LiftedBackend = Self;
 
@@ -240,12 +240,12 @@ pub(crate) struct DietMacAndCheeseConv<
 }
 
 impl<
-        P: Party,
-        FE: PrimeFiniteField,
-        C: AbstractChannel + Clone,
-        SvoleF2: SvoleT<P, F2, F40b>,
-        SvoleFE: SvoleT<P, FE, FE>,
-    > DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
+    P: Party,
+    FE: PrimeFiniteField,
+    C: AbstractChannel + Clone,
+    SvoleF2: SvoleT<P, F2, F40b>,
+    SvoleFE: SvoleT<P, FE, FE>,
+> DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
 {
     pub fn init(
         channel: &mut C,
@@ -351,12 +351,12 @@ impl<
 }
 
 impl<
-        P: Party,
-        FE: PrimeFiniteField,
-        C: AbstractChannel + Clone,
-        SvoleF2: SvoleT<P, F2, F40b>,
-        SvoleFE: SvoleT<P, FE, FE>,
-    > BackendT for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
+    P: Party,
+    FE: PrimeFiniteField,
+    C: AbstractChannel + Clone,
+    SvoleF2: SvoleT<P, F2, F40b>,
+    SvoleFE: SvoleT<P, FE, FE>,
+> BackendT for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
 {
     type Wire = <DietMacAndCheese<P, FE, FE, C, SvoleFE> as BackendT>::Wire;
     type FieldElement = <DietMacAndCheese<P, FE, FE, C, SvoleFE> as BackendT>::FieldElement;
@@ -408,12 +408,12 @@ impl<
 // Note: The restriction to a prime field is not caused by Dora
 // This should be expanded in the future to allow disjunctions over extension fields.
 impl<
-        P: Party,
-        FP: PrimeFiniteField + SieveIrDeserialize,
-        C: AbstractChannel + Clone,
-        SvoleF2: SvoleT<P, F2, F40b>,
-        SvoleFP: SvoleT<P, FP, FP>,
-    > BackendDisjunctionT for DietMacAndCheeseConv<P, FP, C, SvoleF2, SvoleFP>
+    P: Party,
+    FP: PrimeFiniteField + SieveIrDeserialize,
+    C: AbstractChannel + Clone,
+    SvoleF2: SvoleT<P, F2, F40b>,
+    SvoleFP: SvoleT<P, FP, FP>,
+> BackendDisjunctionT for DietMacAndCheeseConv<P, FP, C, SvoleF2, SvoleFP>
 {
     fn finalize_disj(&mut self) -> Result<()> {
         for (_, disj) in std::mem::take(&mut self.dora_states) {
@@ -520,12 +520,12 @@ impl<
 }
 
 impl<
-        P: Party,
-        FE: PrimeFiniteField,
-        C: AbstractChannel + Clone,
-        SvoleF2: SvoleT<P, F2, F40b>,
-        SvoleFE: SvoleT<P, FE, FE>,
-    > BackendConvT<P> for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
+    P: Party,
+    FE: PrimeFiniteField,
+    C: AbstractChannel + Clone,
+    SvoleF2: SvoleT<P, F2, F40b>,
+    SvoleFE: SvoleT<P, FE, FE>,
+> BackendConvT<P> for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
 {
     fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
         debug!("CONV_TO_BITS {:?}", a);
@@ -694,12 +694,12 @@ impl<
 }
 
 impl<
-        P: Party,
-        FE: PrimeFiniteField,
-        C: AbstractChannel + Clone,
-        SvoleF2: SvoleT<P, F2, F40b>,
-        SvoleFE: SvoleT<P, FE, FE>,
-    > BackendRamT for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
+    P: Party,
+    FE: PrimeFiniteField,
+    C: AbstractChannel + Clone,
+    SvoleF2: SvoleT<P, F2, F40b>,
+    SvoleFE: SvoleT<P, FE, FE>,
+> BackendRamT for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
 {
     fn init_ram(
         &mut self,
@@ -1346,11 +1346,11 @@ pub struct EvaluatorCirc<
 }
 
 impl<
-        P: Party,
-        C: AbstractChannel + Clone + 'static,
-        SvoleF2: SvoleT<P, F2, F40b> + 'static,
-        SvoleF2Ext: SvoleT<P, F40b, F40b> + 'static,
-    > EvaluatorCirc<P, C, SvoleF2, SvoleF2Ext>
+    P: Party,
+    C: AbstractChannel + Clone + 'static,
+    SvoleF2: SvoleT<P, F2, F40b> + 'static,
+    SvoleF2Ext: SvoleT<P, F40b, F40b> + 'static,
+> EvaluatorCirc<P, C, SvoleF2, SvoleF2Ext>
 {
     /// Initialize a new (single-threaded) `EvaluatorCirc`.
     ///
@@ -1571,7 +1571,9 @@ impl<
 
                     // Validate type index refers to F2
                     let PluginTypeArg::Number(field_id) = params[0] else {
-                        bail!("The v0 Boolean RAM type expects a number as its first parameter, but a string was found")
+                        bail!(
+                            "The v0 Boolean RAM type expects a number as its first parameter, but a string was found"
+                        )
                     };
                     let field_id = u8::try_from(number_to_u64(&field_id)?)?;
                     let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)?
@@ -1586,7 +1588,10 @@ impl<
                     // Just check that the other parameters are numeric
                     for (i, p) in params.iter().enumerate().skip(1) {
                         if let PluginTypeArg::String(_) = p {
-                            bail!("The v0 Boolean RAM type expects a number for parameter {}, but a string was found", i)
+                            bail!(
+                                "The v0 Boolean RAM type expects a number for parameter {}, but a string was found",
+                                i
+                            )
                         }
                     }
 
@@ -1606,7 +1611,9 @@ impl<
 
                     // Validate type index refers to F2
                     let PluginTypeArg::Number(field_id) = params[0] else {
-                        bail!("The Boolean RAM type expects a number as its first parameter, but a string was found")
+                        bail!(
+                            "The Boolean RAM type expects a number as its first parameter, but a string was found"
+                        )
                     };
                     let field_id = u8::try_from(number_to_u64(&field_id)?)?;
                     let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)?
@@ -1620,11 +1627,15 @@ impl<
 
                     // Just check that the other parameters are numeric
                     if let PluginTypeArg::String(_) = params[1] {
-                        bail!("The Boolean RAM type expects a number as its second parameter, but a string was found")
+                        bail!(
+                            "The Boolean RAM type expects a number as its second parameter, but a string was found"
+                        )
                     }
 
                     if let PluginTypeArg::String(_) = params[2] {
-                        bail!("The Boolean RAM type expects a number as its third parameter, but a string was found")
+                        bail!(
+                            "The Boolean RAM type expects a number as its third parameter, but a string was found"
+                        )
                     }
 
                     self.eval.push(Box::new(EvaluatorRam(Memory::new())));
@@ -1643,7 +1654,9 @@ impl<
 
                     // Validate type index refers to a field
                     let PluginTypeArg::Number(field_id) = params[0] else {
-                        bail!("The v0 arithmetic RAM type expects a number as its first parameter, but a string was found")
+                        bail!(
+                            "The v0 arithmetic RAM type expects a number as its first parameter, but a string was found"
+                        )
                     };
                     let field_id = u8::try_from(number_to_u64(&field_id)?)?;
                     if let TypeSpecification::Plugin(_) = type_store.get(&field_id)? {
@@ -1653,7 +1666,10 @@ impl<
                     // Just check that the other parameters are numeric
                     for (i, p) in params.iter().enumerate().skip(1) {
                         if let PluginTypeArg::String(_) = p {
-                            bail!("The v0 arithmetic RAM type expects a number for parameter {}, but a string was found", i)
+                            bail!(
+                                "The v0 arithmetic RAM type expects a number for parameter {}, but a string was found",
+                                i
+                            )
                         }
                     }
 
@@ -1673,7 +1689,9 @@ impl<
 
                     // Validate type index refers to a field
                     let PluginTypeArg::Number(field_id) = params[0] else {
-                        bail!("The arithmetic RAM type expects a number as its first parameter, but a string was found")
+                        bail!(
+                            "The arithmetic RAM type expects a number as its first parameter, but a string was found"
+                        )
                     };
                     let field_id = u8::try_from(number_to_u64(&field_id)?)?;
                     if let TypeSpecification::Plugin(_) = type_store.get(&field_id)? {
@@ -2507,11 +2525,11 @@ impl<
 }
 
 impl<
-        P: Party,
-        C: AbstractChannel + Clone,
-        SvoleF2: SvoleT<P, F2, F40b>,
-        SvoleF2Ext: SvoleT<P, F40b, F40b>,
-    > Drop for EvaluatorCirc<P, C, SvoleF2, SvoleF2Ext>
+    P: Party,
+    C: AbstractChannel + Clone,
+    SvoleF2: SvoleT<P, F2, F40b>,
+    SvoleF2Ext: SvoleT<P, F40b, F40b>,
+> Drop for EvaluatorCirc<P, C, SvoleF2, SvoleF2Ext>
 {
     fn drop(&mut self) {
         if !self.multithreaded_voles.is_empty() {
@@ -2526,11 +2544,11 @@ impl<
 #[cfg(test)]
 pub(crate) mod tests {
     use super::TypeStore;
-    use crate::svole_trait::Svole;
     use crate::LpnSize;
+    use crate::svole_trait::Svole;
     use crate::{
         backend_multifield::EvaluatorCirc,
-        fields::{F2_MODULUS, F61P_MODULUS, SECP256K1ORDER_MODULUS, SECP256K1_MODULUS},
+        fields::{F2_MODULUS, F61P_MODULUS, SECP256K1_MODULUS, SECP256K1ORDER_MODULUS},
     };
     use crate::{
         circuit_ir::{CircInputs, FunStore, FuncDecl, GateM, WireId, WireRange},
@@ -2538,12 +2556,12 @@ pub(crate) mod tests {
     };
     use mac_n_cheese_sieve_parser::Number;
     use rand::SeedableRng;
+    use scuttlebutt::SyncChannel;
     use scuttlebutt::field::F2;
     use scuttlebutt::field::{F384p, F384q, PrimeFiniteField};
     use scuttlebutt::field::{Secp256k1, Secp256k1order};
     use scuttlebutt::ring::FiniteRing;
-    use scuttlebutt::SyncChannel;
-    use scuttlebutt::{field::F61p, AesRng, Channel};
+    use scuttlebutt::{AesRng, Channel, field::F61p};
     use std::env;
     use std::net::TcpStream;
     use std::{collections::VecDeque, thread::JoinHandle};
@@ -2604,7 +2622,7 @@ pub(crate) mod tests {
         // if log-level `RUST_LOG` not already set, then set to info
         match env::var("RUST_LOG") {
             Ok(val) => println!("loglvl: {}", val),
-            Err(_) => env::set_var("RUST_LOG", "info"),
+            Err(_) => unsafe { env::set_var("RUST_LOG", "info") },
         };
 
         pretty_env_logger::init_timed();

@@ -4,25 +4,26 @@ use std::{
 
 use eyre::{Context, ContextCompat};
 use mac_n_cheese_ir::circuit_builder::{
-    build_circuit, vole_supplier::VoleSupplier, CircuitBuilder, PrivateBuilder, TaskOutputRef,
-    TaskPrototypeRef,
+    CircuitBuilder, PrivateBuilder, TaskOutputRef, TaskPrototypeRef, build_circuit,
+    vole_supplier::VoleSupplier,
 };
 use mac_n_cheese_sieve_parser::ValueStreamReader;
 use mac_n_cheese_wire_map::WireMap;
 use rustc_hash::FxHashMap;
 use scuttlebutt::field::F2;
 use swanky_party::{
-    private::{ProverPrivate, ProverPrivateCopy},
     Party, WhichParty,
+    private::{ProverPrivate, ProverPrivateCopy},
 };
 
 use super::{
+    Inputs,
     circuit_ir::{
         FieldInstruction, FieldInstructions, FieldInstructionsTy, FunctionDefinition, FunctionId,
     },
     put,
     supported_fields::{FieldType, InvariantType},
-    to_fe, to_k_bits, to_k_flipped_bits, Inputs,
+    to_fe, to_k_bits, to_k_flipped_bits,
 };
 use crate::sieve_compiler::{
     circuit_ir::{CircuitChunk, CounterInfo, Instruction, Permissiveness, WireRange},
@@ -31,8 +32,8 @@ use crate::sieve_compiler::{
         FieldGenericType, FieldIndexedArray,
     },
 };
-use mac_n_cheese_ir::compilation_format::wire_format::Wire as IrWire;
 use mac_n_cheese_ir::compilation_format::Type as IrType;
+use mac_n_cheese_ir::compilation_format::wire_format::Wire as IrWire;
 
 #[derive(Clone, Copy, Debug)]
 struct WireRef {
@@ -73,13 +74,18 @@ impl Resolver {
                 u32::try_from(cm.constant_data.len()).unwrap()
             } else if tid == cm.linear_id {
                 u32::try_from(cm.linear_data.len()).unwrap()
-            } else if let Some(task) = cm.finished_tasks.get(&tid) {
-                task.outputs(IrType::Mac(FE::FIELD_TYPE.field_mac_type()))
-                    .len()
-            } else if let Some((proto, _)) = cm.linear_protos.get(&tid) {
-                proto.outputs()[0].count()
             } else {
-                panic!("cannot find task id {tid}");
+                match cm.finished_tasks.get(&tid) {
+                    Some(task) => task
+                        .outputs(IrType::Mac(FE::FIELD_TYPE.field_mac_type()))
+                        .len(),
+                    _ => match cm.linear_protos.get(&tid) {
+                        Some((proto, _)) => proto.outputs()[0].count(),
+                        _ => {
+                            panic!("cannot find task id {tid}");
+                        }
+                    },
+                }
             };
             out.mapping.insert(tid, (new_id, sz));
             out.input_sizes.push(sz);
@@ -729,7 +735,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                     }
 
                                     // Multiply the results
-                                    let (mut g_i, mut g_i_v) =
+                                    let &(mut g_i, mut g_i_v) =
                                         xors.get(0).context("Mux condition empty")?;
                                     for &(xor, xor_v) in &xors[1..] {
                                         (g_i, g_i_v) = mul(
@@ -770,11 +776,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                         let x = cm.linear(self.cb, cond, FE::ONE, one, -i)?;
 
                                         let x_prime_v = x_v.map(|x| {
-                                            if x != FE::ZERO {
-                                                x.inverse()
-                                            } else {
-                                                FE::ZERO
-                                            }
+                                            if x != FE::ZERO { x.inverse() } else { FE::ZERO }
                                         });
                                         let x_prime =
                                             cm.fix(self.cb, self.vs, self.pb, x_prime_v)?;
@@ -790,7 +792,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
 
                         // For strict mode, assert sum(g_i) = 1
                         if let Permissiveness::Strict = self.permissiveness {
-                            let (mut sum, _) = g.get(0).context("Mux has no branches")?;
+                            let &(mut sum, _) = g.get(0).context("Mux has no branches")?;
 
                             // sum(g_i)
                             for &(g_i, _) in &g[1..] {

@@ -1,11 +1,11 @@
 use super::{Plugin, PluginExecution};
 use crate::circuit_ir::{
-    first_unused_wire_id, FunStore, GateM, GatesBody, TypeId, TypeSpecification, TypeStore,
-    WireCount,
+    FunStore, GateM, GatesBody, TypeId, TypeSpecification, TypeStore, WireCount,
+    first_unused_wire_id,
 };
-use eyre::{bail, ensure, Result};
+use eyre::{Result, bail, ensure};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
-use swanky_field_binary::{F128b, F63b, F2};
+use swanky_field_binary::{F2, F63b, F128b};
 use swanky_field_f61p::F61p;
 
 pub(crate) struct GaloisPolyV0;
@@ -335,9 +335,9 @@ mod tests {
     use mac_n_cheese_sieve_parser::Number;
     use rand::Rng;
     use scuttlebutt::{
+        AesRng,
         field::{F61p, PrimeFiniteField},
         ring::FiniteRing,
-        AesRng,
     };
     use swanky_polynomial::Polynomial;
 
@@ -440,9 +440,11 @@ mod tests {
         let witnesses = if should_verify {
             vec![p0]
         } else {
-            vec![(0..p0_size + p1_size)
-                .map(|_| F61p::random(&mut rng).as_int())
-                .collect()]
+            vec![
+                (0..p0_size + p1_size)
+                    .map(|_| F61p::random(&mut rng).as_int())
+                    .collect(),
+            ]
         };
         let instances = vec![q];
 
@@ -514,9 +516,11 @@ mod tests {
         let witnesses = if should_verify {
             vec![p0]
         } else {
-            vec![(0..p_size + 1)
-                .map(|_| F61p::random(&mut rng).as_int())
-                .collect()]
+            vec![
+                (0..p_size + 1)
+                    .map(|_| F61p::random(&mut rng).as_int())
+                    .collect(),
+            ]
         };
         let instances = vec![q];
 

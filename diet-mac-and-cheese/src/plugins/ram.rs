@@ -1,4 +1,4 @@
-use eyre::{bail, ensure, Result};
+use eyre::{Result, bail, ensure};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
 use swanky_field_binary::F2;
 
@@ -196,7 +196,10 @@ impl Plugin for RamBoolV0 {
                 let &TypeSpecification::Field(initial_value_rust_type_id) =
                     type_store.get(&initial_value_type_id)?
                 else {
-                    bail!("{}: No type with index {initial_value_type_id}, or that index refers to a plugin-defined type.", Self::NAME)
+                    bail!(
+                        "{}: No type with index {initial_value_type_id}, or that index refers to a plugin-defined type.",
+                        Self::NAME
+                    )
                 };
 
                 ensure!(
@@ -223,7 +226,10 @@ impl Plugin for RamBoolV0 {
                 let TypeSpecification::Plugin(ram_output_type) =
                     type_store.get(&ram_output_type_id)?
                 else {
-                    bail!("{}: {operation} must output a plugin-defined type, but the type with index {ram_output_type_id} refers to a field (or is undefined).", Self::NAME);
+                    bail!(
+                        "{}: {operation} must output a plugin-defined type, but the type with index {ram_output_type_id} refers to a field (or is undefined).",
+                        Self::NAME
+                    );
                 };
 
                 ensure!(
@@ -362,7 +368,10 @@ impl Plugin for RamBoolV0 {
                 let field_id = u8::try_from(number_to_u64(&field_id)?)?;
 
                 let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)? else {
-                    bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
+                    bail!(
+                        "{}: No type with index {field_id}, or that index refers to a plugin-defined type.",
+                        Self::NAME
+                    );
                 };
 
                 ensure!(
@@ -498,7 +507,10 @@ impl Plugin for RamBoolV0 {
                 let field_id = u8::try_from(number_to_u64(&field_id)?)?;
 
                 let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)? else {
-                    bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
+                    bail!(
+                        "{}: No type with index {field_id}, or that index refers to a plugin-defined type.",
+                        Self::NAME
+                    );
                 };
 
                 ensure!(
@@ -615,7 +627,10 @@ impl Plugin for RamBoolV1 {
                 let &TypeSpecification::Field(initial_value_rust_type_id) =
                     type_store.get(&initial_value_type_id)?
                 else {
-                    bail!("{}: No type with index {initial_value_type_id}, or that index refers to a plugin-defined type.", Self::NAME)
+                    bail!(
+                        "{}: No type with index {initial_value_type_id}, or that index refers to a plugin-defined type.",
+                        Self::NAME
+                    )
                 };
 
                 ensure!(
@@ -642,7 +657,10 @@ impl Plugin for RamBoolV1 {
                 let TypeSpecification::Plugin(ram_output_type) =
                     type_store.get(&ram_output_type_id)?
                 else {
-                    bail!("{}: {operation} must output a plugin-defined type, but the type with index {ram_output_type_id} refers to a field (or is undefined).", Self::NAME);
+                    bail!(
+                        "{}: {operation} must output a plugin-defined type, but the type with index {ram_output_type_id} refers to a field (or is undefined).",
+                        Self::NAME
+                    );
                 };
 
                 ensure!(
@@ -781,7 +799,10 @@ impl Plugin for RamBoolV1 {
                 let field_id = u8::try_from(number_to_u64(&field_id)?)?;
 
                 let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)? else {
-                    bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
+                    bail!(
+                        "{}: No type with index {field_id}, or that index refers to a plugin-defined type.",
+                        Self::NAME
+                    );
                 };
 
                 ensure!(
@@ -917,7 +938,10 @@ impl Plugin for RamBoolV1 {
                 let field_id = u8::try_from(number_to_u64(&field_id)?)?;
 
                 let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)? else {
-                    bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
+                    bail!(
+                        "{}: No type with index {field_id}, or that index refers to a plugin-defined type.",
+                        Self::NAME
+                    );
                 };
 
                 ensure!(
@@ -1032,7 +1056,10 @@ impl Plugin for RamArithV0 {
 
                 let initial_value_type_id = input_counts[0].0;
                 let &TypeSpecification::Field(_) = type_store.get(&initial_value_type_id)? else {
-                    bail!("{}: No type with index {initial_value_type_id}, or that index refers to a plugin-defined type.", Self::NAME)
+                    bail!(
+                        "{}: No type with index {initial_value_type_id}, or that index refers to a plugin-defined type.",
+                        Self::NAME
+                    )
                 };
 
                 ensure!(
@@ -1060,7 +1087,10 @@ impl Plugin for RamArithV0 {
                 let TypeSpecification::Plugin(ram_output_type) =
                     type_store.get(&ram_output_type_id)?
                 else {
-                    bail!("{}: {operation} must output a plugin-defined type, but the type with index {ram_output_type_id} refers to a field (or is undefined).", Self::NAME);
+                    bail!(
+                        "{}: {operation} must output a plugin-defined type, but the type with index {ram_output_type_id} refers to a field (or is undefined).",
+                        Self::NAME
+                    );
                 };
 
                 ensure!(
@@ -1169,7 +1199,10 @@ impl Plugin for RamArithV0 {
                 let field_id = u8::try_from(number_to_u64(&field_id)?)?;
 
                 let &TypeSpecification::Field(_) = type_store.get(&field_id)? else {
-                    bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
+                    bail!(
+                        "{}: No type with index {field_id}, or that index refers to a plugin-defined type.",
+                        Self::NAME
+                    );
                 };
 
                 ensure!(
@@ -1275,7 +1308,10 @@ impl Plugin for RamArithV0 {
                 let field_id = u8::try_from(number_to_u64(&field_id)?)?;
 
                 let &TypeSpecification::Field(_) = type_store.get(&field_id)? else {
-                    bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
+                    bail!(
+                        "{}: No type with index {field_id}, or that index refers to a plugin-defined type.",
+                        Self::NAME
+                    );
                 };
 
                 ensure!(
@@ -1360,7 +1396,10 @@ impl Plugin for RamArithV1 {
 
                 let initial_value_type_id = input_counts[0].0;
                 let &TypeSpecification::Field(_) = type_store.get(&initial_value_type_id)? else {
-                    bail!("{}: No type with index {initial_value_type_id}, or that index refers to a plugin-defined type.", Self::NAME)
+                    bail!(
+                        "{}: No type with index {initial_value_type_id}, or that index refers to a plugin-defined type.",
+                        Self::NAME
+                    )
                 };
 
                 ensure!(
@@ -1388,7 +1427,10 @@ impl Plugin for RamArithV1 {
                 let TypeSpecification::Plugin(ram_output_type) =
                     type_store.get(&ram_output_type_id)?
                 else {
-                    bail!("{}: {operation} must output a plugin-defined type, but the type with index {ram_output_type_id} refers to a field (or is undefined).", Self::NAME);
+                    bail!(
+                        "{}: {operation} must output a plugin-defined type, but the type with index {ram_output_type_id} refers to a field (or is undefined).",
+                        Self::NAME
+                    );
                 };
 
                 ensure!(
@@ -1497,7 +1539,10 @@ impl Plugin for RamArithV1 {
                 let field_id = u8::try_from(number_to_u64(&field_id)?)?;
 
                 let &TypeSpecification::Field(_) = type_store.get(&field_id)? else {
-                    bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
+                    bail!(
+                        "{}: No type with index {field_id}, or that index refers to a plugin-defined type.",
+                        Self::NAME
+                    );
                 };
 
                 ensure!(
@@ -1603,7 +1648,10 @@ impl Plugin for RamArithV1 {
                 let field_id = u8::try_from(number_to_u64(&field_id)?)?;
 
                 let &TypeSpecification::Field(_) = type_store.get(&field_id)? else {
-                    bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
+                    bail!(
+                        "{}: No type with index {field_id}, or that index refers to a plugin-defined type.",
+                        Self::NAME
+                    );
                 };
 
                 ensure!(

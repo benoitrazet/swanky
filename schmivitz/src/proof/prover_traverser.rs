@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use eyre::{bail, eyre, Result};
+use eyre::{Result, bail, eyre};
 use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
     TypeId, TypedCount, TypedWireRange, WireId, WireRange,
 };
 use swanky_field::FiniteRing;
-use swanky_field_binary::{F128b, F2};
+use swanky_field_binary::{F2, F128b};
 
 use crate::vole::RandomVole;
 
@@ -335,11 +335,11 @@ mod tests {
 
     use eyre::Result;
     use merlin::Transcript;
-    use rand::{thread_rng, Rng};
+    use rand::{Rng, thread_rng};
     use swanky_field::FiniteRing;
-    use swanky_field_binary::{F128b, F2};
+    use swanky_field_binary::{F2, F128b};
 
-    use crate::vole::{insecure::InsecureVole, RandomVole};
+    use crate::vole::{RandomVole, insecure::InsecureVole};
 
     use super::ProverTraverser;
 
@@ -349,7 +349,7 @@ mod tests {
 
         let (voles, _) = InsecureVole::create(len, transcript, rng);
         let challenges = repeat_with(|| F128b::random(rng)).take(len).collect();
-        let wire_ids = repeat_with(|| (rng.gen(), F2::random(rng))).take(len);
+        let wire_ids = repeat_with(|| (rng.r#gen(), F2::random(rng))).take(len);
         ProverTraverser::new(HashMap::from_iter(wire_ids), challenges, voles).unwrap()
     }
 

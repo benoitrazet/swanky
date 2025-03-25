@@ -6,12 +6,12 @@ use crate::{
     errors::Error,
     ot::{KosReceiver, KosSender, RandomReceiver as ROTReceiver, RandomSender as ROTSender},
 };
-use generic_array::{typenum::Unsigned, GenericArray};
+use generic_array::{GenericArray, typenum::Unsigned};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{
+    AbstractChannel, Block, Malicious,
     field::{Degree, FiniteField as FF},
     ring::FiniteRing,
-    AbstractChannel, Block, Malicious,
 };
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
@@ -175,9 +175,9 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
 mod tests {
     use super::{super::utils::Powers, CopeeReceiver, CopeeSender};
     use scuttlebutt::{
-        field::{F128b, F61p, FiniteField as FF, F2},
-        ring::FiniteRing,
         AesRng, Channel,
+        field::{F2, F61p, F128b, FiniteField as FF},
+        ring::FiniteRing,
     };
     use std::{
         io::{BufReader, BufWriter},

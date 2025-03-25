@@ -1,7 +1,7 @@
 #![allow(clippy::all)]
 use ocelot::oprf::{KmprtReceiver, KmprtSender};
 use rand::Rng;
-use scuttlebutt::{channel::track_unix_channel_pair, AesRng, Block, Block512};
+use scuttlebutt::{AesRng, Block, Block512, channel::track_unix_channel_pair};
 use std::time::SystemTime;
 
 fn rand_block_vec(size: usize) -> Vec<Block> {
@@ -13,7 +13,7 @@ fn run(ninputs: usize, npoints: usize) {
     let inputs = rand_block_vec(ninputs);
     let mut rng = AesRng::new();
     let points = (0..npoints)
-        .map(|_| (rng.gen(), rng.gen()))
+        .map(|_| (rng.r#gen(), rng.r#gen()))
         .collect::<Vec<(Block, Block512)>>();
     let (mut sender, mut receiver) = track_unix_channel_pair();
     let total = SystemTime::now();

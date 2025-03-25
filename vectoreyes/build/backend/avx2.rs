@@ -7,8 +7,8 @@ use quote::{format_ident, quote};
 
 use super::types::VectorType;
 
-use super::{cfg::Cfg, VectorBackend};
 use super::{Docs, PairwiseOperator};
+use super::{VectorBackend, cfg::Cfg};
 
 /// An intel intrinsic.
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -78,7 +78,9 @@ impl Builder<'_> {
                 continue;
             }
             if !REQUIRED_FEATURES.contains(&feature.to_lowercase().as_str()) {
-                panic!("intrinsic {name:?} requires cpu feature {feature:?} which the avx2 backend doesn't require");
+                panic!(
+                    "intrinsic {name:?} requires cpu feature {feature:?} which the avx2 backend doesn't require"
+                );
             }
         }
         self.intrinsics_used.insert(intrinsic);

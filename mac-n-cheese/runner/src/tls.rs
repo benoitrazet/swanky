@@ -9,13 +9,13 @@ use std::{
 
 use bufstream::BufStream;
 use eyre::Context;
-use party::{either::PartyEitherCopy, WhichParty};
+use party::{WhichParty, either::PartyEitherCopy};
 use rand::RngCore;
 use rustls::{ClientConnection, ServerConnection, StreamOwned};
-use swanky_party::{self as party, either::PartyEither, Party};
+use swanky_party::{self as party, Party, either::PartyEither};
 use vectoreyes::SimdBase;
 
-use crate::{keys::Keys, MAC_N_CHEESE_RUNNER_VERSION};
+use crate::{MAC_N_CHEESE_RUNNER_VERSION, keys::Keys};
 
 pub struct TlsConnection<P: Party> {
     inner: BufStream<
@@ -167,12 +167,15 @@ pub fn initiate_tls<P: Party>(
             }
             let mut connections = Vec::with_capacity(num_connections);
             for (i, c) in sorted_connections.into_iter().enumerate() {
-                if let Some(c) = c {
-                    connections.push(c);
-                } else {
-                    // We panic here since this situation shouldn't ever occur.
-                    // We've put every connection into a slot with no duplicates.
-                    panic!("Connection {i} is missing");
+                match c {
+                    Some(c) => {
+                        connections.push(c);
+                    }
+                    _ => {
+                        // We panic here since this situation shouldn't ever occur.
+                        // We've put every connection into a slot with no duplicates.
+                        panic!("Connection {i} is missing");
+                    }
                 }
             }
             root_conn.flush()?;

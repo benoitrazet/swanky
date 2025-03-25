@@ -23,7 +23,7 @@ We assume the $`\lambda`$ security parameter in the spec to be 128 as set in
 For convenience we abbreviate "all-but-one vector commitment" to "1-VC".
 */
 #![allow(dead_code)]
-use eyre::{bail, Result};
+use eyre::{Result, bail};
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 // The following types are instrumental in the 4 functions
@@ -343,7 +343,7 @@ pub(crate) fn verify(h_com: H1, pdecom: Pdecom, j: Vec<bool>, iv: IV) -> Result<
 
 #[cfg(test)]
 mod test {
-    use super::{commit, num_rec, open, reconstruct, verify, Key, IV};
+    use super::{IV, Key, commit, num_rec, open, reconstruct, verify};
     use proptest::prelude::*;
 
     #[test]

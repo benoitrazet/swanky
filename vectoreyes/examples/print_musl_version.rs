@@ -1,7 +1,7 @@
 //! If running with `musl` libc, then print out the version of musl. Otherwise do nothing.
 
 #[cfg(target_env = "musl")]
-extern "C" {
+unsafe extern "C" {
     static __libc_version: std::ffi::c_char;
 }
 

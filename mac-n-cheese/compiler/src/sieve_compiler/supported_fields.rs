@@ -3,7 +3,7 @@ use mac_n_cheese_sieve_parser::Number;
 use mac_n_cheese_wire_map::WireMap;
 
 use scuttlebutt::{
-    field::{F128p, F61p, FiniteField, F2},
+    field::{F2, F61p, F128p, FiniteField},
     ring::FiniteRing,
 };
 use std::ops::{Deref, DerefMut, Index};

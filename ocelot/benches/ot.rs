@@ -1,7 +1,7 @@
 #![allow(clippy::all)]
 //! Oblivious transfer benchmarks using `criterion`.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use ocelot::ot::{
     self, CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver, Sender,
 };

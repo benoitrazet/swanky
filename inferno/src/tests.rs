@@ -1,6 +1,6 @@
 use crate::Proof;
 use proptest::prelude::*;
-use scuttlebutt::field::{F64b, FiniteField, F2};
+use scuttlebutt::field::{F2, F64b, FiniteField};
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::{AesRng, Block};
 use simple_arith_circuit::Circuit;

@@ -1,10 +1,10 @@
 use crate::{
+    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireLabel, WireMod2,
     check_binary,
     errors::{FancyError, GarblerError},
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal},
     hash_wires,
-    util::{output_tweak, tweak, tweak2, RngExt},
-    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireLabel, WireMod2,
+    util::{RngExt, output_tweak, tweak, tweak2},
 };
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::{AbstractChannel, Block};
@@ -250,7 +250,7 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> FancyBinary for Garbler<C, RN
 
     /// Use binary and_gate
     fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        if let (AllWire::Mod2(ref A), AllWire::Mod2(ref B), AllWire::Mod2(ref delta)) =
+        if let (AllWire::Mod2(A), AllWire::Mod2(B), AllWire::Mod2(ref delta)) =
             (x, y, self.delta(2))
         {
             let (gate0, gate1, C) = self.garble_and_gate(A, B, delta);

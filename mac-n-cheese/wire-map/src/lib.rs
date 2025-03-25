@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, sync::atomic::AtomicU64};
 
 use allocation::Allocation;
 use eyre::ContextCompat;
-use vectoreyes::{SimdBase, SimdBase8, SimdSaturatingArithmetic, U16x16, U64x4, U8x32};
+use vectoreyes::{SimdBase, SimdBase8, SimdSaturatingArithmetic, U8x32, U16x16, U64x4};
 
 pub type WireId = u64;
 type AllocationStartId = u64;
@@ -116,29 +116,30 @@ impl<'parent, T> WireMap<'parent, T> {
         wire: WireId,
     ) -> Option<WirePosition<'a, 'parent, T>> {
         LOOKUP_MISSES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        if let Some((&start, allocation)) = self.storage.range_mut(..=wire).next_back() {
-            debug_assert!(start <= wire);
-            let allocation_len = allocation.len();
-            if wire - start >= allocation_len as u64 {
-                return None;
+        match self.storage.range_mut(..=wire).next_back() {
+            Some((&start, allocation)) => {
+                debug_assert!(start <= wire);
+                let allocation_len = allocation.len();
+                if wire - start >= allocation_len as u64 {
+                    return None;
+                }
+                let allocation = match std::mem::replace(
+                    allocation,
+                    Cell::InCache {
+                        len: allocation_len,
+                    },
+                ) {
+                    Cell::Uncached { allocation } => allocation,
+                    Cell::InCache { len: _ } => panic!("Allocation is already in the cache"),
+                };
+                let allocation = self.insert_into_cache(start, allocation);
+                let pos_in_allocation = (wire - start) as usize;
+                Some(WirePosition {
+                    allocation,
+                    pos_in_allocation,
+                })
             }
-            let allocation = match std::mem::replace(
-                allocation,
-                Cell::InCache {
-                    len: allocation_len,
-                },
-            ) {
-                Cell::Uncached { allocation } => allocation,
-                Cell::InCache { len: _ } => panic!("Allocation is already in the cache"),
-            };
-            let allocation = self.insert_into_cache(start, allocation);
-            let pos_in_allocation = (wire - start) as usize;
-            Some(WirePosition {
-                allocation,
-                pos_in_allocation,
-            })
-        } else {
-            None
+            _ => None,
         }
     }
     /// We assume that the allocation doesn't conflict with any other allocation.
@@ -161,10 +162,12 @@ impl<'parent, T> WireMap<'parent, T> {
             .unwrap();
         // Assert that no valid cache entry shares this start (a valid cache entry has a non-zero
         // length).
-        debug_assert!(!cache_starts
-            .iter()
-            .zip(cache_lens_and_last_useds.iter())
-            .any(|(s, l)| *s == start && ((l >> 16) > 0)));
+        debug_assert!(
+            !cache_starts
+                .iter()
+                .zip(cache_lens_and_last_useds.iter())
+                .any(|(s, l)| *s == start && ((l >> 16) > 0))
+        );
         let evicted_start = cache_starts[victim_idx];
         let alloc_len = alloc.len();
         let evicted_allocation = std::mem::replace(&mut self.cached_allocations[victim_idx], alloc);

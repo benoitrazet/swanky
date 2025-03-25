@@ -1,9 +1,9 @@
-use eyre::{bail, ensure, Result};
+use eyre::{Result, bail, ensure};
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 
 use crate::circuit_ir::{
-    first_unused_wire_id, FunStore, GateM, GatesBody, TypeId, TypeSpecification, TypeStore,
-    WireCount,
+    FunStore, GateM, GatesBody, TypeId, TypeSpecification, TypeStore, WireCount,
+    first_unused_wire_id,
 };
 
 use super::{Plugin, PluginExecution};
@@ -30,7 +30,11 @@ impl Plugin for VectorsV1 {
 
         let t = output_counts[0].0;
         let TypeSpecification::Field(_) = type_store.get(&t)? else {
-            bail!("{}: {operation} expects only field-typed inputs and outputs, but the type with index {} is plugin-defined.", Self::NAME, t);
+            bail!(
+                "{}: {operation} expects only field-typed inputs and outputs, but the type with index {} is plugin-defined.",
+                Self::NAME,
+                t
+            );
         };
 
         match operation {
@@ -371,7 +375,7 @@ impl Plugin for VectorsV1 {
 mod tests {
     use super::VectorsV1;
     use crate::{
-        backend_multifield::tests::{minus_one, one, test_circuit, zero, FF0},
+        backend_multifield::tests::{FF0, minus_one, one, test_circuit, zero},
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
         fields::F61P_MODULUS,
         plugins::Plugin,

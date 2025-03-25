@@ -254,7 +254,7 @@ impl Channel<'_> {
                             std::io::ErrorKind::UnexpectedEof,
                             "Hit unexpected EOF",
                         ))
-                        .wrap_err(NetworkError)
+                        .wrap_err(NetworkError);
                     }
                     Ok(n) => n,
                     Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,

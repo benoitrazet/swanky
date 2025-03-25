@@ -7,7 +7,7 @@
 use crate::ligero::FieldForLigero;
 use crate::threshold_secret_sharing::PackedSecretSharingGenerator;
 use crate::util::*;
-use ndarray::{concatenate, Array1, Array2, ArrayView1, ArrayView2, Axis, Zip};
+use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis, Zip, concatenate};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::field::fft;
 use scuttlebutt::field::fft::FieldForFFT;
@@ -254,8 +254,8 @@ impl<Field: FieldForLigero> Params<Field> {
         debug_assert!(mat.ncols() <= self.k);
 
         let mut res = Array2::zeros((mat.nrows(), self.k + 1)); // TODO use uninit for efficiency
-                                                                //mat.to_owned() // TODO better if we move this argument?
-                                                                //    .move_into(res.slice_mut(ndarray::s![.., 1..mat.ncols()+1]));
+        //mat.to_owned() // TODO better if we move this argument?
+        //    .move_into(res.slice_mut(ndarray::s![.., 1..mat.ncols()+1]));
         res.slice_mut(ndarray::s![.., 1..mat.ncols() + 1])
             .assign(&mat);
 
@@ -272,8 +272,8 @@ impl<Field: FieldForLigero> Params<Field> {
         debug_assert!(mat.ncols() <= self.k + 1);
 
         let mut res = Array2::zeros((mat.nrows(), self.k + 1)); // TODO use uninit for efficiency
-                                                                //mat.to_owned() // TODO better if we move this argument?
-                                                                //    .move_into(res.slice_mut(ndarray::s![.., 0..mat.ncols()]));
+        //mat.to_owned() // TODO better if we move this argument?
+        //    .move_into(res.slice_mut(ndarray::s![.., 0..mat.ncols()]));
         res.slice_mut(ndarray::s![.., 0..mat.ncols()]).assign(&mat);
 
         Zip::from(res.rows_mut()).for_each(|mut row| {
@@ -342,8 +342,8 @@ impl<Field: FieldForLigero> Params<Field> {
         debug_assert!(mat.ncols() <= self.n);
 
         let mut res = Array2::zeros((mat.nrows(), self.n + 1)); // TODO use uninit for efficiency
-                                                                //mat.to_owned() // TODO better if we move this argument?
-                                                                //    .move_into(res.slice_mut(ndarray::s![.., 1..mat.ncols()+1]));
+        //mat.to_owned() // TODO better if we move this argument?
+        //    .move_into(res.slice_mut(ndarray::s![.., 1..mat.ncols()+1]));
         res.slice_mut(ndarray::s![.., 1..mat.ncols() + 1])
             .assign(&mat);
 
@@ -360,8 +360,8 @@ impl<Field: FieldForLigero> Params<Field> {
         debug_assert!(mat.ncols() <= self.n + 1);
 
         let mut res = Array2::zeros((mat.nrows(), self.n + 1)); // TODO use uninit for efficiency
-                                                                //mat.to_owned() // TODO better if we move this argument?
-                                                                //    .move_into(res.slice_mut(ndarray::s![.., 0..mat.ncols()]));
+        //mat.to_owned() // TODO better if we move this argument?
+        //    .move_into(res.slice_mut(ndarray::s![.., 0..mat.ncols()]));
         res.slice_mut(ndarray::s![.., 0..mat.ncols()]).assign(&mat);
 
         Zip::from(res.rows_mut()).for_each(|mut row| {

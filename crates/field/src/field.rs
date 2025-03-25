@@ -3,7 +3,7 @@
 use crate::ring::{FiniteRing, IsSubRingOf};
 use crypto_bigint::{Limb, Uint};
 use generic_array::typenum;
-use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
+use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
 use std::ops::{Div, DivAssign};
 use subtle::CtOption;
 
@@ -147,7 +147,7 @@ pub trait PrimeFiniteField:
     /// The minimum number of word-sized limbs needed to represent the modulus
     /// of the `PrimeFiniteField`.
     const MIN_LIMBS_NEEDED: usize =
-        Self::NumberOfBitsInBitDecomposition::USIZE.div_ceil(Limb::BITS);
+        Self::NumberOfBitsInBitDecomposition::USIZE.div_ceil(Limb::BITS as usize);
 
     /// Return the modulus of this `PrimeFiniteField` as a `Uint`.
     ///

@@ -33,9 +33,9 @@ use crate::{
     utils,
 };
 use fancy_garbling::{
-    twopac::semihonest::{Evaluator, Garbler},
     AllWire, ArithmeticBundleGadgets, BinaryBundle, Bundle, CrtBundle, CrtGadgets, Fancy,
     FancyBinary, FancyInput,
+    twopac::semihonest::{Evaluator, Garbler},
 };
 
 use itertools::Itertools;
@@ -131,7 +131,7 @@ impl Sender {
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let mut gb =
-            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.gen()))
+            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.r#gen()))
                 .unwrap();
 
         let (mut state, nbins, _, _) = self.bucketize_data(table, payloads, channel, rng)?;
@@ -165,7 +165,7 @@ impl Sender {
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let mut gb =
-            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.gen()))
+            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.r#gen()))
                 .unwrap();
         let _ = gb.load_deltas(path_deltas);
 
@@ -223,7 +223,7 @@ impl Sender {
         rng: &mut RNG,
     ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error> {
         let mut gb =
-            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.gen()))
+            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.r#gen()))
                 .unwrap();
         let _ = gb.load_deltas(path_deltas);
 
@@ -275,7 +275,7 @@ impl Sender {
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let mut gb =
-            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.gen()))
+            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.r#gen()))
                 .unwrap();
         let _ = gb.load_deltas(path_deltas);
 
@@ -312,8 +312,8 @@ impl Sender {
         let mut table = vec![Vec::new(); nbins];
         let mut payload = vec![Vec::new(); nbins];
 
-        let ts_id = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
-        let ts_payload = (0..nbins).map(|_| rng.gen::<Block512>()).collect_vec();
+        let ts_id = (0..nbins).map(|_| rng.r#gen::<Block512>()).collect_vec();
+        let ts_payload = (0..nbins).map(|_| rng.r#gen::<Block512>()).collect_vec();
 
         for (x, p) in hashes.iter().zip_eq(payloads.iter()) {
             let mut bins = Vec::with_capacity(NHASHES);
@@ -333,8 +333,8 @@ impl Sender {
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
             // table2[j] & payload[j]
             if bins.iter().skip(1).all(|&x| x == bins[0]) {
-                table[bins[0]].push(rng.gen());
-                payload[bins[0]].push(rng.gen());
+                table[bins[0]].push(rng.r#gen());
+                payload[bins[0]].push(rng.r#gen());
             }
         }
 
@@ -454,7 +454,7 @@ impl Receiver {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let key = rng.gen();
+        let key = rng.r#gen();
         channel.write_block(&key)?;
         channel.flush()?;
 
@@ -481,7 +481,7 @@ impl Receiver {
     ) -> Result<u128, Error> {
         let mut ev = Evaluator::<C, RNG, OtReceiver, AllWire>::new(
             channel.clone(),
-            RNG::from_seed(rng.gen()),
+            RNG::from_seed(rng.r#gen()),
         )
         .unwrap();
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
@@ -527,7 +527,7 @@ impl Receiver {
     ) -> Result<u128, Error> {
         let mut ev = Evaluator::<C, RNG, OtReceiver, AllWire>::new(
             channel.clone(),
-            RNG::from_seed(rng.gen()),
+            RNG::from_seed(rng.r#gen()),
         )
         .unwrap();
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
@@ -566,7 +566,7 @@ impl Receiver {
     ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error> {
         let mut ev = Evaluator::<C, RNG, OtReceiver, AllWire>::new(
             channel.clone(),
-            RNG::from_seed(rng.gen()),
+            RNG::from_seed(rng.r#gen()),
         )
         .unwrap();
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
@@ -616,7 +616,7 @@ impl Receiver {
     ) -> Result<u128, Error> {
         let mut ev = Evaluator::<C, RNG, OtReceiver, AllWire>::new(
             channel.clone(),
-            RNG::from_seed(rng.gen()),
+            RNG::from_seed(rng.r#gen()),
         )
         .unwrap();
 
@@ -667,7 +667,7 @@ impl Receiver {
             .iter()
             .map(|opt_item| match opt_item {
                 Some(item) => item.entry_with_hindex(),
-                None => rng.gen(),
+                None => rng.r#gen(),
             })
             .collect::<Vec<Block>>();
 
@@ -677,7 +677,7 @@ impl Receiver {
             .iter()
             .map(|opt_item| match opt_item {
                 Some(item) => payloads[item.input_index],
-                None => rng.gen::<Block512>(),
+                None => rng.r#gen::<Block512>(),
             })
             .collect::<Vec<Block512>>();
 
@@ -716,7 +716,7 @@ impl Receiver {
                     .iter()
                     .map(|opt_item| match opt_item {
                         Some(item) => item.entry_with_hindex(),
-                        None => rng.gen::<Block>(),
+                        None => rng.r#gen::<Block>(),
                     })
                     .collect::<Vec<Block>>()
             })
@@ -729,7 +729,7 @@ impl Receiver {
                     .iter()
                     .map(|opt_item| match opt_item {
                         Some(item) => payloads[item.input_index],
-                        None => rng.gen::<Block512>(),
+                        None => rng.r#gen::<Block512>(),
                     })
                     .collect::<Vec<Block512>>()
             })
@@ -972,7 +972,7 @@ fn mask_payload_crt<RNG: rand::Rng + Sized>(x: Block512, y: Block512, rng: &mut 
         if i < res.len() {
             block[i] = res[i];
         } else {
-            block[i] = rng.gen::<u8>(); // TODO: mod rest of prime
+            block[i] = rng.r#gen::<u8>(); // TODO: mod rest of prime
         }
     }
     Block512::from(block)

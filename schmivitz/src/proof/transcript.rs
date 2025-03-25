@@ -2,7 +2,7 @@ use std::iter::repeat_with;
 
 use mac_n_cheese_sieve_parser::WireId;
 use swanky_field::FiniteRing;
-use swanky_field_binary::{F128b, F2};
+use swanky_field_binary::{F2, F128b};
 use swanky_serialization::CanonicalSerialize;
 
 use crate::parameters::{FIELD_SIZE, REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};

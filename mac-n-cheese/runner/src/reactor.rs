@@ -8,9 +8,9 @@ use crate::{
     task_queue::RunningTaskId,
     thread_spawner::ThreadSpawner,
 };
-use mac_n_cheese_ir::compilation_format::{fb::DataChunkAddress, Manifest, PrivateDataAddress};
+use mac_n_cheese_ir::compilation_format::{Manifest, PrivateDataAddress, fb::DataChunkAddress};
 use std::fs::File;
-use swanky_party::{private::ProverPrivate, Party};
+use swanky_party::{Party, private::ProverPrivate};
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct ReactorRequest {
@@ -41,7 +41,7 @@ pub trait Reactor<P: Party>: 'static + Send + Sync {
     // This may block
     // This must be sent in topological order
     fn send_outgoing(&self, task_id: RunningTaskId, payload: OwnedAlignedBytes)
-        -> eyre::Result<()>;
+    -> eyre::Result<()>;
     fn request(
         &self,
         task_id: RunningTaskId,

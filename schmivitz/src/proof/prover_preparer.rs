@@ -2,9 +2,9 @@ use std::{collections::HashMap, fs::File, path::Path};
 
 use eyre::{bail, eyre};
 use mac_n_cheese_sieve_parser::{
-    text_parser::ValueStreamReader, ConversionSemantics, FunctionBodyVisitor, Identifier, Number,
-    RelationVisitor, TypeId, TypedWireRange, ValueStreamKind,
-    ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
+    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, RelationVisitor, TypeId,
+    TypedWireRange, ValueStreamKind, ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
+    text_parser::ValueStreamReader,
 };
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::F2;
@@ -212,7 +212,7 @@ impl<StreamReader: ValueStreamReaderT> RelationVisitor for ProverPreparer<Stream
 
 #[cfg(test)]
 mod tests {
-    use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, ValueStreamReader};
+    use mac_n_cheese_sieve_parser::{Number, ValueStreamReader, text_parser::RelationReader};
     use std::io::Cursor;
 
     use crate::proof::prover_preparer::ProverPreparer;

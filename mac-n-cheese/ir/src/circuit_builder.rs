@@ -11,7 +11,7 @@ use std::io::{BufWriter, Seek, Write};
 use std::ops::RangeBounds;
 use std::path::Path;
 
-use crate::{compilation_format::*, MAC_N_CHEESE_VERSION};
+use crate::{MAC_N_CHEESE_VERSION, compilation_format::*};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Shape {

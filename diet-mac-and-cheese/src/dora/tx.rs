@@ -1,6 +1,6 @@
 use std::io::Result;
 
-use scuttlebutt::{field::FiniteField, AbstractChannel};
+use scuttlebutt::{AbstractChannel, field::FiniteField};
 
 #[derive(Debug)]
 pub struct TxChannel<'a, C: AbstractChannel + Clone> {

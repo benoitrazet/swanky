@@ -64,10 +64,10 @@
 
 use digest::Digest as CryptoDigest;
 use generic_array::typenum::Unsigned;
-use ndarray::{concatenate, Array1, Array2, ArrayView1, Axis};
+use ndarray::{Array1, Array2, ArrayView1, Axis, concatenate};
 use rand::{CryptoRng, Rng, SeedableRng};
-use scuttlebutt::field::fft::FieldForFFT;
 use scuttlebutt::field::FiniteField;
+use scuttlebutt::field::fft::FieldForFFT;
 #[cfg(test)]
 use scuttlebutt::serialization::CanonicalSerialize;
 use scuttlebutt::{AesRng, Block};
@@ -863,8 +863,8 @@ fn make_qadd<Field: FieldForLigero, H: CryptoDigest>(
 
     let radd = make_ra(params, &r1_radd, Padd); // deg < l
     let radd_blind = params.fft3_inverse(s.uadd.view()); // deg < k + l
-                                                         //    .slice(ndarray::s![0 .. params.k+params.l])
-                                                         //    .to_owned();
+    //    .slice(ndarray::s![0 .. params.k+params.l])
+    //    .to_owned();
 
     radd.rows().into_iter().zip(p.rows()).fold(
         radd_blind,
@@ -893,9 +893,11 @@ fn make_qa<Field: FieldForLigero>(
 ) -> Array1<Field> {
     let ra = make_ra_Iml_Pa_neg(params, &r1_ra, Pa); // each row deg < l
     let pa = params.fft3_inverse_rows(Ua.view()); // each row deg < k + 1
-    let ra_blind = params.fft3_inverse(ua.view()); // deg < k + l
-                                                   //.slice(ndarray::s![0 .. params.k+params.l])
-                                                   //.to_owned();
+    let ra_blind = params.fft3_inverse(ua.view());
+    // deg < k + l
+
+    //.slice(ndarray::s![0 .. params.k+params.l])
+    //.to_owned();
 
     ra.rows()
         .into_iter()

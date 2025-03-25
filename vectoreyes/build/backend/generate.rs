@@ -2,15 +2,15 @@ use std::ops::Deref;
 use std::path::PathBuf;
 
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, TokenStreamExt};
+use quote::{TokenStreamExt, format_ident, quote};
 use syn::Ident;
 
 use super::code_block::CodeBlock;
 use super::neon::neon_backend;
 use super::types::VectorType;
 use super::utils::index_literals;
-use super::{avx2::avx2_backend, cfg::Cfg, Scalar, VectorBackend};
 use super::{Docs, PairwiseOperator};
+use super::{Scalar, VectorBackend, avx2::avx2_backend, cfg::Cfg};
 
 struct Backends {
     backends_with_cfg: Vec<(Box<dyn VectorBackend>, Cfg)>,

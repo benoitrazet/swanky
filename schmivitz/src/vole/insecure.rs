@@ -7,11 +7,11 @@
 use std::iter::{repeat_with, zip};
 
 use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
-use eyre::{bail, Result};
+use eyre::{Result, bail};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
 use swanky_field::{FiniteRing, IsSubFieldOf};
-use swanky_field_binary::{F128b, F8b, F2};
+use swanky_field_binary::{F2, F8b, F128b};
 
 use super::RandomVole;
 
@@ -269,7 +269,7 @@ mod tests {
 
     use crate::{
         parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM},
-        vole::{insecure::InsecureVole, RandomVole},
+        vole::{RandomVole, insecure::InsecureVole},
     };
 
     #[test]

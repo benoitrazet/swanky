@@ -2,12 +2,12 @@ use std::{io::Cursor, marker::PhantomData, sync::Arc};
 
 use eyre::ContextCompat;
 use mac_n_cheese_ir::compilation_format::{
+    FieldMacType, TaskId, Type,
     fb::{Task, TaskPrototype},
     wire_format::{
         simd_batched,
         simple::{self, ReadWire},
     },
-    FieldMacType, TaskId, Type,
 };
 use mac_n_cheese_vole::{
     mac::{Mac, MacTypes},
@@ -15,19 +15,19 @@ use mac_n_cheese_vole::{
 };
 use rustc_hash::FxHashMap;
 use scuttlebutt::{
-    field::{FiniteField, IsSubFieldOf, SmallBinaryField, F2},
-    serialization::{CanonicalSerialize, SequenceDeserializer, SequenceSerializer},
     AesRng,
+    field::{F2, FiniteField, IsSubFieldOf, SmallBinaryField},
+    serialization::{CanonicalSerialize, SequenceDeserializer, SequenceSerializer},
 };
 use smallvec::SmallVec;
 use swanky_party::{
+    Party, WhichParty,
     either::PartyEither,
     private::{ProverPrivate, ProverPrivateCopy},
-    Party, WhichParty,
 };
 use vectoreyes::{
-    array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
     I32x4, SimdBase, SimdBaseGatherable, U32x4, U64x4,
+    array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
 };
 
 use crate::{
@@ -397,11 +397,13 @@ impl<P: Party> TaskInput<P> {
                 #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
                 unsafe fn gather_pointers(ptrs: U64x4) -> U64x4 {
                     use std::arch::x86_64::_mm256_i64gather_epi64;
-                    bytemuck::cast(_mm256_i64gather_epi64(
-                        std::ptr::null(),
-                        bytemuck::cast(ptrs),
-                        1,
-                    ))
+                    unsafe {
+                        bytemuck::cast(_mm256_i64gather_epi64(
+                            std::ptr::null(),
+                            bytemuck::cast(ptrs),
+                            1,
+                        ))
+                    }
                 }
                 #[cfg(not(all(target_arch = "x86_64", target_feature = "avx2")))]
                 unsafe fn gather_pointers(ptrs: U64x4) -> U64x4 {

@@ -4,13 +4,13 @@ use crate::{
     cache::Cache,
     circuit::CircuitEvaluator,
     hashers::{Hashers, Party},
-    round::{round1, round_compress_finish, round_compress_start, Round},
+    round::{Round, round_compress_finish, round_compress_start, round1},
     secretsharing::{CorrectionSharing, LinearSharing, SecretSharing},
 };
 use anyhow::anyhow;
 use blake3::Hash;
 use rand::{Rng, SeedableRng};
-use scuttlebutt::{field::FiniteField, AesRng, Block};
+use scuttlebutt::{AesRng, Block, field::FiniteField};
 use scuttlebutt::{ring::FiniteRing, serialization::serde_vec};
 use serde::{Deserialize, Serialize};
 use simple_arith_circuit::Circuit;
@@ -47,7 +47,7 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
 
         // Construct RNGs for each party.
         let seeds: [u128; N] = (0..N)
-            .map(|_| rng.gen::<u128>())
+            .map(|_| rng.r#gen::<u128>())
             .collect::<Vec<u128>>()
             .try_into()
             .unwrap(); // This `unwrap` will never fail.

@@ -1,6 +1,6 @@
 #![allow(clippy::all)]
 use ocelot::oprf::{KkrtReceiver, KkrtSender, Receiver, Sender};
-use scuttlebutt::{channel::track_unix_channel_pair, AesRng, Block};
+use scuttlebutt::{AesRng, Block, channel::track_unix_channel_pair};
 use std::time::SystemTime;
 
 fn rand_block_vec(size: usize) -> Vec<Block> {

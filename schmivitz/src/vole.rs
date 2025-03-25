@@ -10,7 +10,7 @@ pub(crate) mod insecure;
 use eyre::Result;
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
-use swanky_field_binary::{F128b, F2};
+use swanky_field_binary::{F2, F128b};
 
 use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 

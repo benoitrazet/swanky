@@ -3,11 +3,11 @@
 use crate::{fancy::HasModulus, util};
 use fancy_garbling_base_conversion as base_conversion;
 use rand::{CryptoRng, Rng, RngCore};
-use scuttlebutt::{Block, AES_HASH};
+use scuttlebutt::{AES_HASH, Block};
 use subtle::ConditionallySelectable;
 use vectoreyes::{
-    array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
     SimdBase,
+    array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
 };
 
 #[cfg(feature = "serde")]
@@ -336,13 +336,13 @@ impl WireLabel for AllWire {
     }
     fn plus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self {
         match (&mut *self, other) {
-            (AllWire::Mod2(ref mut x), AllWire::Mod2(y)) => {
+            (AllWire::Mod2(x), AllWire::Mod2(y)) => {
                 x.plus_eq(y);
             }
-            (AllWire::Mod3(ref mut x), AllWire::Mod3(y)) => {
+            (AllWire::Mod3(x), AllWire::Mod3(y)) => {
                 x.plus_eq(y);
             }
-            (AllWire::ModN(ref mut x), AllWire::ModN(y)) => {
+            (AllWire::ModN(x), AllWire::ModN(y)) => {
                 x.plus_eq(y);
             }
             _ => {
@@ -358,13 +358,13 @@ impl WireLabel for AllWire {
 
     fn cmul_eq(&mut self, c: u16) -> &mut Self {
         match &mut *self {
-            AllWire::Mod2(ref mut x) => {
+            AllWire::Mod2(x) => {
                 x.cmul_eq(c);
             }
-            AllWire::Mod3(ref mut x) => {
+            AllWire::Mod3(x) => {
                 x.cmul_eq(c);
             }
-            AllWire::ModN(ref mut x) => {
+            AllWire::ModN(x) => {
                 x.cmul_eq(c);
             }
         };
@@ -372,13 +372,13 @@ impl WireLabel for AllWire {
     }
     fn negate_eq(&mut self) -> &mut Self {
         match &mut *self {
-            AllWire::Mod2(ref mut x) => {
+            AllWire::Mod2(x) => {
                 x.negate_eq();
             }
-            AllWire::Mod3(ref mut x) => {
+            AllWire::Mod3(x) => {
                 x.negate_eq();
             }
-            AllWire::ModN(ref mut x) => {
+            AllWire::ModN(x) => {
                 x.negate_eq();
             }
         };
@@ -496,7 +496,7 @@ impl WireLabel for WireMod2 {
             panic!("[WireMod2::rand] Expected modulo 2. Got {}", q);
         }
 
-        Self { val: rng.gen() }
+        Self { val: rng.r#gen() }
     }
 
     fn hash_to_mod(hash: Block, q: u16) -> Self {
@@ -595,7 +595,7 @@ impl WireLabel for WireMod3 {
         }
         let mut lsb = 0u64;
         let mut msb = 0u64;
-        for (i, v) in (0..64).map(|_| rng.gen::<u8>() % 3).enumerate() {
+        for (i, v) in (0..64).map(|_| rng.r#gen::<u8>() % 3).enumerate() {
             lsb |= ((v & 1) as u64) << i;
             msb |= (((v >> 1) & 1) as u64) << i;
         }
@@ -716,7 +716,7 @@ impl WireLabel for WireModQ {
             panic!("[WireModQ::rand] Modulus must be at least 2. Got {}", q);
         }
         let ds = (0..util::digits_per_u128(q))
-            .map(|_| rng.gen::<u16>() % q)
+            .map(|_| rng.r#gen::<u16>() % q)
             .collect();
         Self { q, ds }
     }
@@ -1027,9 +1027,9 @@ mod tests {
         let mut rng = thread_rng();
 
         for _ in 0..16 {
-            let mut q: u16 = rng.gen();
+            let mut q: u16 = rng.r#gen();
             while q < 2 {
-                q = rng.gen();
+                q = rng.r#gen();
             }
             let w = WireModQ::rand(&mut rng, q);
             let serialized = serde_json::to_string(&w).unwrap();
@@ -1043,9 +1043,9 @@ mod tests {
     #[test]
     fn test_serialize_bad_modQ_mod() {
         let mut rng = thread_rng();
-        let mut q: u16 = rng.gen();
+        let mut q: u16 = rng.r#gen();
         while q < 2 {
-            q = rng.gen();
+            q = rng.r#gen();
         }
 
         let mut w = WireModQ::rand(&mut rng, q);

@@ -4,8 +4,8 @@ use crate::{
     backend_multifield::BackendLiftT, backend_trait::BackendT,
     gadgets::dotproduct_with_public_powers, mac::MacT,
 };
-use eyre::{ensure, Result};
-use generic_array::{typenum::Unsigned, GenericArray};
+use eyre::{Result, ensure};
+use generic_array::{GenericArray, typenum::Unsigned};
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing};
 
 /// A permutation check gadget that asserts that `xs = 𝛑(ys)`, erroring out if
@@ -134,15 +134,15 @@ mod tests {
     };
 
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
-    use rand::{seq::SliceRandom, Rng};
+    use rand::{Rng, seq::SliceRandom};
     use scuttlebutt::{AesRng, Channel};
     use swanky_field::{FiniteField, FiniteRing};
-    use swanky_field_binary::{F40b, F2};
+    use swanky_field_binary::{F2, F40b};
     use swanky_field_f61p::F61p;
 
     use crate::{
-        backend_extfield::DietMacAndCheeseExtField, backend_trait::BackendT, mac::Mac,
-        svole_trait::Svole, DietMacAndCheese,
+        DietMacAndCheese, backend_extfield::DietMacAndCheeseExtField, backend_trait::BackendT,
+        mac::Mac, svole_trait::Svole,
     };
     use swanky_party::{Prover, Verifier};
 

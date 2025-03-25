@@ -1,4 +1,4 @@
-use crate::{SimdBase8, U64x2, U8x16};
+use crate::{SimdBase8, U8x16, U64x2};
 
 // For compatibility with scuttlebutt::Block
 impl From<u128> for U8x16 {

@@ -1,8 +1,8 @@
 #![allow(clippy::all)]
 //! Benchmark code of garbling / evaluating using Nigel's circuits.
 
-use criterion::{criterion_group, criterion_main, Criterion};
-use fancy_garbling::{circuit::BinaryCircuit, classic::garble, AllWire, WireMod2};
+use criterion::{Criterion, criterion_group, criterion_main};
+use fancy_garbling::{AllWire, WireMod2, circuit::BinaryCircuit, classic::garble};
 use std::{fs::File, io::BufReader, time::Duration};
 
 fn circuit(fname: &str) -> BinaryCircuit {

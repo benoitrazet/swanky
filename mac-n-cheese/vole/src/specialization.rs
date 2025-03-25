@@ -1,15 +1,15 @@
-use generic_array::typenum::Unsigned;
 use generic_array::GenericArray;
+use generic_array::typenum::Unsigned;
 use scuttlebutt::field::{Degree, DegreeModulo, IsSubFieldOf, SmallBinaryField};
 use scuttlebutt::{
-    field::{FiniteField, F2},
     AesRng,
+    field::{F2, FiniteField},
 };
 use std::convert::TryFrom;
 use vectoreyes::{
+    ExtendingCast, I32x4, SimdBase, SimdBase32, SimdBaseGatherable, U8x16, U16x8, U32x4, U32x8,
+    U64x2, U64x4,
     array_utils::{ArrayUnrolledExt, EvenArrayAdjacentPairs},
-    ExtendingCast, I32x4, SimdBase, SimdBase32, SimdBaseGatherable, U16x8, U32x4, U32x8, U64x2,
-    U64x4, U8x16,
 };
 
 mod lpn_indices;

@@ -1,11 +1,11 @@
 #![allow(clippy::all)]
 use fancy_garbling::{
+    FancyInput, WireMod2,
     circuit::{BinaryCircuit as Circuit, EvaluableCircuit},
     twopac::semihonest::{Evaluator, Garbler},
-    FancyInput, WireMod2,
 };
 use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
-use scuttlebutt::{unix_channel_pair, AesRng, UnixChannel};
+use scuttlebutt::{AesRng, UnixChannel, unix_channel_pair};
 use std::{fs::File, io::BufReader, time::SystemTime};
 
 fn circuit(fname: &str) -> Circuit {

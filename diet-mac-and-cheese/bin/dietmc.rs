@@ -3,17 +3,17 @@ mod cli;
 use crate::cli::Config;
 use clap::Parser;
 use cli::Cli;
+use diet_mac_and_cheese::EvaluatorCirc;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
-use diet_mac_and_cheese::sieveir_reader_fbs::{read_types, InputFlatbuffers};
+use diet_mac_and_cheese::sieveir_reader_fbs::{InputFlatbuffers, read_types};
 use diet_mac_and_cheese::sieveir_reader_text::InputText;
 use diet_mac_and_cheese::svole_thread::SvoleAtomic;
 use diet_mac_and_cheese::svole_trait::Svole;
-use diet_mac_and_cheese::EvaluatorCirc;
-use eyre::{bail, Result, WrapErr};
+use eyre::{Result, WrapErr, bail};
 use log::info;
-use mac_n_cheese_sieve_parser::text_parser::RelationReader;
 use mac_n_cheese_sieve_parser::RelationReader as RR;
-use scuttlebutt::field::{F40b, F2};
+use mac_n_cheese_sieve_parser::text_parser::RelationReader;
+use scuttlebutt::field::{F2, F40b};
 use scuttlebutt::{AesRng, Channel, SyncChannel};
 use std::env;
 use std::fs::File;
@@ -61,11 +61,14 @@ fn start_connection_verifier(addresses: &[String]) -> Result<Vec<TcpStream>> {
 
     for addr in addresses.iter() {
         let listener = TcpListener::bind(addr.clone())?;
-        if let Ok((stream, _addr)) = listener.accept() {
-            tcp_streams.push(stream);
-            info!("accept connections on {:?}", addr);
-        } else {
-            bail!("Error binding addr: {:?}", addr);
+        match listener.accept() {
+            Ok((stream, _addr)) => {
+                tcp_streams.push(stream);
+                info!("accept connections on {:?}", addr);
+            }
+            _ => {
+                bail!("Error binding addr: {:?}", addr);
+            }
         }
     }
 
@@ -130,22 +133,24 @@ impl<P: Party> Iterator
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(addr) = self.next_address() {
             match P::WHICH {
-                WhichParty::Verifier(_ev) => {
-                    if let Ok(listener) = TcpListener::bind(&addr) {
-                        if let Ok((stream, _addr)) = listener.accept() {
+                WhichParty::Verifier(_ev) => match TcpListener::bind(&addr) {
+                    Ok(listener) => match listener.accept() {
+                        Ok((stream, _addr)) => {
                             info!("accept connection on {}", addr);
                             let reader = BufReader::new(stream.try_clone().unwrap());
                             let writer = BufWriter::new(stream);
                             Some(SyncChannel::new(reader, writer))
-                        } else {
+                        }
+                        _ => {
                             info!("Error accepting addr {}", addr);
                             None
                         }
-                    } else {
+                    },
+                    _ => {
                         log::error!("Error binding addr {}", addr);
                         None
                     }
-                }
+                },
                 WhichParty::Prover(_) => loop {
                     let c = TcpStream::connect(&addr);
                     if let Ok(stream) = c {
@@ -330,10 +335,11 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
             >::new(&addresses);
 
             // This is the channel for the main thread
-            let mut channel = if let Some(c) = channels.next() {
-                c
-            } else {
-                bail!("cannot open first channel");
+            let mut channel = match channels.next() {
+                Some(c) => c,
+                _ => {
+                    bail!("cannot open first channel");
+                }
             };
 
             let init_time = Instant::now();
@@ -392,10 +398,11 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
             >::new(&addresses);
 
             // This is the channel for the main thread
-            let mut channel = if let Some(c) = channels.next() {
-                c
-            } else {
-                bail!("cannot open first channel");
+            let mut channel = match channels.next() {
+                Some(c) => c,
+                _ => {
+                    bail!("cannot open first channel");
+                }
             };
 
             let init_time = Instant::now();
@@ -554,7 +561,7 @@ fn main() -> Result<()> {
     // if log-level `RUST_LOG` not already set, then set to info
     match env::var("RUST_LOG") {
         Ok(val) => println!("loglvl: {}", val),
-        Err(_) => env::set_var("RUST_LOG", "info"),
+        Err(_) => unsafe { env::set_var("RUST_LOG", "info") },
     };
 
     pretty_env_logger::init_timed();

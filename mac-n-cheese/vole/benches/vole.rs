@@ -2,8 +2,8 @@
 use keyed_arena::KeyedArena;
 use rand::SeedableRng;
 use scuttlebutt::{
-    field::{F128p, F56b, F61p, F63b, FiniteField, IsSubFieldOf, F2},
     AbstractChannel, AesRng, Block,
+    field::{F2, F56b, F61p, F63b, F128p, FiniteField, IsSubFieldOf},
 };
 use std::str::FromStr;
 use std::{any::type_name, hint::black_box, time::Instant};

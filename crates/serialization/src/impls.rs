@@ -2,8 +2,8 @@ use super::{
     ByteElementDeserializer, ByteElementSerializer, BytesDeserializationCannotFail,
     CanonicalSerialize,
 };
-use generic_array::typenum::{self, U};
 use generic_array::GenericArray;
+use generic_array::typenum::{self, U};
 
 macro_rules! pod_impl {
     ($($ty:ty),*$(,)?) => {$(

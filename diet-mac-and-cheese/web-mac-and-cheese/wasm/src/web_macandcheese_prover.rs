@@ -1,17 +1,17 @@
 use crate::js_channel::ShimChannel;
-use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
-use diet_mac_and_cheese::svole_trait::Svole;
 use diet_mac_and_cheese::EvaluatorCirc;
 use diet_mac_and_cheese::LpnSize;
-use log::info;
+use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
+use diet_mac_and_cheese::svole_trait::Svole;
 use log::Level;
-use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
+use log::info;
 use mac_n_cheese_sieve_parser::ValueStreamKind;
+use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
 use scuttlebutt::{AesRng, TrackChannel};
 use std::collections::VecDeque;
 use std::io::Cursor;
 use std::panic;
-use swanky_field_binary::{F40b, F2};
+use swanky_field_binary::{F2, F40b};
 use swanky_party::Prover;
 use wasm_bindgen::prelude::*;
 

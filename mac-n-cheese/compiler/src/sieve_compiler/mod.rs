@@ -5,7 +5,7 @@ use eyre::{Context, ContextCompat};
 use mac_n_cheese_ir::circuit_builder::build_privates;
 use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamKind, ValueStreamReader};
 use mac_n_cheese_wire_map::WireMap;
-use swanky_party::{private::ProverPrivate, Party, WhichParty, IS_VERIFIER};
+use swanky_party::{IS_VERIFIER, Party, WhichParty, private::ProverPrivate};
 
 use self::{
     circuit_ir::CircuitChunk,

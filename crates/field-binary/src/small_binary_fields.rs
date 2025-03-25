@@ -1,13 +1,13 @@
 use crate::F2;
 use bytemuck::{TransparentWrapper, Zeroable};
-use generic_array::{typenum::Unsigned, GenericArray};
+use generic_array::{GenericArray, typenum::Unsigned};
 use std::iter::FromIterator;
 use std::ops::{AddAssign, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use swanky_field::{Degree, FiniteField, FiniteRing};
 use vectoreyes::{
-    array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
     SimdBase, U64x2,
+    array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
 };
 
 /// A GF(2) extension field such that:

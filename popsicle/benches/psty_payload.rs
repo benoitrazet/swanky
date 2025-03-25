@@ -1,9 +1,9 @@
 #![allow(clippy::all)]
 //! Private set intersection (PSTY) benchmarks using `criterion`.
 
-use criterion::{criterion_group, criterion_main, Criterion};
-use fancy_garbling::util::generate_deltas;
+use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::AllWire;
+use fancy_garbling::util::generate_deltas;
 use popsicle::psty_payload::{Receiver, Sender};
 use scuttlebutt::{AesRng, Block512, Channel, SymChannel, TrackChannel};
 
@@ -41,7 +41,7 @@ fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
         .collect()
 }
 fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64> {
-    (0..n).map(|_| rng.gen::<u64>() % modulus).collect()
+    (0..n).map(|_| rng.r#gen::<u64>() % modulus).collect()
 }
 
 fn bench_psty_payload_init() {

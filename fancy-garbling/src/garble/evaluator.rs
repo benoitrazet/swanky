@@ -1,13 +1,12 @@
 use std::marker::PhantomData;
 
 use crate::{
-    check_binary,
+    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireMod2, check_binary,
     errors::{EvaluatorError, FancyError},
     fancy::{Fancy, FancyReveal},
     hash_wires,
     util::{output_tweak, tweak, tweak2},
     wire::WireLabel,
-    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireMod2,
 };
 use scuttlebutt::{AbstractChannel, Block};
 use subtle::ConditionallySelectable;
@@ -131,7 +130,7 @@ impl<C: AbstractChannel> FancyBinary for Evaluator<C, AllWire> {
     }
 
     fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        if let (AllWire::Mod2(ref A), AllWire::Mod2(ref B)) = (x, y) {
+        if let (AllWire::Mod2(A), AllWire::Mod2(B)) = (x, y) {
             let gate0 = self.channel.read_block()?;
             let gate1 = self.channel.read_block()?;
             return Ok(AllWire::Mod2(self.evaluate_and_gate(A, B, &gate0, &gate1)));

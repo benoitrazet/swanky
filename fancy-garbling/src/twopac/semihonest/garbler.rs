@@ -1,6 +1,6 @@
 use crate::{
-    errors::TwopacError, wire::WireLabel, AllWire, ArithmeticWire, Fancy, FancyArithmetic,
-    FancyBinary, FancyInput, FancyReveal, Garbler as Gb, WireMod2,
+    AllWire, ArithmeticWire, Fancy, FancyArithmetic, FancyBinary, FancyInput, FancyReveal,
+    Garbler as Gb, WireMod2, errors::TwopacError, wire::WireLabel,
 };
 use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, Rng, SeedableRng};
@@ -27,17 +27,17 @@ impl<C, OT, RNG, Wire> std::ops::DerefMut for Garbler<C, RNG, OT, Wire> {
 }
 
 impl<
-        C: AbstractChannel,
-        RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
-        OT: OtSender<Msg = Block> + SemiHonest,
-        Wire: WireLabel,
-    > Garbler<C, RNG, OT, Wire>
+    C: AbstractChannel,
+    RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+    OT: OtSender<Msg = Block> + SemiHonest,
+    Wire: WireLabel,
+> Garbler<C, RNG, OT, Wire>
 {
     /// Make a new `Garbler`.
     pub fn new(mut channel: C, mut rng: RNG) -> Result<Self, TwopacError> {
         let ot = OT::init(&mut channel, &mut rng)?;
 
-        let garbler = Gb::new(channel, RNG::from_seed(rng.gen()));
+        let garbler = Gb::new(channel, RNG::from_seed(rng.r#gen()));
         Ok(Garbler { garbler, ot, rng })
     }
 
@@ -62,11 +62,11 @@ impl<
 }
 
 impl<
-        C: AbstractChannel,
-        RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
-        OT: OtSender<Msg = Block> + SemiHonest,
-        Wire: WireLabel,
-    > FancyInput for Garbler<C, RNG, OT, Wire>
+    C: AbstractChannel,
+    RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+    OT: OtSender<Msg = Block> + SemiHonest,
+    Wire: WireLabel,
+> FancyInput for Garbler<C, RNG, OT, Wire>
 {
     type Item = Wire;
     type Error = TwopacError;

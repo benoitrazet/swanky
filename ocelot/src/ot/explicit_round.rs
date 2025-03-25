@@ -6,9 +6,9 @@
 use crate::Error;
 use keyed_arena::{AllocationKey, BorrowedAllocation, KeyedArena};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AbstractChannel, AesRng, Block, AES_HASH};
+use scuttlebutt::{AES_HASH, AbstractChannel, AesRng, Block};
 use std::convert::TryInto;
-use vectoreyes::{array_utils::ArrayUnrolledExt, Aes128EncryptOnly, AesBlockCipher, U64x2, U8x16};
+use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16, U64x2, array_utils::ArrayUnrolledExt};
 
 // TODO: alsz and kos should be based on this file?
 
@@ -51,7 +51,7 @@ impl AlszSender {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let s: u128 = rng.gen();
+        let s: u128 = rng.r#gen();
         let mut ot = BaseOtReceiver::init(channel, rng)?;
         // We need to make a vector of bools in order to use the BaseOt API.
         let mut s_bit_vec = Vec::with_capacity(128);
@@ -130,8 +130,8 @@ impl AlszReceiver {
         let mut ot = BaseOtSender::init(channel, rng)?;
         let mut seeds = Vec::with_capacity(128);
         for _ in 0..128 {
-            let a = rng.gen::<Block>();
-            let b = rng.gen::<Block>();
+            let a = rng.r#gen::<Block>();
+            let b = rng.r#gen::<Block>();
             seeds.push((a, b));
         }
         ot.send(channel, &seeds, rng)?;
@@ -403,7 +403,7 @@ impl KosReceiver {
             self.alsz
                 .receive_setup(arena, &r, m_, &mut outgoing_bytes[0..alsz_bytes], selector)?;
         outgoing_bytes = &mut outgoing_bytes[alsz_bytes..];
-        let our_seed = rng.gen::<Block>();
+        let our_seed = rng.r#gen::<Block>();
         outgoing_bytes.copy_from_slice(
             blake3::hash(bytemuck::bytes_of(&our_seed))
                 .as_bytes()
@@ -580,9 +580,9 @@ fn test_kos_ot() {
     );
     for (i, len) in [32, 33, 65, 65, 5873, 8582].iter().copied().enumerate() {
         let mut rng = AesRng::from_seed(Block::from(u128::from((i as u64) + 25903468354)));
-        let choices = (0..len).map(|_| rng.gen::<bool>()).collect();
+        let choices = (0..len).map(|_| rng.r#gen::<bool>()).collect();
         let inputs = (0..len)
-            .map(|_| (rng.gen::<Block>(), rng.gen::<Block>()))
+            .map(|_| (rng.r#gen::<Block>(), rng.r#gen::<Block>()))
             .collect();
         run_test(inputs, choices, i as u64);
     }

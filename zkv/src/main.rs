@@ -1,11 +1,11 @@
 #![allow(clippy::all)]
 use anyhow::{Error, Result};
-use clap::{arg, Arg, ArgAction, ArgMatches, Command};
+use clap::{Arg, ArgAction, ArgMatches, Command, arg};
 use inferno::Proof;
-use scuttlebutt::field::{F64b, F2};
-use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::AesRng;
-use simple_arith_circuit::{builder, Circuit};
+use scuttlebutt::field::{F2, F64b};
+use scuttlebutt::ring::FiniteRing;
+use simple_arith_circuit::{Circuit, builder};
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};

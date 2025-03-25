@@ -1,4 +1,4 @@
-use generic_array::{typenum::U128, GenericArray};
+use generic_array::{GenericArray, typenum::U128};
 
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
@@ -6,7 +6,7 @@ use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf, IsSubRingOf};
 use swanky_serialization::{BytesDeserializationCannotFail, CanonicalSerialize};
 use vectoreyes::{SimdBase, U64x2};
 
-use crate::{F128b, F2};
+use crate::{F2, F128b};
 
 /// An element of the finite field $`\textsf{GF}({2^{8}})`$ reduced over $`x^8 + x^4 + x^3 + x + 1`$.
 #[derive(Debug, Clone, Copy, Hash, Eq)]
@@ -102,7 +102,7 @@ impl FiniteRing for F8b {
     }
 
     fn random<R: rand::prelude::Rng + ?Sized>(rng: &mut R) -> Self {
-        let x: u8 = rng.gen();
+        let x: u8 = rng.r#gen();
         Self(x)
     }
     const ZERO: Self = Self(0);
@@ -237,7 +237,7 @@ mod tests {
     use std::iter::zip;
 
     use super::*;
-    use generic_array::{typenum::U16, GenericArray};
+    use generic_array::{GenericArray, typenum::U16};
     use proptest::{array::uniform16, prelude::*};
     use swanky_field::IsSubFieldOf;
     use swanky_field_test::arbitrary_ring;

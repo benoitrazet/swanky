@@ -2,12 +2,11 @@
 //! where you create a circuit for a computation then garble it.
 
 use crate::{
-    check_binary, derive_binary,
+    FancyArithmetic, FancyBinary, check_binary, derive_binary,
     dummy::{Dummy, DummyVal},
     errors::{CircuitBuilderError, DummyError, FancyError},
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyInput, HasModulus},
     informer::Informer,
-    FancyArithmetic, FancyBinary,
 };
 use itertools::Itertools;
 use std::{collections::HashMap, fmt::Display};
@@ -1151,7 +1150,7 @@ mod bundle {
     use super::*;
     use crate::{
         fancy::{ArithmeticBundleGadgets, BinaryGadgets, BundleGadgets, CrtGadgets},
-        util::{self, crt_factor, crt_inv_factor, RngExt},
+        util::{self, RngExt, crt_factor, crt_inv_factor},
     };
     use itertools::Itertools;
     use rand::thread_rng;

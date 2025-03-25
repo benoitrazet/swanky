@@ -159,7 +159,7 @@ mod is_party {
     pub const IS_VERIFIER: IsParty<Verifier, Verifier> = IsParty(PhantomData);
 }
 use bytemuck::{Pod, Zeroable};
-pub use is_party::{IsParty, IS_PROVER, IS_VERIFIER};
+pub use is_party::{IS_PROVER, IS_VERIFIER, IsParty};
 
 /// Value-level party distinction.
 ///

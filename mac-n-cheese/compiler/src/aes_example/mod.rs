@@ -9,7 +9,7 @@ use scuttlebutt::field::F2;
 use scuttlebutt::ring::FiniteRing;
 use std::{cmp::Reverse, collections::BinaryHeap, str::FromStr};
 use vectoreyes::{
-    array_utils::ArrayUnrolledExt, Aes128EncryptOnly, AesBlockCipher, SimdBase, U8x16,
+    Aes128EncryptOnly, AesBlockCipher, SimdBase, U8x16, array_utils::ArrayUnrolledExt,
 };
 
 fn own_wire(idx: impl TryInto<WireSize>) -> Wire {

@@ -40,14 +40,17 @@ impl<T> Queue<T> {
                 }
             });
         }
-        if let Some(queue) = guard.as_mut() {
-            queue.push_back(data);
-            self.dequeue_waiters.notify_one();
-        } else {
-            eprintln!(
-                "WARNING tried to push to closed queue {}",
-                type_name::<Self>()
-            );
+        match guard.as_mut() {
+            Some(queue) => {
+                queue.push_back(data);
+                self.dequeue_waiters.notify_one();
+            }
+            _ => {
+                eprintln!(
+                    "WARNING tried to push to closed queue {}",
+                    type_name::<Self>()
+                );
+            }
         }
     }
     // May block
@@ -56,14 +59,18 @@ impl<T> Queue<T> {
         // TODO: add this to event log when it supports condvars
         let mut guard = self.contents.lock();
         loop {
-            if let Some(queue) = guard.as_mut() {
-                if let Some(t) = queue.pop_front() {
-                    return Some(t);
-                } else {
-                    self.dequeue_waiters.wait(&mut guard);
+            match guard.as_mut() {
+                Some(queue) => match queue.pop_front() {
+                    Some(t) => {
+                        return Some(t);
+                    }
+                    _ => {
+                        self.dequeue_waiters.wait(&mut guard);
+                    }
+                },
+                _ => {
+                    return None;
                 }
-            } else {
-                return None;
             }
         }
     }
