@@ -7,7 +7,7 @@ use vectoreyes::U8x16;
 
 /// TODO: Figure out better Error handling
 #[derive(Clone, Copy, Debug, Default)]
-pub struct AuthenticationBitError;
+struct AuthenticationBitError;
 impl std::fmt::Display for AuthenticationBitError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self:?}")
@@ -23,9 +23,9 @@ impl std::error::Error for AuthenticationBitError {}
 #[derive(Debug, Default, Clone, Copy)]
 struct ProverAuthBit {
     /// Mac authenticating the bit
-    pub mac: U8x16,
+    mac: U8x16,
     /// Bit value
-    pub bit: bool,
+    bit: bool,
 }
 /// The Verifier's part of the authentication bit
 ///
