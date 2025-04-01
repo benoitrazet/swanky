@@ -50,7 +50,7 @@ struct AuthBitGenerator<P: Party> {
     /// A vector of authenticated bit.
     data: Vec<AuthBit<P>>,
     /// The verifier's global key.
-    delta: PartyEitherCopy<P, (), VerifierPrivateCopy<P, U8x16>>,
+    delta: VerifierPrivateCopy<P, U8x16>,
 }
 
 impl<P: Party> AuthBitGenerator<P> {
@@ -58,19 +58,9 @@ impl<P: Party> AuthBitGenerator<P> {
     /// the party. In the case of the `Verifier`, store the
     /// `delta` value.
     pub fn new(delta: VerifierPrivateCopy<P, U8x16>) -> Self {
-        match P::WHICH {
-            WhichParty::Prover(pr) => {
-                return AuthBitGenerator {
-                    data: vec![],
-                    delta: PartyEitherCopy::prover_new(pr, ()),
-                }
-            }
-            WhichParty::Verifier(ev) => {
-                return AuthBitGenerator {
-                    data: vec![],
-                    delta: PartyEitherCopy::verifier_new(ev, delta),
-                }
-            }
+        AuthBitGenerator {
+            data: vec![],
+            delta: delta,
         }
     }
     // Generate `count` authenticated bits. These are stored in `output`.
