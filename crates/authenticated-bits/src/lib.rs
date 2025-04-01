@@ -41,7 +41,42 @@ struct VerifierAuthBit {
 ///
 /// When `P = Prover`, this value is `ProverAuthBit`
 /// When `P = Verifier`, this value is `VerifierAuthBit`
-type AuthBit<P> = PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>;
+struct AuthBit<P: Party> {
+    data: PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>,
+}
+
+/// A struct which contains multiple generated authentication bit
+impl<P: Party> AuthBit<P> {
+    /// This outputs the key associated with the AuthBit
+    pub fn key(&self, ev: IsParty<P, Verifier>) -> U8x16 {
+        return self.data.verifier_into(ev).key;
+    }
+    /// Output the mac associated with the `AuthBit`
+    pub fn mac(&self, ev: IsParty<P, Prover>) -> U8x16 {
+        return self.data.prover_into(ev).mac;
+    }
+}
+
+// XOR two authenticated bits. Linear operations on authenticated bits are "free"
+// (i.e. can be done locally).
+impl<P: Party> std::ops::BitXor for AuthBit<P> {
+    type Output = Self;
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        let pairs = self.data.zip(rhs.data);
+        AuthBit {
+            data: pairs.map(
+                |(lhs, rhs)| ProverAuthBit {
+                    mac: lhs.mac ^ rhs.mac,
+                    bit: lhs.bit ^ rhs.bit,
+                },
+                |(lhs, rhs)| VerifierAuthBit {
+                    key: lhs.key ^ rhs.key,
+                },
+            ),
+        }
+    }
+}
+
 /// A struct which contains multiple generated authentication bit
 ///
 /// When `P = Verifier`, this struct also stores the verifier's
@@ -82,37 +117,8 @@ impl<P: Party> AuthBitGenerator<P> {
     ) -> Result<(), AuthenticationBitError> {
         todo!()
     }
-    // XOR two authenticated bits. Linear operations on authenticated bits are "free"
-    // (i.e. can be done locally).
-    pub fn xor(&self, a: AuthBit<P>, b: AuthBit<P>) -> AuthBit<P> {
-        match P::WHICH {
-            WhichParty::Prover(pr) => {
-                return PartyEitherCopy::prover_new(
-                    pr,
-                    ProverAuthBit {
-                        mac: a.prover_into(pr).mac ^ b.prover_into(pr).mac,
-                        bit: a.prover_into(pr).bit ^ b.prover_into(pr).bit,
-                    },
-                )
-            }
-            WhichParty::Verifier(ev) => PartyEitherCopy::verifier_new(
-                ev,
-                VerifierAuthBit {
-                    key: a.verifier_into(ev).key ^ b.verifier_into(ev).key,
-                },
-            ),
-        }
-    }
     /// This outputs the verifier's Delta value.
     pub fn delta(&self, ev: IsParty<P, Verifier>) -> U8x16 {
         return self.delta.verifier_into(ev).into_inner(ev);
-    }
-    /// This outputs the key associated with the AuthBit
-    pub fn key(&self, bit: &AuthBit<P>, ev: IsParty<P, Verifier>) -> U8x16 {
-        return bit.verifier_into(ev).key;
-    }
-    /// Output the mac associated with the `AuthBit`
-    pub fn mac(&self, bit: &AuthBit<P>, ev: IsParty<P, Prover>) -> U8x16 {
-        return bit.prover_into(ev).mac;
     }
 }
