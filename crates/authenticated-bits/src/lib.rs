@@ -1,7 +1,8 @@
+use ocelot::ot::{CorrelatedReceiver, CorrelatedSender};
+use scuttlebut::Malicious;
 use std::io::{Read, Write};
 use swanky_party::{
     either::PartyEitherCopy, private::VerifierPrivateCopy, IsParty, Party, Prover, Verifier,
-    WhichParty,
 };
 use vectoreyes::U8x16;
 
@@ -81,21 +82,39 @@ impl<P: Party> std::ops::BitXor for AuthBit<P> {
 ///
 /// When `P = Verifier`, this struct also stores the verifier's
 /// global key `delta`.
-struct AuthBitGenerator<P: Party> {
+struct AuthBitGenerator<
+    P: Party,
+    OTS: CorrelatedSender<Msg = U8x16> + Malicious,
+    OTR: CorrelatedReceiver<Msg = U8x16> + Malicious,
+> {
     /// A vector of authenticated bit.
     data: Vec<AuthBit<P>>,
     /// The verifier's global key.
     delta: VerifierPrivateCopy<P, U8x16>,
+    /// The party's sending OT
+    ots: OTS,
+    /// The party's receiving OT
+    otr: OTR,
 }
 
-impl<P: Party> AuthBitGenerator<P> {
+impl<
+        P: Party,
+        OTS: CorrelatedSender<Msg = U8x16> + Malicious,
+        OTR: CorrelatedReceiver<Msg = U8x16> + Malicious,
+    > AuthBitGenerator<P>
+{
     /// Create a new `AuthBitGenerator` based on the type of
     /// the party. In the case of the `Verifier`, store the
     /// `delta` value.
-    pub fn new(delta: VerifierPrivateCopy<P, U8x16>) -> Self {
+    pub fn new<RNG>(delta: VerifierPrivateCopy<P, U8x16>, mut channel: C, mut rng: RNG) -> Self
+    where
+        RNG: CryptoRng + Rng,
+    {
         AuthBitGenerator {
             data: vec![],
             delta: delta,
+            ots: OTS::init(&mut channel, &mut rng)?,
+            otr: OTR::init(&mut channel, &mut rng)?,
         }
     }
     // Generate `count` authenticated bits. These are stored in `output`.
