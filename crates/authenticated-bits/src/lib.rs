@@ -119,6 +119,6 @@ impl<P: Party> AuthBitGenerator<P> {
     }
     /// This outputs the verifier's Delta value.
     pub fn delta(&self, ev: IsParty<P, Verifier>) -> U8x16 {
-        return self.delta.verifier_into(ev).into_inner(ev);
+        self.delta.into_inner(ev)
     }
 }
