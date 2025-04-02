@@ -138,20 +138,15 @@ impl<
         match P::WHICH {
             WhichParty::Prover(ev_pr) => {
                 let bits = vec![rng.gen::<bool>(); count];
-                let macs = self
-                    .ot
-                    .as_mut()
-                    .prover_into(ev_pr)
-                    .receive_correlated(&mut channel, &bits, &mut rng)
-                    .unwrap();
-                for (i, (bit, mac)) in bits.into_iter().zip(macs).enumerate() {
-                    output[i] = AuthBit {
-                        data: PartyEitherCopy::prover_new(
-                            ev_pr,
-                            ProverAuthBit { bit: bit, mac: mac },
-                        ),
-                    };
-                }
+                let macs = self.ot.as_mut().prover_into(ev_pr).receive_correlated(
+                    &mut channel,
+                    &bits,
+                    &mut rng,
+                )?;
+                output.extend(bits.into_iter().zip(macs).map(|(bit, mac)| AuthBit {
+                    data: PartyEitherCopy::prover_new(ev_pr, ProverAuthBit { bit: bit, mac: mac }),
+                }));
+
                 Ok(())
             }
             WhichParty::Verifier(ev_vr) => {
@@ -161,11 +156,10 @@ impl<
                     &vec![delta; count],
                     &mut rng,
                 )?;
-                for (i, key) in keys.into_iter().enumerate() {
-                    output[i] = AuthBit {
-                        data: PartyEitherCopy::verifier_new(ev_vr, VerifierAuthBit { key: key.0 }),
-                    };
-                }
+                output.extend(keys.into_iter().map(|(key, _delta)| AuthBit {
+                    data: PartyEitherCopy::verifier_new(ev_vr, VerifierAuthBit { key: key }),
+                }));
+
                 Ok(())
             }
         }
