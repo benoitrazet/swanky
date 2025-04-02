@@ -8,7 +8,6 @@ use swanky_party::{
     Prover, Verifier, WhichParty,
 };
 use vectoreyes::U8x16;
-
 /// TODO: Figure out better Error handling
 #[derive(Clone, Copy, Debug, Default)]
 struct AuthenticationBitError;
@@ -91,9 +90,7 @@ struct AuthBitGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver
     /// The verifier's global key.
     delta: VerifierPrivateCopy<P, U8x16>,
     /// The party's receiving OT
-    otr: OTR,
-    /// The party's sender OT
-    ots: OTS,
+    ot: PartyEither<P, OTR, OTS>,
 }
 
 /// A struct which contains multiple generated authentication bit
@@ -117,8 +114,14 @@ impl<
         AuthBitGenerator {
             data: vec![],
             delta: delta,
-            otr: OTR::init(&mut channel, &mut rng).unwrap(),
-            ots: OTS::init(&mut channel, &mut rng).unwrap(),
+            ot: match P::WHICH {
+                WhichParty::Prover(ev_pr) => {
+                    PartyEither::prover_new(ev_pr, OTR::init(&mut channel, &mut rng).unwrap())
+                }
+                WhichParty::Verifier(ev_vr) => {
+                    PartyEither::verifier_new(ev_vr, OTS::init(&mut channel, &mut rng).unwrap())
+                }
+            },
         }
     }
     // Generate `count` authenticated bits. These are stored in `output`.
@@ -136,7 +139,9 @@ impl<
             WhichParty::Prover(ev_pr) => {
                 let bits = vec![rng.gen::<bool>(); count];
                 let macs = self
-                    .otr
+                    .ot
+                    .as_mut()
+                    .prover_into(ev_pr)
                     .receive_correlated(&mut channel, &bits, &mut rng)
                     .unwrap();
                 for (i, (bit, mac)) in bits.into_iter().zip(macs).enumerate() {
@@ -150,9 +155,10 @@ impl<
                 Ok(())
             }
             WhichParty::Verifier(ev_vr) => {
-                let keys = self.ots.send_correlated(
+                let delta = self.delta(ev_vr);
+                let keys = self.ot.as_mut().verifier_into(ev_vr).send_correlated(
                     &mut channel,
-                    &vec![self.delta(ev_vr); count],
+                    &vec![delta; count],
                     &mut rng,
                 )?;
                 for (i, key) in keys.into_iter().enumerate() {
