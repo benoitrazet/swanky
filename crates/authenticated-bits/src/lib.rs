@@ -58,6 +58,42 @@ impl<P: Party> AuthBit<P> {
     pub fn mac(&self, ev: IsParty<P, Prover>) -> U8x16 {
         return self.data.prover_into(ev).mac;
     }
+    /// Open a single Authenticated Bit
+    pub fn open(
+        &self,
+        delta: VerifierPrivateCopy<P, U8x16>,
+        channel: &mut Channel,
+    ) -> Result<VerifierPrivateCopy<P, bool>, AuthenticationBitError> {
+        // TODO: Can we get rid of this pattern match ?
+        // So far I haven't been able to because each party needs a copy
+        // of the channel.
+        match P::WHICH {
+            WhichParty::Prover(ev_pr) => {
+                // TODO: Change how bits are sent, this is extremely inefficent
+                channel.write_bytes(&[self.data.prover_into(ev_pr).bit as u8]);
+                // TODO: Potentially leave last bit in the mac for the
+                // authenticated bit.
+                channel.write_bytes(self.data.prover_into(ev_pr).mac.as_ref());
+                Ok(VerifierPrivateCopy::empty(ev_pr))
+            }
+            WhichParty::Verifier(ev_vr) => {
+                let mut bit_bytes = [0u8; 1];
+                channel.read_bytes(&mut bit_bytes);
+                let mut mac_bytes = [0u8; 16];
+                channel.read_bytes(&mut mac_bytes);
+                let mac = U8x16::from(mac_bytes);
+
+                let key = self.data.verifier_into(ev_vr).key;
+
+                let validation = if bit_bytes[0] == 1 {
+                    key + delta.into_inner(ev_vr)
+                } else {
+                    key
+                };
+                Ok(VerifierPrivateCopy::new(validation == mac))
+            }
+        }
+    }
 }
 
 // XOR two authenticated bits. Linear operations on authenticated bits are "free"
