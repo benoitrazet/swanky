@@ -98,8 +98,8 @@ impl<P: Party> AuthBit<P> {
     }
 }
 
-// XOR two authenticated bits. Linear operations on authenticated bits are "free"
-// (i.e. can be done locally).
+/// XOR two authenticated bits. Linear operations on authenticated bits are "free"
+/// (i.e. can be done locally).
 impl<P: Party> std::ops::BitXor for AuthBit<P> {
     type Output = Self;
     fn bitxor(self, rhs: Self) -> Self::Output {
@@ -127,7 +127,7 @@ struct AuthBitGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver
     data: Vec<AuthBit<P>>,
     /// The verifier's global key.
     delta: VerifierPrivateCopy<P, U8x16>,
-    /// The party's receiving OT
+    /// The party's OT
     ot: PartyEither<P, OTR, OTS>,
 }
 
@@ -162,7 +162,10 @@ impl<
             },
         }
     }
-    // Generate `count` authenticated bits. These are stored in `output`.
+    /// Generate `count` authenticated bits. These are stored in `output`.
+    ///
+    /// TODO: Possibly allow the user to specify the bits they would like
+    /// authenticated instead of always generate them at random
     pub fn generate<C, RNG>(
         &mut self,
         mut channel: Channel,
@@ -173,6 +176,7 @@ impl<
     where
         RNG: CryptoRng + Rng,
     {
+        // TODO: Can we get rid of this pattern match ?
         match P::WHICH {
             WhichParty::Prover(ev_pr) => {
                 let bits = vec![rng.gen::<bool>(); count];
@@ -202,11 +206,13 @@ impl<
             }
         }
     }
-    /// Open all authenticated bits in AuthBitGenerator
+    ///
+    /// TODO: Possibly add the index of the bit to check
     pub fn open(
         &self,
         channel: &mut Channel,
     ) -> Result<VerifierPrivateCopy<P, bool>, AuthenticationBitError> {
+        //TODO: Get rid of these unwraps
         let validations = self
             .data
             .iter()
@@ -215,6 +221,8 @@ impl<
             WhichParty::Prover(ev_pr) => Ok(VerifierPrivateCopy::empty(ev_pr)),
             WhichParty::Verifier(ev_vr) => Ok(VerifierPrivateCopy::new(
                 validations
+                    // TODO: possibly return the index of the bit that failed if a
+                    // failure happens
                     .reduce(|b1, b2| {
                         VerifierPrivateCopy::new(b1.into_inner(ev_vr) && b2.into_inner(ev_vr))
                     })
