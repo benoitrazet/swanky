@@ -1,8 +1,8 @@
-use itertools::Itertools;
 use ocelot::ot::{CorrelatedReceiver, CorrelatedSender};
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, Malicious};
+use scuttlebutt::Malicious;
 use std::io::{Read, Write};
+use swanky_channel::Channel;
 use swanky_party::{
     either::PartyEither, either::PartyEitherCopy, private::VerifierPrivateCopy, IsParty, Party,
     Prover, Verifier, WhichParty,
@@ -106,10 +106,13 @@ impl<
     /// Create a new `AuthBitGenerator` based on the type of
     /// the party. In the case of the `Verifier`, store the
     /// `delta` value.
-    pub fn new<C, RNG>(delta: VerifierPrivateCopy<P, U8x16>, mut channel: C, mut rng: RNG) -> Self
+    pub fn new<C, RNG>(
+        delta: VerifierPrivateCopy<P, U8x16>,
+        mut channel: Channel,
+        mut rng: RNG,
+    ) -> Self
     where
         RNG: CryptoRng + Rng,
-        C: AbstractChannel,
     {
         AuthBitGenerator {
             data: vec![],
@@ -121,14 +124,13 @@ impl<
     // Generate `count` authenticated bits. These are stored in `output`.
     pub fn generate<C, RNG>(
         &mut self,
-        mut channel: C,
+        mut channel: Channel,
         count: usize,
         output: &mut Vec<AuthBit<P>>,
         mut rng: RNG,
     ) -> Result<(), ocelot::Error>
     where
         RNG: CryptoRng + Rng,
-        C: AbstractChannel,
     {
         match P::WHICH {
             WhichParty::Prover(ev_pr) => {
