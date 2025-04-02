@@ -58,7 +58,9 @@ impl<P: Party> AuthBit<P> {
     pub fn mac(&self, ev: IsParty<P, Prover>) -> U8x16 {
         return self.data.prover_into(ev).mac;
     }
-    /// Open a single Authenticated Bit
+    // "Open" a single Authenticated bit.
+    // This corresponds to the prover sending $(b, M)$ to the verifier, who checks
+    // that $K = M xor b Delta$.
     pub fn open(
         &self,
         delta: VerifierPrivateCopy<P, U8x16>,
@@ -200,15 +202,25 @@ impl<
             }
         }
     }
-    // "Open" a bit.
-    // This corresponds to the prover sending $(b, M)$ to the verifier, who checks
-    // that $K = M xor b Delta$.
-    pub fn open<C: Read + Write>(
+    /// Open all authenticated bits in AuthBitGenerator
+    pub fn open(
         &self,
-        channel: C,
-        bit: AuthBit<P>,
-    ) -> Result<(), AuthenticationBitError> {
-        todo!()
+        channel: &mut Channel,
+    ) -> Result<VerifierPrivateCopy<P, bool>, AuthenticationBitError> {
+        let validations = self
+            .data
+            .iter()
+            .map(|auth_bit| auth_bit.open(self.delta, channel).unwrap());
+        match P::WHICH {
+            WhichParty::Prover(ev_pr) => Ok(VerifierPrivateCopy::empty(ev_pr)),
+            WhichParty::Verifier(ev_vr) => Ok(VerifierPrivateCopy::new(
+                validations
+                    .reduce(|b1, b2| {
+                        VerifierPrivateCopy::new(b1.into_inner(ev_vr) && b2.into_inner(ev_vr))
+                    })
+                    .is_some(),
+            )),
+        }
     }
     /// This outputs the verifier's Delta value.
     pub fn delta(&self, ev: IsParty<P, Verifier>) -> U8x16 {
