@@ -23,9 +23,9 @@ const SLEEP_TIME_DELTA: u64 = 20;
 /// using a round-robin.
 /// * `SvoleAtomic` is the atomic structure allowing to produce or consume the voles.
 /// * `ThreadVole` is the structure that is spawn in a thread containing the `Sender/Receiver`
-///    svole functionality together with a `SvoleAtomic` used at a producer.
+///   svole functionality together with a `SvoleAtomic` used at a producer.
 /// * `SvoleAtomicRoundRobin` is the structure used by the consumer of svoles which draws the
-///    svoles by the threads in a round-robin fashion.
+///   svoles by the threads in a round-robin fashion.
 ///
 /// Multithreading Svole using some atomic data-structures.
 ///
