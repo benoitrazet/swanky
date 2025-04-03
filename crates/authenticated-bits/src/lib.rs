@@ -52,11 +52,15 @@ struct AuthBit<P: Party> {
 impl<P: Party> AuthBit<P> {
     /// This outputs the key associated with the AuthBit
     pub fn key(&self, ev: IsParty<P, Verifier>) -> U8x16 {
-        return self.data.verifier_into(ev).key;
+        self.data.verifier_into(ev).key
     }
     /// Output the mac associated with the `AuthBit`
     pub fn mac(&self, ev: IsParty<P, Prover>) -> U8x16 {
-        return self.data.prover_into(ev).mac;
+        self.data.prover_into(ev).mac
+    }
+    /// Output the mac associated with the `AuthBit`
+    pub fn bit(&self, ev: IsParty<P, Prover>) -> bool {
+        self.data.prover_into(ev).bit
     }
     // "Open" a single Authenticated bit.
     // This corresponds to the prover sending $(b, M)$ to the verifier, who checks
@@ -72,10 +76,10 @@ impl<P: Party> AuthBit<P> {
         match P::WHICH {
             WhichParty::Prover(ev_pr) => {
                 // TODO: Change how bits are sent, this is extremely inefficent
-                channel.write_bytes(&[self.data.prover_into(ev_pr).bit as u8]);
+                channel.write_bytes(&[self.bit(ev_pr) as u8]);
                 // TODO: Potentially leave last bit in the mac for the
                 // authenticated bit.
-                channel.write_bytes(self.data.prover_into(ev_pr).mac.as_ref());
+                channel.write_bytes(self.mac(ev_pr).as_ref());
                 Ok(VerifierPrivateCopy::empty(ev_pr))
             }
             WhichParty::Verifier(ev_vr) => {
@@ -85,7 +89,7 @@ impl<P: Party> AuthBit<P> {
                 channel.read_bytes(&mut mac_bytes);
                 let mac = U8x16::from(mac_bytes);
 
-                let key = self.data.verifier_into(ev_vr).key;
+                let key = self.key(ev_vr);
 
                 let validation = if bit_bytes[0] == 1 {
                     key + delta.into_inner(ev_vr)
