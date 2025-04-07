@@ -339,8 +339,8 @@ impl<Pa: Party, P: Copy, V: Copy> From<PartyEitherCopy<Pa, P, V>> for PartyEithe
 }
 
 impl<Pa: Party, P, V> PartyEither<Pa, P, V> {
-    /// Transform the `PartyEither` into a pair of `ProverPrivate`
-    /// and `VerifierPrivate`.
+    /// Transform the [`PartyEither`] into a pair of [`ProverPrivate`]
+    /// and [`VerifierPrivate`].
     pub fn into_privates(self) -> (ProverPrivate<Pa, P>, VerifierPrivate<Pa, V>) {
         match Pa::WHICH {
             WhichParty::Prover(ev_pr) => (
@@ -356,8 +356,8 @@ impl<Pa: Party, P, V> PartyEither<Pa, P, V> {
 }
 
 impl<Pa: Party, P: Copy, V: Copy> PartyEitherCopy<Pa, P, V> {
-    /// Transform the `PartyEitherCopy` into a pair of `ProverPrivateCopy`
-    /// and `VerifierPrivateCopy`.
+    /// Transform the [`PartyEitherCopy`] into a pair of [`ProverPrivateCopy`]
+    /// and [`VerifierPrivateCopy`].
     pub fn into_privates(self) -> (ProverPrivateCopy<Pa, P>, VerifierPrivateCopy<Pa, V>) {
         match Pa::WHICH {
             WhichParty::Prover(ev_pr) => (
