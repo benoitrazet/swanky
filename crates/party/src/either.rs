@@ -23,6 +23,7 @@
 use std::io::{Read, Write};
 
 use super::*;
+use crate::private::{ProverPrivate, VerifierPrivate};
 
 pub(super) mod internal {
     use super::*;
@@ -209,6 +210,22 @@ macro_rules! define_prover_either {
                 match Pa::WHICH {
                     WhichParty::Prover(e) => $PartyEither::prover_new(e, pf(self.prover_into(e))),
                     WhichParty::Verifier(e) => $PartyEither::verifier_new(e, vf(self.verifier_into(e))),
+                }
+            }
+            /// Transform the `PartyEither` into a pair of `ProverPrivate`
+            /// and `VerifierPrivate`.
+            pub fn into_privates(
+                self,
+            ) -> (ProverPrivate<Pa, P>, VerifierPrivate<Pa, V>) {
+                match Pa::WHICH {
+                    WhichParty::Prover(ev_pr) => (
+                        ProverPrivate::new(self.prover_into(ev_pr)),
+                        VerifierPrivate::empty(ev_pr),
+                    ),
+                    WhichParty::Verifier(ev_vr) => (
+                        ProverPrivate::empty(ev_vr),
+                        VerifierPrivate::new(self.verifier_into(ev_vr)),
+                    ),
                 }
             }
         }
