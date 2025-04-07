@@ -58,6 +58,9 @@ macro_rules! make_prover_private_type {
                     WhichParty::Verifier(_) => f(),
                 }
             }
+            fn into_option(self) -> Option<T> {
+                self.map(Some).unwrap_or_else(|| None)
+            }
         }
         impl<P: Party, T $(: $Copy)?> $ProverPrivate<P, T> {
             /// Given evidence that `P = Verifier`, create an empty
@@ -225,6 +228,9 @@ macro_rules! make_verifier_private_type {
                     WhichParty::Verifier(e) => self.into_inner(e),
                 }
             }
+            fn into_option(self) -> Option<T> {
+                self.map(Some).unwrap_or_else(|| None)
+            }
         }
         impl<P: Party, T $(: $Copy)?> $VerifierPrivate<P, T> {
             /// Given evidence that `P = Prover`, create an empty
@@ -361,4 +367,7 @@ mod sealed {
 pub trait PartyPrivate<P: Party, T>: sealed::Sealed {
     /// Return the private value (if `self` is private to `P`), or else run the given closure.
     fn unwrap_or_else<F: FnOnce() -> T>(self, f: F) -> T;
+
+    /// Return the private value (if `self` is private to `P`), or else return `None`.
+    fn into_option(self) -> Option<T>;
 }
