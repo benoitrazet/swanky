@@ -4,8 +4,8 @@ use scuttlebutt::Malicious;
 use std::io::{Read, Write};
 use swanky_channel::Channel;
 use swanky_party::{
-    either::PartyEither, either::PartyEitherCopy, private::VerifierPrivateCopy, IsParty, Party,
-    Prover, Verifier, WhichParty,
+    IsParty, Party, Prover, Verifier, WhichParty, either::PartyEither, either::PartyEitherCopy,
+    private::VerifierPrivateCopy,
 };
 use vectoreyes::U8x16;
 /// TODO: Figure out better Error handling
@@ -137,10 +137,10 @@ struct AuthBitGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver
 
 /// A struct which contains multiple generated authentication bit
 impl<
-        P: Party,
-        OTS: CorrelatedSender<Msg = U8x16> + Malicious,
-        OTR: CorrelatedReceiver<Msg = U8x16> + Malicious,
-    > AuthBitGenerator<P, OTS, OTR>
+    P: Party,
+    OTS: CorrelatedSender<Msg = U8x16> + Malicious,
+    OTR: CorrelatedReceiver<Msg = U8x16> + Malicious,
+> AuthBitGenerator<P, OTS, OTR>
 {
     /// Create a new `AuthBitGenerator` based on the type of
     /// the party. In the case of the `Verifier`, store the
@@ -196,7 +196,7 @@ impl<
                 Ok(())
             }
             WhichParty::Verifier(ev_vr) => {
-                let delta = self.delta(ev_vr);
+                let delta = self.delta().into_inner(ev_vr);
                 let keys = self.ot.as_mut().verifier_into(ev_vr).send_correlated(
                     &mut channel,
                     &vec![delta; count],
@@ -235,7 +235,7 @@ impl<
         }
     }
     /// This outputs the verifier's Delta value.
-    pub fn delta(&self, ev: IsParty<P, Verifier>) -> U8x16 {
-        self.delta.into_inner(ev)
+    pub fn delta(&self) -> VerifierPrivateCopy<P, U8x16> {
+        self.delta
     }
 }
