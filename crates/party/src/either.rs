@@ -23,7 +23,7 @@
 use std::io::{Read, Write};
 
 use super::*;
-use crate::private::{ProverPrivate, VerifierPrivate};
+use crate::private::{ProverPrivate, ProverPrivateCopy, VerifierPrivate, VerifierPrivateCopy};
 
 pub(super) mod internal {
     use super::*;
@@ -212,22 +212,6 @@ macro_rules! define_prover_either {
                     WhichParty::Verifier(e) => $PartyEither::verifier_new(e, vf(self.verifier_into(e))),
                 }
             }
-            /// Transform the `PartyEither` into a pair of `ProverPrivate`
-            /// and `VerifierPrivate`.
-            pub fn into_privates(
-                self,
-            ) -> (ProverPrivate<Pa, P>, VerifierPrivate<Pa, V>) {
-                match Pa::WHICH {
-                    WhichParty::Prover(ev_pr) => (
-                        ProverPrivate::new(self.prover_into(ev_pr)),
-                        VerifierPrivate::empty(ev_pr),
-                    ),
-                    WhichParty::Verifier(ev_vr) => (
-                        ProverPrivate::empty(ev_vr),
-                        VerifierPrivate::new(self.verifier_into(ev_vr)),
-                    ),
-                }
-            }
         }
         unsafe impl<Pa: Party, P: Send $(+ $Copy)?, V: Send $(+ $Copy)?> Send for $PartyEither<Pa, P, V> {}
         unsafe impl<Pa: Party, P: Sync $(+ $Copy)?, V: Sync $(+ $Copy)?> Sync for $PartyEither<Pa, P, V> {}
@@ -350,6 +334,40 @@ impl<Pa: Party, P: Copy, V: Copy> From<PartyEitherCopy<Pa, P, V>> for PartyEithe
         match Pa::WHICH {
             WhichParty::Prover(e) => PartyEither::prover_new(e, x.prover_into(e)),
             WhichParty::Verifier(e) => PartyEither::verifier_new(e, x.verifier_into(e)),
+        }
+    }
+}
+
+impl<Pa: Party, P, V> PartyEither<Pa, P, V> {
+    /// Transform the `PartyEither` into a pair of `ProverPrivate`
+    /// and `VerifierPrivate`.
+    pub fn into_privates(self) -> (ProverPrivate<Pa, P>, VerifierPrivate<Pa, V>) {
+        match Pa::WHICH {
+            WhichParty::Prover(ev_pr) => (
+                ProverPrivate::new(self.prover_into(ev_pr)),
+                VerifierPrivate::empty(ev_pr),
+            ),
+            WhichParty::Verifier(ev_vr) => (
+                ProverPrivate::empty(ev_vr),
+                VerifierPrivate::new(self.verifier_into(ev_vr)),
+            ),
+        }
+    }
+}
+
+impl<Pa: Party, P: Copy, V: Copy> PartyEitherCopy<Pa, P, V> {
+    /// Transform the `PartyEitherCopy` into a pair of `ProverPrivateCopy`
+    /// and `VerifierPrivateCopy`.
+    pub fn into_privates(self) -> (ProverPrivateCopy<Pa, P>, VerifierPrivateCopy<Pa, V>) {
+        match Pa::WHICH {
+            WhichParty::Prover(ev_pr) => (
+                ProverPrivateCopy::new(self.prover_into(ev_pr)),
+                VerifierPrivateCopy::empty(ev_pr),
+            ),
+            WhichParty::Verifier(ev_vr) => (
+                ProverPrivateCopy::empty(ev_vr),
+                VerifierPrivateCopy::new(self.verifier_into(ev_vr)),
+            ),
         }
     }
 }
