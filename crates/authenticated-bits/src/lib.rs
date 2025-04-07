@@ -1,11 +1,12 @@
 use ocelot::ot::{CorrelatedReceiver, CorrelatedSender};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::Malicious;
-use std::io::{Read, Write};
 use swanky_channel::Channel;
 use swanky_party::{
-    IsParty, Party, Prover, Verifier, WhichParty, either::PartyEither, either::PartyEitherCopy,
-    private::VerifierPrivateCopy,
+    IsParty, Party, Prover, Verifier, WhichParty,
+    either::PartyEither,
+    either::PartyEitherCopy,
+    private::{ProverPrivateCopy, VerifierPrivateCopy},
 };
 use vectoreyes::U8x16;
 /// TODO: Figure out better Error handling
@@ -44,23 +45,29 @@ struct VerifierAuthBit {
 ///
 /// When `P = Prover`, this value is `ProverAuthBit`
 /// When `P = Verifier`, this value is `VerifierAuthBit`
-struct AuthBit<P: Party> {
-    data: PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>,
-}
+struct AuthBit<P: Party>(PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>);
 
 /// A struct which contains a single authenticated bit
 impl<P: Party> AuthBit<P> {
+    /// Retrieve the prover's `ProverAuthBit` from the  `PartyEitherCopy`
+    pub fn prover_into(&self) -> ProverPrivateCopy<P, ProverAuthBit> {
+        self.0.into_privates().0
+    }
+    /// Retrieve the verifier's `VerifierAuthBit` from the  `VerifierPrivateCopy`
+    pub fn verifier_into(&self) -> VerifierPrivateCopy<P, VerifierAuthBit> {
+        self.0.into_privates().1
+    }
     /// This outputs the key associated with the AuthBit
-    pub fn key(&self, ev: IsParty<P, Verifier>) -> U8x16 {
-        self.data.verifier_into(ev).key
+    pub fn verifier_key(&self) -> VerifierPrivateCopy<P, U8x16> {
+        self.verifier_into().map(|vab| vab.key)
     }
     /// Output the mac associated with the `AuthBit`
-    pub fn mac(&self, ev: IsParty<P, Prover>) -> U8x16 {
-        self.data.prover_into(ev).mac
+    pub fn prover_mac(&self) -> ProverPrivateCopy<P, U8x16> {
+        self.prover_into().map(|vab| vab.mac)
     }
     /// Output the mac associated with the `AuthBit`
-    pub fn bit(&self, ev: IsParty<P, Prover>) -> bool {
-        self.data.prover_into(ev).bit
+    pub fn prover_bit(&self) -> ProverPrivateCopy<P, bool> {
+        self.prover_into().map(|vab| vab.bit)
     }
     // "Open" a single Authenticated bit.
     // This corresponds to the prover sending $(b, M)$ to the verifier, who checks
@@ -76,10 +83,10 @@ impl<P: Party> AuthBit<P> {
         match P::WHICH {
             WhichParty::Prover(ev_pr) => {
                 // TODO: Change how bits are sent, this is extremely inefficent
-                channel.write_bytes(&[self.bit(ev_pr) as u8]);
+                channel.write_bytes(&[self.prover_bit().into_inner(ev_pr) as u8]);
                 // TODO: Potentially leave last bit in the mac for the
                 // authenticated bit.
-                channel.write_bytes(self.mac(ev_pr).as_ref());
+                channel.write_bytes(self.prover_mac().into_inner(ev_pr).as_ref());
                 Ok(VerifierPrivateCopy::empty(ev_pr))
             }
             WhichParty::Verifier(ev_vr) => {
@@ -89,7 +96,7 @@ impl<P: Party> AuthBit<P> {
                 channel.read_bytes(&mut mac_bytes);
                 let mac = U8x16::from(mac_bytes);
 
-                let key = self.key(ev_vr);
+                let key = self.verifier_key().into_inner(ev_vr);
 
                 let validation = if bit_bytes[0] == 1 {
                     key + delta.into_inner(ev_vr)
@@ -107,18 +114,16 @@ impl<P: Party> AuthBit<P> {
 impl<P: Party> std::ops::BitXor for AuthBit<P> {
     type Output = Self;
     fn bitxor(self, rhs: Self) -> Self::Output {
-        let pairs = self.data.zip(rhs.data);
-        AuthBit {
-            data: pairs.map(
-                |(lhs, rhs)| ProverAuthBit {
-                    mac: lhs.mac ^ rhs.mac,
-                    bit: lhs.bit ^ rhs.bit,
-                },
-                |(lhs, rhs)| VerifierAuthBit {
-                    key: lhs.key ^ rhs.key,
-                },
-            ),
-        }
+        let pairs = self.0.zip(rhs.0);
+        AuthBit(pairs.map(
+            |(lhs, rhs)| ProverAuthBit {
+                mac: lhs.mac ^ rhs.mac,
+                bit: lhs.bit ^ rhs.bit,
+            },
+            |(lhs, rhs)| VerifierAuthBit {
+                key: lhs.key ^ rhs.key,
+            },
+        ))
     }
 }
 
@@ -183,14 +188,17 @@ impl<
         // TODO: Can we get rid of this pattern match ?
         match P::WHICH {
             WhichParty::Prover(ev_pr) => {
-                let bits = vec![rng.gen::<bool>(); count];
+                let bits = vec![rng.r#gen::<bool>(); count];
                 let macs = self.ot.as_mut().prover_into(ev_pr).receive_correlated(
                     &mut channel,
                     &bits,
                     &mut rng,
                 )?;
-                output.extend(bits.into_iter().zip(macs).map(|(bit, mac)| AuthBit {
-                    data: PartyEitherCopy::prover_new(ev_pr, ProverAuthBit { bit: bit, mac: mac }),
+                output.extend(bits.into_iter().zip(macs).map(|(bit, mac)| {
+                    AuthBit(PartyEitherCopy::prover_new(
+                        ev_pr,
+                        ProverAuthBit { bit: bit, mac: mac },
+                    ))
                 }));
 
                 Ok(())
@@ -202,8 +210,11 @@ impl<
                     &vec![delta; count],
                     &mut rng,
                 )?;
-                output.extend(keys.into_iter().map(|(key, _delta)| AuthBit {
-                    data: PartyEitherCopy::verifier_new(ev_vr, VerifierAuthBit { key: key }),
+                output.extend(keys.into_iter().map(|(key, _delta)| {
+                    AuthBit(PartyEitherCopy::verifier_new(
+                        ev_vr,
+                        VerifierAuthBit { key: key },
+                    ))
                 }));
 
                 Ok(())
