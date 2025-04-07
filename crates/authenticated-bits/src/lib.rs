@@ -69,44 +69,6 @@ impl<P: Party> AuthBit<P> {
     pub fn prover_bit(&self) -> ProverPrivateCopy<P, bool> {
         self.prover_into().map(|vab| vab.bit)
     }
-    // "Open" a single Authenticated bit.
-    // This corresponds to the prover sending $(b, M)$ to the verifier, who checks
-    // that $K = M xor b Delta$.
-    pub fn open(
-        &self,
-        delta: VerifierPrivateCopy<P, U8x16>,
-        channel: &mut Channel,
-    ) -> Result<VerifierPrivateCopy<P, bool>, AuthenticationBitError> {
-        // TODO: Can we get rid of this pattern match ?
-        // So far I haven't been able to because each party needs a copy
-        // of the channel.
-        match P::WHICH {
-            WhichParty::Prover(ev_pr) => {
-                // TODO: Change how bits are sent, this is extremely inefficent
-                channel.write_bytes(&[self.prover_bit().into_inner(ev_pr) as u8]);
-                // TODO: Potentially leave last bit in the mac for the
-                // authenticated bit.
-                channel.write_bytes(self.prover_mac().into_inner(ev_pr).as_ref());
-                Ok(VerifierPrivateCopy::empty(ev_pr))
-            }
-            WhichParty::Verifier(ev_vr) => {
-                let mut bit_bytes = [0u8; 1];
-                channel.read_bytes(&mut bit_bytes);
-                let mut mac_bytes = [0u8; 16];
-                channel.read_bytes(&mut mac_bytes);
-                let mac = U8x16::from(mac_bytes);
-
-                let key = self.verifier_key().into_inner(ev_vr);
-
-                let validation = if bit_bytes[0] == 1 {
-                    key + delta.into_inner(ev_vr)
-                } else {
-                    key
-                };
-                Ok(VerifierPrivateCopy::new(validation == mac))
-            }
-        }
-    }
 }
 
 /// XOR two authenticated bits. Linear operations on authenticated bits are "free"
@@ -221,28 +183,50 @@ impl<
             }
         }
     }
+    /// "Open" a all authenticated bits.
     ///
-    /// TODO: Possibly add the index of the bit to check
+    /// This corresponds to the prover sending $(b, M)$ to the verifier, who checks
+    /// that $K = M xor b Delta$.
     pub fn open(
         &self,
         channel: &mut Channel,
     ) -> Result<VerifierPrivateCopy<P, bool>, AuthenticationBitError> {
-        //TODO: Get rid of these unwraps
-        let validations = self
-            .data
-            .iter()
-            .map(|auth_bit| auth_bit.open(self.delta, channel).unwrap());
         match P::WHICH {
-            WhichParty::Prover(ev_pr) => Ok(VerifierPrivateCopy::empty(ev_pr)),
-            WhichParty::Verifier(ev_vr) => Ok(VerifierPrivateCopy::new(
-                validations
-                    // TODO: possibly return the index of the bit that failed if a
-                    // failure happens
-                    .reduce(|b1, b2| {
-                        VerifierPrivateCopy::new(b1.into_inner(ev_vr) && b2.into_inner(ev_vr))
-                    })
-                    .is_some(),
-            )),
+            WhichParty::Prover(ev_pr) => {
+                self.data.iter().map(
+                    |ab|                    // TODO: Change how bits are sent, this is extremely inefficent
+                    {channel.write_bytes(&[ab.prover_bit().into_inner(ev_pr) as u8]);
+                    // TODO: Potentially leave last bit in the mac for the
+                    // authenticated bit.
+                    channel.write_bytes(ab.prover_mac().into_inner(ev_pr).as_ref());},
+                );
+                Ok(VerifierPrivateCopy::empty(ev_pr))
+            }
+            WhichParty::Verifier(ev_vr) => {
+                let validations = self.data.iter().map(|ab| {
+                    let mut bit_bytes = [0u8; 1];
+                    channel.read_bytes(&mut bit_bytes);
+                    let mut mac_bytes = [0u8; 16];
+                    channel.read_bytes(&mut mac_bytes);
+                    let mac = U8x16::from(mac_bytes);
+
+                    let key = ab.verifier_key().into_inner(ev_vr);
+
+                    if bit_bytes[0] == 1 {
+                        mac == key + self.delta().into_inner(ev_vr)
+                    } else {
+                        mac == key
+                    }
+                });
+
+                Ok(VerifierPrivateCopy::new(
+                    validations
+                        // TODO: possibly return the index of the bit that failed if a
+                        // failure happens
+                        .reduce(|b1, b2| b1 && b2)
+                        .is_some(),
+                ))
+            }
         }
     }
     /// This outputs the verifier's Delta value.
