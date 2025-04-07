@@ -50,6 +50,8 @@ macro_rules! make_prover_private_type {
         /// A value known only to `Prover`s.
         #[derive(Clone $(, $Copy)?)]
         pub struct $ProverPrivate<P: Party, T $(: $Copy)?>($PartyEither<P, T, UnknownProverSecret>);
+        impl<P: Party, T $(: $Copy)?> sealed::Sealed for $ProverPrivate<P, T> {}
+        impl<P: Party, T $(: $Copy)?> PartyPrivate<P, T> for $ProverPrivate<P, T> {}
         impl<P: Party, T $(: $Copy)?> $ProverPrivate<P, T> {
             /// Given evidence that `P = Verifier`, create an empty
             /// `ProverPrivate(Copy)` value.
@@ -217,6 +219,8 @@ macro_rules! make_verifier_private_type {
         /// A value known only to `Verifier`s.
         #[derive(Clone $(, $Copy)?)]
         pub struct $VerifierPrivate<P: Party, T $(: $Copy)?>($PartyEither<P, UnknownVerifierSecret, T>);
+        impl<P: Party, T $(: $Copy)?> sealed::Sealed for $VerifierPrivate<P, T> {}
+        impl<P: Party, T $(: $Copy)?> PartyPrivate<P, T> for $VerifierPrivate<P, T> {}
         impl<P: Party, T $(: $Copy)?> $VerifierPrivate<P, T> {
             /// Given evidence that `P = Prover`, create an empty
             /// `VerifierPrivate(Copy)` value.
@@ -351,3 +355,11 @@ impl<P: Party, T: Copy> From<VerifierPrivateCopy<P, T>> for VerifierPrivate<P, T
         Self(x.0.into())
     }
 }
+
+mod sealed {
+    /// An internal sealed trait to limit `impl`s of the `PartyPrivate` trait.
+    pub trait Sealed {}
+}
+
+/// A trait to add utilities to all of the `*Private` types.
+pub trait PartyPrivate<P: Party, T>: sealed::Sealed {}
