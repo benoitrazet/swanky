@@ -63,6 +63,7 @@ schmivitz = { path = "schmivitz" }
 scuttlebutt = { path = "scuttlebutt" }
 simple-arith-circuit = { path = "simple-arith-circuit" }
 swanky-aes-rng = { path = "crates/aes-rng" }
+swanky-authenticated-bits = { path = "crates/authenticated-bits" }
 swanky-channel = { path = "crates/channel" }
 swanky-field = { path = "crates/field" }
 swanky-field-binary = { path = "crates/field-binary" }

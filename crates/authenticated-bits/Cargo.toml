@@ -1,6 +1,5 @@
 [package]
 name = "swanky-authenticated-bits"
-description = "Definition for bit authentication"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
