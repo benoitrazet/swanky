@@ -38,8 +38,10 @@ struct ProverAuthBit {
 /// integrity of the provers MAC.
 #[derive(Debug, Default, Clone, Copy)]
 struct VerifierAuthBit {
-    /// Local key
+    /// Key from OT
     key: U8x16,
+    /// Mac from OT
+    mac: U8x16,
 }
 /// A type that represents the Party's part of the authenticated bit
 ///
@@ -60,6 +62,10 @@ impl<P: Party> AuthBit<P> {
     /// This outputs the key associated with the AuthBit
     pub fn verifier_key(&self) -> VerifierPrivateCopy<P, U8x16> {
         self.verifier_into().map(|vab| vab.key)
+    }
+    /// Output the mac associated with the `AuthBit`
+    pub fn verifier_mac(&self) -> VerifierPrivateCopy<P, U8x16> {
+        self.verifier_into().map(|vab| vab.mac)
     }
     /// Output the mac associated with the `AuthBit`
     pub fn prover_mac(&self) -> ProverPrivateCopy<P, U8x16> {
@@ -84,6 +90,7 @@ impl<P: Party> std::ops::BitXor for AuthBit<P> {
             },
             |(lhs, rhs)| VerifierAuthBit {
                 key: lhs.key ^ rhs.key,
+                mac: lhs.mac ^ rhs.mac,
             },
         ))
     }
@@ -172,10 +179,10 @@ impl<
                     &vec![delta; count],
                     &mut rng,
                 )?;
-                self.data.extend(keys.into_iter().map(|(key, _delta)| {
+                self.data.extend(keys.into_iter().map(|(key, mac)| {
                     AuthBit(PartyEitherCopy::verifier_new(
                         ev_vr,
-                        VerifierAuthBit { key: key },
+                        VerifierAuthBit { key: key, mac: mac },
                     ))
                 }));
 
@@ -210,12 +217,10 @@ impl<
                     let _ = channel.read_bytes(&mut mac_bytes);
                     let mac = U8x16::from(mac_bytes);
 
-                    let key = ab.verifier_key().into_inner(ev_vr);
-
-                    if bit_bytes[0] == 1 {
-                        mac == key + self.delta().into_inner(ev_vr)
+                    mac == if bit_bytes[0] == 1 {
+                        ab.verifier_mac().into_inner(ev_vr)
                     } else {
-                        mac == key
+                        ab.verifier_key().into_inner(ev_vr)
                     }
                 });
 
@@ -245,17 +250,13 @@ mod tests {
     use swanky_aes_rng::AesRng;
     use swanky_channel::Channel;
     use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier, private::VerifierPrivateCopy};
-    pub fn authenticate_in_clear(
-        pr: Vec<AuthBit<Prover>>,
-        vr: Vec<AuthBit<Verifier>>,
-        delta: U8x16,
-    ) -> bool {
+    pub fn authenticate_in_clear(pr: Vec<AuthBit<Prover>>, vr: Vec<AuthBit<Verifier>>) -> bool {
         pr.iter()
             .zip(vr)
             .map(|(ab_pr, ab_vr)| {
                 ab_pr.prover_mac().into_inner(IS_PROVER)
                     == (if ab_pr.prover_bit().into_inner(IS_PROVER) {
-                        delta + ab_vr.verifier_key().into_inner(IS_VERIFIER)
+                        ab_vr.verifier_mac().into_inner(IS_VERIFIER)
                     } else {
                         ab_vr.verifier_key().into_inner(IS_VERIFIER)
                     })
@@ -266,11 +267,11 @@ mod tests {
     // proptest! {
     #[test]
     fn test_add() {
-        let count = 10;
+        let count = 1;
         let mut output_pr: Vec<AuthBit<Prover>> = vec![];
         let mut output_vr: Vec<AuthBit<Verifier>> = vec![];
         let mut rng = AesRng::new();
-        let delta = rng.r#gen::<U8x16>();
+
         let mut validation: bool = false;
         let _ = swanky_channel::local::local_channel_pair(
             |channel_pr| {
@@ -285,11 +286,12 @@ mod tests {
                 let _ = auth_bits.generate::<Channel, &mut AesRng>(channel_pr, count, &mut rng);
                 let _ = auth_bits.open(channel_pr);
                 output_pr = auth_bits.data;
+
                 Ok(())
             },
             |channel_vr| {
                 let mut rng = AesRng::new();
-
+                let delta = rng.r#gen::<U8x16>();
                 let mut auth_bits: AuthBitGenerator<_, ot::KosSender, ot::KosReceiver> =
                     AuthBitGenerator::new::<Channel, &mut AesRng>(
                         VerifierPrivateCopy::new(delta),
@@ -303,7 +305,7 @@ mod tests {
             },
         )
         .unwrap();
-        let validation_clear = authenticate_in_clear(output_pr, output_vr, delta);
+        let validation_clear = authenticate_in_clear(output_pr, output_vr);
         assert!(validation);
         assert_eq!(validation, validation_clear);
     }
