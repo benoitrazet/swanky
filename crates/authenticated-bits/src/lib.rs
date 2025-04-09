@@ -141,7 +141,6 @@ impl<
         &mut self,
         mut channel: &mut Channel,
         count: usize,
-        output: &mut Vec<AuthBit<P>>,
         mut rng: RNG,
     ) -> Result<(), ocelot::Error>
     where
@@ -156,12 +155,13 @@ impl<
                     &bits,
                     &mut rng,
                 )?;
-                output.extend(bits.into_iter().zip(macs).map(|(bit, mac)| {
-                    AuthBit(PartyEitherCopy::prover_new(
-                        ev_pr,
-                        ProverAuthBit { bit: bit, mac: mac },
-                    ))
-                }));
+                self.data
+                    .extend(bits.into_iter().zip(macs).map(|(bit, mac)| {
+                        AuthBit(PartyEitherCopy::prover_new(
+                            ev_pr,
+                            ProverAuthBit { bit: bit, mac: mac },
+                        ))
+                    }));
 
                 Ok(())
             }
@@ -172,7 +172,7 @@ impl<
                     &vec![delta; count],
                     &mut rng,
                 )?;
-                output.extend(keys.into_iter().map(|(key, _delta)| {
+                self.data.extend(keys.into_iter().map(|(key, _delta)| {
                     AuthBit(PartyEitherCopy::verifier_new(
                         ev_vr,
                         VerifierAuthBit { key: key },
@@ -282,14 +282,9 @@ mod tests {
                         channel_pr,
                         &mut rng,
                     );
-                let _ = auth_bits.generate::<Channel, &mut AesRng>(
-                    channel_pr,
-                    count,
-                    &mut output_pr,
-                    &mut rng,
-                );
+                let _ = auth_bits.generate::<Channel, &mut AesRng>(channel_pr, count, &mut rng);
                 let _ = auth_bits.open(channel_pr);
-
+                output_pr = auth_bits.data;
                 Ok(())
             },
             |channel_vr| {
@@ -301,14 +296,9 @@ mod tests {
                         channel_vr,
                         &mut rng,
                     );
-                let _ = auth_bits.generate::<Channel, &mut AesRng>(
-                    channel_vr,
-                    count,
-                    &mut output_vr,
-                    &mut rng,
-                );
+                let _ = auth_bits.generate::<Channel, &mut AesRng>(channel_vr, count, &mut rng);
                 validation = auth_bits.open(channel_vr).unwrap().into_inner(IS_VERIFIER);
-
+                output_vr = auth_bits.data;
                 Ok(())
             },
         )

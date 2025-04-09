@@ -17,3 +17,5 @@ ocelot.workspace = true
 scuttlebutt.workspace = true
 vectoreyes.workspace = true
 rand.workspace = true
+proptest.workspace = true
+swanky-aes-rng.workspace = true
