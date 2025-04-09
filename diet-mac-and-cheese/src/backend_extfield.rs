@@ -169,7 +169,10 @@ impl<
                     .iter()
                     .copied()
                     .rev()
-                    .chain(iter::repeat(dmc.input_public(F2::ZERO).unwrap()).take(40 - num_cond)),
+                    .chain(iter::repeat_n(
+                        dmc.input_public(F2::ZERO).unwrap(),
+                        40 - num_cond,
+                    )),
             ))
         }
 
