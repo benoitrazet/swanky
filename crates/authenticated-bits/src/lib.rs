@@ -114,7 +114,7 @@ impl<
     /// `delta` value.
     pub fn new<C, RNG>(
         delta: VerifierPrivateCopy<P, U8x16>,
-        mut channel: Channel,
+        mut channel: &mut Channel,
         mut rng: RNG,
     ) -> Self
     where
@@ -139,7 +139,7 @@ impl<
     /// authenticated instead of always generate them at random
     pub fn generate<C, RNG>(
         &mut self,
-        mut channel: Channel,
+        mut channel: &mut Channel,
         count: usize,
         output: &mut Vec<AuthBit<P>>,
         mut rng: RNG,
@@ -193,21 +193,21 @@ impl<
     ) -> Result<VerifierPrivateCopy<P, bool>, AuthenticationBitError> {
         match P::WHICH {
             WhichParty::Prover(ev_pr) => {
-                self.data.iter().map(
+                let _ = self.data.iter().map(
                     |ab|                    // TODO: Change how bits are sent, this is extremely inefficent
-                    {channel.write_bytes(&[ab.prover_bit().into_inner(ev_pr) as u8]);
+                    {let _ = channel.write_bytes(&[ab.prover_bit().into_inner(ev_pr) as u8]);
                     // TODO: Potentially leave last bit in the mac for the
                     // authenticated bit.
-                    channel.write_bytes(ab.prover_mac().into_inner(ev_pr).as_ref());},
+                    let _ = channel.write_bytes(ab.prover_mac().into_inner(ev_pr).as_ref());},
                 );
                 Ok(VerifierPrivateCopy::empty(ev_pr))
             }
             WhichParty::Verifier(ev_vr) => {
                 let validations = self.data.iter().map(|ab| {
                     let mut bit_bytes = [0u8; 1];
-                    channel.read_bytes(&mut bit_bytes);
+                    let _ = channel.read_bytes(&mut bit_bytes);
                     let mut mac_bytes = [0u8; 16];
-                    channel.read_bytes(&mut mac_bytes);
+                    let _ = channel.read_bytes(&mut mac_bytes);
                     let mac = U8x16::from(mac_bytes);
 
                     let key = ab.verifier_key().into_inner(ev_vr);
@@ -233,4 +233,89 @@ impl<
     pub fn delta(&self) -> VerifierPrivateCopy<P, U8x16> {
         self.delta
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::AuthBitGenerator;
+    use proptest::prelude::*;
+    // use rand::Rng;
+    use ocelot::ot;
+    use swanky_aes_rng::AesRng;
+    use swanky_channel::Channel;
+    use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier, private::VerifierPrivateCopy};
+    pub fn authenticate_in_clear(
+        pr: Vec<AuthBit<Prover>>,
+        vr: Vec<AuthBit<Verifier>>,
+        delta: U8x16,
+    ) -> bool {
+        pr.iter()
+            .zip(vr)
+            .map(|(ab_pr, ab_vr)| {
+                ab_pr.prover_mac().into_inner(IS_PROVER)
+                    == (if ab_pr.prover_bit().into_inner(IS_PROVER) {
+                        delta + ab_vr.verifier_key().into_inner(IS_VERIFIER)
+                    } else {
+                        ab_vr.verifier_key().into_inner(IS_VERIFIER)
+                    })
+            })
+            .reduce(|b1, b2| b1 && b2)
+            .unwrap()
+    }
+    // proptest! {
+    #[test]
+    fn test_add() {
+        let count = 10;
+        let mut output_pr: Vec<AuthBit<Prover>> = vec![];
+        let mut output_vr: Vec<AuthBit<Verifier>> = vec![];
+        let mut rng = AesRng::new();
+        let delta = rng.r#gen::<U8x16>();
+        let mut validation: bool = false;
+        let _ = swanky_channel::local::local_channel_pair(
+            |channel_pr| {
+                let mut rng = AesRng::new();
+
+                let mut auth_bits: AuthBitGenerator<_, ot::KosSender, ot::KosReceiver> =
+                    AuthBitGenerator::new::<Channel, &mut AesRng>(
+                        VerifierPrivateCopy::empty(IS_PROVER),
+                        channel_pr,
+                        &mut rng,
+                    );
+                let _ = auth_bits.generate::<Channel, &mut AesRng>(
+                    channel_pr,
+                    count,
+                    &mut output_pr,
+                    &mut rng,
+                );
+                let _ = auth_bits.open(channel_pr);
+
+                Ok(())
+            },
+            |channel_vr| {
+                let mut rng = AesRng::new();
+
+                let mut auth_bits: AuthBitGenerator<_, ot::KosSender, ot::KosReceiver> =
+                    AuthBitGenerator::new::<Channel, &mut AesRng>(
+                        VerifierPrivateCopy::new(delta),
+                        channel_vr,
+                        &mut rng,
+                    );
+                let _ = auth_bits.generate::<Channel, &mut AesRng>(
+                    channel_vr,
+                    count,
+                    &mut output_vr,
+                    &mut rng,
+                );
+                validation = auth_bits.open(channel_vr).unwrap().into_inner(IS_VERIFIER);
+
+                Ok(())
+            },
+        )
+        .unwrap();
+        let validation_clear = authenticate_in_clear(output_pr, output_vr, delta);
+        assert!(validation);
+        assert_eq!(validation, validation_clear);
+    }
+    // }
 }
