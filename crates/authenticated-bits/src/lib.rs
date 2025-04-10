@@ -1,12 +1,14 @@
+//! Bit Authentication from CorrelatedOT
+#![deny(missing_docs)]
 use ocelot::ot::{CorrelatedReceiver, CorrelatedSender};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::Malicious;
 use swanky_channel::Channel;
 use swanky_party::{
-    IsParty, Party, Prover, Verifier, WhichParty,
+    Party, WhichParty,
     either::PartyEither,
     either::PartyEitherCopy,
-    private::{ProverPrivateCopy, VerifierPrivateCopy},
+    private::{ProverPrivate, ProverPrivateCopy, VerifierPrivateCopy},
 };
 use vectoreyes::U8x16;
 /// TODO: Figure out better Error handling
@@ -95,7 +97,6 @@ impl<P: Party> std::ops::BitXor for AuthBit<P> {
         ))
     }
 }
-
 /// A struct which contains multiple generated authentication bit
 ///
 /// When `P = Verifier`, this struct also stores the verifier's
@@ -148,6 +149,7 @@ impl<
         &mut self,
         mut channel: &mut Channel,
         count: usize,
+        bits_in: Option<ProverPrivate<P, Vec<bool>>>,
         mut rng: RNG,
     ) -> Result<(), ocelot::Error>
     where
@@ -156,12 +158,18 @@ impl<
         // TODO: Can we get rid of this pattern match ?
         match P::WHICH {
             WhichParty::Prover(ev_pr) => {
-                let bits = vec![rng.r#gen::<bool>(); count];
+                let bits = if bits_in.is_some() {
+                    bits_in.unwrap().into_inner(ev_pr)
+                } else {
+                    (0..count).map(|_| rng.r#gen::<bool>()).collect()
+                };
+                println!("bits {:?}", bits[0]);
                 let macs = self.ot.as_mut().prover_into(ev_pr).receive_correlated(
                     &mut channel,
                     &bits,
                     &mut rng,
                 )?;
+
                 self.data
                     .extend(bits.into_iter().zip(macs).map(|(bit, mac)| {
                         AuthBit(PartyEitherCopy::prover_new(
@@ -169,7 +177,6 @@ impl<
                             ProverAuthBit { bit: bit, mac: mac },
                         ))
                     }));
-
                 Ok(())
             }
             WhichParty::Verifier(ev_vr) => {
@@ -200,13 +207,13 @@ impl<
     ) -> Result<VerifierPrivateCopy<P, bool>, AuthenticationBitError> {
         match P::WHICH {
             WhichParty::Prover(ev_pr) => {
-                let _ = self.data.iter().map(
-                    |ab|                    // TODO: Change how bits are sent, this is extremely inefficent
-                    {let _ = channel.write_bytes(&[ab.prover_bit().into_inner(ev_pr) as u8]);
+                let _ = self.data.iter().for_each(|ab| {
+                    // TODO: Change how bits are sent, this is extremely inefficent
+                    let _ = channel.write_bytes(&[ab.prover_bit().into_inner(ev_pr) as u8]);
                     // TODO: Potentially leave last bit in the mac for the
                     // authenticated bit.
-                    let _ = channel.write_bytes(ab.prover_mac().into_inner(ev_pr).as_ref());},
-                );
+                    let _ = channel.write_bytes(ab.prover_mac().into_inner(ev_pr).as_ref());
+                });
                 Ok(VerifierPrivateCopy::empty(ev_pr))
             }
             WhichParty::Verifier(ev_vr) => {
@@ -223,7 +230,6 @@ impl<
                         ab.verifier_key().into_inner(ev_vr)
                     }
                 });
-
                 Ok(VerifierPrivateCopy::new(
                     validations
                         // TODO: possibly return the index of the bit that failed if a
@@ -266,7 +272,7 @@ mod tests {
     }
     // proptest! {
     #[test]
-    fn test_add() {
+    fn test_correct_generation() {
         let count = 1;
         let mut output_pr: Vec<AuthBit<Prover>> = vec![];
         let mut output_vr: Vec<AuthBit<Verifier>> = vec![];
