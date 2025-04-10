@@ -234,7 +234,7 @@ impl<
                         // TODO: possibly return the index of the bit that failed if a
                         // failure happens
                         .reduce(|b1, b2| b1 && b2)
-                        .is_some(),
+                        .unwrap(),
                 ))
             }
         }
@@ -321,7 +321,7 @@ mod tests {
     #[test]
     // Turn this into a proptest
     fn test_correct_generation() {
-        let count = 3;
+        let count = 10;
         let (output_pr, output_vr, validation) = run_authentication(None, count);
 
         let validation_clear = authenticate_in_clear(&output_pr, &output_vr);
@@ -351,7 +351,7 @@ mod tests {
     #[test]
     // Turn this into a proptest
     fn test_failing_tamper_mac() {
-        let count = 3;
+        let count = 10;
         let (_, res) = swanky_channel::local::local_channel_pair(
             |channel_pr| {
                 let mut rng = AesRng::new();
@@ -364,7 +364,7 @@ mod tests {
                 let _ =
                     auth_bits.generate::<Channel, &mut AesRng>(channel_pr, count, None, &mut rng);
                 // Mess with the mac
-                auth_bits.data[2] = AuthBit(PartyEitherCopy::prover_new(
+                auth_bits.data[0] = AuthBit(PartyEitherCopy::prover_new(
                     IS_PROVER,
                     ProverAuthBit {
                         bit: auth_bits.data[0].prover_bit().into_inner(IS_PROVER),
