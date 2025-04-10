@@ -163,7 +163,6 @@ impl<
                 } else {
                     (0..count).map(|_| rng.r#gen::<bool>()).collect()
                 };
-                println!("bits {:?}", bits[0]);
                 let macs = self.ot.as_mut().prover_into(ev_pr).receive_correlated(
                     &mut channel,
                     &bits,
@@ -250,13 +249,15 @@ impl<
 mod tests {
     use super::*;
     use crate::AuthBitGenerator;
-    use proptest::prelude::*;
-    // use rand::Rng;
     use ocelot::ot;
+    use proptest::prelude::*;
     use swanky_aes_rng::AesRng;
     use swanky_channel::Channel;
-    use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier, private::VerifierPrivateCopy};
-    pub fn authenticate_in_clear(pr: Vec<AuthBit<Prover>>, vr: Vec<AuthBit<Verifier>>) -> bool {
+    use swanky_party::{
+        IS_PROVER, IS_VERIFIER, Prover, Verifier, either::PartyEitherCopy,
+        private::VerifierPrivateCopy,
+    };
+    pub fn authenticate_in_clear(pr: &[AuthBit<Prover>], vr: &[AuthBit<Verifier>]) -> bool {
         pr.iter()
             .zip(vr)
             .map(|(ab_pr, ab_vr)| {
@@ -270,26 +271,28 @@ mod tests {
             .reduce(|b1, b2| b1 && b2)
             .unwrap()
     }
-    // proptest! {
-    #[test]
-    fn test_correct_generation() {
-        let count = 1;
+    fn run_authentication(
+        bits_in: Option<Vec<bool>>,
+        count: usize,
+    ) -> (Vec<AuthBit<Prover>>, Vec<AuthBit<Verifier>>, bool) {
         let mut output_pr: Vec<AuthBit<Prover>> = vec![];
         let mut output_vr: Vec<AuthBit<Verifier>> = vec![];
-        let mut rng = AesRng::new();
-
-        let mut validation: bool = false;
-        let _ = swanky_channel::local::local_channel_pair(
+        let (_, res) = swanky_channel::local::local_channel_pair(
             |channel_pr| {
                 let mut rng = AesRng::new();
-
+                let bits = if bits_in.is_some() {
+                    Some(ProverPrivate::new(bits_in.unwrap()))
+                } else {
+                    None
+                };
                 let mut auth_bits: AuthBitGenerator<_, ot::KosSender, ot::KosReceiver> =
                     AuthBitGenerator::new::<Channel, &mut AesRng>(
                         VerifierPrivateCopy::empty(IS_PROVER),
                         channel_pr,
                         &mut rng,
                     );
-                let _ = auth_bits.generate::<Channel, &mut AesRng>(channel_pr, count, &mut rng);
+                let _ =
+                    auth_bits.generate::<Channel, &mut AesRng>(channel_pr, count, bits, &mut rng);
                 let _ = auth_bits.open(channel_pr);
                 output_pr = auth_bits.data;
 
@@ -304,16 +307,91 @@ mod tests {
                         channel_vr,
                         &mut rng,
                     );
-                let _ = auth_bits.generate::<Channel, &mut AesRng>(channel_vr, count, &mut rng);
-                validation = auth_bits.open(channel_vr).unwrap().into_inner(IS_VERIFIER);
+                let _ =
+                    auth_bits.generate::<Channel, &mut AesRng>(channel_vr, count, None, &mut rng);
+                let validation = auth_bits.open(channel_vr).unwrap().into_inner(IS_VERIFIER);
                 output_vr = auth_bits.data;
-                Ok(())
+                Ok(validation)
             },
         )
         .unwrap();
-        let validation_clear = authenticate_in_clear(output_pr, output_vr);
+        (output_pr, output_vr, res)
+    }
+    // proptest! {
+    #[test]
+    // Turn this into a proptest
+    fn test_correct_generation() {
+        let count = 3;
+        let (output_pr, output_vr, validation) = run_authentication(None, count);
+
+        let validation_clear = authenticate_in_clear(&output_pr, &output_vr);
         assert!(validation);
         assert_eq!(validation, validation_clear);
+    }
+    #[test]
+    fn test_bit_true() {
+        let count = 1;
+        let bits = vec![true];
+        let (output_pr, output_vr, _validation) = run_authentication(Some(bits), count);
+        assert!(
+            output_pr[0].prover_mac().into_inner(IS_PROVER)
+                == output_vr[0].verifier_mac().into_inner(IS_VERIFIER)
+        )
+    }
+    #[test]
+    fn test_bit_false() {
+        let count = 1;
+        let bits = vec![false];
+        let (output_pr, output_vr, _validation) = run_authentication(Some(bits), count);
+        assert!(
+            output_pr[0].prover_mac().into_inner(IS_PROVER)
+                == output_vr[0].verifier_key().into_inner(IS_VERIFIER)
+        )
+    }
+    #[test]
+    // Turn this into a proptest
+    fn test_failing_tamper_mac() {
+        let count = 3;
+        let (_, res) = swanky_channel::local::local_channel_pair(
+            |channel_pr| {
+                let mut rng = AesRng::new();
+                let mut auth_bits: AuthBitGenerator<_, ot::KosSender, ot::KosReceiver> =
+                    AuthBitGenerator::new::<Channel, &mut AesRng>(
+                        VerifierPrivateCopy::empty(IS_PROVER),
+                        channel_pr,
+                        &mut rng,
+                    );
+                let _ =
+                    auth_bits.generate::<Channel, &mut AesRng>(channel_pr, count, None, &mut rng);
+                // Mess with the mac
+                auth_bits.data[2] = AuthBit(PartyEitherCopy::prover_new(
+                    IS_PROVER,
+                    ProverAuthBit {
+                        bit: auth_bits.data[0].prover_bit().into_inner(IS_PROVER),
+                        mac: rng.r#gen(),
+                    },
+                ));
+
+                let _ = auth_bits.open(channel_pr);
+
+                Ok(())
+            },
+            |channel_vr| {
+                let mut rng = AesRng::new();
+                let delta = rng.r#gen::<U8x16>();
+                let mut auth_bits: AuthBitGenerator<_, ot::KosSender, ot::KosReceiver> =
+                    AuthBitGenerator::new::<Channel, &mut AesRng>(
+                        VerifierPrivateCopy::new(delta),
+                        channel_vr,
+                        &mut rng,
+                    );
+                let _ =
+                    auth_bits.generate::<Channel, &mut AesRng>(channel_vr, count, None, &mut rng);
+                Ok(auth_bits.open(channel_vr).unwrap().into_inner(IS_VERIFIER))
+            },
+        )
+        .unwrap();
+        assert!(res == false);
     }
     // }
 }
