@@ -68,10 +68,11 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
     fn send_correlated<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        deltas: &[Self::Msg],
+        m: usize,
+        delta: Self::Msg,
         rng: &mut RNG,
-    ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
-        self.ot.send_correlated(channel, deltas, rng)
+    ) -> Result<Vec<Self::Msg>, Error> {
+        self.ot.send_correlated(channel, m, delta, rng)
     }
 }
 
