@@ -120,14 +120,15 @@ pub trait CorrelatedSender: Sender
 where
     Self: Sized,
 {
-    /// Correlated oblivious transfer send. Takes as input an array `deltas`
+    /// Correlated oblivious transfer send. Takes as input a $\Delta$ value
     /// which specifies the offset between the zero and one message.
     fn send_correlated<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        deltas: &[Self::Msg],
+        m: usize,
+        delta: Self::Msg,
         rng: &mut RNG,
-    ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error>;
+    ) -> Result<Vec<Self::Msg>, Error>;
 }
 
 /// Trait for one-out-of-two _correlated_ oblivious transfer from the receiver's
@@ -270,7 +271,7 @@ mod tests {
     >(
         ninputs: usize,
     ) {
-        let deltas = rand_block_vec(ninputs);
+        let delta = rand::random::<Block>();
         let bs = rand_bool_vec(ninputs);
         let out = Arc::new(Mutex::new(vec![]));
         let out_ = out.clone();
@@ -283,7 +284,7 @@ mod tests {
             let mut otext = OTSender::init(&mut channel, &mut rng).unwrap();
             let mut out = out.lock().unwrap();
             *out = otext
-                .send_correlated(&mut channel, &deltas, &mut rng)
+                .send_correlated(&mut channel, ninputs, delta, &mut rng)
                 .unwrap();
         });
         let mut rng = AesRng::new();
@@ -297,7 +298,7 @@ mod tests {
         handle.join().unwrap();
         let out_ = out_.lock().unwrap();
         for j in 0..ninputs {
-            assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
+            assert_eq!(results[j], if bs[j] { out_[j] ^ delta } else { out_[j] })
         }
     }
 

@@ -49,8 +49,9 @@ fn _bench_block_cot<
     OTReceiver: CorrelatedReceiver<Msg = Block>,
 >(
     bs: &[bool],
-    deltas: Vec<Block>,
+    delta: Block,
 ) {
+    let m = bs.len();
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
@@ -58,7 +59,8 @@ fn _bench_block_cot<
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
         let mut ot = OTSender::init(&mut channel, &mut rng).unwrap();
-        ot.send_correlated(&mut channel, &deltas, &mut rng).unwrap();
+        ot.send_correlated(&mut channel, m, delta, &mut rng)
+            .unwrap();
     });
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
@@ -156,14 +158,14 @@ fn bench_otext(c: &mut Criterion) {
 
 fn bench_correlated_otext(c: &mut Criterion) {
     c.bench_function("cot::AlszOT", move |bench| {
-        let deltas = rand_block_vec(T);
+        let delta = rand::random::<Block>();
         let bs = rand_bool_vec(T);
-        bench.iter(|| _bench_block_cot::<ot::AlszSender, ot::AlszReceiver>(&bs, deltas.clone()))
+        bench.iter(|| _bench_block_cot::<ot::AlszSender, ot::AlszReceiver>(&bs, delta))
     });
     c.bench_function("cot::KosOT", move |bench| {
-        let deltas = rand_block_vec(T);
+        let delta = rand::random::<Block>();
         let bs = rand_bool_vec(T);
-        bench.iter(|| _bench_block_cot::<ot::KosSender, ot::KosReceiver>(&bs, deltas.clone()))
+        bench.iter(|| _bench_block_cot::<ot::KosSender, ot::KosReceiver>(&bs, delta))
     });
 }
 

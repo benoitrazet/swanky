@@ -123,22 +123,22 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> CorrelatedSender for Sender<OT> {
     fn send_correlated<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
-        deltas: &[Self::Msg],
+        m: usize,
+        delta: Self::Msg,
         _: &mut RNG,
-    ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
-        let m = deltas.len();
+    ) -> Result<Vec<Self::Msg>, Error> {
         let qs = self.send_setup(channel, m)?;
         let mut out = Vec::with_capacity(m);
-        for (j, delta) in deltas.iter().enumerate() {
+        for j in 0..m {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
             let q = Block::from(q);
             let x0 = self.hash.cr_hash(Block::from(j as u128), q);
-            let x1 = x0 ^ *delta;
+            let x1 = x0 ^ delta;
             let q = q ^ self.s_;
             let y = self.hash.cr_hash(Block::from(j as u128), q) ^ x1;
             channel.write_block(&y)?;
-            out.push((x0, x1));
+            out.push(x0);
         }
         channel.flush()?;
         Ok(out)
