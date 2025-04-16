@@ -1,5 +1,6 @@
 //! Bit Authentication from CorrelatedOT
 #![deny(missing_docs)]
+use eyre;
 use ocelot::ot::{CorrelatedReceiver, CorrelatedSender};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::Malicious;
@@ -11,16 +12,6 @@ use swanky_party::{
     private::{ProverPrivate, ProverPrivateCopy, VerifierPrivateCopy},
 };
 use vectoreyes::U8x16;
-/// TODO: Figure out better Error handling
-#[derive(Clone, Copy, Debug, Default)]
-struct AuthenticationBitError;
-impl std::fmt::Display for AuthenticationBitError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
-    }
-}
-impl std::error::Error for AuthenticationBitError {}
-
 /// The Prover's part of the authentication bit
 ///
 /// The Prover holds a bit that they wish to
@@ -42,40 +33,30 @@ struct ProverAuthBit {
 struct VerifierAuthBit {
     /// Key from OT
     key: U8x16,
-    /// Mac from OT
-    mac: U8x16,
 }
 /// A type that represents the Party's part of the authenticated bit
-///
-/// When `P = Prover`, this value is `ProverAuthBit`
-/// When `P = Verifier`, this value is `VerifierAuthBit`
-struct AuthBit<P: Party>(PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>);
+pub struct AuthBit<P: Party>(PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>);
 
-/// A struct which contains a single authenticated bit
 impl<P: Party> AuthBit<P> {
-    /// Retrieve the prover's `ProverAuthBit` from the  `PartyEitherCopy`
-    pub fn prover_into(&self) -> ProverPrivateCopy<P, ProverAuthBit> {
+    /// Return the [ProverAuthBit] component.
+    fn to_prover(&self) -> ProverPrivateCopy<P, ProverAuthBit> {
         self.0.into_privates().0
     }
-    /// Retrieve the verifier's `VerifierAuthBit` from the  `VerifierPrivateCopy`
-    pub fn verifier_into(&self) -> VerifierPrivateCopy<P, VerifierAuthBit> {
+    /// Return the [VerifierAuthBit] component.
+    fn to_verifier(&self) -> VerifierPrivateCopy<P, VerifierAuthBit> {
         self.0.into_privates().1
     }
-    /// This outputs the key associated with the AuthBit
-    pub fn verifier_key(&self) -> VerifierPrivateCopy<P, U8x16> {
-        self.verifier_into().map(|vab| vab.key)
+    /// Output the verifier's key associated with this [AuthBit].
+    pub fn key(&self) -> VerifierPrivateCopy<P, U8x16> {
+        self.to_verifier().map(|vab| vab.key)
     }
-    /// Output the mac associated with the `AuthBit`
-    pub fn verifier_mac(&self) -> VerifierPrivateCopy<P, U8x16> {
-        self.verifier_into().map(|vab| vab.mac)
+    /// Output the prover's MAC associated with this [AuthBit].
+    pub fn mac(&self) -> ProverPrivateCopy<P, U8x16> {
+        self.to_prover().map(|vab| vab.mac)
     }
-    /// Output the mac associated with the `AuthBit`
-    pub fn prover_mac(&self) -> ProverPrivateCopy<P, U8x16> {
-        self.prover_into().map(|vab| vab.mac)
-    }
-    /// Output the mac associated with the `AuthBit`
-    pub fn prover_bit(&self) -> ProverPrivateCopy<P, bool> {
-        self.prover_into().map(|vab| vab.bit)
+    /// Output the prover's bit associated with this [AuthBit].
+    pub fn bit(&self) -> ProverPrivateCopy<P, bool> {
+        self.to_prover().map(|vab| vab.bit)
     }
 }
 
@@ -92,7 +73,6 @@ impl<P: Party> std::ops::BitXor for AuthBit<P> {
             },
             |(lhs, rhs)| VerifierAuthBit {
                 key: lhs.key ^ rhs.key,
-                mac: lhs.mac ^ rhs.mac,
             },
         ))
     }
@@ -101,7 +81,7 @@ impl<P: Party> std::ops::BitXor for AuthBit<P> {
 ///
 /// When `P = Verifier`, this struct also stores the verifier's
 /// global key `delta`.
-struct AuthBitGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver> {
+pub struct AuthBitGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver> {
     /// A vector of authenticated bit.
     data: Vec<AuthBit<P>>,
     /// The verifier's global key.
@@ -117,10 +97,10 @@ impl<
     OTR: CorrelatedReceiver<Msg = U8x16> + Malicious,
 > AuthBitGenerator<P, OTS, OTR>
 {
-    /// Create a new `AuthBitGenerator` based on the type of
-    /// the party. In the case of the `Verifier`, store the
+    /// Create a new [AuthBitGenerator] based on the type of
+    /// the party. In the case of the `P = Verifier`, store the
     /// `delta` value.
-    pub fn new<C, RNG>(
+    pub fn new<RNG>(
         delta: VerifierPrivateCopy<P, U8x16>,
         mut channel: &mut Channel,
         mut rng: RNG,
@@ -145,17 +125,16 @@ impl<
     ///
     /// TODO: Possibly allow the user to specify the bits they would like
     /// authenticated instead of always generate them at random
-    pub fn generate<C, RNG>(
+    pub fn generate<RNG>(
         &mut self,
         mut channel: &mut Channel,
         count: usize,
         bits_in: Option<ProverPrivate<P, Vec<bool>>>,
         mut rng: RNG,
-    ) -> Result<(), ocelot::Error>
+    ) -> eyre::Result<()>
     where
         RNG: CryptoRng + Rng,
     {
-        // TODO: Can we get rid of this pattern match ?
         match P::WHICH {
             WhichParty::Prover(ev_pr) => {
                 let bits = if bits_in.is_some() {
@@ -185,10 +164,10 @@ impl<
                     &vec![delta; count],
                     &mut rng,
                 )?;
-                self.data.extend(keys.into_iter().map(|(key, mac)| {
+                self.data.extend(keys.into_iter().map(|(ot_0, _ot_1)| {
                     AuthBit(PartyEitherCopy::verifier_new(
                         ev_vr,
-                        VerifierAuthBit { key: key, mac: mac },
+                        VerifierAuthBit { key: ot_0 },
                     ))
                 }));
 
@@ -200,46 +179,39 @@ impl<
     ///
     /// This corresponds to the prover sending $(b, M)$ to the verifier, who checks
     /// that $K = M xor b Delta$.
-    pub fn open(
-        &self,
-        channel: &mut Channel,
-    ) -> Result<VerifierPrivateCopy<P, bool>, AuthenticationBitError> {
+    pub fn open(&self, channel: &mut Channel) -> eyre::Result<VerifierPrivateCopy<P, bool>> {
         match P::WHICH {
             WhichParty::Prover(ev_pr) => {
-                let _ = self.data.iter().for_each(|ab| {
+                for ab in self.data.iter() {
                     // TODO: Change how bits are sent, this is extremely inefficent
-                    let _ = channel.write_bytes(&[ab.prover_bit().into_inner(ev_pr) as u8]);
+                    channel.write_bytes(&[ab.bit().into_inner(ev_pr) as u8])?;
                     // TODO: Potentially leave last bit in the mac for the
                     // authenticated bit.
-                    let _ = channel.write_bytes(ab.prover_mac().into_inner(ev_pr).as_ref());
-                });
+                    channel.write_bytes(ab.mac().into_inner(ev_pr).as_ref())?;
+                }
                 Ok(VerifierPrivateCopy::empty(ev_pr))
             }
             WhichParty::Verifier(ev_vr) => {
-                let validations = self.data.iter().map(|ab| {
+                let mut validation = true;
+                for ab in self.data.iter() {
                     let mut bit_bytes = [0u8; 1];
-                    let _ = channel.read_bytes(&mut bit_bytes);
+                    channel.read_bytes(&mut bit_bytes)?;
                     let mut mac_bytes = [0u8; 16];
-                    let _ = channel.read_bytes(&mut mac_bytes);
+                    channel.read_bytes(&mut mac_bytes)?;
                     let mac = U8x16::from(mac_bytes);
 
-                    mac == if bit_bytes[0] == 1 {
-                        ab.verifier_mac().into_inner(ev_vr)
-                    } else {
-                        ab.verifier_key().into_inner(ev_vr)
-                    }
-                });
-                Ok(VerifierPrivateCopy::new(
-                    validations
-                        // TODO: possibly return the index of the bit that failed if a
-                        // failure happens
-                        .reduce(|b1, b2| b1 && b2)
-                        .unwrap(),
-                ))
+                    validation &= mac
+                        == if bit_bytes[0] == 1 {
+                            ab.key().into_inner(ev_vr) ^ self.delta().into_inner(ev_vr)
+                        } else {
+                            ab.key().into_inner(ev_vr)
+                        };
+                }
+                Ok(VerifierPrivateCopy::new(validation))
             }
         }
     }
-    /// This outputs the verifier's Delta value.
+    /// "Output the verifier's Δ value."
     pub fn delta(&self) -> VerifierPrivateCopy<P, U8x16> {
         self.delta
     }
@@ -250,22 +222,25 @@ mod tests {
     use super::*;
     use crate::AuthBitGenerator;
     use ocelot::ot;
-    use proptest::prelude::*;
     use swanky_aes_rng::AesRng;
     use swanky_channel::Channel;
     use swanky_party::{
         IS_PROVER, IS_VERIFIER, Prover, Verifier, either::PartyEitherCopy,
         private::VerifierPrivateCopy,
     };
-    pub fn authenticate_in_clear(pr: &[AuthBit<Prover>], vr: &[AuthBit<Verifier>]) -> bool {
+    fn authenticate_in_clear(
+        pr: &[AuthBit<Prover>],
+        vr: &[AuthBit<Verifier>],
+        delta: U8x16,
+    ) -> bool {
         pr.iter()
             .zip(vr)
             .map(|(ab_pr, ab_vr)| {
-                ab_pr.prover_mac().into_inner(IS_PROVER)
-                    == (if ab_pr.prover_bit().into_inner(IS_PROVER) {
-                        ab_vr.verifier_mac().into_inner(IS_VERIFIER)
+                ab_pr.mac().into_inner(IS_PROVER)
+                    == (if ab_pr.bit().into_inner(IS_PROVER) {
+                        ab_vr.key().into_inner(IS_VERIFIER) ^ delta
                     } else {
-                        ab_vr.verifier_key().into_inner(IS_VERIFIER)
+                        ab_vr.key().into_inner(IS_VERIFIER)
                     })
             })
             .reduce(|b1, b2| b1 && b2)
@@ -274,10 +249,10 @@ mod tests {
     fn run_authentication(
         bits_in: Option<Vec<bool>>,
         count: usize,
-    ) -> (Vec<AuthBit<Prover>>, Vec<AuthBit<Verifier>>, bool) {
+    ) -> (Vec<AuthBit<Prover>>, Vec<AuthBit<Verifier>>, bool, U8x16) {
         let mut output_pr: Vec<AuthBit<Prover>> = vec![];
         let mut output_vr: Vec<AuthBit<Verifier>> = vec![];
-        let (_, res) = swanky_channel::local::local_channel_pair(
+        let (_, (validation, delta)) = swanky_channel::local::local_channel_pair(
             |channel_pr| {
                 let mut rng = AesRng::new();
                 let bits = if bits_in.is_some() {
@@ -286,13 +261,12 @@ mod tests {
                     None
                 };
                 let mut auth_bits: AuthBitGenerator<_, ot::KosSender, ot::KosReceiver> =
-                    AuthBitGenerator::new::<Channel, &mut AesRng>(
+                    AuthBitGenerator::new::<&mut AesRng>(
                         VerifierPrivateCopy::empty(IS_PROVER),
                         channel_pr,
                         &mut rng,
                     );
-                let _ =
-                    auth_bits.generate::<Channel, &mut AesRng>(channel_pr, count, bits, &mut rng);
+                let _ = auth_bits.generate::<&mut AesRng>(channel_pr, count, bits, &mut rng);
                 let _ = auth_bits.open(channel_pr);
                 output_pr = auth_bits.data;
 
@@ -302,29 +276,28 @@ mod tests {
                 let mut rng = AesRng::new();
                 let delta = rng.r#gen::<U8x16>();
                 let mut auth_bits: AuthBitGenerator<_, ot::KosSender, ot::KosReceiver> =
-                    AuthBitGenerator::new::<Channel, &mut AesRng>(
+                    AuthBitGenerator::new::<&mut AesRng>(
                         VerifierPrivateCopy::new(delta),
                         channel_vr,
                         &mut rng,
                     );
-                let _ =
-                    auth_bits.generate::<Channel, &mut AesRng>(channel_vr, count, None, &mut rng);
+                let _ = auth_bits.generate::<&mut AesRng>(channel_vr, count, None, &mut rng);
                 let validation = auth_bits.open(channel_vr).unwrap().into_inner(IS_VERIFIER);
                 output_vr = auth_bits.data;
-                Ok(validation)
+                Ok((validation, delta))
             },
         )
         .unwrap();
-        (output_pr, output_vr, res)
+        (output_pr, output_vr, validation, delta)
     }
     // proptest! {
     #[test]
     // Turn this into a proptest
     fn test_correct_generation() {
         let count = 10;
-        let (output_pr, output_vr, validation) = run_authentication(None, count);
+        let (output_pr, output_vr, validation, delta) = run_authentication(None, count);
 
-        let validation_clear = authenticate_in_clear(&output_pr, &output_vr);
+        let validation_clear = authenticate_in_clear(&output_pr, &output_vr, delta);
         assert!(validation);
         assert_eq!(validation, validation_clear);
     }
@@ -332,20 +305,19 @@ mod tests {
     fn test_bit_true() {
         let count = 1;
         let bits = vec![true];
-        let (output_pr, output_vr, _validation) = run_authentication(Some(bits), count);
+        let (output_pr, output_vr, _validation, delta) = run_authentication(Some(bits), count);
         assert!(
-            output_pr[0].prover_mac().into_inner(IS_PROVER)
-                == output_vr[0].verifier_mac().into_inner(IS_VERIFIER)
+            output_pr[0].mac().into_inner(IS_PROVER)
+                == (output_vr[0].key().into_inner(IS_VERIFIER) ^ delta)
         )
     }
     #[test]
     fn test_bit_false() {
         let count = 1;
         let bits = vec![false];
-        let (output_pr, output_vr, _validation) = run_authentication(Some(bits), count);
+        let (output_pr, output_vr, _validation, _delta) = run_authentication(Some(bits), count);
         assert!(
-            output_pr[0].prover_mac().into_inner(IS_PROVER)
-                == output_vr[0].verifier_key().into_inner(IS_VERIFIER)
+            output_pr[0].mac().into_inner(IS_PROVER) == output_vr[0].key().into_inner(IS_VERIFIER)
         )
     }
     #[test]
@@ -356,18 +328,17 @@ mod tests {
             |channel_pr| {
                 let mut rng = AesRng::new();
                 let mut auth_bits: AuthBitGenerator<_, ot::KosSender, ot::KosReceiver> =
-                    AuthBitGenerator::new::<Channel, &mut AesRng>(
+                    AuthBitGenerator::new::<&mut AesRng>(
                         VerifierPrivateCopy::empty(IS_PROVER),
                         channel_pr,
                         &mut rng,
                     );
-                let _ =
-                    auth_bits.generate::<Channel, &mut AesRng>(channel_pr, count, None, &mut rng);
+                let _ = auth_bits.generate::<&mut AesRng>(channel_pr, count, None, &mut rng);
                 // Mess with the mac
                 auth_bits.data[0] = AuthBit(PartyEitherCopy::prover_new(
                     IS_PROVER,
                     ProverAuthBit {
-                        bit: auth_bits.data[0].prover_bit().into_inner(IS_PROVER),
+                        bit: auth_bits.data[0].bit().into_inner(IS_PROVER),
                         mac: rng.r#gen(),
                     },
                 ));
@@ -380,13 +351,12 @@ mod tests {
                 let mut rng = AesRng::new();
                 let delta = rng.r#gen::<U8x16>();
                 let mut auth_bits: AuthBitGenerator<_, ot::KosSender, ot::KosReceiver> =
-                    AuthBitGenerator::new::<Channel, &mut AesRng>(
+                    AuthBitGenerator::new::<&mut AesRng>(
                         VerifierPrivateCopy::new(delta),
                         channel_vr,
                         &mut rng,
                     );
-                let _ =
-                    auth_bits.generate::<Channel, &mut AesRng>(channel_vr, count, None, &mut rng);
+                let _ = auth_bits.generate::<&mut AesRng>(channel_vr, count, None, &mut rng);
                 Ok(auth_bits.open(channel_vr).unwrap().into_inner(IS_VERIFIER))
             },
         )
