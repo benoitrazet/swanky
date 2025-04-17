@@ -77,6 +77,23 @@ impl<P: Party> std::ops::BitXor for AuthBit<P> {
         ))
     }
 }
+
+/// XOR two authenticated bits. Linear operations on authenticated bits are "free"
+/// (i.e. can be done locally).
+impl<P: Party> std::ops::BitXorAssign for AuthBit<P> {
+    fn bitxor_assign(&mut self, rhs: Self) {
+        match P::WHICH {
+            WhichParty::Prover(e) => {
+                self.to_prover().into_inner(e).bit ^= rhs.to_prover().into_inner(e).bit;
+                self.to_prover().into_inner(e).mac ^= rhs.to_prover().into_inner(e).mac;
+            }
+
+            WhichParty::Verifier(e) => {
+                self.to_verifier().into_inner(e).key ^= rhs.to_verifier().into_inner(e).key;
+            }
+        }
+    }
+}
 /// A struct which contains multiple generated authentication bit
 ///
 /// When `P = Verifier`, this struct also stores the verifier's
