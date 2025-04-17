@@ -1,5 +1,6 @@
 [package]
 name = "swanky-authenticated-bits"
+description = "A package for generating authenticated bits"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -18,3 +19,4 @@ vectoreyes.workspace = true
 rand.workspace = true
 proptest.workspace = true
 swanky-aes-rng.workspace = true
+eyre.workspace = true

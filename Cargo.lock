@@ -2503,6 +2503,7 @@ dependencies = [
 name = "swanky-authenticated-bits"
 version = "0.6.0"
 dependencies = [
+ "eyre",
  "ocelot",
  "proptest",
  "rand 0.8.5",
