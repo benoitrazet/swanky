@@ -59,15 +59,16 @@ struct VerifierAuthBit {
     key: U8x16,
 }
 /// A type that represents the Party's part of the authenticated bit
+#[derive(Default, Clone, Copy)]
 pub struct AuthBit<P: Party>(PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>);
 
 impl<P: Party> AuthBit<P> {
     /// Return the [`ProverAuthBit``] component.
-    fn to_prover(&self) -> ProverPrivateCopy<P, ProverAuthBit> {
+    fn to_prover(self) -> ProverPrivateCopy<P, ProverAuthBit> {
         self.0.into_privates().0
     }
     /// Return the [`VerifierAuthBit`] component.
-    fn to_verifier(&self) -> VerifierPrivateCopy<P, VerifierAuthBit> {
+    fn to_verifier(self) -> VerifierPrivateCopy<P, VerifierAuthBit> {
         self.0.into_privates().1
     }
     /// Output the verifier's key associated with this [AuthBit].
@@ -223,10 +224,14 @@ impl<
     /// "Open" all authenticated bits stored in `out`.
     ///
     /// This corresponds to the prover sending $(b, M)$ to the verifier, who checks
-    /// that $`K = M \oplus b \Delta`$.
+    /// that $`K = M \oplus b \Delta`$.\
+    ///
+    /// Note: We force the user to consume the passed `Vec<AuthBit<P>>` in order to prevent
+    /// the user from re-using them. Re-using these bits may result in security leaks because
+    /// their security relies on a one time pad.
     pub fn open(
         &self,
-        out: &[AuthBit<P>],
+        out: Vec<AuthBit<P>>,
         channel: &mut Channel,
     ) -> eyre::Result<VerifierPrivateCopy<P, bool>> {
         match P::WHICH {
@@ -302,7 +307,6 @@ mod tests {
         let (_, (validation, delta)) = swanky_channel::local::local_channel_pair(
             |channel_pr| {
                 let mut rng = AesRng::new();
-
                 let bits = PartyEitherCopy::prover_new(IS_PROVER, bits_in);
                 let mut auth_bits: AuthBitGenerator<_, ot::KosSender, ot::KosReceiver> =
                     AuthBitGenerator::new::<&mut AesRng>(
@@ -312,7 +316,7 @@ mod tests {
                     );
                 let _ =
                     auth_bits.generate::<&mut AesRng>(bits, &mut output_pr, channel_pr, &mut rng);
-                let _ = auth_bits.open(&output_pr, channel_pr);
+                let _ = auth_bits.open(output_pr.clone(), channel_pr);
 
                 Ok(())
             },
@@ -329,7 +333,7 @@ mod tests {
                 let _ =
                     auth_bits.generate::<&mut AesRng>(count, &mut output_vr, channel_vr, &mut rng);
                 let validation = auth_bits
-                    .open(&output_vr, channel_vr)
+                    .open(output_vr.clone(), channel_vr)
                     .unwrap()
                     .into_inner(IS_VERIFIER);
                 Ok((validation, delta))
@@ -403,7 +407,7 @@ mod tests {
                     },
                 ));
 
-                let _ = auth_bits.open(&output_pr, channel_pr);
+                let _ = auth_bits.open(output_pr.clone(), channel_pr);
 
                 Ok(())
             },
@@ -421,7 +425,7 @@ mod tests {
                 let _ =
                     auth_bits.generate::<&mut AesRng>(count, &mut output_vr, channel_vr, &mut rng);
                 Ok(auth_bits
-                    .open(&output_vr, channel_vr)
+                    .open(output_vr.clone(), channel_vr)
                     .unwrap()
                     .into_inner(IS_VERIFIER))
             },
