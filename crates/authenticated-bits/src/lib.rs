@@ -233,14 +233,10 @@ impl<
     /// "Open" all authenticated bits stored in `out`.
     ///
     /// This corresponds to the prover sending $(b, M)$ to the verifier, who checks
-    /// that $`K = M \oplus b \Delta`$.\
-    ///
-    /// Note: We force the user to consume the passed `Vec<AuthBit<P>>` in order to prevent
-    /// the user from re-using them. Re-using these bits may result in security leaks because
-    /// their security relies on a one time pad.
+    /// that $`K = M \oplus b \Delta`$.
     pub fn open(
         &self,
-        out: Vec<AuthBit<P>>,
+        out: &[AuthBit<P>],
         channel: &mut Channel,
     ) -> eyre::Result<VerifierPrivateCopy<P, bool>> {
         match P::WHICH {
@@ -318,7 +314,7 @@ mod tests {
                     AuthBitGenerator::new::<&mut AesRng>(channel_pr, &mut rng);
                 let _ =
                     auth_bits.generate::<&mut AesRng>(bits, &mut output_pr, channel_pr, &mut rng);
-                let _ = auth_bits.open(output_pr.clone(), channel_pr);
+                let _ = auth_bits.open(&output_pr, channel_pr);
 
                 Ok(())
             },
@@ -335,7 +331,7 @@ mod tests {
                 let _ =
                     auth_bits.generate::<&mut AesRng>(count, &mut output_vr, channel_vr, &mut rng);
                 let validation = auth_bits
-                    .open(output_vr.clone(), channel_vr)
+                    .open(&output_vr, channel_vr)
                     .unwrap()
                     .into_inner(IS_VERIFIER);
                 Ok((validation, delta))
@@ -405,7 +401,7 @@ mod tests {
                     },
                 ));
 
-                let _ = auth_bits.open(output_pr.clone(), channel_pr);
+                let _ = auth_bits.open(&output_pr, channel_pr);
 
                 Ok(())
             },
@@ -418,7 +414,7 @@ mod tests {
                 let _ =
                     auth_bits.generate::<&mut AesRng>(count, &mut output_vr, channel_vr, &mut rng);
                 Ok(auth_bits
-                    .open(output_vr.clone(), channel_vr)
+                    .open(&output_vr, channel_vr)
                     .unwrap()
                     .into_inner(IS_VERIFIER))
             },
