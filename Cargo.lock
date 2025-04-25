@@ -2500,6 +2500,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-authenticated-bits"
+version = "0.6.0"
+dependencies = [
+ "eyre",
+ "ocelot",
+ "proptest",
+ "rand 0.8.5",
+ "scuttlebutt",
+ "swanky-aes-rng",
+ "swanky-channel",
+ "swanky-party",
+ "vectoreyes",
+]
+
+[[package]]
 name = "swanky-channel"
 version = "0.6.0"
 dependencies = [
