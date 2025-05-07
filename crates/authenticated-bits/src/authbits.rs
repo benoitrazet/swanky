@@ -135,40 +135,41 @@ impl<
     /// Create a new [`AuthBitGenerator`].
     ///
     /// The verifier's $`\Delta`$ value is randomly generated using `rng`.
-    pub fn new<RNG>(channel: &mut Channel, mut rng: RNG) -> Self
+    pub fn new<RNG>(channel: &mut Channel, mut rng: RNG) -> eyre::Result<Self>
     where
         RNG: CryptoRng + Rng,
     {
         match P::WHICH {
-            WhichParty::Prover(e) => AuthBitGenerator {
-                delta: VerifierPrivateCopy::empty(e),
-                ot: PartyEither::prover_new(e, OTR::init(channel, &mut rng).unwrap()),
-            },
-            WhichParty::Verifier(e) => AuthBitGenerator {
-                delta: VerifierPrivateCopy::new(rng.r#gen::<U8x16>()),
-                ot: PartyEither::verifier_new(e, OTS::init(channel, &mut rng).unwrap()),
-            },
+            WhichParty::Prover(e) => {
+                Self::new_with_delta(VerifierPrivateCopy::empty(e), channel, rng)
+            }
+            WhichParty::Verifier(_e) => {
+                let delta = rng.r#gen::<U8x16>();
+                Self::new_with_delta(VerifierPrivateCopy::new(delta), channel, rng)
+            }
         }
     }
+
     /// Create a new [`AuthBitGenerator`] with a supplied $`\Delta`$ value.
     pub fn new_with_delta<RNG>(
         delta: VerifierPrivateCopy<P, U8x16>,
         channel: &mut Channel,
         mut rng: RNG,
-    ) -> Self
+    ) -> eyre::Result<Self>
     where
         RNG: CryptoRng + Rng,
     {
-        match P::WHICH {
+        let result = match P::WHICH {
             WhichParty::Prover(e) => AuthBitGenerator {
                 delta: VerifierPrivateCopy::empty(e),
-                ot: PartyEither::prover_new(e, OTR::init(channel, &mut rng).unwrap()),
+                ot: PartyEither::prover_new(e, OTR::init(channel, &mut rng)?),
             },
             WhichParty::Verifier(e) => AuthBitGenerator {
                 delta: VerifierPrivateCopy::new(delta.into_inner(e)),
-                ot: PartyEither::verifier_new(e, OTS::init(channel, &mut rng).unwrap()),
+                ot: PartyEither::verifier_new(e, OTS::init(channel, &mut rng)?),
             },
-        }
+        };
+        Ok(result)
     }
     /// Generate a vector of authenticated of bits.
     ///
@@ -303,7 +304,7 @@ mod tests {
                 let mut rng = AesRng::new();
                 let bits = PartyEitherCopy::prover_new(IS_PROVER, bits_in);
                 let mut auth_bits: AuthBitGenerator<_, ot::KosSender, ot::KosReceiver> =
-                    AuthBitGenerator::new::<&mut AesRng>(channel_pr, &mut rng);
+                    AuthBitGenerator::new::<&mut AesRng>(channel_pr, &mut rng).unwrap();
                 let _ =
                     auth_bits.generate::<&mut AesRng>(bits, &mut output_pr, channel_pr, &mut rng);
                 let _ = auth_bits.open(&output_pr, channel_pr);
@@ -319,7 +320,8 @@ mod tests {
                         VerifierPrivateCopy::new(delta),
                         channel_vr,
                         &mut rng,
-                    );
+                    )
+                    .unwrap();
                 let _ =
                     auth_bits.generate::<&mut AesRng>(count, &mut output_vr, channel_vr, &mut rng);
                 let validation = auth_bits
@@ -377,7 +379,7 @@ mod tests {
                 let mut rng = AesRng::new();
                 let bits_in = PartyEitherCopy::prover_new(IS_PROVER, bits.as_slice());
                 let mut auth_bits: AuthBitGenerator<_, ot::KosSender, ot::KosReceiver> =
-                    AuthBitGenerator::new::<&mut AesRng>(channel_pr, &mut rng);
+                    AuthBitGenerator::new::<&mut AesRng>(channel_pr, &mut rng).unwrap();
                 let _ = auth_bits.generate::<&mut AesRng>(
                     bits_in,
                     &mut output_pr,
@@ -402,7 +404,7 @@ mod tests {
                 let count = PartyEitherCopy::verifier_new(IS_VERIFIER, bits.len());
 
                 let mut auth_bits: AuthBitGenerator<_, ot::KosSender, ot::KosReceiver> =
-                    AuthBitGenerator::new::<&mut AesRng>(channel_vr, &mut rng);
+                    AuthBitGenerator::new::<&mut AesRng>(channel_vr, &mut rng).unwrap();
                 let _ =
                     auth_bits.generate::<&mut AesRng>(count, &mut output_vr, channel_vr, &mut rng);
                 Ok(auth_bits
