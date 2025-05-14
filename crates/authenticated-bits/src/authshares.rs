@@ -222,60 +222,66 @@ mod tests {
     ) -> (
         Vec<AuthShare<Prover>>,
         Vec<AuthShare<Verifier>>,
-        bool,
-        bool,
-        U8x16,
-        U8x16,
+        AuthShareGenerator<Prover, ot::KosSender, ot::KosReceiver>,
+        AuthShareGenerator<Verifier, ot::KosSender, ot::KosReceiver>,
     ) {
         let mut output_a: Vec<AuthShare<Prover>> = vec![];
         let mut output_b: Vec<AuthShare<Verifier>> = vec![];
+        let (generator_a, generator_b) = swanky_channel::local::local_channel_pair(
+            |c| {
+                let mut rng = AesRng::new();
+                let mut generator =
+                    AuthShareGenerator::<Prover, ot::KosSender, ot::KosReceiver>::new(c, &mut rng)
+                        .unwrap();
+                let _ = generator
+                    .generate(nshares, &mut output_a, c, &mut rng)
+                    .unwrap();
+                Ok(generator)
+            },
+            |c| {
+                let mut rng = AesRng::new();
+                let mut generator =
+                    AuthShareGenerator::<Verifier, ot::KosSender, ot::KosReceiver>::new(
+                        c, &mut rng,
+                    )
+                    .unwrap();
+                let _ = generator
+                    .generate(nshares, &mut output_b, c, &mut rng)
+                    .unwrap();
+                Ok(generator)
+            },
+        )
+        .unwrap();
+        (output_a, output_b, generator_a, generator_b)
+    }
+    fn auth_share_validation(
+        generator_a: AuthShareGenerator<Prover, ot::KosSender, ot::KosReceiver>,
+        generator_b: AuthShareGenerator<Verifier, ot::KosSender, ot::KosReceiver>,
+        output_a: Vec<AuthShare<Prover>>,
+        output_b: Vec<AuthShare<Verifier>>,
+    ) -> (bool, bool, U8x16, U8x16) {
         let ((validation_a, delta_a), (validation_b, delta_b)) =
             swanky_channel::local::local_channel_pair(
                 |c| {
-                    let mut rng = AesRng::new();
-                    let mut generator =
-                        AuthShareGenerator::<Prover, ot::KosSender, ot::KosReceiver>::new(
-                            c, &mut rng,
-                        )
-                        .unwrap();
-                    let _ = generator
-                        .generate(nshares, &mut output_a, c, &mut rng)
-                        .unwrap();
-                    let result = generator.open(&output_a, c).unwrap();
-                    let delta = generator.delta();
+                    let result = generator_a.open(&output_a, c).unwrap();
+                    let delta = generator_a.delta();
                     Ok((result, delta))
                 },
                 |c| {
-                    let mut rng = AesRng::new();
-                    let mut generator =
-                        AuthShareGenerator::<Verifier, ot::KosSender, ot::KosReceiver>::new(
-                            c, &mut rng,
-                        )
-                        .unwrap();
-                    let _ = generator
-                        .generate(nshares, &mut output_b, c, &mut rng)
-                        .unwrap();
-                    let result = generator.open(&output_b, c).unwrap();
-                    let delta = generator.delta();
+                    let result = generator_b.open(&output_b, c).unwrap();
+                    let delta = generator_b.delta();
                     Ok((result, delta))
                 },
             )
             .unwrap();
-        (
-            output_a,
-            output_b,
-            validation_a,
-            validation_b,
-            delta_a,
-            delta_b,
-        )
+        (validation_a, validation_b, delta_a, delta_b)
     }
-
     #[test]
     fn test_correct_generation() {
         let nshares = 1000;
-        let (output_a, output_b, validation_a, validation_b, delta_a, delta_b) =
-            auth_share_generation(nshares);
+        let (output_a, output_b, generator_a, generator_b) = auth_share_generation(nshares);
+        let (validation_a, validation_b, _delta_a, _delta_b) =
+            auth_share_validation(generator_a, generator_b, output_a, output_b);
         assert!(validation_a);
         assert!(validation_b);
     }
