@@ -22,6 +22,7 @@ use vectoreyes::U8x16;
 /// An authenticated share.
 ///
 /// See [`crate::authshares`] for details.
+#[derive(Default, Clone, Copy)]
 pub struct AuthShare<P: Party> {
     /// Party A's side of the authenticated bit.
     party_a: PartyEitherCopy<P, AuthBit<Prover>, AuthBit<Verifier>>,
@@ -234,7 +235,7 @@ mod tests {
                 let mut generator =
                     AuthShareGenerator::<Prover, ot::KosSender, ot::KosReceiver>::new(c, &mut rng)
                         .unwrap();
-                let _ = generator
+                generator
                     .generate(nshares, &mut output_a, c, &mut rng)
                     .unwrap();
                 Ok(generator)
@@ -246,7 +247,7 @@ mod tests {
                         c, &mut rng,
                     )
                     .unwrap();
-                let _ = generator
+                generator
                     .generate(nshares, &mut output_b, c, &mut rng)
                     .unwrap();
                 Ok(generator)
@@ -324,6 +325,28 @@ mod tests {
         let (validation_c, validation_b, _delta_c, _delta_b) =
             auth_share_validation(generator_c, generator_b, output_c, output_b);
         assert!(!validation_c);
+        assert!(!validation_b);
+    }
+    #[test]
+    fn test_tampered_share_prove_oneerror() {
+        let nshares = 1000;
+        let (output_a, mut output_b, generator_a, generator_b) = auth_share_generation(nshares);
+        let (_output_c, output_d, _generator_c, _generator_d) = auth_share_generation(nshares);
+        output_b[0] = output_d[0];
+        let (validation_a, validation_b, _delta_a, _delta_b) =
+            auth_share_validation(generator_a, generator_b, output_a, output_b);
+        assert!(!validation_a);
+        assert!(!validation_b);
+    }
+    #[test]
+    fn test_tampered_share_verifier_oneerror() {
+        let nshares = 1000;
+        let (mut output_a, output_b, generator_a, generator_b) = auth_share_generation(nshares);
+        let (output_c, _output_d, _generator_c, _generator_d) = auth_share_generation(nshares);
+        output_a[0] = output_c[0];
+        let (validation_a, validation_b, _delta_a, _delta_b) =
+            auth_share_validation(generator_a, generator_b, output_a, output_b);
+        assert!(!validation_a);
         assert!(!validation_b);
     }
 }
