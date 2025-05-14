@@ -133,30 +133,24 @@ impl<
                 let party_b = self.party_b.as_mut().prover_into(ev);
                 party_a.generate(bits, &mut our_auth_bits, channel, &mut rng)?;
                 party_b.generate(nshares, &mut their_auth_bits, channel, &mut rng)?;
-                shares.extend(
-                    our_auth_bits
-                        .into_iter()
-                        .zip(their_auth_bits.into_iter())
-                        .map(|(ours, theirs)| AuthShare {
-                            party_a: PartyEitherCopy::prover_new(ev, ours),
-                            party_b: PartyEitherCopy::prover_new(ev, theirs),
-                        }),
-                );
+                shares.extend(our_auth_bits.into_iter().zip(their_auth_bits).map(
+                    |(ours, theirs)| AuthShare {
+                        party_a: PartyEitherCopy::prover_new(ev, ours),
+                        party_b: PartyEitherCopy::prover_new(ev, theirs),
+                    },
+                ));
             }
             WhichParty::Verifier(ev) => {
                 let party_a = self.party_a.as_mut().verifier_into(ev);
                 let party_b = self.party_b.as_mut().verifier_into(ev);
                 party_a.generate(nshares, &mut their_auth_bits, channel, &mut rng)?;
                 party_b.generate(bits, &mut our_auth_bits, channel, &mut rng)?;
-                shares.extend(
-                    our_auth_bits
-                        .into_iter()
-                        .zip(their_auth_bits.into_iter())
-                        .map(|(ours, theirs)| AuthShare {
-                            party_a: PartyEitherCopy::verifier_new(ev, theirs),
-                            party_b: PartyEitherCopy::verifier_new(ev, ours),
-                        }),
-                );
+                shares.extend(our_auth_bits.into_iter().zip(their_auth_bits).map(
+                    |(ours, theirs)| AuthShare {
+                        party_a: PartyEitherCopy::verifier_new(ev, theirs),
+                        party_b: PartyEitherCopy::verifier_new(ev, ours),
+                    },
+                ));
             }
         }
         Ok(())
@@ -176,18 +170,18 @@ impl<
                 let party_a = self.party_a.as_ref().prover_into(ev);
                 let party_b = self.party_b.as_ref().prover_into(ev);
                 let ours = PartyEitherCopy::pull_either_outside(&ours).prover_into(ev);
-                party_a.open(&ours, channel)?;
+                party_a.open(ours, channel)?;
                 let theirs = PartyEitherCopy::pull_either_outside(&theirs).prover_into(ev);
-                let result = party_b.open(&theirs, channel)?;
+                let result = party_b.open(theirs, channel)?;
                 Ok(result.into_inner(IS_VERIFIER))
             }
             WhichParty::Verifier(ev) => {
                 let party_a = self.party_a.as_ref().verifier_into(ev);
                 let party_b = self.party_b.as_ref().verifier_into(ev);
                 let ours = PartyEitherCopy::pull_either_outside(&ours).verifier_into(ev);
-                let result = party_a.open(&ours, channel)?;
+                let result = party_a.open(ours, channel)?;
                 let theirs = PartyEitherCopy::pull_either_outside(&theirs).verifier_into(ev);
-                party_b.open(&theirs, channel)?;
+                party_b.open(theirs, channel)?;
                 Ok(result.into_inner(IS_VERIFIER))
             }
         }
