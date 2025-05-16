@@ -1,9 +1,8 @@
 //! Authenticated shares.
 //!
-//! See [`crate`] for a high-level description of authenticated bits. An
-//! authenticated share $`\langle \lambda \rangle = \langle r | s \rangle`$ is a
-//! pair of authenticated bits $`[r]_A`$, $`[s]_B`$, where $`[r]_A`$ denotes
-//! that $`[r]`$ is an authenticated bit held by Party A, and likewise,
+//! An authenticated share $`\langle \lambda \rangle = \langle r | s \rangle`$
+//! is a pair of authenticated bits $`[r]_A`$, $`[s]_B`$, where $`[r]_A`$
+//! denotes that $`[r]`$ is an authenticated bit held by Party A, and likewise,
 //! $`[s]_B`$ is an authenticated bit held by Party B. We define $`\lambda = r
 //! \oplus s`$.
 
@@ -18,6 +17,17 @@ use swanky_party::{
     private::VerifierPrivateCopy,
 };
 use vectoreyes::U8x16;
+
+/// Party A.
+///
+/// This is a type-alias for [`Prover`] and is useful to clarify the role of a
+/// given [`AuthShare`].
+pub type PartyA = Prover;
+/// Party B.
+///
+/// This is a type-alias for [`Verifier`] and is useful to clarify the role of a
+/// given [`AuthShare`].
+pub type PartyB = Verifier;
 
 /// An authenticated share.
 ///
@@ -211,23 +221,22 @@ mod tests {
     use super::*;
     use ocelot::ot;
     use scuttlebutt::AesRng;
-    use swanky_party::{Prover, Verifier};
 
     fn auth_share_generation(
         nshares: usize,
     ) -> (
-        Vec<AuthShare<Prover>>,
-        Vec<AuthShare<Verifier>>,
-        AuthShareGenerator<Prover, ot::KosSender, ot::KosReceiver>,
-        AuthShareGenerator<Verifier, ot::KosSender, ot::KosReceiver>,
+        Vec<AuthShare<PartyA>>,
+        Vec<AuthShare<PartyB>>,
+        AuthShareGenerator<PartyA, ot::KosSender, ot::KosReceiver>,
+        AuthShareGenerator<PartyB, ot::KosSender, ot::KosReceiver>,
     ) {
-        let mut output_a: Vec<AuthShare<Prover>> = vec![];
-        let mut output_b: Vec<AuthShare<Verifier>> = vec![];
+        let mut output_a: Vec<AuthShare<PartyA>> = vec![];
+        let mut output_b: Vec<AuthShare<PartyB>> = vec![];
         let (generator_a, generator_b) = swanky_channel::local::local_channel_pair(
             |c| {
                 let mut rng = AesRng::new();
                 let mut generator =
-                    AuthShareGenerator::<Prover, ot::KosSender, ot::KosReceiver>::new(c, &mut rng)
+                    AuthShareGenerator::<PartyA, ot::KosSender, ot::KosReceiver>::new(c, &mut rng)
                         .unwrap();
                 generator
                     .generate(nshares, &mut output_a, c, &mut rng)
@@ -237,10 +246,8 @@ mod tests {
             |c| {
                 let mut rng = AesRng::new();
                 let mut generator =
-                    AuthShareGenerator::<Verifier, ot::KosSender, ot::KosReceiver>::new(
-                        c, &mut rng,
-                    )
-                    .unwrap();
+                    AuthShareGenerator::<PartyB, ot::KosSender, ot::KosReceiver>::new(c, &mut rng)
+                        .unwrap();
                 generator
                     .generate(nshares, &mut output_b, c, &mut rng)
                     .unwrap();
@@ -251,10 +258,10 @@ mod tests {
         (output_a, output_b, generator_a, generator_b)
     }
     fn auth_share_validation(
-        generator_a: AuthShareGenerator<Prover, ot::KosSender, ot::KosReceiver>,
-        generator_b: AuthShareGenerator<Verifier, ot::KosSender, ot::KosReceiver>,
-        output_a: Vec<AuthShare<Prover>>,
-        output_b: Vec<AuthShare<Verifier>>,
+        generator_a: AuthShareGenerator<PartyA, ot::KosSender, ot::KosReceiver>,
+        generator_b: AuthShareGenerator<PartyB, ot::KosSender, ot::KosReceiver>,
+        output_a: Vec<AuthShare<PartyA>>,
+        output_b: Vec<AuthShare<PartyB>>,
     ) -> (bool, bool, U8x16, U8x16) {
         let ((validation_a, delta_a), (validation_b, delta_b)) =
             swanky_channel::local::local_channel_pair(
