@@ -176,7 +176,7 @@ fn main() {
         for (k, v) in outputs.iter() {
             std::fs::write(tmpdir.path().join(k), v.as_bytes()).unwrap();
         }
-        std::fs::rename(tmpdir.into_path(), cache_entry).unwrap();
+        std::fs::rename(tmpdir.keep(), cache_entry).unwrap();
     }
     println!("cargo:rerun-if-changed=build.rs");
 }
