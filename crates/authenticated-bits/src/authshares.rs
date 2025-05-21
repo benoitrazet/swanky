@@ -280,7 +280,7 @@ mod tests {
         (validation_a, validation_b, delta_a, delta_b)
     }
     #[test]
-    fn test_correct_generation() {
+    fn test_correct() {
         let nshares = 1000;
         let (output_a, output_b, generator_a, generator_b) = auth_share_generation(nshares);
         let (validation_a, validation_b, _delta_a, _delta_b) =
@@ -289,17 +289,7 @@ mod tests {
         assert!(validation_b);
     }
     #[test]
-    fn test_wrong_generator_prover() {
-        let nshares = 1000;
-        let (output_a, _output_b, generator_a, _generator_b) = auth_share_generation(nshares);
-        let (_output_c, output_d, _generator_c, generator_d) = auth_share_generation(nshares);
-        let (validation_a, validation_d, _delta_a, _delta_d) =
-            auth_share_validation(generator_a, generator_d, output_a, output_d);
-        assert!(!validation_a);
-        assert!(!validation_d);
-    }
-    #[test]
-    fn test_wrong_generator_verifier() {
+    fn test_wrong_generator() {
         let nshares = 1000;
         let (_output_a, output_b, _generator_a, generator_b) = auth_share_generation(nshares);
         let (output_c, _output_d, generator_c, _generator_d) = auth_share_generation(nshares);
@@ -318,36 +308,13 @@ mod tests {
         assert!(!validation_a);
         assert!(!validation_d);
     }
-    #[test]
-    fn test_tampered_share_verifier() {
-        let nshares = 1000;
-        let (_output_a, output_b, _generator_a, generator_b) = auth_share_generation(nshares);
-        let (output_c, _output_d, generator_c, _generator_d) = auth_share_generation(nshares);
-        let (validation_c, validation_b, _delta_c, _delta_b) =
-            auth_share_validation(generator_c, generator_b, output_c, output_b);
-        assert!(!validation_c);
-        assert!(!validation_b);
-    }
     proptest! {
         #[test]
-        fn test_tampered_share_prove_oneerror(index in 0..1000usize) {
+        fn test_tampered_share_oneerror(index in 0..1000usize) {
             let nshares = 1000;
             let (output_a, mut output_b, generator_a, generator_b) = auth_share_generation(nshares);
             let (_output_c, output_d, _generator_c, _generator_d) = auth_share_generation(nshares);
             output_b[index] = output_d[index];
-            let (validation_a, validation_b, _delta_a, _delta_b) =
-                auth_share_validation(generator_a, generator_b, output_a, output_b);
-            assert!(!validation_a);
-            assert!(!validation_b);
-        }
-    }
-    proptest! {
-        #[test]
-        fn test_tampered_share_verifier_oneerror(index in 0..1000usize) {
-            let nshares = 1000;
-            let (mut output_a, output_b, generator_a, generator_b) = auth_share_generation(nshares);
-            let (output_c, _output_d, _generator_c, _generator_d) = auth_share_generation(nshares);
-            output_a[index] = output_c[index];
             let (validation_a, validation_b, _delta_a, _delta_b) =
                 auth_share_validation(generator_a, generator_b, output_a, output_b);
             assert!(!validation_a);
