@@ -133,32 +133,38 @@ impl<
         mut rng: RNG,
     ) -> eyre::Result<()> {
         let bits: Vec<_> = (0..nshares).map(|_| rng.r#gen::<bool>()).collect();
+
+        let mut party_a_auth_bits = Vec::with_capacity(nshares);
+        let mut party_b_auth_bits = Vec::with_capacity(nshares);
+
         let bits = PartyEitherCopy::prover_new(IS_PROVER, bits.as_slice());
         let nshares = PartyEitherCopy::verifier_new(IS_VERIFIER, nshares);
-        let mut our_auth_bits = vec![];
-        let mut their_auth_bits = vec![];
         match P::WHICH {
             WhichParty::Prover(ev) => {
                 let party_a = self.party_a.as_mut().prover_into(ev);
                 let party_b = self.party_b.as_mut().prover_into(ev);
-                party_a.generate(bits, &mut our_auth_bits, channel, &mut rng)?;
-                party_b.generate(nshares, &mut their_auth_bits, channel, &mut rng)?;
-                shares.extend(our_auth_bits.into_iter().zip(their_auth_bits).map(
-                    |(ours, theirs)| AuthShare {
-                        party_a: PartyEitherCopy::prover_new(ev, ours),
-                        party_b: PartyEitherCopy::prover_new(ev, theirs),
+
+                party_a.generate(bits, &mut party_a_auth_bits, channel, &mut rng)?;
+                party_b.generate(nshares, &mut party_b_auth_bits, channel, &mut rng)?;
+
+                shares.extend(party_a_auth_bits.into_iter().zip(party_b_auth_bits).map(
+                    |(party_a_val, party_b_val)| AuthShare {
+                        party_a: PartyEitherCopy::prover_new(ev, party_a_val),
+                        party_b: PartyEitherCopy::prover_new(ev, party_b_val),
                     },
                 ));
             }
             WhichParty::Verifier(ev) => {
                 let party_a = self.party_a.as_mut().verifier_into(ev);
                 let party_b = self.party_b.as_mut().verifier_into(ev);
-                party_a.generate(nshares, &mut their_auth_bits, channel, &mut rng)?;
-                party_b.generate(bits, &mut our_auth_bits, channel, &mut rng)?;
-                shares.extend(our_auth_bits.into_iter().zip(their_auth_bits).map(
-                    |(ours, theirs)| AuthShare {
-                        party_a: PartyEitherCopy::verifier_new(ev, theirs),
-                        party_b: PartyEitherCopy::verifier_new(ev, ours),
+
+                party_a.generate(nshares, &mut party_b_auth_bits, channel, &mut rng)?;
+                party_b.generate(bits, &mut party_a_auth_bits, channel, &mut rng)?;
+
+                shares.extend(party_a_auth_bits.into_iter().zip(party_b_auth_bits).map(
+                    |(party_a_val, party_b_val)| AuthShare {
+                        party_a: PartyEitherCopy::verifier_new(ev, party_b_val),
+                        party_b: PartyEitherCopy::verifier_new(ev, party_a_val),
                     },
                 ));
             }
@@ -171,7 +177,7 @@ impl<
     /// This corresponds to opening all the authenticated bits that make up the
     /// authenticated shares.
     pub fn open(&self, shares: &[AuthShare<P>], channel: &mut Channel) -> eyre::Result<bool> {
-        let (ours, theirs): (Vec<_>, Vec<_>) = shares
+        let (party_a_shares, party_b_shares): (Vec<_>, Vec<_>) = shares
             .iter()
             .map(|authshare| (authshare.party_a, authshare.party_b))
             .unzip();
@@ -179,19 +185,27 @@ impl<
             WhichParty::Prover(ev) => {
                 let party_a = self.party_a.as_ref().prover_into(ev);
                 let party_b = self.party_b.as_ref().prover_into(ev);
-                let ours = PartyEitherCopy::pull_either_outside(&ours).prover_into(ev);
-                party_a.open(ours, channel)?;
-                let theirs = PartyEitherCopy::pull_either_outside(&theirs).prover_into(ev);
-                let result = party_b.open(theirs, channel)?;
+
+                let party_a_shares =
+                    PartyEitherCopy::pull_either_outside(&party_a_shares).prover_into(ev);
+                party_a.open(party_a_shares, channel)?;
+                let party_b_shares =
+                    PartyEitherCopy::pull_either_outside(&party_b_shares).prover_into(ev);
+
+                let result = party_b.open(party_b_shares, channel)?;
                 Ok(result.into_inner(IS_VERIFIER))
             }
             WhichParty::Verifier(ev) => {
                 let party_a = self.party_a.as_ref().verifier_into(ev);
                 let party_b = self.party_b.as_ref().verifier_into(ev);
-                let ours = PartyEitherCopy::pull_either_outside(&ours).verifier_into(ev);
-                let result = party_a.open(ours, channel)?;
-                let theirs = PartyEitherCopy::pull_either_outside(&theirs).verifier_into(ev);
-                party_b.open(theirs, channel)?;
+
+                let party_a_shares =
+                    PartyEitherCopy::pull_either_outside(&party_a_shares).verifier_into(ev);
+                let result = party_a.open(party_a_shares, channel)?;
+                let party_b_shares =
+                    PartyEitherCopy::pull_either_outside(&party_b_shares).verifier_into(ev);
+                party_b.open(party_b_shares, channel)?;
+
                 Ok(result.into_inner(IS_VERIFIER))
             }
         }
@@ -216,6 +230,7 @@ impl<
     }
 }
 
+//
 #[cfg(test)]
 mod tests {
     use super::*;
