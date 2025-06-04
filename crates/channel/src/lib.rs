@@ -7,7 +7,6 @@
 
 use std::io::{Read, Write};
 
-use eyre::Context;
 use generic_array::GenericArray;
 use swanky_serialization::CanonicalSerialize;
 
@@ -17,29 +16,6 @@ pub mod local;
 /// ReadWrite`, instead.
 trait ReadWrite: Read + Write {}
 impl<T: Read + Write + ?Sized> ReadWrite for T {}
-
-/// A tag denoting that an error was caused by a network error.
-///
-/// # Checking for Network Error
-///
-/// [`eyre::Error`]s can be queried to see if they're due to a [`NetworkError`]
-///
-/// ```rust
-/// use swanky_channel::NetworkError;
-///
-/// let e = eyre::eyre!("My Error");
-/// let e = e.wrap_err(NetworkError);
-/// let e = e.wrap_err("Some other message");
-/// assert!(e.is::<NetworkError>());
-/// ```
-#[derive(Clone, Copy, Debug, Default)]
-pub struct NetworkError;
-impl std::fmt::Display for NetworkError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
-    }
-}
-impl std::error::Error for NetworkError {}
 
 /// The sizes of the read and write buffers be for a [`Channel`]
 ///
@@ -159,17 +135,15 @@ impl Channel<'_> {
             inner: &mut inner,
         };
         let t = thunk(&mut channel)?;
-        channel.force_flush().wrap_err(NetworkError)?;
+        channel.force_flush()?;
         Ok(t)
     }
 
     #[inline(never)]
-    fn force_flush_slow(&mut self) -> eyre::Result<()> {
-        self.inner
-            .write_all(&self.write_buffer)
-            .wrap_err(NetworkError)?;
+    fn force_flush_slow(&mut self) -> std::io::Result<()> {
+        self.inner.write_all(&self.write_buffer)?;
         self.write_buffer.clear();
-        self.inner.flush().wrap_err(NetworkError)?;
+        self.inner.flush()?;
         Ok(())
     }
 
@@ -182,24 +156,24 @@ impl Channel<'_> {
     ///
     /// See the "Flushes" section in [`Channel`] for more information.
     #[inline]
-    pub fn force_flush(&mut self) -> eyre::Result<()> {
+    pub fn force_flush(&mut self) -> std::io::Result<()> {
         if !self.write_buffer.is_empty() {
             self.force_flush_slow()?;
         }
         Ok(())
     }
     #[inline(never)]
-    fn write_bytes_slow(&mut self, bytes: &[u8]) -> eyre::Result<()> {
+    fn write_bytes_slow(&mut self, bytes: &[u8]) -> std::io::Result<()> {
         let available = self.write_buffer.capacity() - self.write_buffer.len();
         debug_assert!(bytes.len() > available);
         self.force_flush()?;
         debug_assert!(self.write_buffer.is_empty());
         if bytes.len() > self.write_buffer.capacity() {
-            self.inner.write_all(bytes).wrap_err(NetworkError)?;
+            self.inner.write_all(bytes)?;
             // We flush here because we use the length of the write_buffer to indicate whether
             // there are outstanding writes to flush. If we didn't flush here, then a long write
             // followed by a read would deadlock.
-            self.inner.flush().wrap_err(NetworkError)?;
+            self.inner.flush()?;
         } else {
             self.write_buffer.extend_from_slice(bytes);
         }
@@ -214,14 +188,14 @@ impl Channel<'_> {
     /// use swanky_channel::Channel;
     /// let mut dst = [0; 5];
     /// swanky_channel::local::local_channel_pair(
-    ///     |c| c.read_bytes(&mut dst),
-    ///     |c| c.write_bytes(b"hello"),
+    ///     |c| Ok(c.read_bytes(&mut dst)?),
+    ///     |c| Ok(c.write_bytes(b"hello")?),
     /// )
     /// .unwrap();
     /// assert_eq!(dst.as_slice(), b"hello");
     /// ```
     #[inline]
-    pub fn write_bytes(&mut self, bytes: &[u8]) -> eyre::Result<()> {
+    pub fn write_bytes(&mut self, bytes: &[u8]) -> std::io::Result<()> {
         let available = self.write_buffer.capacity() - self.write_buffer.len();
         if available >= bytes.len() {
             self.write_buffer.extend_from_slice(bytes);
@@ -231,7 +205,7 @@ impl Channel<'_> {
         }
     }
     #[inline(never)]
-    fn read_bytes_slow(&mut self, mut dst: &mut [u8]) -> eyre::Result<()> {
+    fn read_bytes_slow(&mut self, mut dst: &mut [u8]) -> std::io::Result<()> {
         while !dst.is_empty() {
             if self.read_buffer_len > 0 {
                 let to_take = self.read_buffer_len.min(dst.len());
@@ -244,7 +218,7 @@ impl Channel<'_> {
                 self.read_buffer_len -= to_take;
             } else if dst.len() > self.read_buffer.len() {
                 // Fill big reads from inner, directly.
-                self.inner.read_exact(dst).wrap_err(NetworkError)?;
+                self.inner.read_exact(dst)?;
                 return Ok(());
             } else {
                 self.read_buffer_pos = 0;
@@ -253,12 +227,11 @@ impl Channel<'_> {
                         return Err(std::io::Error::new(
                             std::io::ErrorKind::UnexpectedEof,
                             "Hit unexpected EOF",
-                        ))
-                        .wrap_err(NetworkError);
+                        ));
                     }
                     Ok(n) => n,
                     Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
-                    Err(e) => return Err(e).wrap_err(NetworkError),
+                    Err(e) => return Err(e),
                 };
             }
         }
@@ -271,14 +244,14 @@ impl Channel<'_> {
     /// use swanky_channel::Channel;
     /// let mut dst = [0; 5];
     /// swanky_channel::local::local_channel_pair(
-    ///     |c| c.read_bytes(&mut dst),
-    ///     |c| c.write_bytes(b"hello"),
+    ///     |c| Ok(c.read_bytes(&mut dst)?),
+    ///     |c| Ok(c.write_bytes(b"hello")?),
     /// )
     /// .unwrap();
     /// assert_eq!(dst.as_slice(), b"hello");
     /// ```
     #[inline]
-    pub fn read_bytes(&mut self, dst: &mut [u8]) -> eyre::Result<()> {
+    pub fn read_bytes(&mut self, dst: &mut [u8]) -> std::io::Result<()> {
         self.force_flush()?;
         let read_buffer =
             &self.read_buffer[self.read_buffer_pos..self.read_buffer_pos + self.read_buffer_len];
@@ -319,7 +292,7 @@ impl Channel<'_> {
     /// ```
     #[inline]
     pub fn write<T: CanonicalSerialize>(&mut self, t: &T) -> eyre::Result<()> {
-        self.write_bytes(&t.to_bytes())
+        Ok(self.write_bytes(&t.to_bytes())?)
     }
 }
 
