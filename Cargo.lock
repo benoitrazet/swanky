@@ -2521,6 +2521,7 @@ dependencies = [
 name = "swanky-channel"
 version = "0.6.0"
 dependencies = [
+ "bytemuck",
  "eyre",
  "generic-array 1.2.0",
  "proptest",

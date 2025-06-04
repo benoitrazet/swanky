@@ -7,6 +7,7 @@
 
 use std::io::{Read, Write};
 
+use bytemuck::TransparentWrapper;
 use generic_array::GenericArray;
 use swanky_serialization::CanonicalSerialize;
 
@@ -72,15 +73,15 @@ impl Default for BufferSizes {
 ///
 /// As a result, on channel error, the only safe remediation strategy is to drop (and close) the
 /// inner `Read + Write` type.
-pub struct Channel<'a> {
+pub struct Channel<'inner> {
     read_buffer: Vec<u8>,
     read_buffer_pos: usize,
     read_buffer_len: usize,
     write_buffer: Vec<u8>,
-    inner: &'a mut dyn ReadWrite,
+    inner: &'inner mut dyn ReadWrite,
 }
 
-impl Channel<'_> {
+impl<'inner> Channel<'inner> {
     /// Construct a new `[Channel]` wrapping the full-duplex connection, `inner`.
     ///
     /// This function is equivalent to calling [`Channel::with_sizes`] with the default
@@ -204,6 +205,19 @@ impl Channel<'_> {
             self.write_bytes_slow(bytes)
         }
     }
+    fn fill_read_buffer(&mut self) -> std::io::Result<()> {
+        self.read_buffer_pos = 0;
+        loop {
+            match self.inner.read(&mut self.read_buffer) {
+                Ok(n) => {
+                    self.read_buffer_len = n;
+                    return Ok(());
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => return Err(e),
+            }
+        }
+    }
     #[inline(never)]
     fn read_bytes_slow(&mut self, mut dst: &mut [u8]) -> std::io::Result<()> {
         while !dst.is_empty() {
@@ -221,18 +235,13 @@ impl Channel<'_> {
                 self.inner.read_exact(dst)?;
                 return Ok(());
             } else {
-                self.read_buffer_pos = 0;
-                self.read_buffer_len = match self.inner.read(&mut self.read_buffer) {
-                    Ok(0) => {
-                        return Err(std::io::Error::new(
-                            std::io::ErrorKind::UnexpectedEof,
-                            "Hit unexpected EOF",
-                        ));
-                    }
-                    Ok(n) => n,
-                    Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
-                    Err(e) => return Err(e),
-                };
+                self.fill_read_buffer()?;
+                if self.read_buffer_len == 0 {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        "Hit unexpected EOF",
+                    ));
+                }
             }
         }
         Ok(())
@@ -293,6 +302,69 @@ impl Channel<'_> {
     #[inline]
     pub fn write<T: CanonicalSerialize>(&mut self, t: &T) -> eyre::Result<()> {
         Ok(self.write_bytes(&t.to_bytes())?)
+    }
+
+    /// Return an [`IoAdapter`] for this channel which implements [`std::io::Read`] and
+    /// [`std::io::Write`].
+    ///
+    /// # Example
+    /// ```
+    /// use swanky_channel::Channel;
+    /// use std::io::Write;
+    /// fn use_write(mut x: impl Write) -> eyre::Result<()> {
+    ///     x.write_all(b"x")?;
+    ///     Ok(())
+    /// }
+    /// let (r, _) =
+    ///     swanky_channel::local::local_channel_pair(
+    ///         |c| c.read::<u8>(),
+    ///         |c| use_write(c.as_std_io())
+    ///     ).unwrap();
+    /// assert_eq!(r, b'x');
+    /// ```
+    #[inline]
+    pub fn as_std_io(&mut self) -> &mut IoAdapter<'inner> {
+        IoAdapter::wrap_mut(self)
+    }
+}
+
+/// An adapter for [`Channel`] which implements [`std::io::Read`] and [`std::io::Write`].
+///
+/// See [`Channel::as_std_io`] for more info.
+#[repr(transparent)]
+#[derive(TransparentWrapper)]
+pub struct IoAdapter<'a> {
+    inner: Channel<'a>,
+}
+impl std::io::Read for IoAdapter<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.inner.force_flush()?;
+        if self.inner.read_buffer_len == 0 {
+            self.inner.fill_read_buffer()?;
+            if self.inner.read_buffer_len == 0 {
+                return Ok(0);
+            }
+        }
+        let to_take = buf.len().min(self.inner.read_buffer_len);
+        self.inner.read_bytes(&mut buf[0..to_take])?;
+        Ok(to_take)
+    }
+    fn read_exact(&mut self, buf: &mut [u8]) -> std::io::Result<()> {
+        self.inner.read_bytes(buf)
+    }
+}
+impl std::io::Write for IoAdapter<'_> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.inner.write_bytes(buf)?;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.force_flush()
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
+        self.inner.write_bytes(buf)
     }
 }
 
