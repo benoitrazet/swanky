@@ -14,7 +14,7 @@ workspace = true
 scuttlebutt.workspace = true
 ocelot.workspace = true
 vectoreyes.workspace = true
-bytemuck = { workspace = true, features = ["derive"] }
+bytemuck.workspace = true
 rustc-hash.workspace = true
 subtle.workspace = true
 smallvec = { workspace = true, features = ["serde"] }
