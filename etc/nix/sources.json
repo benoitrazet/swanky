@@ -1,14 +1,14 @@
 {
     "nixpkgs": {
-        "branch": "nixos-24.11",
+        "branch": "nixos-25.05",
         "description": "Nix Packages collection",
         "homepage": "",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "5d736263df906c5da72ab0f372427814de2f52f8",
-        "sha256": "1cvxfj03xhakyrrz8bh4499vz5d35ay92575irrbmydcxixsrf3w",
+        "rev": "8f1b52b04f2cb6e5ead50bd28d76528a2f0380ef",
+        "sha256": "0854a0169bh2rlfvrsibaqlmsql0dp3ycwq5z8178kdl7q9h6rrq",
         "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/5d736263df906c5da72ab0f372427814de2f52f8.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs/archive/8f1b52b04f2cb6e5ead50bd28d76528a2f0380ef.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "rust-overlay": {
