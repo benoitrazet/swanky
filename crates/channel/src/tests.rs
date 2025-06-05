@@ -68,7 +68,7 @@ fn io_adapter_write() {
             let x: T = 0x8BADF00D;
             let y: T = 0xDEADBEEF;
             let c = c.as_std_io();
-            c.write(x.to_le_bytes().as_slice())?;
+            let _we_use_write_all_under_the_hood = c.write(x.to_le_bytes().as_slice())?;
             c.write_all(y.to_le_bytes().as_slice())?;
             Ok((x, y))
         },
