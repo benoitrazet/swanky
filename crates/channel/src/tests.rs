@@ -1,7 +1,12 @@
+use std::io::{Read, Write};
+
 use proptest::collection::vec as pvec;
 use proptest::prelude::*;
 
-use crate::{BufferSizes, Channel, local::LocalSocket};
+use crate::{
+    BufferSizes, Channel,
+    local::{LocalSocket, local_channel_pair},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Sender {
@@ -48,4 +53,68 @@ proptest! {
             runit(a, A, data);
         });
     }
+}
+
+#[test]
+fn io_adapter_write() {
+    type T = u32;
+    let (a, b) = local_channel_pair(
+        |c| {
+            let x = c.read::<T>()?;
+            let y = c.read::<T>()?;
+            Ok((x, y))
+        },
+        |c| {
+            let x: T = 0x8BADF00D;
+            let y: T = 0xDEADBEEF;
+            let c = c.as_std_io();
+            let _we_use_write_all_under_the_hood = c.write(x.to_le_bytes().as_slice())?;
+            c.write_all(y.to_le_bytes().as_slice())?;
+            Ok((x, y))
+        },
+    )
+    .unwrap();
+    assert_eq!(a, b);
+}
+
+#[test]
+fn io_adapter_read_eof() {
+    type T = u32;
+    let (a, b) = local_channel_pair(
+        |c| {
+            let x = c.read::<T>()?;
+            assert_eq!(c.as_std_io().read(&mut [0])?, 0);
+            Ok(x)
+        },
+        |c| {
+            let x: T = 0x8BADF00D;
+            c.write(&x)?;
+            Ok(x)
+        },
+    )
+    .unwrap();
+    assert_eq!(a, b);
+}
+
+#[test]
+fn io_adapter_read() {
+    let msg: Vec<u8> = (0..=u8::MAX).collect();
+    let (mut a, mut b) = LocalSocket::pair().unwrap();
+    std::thread::scope(|s| {
+        s.spawn(|| {
+            b.write_all(&msg).unwrap();
+            std::mem::drop(b);
+        });
+        Channel::with_sizes(&mut a, BufferSizes { read: 2, write: 16 }, |a| {
+            let mut buf = vec![0_u8; 8];
+            let a = a.as_std_io();
+            a.read_exact(&mut buf[0..1])?;
+            a.read_exact(&mut buf[1..3])?;
+            a.read_exact(&mut buf[3..8])?;
+            a.read_to_end(&mut buf)?;
+            assert_eq!(buf, msg);
+            Ok(())
+        })
+        .unwrap();
+    });
 }
