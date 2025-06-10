@@ -25,6 +25,7 @@
 use rand::{CryptoRng, Rng};
 use swanky_adversary::Malicious;
 use swanky_channel::Channel;
+use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
 use swanky_party::{
@@ -32,6 +33,10 @@ use swanky_party::{
     either::PartyEither,
     either::PartyEitherCopy,
     private::{ProverPrivateCopy, VerifierPrivateCopy},
+};
+use swanky_serialization::{
+    SequenceDeserializer, SequenceSerializer,
+    serde_vec::{deserialize, serialize},
 };
 use vectoreyes::U8x16;
 
@@ -237,9 +242,14 @@ impl<
     ) -> eyre::Result<VerifierPrivateCopy<P, F2>> {
         match P::WHICH {
             WhichParty::Prover(e) => {
+                let ser = SequenceSerializer::<F2>::new(&mut channel)?;
+
+                let bits: Vec<_> = out.iter().map(|ab| ab.bit().into_inner(e)).collect();
+                let bits_ser = serialize(&bits, ser)?;
+
+                channel.write(&bits_ser.len())?;
+                channel.write_bytes(&bits_ser)?;
                 for ab in out.iter() {
-                    // TODO: Change how bits are sent, this is extremely inefficent
-                    channel.write_bytes(&[bool::from(ab.bit().into_inner(e)) as u8])?;
                     // TODO: Potentially leave last bit in the mac for the
                     // authenticated bit.
                     channel.write_bytes(ab.mac().into_inner(e).as_ref())?;
@@ -248,15 +258,20 @@ impl<
             }
             WhichParty::Verifier(e) => {
                 let mut validation = true;
+
+                let mut bits_bytes = Vec::new();
+                channel.read_bytes(&mut bits_bytes)?;
+
+                let bit_ser = SequenceDeserializer::<F2>::new(&mut channel)?;
+                let mut bits = deserialize(bit_ser)?;
+
                 for ab in out.iter() {
-                    let mut bit_bytes = [0u8; 1];
-                    channel.read_bytes(&mut bit_bytes)?;
                     let mut mac_bytes = [0u8; 16];
                     channel.read_bytes(&mut mac_bytes)?;
                     let mac = U8x16::from(mac_bytes);
 
                     validation &= mac
-                        == if bit_bytes[0] == 1 {
+                        == if bits[0] == F2::ONE {
                             ab.key().into_inner(e) ^ self.delta().into_inner(e)
                         } else {
                             ab.key().into_inner(e)

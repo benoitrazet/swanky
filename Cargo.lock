@@ -2527,6 +2527,7 @@ dependencies = [
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",
  "swanky-party",
+ "swanky-serialization",
  "vectoreyes",
 ]
 
