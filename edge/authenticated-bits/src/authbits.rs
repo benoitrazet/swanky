@@ -44,7 +44,7 @@ struct ProverAuthBit {
     /// MAC authenticating the bit.
     mac: U8x16,
     /// The authenticated bit.
-    bit: bool,
+    bit: F2,
 }
 /// The verifier's part of the authentication bit.
 ///
@@ -79,7 +79,7 @@ impl<P: Party> AuthBit<P> {
         self.to_prover().map(|vab| vab.mac)
     }
     /// Output the prover's bit associated with this [`AuthBit`].
-    pub fn bit(&self) -> ProverPrivateCopy<P, bool> {
+    pub fn bit(&self) -> ProverPrivateCopy<P, F2> {
         self.to_prover().map(|vab| vab.bit)
     }
 }
@@ -93,7 +93,7 @@ impl<P: Party> std::ops::BitXor for AuthBit<P> {
         AuthBit(pairs.map(
             |(lhs, rhs)| ProverAuthBit {
                 mac: lhs.mac ^ rhs.mac,
-                bit: lhs.bit ^ rhs.bit,
+                bit: lhs.bit + rhs.bit,
             },
             |(lhs, rhs)| VerifierAuthBit {
                 key: lhs.key ^ rhs.key,
@@ -108,7 +108,7 @@ impl<P: Party> std::ops::BitXorAssign for AuthBit<P> {
     fn bitxor_assign(&mut self, rhs: Self) {
         match P::WHICH {
             WhichParty::Prover(e) => {
-                self.to_prover().into_inner(e).bit ^= rhs.to_prover().into_inner(e).bit;
+                self.to_prover().into_inner(e).bit += rhs.to_prover().into_inner(e).bit;
                 self.to_prover().into_inner(e).mac ^= rhs.to_prover().into_inner(e).mac;
             }
 
@@ -180,7 +180,7 @@ impl<
     /// - `rng`: The random number generator to use.
     pub fn generate<RNG>(
         &mut self,
-        bits_in: PartyEitherCopy<P, &[bool], usize>,
+        bits_in: PartyEitherCopy<P, &[F2], usize>,
         out: &mut Vec<AuthBit<P>>,
         mut channel: &mut Channel,
         mut rng: RNG,
@@ -193,7 +193,10 @@ impl<
                 let bits = bits_in.prover_into(e);
                 let macs = self.ot.as_mut().prover_into(e).receive_correlated(
                     &mut channel,
-                    bits,
+                    &bits
+                        .into_iter()
+                        .map(|b| bool::from(*b))
+                        .collect::<Vec<bool>>(),
                     &mut rng,
                 )?;
 
@@ -231,12 +234,12 @@ impl<
         &self,
         out: &[AuthBit<P>],
         channel: &mut Channel,
-    ) -> eyre::Result<VerifierPrivateCopy<P, bool>> {
+    ) -> eyre::Result<VerifierPrivateCopy<P, F2>> {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 for ab in out.iter() {
                     // TODO: Change how bits are sent, this is extremely inefficent
-                    channel.write_bytes(&[ab.bit().into_inner(e) as u8])?;
+                    channel.write_bytes(&[bool::from(ab.bit().into_inner(e)) as u8])?;
                     // TODO: Potentially leave last bit in the mac for the
                     // authenticated bit.
                     channel.write_bytes(ab.mac().into_inner(e).as_ref())?;
@@ -259,7 +262,7 @@ impl<
                             ab.key().into_inner(e)
                         };
                 }
-                Ok(VerifierPrivateCopy::new(validation))
+                Ok(VerifierPrivateCopy::new(F2::from(validation)))
             }
         }
     }
@@ -273,13 +276,13 @@ impl<
     ///
     /// This maps the prover's values $`(b, M)`$ to $`(b \oplus c, M)`$,
     /// and maps the verifier's value $`K`$ to $`K \oplus c \Delta`$.
-    pub fn xor_with_const(&self, authbit: AuthBit<P>, bit: bool) -> AuthBit<P> {
+    pub fn xor_with_const(&self, authbit: AuthBit<P>, bit: F2) -> AuthBit<P> {
         match P::WHICH {
             WhichParty::Prover(ev) => AuthBit(PartyEitherCopy::prover_new(
                 ev,
                 ProverAuthBit {
                     mac: authbit.mac().into_inner(ev),
-                    bit: authbit.bit().into_inner(ev) ^ bit,
+                    bit: authbit.bit().into_inner(ev) + bit,
                 },
             )),
             WhichParty::Verifier(ev) => AuthBit(PartyEitherCopy::verifier_new(
@@ -297,16 +300,16 @@ impl<
 mod tests {
     use super::*;
     use swanky_aes_rng::AesRng;
+    use swanky_field::FiniteRing;
     use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
     use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier, either::PartyEitherCopy};
-
     /// Validates pairs of prover and verifier `AuthBit`s.
     fn validate(pr: &[AuthBit<Prover>], vr: &[AuthBit<Verifier>], delta: U8x16) -> bool {
         pr.iter()
             .zip(vr)
             .map(|(ab_pr, ab_vr)| {
                 ab_pr.mac().into_inner(IS_PROVER)
-                    == (if ab_pr.bit().into_inner(IS_PROVER) {
+                    == (if ab_pr.bit().into_inner(IS_PROVER) == F2::ONE {
                         ab_vr.key().into_inner(IS_VERIFIER) ^ delta
                     } else {
                         ab_vr.key().into_inner(IS_VERIFIER)
@@ -320,7 +323,7 @@ mod tests {
     /// associated generators. If `tamper_mac` is true, tamper with the prover's
     /// MAC. If `tamper_key` is true, tamper with the verifier's key.
     fn generate(
-        bits_in: &[bool],
+        bits_in: &[F2],
         tamper_mac: bool,
         tamper_key: bool,
     ) -> (
@@ -369,7 +372,7 @@ mod tests {
                     .into_inner(IS_VERIFIER);
                 // The generated bits should always be valid when no tampering happens.
                 if !tamper_mac && !tamper_key {
-                    assert!(validation);
+                    assert!(bool::from(validation));
                 }
                 Ok(generator)
             },
@@ -382,8 +385,8 @@ mod tests {
     fn xor_with_const_works() {
         let count = 1000;
         let mut rng = AesRng::new();
-        let bits: Vec<bool> = (0..count).map(|_| rng.r#gen::<bool>()).collect();
-        let public_bits: Vec<bool> = (0..count).map(|_| rng.r#gen::<bool>()).collect();
+        let bits: Vec<F2> = (0..count).map(|_| rng.r#gen::<F2>()).collect();
+        let public_bits: Vec<F2> = (0..count).map(|_| rng.r#gen::<F2>()).collect();
         let (output_pr, output_vr, prover, verifier) = generate(&bits, false, false);
         for ((authbit_pr, authbit_vr), public_bit) in output_pr
             .into_iter()
@@ -402,7 +405,7 @@ mod tests {
             // The new authenticated bits should equal `bit ^ public_bit`.
             assert_eq!(
                 new_authbit_pr.bit().into_inner(IS_PROVER),
-                authbit_pr.bit().into_inner(IS_PROVER) ^ public_bit
+                authbit_pr.bit().into_inner(IS_PROVER) + public_bit
             );
         }
     }
@@ -412,7 +415,7 @@ mod tests {
     fn honest_generation_works() {
         let count = 1000;
         let mut rng = AesRng::new();
-        let bits: Vec<bool> = (0..count).map(|_| rng.r#gen::<bool>()).collect();
+        let bits: Vec<F2> = (0..count).map(|_| rng.r#gen::<F2>()).collect();
         let (output_pr, output_vr, _, verifier) = generate(&bits, false, false);
         let validation = validate(
             &output_pr,
@@ -427,7 +430,7 @@ mod tests {
     fn tampered_mac_fails() {
         let count = 1000;
         let mut rng = AesRng::new();
-        let bits: Vec<bool> = (0..count).map(|_| rng.r#gen::<bool>()).collect();
+        let bits: Vec<F2> = (0..count).map(|_| rng.r#gen::<F2>()).collect();
         let (output_pr, output_vr, _, verifier) = generate(&bits, true, false);
         let validation = validate(
             &output_pr,
@@ -442,7 +445,7 @@ mod tests {
     fn tampered_key_fails() {
         let count = 1000;
         let mut rng = AesRng::new();
-        let bits: Vec<bool> = (0..count).map(|_| rng.r#gen::<bool>()).collect();
+        let bits: Vec<F2> = (0..count).map(|_| rng.r#gen::<F2>()).collect();
         let (output_pr, output_vr, _, verifier) = generate(&bits, false, true);
         let validation = validate(
             &output_pr,
@@ -457,7 +460,7 @@ mod tests {
     fn tampered_delta_fails() {
         let count = 1000;
         let mut rng = AesRng::new();
-        let bits: Vec<bool> = (0..count).map(|_| rng.r#gen::<bool>()).collect();
+        let bits: Vec<F2> = (0..count).map(|_| rng.r#gen::<F2>()).collect();
         let (output_pr, output_vr, _, _) = generate(&bits, false, false);
         let validation = validate(&output_pr, &output_vr, rng.r#gen::<U8x16>());
         assert!(!validation);

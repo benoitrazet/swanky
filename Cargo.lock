@@ -2522,6 +2522,7 @@ dependencies = [
  "swanky-adversary",
  "swanky-aes-rng",
  "swanky-channel",
+ "swanky-field",
  "swanky-field-binary",
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",

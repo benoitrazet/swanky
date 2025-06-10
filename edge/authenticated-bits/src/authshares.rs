@@ -171,7 +171,7 @@ impl<
         channel: &mut Channel,
         mut rng: RNG,
     ) -> eyre::Result<()> {
-        let bits: Vec<_> = (0..nshares).map(|_| rng.r#gen::<bool>()).collect();
+        let bits: Vec<_> = (0..nshares).map(|_| rng.r#gen::<F2>()).collect();
 
         let mut party_a_auth_bits = Vec::with_capacity(nshares);
         let mut party_b_auth_bits = Vec::with_capacity(nshares);
@@ -215,7 +215,7 @@ impl<
     ///
     /// This corresponds to opening all the authenticated bits that make up the
     /// authenticated shares.
-    pub fn open(&self, shares: &[AuthShare<P>], channel: &mut Channel) -> eyre::Result<bool> {
+    pub fn open(&self, shares: &[AuthShare<P>], channel: &mut Channel) -> eyre::Result<F2> {
         let (party_a_shares, party_b_shares): (Vec<_>, Vec<_>) = shares
             .iter()
             .map(|authshare| (authshare.party_a, authshare.party_b))
@@ -273,7 +273,7 @@ impl<
     ///
     /// This works by computing $`[x_2]_B \oplus c`$, where $`[x_2]_B`$ is the
     /// authenticated bit held by Party B.
-    pub fn xor_with_const(&self, authshare: AuthShare<P>, bit: bool) -> AuthShare<P> {
+    pub fn xor_with_const(&self, authshare: AuthShare<P>, bit: F2) -> AuthShare<P> {
         match P::WHICH {
             WhichParty::Prover(ev) => AuthShare {
                 party_a: authshare.party_a,
@@ -343,7 +343,7 @@ mod tests {
         generator_b: &AuthShareGenerator<PartyB, kos::Sender, kos::Receiver>,
         output_a: Vec<AuthShare<PartyA>>,
         output_b: Vec<AuthShare<PartyB>>,
-    ) -> (bool, bool, U8x16, U8x16) {
+    ) -> (F2, F2, U8x16, U8x16) {
         let ((validation_a, delta_a), (validation_b, delta_b)) =
             swanky_channel::local::local_channel_pair(
                 |c| {
@@ -367,8 +367,8 @@ mod tests {
         let (output_a, output_b, generator_a, generator_b) = generate(nshares);
         let (validation_a, validation_b, _, _) =
             validate(&generator_a, &generator_b, output_a, output_b);
-        assert!(validation_a);
-        assert!(validation_b);
+        assert!(bool::from(validation_a));
+        assert!(bool::from(validation_b));
     }
     #[test]
     fn wrong_generators_fail() {
@@ -377,8 +377,8 @@ mod tests {
         let (_output_c, _output_d, generator_c, generator_d) = generate(nshares);
         let (validation_a, validation_b, _, _) =
             validate(&generator_c, &generator_d, output_a, output_b);
-        assert!(!validation_a);
-        assert!(!validation_b);
+        assert!(!bool::from(validation_a));
+        assert!(!bool::from(validation_b));
     }
     #[test]
     fn wrong_output_fails() {
@@ -387,8 +387,8 @@ mod tests {
         let (_output_c, output_d, _generator_c, _generator_d) = generate(nshares);
         let (validation_a, validation_b, _, _) =
             validate(&generator_a, &generator_b, output_a, output_d);
-        assert!(!validation_a);
-        assert!(!validation_b);
+        assert!(!bool::from(validation_a));
+        assert!(!bool::from(validation_b));
     }
     #[test]
     fn tampered_party_b_share_fails() {
@@ -399,8 +399,8 @@ mod tests {
         output_b[index] = output_d[index];
         let (validation_a, validation_b, _, _) =
             validate(&generator_a, &generator_b, output_a, output_b);
-        assert!(!validation_a);
-        assert!(!validation_b);
+        assert!(!bool::from(validation_a));
+        assert!(!bool::from(validation_b));
     }
     #[test]
     fn tampered_party_a_share_fails() {
@@ -411,15 +411,15 @@ mod tests {
         output_a[index] = output_c[index];
         let (validation_a, validation_b, _, _) =
             validate(&generator_a, &generator_b, output_a, output_b);
-        assert!(!validation_a);
-        assert!(!validation_b);
+        assert!(!bool::from(validation_a));
+        assert!(!bool::from(validation_b));
     }
 
     #[test]
     fn xor_with_const_works() {
         let count = 1000;
         let mut rng = AesRng::new();
-        let constants: Vec<bool> = (0..count).map(|_| rng.r#gen::<bool>()).collect();
+        let constants: Vec<F2> = (0..count).map(|_| rng.r#gen::<F2>()).collect();
         let (output_a, output_b, generator_a, generator_b) = generate(count);
         for ((a, b), bit) in output_a
             .into_iter()
@@ -431,8 +431,8 @@ mod tests {
             // The new authenticated share should still validate.
             let (validation_a, validation_b, _, _) =
                 validate(&generator_a, &generator_b, vec![new_a], vec![new_b]);
-            assert!(validation_a);
-            assert!(validation_b);
+            assert!(bool::from(validation_a));
+            assert!(bool::from(validation_b));
             // The new authenticated share should equal `⟨x⟩ ⊕ c`.
             assert_eq!(a.bit() + b.bit() + F2::from(bit), new_a.bit() + new_b.bit());
         }
