@@ -26,7 +26,7 @@ use rand::{CryptoRng, Rng};
 use swanky_adversary::Malicious;
 use swanky_channel::Channel;
 use swanky_field::FiniteRing;
-use swanky_field_binary::{F2, F128b};
+use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
 use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
 use swanky_party::{
     Party, WhichParty,
@@ -34,10 +34,7 @@ use swanky_party::{
     either::PartyEitherCopy,
     private::{ProverPrivateCopy, VerifierPrivateCopy},
 };
-use swanky_serialization::{
-    SequenceDeserializer, SequenceSerializer,
-    serde_vec::{deserialize, serialize},
-};
+use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 use vectoreyes::U8x16;
 
 /// The prover's part of the authentication bit.
@@ -242,36 +239,37 @@ impl<
     ) -> eyre::Result<VerifierPrivateCopy<P, F2>> {
         match P::WHICH {
             WhichParty::Prover(e) => {
-                let ser = SequenceSerializer::<F2>::new(&mut channel)?;
+                channel.write(&out.len())?;
+                let mut bit_ser: F2BitSerializer =
+                    SequenceSerializer::new(&mut channel.as_std_io())?;
+                for b in out.iter() {
+                    bit_ser.write(channel.as_std_io(), b.bit().into_inner(e))?;
+                }
+                bit_ser.finish(channel.as_std_io())?;
 
-                let bits: Vec<_> = out.iter().map(|ab| ab.bit().into_inner(e)).collect();
-                let bits_ser = serialize(&bits, ser)?;
-
-                channel.write(&bits_ser.len())?;
-                channel.write_bytes(&bits_ser)?;
                 for ab in out.iter() {
-                    // TODO: Potentially leave last bit in the mac for the
-                    // authenticated bit.
                     channel.write_bytes(ab.mac().into_inner(e).as_ref())?;
                 }
                 Ok(VerifierPrivateCopy::empty(e))
             }
             WhichParty::Verifier(e) => {
+                let bits_len: usize = channel.read()?;
+
+                let mut bit_ser: F2BitDeserializer =
+                    SequenceDeserializer::new(channel.as_std_io())?;
+                let mut bits: Vec<F2> = Vec::new();
+                for _ in 0..bits_len {
+                    bits.push(bit_ser.read(channel.as_std_io())?);
+                }
+
                 let mut validation = true;
-
-                let mut bits_bytes = Vec::new();
-                channel.read_bytes(&mut bits_bytes)?;
-
-                let bit_ser = SequenceDeserializer::<F2>::new(&mut channel)?;
-                let mut bits = deserialize(bit_ser)?;
-
-                for ab in out.iter() {
+                for (i, ab) in out.iter().enumerate() {
                     let mut mac_bytes = [0u8; 16];
                     channel.read_bytes(&mut mac_bytes)?;
                     let mac = U8x16::from(mac_bytes);
 
                     validation &= mac
-                        == if bits[0] == F2::ONE {
+                        == if F2::ONE == bits[i] {
                             ab.key().into_inner(e) ^ self.delta().into_inner(e)
                         } else {
                             ab.key().into_inner(e)
