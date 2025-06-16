@@ -39,6 +39,7 @@ nightly-test:
     - bash -c "set -euxo pipefail; ./swanky ci nightly 2>&1 | lz4 > ./log.lz4"
     - tar -c ./coverage | zstd -9 -T > ./coverage.tar.zst
   artifacts:
+    when: always
     paths:
       - log.lz4
       - ./coverage/coverage-split
