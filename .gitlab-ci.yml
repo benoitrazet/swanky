@@ -22,6 +22,7 @@ normal-test:
     - export PATH="/nix/var/nix/profiles/default/bin/:$PATH"
   script:
     - ./etc/ci/swanky_releasing_check.sh
+    - ulimit -n 524288 || true
     - ./swanky ci quick --cache-dir /var/lib/swanky-sccache/
 
 nightly-test:
@@ -36,6 +37,7 @@ nightly-test:
     TMPDIR: /tmp
   script:
     - apt-get update && apt-get install -y nix python3 lz4 zstd
+    - ulimit -n 524288 || true
     - bash -c "set -euxo pipefail; ./swanky ci nightly 2>&1 | lz4 > ./log.lz4"
     - tar -c ./coverage | zstd -9 -T > ./coverage.tar.zst
   artifacts:
