@@ -195,10 +195,7 @@ impl<
                 let bits = bits_in.prover_into(e);
                 let macs = self.ot.as_mut().prover_into(e).receive_correlated(
                     &mut channel,
-                    &bits
-                        .into_iter()
-                        .map(|b| bool::from(*b))
-                        .collect::<Vec<bool>>(),
+                    &bits.iter().map(|b| bool::from(*b)).collect::<Vec<bool>>(),
                     &mut rng,
                 )?;
 
