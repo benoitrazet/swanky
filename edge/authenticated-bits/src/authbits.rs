@@ -239,7 +239,6 @@ impl<
     ) -> eyre::Result<VerifierPrivateCopy<P, F2>> {
         match P::WHICH {
             WhichParty::Prover(e) => {
-                channel.write(&out.len())?;
                 let mut bit_ser: F2BitSerializer =
                     SequenceSerializer::new(&mut channel.as_std_io())?;
                 for b in out.iter() {
@@ -253,12 +252,10 @@ impl<
                 Ok(VerifierPrivateCopy::empty(e))
             }
             WhichParty::Verifier(e) => {
-                let bits_len: usize = channel.read()?;
-
                 let mut bit_ser: F2BitDeserializer =
                     SequenceDeserializer::new(channel.as_std_io())?;
                 let mut bits: Vec<F2> = Vec::new();
-                for _ in 0..bits_len {
+                for _ in 0..out.len() {
                     bits.push(bit_ser.read(channel.as_std_io())?);
                 }
 
