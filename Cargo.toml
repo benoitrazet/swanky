@@ -65,6 +65,7 @@ simple-arith-circuit = { path = "simple-arith-circuit" }
 swanky-adversary = { path = "crates/adversary" }
 swanky-aes-rng = { path = "crates/aes-rng" }
 swanky-authenticated-bits = { path = "crates/authenticated-bits" }
+swanky-block = { path = "crates/block" }
 swanky-channel = { path = "crates/channel" }
 swanky-field = { path = "crates/field" }
 swanky-field-binary = { path = "crates/field-binary" }

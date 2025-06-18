@@ -2522,6 +2522,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-block"
+version = "0.6.0"
+dependencies = [
+ "bytemuck",
+ "criterion",
+ "rand 0.8.5",
+ "serde",
+ "swanky-aes-rng",
+ "vectoreyes",
+]
+
+[[package]]
 name = "swanky-channel"
 version = "0.6.0"
 dependencies = [

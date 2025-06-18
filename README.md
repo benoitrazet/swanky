@@ -26,6 +26,7 @@
 - **`swanky-adversary`**: Traits describing MPC adversaries.
 - **`swanky-aes-rng`**: A random number generator based on AES-CTR.
 - **`swanky-authenticated-bits`**: A package for generating authenticated bits
+- **`swanky-block`**: 128-, 256-, and  512-bit data blocks.
 - **`swanky-channel`**: A channel abstraction to let users avoid manual flushing
 - **`swanky-field`**: Definitions of the core `FiniteField` and `FiniteRing` traits
 - **`swanky-field-binary`**: Binary finite (extension) fields
