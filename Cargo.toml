@@ -68,6 +68,7 @@ swanky-authenticated-bits = { path = "crates/authenticated-bits" }
 swanky-block = { path = "crates/block" }
 swanky-channel = { path = "crates/channel" }
 swanky-channel-legacy = { path = "crates/channel-legacy" }
+swanky-cointoss = { path = "crates/cointoss" }
 swanky-field = { path = "crates/field" }
 swanky-field-binary = { path = "crates/field-binary" }
 swanky-field-f61p = { path = "crates/field-f61p" }

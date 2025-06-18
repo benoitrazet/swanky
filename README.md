@@ -29,6 +29,7 @@
 - **`swanky-block`**: 128-, 256-, and  512-bit data blocks.
 - **`swanky-channel`**: A channel abstraction to let users avoid manual flushing
 - **`swanky-channel-legacy`**: A (legacy) channel abstraction; use `swanky-channel` for new code!
+- **`swanky-cointoss`**: A simple coin-tossing protocol.
 - **`swanky-field`**: Definitions of the core `FiniteField` and `FiniteRing` traits
 - **`swanky-field-binary`**: Binary finite (extension) fields
 - **`swanky-field-f61p`**: An implementation of `GF(2^61-1)`
