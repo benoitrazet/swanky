@@ -24,6 +24,7 @@
 - **`scuttlebutt`**: A library of useful multi-party computation utilities
 - **`simple-arith-circuit`**: Simple arithmetic circuit library
 - **`swanky-adversary`**: Traits describing MPC adversaries.
+- **`swanky-aes-hash`**: Correlation-robust hashing based on fixed-key AES.
 - **`swanky-aes-rng`**: A random number generator based on AES-CTR.
 - **`swanky-authenticated-bits`**: A package for generating authenticated bits
 - **`swanky-block`**: 128-, 256-, and  512-bit data blocks.

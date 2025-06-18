@@ -2496,6 +2496,16 @@ name = "swanky-adversary"
 version = "0.6.0"
 
 [[package]]
+name = "swanky-aes-hash"
+version = "0.6.0"
+dependencies = [
+ "criterion",
+ "rand 0.8.5",
+ "swanky-block",
+ "vectoreyes",
+]
+
+[[package]]
 name = "swanky-aes-rng"
 version = "0.6.0"
 dependencies = [
