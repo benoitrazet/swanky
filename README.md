@@ -23,6 +23,7 @@
 - **`schmivitz`**: A library for zero-knowledge protocols using VOLE-in-the-head
 - **`scuttlebutt`**: A library of useful multi-party computation utilities
 - **`simple-arith-circuit`**: Simple arithmetic circuit library
+- **`swanky-adversary`**: Traits describing MPC adversaries.
 - **`swanky-aes-rng`**: A random number generator based on AES-CTR.
 - **`swanky-authenticated-bits`**: A package for generating authenticated bits
 - **`swanky-channel`**: A channel abstraction to let users avoid manual flushing
