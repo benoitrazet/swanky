@@ -12,7 +12,8 @@ use curve25519_dalek::{
     constants::RISTRETTO_BASEPOINT_TABLE, ristretto::RistrettoPoint, scalar::Scalar,
 };
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, Block, SemiHonest};
+use scuttlebutt::{AbstractChannel, Block};
+use swanky_adversary::SemiHonest;
 
 /// Oblivious transfer sender.
 pub struct Sender {}

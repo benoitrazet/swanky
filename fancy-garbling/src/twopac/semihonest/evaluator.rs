@@ -4,7 +4,8 @@ use crate::{
 };
 use ocelot::ot::Receiver as OtReceiver;
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, Block, SemiHonest};
+use scuttlebutt::{AbstractChannel, Block};
+use swanky_adversary::SemiHonest;
 
 /// Semi-honest evaluator.
 pub struct Evaluator<C, RNG, OT, Wire> {

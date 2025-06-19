@@ -32,6 +32,7 @@ regex.workspace = true
 subtle.workspace = true
 serde = { workspace = true, features = ["derive"], optional = true }
 serde_json = { workspace = true, optional = true }
+swanky-adversary.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

@@ -12,8 +12,9 @@ use crate::{
 use itertools::Itertools;
 use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::{CryptoRng, Rng, RngCore, seq::SliceRandom};
-use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest, cointoss};
+use scuttlebutt::{AbstractChannel, Block, Block512, cointoss};
 use std::collections::{HashMap, HashSet};
+use swanky_adversary::SemiHonest;
 
 const NHASHES: usize = 3;
 

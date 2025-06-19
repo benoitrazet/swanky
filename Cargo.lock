@@ -789,6 +789,7 @@ dependencies = [
  "serde",
  "serde_json",
  "subtle",
+ "swanky-adversary",
  "vectoreyes",
 ]
 
@@ -1717,6 +1718,7 @@ dependencies = [
  "rand 0.8.5",
  "scuttlebutt",
  "subtle",
+ "swanky-adversary",
  "vectoreyes",
 ]
 
@@ -1840,6 +1842,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "swanky-adversary",
  "vectoreyes",
 ]
 
@@ -2526,6 +2529,7 @@ dependencies = [
  "proptest",
  "rand 0.8.5",
  "scuttlebutt",
+ "swanky-adversary",
  "swanky-aes-rng",
  "swanky-channel",
  "swanky-party",

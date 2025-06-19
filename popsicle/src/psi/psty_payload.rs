@@ -45,8 +45,9 @@ use ocelot::{
 };
 
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
+use scuttlebutt::{AbstractChannel, Block, Block512};
 use std::time::SystemTime;
+use swanky_adversary::SemiHonest;
 
 use std::{
     fs::File,

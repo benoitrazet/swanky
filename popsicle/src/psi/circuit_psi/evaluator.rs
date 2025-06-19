@@ -5,8 +5,9 @@ use crate::{
 };
 use fancy_garbling::{WireMod2, twopac::semihonest::Evaluator};
 use ocelot::ot::AlszReceiver as OtReceiver;
-use scuttlebutt::{AbstractChannel, Block, SemiHonest};
+use scuttlebutt::{AbstractChannel, Block};
 use std::marker::PhantomData;
+use swanky_adversary::SemiHonest;
 
 use self::receiver::OpprfReceiver;
 

@@ -12,10 +12,9 @@ use crate::{
     utils,
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{
-    AbstractChannel, AesRng, Block, Block512, SemiHonest, cointoss, utils as scutils,
-};
+use scuttlebutt::{AbstractChannel, AesRng, Block, Block512, cointoss, utils as scutils};
 use std::marker::PhantomData;
+use swanky_adversary::SemiHonest;
 
 /// KKRT oblivious PRF sender.
 pub struct Sender<OT: OtReceiver + SemiHonest> {

@@ -42,8 +42,3 @@ pub use swanky_aes_rng::{AesRng, UniformIntegersUnderBound};
 pub use crate::channel::{
     TrackUnixChannel, UnixChannel, track_unix_channel_pair, unix_channel_pair,
 };
-
-/// A marker trait denoting that the given scheme is semi-honest secure.
-pub trait SemiHonest {}
-/// A marker trait denoting that the given scheme is maliciously secure.
-pub trait Malicious: SemiHonest {}

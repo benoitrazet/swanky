@@ -6,8 +6,9 @@ use crate::{
     oprf::{Receiver as OprfReceiver, Sender as OprfSender},
 };
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
+use scuttlebutt::{AbstractChannel, Block, Block512};
 use std::collections::HashSet;
+use swanky_adversary::SemiHonest;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 mod cuckoo;

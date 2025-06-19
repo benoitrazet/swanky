@@ -27,6 +27,7 @@ subtle.workspace = true
 bytemuck.workspace = true
 keyed_arena.workspace = true
 arrayvec.workspace = true
+swanky-adversary.workspace = true
 
 [build-dependencies]
 cc.workspace = true

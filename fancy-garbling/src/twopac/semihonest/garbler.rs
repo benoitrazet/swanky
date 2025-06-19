@@ -4,7 +4,8 @@ use crate::{
 };
 use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, Rng, SeedableRng};
-use scuttlebutt::{AbstractChannel, Block, SemiHonest};
+use scuttlebutt::{AbstractChannel, Block};
+use swanky_adversary::SemiHonest;
 
 /// Semi-honest garbler.
 pub struct Garbler<C, RNG, OT, Wire> {
