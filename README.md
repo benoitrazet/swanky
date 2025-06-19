@@ -28,6 +28,7 @@
 - **`swanky-aes-rng`**: A random number generator based on AES-CTR.
 - **`swanky-authenticated-bits`**: A package for generating authenticated bits
 - **`swanky-block`**: 128-, 256-, and  512-bit data blocks.
+- **`swanky-bytearray-utils`**: Functions for working with bits and bytearrays.
 - **`swanky-channel`**: A channel abstraction to let users avoid manual flushing
 - **`swanky-channel-legacy`**: A (legacy) channel abstraction; use `swanky-channel` for new code!
 - **`swanky-cointoss`**: A simple coin-tossing protocol.

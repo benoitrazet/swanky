@@ -67,6 +67,7 @@ swanky-aes-hash = { path = "crates/aes-hash" }
 swanky-aes-rng = { path = "crates/aes-rng" }
 swanky-authenticated-bits = { path = "crates/authenticated-bits" }
 swanky-block = { path = "crates/block" }
+swanky-bytearray-utils = { path = "crates/bytearray-utils" }
 swanky-channel = { path = "crates/channel" }
 swanky-channel-legacy = { path = "crates/channel-legacy" }
 swanky-cointoss = { path = "crates/cointoss" }
