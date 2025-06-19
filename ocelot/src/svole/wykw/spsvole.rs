@@ -14,12 +14,13 @@ use rand::{
     distributions::{Distribution, Uniform},
 };
 use scuttlebutt::{
-    AbstractChannel, AesRng, Block,
+    AbstractChannel, AesRng,
     field::{Degree, FiniteField as FF},
     ring::FiniteRing,
     utils::unpack_bits,
 };
 use swanky_adversary::Malicious;
+use swanky_block::Block;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 pub(super) struct Sender<OT: OtReceiver + Malicious, FE: FF> {

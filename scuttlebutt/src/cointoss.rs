@@ -6,8 +6,9 @@
 //! seed_`. Likewise, on input `seed`, the receiver gets `r`, sends `seed` to
 //! the sender, and then receives `seed_`, checking that `PRG(seed_) = r`.
 
-use crate::{AbstractChannel, AesRng, Block};
+use crate::{AbstractChannel, AesRng};
 use rand_core::{RngCore, SeedableRng};
+use swanky_block::Block;
 
 /// Errors produced by the coin tossing protocol.
 #[derive(Debug)]

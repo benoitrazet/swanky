@@ -6,7 +6,8 @@ use crate::{
     ot::{Receiver as OtReceiver, Sender as OtSender},
 };
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, Block};
+use scuttlebutt::AbstractChannel;
+use swanky_block::Block;
 
 /// Oblivious transfer sender.
 pub struct Sender {}

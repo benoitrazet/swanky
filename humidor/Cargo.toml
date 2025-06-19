@@ -25,6 +25,7 @@ num-traits.workspace = true
 rand.workspace = true
 subtle.workspace = true
 scuttlebutt.workspace = true
+swanky-block.workspace = true
 swanky-polynomial.workspace = true
 generic-array.workspace = true
 digest.workspace = true

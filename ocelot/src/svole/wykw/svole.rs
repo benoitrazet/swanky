@@ -10,11 +10,12 @@ use rand::{
     distributions::{Distribution, Uniform},
 };
 use scuttlebutt::{
-    AbstractChannel, AesRng, Block,
+    AbstractChannel, AesRng,
     field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf},
     ring::FiniteRing,
 };
 use swanky_adversary::{Malicious, SemiHonest};
+use swanky_block::Block;
 
 // LPN parameters used in the protocol. We use three stages, two sets of LPN
 // parameters for setup, and one set of LPN parameters for the extend phase.

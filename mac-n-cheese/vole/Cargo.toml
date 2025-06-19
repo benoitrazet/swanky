@@ -21,6 +21,7 @@ rand.workspace = true
 keyed_arena.workspace = true
 blake3.workspace = true
 arrayvec.workspace = true
+swanky-block.workspace = true
 swanky-party.workspace = true
 
 [dev-dependencies]

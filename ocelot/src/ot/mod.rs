@@ -21,7 +21,8 @@ pub mod naor_pinkas;
 use crate::errors::Error;
 use curve25519_dalek::RistrettoPoint;
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, Block};
+use scuttlebutt::AbstractChannel;
+use swanky_block::Block;
 
 pub(crate) fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Block {
     let h = blake3::keyed_hash(pt.compress().as_bytes(), &tweak.to_le_bytes());
@@ -180,13 +181,14 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use scuttlebutt::{AesRng, Block, Channel};
+    use scuttlebutt::{AesRng, Channel};
     use std::{
         fmt::Display,
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
         sync::{Arc, Mutex},
     };
+    use swanky_block::Block;
 
     fn rand_block_vec(size: usize) -> Vec<Block> {
         (0..size).map(|_| rand::random::<Block>()).collect()

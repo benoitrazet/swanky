@@ -5,7 +5,8 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::AllWire;
 use fancy_garbling::util::generate_deltas;
 use popsicle::psty_payload::{Receiver, Sender};
-use scuttlebutt::{AesRng, Block512, Channel, SymChannel, TrackChannel};
+use scuttlebutt::{AesRng, Channel, SymChannel, TrackChannel};
+use swanky_block::Block512;
 
 use rand::{CryptoRng, Rng};
 

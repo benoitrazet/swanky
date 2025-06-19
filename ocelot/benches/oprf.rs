@@ -6,12 +6,13 @@ use ocelot::{
     oprf::{self, Receiver as OprfReceiver, Sender as OprfSender, kkrt, kmprt},
     ot::chou_orlandi,
 };
-use scuttlebutt::{AesRng, Block, Block512, Channel};
+use scuttlebutt::{AesRng, Channel};
 use std::{
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
     time::Duration,
 };
+use swanky_block::{Block, Block512};
 
 type OpprfSender = kmprt::Sender<kkrt::Sender<chou_orlandi::Receiver>>;
 type OpprfReceiver = kmprt::Receiver<kkrt::Receiver<chou_orlandi::Sender>>;

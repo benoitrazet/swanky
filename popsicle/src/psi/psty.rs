@@ -17,8 +17,9 @@ use ocelot::{
     ot::{AlszReceiver as OtReceiver, AlszSender as OtSender},
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AbstractChannel, Block, Block512};
+use scuttlebutt::AbstractChannel;
 use swanky_adversary::SemiHonest;
+use swanky_block::{Block, Block512};
 
 const NHASHES: usize = 3;
 // How many bytes of the hash to use for the equality tests. This affects

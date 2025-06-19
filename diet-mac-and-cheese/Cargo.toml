@@ -44,6 +44,7 @@ flatbuffers.workspace = true
 nix.workspace = true
 serde = { workspace = true, features = ["derive"] }
 toml = { workspace = true, features = ["display", "parse"] }
+swanky-block.workspace = true
 swanky-party.workspace = true
 rustc-hash.workspace = true
 

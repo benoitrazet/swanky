@@ -561,7 +561,7 @@ mod tests {
                 use super::*;
                 #[allow(unused_imports)]
                 use proptest::prelude::*;
-                use scuttlebutt::Block;
+                use swanky_block::Block;
 
                 fn any_fe() -> impl Strategy<Value = $field> {
                     any::<u128>().prop_map(|seed| {

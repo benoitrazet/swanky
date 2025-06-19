@@ -5,9 +5,10 @@ use crate::{
 };
 use fancy_garbling::{WireMod2, twopac::semihonest::Garbler};
 use ocelot::ot::AlszSender as OtSender;
-use scuttlebutt::{AbstractChannel, Block};
+use scuttlebutt::AbstractChannel;
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
+use swanky_block::Block;
 
 use self::sender::OpprfSender;
 

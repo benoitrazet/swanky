@@ -130,7 +130,7 @@ mod tests {
                 use super::*;
                 #[allow(unused_imports)]
                 use proptest::prelude::*;
-                use scuttlebutt::Block;
+                use swanky_block::Block;
 
                 fn any_seed() -> impl Strategy<Value = Block> {
                     any::<u128>().prop_map(|seed| Block::from(seed))

@@ -5,12 +5,13 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use ocelot::ot::{
     self, CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver, Sender,
 };
-use scuttlebutt::{AesRng, Block, Channel};
+use scuttlebutt::{AesRng, Channel};
 use std::{
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
     time::Duration,
 };
+use swanky_block::Block;
 
 /// Specifies the number of OTs to run when benchmarking OT extension.
 const T: usize = 1 << 18;

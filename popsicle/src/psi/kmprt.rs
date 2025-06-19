@@ -5,7 +5,8 @@ use crate::Error;
 use itertools::Itertools;
 use ocelot::oprf::{KmprtReceiver, KmprtSender};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AbstractChannel, Block, Block512};
+use scuttlebutt::AbstractChannel;
+use swanky_block::{Block, Block512};
 
 /// The party number for each party.
 pub type PartyId = usize;

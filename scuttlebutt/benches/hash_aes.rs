@@ -1,6 +1,7 @@
 #![allow(clippy::all)]
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
-use scuttlebutt::{AesHash, Block};
+use scuttlebutt::AesHash;
+use swanky_block::Block;
 
 fn bench_cr_hash(c: &mut Criterion) {
     c.bench_function("AesHash::cr_hash", |b| {

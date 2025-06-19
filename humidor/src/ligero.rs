@@ -66,13 +66,14 @@ use digest::Digest as CryptoDigest;
 use generic_array::typenum::Unsigned;
 use ndarray::{Array1, Array2, ArrayView1, Axis, concatenate};
 use rand::{CryptoRng, Rng, SeedableRng};
+use scuttlebutt::AesRng;
 use scuttlebutt::field::FiniteField;
 use scuttlebutt::field::fft::FieldForFFT;
 #[cfg(test)]
 use scuttlebutt::serialization::CanonicalSerialize;
-use scuttlebutt::{AesRng, Block};
 use sprs::{CsMat, TriMat};
 use std::ops::Range;
+use swanky_block::Block;
 
 type HashOutput<T> = digest::Output<T>;
 

@@ -21,8 +21,9 @@ use curve25519_dalek::{
     scalar::Scalar,
 };
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, Block};
+use scuttlebutt::AbstractChannel;
 use swanky_adversary::{Malicious, SemiHonest};
+use swanky_block::Block;
 
 /// Oblivious transfer sender.
 pub struct Sender {

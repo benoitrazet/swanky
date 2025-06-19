@@ -11,7 +11,7 @@ pub use track_channel::TrackChannel;
 #[cfg(unix)]
 pub use unix_channel::{TrackUnixChannel, UnixChannel, track_unix_channel_pair, unix_channel_pair};
 
-use crate::{Block, Block512, serialization::CanonicalSerialize};
+use crate::serialization::CanonicalSerialize;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use generic_array::GenericArray;
 use std::{
@@ -19,6 +19,7 @@ use std::{
     io::{Read, Result, Write},
     rc::Rc,
 };
+use swanky_block::{Block, Block512};
 
 /// A trait for managing I/O. `AbstractChannel`s are clonable, and provide basic
 /// read/write capabilities for both common and scuttlebutt-specific types.

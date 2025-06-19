@@ -28,6 +28,7 @@ bytemuck.workspace = true
 keyed_arena.workspace = true
 arrayvec.workspace = true
 swanky-adversary.workspace = true
+swanky-block.workspace = true
 
 [build-dependencies]
 cc.workspace = true

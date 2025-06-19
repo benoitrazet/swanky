@@ -686,6 +686,7 @@ dependencies = [
  "scuttlebutt",
  "serde",
  "subtle",
+ "swanky-block",
  "swanky-field",
  "swanky-field-binary",
  "swanky-field-f61p",
@@ -790,6 +791,7 @@ dependencies = [
  "serde_json",
  "subtle",
  "swanky-adversary",
+ "swanky-block",
  "vectoreyes",
 ]
 
@@ -1051,6 +1053,7 @@ dependencies = [
  "simple-arith-circuit",
  "sprs",
  "subtle",
+ "swanky-block",
  "swanky-polynomial",
 ]
 
@@ -1100,6 +1103,7 @@ dependencies = [
  "serde_json",
  "simple-arith-circuit",
  "snafu",
+ "swanky-block",
  "swanky-polynomial",
 ]
 
@@ -1442,6 +1446,7 @@ dependencies = [
  "smallvec",
  "snmalloc-rs",
  "subtle",
+ "swanky-block",
  "swanky-party",
  "vectoreyes",
 ]
@@ -1475,6 +1480,7 @@ dependencies = [
  "ocelot",
  "rand 0.8.5",
  "scuttlebutt",
+ "swanky-block",
  "swanky-party",
  "vectoreyes",
 ]
@@ -1719,6 +1725,7 @@ dependencies = [
  "scuttlebutt",
  "subtle",
  "swanky-adversary",
+ "swanky-block",
  "vectoreyes",
 ]
 
@@ -1843,6 +1850,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "swanky-adversary",
+ "swanky-block",
  "vectoreyes",
 ]
 
@@ -2304,6 +2312,7 @@ dependencies = [
  "smallvec",
  "subtle",
  "swanky-aes-rng",
+ "swanky-block",
  "swanky-channel",
  "swanky-field",
  "swanky-field-binary",
@@ -2408,6 +2417,7 @@ dependencies = [
  "rand 0.8.5",
  "scuttlebutt",
  "serde",
+ "swanky-block",
 ]
 
 [[package]]

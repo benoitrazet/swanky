@@ -10,8 +10,9 @@ use crate::{
     },
 };
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, Block};
+use scuttlebutt::AbstractChannel;
 use swanky_adversary::{Malicious, SemiHonest};
+use swanky_block::Block;
 
 /// Oblivious transfer extension sender.
 pub struct Sender<OT: OtReceiver<Msg = Block> + Malicious> {

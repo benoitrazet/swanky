@@ -242,7 +242,8 @@ pub fn arbitrary_zero_circuit<F: PrimeFiniteField>(
 mod tests {
     use super::*;
     use rand::SeedableRng;
-    use scuttlebutt::{AesRng, Block};
+    use scuttlebutt::AesRng;
+    use swanky_block::Block;
 
     type TestField = scuttlebutt::field::F2e19x3e26;
 

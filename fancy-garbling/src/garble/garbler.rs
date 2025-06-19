@@ -7,11 +7,12 @@ use crate::{
     util::{RngExt, output_tweak, tweak, tweak2},
 };
 use rand::{CryptoRng, RngCore};
-use scuttlebutt::{AbstractChannel, Block};
+use scuttlebutt::AbstractChannel;
 #[cfg(feature = "serde")]
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use subtle::ConditionallySelectable;
+use swanky_block::Block;
 
 use super::security_warning::warn_proj;
 

@@ -20,7 +20,8 @@ mod nonstreaming {
     };
     use itertools::Itertools;
     use rand::{SeedableRng, thread_rng};
-    use scuttlebutt::{AesRng, Block};
+    use scuttlebutt::AesRng;
+    use swanky_block::Block;
 
     // helper
     fn garble_test_helper<F>(f: F)

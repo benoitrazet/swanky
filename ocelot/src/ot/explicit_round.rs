@@ -6,8 +6,9 @@
 use crate::Error;
 use keyed_arena::{AllocationKey, BorrowedAllocation, KeyedArena};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AES_HASH, AbstractChannel, AesRng, Block};
+use scuttlebutt::{AES_HASH, AbstractChannel, AesRng};
 use std::convert::TryInto;
+use swanky_block::Block;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16, U64x2, array_utils::ArrayUnrolledExt};
 
 // TODO: alsz and kos should be based on this file?

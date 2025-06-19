@@ -6,7 +6,7 @@ use vectoreyes::{
     array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
 };
 
-use crate::Block;
+use swanky_block::Block;
 
 /// AES-based correlation-robust hash function.
 ///

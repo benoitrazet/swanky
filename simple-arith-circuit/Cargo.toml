@@ -21,6 +21,7 @@ rand.workspace = true
 serde = { workspace = true, features = ["derive"], optional = true }
 proptest = { workspace = true, optional = true }
 log.workspace = true
+swanky-block.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

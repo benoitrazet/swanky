@@ -10,10 +10,11 @@ use crate::{
 use anyhow::anyhow;
 use blake3::Hash;
 use rand::{Rng, SeedableRng};
-use scuttlebutt::{AesRng, Block, field::FiniteField};
+use scuttlebutt::{AesRng, field::FiniteField};
 use scuttlebutt::{ring::FiniteRing, serialization::serde_vec};
 use serde::{Deserialize, Serialize};
 use simple_arith_circuit::Circuit;
+use swanky_block::Block;
 
 /// The proof for a single execution of the protocol. `N` denotes
 /// the number of participants in the MPC.
@@ -424,7 +425,7 @@ mod tests {
                 use super::*;
                 #[allow(unused_imports)]
                 use proptest::prelude::*;
-                use scuttlebutt::Block;
+                use swanky_block::Block;
 
                 fn any_seed() -> impl Strategy<Value = Block> {
                     any::<u128>().prop_map(|seed| Block::from(seed))

@@ -13,9 +13,10 @@ use crate::{
     utils,
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AES_HASH, AbstractChannel, AesHash, AesRng, Block, utils as scutils};
+use scuttlebutt::{AES_HASH, AbstractChannel, AesHash, AesRng, utils as scutils};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
+use swanky_block::Block;
 
 /// Oblivious transfer sender.
 pub struct Sender<OT: OtReceiver<Msg = Block> + SemiHonest> {

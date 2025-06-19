@@ -7,8 +7,8 @@
 //     the current megabin handling is an artifact of older bugs that stalled the system for large sets
 
 use crate::Error;
-use scuttlebutt::Block;
 use std::fmt::Debug;
+use swanky_block::Block;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 #[derive(Clone, Debug)]

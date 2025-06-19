@@ -1,8 +1,9 @@
 //! Util mostly in support of cuckoo hashing.
 
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AesHash, Block};
+use scuttlebutt::AesHash;
 use sha2::{Digest, Sha256};
+use swanky_block::Block;
 
 /// Compress an arbitrary vector into a 128-bit chunk, leaving the final 8-bits
 /// as zero. We need to leave 8 bits free in order to add in the hash index when

@@ -11,7 +11,8 @@ use log::{debug, warn};
 use ocelot::svole::LpnParams;
 use rand::{Rng, SeedableRng};
 use scuttlebutt::field::{DegreeModulo, IsSubFieldOf};
-use scuttlebutt::{AbstractChannel, AesRng, Block, field::FiniteField};
+use scuttlebutt::{AbstractChannel, AesRng, field::FiniteField};
+use swanky_block::Block;
 use swanky_party::either::PartyEither;
 use swanky_party::private::{
     ProverPrivate, ProverPrivateCopy, VerifierPrivate, VerifierPrivateCopy,

@@ -92,7 +92,7 @@ mod vope {
         fn do_test<T: MacTypes>() {
             eprintln!("Testing {}", std::any::type_name::<T>());
             for i in 1_u128..=256 {
-                let mut rng = AesRng::from_seed(scuttlebutt::Block::from(85787 * i));
+                let mut rng = AesRng::from_seed(swanky_block::Block::from(85787 * i));
                 let alpha = T::TF::random_nonzero(&mut rng);
                 let u = T::TF::random(&mut rng);
                 let v = T::TF::random(&mut rng);
@@ -196,7 +196,7 @@ fn test_assert_multiply_state() {
     fn do_test<T: MacTypes>() {
         eprintln!("Testing {}", std::any::type_name::<T>());
         for i in 1_u128..=256 {
-            let mut rng = AesRng::from_seed(scuttlebutt::Block::from(68569425 * i));
+            let mut rng = AesRng::from_seed(swanky_block::Block::from(68569425 * i));
             let alpha = T::TF::random_nonzero(&mut rng);
             let challenge = T::TF::random_nonzero(&mut rng);
             let mut prover_right_proof = AssertMultiplyState::<party::Prover, T::TF>::default();

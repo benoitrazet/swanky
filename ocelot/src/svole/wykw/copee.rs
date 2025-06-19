@@ -9,13 +9,14 @@ use crate::{
 use generic_array::{GenericArray, typenum::Unsigned};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{
-    AbstractChannel, Block,
+    AbstractChannel,
     field::{Degree, FiniteField as FF},
     ring::FiniteRing,
 };
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
 use swanky_adversary::Malicious;
+use swanky_block::Block;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 pub(super) struct Sender<ROT: ROTSender + Malicious, FE: FF> {
