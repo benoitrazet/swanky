@@ -5,7 +5,6 @@
 
 //! Scuttlebutt provides many utility functions for cryptographic applications.
 
-pub mod cointoss;
 mod hash_aes;
 pub use swanky_serialization as serialization;
 pub mod utils;

@@ -119,7 +119,7 @@ impl<T: MacTypes> VoleSender<T> {
         rng: &mut RNG,
     ) -> eyre::Result<Self> {
         let lpn_seeds = Aes128EncryptOnly::new_with_key(
-            scuttlebutt::cointoss::send(channel, &[rng.r#gen::<Block>()])?[0],
+            swanky_cointoss::send(channel, &[rng.r#gen::<Block>()])?[0],
         );
         let ot = KosReceiver::init(channel, rng)?;
         let ggm_seeds = make_ggm_seeds(&lpn_seeds);
@@ -357,7 +357,7 @@ impl<T: MacTypes> VoleReceiver<T> {
         delta: T::TF,
     ) -> eyre::Result<Self> {
         let lpn_seeds = Aes128EncryptOnly::new_with_key(
-            scuttlebutt::cointoss::receive(channel, &[rng.r#gen::<Block>()])?[0],
+            swanky_cointoss::receive(channel, &[rng.r#gen::<Block>()])?[0],
         );
         let ot = KosSender::init(channel, rng)?;
         let ggm_seeds = make_ggm_seeds(&lpn_seeds);

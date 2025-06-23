@@ -12,11 +12,12 @@ use crate::{
     utils,
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AesRng, cointoss, utils as scutils};
+use scuttlebutt::{AesRng, utils as scutils};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
 use swanky_channel_legacy::AbstractChannel;
+use swanky_cointoss;
 
 /// KKRT oblivious PRF sender.
 pub struct Sender<OT: OtReceiver + SemiHonest> {
@@ -44,7 +45,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
         rng.fill_bytes(&mut s_);
         let s = utils::u8vec_to_boolvec(&s_);
         let seeds = (0..4).map(|_| rng.r#gen()).collect::<Vec<Block>>();
-        let keys = cointoss::send(channel, &seeds)?;
+        let keys = swanky_cointoss::send(channel, &seeds)?;
         let code = PseudorandomCode::new(keys[0], keys[1], keys[2], keys[3]);
         let ks = ot.receive(channel, &s, rng)?;
         let rngs = ks
@@ -136,7 +137,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
     ) -> Result<Self, Error> {
         let mut ot = OT::init(channel, rng)?;
         let seeds = (0..4).map(|_| rng.r#gen()).collect::<Vec<Block>>();
-        let keys = cointoss::receive(channel, &seeds)?;
+        let keys = swanky_cointoss::receive(channel, &seeds)?;
         let code = PseudorandomCode::new(keys[0], keys[1], keys[2], keys[3]);
         let mut ks = Vec::with_capacity(512);
         let mut k0 = Block::default();

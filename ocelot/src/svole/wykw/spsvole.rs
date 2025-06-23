@@ -96,7 +96,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         let ot = OT::init(channel, rng)?;
         let seed0 = rng.r#gen::<Block>();
         let seed1 = rng.r#gen::<Block>();
-        let seeds = scuttlebutt::cointoss::send(channel, &[seed0, seed1])?;
+        let seeds = swanky_cointoss::send(channel, &[seed0, seed1])?;
         let aes0 = Aes128EncryptOnly::new_with_key(seeds[0]);
         let aes1 = Aes128EncryptOnly::new_with_key(seeds[1]);
         Ok(Self {
@@ -249,7 +249,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         let ot = OT::init(channel, &mut rng)?;
         let seed0 = rng.r#gen::<Block>();
         let seed1 = rng.r#gen::<Block>();
-        let seeds = scuttlebutt::cointoss::receive(channel, &[seed0, seed1])?;
+        let seeds = swanky_cointoss::receive(channel, &[seed0, seed1])?;
         let aes0 = Aes128EncryptOnly::new_with_key(seeds[0]);
         let aes1 = Aes128EncryptOnly::new_with_key(seeds[1]);
         Ok(Self {

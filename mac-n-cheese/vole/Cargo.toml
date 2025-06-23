@@ -23,6 +23,7 @@ blake3.workspace = true
 arrayvec.workspace = true
 swanky-block.workspace = true
 swanky-channel-legacy.workspace = true
+swanky-cointoss.workspace = true
 swanky-party.workspace = true
 
 [dev-dependencies]

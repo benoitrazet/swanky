@@ -12,11 +12,11 @@ use crate::{
 use itertools::Itertools;
 use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::{CryptoRng, Rng, RngCore, seq::SliceRandom};
-use scuttlebutt::cointoss;
 use std::collections::{HashMap, HashSet};
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
 use swanky_channel_legacy::AbstractChannel;
+use swanky_cointoss;
 
 const NHASHES: usize = 3;
 
@@ -46,7 +46,7 @@ impl Sender {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(), Error> {
-        let key = cointoss::send(channel, &[rng.r#gen()])?[0];
+        let key = swanky_cointoss::send(channel, &[rng.r#gen()])?[0];
         let inputs = utils::compress_and_hash_inputs(inputs, key);
         let masksize = compute_masksize(inputs.len())?;
         let nbins = channel.read_usize()?;
@@ -83,7 +83,7 @@ impl Sender {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Vec<Block>, Error> {
-        let key = cointoss::send(channel, &[rng.r#gen()])?[0];
+        let key = swanky_cointoss::send(channel, &[rng.r#gen()])?[0];
         let masksize = compute_masksize(inputs.len())?;
         let inputs = utils::compress_and_hash_inputs(inputs, key);
         let nbins = channel.read_usize()?;
@@ -240,7 +240,7 @@ impl Receiver {
         ),
         Error,
     > {
-        let key = cointoss::receive(channel, &[rng.r#gen()])?[0];
+        let key = swanky_cointoss::receive(channel, &[rng.r#gen()])?[0];
 
         let hashed = utils::compress_and_hash_inputs(inputs, key);
 

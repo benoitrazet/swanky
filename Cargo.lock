@@ -1485,6 +1485,7 @@ dependencies = [
  "scuttlebutt",
  "swanky-block",
  "swanky-channel-legacy",
+ "swanky-cointoss",
  "swanky-party",
  "vectoreyes",
 ]
@@ -1731,6 +1732,7 @@ dependencies = [
  "swanky-adversary",
  "swanky-block",
  "swanky-channel-legacy",
+ "swanky-cointoss",
  "vectoreyes",
 ]
 
@@ -1857,6 +1859,7 @@ dependencies = [
  "swanky-adversary",
  "swanky-block",
  "swanky-channel-legacy",
+ "swanky-cointoss",
  "vectoreyes",
 ]
 
