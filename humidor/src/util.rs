@@ -4,7 +4,7 @@ use ndarray::{Array1, ArrayView1};
 
 use scuttlebutt::field::FiniteField;
 #[cfg(test)]
-use scuttlebutt::ring::FiniteRing;
+use swanky_field::FiniteRing;
 
 #[cfg(test)]
 use proptest::prelude::*;

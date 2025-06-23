@@ -493,8 +493,8 @@ mod tests {
     use super::*;
     use rand::SeedableRng;
     use scuttlebutt::field::{F2, F61p};
-    use scuttlebutt::ring::FiniteRing;
     use swanky_aes_rng::AesRng;
+    use swanky_field::FiniteRing;
     use swanky_polynomial::Polynomial;
 
     const N: usize = 16;

@@ -23,6 +23,7 @@ proptest = { workspace = true, optional = true }
 log.workspace = true
 swanky-aes-rng.workspace = true
 swanky-block.workspace = true
+swanky-field.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

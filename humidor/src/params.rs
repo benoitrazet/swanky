@@ -482,7 +482,7 @@ impl<Field: FieldForLigero> Params<Field> {
 use {
     proptest::{collection::vec as pvec, prelude::*, *},
     rand::prelude::{SeedableRng, StdRng},
-    scuttlebutt::ring::FiniteRing,
+    swanky_field::FiniteRing,
 };
 
 #[cfg(test)]

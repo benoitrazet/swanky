@@ -15,7 +15,3 @@ pub mod field {
     pub use swanky_field_ff_primes::*;
     pub use swanky_field_fft as fft;
 }
-/// A polyfill for the ring functionality inside of `swanky-field`.
-pub mod ring {
-    pub use swanky_field::{FiniteRing, IsSubRingOf, ring_ops};
-}

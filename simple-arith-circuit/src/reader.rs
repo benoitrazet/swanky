@@ -2,12 +2,12 @@
 
 use crate::circuit::{Circuit, Index, Op};
 use scuttlebutt::field::F2;
-use scuttlebutt::ring::FiniteRing;
 use std::{
     fs::File,
     io::{BufRead, BufReader},
     path::Path,
 };
+use swanky_field::FiniteRing;
 
 /// Specifies what debug information `Circuit::read_bristol_fashion` emits.
 /// When specified, this emits information through `log::debug!`.

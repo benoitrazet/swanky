@@ -334,11 +334,9 @@ mod tests {
     };
     use mac_n_cheese_sieve_parser::Number;
     use rand::Rng;
-    use scuttlebutt::{
-        field::{F61p, PrimeFiniteField},
-        ring::FiniteRing,
-    };
+    use scuttlebutt::field::{F61p, PrimeFiniteField};
     use swanky_aes_rng::AesRng;
+    use swanky_field::FiniteRing;
     use swanky_polynomial::Polynomial;
 
     fn convert_poly<F: PrimeFiniteField>(p: Polynomial<F>) -> Vec<Number> {

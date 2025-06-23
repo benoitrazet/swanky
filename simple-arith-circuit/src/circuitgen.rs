@@ -6,7 +6,7 @@ use rand::{
     distributions::{Distribution, Uniform},
 };
 use scuttlebutt::field::{F2, FiniteField};
-use scuttlebutt::ring::FiniteRing;
+use swanky_field::FiniteRing;
 
 fn rand_ix_pair(rng: &mut impl Rng, min: Index, max: Index) -> (Index, Index) {
     let s = max - min;

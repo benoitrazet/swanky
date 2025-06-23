@@ -6,8 +6,8 @@ use mac_n_cheese_ir::compilation_format::{FieldMacType, Type, WireSize};
 use rand::RngCore;
 
 use scuttlebutt::field::F2;
-use scuttlebutt::ring::FiniteRing;
 use std::{cmp::Reverse, collections::BinaryHeap, str::FromStr};
+use swanky_field::FiniteRing;
 use vectoreyes::{
     Aes128EncryptOnly, AesBlockCipher, SimdBase, U8x16, array_utils::ArrayUnrolledExt,
 };

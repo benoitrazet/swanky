@@ -1061,6 +1061,7 @@ dependencies = [
  "subtle",
  "swanky-aes-rng",
  "swanky-block",
+ "swanky-field",
  "swanky-polynomial",
  "swanky-serialization",
 ]
@@ -1113,6 +1114,7 @@ dependencies = [
  "snafu",
  "swanky-aes-rng",
  "swanky-block",
+ "swanky-field",
  "swanky-polynomial",
  "swanky-serialization",
 ]
@@ -1355,6 +1357,7 @@ dependencies = [
  "rustc-hash 2.1.1",
  "scuttlebutt",
  "smallvec",
+ "swanky-field",
  "swanky-party",
  "vectoreyes",
 ]
@@ -1409,6 +1412,7 @@ dependencies = [
  "scuttlebutt",
  "smallvec",
  "subtle",
+ "swanky-field",
  "swanky-flatbuffer-build",
  "swanky-serialization",
  "tempfile",
@@ -1460,6 +1464,7 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-block",
  "swanky-channel-legacy",
+ "swanky-field",
  "swanky-party",
  "swanky-serialization",
  "vectoreyes",
@@ -1498,6 +1503,7 @@ dependencies = [
  "swanky-block",
  "swanky-channel-legacy",
  "swanky-cointoss",
+ "swanky-field",
  "swanky-party",
  "swanky-serialization",
  "vectoreyes",
@@ -1749,6 +1755,7 @@ dependencies = [
  "swanky-bytearray-utils",
  "swanky-channel-legacy",
  "swanky-cointoss",
+ "swanky-field",
  "vectoreyes",
 ]
 
@@ -2448,6 +2455,7 @@ dependencies = [
  "serde",
  "swanky-aes-rng",
  "swanky-block",
+ "swanky-field",
 ]
 
 [[package]]
@@ -3543,6 +3551,7 @@ dependencies = [
  "scuttlebutt",
  "simple-arith-circuit",
  "swanky-aes-rng",
+ "swanky-field",
 ]
 
 [[package]]

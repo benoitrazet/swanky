@@ -11,11 +11,11 @@ use anyhow::anyhow;
 use blake3::Hash;
 use rand::{Rng, SeedableRng};
 use scuttlebutt::field::FiniteField;
-use scuttlebutt::ring::FiniteRing;
 use serde::{Deserialize, Serialize};
 use simple_arith_circuit::Circuit;
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
+use swanky_field::FiniteRing;
 use swanky_serialization::serde_vec;
 
 /// The proof for a single execution of the protocol. `N` denotes

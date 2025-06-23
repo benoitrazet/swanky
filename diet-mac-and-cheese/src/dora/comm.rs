@@ -1,9 +1,9 @@
 use eyre::Result;
-use scuttlebutt::{field::FiniteField, ring::FiniteRing};
+use scuttlebutt::field::FiniteField;
 use std::iter;
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
-use swanky_field::IsSubFieldOf;
+use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_party::{
     IsParty, Party, Prover, WhichParty,
     private::{ProverPrivate, ProverPrivateCopy},

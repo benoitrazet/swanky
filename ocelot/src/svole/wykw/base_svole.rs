@@ -8,12 +8,10 @@ use super::{
 use crate::errors::Error;
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
-use scuttlebutt::{
-    field::{Degree, FiniteField as FF},
-    ring::FiniteRing,
-};
+use scuttlebutt::field::{Degree, FiniteField as FF};
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_field::FiniteRing;
 
 /// The base VOLE sender
 pub struct Sender<FE: FF> {

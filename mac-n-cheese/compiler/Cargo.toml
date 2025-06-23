@@ -32,6 +32,7 @@ bitvec.workspace = true
 crypto-bigint.workspace = true
 dhat.workspace = true
 smallvec.workspace = true
+swanky-field.workspace = true
 swanky-party.workspace = true
 
 [dev-dependencies]

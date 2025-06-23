@@ -13,8 +13,8 @@ use party::either::PartyEitherCopy;
 use party::{IsParty, Party, WhichParty};
 use rand::SeedableRng;
 use scuttlebutt::field::{Degree, DegreeModulo, F2, FiniteField, IsSubFieldOf, SmallBinaryField};
-use scuttlebutt::ring::FiniteRing;
 use swanky_aes_rng::AesRng;
+use swanky_field::FiniteRing;
 use swanky_party as party;
 use swanky_serialization::CanonicalSerialize;
 

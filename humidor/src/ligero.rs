@@ -404,7 +404,7 @@ impl Arbitrary for Secret<TestField, TestHash> {
 }
 
 #[cfg(test)]
-use scuttlebutt::ring::FiniteRing;
+use swanky_field::FiniteRing;
 
 #[cfg(test)]
 proptest! {

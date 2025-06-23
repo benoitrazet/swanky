@@ -13,15 +13,13 @@ use rand::{
     CryptoRng, Rng, SeedableRng,
     distributions::{Distribution, Uniform},
 };
-use scuttlebutt::{
-    field::{Degree, FiniteField as FF},
-    ring::FiniteRing,
-};
+use scuttlebutt::field::{Degree, FiniteField as FF};
 use swanky_adversary::Malicious;
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_bytearray_utils::unpack_bits;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_field::FiniteRing;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 pub(super) struct Sender<OT: OtReceiver + Malicious, FE: FF> {

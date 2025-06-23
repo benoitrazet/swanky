@@ -4,10 +4,8 @@ use mac_n_cheese_ir::{
     compilation_format::{FieldMacType, Type, wire_format::Wire},
 };
 
-use scuttlebutt::{
-    field::{F2, F61p},
-    ring::FiniteRing,
-};
+use scuttlebutt::field::{F2, F61p};
+use swanky_field::FiniteRing;
 
 fn main() -> eyre::Result<()> {
     color_eyre::install()?;

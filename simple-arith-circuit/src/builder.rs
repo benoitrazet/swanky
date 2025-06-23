@@ -2,7 +2,7 @@
 
 use crate::{Circuit, Op};
 use scuttlebutt::field::{F2, FiniteField};
-use scuttlebutt::ring::FiniteRing;
+use swanky_field::FiniteRing;
 
 /// Adds an equality check to `circuit` such that the new circuit
 /// outputs zero if the output of the old circuit is `value`.
