@@ -195,6 +195,8 @@ impl<
                 let bits = bits_in.prover_into(e);
                 let macs = self.ot.as_mut().prover_into(e).receive_correlated(
                     &mut channel,
+                    // TODO: change how ocelots handles bits. Use F2 instead of bol. Once that
+                    // is done, this won't be necessary.
                     &bits.iter().map(|b| bool::from(*b)).collect::<Vec<bool>>(),
                     &mut rng,
                 )?;
@@ -233,7 +235,7 @@ impl<
         &self,
         out: &[AuthBit<P>],
         channel: &mut Channel,
-    ) -> eyre::Result<VerifierPrivateCopy<P, F2>> {
+    ) -> eyre::Result<VerifierPrivateCopy<P, bool>> {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 let mut bit_ser: F2BitSerializer =
@@ -269,7 +271,7 @@ impl<
                             ab.key().into_inner(e)
                         };
                 }
-                Ok(VerifierPrivateCopy::new(F2::from(validation)))
+                Ok(VerifierPrivateCopy::new(validation))
             }
         }
     }
@@ -296,7 +298,7 @@ impl<
                 ev,
                 VerifierAuthBit {
                     key: authbit.key().into_inner(ev)
-                        ^ U8x16::from(F2::from(bit) * F128b::from(self.delta().into_inner(ev))),
+                        ^ U8x16::from(bit * F128b::from(self.delta().into_inner(ev))),
                 },
             )),
         }
