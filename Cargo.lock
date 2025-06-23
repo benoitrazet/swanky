@@ -2510,6 +2510,7 @@ name = "swanky-aes-rng"
 version = "0.6.0"
 dependencies = [
  "bytemuck",
+ "criterion",
  "proptest",
  "rand 0.8.5",
  "rand_core 0.6.4",
