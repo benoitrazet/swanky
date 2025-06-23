@@ -254,6 +254,17 @@ impl Mul<F128b> for F2 {
     }
 }
 
+impl From<U8x16> for F128b {
+    fn from(value: U8x16) -> Self {
+        Self(bytemuck::cast(value))
+    }
+}
+impl From<F128b> for U8x16 {
+    fn from(value: F128b) -> Self {
+        U8x16::from(value.0)
+    }
+}
+
 impl IsSubRingOf<F128b> for F2 {}
 impl IsSubFieldOf<F128b> for F2 {
     type DegreeModulo = generic_array::typenum::U128;
