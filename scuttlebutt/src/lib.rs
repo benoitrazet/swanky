@@ -11,5 +11,4 @@ pub mod field {
         Degree, DegreeModulo, FiniteField, IsSubFieldOf, PrimeFiniteField, field_ops,
     };
     pub use swanky_field_binary::*;
-    pub use swanky_field_f61p::*;
 }

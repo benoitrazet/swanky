@@ -689,13 +689,14 @@ mod tests {
     use crate::svole_trait::{Svole, SvoleT};
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
-    use scuttlebutt::field::{F2, F40b, F61p, FiniteField, IsSubFieldOf};
+    use scuttlebutt::field::{F2, F40b, FiniteField, IsSubFieldOf};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::{AbstractChannel, Channel, SyncChannel};
+    use swanky_field_f61p::F61p;
     use swanky_party::private::{ProverPrivateCopy, VerifierPrivate};
     use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier};
 

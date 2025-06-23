@@ -429,8 +429,9 @@ mod tests {
         },
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
     };
-    use scuttlebutt::field::{F2, F61p, PrimeFiniteField};
+    use scuttlebutt::field::{F2, PrimeFiniteField};
     use swanky_field::FiniteRing;
+    use swanky_field_f61p::F61p;
 
     // Simplest test for mux on f2
     #[test]

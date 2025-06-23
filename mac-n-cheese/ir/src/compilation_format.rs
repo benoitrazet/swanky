@@ -4,7 +4,7 @@ use mac_n_cheese_vole::specialization::{
     FiniteFieldSpecialization, NoSpecialization, SmallBinaryFieldSpecialization,
 };
 use rustc_hash::FxHashMap;
-use scuttlebutt::field::{F2, F61p, F63b, FiniteField, IsSubFieldOf, SmallBinaryField};
+use scuttlebutt::field::{F2, F63b, FiniteField, IsSubFieldOf, SmallBinaryField};
 use std::{
     any::{TypeId, type_name},
     fs::File,
@@ -12,6 +12,7 @@ use std::{
     os::unix::prelude::FileExt,
     sync::atomic::AtomicU32,
 };
+use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::F128p;
 
 use crate::MAC_N_CHEESE_VERSION;

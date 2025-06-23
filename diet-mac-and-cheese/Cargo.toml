@@ -56,6 +56,7 @@ swanky-flatbuffer-build.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
+swanky-field-f61p.workspace = true
 
 [[example]]
 name = "dietmc_lib"

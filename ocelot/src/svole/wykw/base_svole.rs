@@ -134,13 +134,14 @@ impl<FE: FF> Receiver<FE> {
 #[cfg(test)]
 mod tests {
     use super::{super::utils::Powers, Receiver, Sender};
-    use scuttlebutt::field::{F40b, F61p, F128b, FiniteField as FF};
+    use scuttlebutt::field::{F40b, F128b, FiniteField as FF};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
+    use swanky_field_f61p::F61p;
 
     fn test_base_svole<FE: FF>(len: usize) {
         let (sender, receiver) = UnixStream::pair().unwrap();

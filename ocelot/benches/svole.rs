@@ -6,7 +6,7 @@ use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use ocelot::svole::{Receiver, Sender};
 
-use scuttlebutt::field::{F61p, F128b, FiniteField};
+use scuttlebutt::field::{F128b, FiniteField};
 use std::{
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
@@ -15,6 +15,7 @@ use std::{
 };
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::Channel;
+use swanky_field_f61p::F61p;
 
 // TODO: re-enable ggm_utils benchmarks once we've sorted out the private modules issue.
 /*#[path = "../src/svole/wykw/ggm_utils.rs"]

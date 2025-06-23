@@ -416,7 +416,8 @@ impl UnopenedParty {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use scuttlebutt::field::{F61p, F64b};
+    use scuttlebutt::field::F64b;
+    use swanky_field_f61p::F61p;
 
     const N: usize = 16;
     const K: usize = 8;

@@ -33,6 +33,7 @@ crypto-bigint.workspace = true
 dhat.workspace = true
 smallvec.workspace = true
 swanky-field.workspace = true
+swanky-field-f61p.workspace = true
 swanky-field-ff-primes.workspace = true
 swanky-party.workspace = true
 

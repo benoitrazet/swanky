@@ -1,9 +1,10 @@
 #![allow(clippy::all)]
 use criterion::{BatchSize, BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use inferno::Proof;
-use scuttlebutt::field::{F61p, F64b, FiniteField};
+use scuttlebutt::field::{F64b, FiniteField};
 use std::time::Duration;
 use swanky_aes_rng::AesRng;
+use swanky_field_f61p::F61p;
 
 const N: usize = 16;
 
