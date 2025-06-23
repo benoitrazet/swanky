@@ -18,7 +18,8 @@ use crate::{
 };
 use eyre::Result;
 use generic_array::GenericArray;
-use scuttlebutt::{AbstractChannel, AesRng};
+use scuttlebutt::AesRng;
+use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F40b};
 use swanky_party::{Party, WhichParty, private::ProverPrivate};
@@ -355,13 +356,14 @@ mod test {
     use crate::svole_trait::Svole;
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
+    use scuttlebutt::AesRng;
     use scuttlebutt::field::{F2, F40b};
-    use scuttlebutt::{AesRng, Channel};
     use std::thread::JoinHandle;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_channel_legacy::Channel;
     use swanky_party::{Prover, Verifier};
 
     #[test]

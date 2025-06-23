@@ -3,7 +3,7 @@ use std::{collections::hash_map::Entry, iter, marker::PhantomData};
 use eyre::{Result, ensure};
 use rustc_hash::FxHashMap;
 
-use scuttlebutt::AbstractChannel;
+use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::{
     Party, WhichParty,

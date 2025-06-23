@@ -687,6 +687,7 @@ dependencies = [
  "serde",
  "subtle",
  "swanky-block",
+ "swanky-channel-legacy",
  "swanky-field",
  "swanky-field-binary",
  "swanky-field-f61p",
@@ -792,6 +793,7 @@ dependencies = [
  "subtle",
  "swanky-adversary",
  "swanky-block",
+ "swanky-channel-legacy",
  "vectoreyes",
 ]
 
@@ -1447,6 +1449,7 @@ dependencies = [
  "snmalloc-rs",
  "subtle",
  "swanky-block",
+ "swanky-channel-legacy",
  "swanky-party",
  "vectoreyes",
 ]
@@ -1481,6 +1484,7 @@ dependencies = [
  "rand 0.8.5",
  "scuttlebutt",
  "swanky-block",
+ "swanky-channel-legacy",
  "swanky-party",
  "vectoreyes",
 ]
@@ -1726,6 +1730,7 @@ dependencies = [
  "subtle",
  "swanky-adversary",
  "swanky-block",
+ "swanky-channel-legacy",
  "vectoreyes",
 ]
 
@@ -1851,6 +1856,7 @@ dependencies = [
  "sha2",
  "swanky-adversary",
  "swanky-block",
+ "swanky-channel-legacy",
  "vectoreyes",
 ]
 
@@ -2314,6 +2320,7 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-block",
  "swanky-channel",
+ "swanky-channel-legacy",
  "swanky-field",
  "swanky-field-binary",
  "swanky-field-f61p",
@@ -3169,6 +3176,7 @@ dependencies = [
  "pretty_env_logger",
  "rand 0.8.5",
  "scuttlebutt",
+ "swanky-channel-legacy",
  "swanky-field-binary",
  "swanky-party",
  "wasm-bindgen",
@@ -3190,6 +3198,7 @@ dependencies = [
  "rustls",
  "rustls-pemfile",
  "scuttlebutt",
+ "swanky-channel-legacy",
  "swanky-field-binary",
  "swanky-party",
  "tungstenite",

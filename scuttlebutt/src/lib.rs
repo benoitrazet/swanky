@@ -5,8 +5,6 @@
 
 //! Scuttlebutt provides many utility functions for cryptographic applications.
 
-/// Module for encapsulating communication channels for `swanky`.
-pub mod channel;
 pub mod cointoss;
 mod hash_aes;
 pub use swanky_serialization as serialization;
@@ -27,13 +25,5 @@ pub mod ring {
     pub use swanky_field::{FiniteRing, IsSubRingOf, ring_ops};
 }
 
-pub use crate::{
-    channel::{AbstractChannel, Channel, HashChannel, SymChannel, SyncChannel, TrackChannel},
-    hash_aes::{AES_HASH, AesHash},
-};
+pub use crate::hash_aes::{AES_HASH, AesHash};
 pub use swanky_aes_rng::{AesRng, UniformIntegersUnderBound};
-
-#[cfg(unix)]
-pub use crate::channel::{
-    TrackUnixChannel, UnixChannel, track_unix_channel_pair, unix_channel_pair,
-};

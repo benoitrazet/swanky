@@ -1,6 +1,6 @@
-use scuttlebutt::AbstractChannel;
 use std::io::Result;
 use std::io::{Read, Write};
+use swanky_channel_legacy::AbstractChannel;
 use tungstenite::Message;
 use tungstenite::WebSocket;
 

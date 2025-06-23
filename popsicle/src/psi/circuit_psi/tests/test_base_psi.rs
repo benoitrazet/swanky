@@ -14,8 +14,9 @@ mod tests {
     };
 
     use ocelot::{ot::AlszReceiver as OtReceiver, ot::AlszSender as OtSender};
-    use scuttlebutt::{AesRng, Channel};
+    use scuttlebutt::AesRng;
     use swanky_block::Block512;
+    use swanky_channel_legacy::Channel;
 
     use std::{
         io::{BufReader, BufWriter},

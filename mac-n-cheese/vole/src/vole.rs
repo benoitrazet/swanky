@@ -10,13 +10,14 @@ use rand::prelude::Distribution;
 use rand::{CryptoRng, Rng, SeedableRng, distributions::Uniform};
 use scuttlebutt::field::DegreeModulo;
 use scuttlebutt::{
-    AbstractChannel, AesRng,
+    AesRng,
     field::{Degree, FiniteField},
     ring::FiniteRing,
     serialization::CanonicalSerialize,
 };
 use std::{marker::PhantomData, ops::Deref};
 use swanky_block::Block;
+use swanky_channel_legacy::AbstractChannel;
 use swanky_party as party;
 
 mod lpn_params;

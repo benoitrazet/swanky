@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use scuttlebutt::{AbstractChannel, field::FiniteField};
+use scuttlebutt::field::FiniteField;
+use swanky_channel_legacy::AbstractChannel;
 
 // handling of (FS) transcripts
 mod tx;

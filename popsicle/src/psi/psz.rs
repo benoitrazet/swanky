@@ -12,10 +12,11 @@ use crate::{
 use itertools::Itertools;
 use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::{CryptoRng, Rng, RngCore, seq::SliceRandom};
-use scuttlebutt::{AbstractChannel, cointoss};
+use scuttlebutt::cointoss;
 use std::collections::{HashMap, HashSet};
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
+use swanky_channel_legacy::AbstractChannel;
 
 const NHASHES: usize = 3;
 
@@ -277,11 +278,12 @@ impl SemiHonest for Receiver {}
 mod tests {
     use super::*;
     use crate::utils::rand_vec_vec;
-    use scuttlebutt::{AesRng, Channel};
+    use scuttlebutt::AesRng;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_channel_legacy::Channel;
 
     const ITEM_SIZE: usize = 8;
     const SET_SIZE: usize = 1 << 16;

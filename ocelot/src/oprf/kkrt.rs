@@ -12,10 +12,11 @@ use crate::{
     utils,
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AbstractChannel, AesRng, cointoss, utils as scutils};
+use scuttlebutt::{AesRng, cointoss, utils as scutils};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
+use swanky_channel_legacy::AbstractChannel;
 
 /// KKRT oblivious PRF sender.
 pub struct Sender<OT: OtReceiver + SemiHonest> {
@@ -209,12 +210,13 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> SemiHonest for Receiver<OT> {}
 mod tests {
     use super::*;
     use crate::oprf;
-    use scuttlebutt::{AesRng, Channel};
+    use scuttlebutt::AesRng;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
         sync::{Arc, Mutex},
     };
+    use swanky_channel_legacy::Channel;
 
     #[test]
     fn test_seed() {

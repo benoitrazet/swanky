@@ -14,13 +14,14 @@ use rand::{
     distributions::{Distribution, Uniform},
 };
 use scuttlebutt::{
-    AbstractChannel, AesRng,
+    AesRng,
     field::{Degree, FiniteField as FF},
     ring::FiniteRing,
     utils::unpack_bits,
 };
 use swanky_adversary::Malicious;
 use swanky_block::Block;
+use swanky_channel_legacy::AbstractChannel;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 pub(super) struct Sender<OT: OtReceiver + Malicious, FE: FF> {
@@ -368,13 +369,14 @@ mod test {
     };
     use generic_array::typenum::Unsigned;
     use scuttlebutt::{
-        AesRng, Channel,
+        AesRng,
         field::{Degree, F40b, F61p, F128b, FiniteField as FF},
     };
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_channel_legacy::Channel;
 
     fn test_spsvole_<FE: FF>(cols: usize, weight: usize) {
         let r = Degree::<FE>::USIZE;

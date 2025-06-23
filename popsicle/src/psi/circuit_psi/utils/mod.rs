@@ -3,8 +3,8 @@ use crate::{cuckoo::CuckooItem, errors::Error};
 use fancy_garbling::{FancyInput, WireMod2, util};
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::Channel;
 use swanky_block::{Block, Block512};
+use swanky_channel_legacy::Channel;
 
 use std::{
     fmt::Debug,

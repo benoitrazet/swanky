@@ -3,12 +3,13 @@
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use popsicle::psz;
-use scuttlebutt::{AesRng, Channel};
+use scuttlebutt::AesRng;
 use std::{
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
     time::Duration,
 };
+use swanky_channel_legacy::Channel;
 
 const SIZE: usize = 15;
 

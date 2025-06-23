@@ -6,9 +6,10 @@
 //! seed_`. Likewise, on input `seed`, the receiver gets `r`, sends `seed` to
 //! the sender, and then receives `seed_`, checking that `PRG(seed_) = r`.
 
-use crate::{AbstractChannel, AesRng};
+use crate::AesRng;
 use rand_core::{RngCore, SeedableRng};
 use swanky_block::Block;
+use swanky_channel_legacy::AbstractChannel;
 
 /// Errors produced by the coin tossing protocol.
 #[derive(Debug)]
@@ -92,11 +93,11 @@ pub fn receive<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<V
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Channel;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_channel_legacy::Channel;
 
     #[test]
     fn test() {

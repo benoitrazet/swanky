@@ -44,6 +44,7 @@ bufstream.workspace = true
 flatbuffers.workspace = true
 crossbeam-queue.workspace = true
 swanky-block.workspace = true
+swanky-channel-legacy.workspace = true
 swanky-party.workspace = true
 
 # Memory allocators

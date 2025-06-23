@@ -9,10 +9,11 @@ use crate::errors::Error;
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
-    AbstractChannel, AesRng,
+    AesRng,
     field::{Degree, FiniteField as FF},
     ring::FiniteRing,
 };
+use swanky_channel_legacy::AbstractChannel;
 
 /// The base VOLE sender
 pub struct Sender<FE: FF> {
@@ -136,13 +137,14 @@ impl<FE: FF> Receiver<FE> {
 mod tests {
     use super::{super::utils::Powers, Receiver, Sender};
     use scuttlebutt::{
-        AesRng, Channel,
+        AesRng,
         field::{F40b, F61p, F128b, FiniteField as FF},
     };
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_channel_legacy::Channel;
 
     fn test_base_svole<FE: FF>(len: usize) {
         let (sender, receiver) = UnixStream::pair().unwrap();

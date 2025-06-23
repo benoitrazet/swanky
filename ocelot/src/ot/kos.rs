@@ -12,10 +12,11 @@ use crate::{
     utils,
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AbstractChannel, AesRng, cointoss};
+use scuttlebutt::{AesRng, cointoss};
 use std::io::ErrorKind;
 use swanky_adversary::{Malicious, SemiHonest};
 use swanky_block::Block;
+use swanky_channel_legacy::AbstractChannel;
 
 // The statistical security parameter.
 const SSP: usize = 40;

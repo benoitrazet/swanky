@@ -6,9 +6,10 @@
 use crate::Error;
 use keyed_arena::{AllocationKey, BorrowedAllocation, KeyedArena};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AES_HASH, AbstractChannel, AesRng};
+use scuttlebutt::{AES_HASH, AesRng};
 use std::convert::TryInto;
 use swanky_block::Block;
+use swanky_channel_legacy::AbstractChannel;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16, U64x2, array_utils::ArrayUnrolledExt};
 
 // TODO: alsz and kos should be based on this file?
@@ -502,9 +503,9 @@ impl KosReceiverStage2 {
 
 #[test]
 fn test_kos_ot() {
-    use scuttlebutt::Channel;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
+    use swanky_channel_legacy::Channel;
     let (a, b) = UnixStream::pair().unwrap();
     let sender = std::thread::spawn(move || {
         let mut rng = AesRng::from_seed(Block::from(456));

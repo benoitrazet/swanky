@@ -1,6 +1,7 @@
 use eyre::{Result, ensure};
 
-use scuttlebutt::{AbstractChannel, field::FiniteField};
+use scuttlebutt::field::FiniteField;
+use swanky_channel_legacy::AbstractChannel;
 use swanky_field::IsSubFieldOf;
 use swanky_party::{IsParty, Party, Prover};
 

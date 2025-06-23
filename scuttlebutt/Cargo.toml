@@ -37,6 +37,7 @@ swanky-field-binary.workspace = true
 swanky-field-fft.workspace = true
 swanky-field-ff-primes.workspace = true
 swanky-channel.workspace = true
+swanky-channel-legacy.workspace = true
 swanky-aes-rng.workspace = true
 
 [dev-dependencies]

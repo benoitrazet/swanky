@@ -8,13 +8,14 @@ use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
 };
 use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
-use scuttlebutt::{AesRng, Channel};
+use scuttlebutt::AesRng;
 use std::{
     fs::File,
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
     time::Duration,
 };
+use swanky_channel_legacy::Channel;
 
 type Reader = BufReader<UnixStream>;
 type Writer = BufWriter<UnixStream>;

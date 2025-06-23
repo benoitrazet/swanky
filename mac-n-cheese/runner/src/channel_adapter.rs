@@ -1,6 +1,6 @@
 use std::io::{Read, Write};
 
-use scuttlebutt::AbstractChannel;
+use swanky_channel_legacy::AbstractChannel;
 
 pub struct ChannelAdapter<C: Read + Write>(pub C);
 impl<C: Read + Write> AbstractChannel for ChannelAdapter<C> {

@@ -1,4 +1,4 @@
-use scuttlebutt::AbstractChannel;
+use swanky_channel_legacy::AbstractChannel;
 use wasm_bindgen::prelude::*;
 
 // TODO: We should experiment with an API that exchange vector of data instead individual bytes to minimize
