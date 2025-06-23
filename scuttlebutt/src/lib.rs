@@ -6,7 +6,6 @@
 //! Scuttlebutt provides many utility functions for cryptographic applications.
 
 pub use swanky_serialization as serialization;
-pub mod utils;
 
 /// A polyfill for the `swanky-field*` family of crates.
 pub mod field {

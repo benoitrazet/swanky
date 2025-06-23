@@ -13,11 +13,12 @@ use crate::{
     utils,
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AesRng, utils as scutils};
+use scuttlebutt::AesRng;
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
 use swanky_aes_hash::{AES_HASH, AesHash};
 use swanky_block::Block;
+use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
 
 /// Oblivious transfer sender.

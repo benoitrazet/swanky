@@ -330,10 +330,8 @@ pub fn ggm_prime<
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    use scuttlebutt::{
-        field::{F2, F61p, F63b, F128b, FiniteField},
-        utils::unpack_bits,
-    };
+    use scuttlebutt::field::{F2, F61p, F63b, F128b, FiniteField};
+    use swanky_bytearray_utils::unpack_bits;
 
     fn test_ggm_<VF: FiniteField + IsSubFieldOf<FE>, FE: FiniteField>(
         depth: usize,

@@ -113,7 +113,7 @@ impl Sender {
 
                 // encrypt payload
                 let mut ct = payloads[j];
-                scuttlebutt::utils::xor_inplace(ct.as_mut(), key);
+                swanky_bytearray_utils::xor_inplace(ct.as_mut(), key);
 
                 channel.write_bytes(&tag[0..masksize])?;
                 channel.write_bytes(ct.as_ref())?;
@@ -214,7 +214,7 @@ impl Receiver {
                 if let Some(ct) = hs[item.hash_index].get(tag) {
                     let val = inputs[item.input_index].clone();
                     let key = &output.as_ref()[masksize..masksize + 16];
-                    let payload_bytes = scuttlebutt::utils::xor(ct.as_ref(), key);
+                    let payload_bytes = swanky_bytearray_utils::xor(ct.as_ref(), key);
                     let payload = Block::from(
                         <[u8; 16]>::try_from(payload_bytes.as_slice())
                             .expect("it is exactly 16 bytes long"),

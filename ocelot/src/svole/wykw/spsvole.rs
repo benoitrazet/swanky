@@ -17,10 +17,10 @@ use scuttlebutt::{
     AesRng,
     field::{Degree, FiniteField as FF},
     ring::FiniteRing,
-    utils::unpack_bits,
 };
 use swanky_adversary::Malicious;
 use swanky_block::Block;
+use swanky_bytearray_utils::unpack_bits;
 use swanky_channel_legacy::AbstractChannel;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
