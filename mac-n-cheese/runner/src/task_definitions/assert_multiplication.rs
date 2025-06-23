@@ -14,9 +14,9 @@ use party::{IsParty, Party, WhichParty};
 use rand::SeedableRng;
 use scuttlebutt::field::{Degree, DegreeModulo, F2, FiniteField, IsSubFieldOf, SmallBinaryField};
 use scuttlebutt::ring::FiniteRing;
-use scuttlebutt::serialization::CanonicalSerialize;
 use swanky_aes_rng::AesRng;
 use swanky_party as party;
+use swanky_serialization::CanonicalSerialize;
 
 use std::io::Read;
 use std::io::Write;

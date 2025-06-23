@@ -12,13 +12,13 @@ use scuttlebutt::field::DegreeModulo;
 use scuttlebutt::{
     field::{Degree, FiniteField},
     ring::FiniteRing,
-    serialization::CanonicalSerialize,
 };
 use std::{marker::PhantomData, ops::Deref};
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_party as party;
+use swanky_serialization::CanonicalSerialize;
 
 mod lpn_params;
 mod sizes;

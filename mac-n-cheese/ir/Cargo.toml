@@ -27,6 +27,7 @@ twox-hash.workspace = true
 bumpalo = { workspace = true, features = ["collections"] }
 arrayvec.workspace = true
 mac-n-cheese-vole.workspace = true
+swanky-serialization.workspace = true
 
 [build-dependencies]
 swanky-flatbuffer-build.workspace = true

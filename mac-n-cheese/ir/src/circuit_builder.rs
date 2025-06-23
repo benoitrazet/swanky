@@ -2,14 +2,13 @@ use eyre::WrapErr;
 use flatbuffers::FlatBufferBuilder;
 use rustc_hash::{FxHashMap, FxHashSet};
 use scuttlebutt::field::FiniteField;
-use scuttlebutt::serialization::SequenceSerializer;
 use smallvec::SmallVec;
 use std::any::TypeId;
 use std::fs::File;
 use std::io::{BufWriter, Seek, Write};
-
 use std::ops::RangeBounds;
 use std::path::Path;
+use swanky_serialization::SequenceSerializer;
 
 use crate::{MAC_N_CHEESE_VERSION, compilation_format::*};
 

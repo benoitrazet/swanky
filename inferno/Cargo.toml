@@ -26,6 +26,7 @@ scuttlebutt.workspace = true
 swanky-aes-rng.workspace = true
 swanky-block.workspace = true
 swanky-polynomial.workspace = true
+swanky-serialization.workspace = true
 serde = { workspace = true, features = ["derive"] }
 simple-arith-circuit = { workspace = true, features = ["serde"] }
 snafu.workspace = true

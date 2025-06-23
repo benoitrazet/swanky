@@ -6,8 +6,8 @@ use mac_n_cheese_ir::compilation_format::wire_format::AssertZeroPrototypeWireFor
 use mac_n_cheese_vole::mac::Mac;
 use mac_n_cheese_vole::mac::MacTypes;
 use parking_lot::Mutex;
-use scuttlebutt::serialization::CanonicalSerialize;
 use swanky_party::Party;
+use swanky_serialization::CanonicalSerialize;
 use vectoreyes::SimdBase;
 use vectoreyes::U8x32;
 

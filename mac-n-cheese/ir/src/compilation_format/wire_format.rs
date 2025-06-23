@@ -2,8 +2,8 @@ use super::WireSize;
 use crate::circuit_builder::PrototypeBuilder;
 use generic_array::GenericArray;
 use generic_array::typenum::Unsigned;
-use scuttlebutt::serialization::CanonicalSerialize;
 use std::{io::Write, marker::PhantomData};
+use swanky_serialization::CanonicalSerialize;
 use vectoreyes::array_utils::ArrayUnrolledExt;
 use vectoreyes::array_utils::{ArrayUnrolledOps, UnrollableArraySize};
 

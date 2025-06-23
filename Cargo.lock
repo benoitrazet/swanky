@@ -696,6 +696,7 @@ dependencies = [
  "swanky-flatbuffer-build",
  "swanky-party",
  "swanky-polynomial",
+ "swanky-serialization",
  "toml",
 ]
 
@@ -1061,6 +1062,7 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-block",
  "swanky-polynomial",
+ "swanky-serialization",
 ]
 
 [[package]]
@@ -1112,6 +1114,7 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-block",
  "swanky-polynomial",
+ "swanky-serialization",
 ]
 
 [[package]]
@@ -1407,6 +1410,7 @@ dependencies = [
  "smallvec",
  "subtle",
  "swanky-flatbuffer-build",
+ "swanky-serialization",
  "tempfile",
  "twox-hash",
  "vectoreyes",
@@ -1457,6 +1461,7 @@ dependencies = [
  "swanky-block",
  "swanky-channel-legacy",
  "swanky-party",
+ "swanky-serialization",
  "vectoreyes",
 ]
 
@@ -1494,6 +1499,7 @@ dependencies = [
  "swanky-channel-legacy",
  "swanky-cointoss",
  "swanky-party",
+ "swanky-serialization",
  "vectoreyes",
 ]
 

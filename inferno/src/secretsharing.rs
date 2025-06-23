@@ -4,8 +4,8 @@
 use blake3::Hasher;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::field::FiniteField;
-use scuttlebutt::serialization::{SequenceDeserializer, SequenceSerializer};
 use swanky_polynomial::{lagrange_denominator, lagrange_numerator};
+use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 
 /// An evaluator for Lagrange polynomials.
 pub(crate) struct LagrangeEvaluator<F> {

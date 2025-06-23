@@ -1,9 +1,9 @@
 use eyre::ContextCompat;
 use mac_n_cheese_ir::compilation_format::FieldMacType;
 use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
-use scuttlebutt::serialization::{CanonicalSerialize, SequenceDeserializer};
 use std::{io::Cursor, sync::Arc};
 use swanky_party::Party;
+use swanky_serialization::{CanonicalSerialize, SequenceDeserializer};
 
 use crate::{
     alloc::TaskDataBuffer,

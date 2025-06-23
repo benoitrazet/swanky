@@ -68,12 +68,12 @@ use ndarray::{Array1, Array2, ArrayView1, Axis, concatenate};
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::field::FiniteField;
 use scuttlebutt::field::fft::FieldForFFT;
-#[cfg(test)]
-use scuttlebutt::serialization::CanonicalSerialize;
 use sprs::{CsMat, TriMat};
 use std::ops::Range;
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
+#[cfg(test)]
+use swanky_serialization::CanonicalSerialize;
 
 type HashOutput<T> = digest::Output<T>;
 

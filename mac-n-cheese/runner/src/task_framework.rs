@@ -14,10 +14,7 @@ use mac_n_cheese_vole::{
     specialization::SmallBinaryFieldSpecialization,
 };
 use rustc_hash::FxHashMap;
-use scuttlebutt::{
-    field::{F2, FiniteField, IsSubFieldOf, SmallBinaryField},
-    serialization::{CanonicalSerialize, SequenceDeserializer, SequenceSerializer},
-};
+use scuttlebutt::field::{F2, FiniteField, IsSubFieldOf, SmallBinaryField};
 use smallvec::SmallVec;
 use swanky_aes_rng::AesRng;
 use swanky_party::{
@@ -25,6 +22,7 @@ use swanky_party::{
     either::PartyEither,
     private::{ProverPrivate, ProverPrivateCopy},
 };
+use swanky_serialization::{CanonicalSerialize, SequenceDeserializer, SequenceSerializer};
 use vectoreyes::{
     I32x4, SimdBase, SimdBaseGatherable, U32x4, U64x4,
     array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
