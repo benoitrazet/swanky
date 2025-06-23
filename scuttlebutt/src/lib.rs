@@ -5,7 +5,6 @@
 
 //! Scuttlebutt provides many utility functions for cryptographic applications.
 
-mod hash_aes;
 pub use swanky_serialization as serialization;
 pub mod utils;
 
@@ -24,5 +23,4 @@ pub mod ring {
     pub use swanky_field::{FiniteRing, IsSubRingOf, ring_ops};
 }
 
-pub use crate::hash_aes::{AES_HASH, AesHash};
 pub use swanky_aes_rng::{AesRng, UniformIntegersUnderBound};

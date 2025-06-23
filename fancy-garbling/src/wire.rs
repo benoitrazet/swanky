@@ -3,8 +3,8 @@
 use crate::{fancy::HasModulus, util};
 use fancy_garbling_base_conversion as base_conversion;
 use rand::{CryptoRng, Rng, RngCore};
-use scuttlebutt::AES_HASH;
 use subtle::ConditionallySelectable;
+use swanky_aes_hash::AES_HASH;
 use swanky_block::Block;
 use vectoreyes::{
     SimdBase,

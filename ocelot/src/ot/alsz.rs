@@ -13,9 +13,10 @@ use crate::{
     utils,
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AES_HASH, AesHash, AesRng, utils as scutils};
+use scuttlebutt::{AesRng, utils as scutils};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
+use swanky_aes_hash::{AES_HASH, AesHash};
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 

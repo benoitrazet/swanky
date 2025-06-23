@@ -6,8 +6,9 @@
 use crate::Error;
 use keyed_arena::{AllocationKey, BorrowedAllocation, KeyedArena};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AES_HASH, AesRng};
+use scuttlebutt::AesRng;
 use std::convert::TryInto;
+use swanky_aes_hash::AES_HASH;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16, U64x2, array_utils::ArrayUnrolledExt};

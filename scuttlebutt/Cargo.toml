@@ -50,9 +50,5 @@ bincode.workspace = true
 serde = { workspace = true, features = ["derive"] }
 
 [[bench]]
-name = "hash_aes"
-harness = false
-
-[[bench]]
 name = "rand_aes"
 harness = false
