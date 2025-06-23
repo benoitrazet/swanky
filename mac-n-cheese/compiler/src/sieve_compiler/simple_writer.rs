@@ -10,7 +10,7 @@ use mac_n_cheese_ir::circuit_builder::{
 use mac_n_cheese_sieve_parser::ValueStreamReader;
 use mac_n_cheese_wire_map::WireMap;
 use rustc_hash::FxHashMap;
-use scuttlebutt::field::F2;
+use swanky_field_binary::F2;
 use swanky_party::{
     Party, WhichParty,
     private::{ProverPrivate, ProverPrivateCopy},

@@ -1,11 +1,12 @@
 use crate::Proof;
 use proptest::prelude::*;
-use scuttlebutt::field::{F2, F64b, FiniteField};
+use scuttlebutt::field::FiniteField;
 use simple_arith_circuit::Circuit;
 use std::path::PathBuf;
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_field::FiniteRing;
+use swanky_field_binary::{F2, F64b};
 
 // The number of parties in the MPC
 const N: usize = 16;

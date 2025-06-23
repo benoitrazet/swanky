@@ -4,8 +4,8 @@ use mac_n_cheese_ir::{
     compilation_format::{FieldMacType, Type, wire_format::Wire},
 };
 
-use scuttlebutt::field::F2;
 use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 use swanky_field_f61p::F61p;
 
 fn main() -> eyre::Result<()> {

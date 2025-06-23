@@ -1,8 +1,9 @@
 //! This module implements functions for building / extending circuits.
 
 use crate::{Circuit, Op};
-use scuttlebutt::field::{F2, FiniteField};
+use scuttlebutt::field::FiniteField;
 use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 
 /// Adds an equality check to `circuit` such that the new circuit
 /// outputs zero if the output of the old circuit is `value`.

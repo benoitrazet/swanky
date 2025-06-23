@@ -1,7 +1,6 @@
 #![allow(clippy::all)]
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use ocelot::svole::{Receiver, Sender};
-use scuttlebutt::field::{F2, F40b};
 use std::io::{Read, Write};
 use std::{
     io::{BufReader, BufWriter},
@@ -10,6 +9,7 @@ use std::{
 };
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_field_binary::{F2, F40b};
 
 fn get_trials() -> usize {
     if let Ok(n) = std::env::var("N") {

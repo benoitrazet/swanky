@@ -118,7 +118,7 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
 mod tests {
     use super::*;
     use rand::SeedableRng;
-    use scuttlebutt::field::F64b;
+    use swanky_field_binary::F64b;
 
     const N: usize = 16;
     const K: usize = 8;

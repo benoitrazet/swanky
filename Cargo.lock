@@ -1117,6 +1117,7 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-block",
  "swanky-field",
+ "swanky-field-binary",
  "swanky-field-f61p",
  "swanky-polynomial",
  "swanky-serialization",
@@ -1361,6 +1362,7 @@ dependencies = [
  "scuttlebutt",
  "smallvec",
  "swanky-field",
+ "swanky-field-binary",
  "swanky-field-f61p",
  "swanky-field-ff-primes",
  "swanky-party",
@@ -1418,6 +1420,7 @@ dependencies = [
  "smallvec",
  "subtle",
  "swanky-field",
+ "swanky-field-binary",
  "swanky-field-f61p",
  "swanky-field-ff-primes",
  "swanky-flatbuffer-build",
@@ -1472,6 +1475,7 @@ dependencies = [
  "swanky-block",
  "swanky-channel-legacy",
  "swanky-field",
+ "swanky-field-binary",
  "swanky-party",
  "swanky-serialization",
  "vectoreyes",
@@ -1511,6 +1515,7 @@ dependencies = [
  "swanky-channel-legacy",
  "swanky-cointoss",
  "swanky-field",
+ "swanky-field-binary",
  "swanky-field-f61p",
  "swanky-field-ff-primes",
  "swanky-party",
@@ -1765,6 +1770,7 @@ dependencies = [
  "swanky-channel-legacy",
  "swanky-cointoss",
  "swanky-field",
+ "swanky-field-binary",
  "swanky-field-f61p",
  "vectoreyes",
 ]
@@ -2466,6 +2472,7 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-block",
  "swanky-field",
+ "swanky-field-binary",
  "swanky-field-f61p",
  "swanky-field-ff-primes",
 ]
@@ -3564,6 +3571,7 @@ dependencies = [
  "simple-arith-circuit",
  "swanky-aes-rng",
  "swanky-field",
+ "swanky-field-binary",
 ]
 
 [[package]]

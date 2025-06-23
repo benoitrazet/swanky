@@ -366,13 +366,14 @@ mod test {
         SpsReceiver, SpsSender,
     };
     use generic_array::typenum::Unsigned;
-    use scuttlebutt::field::{Degree, F40b, F128b, FiniteField as FF};
+    use scuttlebutt::field::{Degree, FiniteField as FF};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
+    use swanky_field_binary::{F40b, F128b};
     use swanky_field_f61p::F61p;
 
     fn test_spsvole_<FE: FF>(cols: usize, weight: usize) {

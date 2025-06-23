@@ -1,8 +1,9 @@
 use bytemuck::{TransparentWrapper, Zeroable};
 use party::IS_PROVER;
-use scuttlebutt::field::{F2, FiniteField, IsSubFieldOf, SmallBinaryField};
+use scuttlebutt::field::{FiniteField, IsSubFieldOf};
 use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 use swanky_field::FiniteRing;
+use swanky_field_binary::{F2, SmallBinaryField};
 use swanky_party as party;
 use swanky_party::either::PartyEitherCopy;
 use swanky_party::private::ProverPrivateCopy;

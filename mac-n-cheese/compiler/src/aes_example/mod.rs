@@ -5,9 +5,9 @@ use mac_n_cheese_ir::compilation_format::wire_format::Wire;
 use mac_n_cheese_ir::compilation_format::{FieldMacType, Type, WireSize};
 use rand::RngCore;
 
-use scuttlebutt::field::F2;
 use std::{cmp::Reverse, collections::BinaryHeap, str::FromStr};
 use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 use vectoreyes::{
     Aes128EncryptOnly, AesBlockCipher, SimdBase, U8x16, array_utils::ArrayUnrolledExt,
 };

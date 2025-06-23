@@ -476,13 +476,14 @@ mod tests {
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     use scuttlebutt::field::FiniteField;
-    use scuttlebutt::field::{F2, F40b, IsSubFieldOf};
+    use scuttlebutt::field::IsSubFieldOf;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
+    use swanky_field_binary::{F2, F40b};
     use swanky_field_f61p::F61p;
     use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier};
 

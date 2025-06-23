@@ -24,6 +24,7 @@ log.workspace = true
 swanky-aes-rng.workspace = true
 swanky-block.workspace = true
 swanky-field.workspace = true
+swanky-field-binary.workspace = true
 swanky-field-f61p.workspace = true
 swanky-field-ff-primes.workspace = true
 

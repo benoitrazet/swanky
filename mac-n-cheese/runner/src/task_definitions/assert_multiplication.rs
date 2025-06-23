@@ -12,9 +12,10 @@ use parking_lot::Mutex;
 use party::either::PartyEitherCopy;
 use party::{IsParty, Party, WhichParty};
 use rand::SeedableRng;
-use scuttlebutt::field::{Degree, DegreeModulo, F2, FiniteField, IsSubFieldOf, SmallBinaryField};
+use scuttlebutt::field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf};
 use swanky_aes_rng::AesRng;
 use swanky_field::FiniteRing;
+use swanky_field_binary::{F2, SmallBinaryField};
 use swanky_party as party;
 use swanky_serialization::CanonicalSerialize;
 

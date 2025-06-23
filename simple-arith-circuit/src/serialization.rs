@@ -69,6 +69,6 @@ mod tests {
         };
     }
 
-    test_serialization!(test_serialization_f2, scuttlebutt::field::F2);
+    test_serialization!(test_serialization_f2, swanky_field_binary::F2);
     test_serialization!(test_serialization_f61p, swanky_field_f61p::F61p);
 }

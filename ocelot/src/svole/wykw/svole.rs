@@ -519,13 +519,14 @@ impl<FF: FiniteField> Malicious for Receiver<FF> {}
 #[cfg(test)]
 mod tests {
     use super::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL, Receiver, Sender};
-    use scuttlebutt::field::{F2, F40b, F128b, FiniteField, IsSubFieldOf};
+    use scuttlebutt::field::{FiniteField, IsSubFieldOf};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
+    use swanky_field_binary::{F2, F40b, F128b};
     use swanky_field_f61p::F61p;
 
     fn test_lpn_svole_<V: IsSubFieldOf<T>, T: FiniteField>()
