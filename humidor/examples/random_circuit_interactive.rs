@@ -6,7 +6,7 @@ use std::io::Write;
 use swanky_aes_rng::AesRng;
 
 type Hash = sha2::Sha256;
-type Field = scuttlebutt::field::F2e19x3e26;
+type Field = swanky_field_ff_primes::F2e19x3e26;
 type Prover = interactive::Prover<Field, Hash>;
 type Verifier = interactive::Verifier<Field, Hash>;
 

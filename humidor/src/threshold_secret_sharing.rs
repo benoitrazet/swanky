@@ -200,7 +200,7 @@ mod tests {
     use rand::prelude::*;
     use swanky_field_fft::FieldForFFT;
 
-    type TestField = scuttlebutt::field::F2e19x3e26;
+    type TestField = swanky_field_ff_primes::F2e19x3e26;
 
     #[test]
     fn test_share_reconstruct() {

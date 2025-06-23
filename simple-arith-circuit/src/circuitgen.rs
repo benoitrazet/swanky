@@ -245,7 +245,7 @@ mod tests {
     use swanky_aes_rng::AesRng;
     use swanky_block::Block;
 
-    type TestField = scuttlebutt::field::F2e19x3e26;
+    type TestField = swanky_field_ff_primes::F2e19x3e26;
 
     fn any_seed() -> impl Strategy<Value = Block> {
         any::<u128>().prop_map(Block::from)

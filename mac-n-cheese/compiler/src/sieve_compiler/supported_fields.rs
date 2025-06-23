@@ -2,11 +2,12 @@ use mac_n_cheese_ir::compilation_format::FieldMacType;
 use mac_n_cheese_sieve_parser::Number;
 use mac_n_cheese_wire_map::WireMap;
 
-use scuttlebutt::field::{F2, F61p, F128p, FiniteField};
+use scuttlebutt::field::{F2, F61p, FiniteField};
 use std::ops::{Deref, DerefMut, Index};
 use std::{collections::VecDeque, marker::PhantomData};
 use std::{fmt::Debug, ops::IndexMut};
 use swanky_field::FiniteRing;
+use swanky_field_ff_primes::F128p;
 
 pub trait ValueParseableFiniteField: FiniteField {
     fn parse_sieve_value(v: &Number) -> eyre::Result<Self>;

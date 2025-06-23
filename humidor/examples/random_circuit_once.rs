@@ -5,7 +5,7 @@ use simple_arith_circuit::Circuit;
 use swanky_aes_rng::AesRng;
 
 type Hash = sha2::Sha256;
-type Field = scuttlebutt::field::F2e19x3e26;
+type Field = swanky_field_ff_primes::F2e19x3e26;
 type Prover = noninteractive::Prover<Field, Hash>;
 type Verifier = noninteractive::Verifier<Field, Hash>;
 

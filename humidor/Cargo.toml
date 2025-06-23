@@ -27,6 +27,7 @@ subtle.workspace = true
 scuttlebutt.workspace = true
 swanky-aes-rng.workspace = true
 swanky-block.workspace = true
+swanky-field-ff-primes.workspace = true
 swanky-field-fft.workspace = true
 swanky-polynomial.workspace = true
 generic-array.workspace = true

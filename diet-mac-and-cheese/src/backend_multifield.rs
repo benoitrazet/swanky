@@ -2558,8 +2558,7 @@ pub(crate) mod tests {
     use rand::SeedableRng;
     use scuttlebutt::field::F2;
     use scuttlebutt::field::F61p;
-    use scuttlebutt::field::{F384p, F384q, PrimeFiniteField};
-    use scuttlebutt::field::{Secp256k1, Secp256k1order};
+    use scuttlebutt::field::PrimeFiniteField;
     use std::env;
     use std::net::TcpStream;
     use std::{collections::VecDeque, thread::JoinHandle};
@@ -2570,6 +2569,7 @@ pub(crate) mod tests {
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::{Channel, SyncChannel};
     use swanky_field::FiniteRing;
+    use swanky_field_ff_primes::{F384p, F384q, Secp256k1, Secp256k1order};
     use swanky_party::{Prover, Verifier};
 
     pub(crate) const FF0: u8 = 0;
