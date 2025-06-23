@@ -1,7 +1,7 @@
 #![allow(clippy::all)]
 use popsicle::psty::{Receiver, Sender};
-use scuttlebutt::AesRng;
 use std::time::SystemTime;
+use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::track_unix_channel_pair;
 
 const NBYTES: usize = 16;

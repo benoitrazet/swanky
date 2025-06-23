@@ -14,11 +14,11 @@ use rand::{
     distributions::{Distribution, Uniform},
 };
 use scuttlebutt::{
-    AesRng,
     field::{Degree, FiniteField as FF},
     ring::FiniteRing,
 };
 use swanky_adversary::Malicious;
+use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_bytearray_utils::unpack_bits;
 use swanky_channel_legacy::AbstractChannel;
@@ -368,14 +368,12 @@ mod test {
         SpsReceiver, SpsSender,
     };
     use generic_array::typenum::Unsigned;
-    use scuttlebutt::{
-        AesRng,
-        field::{Degree, F40b, F61p, F128b, FiniteField as FF},
-    };
+    use scuttlebutt::field::{Degree, F40b, F61p, F128b, FiniteField as FF};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
 
     fn test_spsvole_<FE: FF>(cols: usize, weight: usize) {

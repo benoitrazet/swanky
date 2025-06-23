@@ -20,7 +20,7 @@ use party::either::PartyEitherCopy;
 use party::private::{ProverPrivate, ProverPrivateCopy};
 use party::{IS_PROVER, IS_VERIFIER, WhichParty};
 use rand::SeedableRng;
-use scuttlebutt::AesRng;
+use swanky_aes_rng::AesRng;
 use swanky_party as party;
 use swanky_party::Party;
 use types::visit_type;

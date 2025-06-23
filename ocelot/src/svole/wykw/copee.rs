@@ -177,7 +177,6 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
 mod tests {
     use super::{super::utils::Powers, CopeeReceiver, CopeeSender};
     use scuttlebutt::{
-        AesRng,
         field::{F2, F61p, F128b, FiniteField as FF},
         ring::FiniteRing,
     };
@@ -185,6 +184,7 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
 
     fn test_copee_<FE: FF>(len: usize) {

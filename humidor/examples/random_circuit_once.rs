@@ -1,8 +1,8 @@
 #![allow(clippy::all)]
 use humidor::ligero::noninteractive;
 use rand::SeedableRng;
-use scuttlebutt::AesRng;
 use simple_arith_circuit::Circuit;
+use swanky_aes_rng::AesRng;
 
 type Hash = sha2::Sha256;
 type Field = scuttlebutt::field::F2e19x3e26;

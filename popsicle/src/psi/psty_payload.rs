@@ -1037,12 +1037,12 @@ mod tests {
     use super::*;
     use crate::utils::rand_u64_vec;
     use rand::{prelude::SliceRandom, thread_rng};
-    use scuttlebutt::AesRng;
     use std::{
         collections::HashMap,
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
     use swanky_block::Block512;
     use swanky_channel_legacy::Channel;
 

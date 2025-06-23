@@ -144,7 +144,7 @@ mod tests {
     use crate::utils;
     use itertools::Itertools;
     use rand::Rng;
-    use scuttlebutt::AesRng;
+    use swanky_aes_rng::AesRng;
 
     const NHASHES: usize = 3;
     const ITEMSIZE: usize = 8;

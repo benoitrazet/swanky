@@ -12,10 +12,10 @@ use parking_lot::Mutex;
 use party::either::PartyEitherCopy;
 use party::{IsParty, Party, WhichParty};
 use rand::SeedableRng;
-use scuttlebutt::AesRng;
 use scuttlebutt::field::{Degree, DegreeModulo, F2, FiniteField, IsSubFieldOf, SmallBinaryField};
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::serialization::CanonicalSerialize;
+use swanky_aes_rng::AesRng;
 use swanky_party as party;
 
 use std::io::Read;
@@ -85,7 +85,7 @@ mod vope {
         use mac_n_cheese_vole::{mac::Mac, specialization::FiniteFieldSpecialization};
         use party::{IS_PROVER, IS_VERIFIER};
         use rand::SeedableRng;
-        use scuttlebutt::AesRng;
+        use swanky_aes_rng::AesRng;
 
         use super::*;
 
@@ -287,7 +287,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
 
     fn initialize(
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut scuttlebutt::AesRng,
+        _rng: &mut swanky_aes_rng::AesRng,
         vc: crate::base_vole::VoleContexts<P>,
         num_runner_threads: usize,
     ) -> eyre::Result<Self> {
@@ -304,7 +304,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
     fn finalize(
         self,
         conn: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut scuttlebutt::AesRng,
+        _rng: &mut swanky_aes_rng::AesRng,
     ) -> eyre::Result<()> {
         let mut acu = AssertMultiplyState::<P, T::TF>::default();
         for state in self.state.into_iter() {

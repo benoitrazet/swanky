@@ -1,6 +1,7 @@
 use eyre::Result;
-use scuttlebutt::{AesRng, field::FiniteField, ring::FiniteRing};
+use scuttlebutt::{field::FiniteField, ring::FiniteRing};
 use std::iter;
+use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field::IsSubFieldOf;
 use swanky_party::{

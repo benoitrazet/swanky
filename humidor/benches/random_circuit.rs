@@ -4,8 +4,8 @@ use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput};
 use criterion::{criterion_group, criterion_main};
 use humidor::ligero::noninteractive;
 use rand::SeedableRng;
-use scuttlebutt::AesRng;
 use simple_arith_circuit::circuitgen::random_zero_circuit;
+use swanky_aes_rng::AesRng;
 
 type Hash = sha2::Sha256;
 type Field = scuttlebutt::field::F2e19x3e26;

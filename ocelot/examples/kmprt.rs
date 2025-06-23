@@ -1,8 +1,8 @@
 #![allow(clippy::all)]
 use ocelot::oprf::{KmprtReceiver, KmprtSender};
 use rand::Rng;
-use scuttlebutt::AesRng;
 use std::time::SystemTime;
+use swanky_aes_rng::AesRng;
 use swanky_block::{Block, Block512};
 use swanky_channel_legacy::track_unix_channel_pair;
 

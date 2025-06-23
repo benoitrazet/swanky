@@ -1,6 +1,6 @@
 use std::{any::Any, marker::PhantomData, sync::atomic::AtomicBool};
 
-use scuttlebutt::AesRng;
+use swanky_aes_rng::AesRng;
 use swanky_party::Party;
 
 use crate::{

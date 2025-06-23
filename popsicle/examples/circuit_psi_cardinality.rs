@@ -4,8 +4,8 @@ use popsicle::circuit_psi::{
 
 use fancy_garbling::Fancy;
 use rand::Rng;
-use scuttlebutt::AesRng;
 use std::{os::unix::net::UnixStream, thread};
+use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 const SET_SIZE: usize = 1 << 8;
 

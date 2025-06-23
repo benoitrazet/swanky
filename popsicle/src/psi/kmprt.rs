@@ -185,11 +185,11 @@ fn secret_sharing_of_zero<R: Rng>(nparties: usize, rng: &mut R) -> Vec<Block512>
 mod tests {
     use super::*;
     use rand::Rng;
-    use scuttlebutt::AesRng;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::SyncChannel;
 
     #[test]

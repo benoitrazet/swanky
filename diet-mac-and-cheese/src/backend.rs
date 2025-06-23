@@ -8,7 +8,7 @@ use crate::svole_trait::field_name;
 use eyre::{Result, bail};
 use log::{debug, info, warn};
 use ocelot::svole::LpnParams;
-use scuttlebutt::AesRng;
+use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::private::ProverPrivateCopy;
@@ -476,14 +476,12 @@ mod tests {
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     use scuttlebutt::field::{F2, F40b, IsSubFieldOf};
-    use scuttlebutt::{
-        AesRng,
-        field::{F61p, FiniteField},
-    };
+    use scuttlebutt::field::{F61p, FiniteField};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier};
 

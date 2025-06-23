@@ -396,11 +396,11 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
 mod tests {
     use super::*;
     use crate::oprf::{KmprtReceiver, KmprtSender};
-    use scuttlebutt::AesRng;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
 
     fn _test_opprf_points(ninputs: usize, npoints: usize, npoints_bound: usize) {

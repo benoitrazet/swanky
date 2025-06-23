@@ -12,9 +12,9 @@ use crate::{
     utils,
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::AesRng;
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
+use swanky_aes_rng::AesRng;
 use swanky_block::{Block, Block512};
 use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
@@ -212,12 +212,12 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> SemiHonest for Receiver<OT> {}
 mod tests {
     use super::*;
     use crate::oprf;
-    use scuttlebutt::AesRng;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
         sync::{Arc, Mutex},
     };
+    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
 
     #[test]

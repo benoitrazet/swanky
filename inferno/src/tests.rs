@@ -1,10 +1,10 @@
 use crate::Proof;
 use proptest::prelude::*;
-use scuttlebutt::AesRng;
 use scuttlebutt::field::{F2, F64b, FiniteField};
 use scuttlebutt::ring::FiniteRing;
 use simple_arith_circuit::Circuit;
 use std::path::PathBuf;
+use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 
 // The number of parties in the MPC
@@ -32,7 +32,7 @@ macro_rules! test_circuits {
     ($modname: ident, $field: ty) => {
         mod $modname {
             use super::*;
-            use scuttlebutt::AesRng;
+            use swanky_aes_rng::AesRng;
             use rand::SeedableRng;
             use rand::distributions::{Distribution, Uniform};
 

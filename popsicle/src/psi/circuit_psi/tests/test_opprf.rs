@@ -9,9 +9,9 @@ mod tests {
         *,
     };
 
-    use scuttlebutt::AesRng;
     use std::thread;
     use std::{collections::HashSet, os::unix::net::UnixStream};
+    use swanky_aes_rng::AesRng;
     use swanky_block::Block512;
 
     // Run the base psi up to the opprf exchange

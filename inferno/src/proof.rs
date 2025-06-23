@@ -13,9 +13,9 @@ use crate::cache::Cache;
 use crate::proof_single::ProofSingle;
 use anyhow::anyhow;
 use rayon::prelude::*;
-use scuttlebutt::AesRng;
 use scuttlebutt::field::FiniteField;
 use simple_arith_circuit::Circuit;
+use swanky_aes_rng::AesRng;
 
 /// The inferno proof. `N` denotes the number of parties in each MPC execution.
 #[derive(serde::Serialize, serde::Deserialize)]

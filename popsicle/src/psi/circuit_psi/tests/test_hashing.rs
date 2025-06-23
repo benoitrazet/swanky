@@ -8,8 +8,8 @@ mod tests {
         utils::*,
         *,
     };
-    use scuttlebutt::AesRng;
     use std::{collections::HashSet, os::unix::net::UnixStream, thread};
+    use swanky_aes_rng::AesRng;
     use swanky_block::Block512;
 
     // Run the base psi up to hashing

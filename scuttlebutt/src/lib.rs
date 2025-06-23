@@ -21,5 +21,3 @@ pub mod field {
 pub mod ring {
     pub use swanky_field::{FiniteRing, IsSubRingOf, ring_ops};
 }
-
-pub use swanky_aes_rng::{AesRng, UniformIntegersUnderBound};

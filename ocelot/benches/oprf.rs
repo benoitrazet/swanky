@@ -6,12 +6,12 @@ use ocelot::{
     oprf::{self, Receiver as OprfReceiver, Sender as OprfSender, kkrt, kmprt},
     ot::chou_orlandi,
 };
-use scuttlebutt::AesRng;
 use std::{
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
     time::Duration,
 };
+use swanky_aes_rng::AesRng;
 use swanky_block::{Block, Block512};
 use swanky_channel_legacy::Channel;
 

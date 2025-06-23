@@ -182,7 +182,7 @@ mod tests {
     };
     use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
     use rand::seq::SliceRandom;
-    use scuttlebutt::AesRng;
+    use swanky_aes_rng::AesRng;
     use swanky_field::PrimeFiniteField;
     use swanky_field_binary::F2;
     use swanky_field_f61p::F61p;

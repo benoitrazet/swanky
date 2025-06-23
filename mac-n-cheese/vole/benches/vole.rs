@@ -1,12 +1,10 @@
 #![allow(clippy::all)]
 use keyed_arena::KeyedArena;
 use rand::SeedableRng;
-use scuttlebutt::{
-    AesRng,
-    field::{F2, F56b, F61p, F63b, F128p, FiniteField, IsSubFieldOf},
-};
+use scuttlebutt::field::{F2, F56b, F61p, F63b, F128p, FiniteField, IsSubFieldOf};
 use std::str::FromStr;
 use std::{any::type_name, hint::black_box, time::Instant};
+use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_party::{IS_PROVER, IS_VERIFIER};

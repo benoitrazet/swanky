@@ -3,10 +3,11 @@ use clap::Parser;
 use inferno::Proof;
 use rand::SeedableRng;
 use scuttlebutt::field::F64b;
-use scuttlebutt::{AesRng, field::FiniteField};
+use scuttlebutt::field::FiniteField;
 use simple_arith_circuit::Circuit;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use swanky_aes_rng::AesRng;
 
 const N: usize = 16;
 const K: usize = 8;

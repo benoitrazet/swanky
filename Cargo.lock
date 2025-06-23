@@ -686,6 +686,7 @@ dependencies = [
  "scuttlebutt",
  "serde",
  "subtle",
+ "swanky-aes-rng",
  "swanky-block",
  "swanky-channel-legacy",
  "swanky-field",
@@ -793,6 +794,7 @@ dependencies = [
  "subtle",
  "swanky-adversary",
  "swanky-aes-hash",
+ "swanky-aes-rng",
  "swanky-block",
  "swanky-channel-legacy",
  "vectoreyes",
@@ -1056,6 +1058,7 @@ dependencies = [
  "simple-arith-circuit",
  "sprs",
  "subtle",
+ "swanky-aes-rng",
  "swanky-block",
  "swanky-polynomial",
 ]
@@ -1106,6 +1109,7 @@ dependencies = [
  "serde_json",
  "simple-arith-circuit",
  "snafu",
+ "swanky-aes-rng",
  "swanky-block",
  "swanky-polynomial",
 ]
@@ -1449,6 +1453,7 @@ dependencies = [
  "smallvec",
  "snmalloc-rs",
  "subtle",
+ "swanky-aes-rng",
  "swanky-block",
  "swanky-channel-legacy",
  "swanky-party",
@@ -1484,6 +1489,7 @@ dependencies = [
  "ocelot",
  "rand 0.8.5",
  "scuttlebutt",
+ "swanky-aes-rng",
  "swanky-block",
  "swanky-channel-legacy",
  "swanky-cointoss",
@@ -1732,6 +1738,7 @@ dependencies = [
  "subtle",
  "swanky-adversary",
  "swanky-aes-hash",
+ "swanky-aes-rng",
  "swanky-block",
  "swanky-bytearray-utils",
  "swanky-channel-legacy",
@@ -1861,6 +1868,7 @@ dependencies = [
  "sha2",
  "swanky-adversary",
  "swanky-aes-hash",
+ "swanky-aes-rng",
  "swanky-block",
  "swanky-bytearray-utils",
  "swanky-channel-legacy",
@@ -2432,6 +2440,7 @@ dependencies = [
  "rand 0.8.5",
  "scuttlebutt",
  "serde",
+ "swanky-aes-rng",
  "swanky-block",
 ]
 
@@ -3184,6 +3193,7 @@ dependencies = [
  "pretty_env_logger",
  "rand 0.8.5",
  "scuttlebutt",
+ "swanky-aes-rng",
  "swanky-channel-legacy",
  "swanky-field-binary",
  "swanky-party",
@@ -3206,6 +3216,7 @@ dependencies = [
  "rustls",
  "rustls-pemfile",
  "scuttlebutt",
+ "swanky-aes-rng",
  "swanky-channel-legacy",
  "swanky-field-binary",
  "swanky-party",
@@ -3525,6 +3536,7 @@ dependencies = [
  "log",
  "scuttlebutt",
  "simple-arith-circuit",
+ "swanky-aes-rng",
 ]
 
 [[package]]

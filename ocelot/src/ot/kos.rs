@@ -12,9 +12,9 @@ use crate::{
     utils,
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::AesRng;
 use std::io::ErrorKind;
 use swanky_adversary::{Malicious, SemiHonest};
+use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cointoss;

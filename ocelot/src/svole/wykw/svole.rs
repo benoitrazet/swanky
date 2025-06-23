@@ -10,11 +10,11 @@ use rand::{
     distributions::{Distribution, Uniform},
 };
 use scuttlebutt::{
-    AesRng,
     field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf},
     ring::FiniteRing,
 };
 use swanky_adversary::{Malicious, SemiHonest};
+use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 
@@ -521,14 +521,12 @@ impl<FF: FiniteField> Malicious for Receiver<FF> {}
 #[cfg(test)]
 mod tests {
     use super::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL, Receiver, Sender};
-    use scuttlebutt::{
-        AesRng,
-        field::{F2, F40b, F61p, F128b, FiniteField, IsSubFieldOf},
-    };
+    use scuttlebutt::field::{F2, F40b, F61p, F128b, FiniteField, IsSubFieldOf};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
 
     fn test_lpn_svole_<V: IsSubFieldOf<T>, T: FiniteField>()

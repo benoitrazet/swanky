@@ -5,7 +5,8 @@ use std::{
 };
 
 use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
-use scuttlebutt::{AesRng, field::F61p, ring::FiniteRing};
+use scuttlebutt::{field::F61p, ring::FiniteRing};
+use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::Channel;
 use swanky_party::{IS_VERIFIER, Prover, Verifier, private::ProverPrivateCopy};
 

@@ -10,8 +10,9 @@ use generic_array::GenericArray;
 use log::{debug, warn};
 use ocelot::svole::LpnParams;
 use rand::{Rng, SeedableRng};
+use scuttlebutt::field::FiniteField;
 use scuttlebutt::field::{DegreeModulo, IsSubFieldOf};
-use scuttlebutt::{AesRng, field::FiniteField};
+use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_party::either::PartyEither;
@@ -688,14 +689,12 @@ mod tests {
     use crate::svole_trait::{Svole, SvoleT};
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
-    use scuttlebutt::{
-        AesRng,
-        field::{F2, F40b, F61p, FiniteField, IsSubFieldOf},
-    };
+    use scuttlebutt::field::{F2, F40b, F61p, FiniteField, IsSubFieldOf};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::{AbstractChannel, Channel, SyncChannel};
     use swanky_party::private::{ProverPrivateCopy, VerifierPrivate};
     use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier};

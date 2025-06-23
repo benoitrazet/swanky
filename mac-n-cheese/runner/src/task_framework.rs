@@ -15,11 +15,11 @@ use mac_n_cheese_vole::{
 };
 use rustc_hash::FxHashMap;
 use scuttlebutt::{
-    AesRng,
     field::{F2, FiniteField, IsSubFieldOf, SmallBinaryField},
     serialization::{CanonicalSerialize, SequenceDeserializer, SequenceSerializer},
 };
 use smallvec::SmallVec;
+use swanky_aes_rng::AesRng;
 use swanky_party::{
     Party, WhichParty,
     either::PartyEither,

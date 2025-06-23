@@ -8,7 +8,7 @@ use fancy_garbling::{
 };
 
 use ocelot::{ot::AlszReceiver as OtReceiver, ot::AlszSender as OtSender};
-use scuttlebutt::AesRng;
+use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::{AbstractChannel, Channel};
 
 use std::fmt::Debug;

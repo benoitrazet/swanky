@@ -10,10 +10,11 @@ use crate::{
 use anyhow::anyhow;
 use blake3::Hash;
 use rand::{Rng, SeedableRng};
-use scuttlebutt::{AesRng, field::FiniteField};
+use scuttlebutt::field::FiniteField;
 use scuttlebutt::{ring::FiniteRing, serialization::serde_vec};
 use serde::{Deserialize, Serialize};
 use simple_arith_circuit::Circuit;
+use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 
 /// The proof for a single execution of the protocol. `N` denotes

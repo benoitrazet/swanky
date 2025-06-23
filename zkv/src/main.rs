@@ -2,13 +2,13 @@
 use anyhow::{Error, Result};
 use clap::{Arg, ArgAction, ArgMatches, Command, arg};
 use inferno::Proof;
-use scuttlebutt::AesRng;
 use scuttlebutt::field::{F2, F64b};
 use scuttlebutt::ring::FiniteRing;
 use simple_arith_circuit::{Circuit, builder};
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use swanky_aes_rng::AesRng;
 
 const N: usize = 16; // Number of MPC parties
 const K: usize = 8; // Compression factor

@@ -278,11 +278,11 @@ impl SemiHonest for Receiver {}
 mod tests {
     use super::*;
     use crate::utils::rand_vec_vec;
-    use scuttlebutt::AesRng;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
 
     const ITEM_SIZE: usize = 8;

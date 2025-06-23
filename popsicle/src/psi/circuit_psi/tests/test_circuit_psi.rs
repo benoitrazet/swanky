@@ -9,8 +9,8 @@ mod tests {
         utils::*,
         *,
     };
-    use scuttlebutt::AesRng;
     use std::{collections::HashSet, os::unix::net::UnixStream, thread};
+    use swanky_aes_rng::AesRng;
     use swanky_block::Block;
 
     // Computes the cardinality of the intersection in the clear

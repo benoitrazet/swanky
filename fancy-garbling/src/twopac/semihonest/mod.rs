@@ -18,7 +18,7 @@ mod tests {
     };
     use itertools::Itertools;
     use ocelot::ot::{ChouOrlandiReceiver, ChouOrlandiSender};
-    use scuttlebutt::AesRng;
+    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::{UnixChannel, unix_channel_pair};
 
     fn addition<F: FancyArithmetic>(

@@ -236,7 +236,7 @@ mod tests {
     use super::*;
     use ocelot::ot;
     use proptest::prelude::*;
-    use scuttlebutt::AesRng;
+    use swanky_aes_rng::AesRng;
     fn auth_share_generation(
         nshares: usize,
     ) -> (

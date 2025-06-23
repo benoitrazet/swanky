@@ -181,13 +181,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use scuttlebutt::AesRng;
     use std::{
         fmt::Display,
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
         sync::{Arc, Mutex},
     };
+    use swanky_aes_rng::AesRng;
     use swanky_block::Block;
     use swanky_channel_legacy::Channel;
 

@@ -7,7 +7,7 @@ fn test_arithmetic_ram() {
 
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
-    use scuttlebutt::AesRng;
+    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_field_f61p::F61p;
     use swanky_party::{Prover, Verifier};
@@ -90,7 +90,7 @@ fn test_boolean_ram() {
 
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
-    use scuttlebutt::AesRng;
+    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F2, F40b};
