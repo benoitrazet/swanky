@@ -13,5 +13,4 @@ pub mod field {
     pub use swanky_field_binary::*;
     pub use swanky_field_f61p::*;
     pub use swanky_field_ff_primes::*;
-    pub use swanky_field_fft as fft;
 }

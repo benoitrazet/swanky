@@ -1062,6 +1062,7 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-block",
  "swanky-field",
+ "swanky-field-fft",
  "swanky-polynomial",
  "swanky-serialization",
 ]

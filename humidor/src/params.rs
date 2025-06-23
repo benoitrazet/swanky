@@ -9,8 +9,8 @@ use crate::threshold_secret_sharing::PackedSecretSharingGenerator;
 use crate::util::*;
 use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis, Zip, concatenate};
 use rand::{CryptoRng, Rng};
-use scuttlebutt::field::fft;
-use scuttlebutt::field::fft::FieldForFFT;
+use swanky_field_fft as fft;
+use swanky_field_fft::FieldForFFT;
 use swanky_polynomial::Polynomial;
 
 /// Parameters for interleaved coding, based on the size of the circuit and
