@@ -2547,6 +2547,7 @@ dependencies = [
  "swanky-adversary",
  "swanky-aes-rng",
  "swanky-channel",
+ "swanky-field-binary",
  "swanky-party",
  "vectoreyes",
 ]
