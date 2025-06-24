@@ -230,14 +230,15 @@ impl<
     }
 }
 
-//
 #[cfg(test)]
 mod tests {
     use super::*;
     use ocelot::ot;
-    use proptest::prelude::*;
     use scuttlebutt::AesRng;
-    fn auth_share_generation(
+
+    /// Generates `AuthShare`s, outputting the produced `AuthShare`s and their
+    /// associated generators.
+    fn generate(
         nshares: usize,
     ) -> (
         Vec<AuthShare<PartyA>>,
@@ -251,28 +252,24 @@ mod tests {
             |c| {
                 let mut rng = AesRng::new();
                 let mut generator =
-                    AuthShareGenerator::<PartyA, ot::KosSender, ot::KosReceiver>::new(c, &mut rng)
-                        .unwrap();
-                generator
-                    .generate(nshares, &mut output_a, c, &mut rng)
-                    .unwrap();
+                    AuthShareGenerator::<PartyA, ot::KosSender, ot::KosReceiver>::new(c, &mut rng)?;
+                generator.generate(nshares, &mut output_a, c, &mut rng)?;
                 Ok(generator)
             },
             |c| {
                 let mut rng = AesRng::new();
                 let mut generator =
-                    AuthShareGenerator::<PartyB, ot::KosSender, ot::KosReceiver>::new(c, &mut rng)
-                        .unwrap();
-                generator
-                    .generate(nshares, &mut output_b, c, &mut rng)
-                    .unwrap();
+                    AuthShareGenerator::<PartyB, ot::KosSender, ot::KosReceiver>::new(c, &mut rng)?;
+                generator.generate(nshares, &mut output_b, c, &mut rng)?;
                 Ok(generator)
             },
         )
         .unwrap();
         (output_a, output_b, generator_a, generator_b)
     }
-    fn auth_share_validation(
+
+    /// Validates vectors of `AuthShare`s using their associated generators.
+    fn validate(
         generator_a: AuthShareGenerator<PartyA, ot::KosSender, ot::KosReceiver>,
         generator_b: AuthShareGenerator<PartyB, ot::KosSender, ot::KosReceiver>,
         output_a: Vec<AuthShare<PartyA>>,
@@ -281,12 +278,12 @@ mod tests {
         let ((validation_a, delta_a), (validation_b, delta_b)) =
             swanky_channel::local::local_channel_pair(
                 |c| {
-                    let result = generator_a.open(&output_a, c).unwrap();
+                    let result = generator_a.open(&output_a, c)?;
                     let delta = generator_a.delta();
                     Ok((result, delta))
                 },
                 |c| {
-                    let result = generator_b.open(&output_b, c).unwrap();
+                    let result = generator_b.open(&output_b, c)?;
                     let delta = generator_b.delta();
                     Ok((result, delta))
                 },
@@ -294,46 +291,46 @@ mod tests {
             .unwrap();
         (validation_a, validation_b, delta_a, delta_b)
     }
+
     #[test]
-    fn test_correct() {
+    fn honest_generation_works() {
         let nshares = 1000;
-        let (output_a, output_b, generator_a, generator_b) = auth_share_generation(nshares);
-        let (validation_a, validation_b, _delta_a, _delta_b) =
-            auth_share_validation(generator_a, generator_b, output_a, output_b);
+        let (output_a, output_b, generator_a, generator_b) = generate(nshares);
+        let (validation_a, validation_b, _, _) =
+            validate(generator_a, generator_b, output_a, output_b);
         assert!(validation_a);
         assert!(validation_b);
     }
     #[test]
-    fn test_wrong_generator() {
+    fn wrong_generators_fail() {
         let nshares = 1000;
-        let (_output_a, output_b, _generator_a, generator_b) = auth_share_generation(nshares);
-        let (output_c, _output_d, generator_c, _generator_d) = auth_share_generation(nshares);
-        let (validation_c, validation_b, _delta_c, _delta_b) =
-            auth_share_validation(generator_c, generator_b, output_c, output_b);
-        assert!(!validation_c);
+        let (output_a, output_b, _generator_a, _generator_b) = generate(nshares);
+        let (_output_c, _output_d, generator_c, generator_d) = generate(nshares);
+        let (validation_a, validation_b, _, _) =
+            validate(generator_c, generator_d, output_a, output_b);
+        assert!(!validation_a);
         assert!(!validation_b);
     }
     #[test]
-    fn test_tampered_share_prover() {
+    fn wrong_output_fails() {
         let nshares = 1000;
-        let (output_a, _output_b, generator_a, _generator_b) = auth_share_generation(nshares);
-        let (_output_c, output_d, _generator_c, generator_d) = auth_share_generation(nshares);
-        let (validation_a, validation_d, _delta_a, _delta_d) =
-            auth_share_validation(generator_a, generator_d, output_a, output_d);
+        let (output_a, _output_b, generator_a, generator_b) = generate(nshares);
+        let (_output_c, output_d, _generator_c, _generator_d) = generate(nshares);
+        let (validation_a, validation_b, _, _) =
+            validate(generator_a, generator_b, output_a, output_d);
         assert!(!validation_a);
-        assert!(!validation_d);
+        assert!(!validation_b);
     }
-    proptest! {
-        #[test]
-        fn test_tampered_share_oneerror(index in 0..1000usize) {
-            let nshares = 1000;
-            let (output_a, mut output_b, generator_a, generator_b) = auth_share_generation(nshares);
-            let (_output_c, output_d, _generator_c, _generator_d) = auth_share_generation(nshares);
-            output_b[index] = output_d[index];
-            let (validation_a, validation_b, _delta_a, _delta_b) =
-                auth_share_validation(generator_a, generator_b, output_a, output_b);
-            assert!(!validation_a);
-            assert!(!validation_b);
-        }
+    #[test]
+    fn tampered_party_b_share_fails() {
+        let nshares = 1000;
+        let index = rand::thread_rng().gen_range(0..1000);
+        let (output_a, mut output_b, generator_a, generator_b) = generate(nshares);
+        let (_output_c, output_d, _generator_c, _generator_d) = generate(nshares);
+        output_b[index] = output_d[index];
+        let (validation_a, validation_b, _, _) =
+            validate(generator_a, generator_b, output_a, output_b);
+        assert!(!validation_a);
+        assert!(!validation_b);
     }
 }
