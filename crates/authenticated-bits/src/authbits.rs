@@ -271,11 +271,11 @@ impl<
         self.delta
     }
 
-    /// Compute $`[b] \oplus c`$, where $`c`$ is a public bit.
+    /// Compute $`[b] \oplus c`$, where $`c`$ is a public constant.
     ///
     /// This maps the prover's values $`(b, M)`$ to $`(b \oplus c, M)`$,
     /// and maps the verifier's value $`K`$ to $`K \oplus c \Delta`$.
-    pub fn xor_public_bit(&self, authbit: AuthBit<P>, bit: bool) -> AuthBit<P> {
+    pub fn xor_with_const(&self, authbit: AuthBit<P>, bit: bool) -> AuthBit<P> {
         match P::WHICH {
             WhichParty::Prover(ev) => AuthBit(PartyEitherCopy::prover_new(
                 ev,
@@ -381,7 +381,7 @@ mod tests {
     }
 
     #[test]
-    fn xoring_public_bit_works() {
+    fn xor_with_const_works() {
         let count = 1000;
         let mut rng = AesRng::new();
         let bits: Vec<bool> = (0..count).map(|_| rng.r#gen::<bool>()).collect();
