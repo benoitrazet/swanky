@@ -24,6 +24,7 @@ impl Block256 {
     /// Return the first `n` bytes, where `n` must be `<= 32`.
     #[inline]
     pub fn prefix(&self, n: usize) -> &[u8] {
+        debug_assert!(n <= 32);
         &self.as_ref()[0..n]
     }
 
