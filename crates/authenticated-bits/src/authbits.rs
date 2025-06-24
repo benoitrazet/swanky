@@ -392,8 +392,8 @@ mod tests {
             .zip(output_vr.into_iter())
             .zip(public_bits.into_iter())
         {
-            let new_authbit_pr = prover.xor_public_bit(authbit_pr, public_bit);
-            let new_authbit_vr = verifier.xor_public_bit(authbit_vr, public_bit);
+            let new_authbit_pr = prover.xor_with_const(authbit_pr, public_bit);
+            let new_authbit_vr = verifier.xor_with_const(authbit_vr, public_bit);
             // The new authenticated bits should still validate.
             let validation = validate(
                 &[new_authbit_pr],
