@@ -50,6 +50,18 @@ macro_rules! make_prover_private_type {
         /// A value known only to `Prover`s.
         #[derive(Clone $(, $Copy)?)]
         pub struct $ProverPrivate<P: Party, T $(: $Copy)?>($PartyEither<P, T, UnknownProverSecret>);
+        impl<P: Party, T $(: $Copy)?> sealed::Sealed for $ProverPrivate<P, T> {}
+        impl<P: Party, T $(: $Copy)?> PartyPrivate<P, T> for $ProverPrivate<P, T> {
+            fn unwrap_or_else<F: FnOnce() -> T>(self, f: F) -> T {
+                match P::WHICH {
+                    WhichParty::Prover(e) => self.into_inner(e),
+                    WhichParty::Verifier(_) => f(),
+                }
+            }
+            fn into_option(self) -> Option<T> {
+                self.map(Some).unwrap_or_else(|| None)
+            }
+        }
         impl<P: Party, T $(: $Copy)?> $ProverPrivate<P, T> {
             /// Given evidence that `P = Verifier`, create an empty
             /// `ProverPrivate(Copy)` value.
@@ -122,15 +134,6 @@ macro_rules! make_prover_private_type {
                     WhichParty::Prover(e) =>
                         f(self.into_inner(e)),
                     WhichParty::Verifier(e) => $ProverPrivate::empty(e),
-                }
-            }
-
-            /// Return the prover-private value, or compute it from the given
-            /// closure (in a verifier context.)
-            pub fn unwrap_or_else<F: FnOnce() -> T>(self, f: F) -> T {
-                match P::WHICH {
-                    WhichParty::Prover(e) => self.into_inner(e),
-                    WhichParty::Verifier(_) => f(),
                 }
             }
         }
@@ -217,6 +220,18 @@ macro_rules! make_verifier_private_type {
         /// A value known only to `Verifier`s.
         #[derive(Clone $(, $Copy)?)]
         pub struct $VerifierPrivate<P: Party, T $(: $Copy)?>($PartyEither<P, UnknownVerifierSecret, T>);
+        impl<P: Party, T $(: $Copy)?> sealed::Sealed for $VerifierPrivate<P, T> {}
+        impl<P: Party, T $(: $Copy)?> PartyPrivate<P, T> for $VerifierPrivate<P, T> {
+            fn unwrap_or_else<F: FnOnce() -> T>(self, f: F) -> T {
+                match P::WHICH {
+                    WhichParty::Prover(_) => f(),
+                    WhichParty::Verifier(e) => self.into_inner(e),
+                }
+            }
+            fn into_option(self) -> Option<T> {
+                self.map(Some).unwrap_or_else(|| None)
+            }
+        }
         impl<P: Party, T $(: $Copy)?> $VerifierPrivate<P, T> {
             /// Given evidence that `P = Prover`, create an empty
             /// `VerifierPrivate(Copy)` value.
@@ -292,15 +307,6 @@ macro_rules! make_verifier_private_type {
                         f(self.into_inner(e)),
                 }
             }
-
-            /// Return the verifier-private value, or compute it form the given
-            /// closure (in a prover context).
-            pub fn unwrap_or_else<F: FnOnce() -> T>(self, f: F) -> T {
-                match P::WHICH {
-                    WhichParty::Prover(_) => f(),
-                    WhichParty::Verifier(e) => self.into_inner(e),
-                }
-            }
         }
         impl<P: Party, T $(: $Copy)?, U $(: $Copy)?> $VerifierPrivate<P, (T, U)> {
             /// Convert a `VerifierPrivate(Copy)<P, (T, U)>` to a
@@ -350,4 +356,18 @@ impl<P: Party, T: Copy> From<VerifierPrivateCopy<P, T>> for VerifierPrivate<P, T
     fn from(x: VerifierPrivateCopy<P, T>) -> Self {
         Self(x.0.into())
     }
+}
+
+mod sealed {
+    /// An internal sealed trait to limit `impl`s of the `PartyPrivate` trait.
+    pub trait Sealed {}
+}
+
+/// A trait to add utilities to all of the `*Private` types.
+pub trait PartyPrivate<P: Party, T>: sealed::Sealed {
+    /// Return the private value (if `self` is private to `P`), or else run the given closure.
+    fn unwrap_or_else<F: FnOnce() -> T>(self, f: F) -> T;
+
+    /// Return the private value (if `self` is private to `P`), or else return `None`.
+    fn into_option(self) -> Option<T>;
 }

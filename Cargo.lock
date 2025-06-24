@@ -2492,10 +2492,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
+name = "swanky-adversary"
+version = "0.6.0"
+
+[[package]]
+name = "swanky-aes-hash"
+version = "0.6.0"
+dependencies = [
+ "criterion",
+ "rand 0.8.5",
+ "swanky-block",
+ "vectoreyes",
+]
+
+[[package]]
 name = "swanky-aes-rng"
 version = "0.6.0"
 dependencies = [
  "bytemuck",
+ "criterion",
  "proptest",
  "rand 0.8.5",
  "rand_core 0.6.4",
@@ -2518,6 +2533,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-block"
+version = "0.6.0"
+dependencies = [
+ "bytemuck",
+ "criterion",
+ "rand 0.8.5",
+ "serde",
+ "swanky-aes-rng",
+ "vectoreyes",
+]
+
+[[package]]
+name = "swanky-bytearray-utils"
+version = "0.6.0"
+dependencies = [
+ "rand 0.8.5",
+]
+
+[[package]]
 name = "swanky-channel"
 version = "0.6.0"
 dependencies = [
@@ -2525,7 +2559,31 @@ dependencies = [
  "eyre",
  "generic-array 1.2.0",
  "proptest",
+ "swanky-party",
  "swanky-serialization",
+]
+
+[[package]]
+name = "swanky-channel-legacy"
+version = "0.6.0"
+dependencies = [
+ "curve25519-dalek",
+ "generic-array 1.2.0",
+ "sha2",
+ "swanky-block",
+ "swanky-channel",
+ "swanky-serialization",
+]
+
+[[package]]
+name = "swanky-cointoss"
+version = "0.6.0"
+dependencies = [
+ "rand 0.8.5",
+ "rand_core 0.6.4",
+ "swanky-aes-rng",
+ "swanky-block",
+ "swanky-channel-legacy",
 ]
 
 [[package]]
