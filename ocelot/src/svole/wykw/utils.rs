@@ -1,5 +1,5 @@
 use generic_array::GenericArray;
-use scuttlebutt::field::{Degree, FiniteField};
+use swanky_field::{Degree, FiniteField};
 
 /// Generates powers of `FE::GENERATOR`.
 fn gen_pows<FE: FiniteField>() -> GenericArray<FE, Degree<FE>> {

@@ -683,9 +683,11 @@ dependencies = [
  "proptest",
  "rand 0.8.5",
  "rustc-hash 2.1.1",
- "scuttlebutt",
  "serde",
  "subtle",
+ "swanky-aes-rng",
+ "swanky-block",
+ "swanky-channel-legacy",
  "swanky-field",
  "swanky-field-binary",
  "swanky-field-f61p",
@@ -693,6 +695,7 @@ dependencies = [
  "swanky-flatbuffer-build",
  "swanky-party",
  "swanky-polynomial",
+ "swanky-serialization",
  "toml",
 ]
 
@@ -785,10 +788,14 @@ dependencies = [
  "ocelot",
  "rand 0.8.5",
  "regex",
- "scuttlebutt",
  "serde",
  "serde_json",
  "subtle",
+ "swanky-adversary",
+ "swanky-aes-hash",
+ "swanky-aes-rng",
+ "swanky-block",
+ "swanky-channel-legacy",
  "vectoreyes",
 ]
 
@@ -1004,12 +1011,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f154ce46856750ed433c8649605bf7ed2de3bc35fd9d2a9f30cddd873c80cb08"
 
 [[package]]
-name = "hex"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-
-[[package]]
 name = "http"
 version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1045,12 +1046,17 @@ dependencies = [
  "num-traits",
  "proptest",
  "rand 0.8.5",
- "scuttlebutt",
  "sha2",
  "simple-arith-circuit",
  "sprs",
  "subtle",
+ "swanky-aes-rng",
+ "swanky-block",
+ "swanky-field",
+ "swanky-field-ff-primes",
+ "swanky-field-fft",
  "swanky-polynomial",
+ "swanky-serialization",
 ]
 
 [[package]]
@@ -1094,12 +1100,17 @@ dependencies = [
  "proptest",
  "rand 0.8.5",
  "rayon",
- "scuttlebutt",
  "serde",
  "serde_json",
  "simple-arith-circuit",
  "snafu",
+ "swanky-aes-rng",
+ "swanky-block",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-field-f61p",
  "swanky-polynomial",
+ "swanky-serialization",
 ]
 
 [[package]]
@@ -1338,8 +1349,11 @@ dependencies = [
  "proptest",
  "rand 0.8.5",
  "rustc-hash 2.1.1",
- "scuttlebutt",
  "smallvec",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-field-f61p",
+ "swanky-field-ff-primes",
  "swanky-party",
  "vectoreyes",
 ]
@@ -1391,10 +1405,14 @@ dependencies = [
  "proptest",
  "rand 0.8.5",
  "rustc-hash 2.1.1",
- "scuttlebutt",
  "smallvec",
  "subtle",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-field-f61p",
+ "swanky-field-ff-primes",
  "swanky-flatbuffer-build",
+ "swanky-serialization",
  "tempfile",
  "twox-hash",
  "vectoreyes",
@@ -1437,11 +1455,16 @@ dependencies = [
  "rustc-hash 2.1.1",
  "rustls",
  "rustls-pemfile",
- "scuttlebutt",
  "smallvec",
  "snmalloc-rs",
  "subtle",
+ "swanky-aes-rng",
+ "swanky-block",
+ "swanky-channel-legacy",
+ "swanky-field",
+ "swanky-field-binary",
  "swanky-party",
+ "swanky-serialization",
  "vectoreyes",
 ]
 
@@ -1473,8 +1496,16 @@ dependencies = [
  "mimalloc",
  "ocelot",
  "rand 0.8.5",
- "scuttlebutt",
+ "swanky-aes-rng",
+ "swanky-block",
+ "swanky-channel-legacy",
+ "swanky-cointoss",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-field-f61p",
+ "swanky-field-ff-primes",
  "swanky-party",
+ "swanky-serialization",
  "vectoreyes",
 ]
 
@@ -1715,8 +1746,17 @@ dependencies = [
  "nix",
  "proptest",
  "rand 0.8.5",
- "scuttlebutt",
  "subtle",
+ "swanky-adversary",
+ "swanky-aes-hash",
+ "swanky-aes-rng",
+ "swanky-block",
+ "swanky-bytearray-utils",
+ "swanky-channel-legacy",
+ "swanky-cointoss",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-field-f61p",
  "vectoreyes",
 ]
 
@@ -1836,10 +1876,16 @@ dependencies = [
  "ocelot",
  "proptest",
  "rand 0.8.5",
- "scuttlebutt",
  "serde",
  "serde_json",
  "sha2",
+ "swanky-adversary",
+ "swanky-aes-hash",
+ "swanky-aes-rng",
+ "swanky-block",
+ "swanky-bytearray-utils",
+ "swanky-channel-legacy",
+ "swanky-cointoss",
  "vectoreyes",
 ]
 
@@ -2280,38 +2326,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
-name = "scuttlebutt"
-version = "0.6.0"
-dependencies = [
- "bincode",
- "bytemuck",
- "criterion",
- "curve25519-dalek",
- "generic-array 1.2.0",
- "hex",
- "num-bigint 0.4.6",
- "num-traits",
- "proptest",
- "rand 0.8.5",
- "rand_chacha 0.3.1",
- "rand_core 0.6.4",
- "serde",
- "serde_json",
- "sha2",
- "smallvec",
- "subtle",
- "swanky-aes-rng",
- "swanky-channel",
- "swanky-field",
- "swanky-field-binary",
- "swanky-field-f61p",
- "swanky-field-ff-primes",
- "swanky-field-fft",
- "swanky-serialization",
- "vectoreyes",
-]
-
-[[package]]
 name = "semver"
 version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2403,8 +2417,13 @@ dependencies = [
  "log",
  "proptest",
  "rand 0.8.5",
- "scuttlebutt",
  "serde",
+ "swanky-aes-rng",
+ "swanky-block",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-field-f61p",
+ "swanky-field-ff-primes",
 ]
 
 [[package]]
@@ -2525,9 +2544,10 @@ dependencies = [
  "ocelot",
  "proptest",
  "rand 0.8.5",
- "scuttlebutt",
+ "swanky-adversary",
  "swanky-aes-rng",
  "swanky-channel",
+ "swanky-field-binary",
  "swanky-party",
  "vectoreyes",
 ]
@@ -3154,7 +3174,8 @@ dependencies = [
  "ocelot",
  "pretty_env_logger",
  "rand 0.8.5",
- "scuttlebutt",
+ "swanky-aes-rng",
+ "swanky-channel-legacy",
  "swanky-field-binary",
  "swanky-party",
  "wasm-bindgen",
@@ -3175,7 +3196,8 @@ dependencies = [
  "rand 0.8.5",
  "rustls",
  "rustls-pemfile",
- "scuttlebutt",
+ "swanky-aes-rng",
+ "swanky-channel-legacy",
  "swanky-field-binary",
  "swanky-party",
  "tungstenite",
@@ -3492,8 +3514,10 @@ dependencies = [
  "env_logger 0.11.8",
  "inferno",
  "log",
- "scuttlebutt",
  "simple-arith-circuit",
+ "swanky-aes-rng",
+ "swanky-field",
+ "swanky-field-binary",
 ]
 
 [[package]]

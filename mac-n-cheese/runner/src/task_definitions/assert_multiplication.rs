@@ -12,11 +12,12 @@ use parking_lot::Mutex;
 use party::either::PartyEitherCopy;
 use party::{IsParty, Party, WhichParty};
 use rand::SeedableRng;
-use scuttlebutt::AesRng;
-use scuttlebutt::field::{Degree, DegreeModulo, F2, FiniteField, IsSubFieldOf, SmallBinaryField};
-use scuttlebutt::ring::FiniteRing;
-use scuttlebutt::serialization::CanonicalSerialize;
+use swanky_aes_rng::AesRng;
+use swanky_field::FiniteRing;
+use swanky_field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf};
+use swanky_field_binary::{F2, SmallBinaryField};
 use swanky_party as party;
+use swanky_serialization::CanonicalSerialize;
 
 use std::io::Read;
 use std::io::Write;
@@ -85,14 +86,14 @@ mod vope {
         use mac_n_cheese_vole::{mac::Mac, specialization::FiniteFieldSpecialization};
         use party::{IS_PROVER, IS_VERIFIER};
         use rand::SeedableRng;
-        use scuttlebutt::AesRng;
+        use swanky_aes_rng::AesRng;
 
         use super::*;
 
         fn do_test<T: MacTypes>() {
             eprintln!("Testing {}", std::any::type_name::<T>());
             for i in 1_u128..=256 {
-                let mut rng = AesRng::from_seed(scuttlebutt::Block::from(85787 * i));
+                let mut rng = AesRng::from_seed(swanky_block::Block::from(85787 * i));
                 let alpha = T::TF::random_nonzero(&mut rng);
                 let u = T::TF::random(&mut rng);
                 let v = T::TF::random(&mut rng);
@@ -196,7 +197,7 @@ fn test_assert_multiply_state() {
     fn do_test<T: MacTypes>() {
         eprintln!("Testing {}", std::any::type_name::<T>());
         for i in 1_u128..=256 {
-            let mut rng = AesRng::from_seed(scuttlebutt::Block::from(68569425 * i));
+            let mut rng = AesRng::from_seed(swanky_block::Block::from(68569425 * i));
             let alpha = T::TF::random_nonzero(&mut rng);
             let challenge = T::TF::random_nonzero(&mut rng);
             let mut prover_right_proof = AssertMultiplyState::<party::Prover, T::TF>::default();
@@ -287,7 +288,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
 
     fn initialize(
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut scuttlebutt::AesRng,
+        _rng: &mut swanky_aes_rng::AesRng,
         vc: crate::base_vole::VoleContexts<P>,
         num_runner_threads: usize,
     ) -> eyre::Result<Self> {
@@ -304,7 +305,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
     fn finalize(
         self,
         conn: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut scuttlebutt::AesRng,
+        _rng: &mut swanky_aes_rng::AesRng,
     ) -> eyre::Result<()> {
         let mut acu = AssertMultiplyState::<P, T::TF>::default();
         for state in self.state.into_iter() {

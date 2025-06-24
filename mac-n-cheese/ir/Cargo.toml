@@ -11,7 +11,6 @@ version.workspace = true
 workspace = true
 
 [dependencies]
-scuttlebutt.workspace = true
 ocelot.workspace = true
 vectoreyes.workspace = true
 bytemuck.workspace = true
@@ -27,6 +26,11 @@ twox-hash.workspace = true
 bumpalo = { workspace = true, features = ["collections"] }
 arrayvec.workspace = true
 mac-n-cheese-vole.workspace = true
+swanky-field.workspace = true
+swanky-field-binary.workspace = true
+swanky-field-f61p.workspace = true
+swanky-field-ff-primes.workspace = true
+swanky-serialization.workspace = true
 
 [build-dependencies]
 swanky-flatbuffer-build.workspace = true

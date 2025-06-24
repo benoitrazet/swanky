@@ -24,11 +24,9 @@
 
 use ocelot::ot::{CorrelatedReceiver, CorrelatedSender};
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{
-    Malicious,
-    field::{F2, F128b},
-};
+use swanky_adversary::Malicious;
 use swanky_channel::Channel;
+use swanky_field_binary::{F2, F128b};
 use swanky_party::{
     Party, WhichParty,
     either::PartyEither,

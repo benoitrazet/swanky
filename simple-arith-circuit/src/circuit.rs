@@ -1,4 +1,4 @@
-use scuttlebutt::field::FiniteField;
+use swanky_field::FiniteField;
 
 #[cfg(feature = "serde")]
 use crate::serialization::serde_index;

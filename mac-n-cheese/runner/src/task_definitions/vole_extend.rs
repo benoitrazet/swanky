@@ -56,7 +56,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
 
     fn initialize(
         c: &mut crate::tls::TlsConnection<P>,
-        rng: &mut scuttlebutt::AesRng,
+        rng: &mut swanky_aes_rng::AesRng,
         vc: crate::base_vole::VoleContexts<P>,
         _num_runner_threads: usize,
     ) -> eyre::Result<Self> {
@@ -84,7 +84,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
     fn finalize(
         self,
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut scuttlebutt::AesRng,
+        _rng: &mut swanky_aes_rng::AesRng,
     ) -> eyre::Result<()> {
         Ok(())
     }

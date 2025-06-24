@@ -1,9 +1,12 @@
 use keyed_arena::KeyedArena;
 use rand::SeedableRng;
-use scuttlebutt::{
-    AbstractChannel, AesRng, Block,
-    field::{F2, F56b, F61p, F63b, F128p, FiniteField, IsSubFieldOf},
-};
+use swanky_aes_rng::AesRng;
+use swanky_block::Block;
+use swanky_channel_legacy::AbstractChannel;
+use swanky_field::{FiniteField, IsSubFieldOf};
+use swanky_field_binary::{F2, F56b, F63b};
+use swanky_field_f61p::F61p;
+use swanky_field_ff_primes::F128p;
 use swanky_party::{IS_PROVER, IS_VERIFIER};
 
 use crate::{
@@ -17,9 +20,9 @@ fn do_test<
     FE: FiniteField,
     S: FiniteFieldSpecialization<VF, FE>,
 >() {
-    use scuttlebutt::Channel;
     use std::io::{BufReader, BufWriter};
     use std::os::unix::net::UnixStream;
+    use swanky_channel_legacy::Channel;
     let (a, b) = UnixStream::pair().unwrap();
     let mut base_vole_rng = AesRng::from_seed(Block::from(2456));
     let alpha = FE::random(&mut base_vole_rng);

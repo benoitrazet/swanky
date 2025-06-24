@@ -6,8 +6,10 @@ use crate::{
     oprf::{Receiver as OprfReceiver, Sender as OprfSender},
 };
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
 use std::collections::HashSet;
+use swanky_adversary::SemiHonest;
+use swanky_block::{Block, Block512};
+use swanky_channel_legacy::AbstractChannel;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 mod cuckoo;
@@ -394,11 +396,12 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
 mod tests {
     use super::*;
     use crate::oprf::{KmprtReceiver, KmprtSender};
-    use scuttlebutt::{AesRng, Channel};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
+    use swanky_channel_legacy::Channel;
 
     fn _test_opprf_points(ninputs: usize, npoints: usize, npoints_bound: usize) {
         assert!(ninputs <= npoints);

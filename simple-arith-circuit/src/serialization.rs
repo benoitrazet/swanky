@@ -35,7 +35,8 @@ mod tests {
     use crate::{Circuit, circuitgen::random_circuit};
     use proptest::prelude::*;
     use rand::{SeedableRng, distributions::Uniform, prelude::Distribution};
-    use scuttlebutt::{AesRng, Block};
+    use swanky_aes_rng::AesRng;
+    use swanky_block::Block;
 
     fn any_seed() -> impl Strategy<Value = Block> {
         any::<u128>().prop_map(Block::from)
@@ -68,6 +69,6 @@ mod tests {
         };
     }
 
-    test_serialization!(test_serialization_f2, scuttlebutt::field::F2);
-    test_serialization!(test_serialization_f61p, scuttlebutt::field::F61p);
+    test_serialization!(test_serialization_f2, swanky_field_binary::F2);
+    test_serialization!(test_serialization_f61p, swanky_field_f61p::F61p);
 }

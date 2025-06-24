@@ -4,13 +4,14 @@ use crate::svole_trait::{SvoleStopSignal, SvoleT, field_name};
 use eyre::{Result, ensure, eyre};
 use log::{debug, info};
 use ocelot::svole::{LpnParams, Receiver, Sender};
-use scuttlebutt::field::IsSubFieldOf;
-use scuttlebutt::{AbstractChannel, AesRng, field::FiniteField};
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
+use swanky_aes_rng::AesRng;
+use swanky_channel_legacy::AbstractChannel;
+use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::either::PartyEither;
 use swanky_party::{IsParty, Party, Verifier, WhichParty};
 
@@ -404,11 +405,12 @@ mod test {
     use super::{SvoleAtomic, SvoleAtomicRoundRobin};
     use crate::svole_trait::SvoleT;
     use rand::Rng;
-    use scuttlebutt::{AesRng, Channel};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
+    use swanky_channel_legacy::Channel;
     use swanky_party::either::PartyEither;
     use swanky_party::{IS_VERIFIER, Verifier};
 

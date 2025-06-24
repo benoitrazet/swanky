@@ -33,8 +33,6 @@ use log::{debug, info, warn};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use ocelot::svole::LpnParams;
-use scuttlebutt::AbstractChannel;
-use scuttlebutt::AesRng;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
@@ -42,6 +40,8 @@ use std::io::{Read, Seek};
 use std::iter;
 use std::marker::PhantomData;
 use std::path::PathBuf;
+use swanky_aes_rng::AesRng;
+use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField, StatisticallySecureField};
 use swanky_field_binary::{F2, F40b};
 use swanky_field_f61p::F61p;
@@ -2556,12 +2556,6 @@ pub(crate) mod tests {
     };
     use mac_n_cheese_sieve_parser::Number;
     use rand::SeedableRng;
-    use scuttlebutt::SyncChannel;
-    use scuttlebutt::field::F2;
-    use scuttlebutt::field::{F384p, F384q, PrimeFiniteField};
-    use scuttlebutt::field::{Secp256k1, Secp256k1order};
-    use scuttlebutt::ring::FiniteRing;
-    use scuttlebutt::{AesRng, Channel, field::F61p};
     use std::env;
     use std::net::TcpStream;
     use std::{collections::VecDeque, thread::JoinHandle};
@@ -2569,6 +2563,13 @@ pub(crate) mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
+    use swanky_channel_legacy::{Channel, SyncChannel};
+    use swanky_field::FiniteRing;
+    use swanky_field::PrimeFiniteField;
+    use swanky_field_binary::F2;
+    use swanky_field_f61p::F61p;
+    use swanky_field_ff_primes::{F384p, F384q, Secp256k1, Secp256k1order};
     use swanky_party::{Prover, Verifier};
 
     pub(crate) const FF0: u8 = 0;

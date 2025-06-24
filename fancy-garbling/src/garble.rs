@@ -20,7 +20,8 @@ mod nonstreaming {
     };
     use itertools::Itertools;
     use rand::{SeedableRng, thread_rng};
-    use scuttlebutt::{AesRng, Block};
+    use swanky_aes_rng::AesRng;
+    use swanky_block::Block;
 
     // helper
     fn garble_test_helper<F>(f: F)
@@ -288,7 +289,8 @@ mod streaming {
     };
     use itertools::Itertools;
     use rand::thread_rng;
-    use scuttlebutt::{AesRng, UnixChannel, unix_channel_pair};
+    use swanky_aes_rng::AesRng;
+    use swanky_channel_legacy::{UnixChannel, unix_channel_pair};
 
     // helper - checks that Streaming evaluation of a fancy function equals Dummy
     // evaluation of the same function
@@ -441,7 +443,8 @@ mod complex {
     };
     use itertools::Itertools;
     use rand::thread_rng;
-    use scuttlebutt::{AesRng, unix_channel_pair};
+    use swanky_aes_rng::AesRng;
+    use swanky_channel_legacy::unix_channel_pair;
 
     fn complex_gadget<F: FancyArithmetic + FancyBinary>(
         b: &mut F,

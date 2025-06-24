@@ -3,8 +3,8 @@
 use crate::{circuit_psi::*, errors::Error};
 use fancy_garbling::{FancyInput, WireMod2};
 use rand::{CryptoRng, RngCore, SeedableRng};
-use scuttlebutt::AbstractChannel;
 use std::fmt::Debug;
+use swanky_channel_legacy::AbstractChannel;
 
 // The number of hash functions that will be used to attempt to
 // place any item in a cuckoo bin

@@ -3,8 +3,6 @@
 use eyre::Result;
 use log::{debug, info};
 use ocelot::svole::{LpnParams, Receiver, Sender};
-use scuttlebutt::field::IsSubFieldOf;
-use scuttlebutt::{AbstractChannel, AesRng, field::FiniteField};
 use std::any::type_name;
 use std::marker::PhantomData;
 use std::time::Instant;
@@ -12,6 +10,9 @@ use std::{
     cell::{RefCell, RefMut},
     rc::Rc,
 };
+use swanky_aes_rng::AesRng;
+use swanky_channel_legacy::AbstractChannel;
+use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::either::PartyEither;
 use swanky_party::{IsParty, Party, Verifier, WhichParty};
 

@@ -3,7 +3,7 @@
 /// Errors produced by the private set intersection protocols.
 pub enum Error {
     /// Coin tossing failed.
-    CoinTossError(scuttlebutt::cointoss::Error),
+    CoinTossError(swanky_cointoss::Error),
     /// The underlying oblivious PRF failed.
     OprfError(ocelot::Error),
     /// An input/output error occurred.
@@ -57,9 +57,9 @@ impl From<ocelot::Error> for Error {
     }
 }
 
-impl From<scuttlebutt::cointoss::Error> for Error {
+impl From<swanky_cointoss::Error> for Error {
     #[inline]
-    fn from(e: scuttlebutt::cointoss::Error) -> Error {
+    fn from(e: swanky_cointoss::Error) -> Error {
         Error::CoinTossError(e)
     }
 }

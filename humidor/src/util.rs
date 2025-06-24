@@ -2,15 +2,15 @@
 
 use ndarray::{Array1, ArrayView1};
 
-use scuttlebutt::field::FiniteField;
+use swanky_field::FiniteField;
 #[cfg(test)]
-use scuttlebutt::ring::FiniteRing;
+use swanky_field::FiniteRing;
 
 #[cfg(test)]
 use proptest::prelude::*;
 
 #[cfg(test)]
-pub type TestField = scuttlebutt::field::F2e19x3e26;
+pub type TestField = swanky_field_ff_primes::F2e19x3e26;
 #[cfg(test)]
 pub type TestHash = sha2::Sha256;
 

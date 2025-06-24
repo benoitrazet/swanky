@@ -1,15 +1,14 @@
 use eyre::WrapErr;
 use flatbuffers::FlatBufferBuilder;
 use rustc_hash::{FxHashMap, FxHashSet};
-use scuttlebutt::field::FiniteField;
-use scuttlebutt::serialization::SequenceSerializer;
 use smallvec::SmallVec;
 use std::any::TypeId;
 use std::fs::File;
 use std::io::{BufWriter, Seek, Write};
-
 use std::ops::RangeBounds;
 use std::path::Path;
+use swanky_field::FiniteField;
+use swanky_serialization::SequenceSerializer;
 
 use crate::{MAC_N_CHEESE_VERSION, compilation_format::*};
 
@@ -691,7 +690,7 @@ impl PrivateBuilder {
                 impl FieldTypeMacVisitor for V {
                     type Output = ();
                     fn visit<
-                        VF: FiniteField + scuttlebutt::field::IsSubFieldOf<TF>,
+                        VF: FiniteField + swanky_field::IsSubFieldOf<TF>,
                         TF: FiniteField,
                         S: mac_n_cheese_vole::specialization::FiniteFieldSpecialization<VF, TF>,
                     >(

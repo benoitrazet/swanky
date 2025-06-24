@@ -1,4 +1,5 @@
-use scuttlebutt::{AesRng, field::FiniteField};
+use swanky_aes_rng::AesRng;
+use swanky_field::FiniteField;
 
 use crate::{
     cache::Cache,

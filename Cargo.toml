@@ -22,7 +22,6 @@ members = [
   "ocelot",
   "popsicle",
   "schmivitz",
-  "scuttlebutt",
   "simple-arith-circuit",
   "vectoreyes",
   "zkv",
@@ -60,7 +59,6 @@ mac-n-cheese-wire-map = { path = "mac-n-cheese/wire-map" }
 ocelot = { path = "ocelot" }
 popsicle = { path = "popsicle" }
 schmivitz = { path = "schmivitz" }
-scuttlebutt = { path = "scuttlebutt" }
 simple-arith-circuit = { path = "simple-arith-circuit" }
 swanky-adversary = { path = "crates/adversary" }
 swanky-aes-hash = { path = "crates/aes-hash" }
