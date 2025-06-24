@@ -14,6 +14,7 @@ workspace = true
 swanky-adversary.workspace = true
 swanky-party.workspace = true
 swanky-channel.workspace = true
+swanky-field-binary.workspace = true
 ocelot.workspace = true
 vectoreyes.workspace = true
 rand.workspace = true
