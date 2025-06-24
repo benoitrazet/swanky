@@ -13,7 +13,6 @@ in
     cargo-edit
     cargo-depgraph
     swankyLlvm.bintools
-    mold
     git
     (python312.withPackages (py: [
       py.black
@@ -35,5 +34,5 @@ in
     nix
     nixpkgs-fmt
     tree-sitter-grammars.tree-sitter-rust
-  ];
+  ] ++ (lib.lists.optional (!stdenv.isDarwin) mold-wrapped);
 }
