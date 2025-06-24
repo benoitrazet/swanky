@@ -1,5 +1,5 @@
 #![allow(clippy::all)]
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::distributions::{Distribution, Uniform};
 use rand_core::RngCore;
 use swanky_aes_rng::{AesRng, UniformIntegersUnderBound};
