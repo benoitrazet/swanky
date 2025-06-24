@@ -11,6 +11,7 @@ use ocelot::ot::{CorrelatedReceiver, CorrelatedSender};
 use rand::{CryptoRng, Rng};
 use swanky_adversary::Malicious;
 use swanky_channel::Channel;
+use swanky_field_binary::F2;
 use swanky_party::{
     IS_PROVER, IS_VERIFIER, Party, Prover, Verifier, WhichParty,
     either::{PartyEither, PartyEitherCopy},
@@ -34,10 +35,48 @@ pub type PartyB = Verifier;
 /// See [`crate::authshares`] for details.
 #[derive(Default, Clone, Copy)]
 pub struct AuthShare<P: Party> {
-    /// Party A's side of the authenticated bit.
+    /// Party A's side of the authenticated share.
     party_a: PartyEitherCopy<P, AuthBit<Prover>, AuthBit<Verifier>>,
-    /// Party B's side of the authenticated bit.
+    /// Party B's side of the authenticated share.
     party_b: PartyEitherCopy<P, AuthBit<Verifier>, AuthBit<Prover>>,
+}
+
+impl<P: Party> AuthShare<P> {
+    /// The given party's bit.
+    ///
+    /// This corresponds to $`x_1`$ for Party A (the "prover"), and $`x_2`$
+    /// for Party B (the "verifier").
+    pub fn bit(self) -> F2 {
+        let bit = match P::WHICH {
+            WhichParty::Prover(ev) => self.party_a.prover_into(ev).bit().into_inner(IS_PROVER),
+            WhichParty::Verifier(ev) => self.party_b.verifier_into(ev).bit().into_inner(IS_PROVER),
+        };
+        F2::from(bit)
+    }
+
+    /// The given party's key.
+    ///
+    /// This corresponds to $`K[x_2]`$ for Party A (the "prover"), and
+    /// $`K[x_1]`$ for Party B (the "verifier").
+    pub fn key(self) -> U8x16 {
+        match P::WHICH {
+            WhichParty::Prover(ev) => self.party_b.prover_into(ev).key().into_inner(IS_VERIFIER),
+            WhichParty::Verifier(ev) => {
+                self.party_a.verifier_into(ev).key().into_inner(IS_VERIFIER)
+            }
+        }
+    }
+
+    /// The given party's MAC.
+    ///
+    /// This corresponds to $`M[x_1]`$ for Party A (the "prover"), and
+    /// $`M[x_2]`$ for Party B (the "verifier").
+    pub fn mac(self) -> U8x16 {
+        match P::WHICH {
+            WhichParty::Prover(ev) => self.party_a.prover_into(ev).mac().into_inner(IS_PROVER),
+            WhichParty::Verifier(ev) => self.party_b.verifier_into(ev).mac().into_inner(IS_PROVER),
+        }
+    }
 }
 
 impl<P: Party> core::ops::BitXor for AuthShare<P> {
