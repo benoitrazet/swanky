@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use mac_n_cheese_ir::compilation_format::{FieldMacType, FieldTypeMacVisitor, TaskKind};
 use mac_n_cheese_vole::{mac::MacTypes, specialization::SmallBinaryFieldSpecialization};
-use scuttlebutt::field::IsSubFieldOf;
+use swanky_field::IsSubFieldOf;
 use swanky_field_binary::{F2, SmallBinaryField};
 use swanky_party::Party;
 
@@ -50,8 +50,8 @@ pub trait TaskDefinitionVisitor<P: Party>: Sized {
                 self.0.visit::<T::SmallBinaryDefn<TF>>()
             }
             fn visit<
-                VF: scuttlebutt::field::FiniteField + scuttlebutt::field::IsSubFieldOf<TF>,
-                TF: scuttlebutt::field::FiniteField,
+                VF: swanky_field::FiniteField + swanky_field::IsSubFieldOf<TF>,
+                TF: swanky_field::FiniteField,
                 S: mac_n_cheese_vole::specialization::FiniteFieldSpecialization<VF, TF>,
             >(
                 self,
@@ -106,8 +106,8 @@ pub fn visit_task_definition<P: Party, T: TaskDefinitionVisitor<P>>(
                     self.0.visit::<xor4::Xor4Task<P, TF>>()
                 }
                 fn visit<
-                    VF: scuttlebutt::field::FiniteField + IsSubFieldOf<TF>,
-                    TF: scuttlebutt::field::FiniteField,
+                    VF: swanky_field::FiniteField + IsSubFieldOf<TF>,
+                    TF: swanky_field::FiniteField,
                     S: mac_n_cheese_vole::specialization::FiniteFieldSpecialization<VF, TF>,
                 >(
                     self,

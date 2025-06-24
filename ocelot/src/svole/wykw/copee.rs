@@ -8,13 +8,12 @@ use crate::{
 };
 use generic_array::{GenericArray, typenum::Unsigned};
 use rand::{CryptoRng, Rng};
-use scuttlebutt::field::{Degree, FiniteField as FF};
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
 use swanky_adversary::Malicious;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
-use swanky_field::FiniteRing;
+use swanky_field::{Degree, FiniteField as FF, FiniteRing};
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 pub(super) struct Sender<ROT: ROTSender + Malicious, FE: FF> {
@@ -174,13 +173,13 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
 #[cfg(test)]
 mod tests {
     use super::{super::utils::Powers, CopeeReceiver, CopeeSender};
-    use scuttlebutt::field::FiniteField as FF;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
+    use swanky_field::FiniteField as FF;
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F2, F128b};
     use swanky_field_f61p::F61p;

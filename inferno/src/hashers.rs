@@ -1,5 +1,5 @@
 use blake3::{Hash, Hasher, OutputReader};
-use scuttlebutt::field::FiniteField;
+use swanky_field::FiniteField;
 
 use crate::secretsharing::LinearSharing;
 

@@ -10,11 +10,11 @@ use crate::{
 use anyhow::anyhow;
 use blake3::Hash;
 use rand::{Rng, SeedableRng};
-use scuttlebutt::field::FiniteField;
 use serde::{Deserialize, Serialize};
 use simple_arith_circuit::Circuit;
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
+use swanky_field::FiniteField;
 use swanky_field::FiniteRing;
 use swanky_serialization::serde_vec;
 

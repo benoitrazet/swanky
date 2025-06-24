@@ -4,8 +4,6 @@ use crate::svole_trait::{SvoleStopSignal, SvoleT, field_name};
 use eyre::{Result, ensure, eyre};
 use log::{debug, info};
 use ocelot::svole::{LpnParams, Receiver, Sender};
-use scuttlebutt::field::FiniteField;
-use scuttlebutt::field::IsSubFieldOf;
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::rc::Rc;
@@ -13,6 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::either::PartyEither;
 use swanky_party::{IsParty, Party, Verifier, WhichParty};
 

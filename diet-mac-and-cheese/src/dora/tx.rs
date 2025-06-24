@@ -1,7 +1,7 @@
 use std::io::Result;
 
-use scuttlebutt::field::FiniteField;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_field::FiniteField;
 
 #[derive(Debug)]
 pub struct TxChannel<'a, C: AbstractChannel + Clone> {

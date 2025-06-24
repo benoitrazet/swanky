@@ -6,7 +6,6 @@ use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use ocelot::svole::{Receiver, Sender};
 
-use scuttlebutt::field::FiniteField;
 use std::{
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
@@ -15,6 +14,7 @@ use std::{
 };
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::Channel;
+use swanky_field::FiniteField;
 use swanky_field_binary::F128b;
 use swanky_field_f61p::F61p;
 

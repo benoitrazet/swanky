@@ -1,6 +1,6 @@
 //! Provides an implementation of the GGM construction.
 
-use scuttlebutt::field::{FiniteField, IsSubFieldOf};
+use swanky_field::{FiniteField, IsSubFieldOf};
 use vectoreyes::{
     Aes128EncryptOnly, AesBlockCipher, SimdBase, U8x16, array_utils::ArrayUnrolledExt,
 };
@@ -330,8 +330,8 @@ pub fn ggm_prime<
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    use scuttlebutt::field::FiniteField;
     use swanky_bytearray_utils::unpack_bits;
+    use swanky_field::FiniteField;
     use swanky_field_binary::{F2, F63b, F128b};
     use swanky_field_f61p::F61p;
 

@@ -14,9 +14,9 @@ use mac_n_cheese_vole::{
     specialization::SmallBinaryFieldSpecialization,
 };
 use rustc_hash::FxHashMap;
-use scuttlebutt::field::{FiniteField, IsSubFieldOf};
 use smallvec::SmallVec;
 use swanky_aes_rng::AesRng;
+use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, SmallBinaryField};
 use swanky_party::{
     Party, WhichParty,

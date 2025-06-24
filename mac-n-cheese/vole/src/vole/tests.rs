@@ -1,9 +1,9 @@
 use keyed_arena::KeyedArena;
 use rand::SeedableRng;
-use scuttlebutt::field::{FiniteField, IsSubFieldOf};
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, F56b, F63b};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::F128p;

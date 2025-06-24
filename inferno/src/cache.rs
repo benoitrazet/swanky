@@ -4,9 +4,9 @@
 use crate::secretsharing::LagrangeEvaluator;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use rayon::iter::{ParallelDrainFull, ParallelIterator};
-use scuttlebutt::field::FiniteField;
 use simple_arith_circuit::Circuit;
 use std::collections::{HashMap, HashSet};
+use swanky_field::FiniteField;
 use swanky_polynomial::NewtonPolynomial;
 
 /// Cached computations used by the prover and verifier.

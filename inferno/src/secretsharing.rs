@@ -3,7 +3,7 @@
 
 use blake3::Hasher;
 use rand::{CryptoRng, Rng};
-use scuttlebutt::field::FiniteField;
+use swanky_field::FiniteField;
 use swanky_polynomial::{lagrange_denominator, lagrange_numerator};
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 

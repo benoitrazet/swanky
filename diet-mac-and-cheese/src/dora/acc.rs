@@ -1,8 +1,7 @@
 use eyre::{Result, ensure};
 
-use scuttlebutt::field::FiniteField;
 use swanky_channel_legacy::AbstractChannel;
-use swanky_field::IsSubFieldOf;
+use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::{IsParty, Party, Prover};
 
 use crate::{DietMacAndCheese, backend_trait::BackendT, svole_trait::SvoleT};

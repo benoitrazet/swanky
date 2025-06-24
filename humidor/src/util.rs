@@ -2,7 +2,7 @@
 
 use ndarray::{Array1, ArrayView1};
 
-use scuttlebutt::field::FiniteField;
+use swanky_field::FiniteField;
 #[cfg(test)]
 use swanky_field::FiniteRing;
 

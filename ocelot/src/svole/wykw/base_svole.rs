@@ -8,10 +8,9 @@ use super::{
 use crate::errors::Error;
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
-use scuttlebutt::field::{Degree, FiniteField as FF};
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
-use swanky_field::FiniteRing;
+use swanky_field::{Degree, FiniteField as FF, FiniteRing};
 
 /// The base VOLE sender
 pub struct Sender<FE: FF> {
@@ -134,13 +133,13 @@ impl<FE: FF> Receiver<FE> {
 #[cfg(test)]
 mod tests {
     use super::{super::utils::Powers, Receiver, Sender};
-    use scuttlebutt::field::FiniteField as FF;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
+    use swanky_field::FiniteField as FF;
     use swanky_field_binary::{F40b, F128b};
     use swanky_field_f61p::F61p;
 

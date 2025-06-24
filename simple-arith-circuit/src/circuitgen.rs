@@ -5,8 +5,7 @@ use rand::{
     Rng,
     distributions::{Distribution, Uniform},
 };
-use scuttlebutt::field::FiniteField;
-use swanky_field::FiniteRing;
+use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::F2;
 
 fn rand_ix_pair(rng: &mut impl Rng, min: Index, max: Index) -> (Index, Index) {
@@ -164,7 +163,7 @@ pub fn simple_test_circuit<F: PrimeFiniteField>() -> (Circuit<F>, Vec<F>) {
 #[cfg(any(feature = "proptest", test))]
 use proptest::{collection::vec as pvec, prelude::*};
 #[cfg(any(feature = "proptest", test))]
-use scuttlebutt::field::PrimeFiniteField;
+use swanky_field::PrimeFiniteField;
 
 #[cfg(any(feature = "proptest", test))]
 fn any_fe<F: FiniteField>() -> BoxedStrategy<F> {

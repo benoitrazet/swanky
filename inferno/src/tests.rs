@@ -1,10 +1,10 @@
 use crate::Proof;
 use proptest::prelude::*;
-use scuttlebutt::field::FiniteField;
 use simple_arith_circuit::Circuit;
 use std::path::PathBuf;
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
+use swanky_field::FiniteField;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F64b};
 

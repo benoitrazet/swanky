@@ -429,8 +429,7 @@ mod tests {
         },
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
     };
-    use scuttlebutt::field::PrimeFiniteField;
-    use swanky_field::FiniteRing;
+    use swanky_field::{FiniteRing, PrimeFiniteField};
     use swanky_field_binary::F2;
     use swanky_field_f61p::F61p;
 

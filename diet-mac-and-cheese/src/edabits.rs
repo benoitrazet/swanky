@@ -1074,13 +1074,13 @@ mod tests {
     use crate::homcom::FCom;
     use crate::svole_trait::Svole;
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
-    use scuttlebutt::field::FiniteField;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
+    use swanky_field::FiniteField;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
     use swanky_field_f61p::F61p;

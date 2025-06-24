@@ -27,6 +27,7 @@ subtle.workspace = true
 scuttlebutt.workspace = true
 swanky-aes-rng.workspace = true
 swanky-block.workspace = true
+swanky-field.workspace = true
 swanky-field-ff-primes.workspace = true
 swanky-field-fft.workspace = true
 swanky-polynomial.workspace = true
@@ -40,7 +41,6 @@ simple-arith-circuit = { workspace = true, features = ["proptest"] }
 proptest.workspace = true
 criterion.workspace = true
 sha2.workspace = true
-swanky-field.workspace = true
 swanky-serialization.workspace = true
 
 [[bench]]

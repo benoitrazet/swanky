@@ -6,7 +6,7 @@ use mac_n_cheese_vole::{
     mac::{Mac, MacTypes},
     specialization::FiniteFieldSpecialization,
 };
-use scuttlebutt::field::{FiniteField, IsSubFieldOf};
+use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::Party;
 
 #[repr(transparent)]

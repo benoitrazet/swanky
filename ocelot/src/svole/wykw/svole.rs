@@ -9,12 +9,11 @@ use rand::{
     Rng, SeedableRng,
     distributions::{Distribution, Uniform},
 };
-use scuttlebutt::field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf};
 use swanky_adversary::{Malicious, SemiHonest};
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
-use swanky_field::FiniteRing;
+use swanky_field::{Degree, DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
 
 // LPN parameters used in the protocol. We use three stages, two sets of LPN
 // parameters for setup, and one set of LPN parameters for the extend phase.
@@ -519,13 +518,13 @@ impl<FF: FiniteField> Malicious for Receiver<FF> {}
 #[cfg(test)]
 mod tests {
     use super::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL, Receiver, Sender};
-    use scuttlebutt::field::{FiniteField, IsSubFieldOf};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
+    use swanky_field::{FiniteField, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b, F128b};
     use swanky_field_f61p::F61p;
 

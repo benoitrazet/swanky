@@ -1,9 +1,8 @@
 use generic_array::GenericArray;
 use generic_array::typenum::Unsigned;
-use scuttlebutt::field::FiniteField;
-use scuttlebutt::field::{Degree, DegreeModulo, IsSubFieldOf};
 use std::convert::TryFrom;
 use swanky_aes_rng::AesRng;
+use swanky_field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, SmallBinaryField};
 use vectoreyes::{
     ExtendingCast, I32x4, SimdBase, SimdBase32, SimdBaseGatherable, U8x16, U16x8, U32x4, U32x8,
