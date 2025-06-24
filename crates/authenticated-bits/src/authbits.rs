@@ -24,7 +24,10 @@
 
 use ocelot::ot::{CorrelatedReceiver, CorrelatedSender};
 use rand::{CryptoRng, Rng};
-use scuttlebutt::Malicious;
+use scuttlebutt::{
+    Malicious,
+    field::{F2, F128b},
+};
 use swanky_channel::Channel;
 use swanky_party::{
     Party, WhichParty,
@@ -267,6 +270,29 @@ impl<
     pub fn delta(&self) -> VerifierPrivateCopy<P, U8x16> {
         self.delta
     }
+
+    /// Compute $`[b] \oplus c`$, where $`c`$ is a public bit.
+    ///
+    /// This maps the prover's values $`(b, M)`$ to $`(b \oplus c, M)`$,
+    /// and maps the verifier's value $`K`$ to $`K \oplus c \Delta`$.
+    pub fn xor_public_bit(&self, authbit: AuthBit<P>, bit: bool) -> AuthBit<P> {
+        match P::WHICH {
+            WhichParty::Prover(ev) => AuthBit(PartyEitherCopy::prover_new(
+                ev,
+                ProverAuthBit {
+                    mac: authbit.mac().into_inner(ev),
+                    bit: authbit.bit().into_inner(ev) ^ bit,
+                },
+            )),
+            WhichParty::Verifier(ev) => AuthBit(PartyEitherCopy::verifier_new(
+                ev,
+                VerifierAuthBit {
+                    key: authbit.key().into_inner(ev)
+                        ^ U8x16::from(F2::from(bit) * F128b::from(self.delta().into_inner(ev))),
+                },
+            )),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -352,6 +378,35 @@ mod tests {
         )
         .unwrap();
         (output_pr, output_vr, prover, verifier)
+    }
+
+    #[test]
+    fn xoring_public_bit_works() {
+        let count = 1000;
+        let mut rng = AesRng::new();
+        let bits: Vec<bool> = (0..count).map(|_| rng.r#gen::<bool>()).collect();
+        let public_bits: Vec<bool> = (0..count).map(|_| rng.r#gen::<bool>()).collect();
+        let (output_pr, output_vr, prover, verifier) = generate(&bits, false, false);
+        for ((authbit_pr, authbit_vr), public_bit) in output_pr
+            .into_iter()
+            .zip(output_vr.into_iter())
+            .zip(public_bits.into_iter())
+        {
+            let new_authbit_pr = prover.xor_public_bit(authbit_pr, public_bit);
+            let new_authbit_vr = verifier.xor_public_bit(authbit_vr, public_bit);
+            // The new authenticated bits should still validate.
+            let validation = validate(
+                &[new_authbit_pr],
+                &[new_authbit_vr],
+                verifier.delta().into_inner(IS_VERIFIER),
+            );
+            assert!(validation);
+            // The new authenticated bits should equal `bit ^ public_bit`.
+            assert_eq!(
+                new_authbit_pr.bit().into_inner(IS_PROVER),
+                authbit_pr.bit().into_inner(IS_PROVER) ^ public_bit
+            );
+        }
     }
 
     #[test]
