@@ -1,13 +1,14 @@
-//! Implementation of a simple two-party coin tossing protocol using a PRG as a
-//! commitment.
+#![deny(missing_docs)]
+//! A simple multi-party coin-tossing protocol.
 //!
-//! On input `seed`, the sender computes `r := PRG(seed)` and sends `r` to the
-//! receiver. It then receives `seed_` from the receiver and outputs `seed ⊕
-//! seed_`. Likewise, on input `seed`, the receiver gets `r`, sends `seed` to
-//! the sender, and then receives `seed_`, checking that `PRG(seed_) = r`.
+//! This can be used to generate uniformly-random bits for use in a multi-party
+//! computation.
 
-use crate::{AbstractChannel, AesRng, Block};
 use rand_core::{RngCore, SeedableRng};
+
+use swanky_aes_rng::AesRng;
+use swanky_block::Block;
+use swanky_channel_legacy::AbstractChannel;
 
 /// Errors produced by the coin tossing protocol.
 #[derive(Debug)]
@@ -47,7 +48,7 @@ pub fn send<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<Vec<
     for seed in seeds.iter() {
         let mut rng = AesRng::from_seed(*seed);
         let mut com = Block::default();
-        rng.fill_bytes(&mut com.as_mut());
+        rng.fill_bytes(com.as_mut());
         channel.write_block(&com)?;
     }
     channel.flush()?;
@@ -56,7 +57,7 @@ pub fn send<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<Vec<
         out.push(*seed ^ seed_);
     }
     for seed in seeds.iter() {
-        channel.write_block(&seed)?;
+        channel.write_block(seed)?;
     }
     channel.flush()?;
     Ok(out)
@@ -72,14 +73,14 @@ pub fn receive<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<V
         coms.push(com);
     }
     for seed in seeds.iter() {
-        channel.write_block(&seed)?;
+        channel.write_block(seed)?;
     }
     channel.flush()?;
     for (seed, com) in seeds.iter().zip(coms.into_iter()) {
         let seed_ = channel.read_block()?;
         let mut rng_ = AesRng::from_seed(seed_);
         let mut check = Block::default();
-        rng_.fill_bytes(&mut check.as_mut());
+        rng_.fill_bytes(check.as_mut());
         if check != com {
             return Err(Error::CommitmentCheckFailed);
         }
@@ -91,11 +92,11 @@ pub fn receive<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<V
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Channel;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_channel_legacy::Channel;
 
     #[test]
     fn test() {

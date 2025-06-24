@@ -36,14 +36,19 @@ ring.workspace = true
 rustc-hash.workspace = true
 rustls-pemfile.workspace = true
 rustls.workspace = true
-scuttlebutt.workspace = true
 smallvec.workspace = true
 subtle.workspace = true
 vectoreyes.workspace = true
 bufstream.workspace = true
 flatbuffers.workspace = true
 crossbeam-queue.workspace = true
+swanky-aes-rng.workspace = true
+swanky-block.workspace = true
+swanky-channel-legacy.workspace = true
+swanky-field.workspace = true
+swanky-field-binary.workspace = true
 swanky-party.workspace = true
+swanky-serialization.workspace = true
 
 # Memory allocators
 jemallocator = { workspace = true, optional = true }

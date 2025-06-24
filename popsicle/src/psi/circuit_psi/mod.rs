@@ -6,8 +6,8 @@ use crate::{
 };
 use fancy_garbling::{BinaryBundle, Fancy, FancyBinary, FancyReveal, WireMod2};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::Block512;
 use std::fmt::Debug;
+use swanky_block::Block512;
 
 pub mod base_psi;
 pub mod circuits;

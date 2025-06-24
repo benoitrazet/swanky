@@ -5,7 +5,8 @@ use crate::Error;
 use itertools::Itertools;
 use ocelot::oprf::{KmprtReceiver, KmprtSender};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AbstractChannel, Block, Block512};
+use swanky_block::{Block, Block512};
+use swanky_channel_legacy::AbstractChannel;
 
 /// The party number for each party.
 pub type PartyId = usize;
@@ -184,11 +185,12 @@ fn secret_sharing_of_zero<R: Rng>(nparties: usize, rng: &mut R) -> Vec<Block512>
 mod tests {
     use super::*;
     use rand::Rng;
-    use scuttlebutt::{AesRng, SyncChannel};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
+    use swanky_channel_legacy::SyncChannel;
 
     #[test]
     fn test_secret_sharing_of_zero() {

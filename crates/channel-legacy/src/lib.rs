@@ -1,24 +1,34 @@
-mod hash_channel;
-mod sync_channel;
-mod track_channel;
-#[cfg(unix)]
-mod unix_channel;
+#![deny(missing_docs)]
+//! Abstractions for communication in Swanky.
+//!
+//! **WARNING:** This is considered legacy code, and will be removed in a future
+//! version of Swanky. Use the [`swanky-channel`] crate instead for new code!
 
+mod hash_channel;
 pub use hash_channel::HashChannel;
+
+mod sync_channel;
 pub use sync_channel::SyncChannel;
+
+mod track_channel;
 pub use track_channel::TrackChannel;
 
 #[cfg(unix)]
+mod unix_channel;
+#[cfg(unix)]
 pub use unix_channel::{TrackUnixChannel, UnixChannel, track_unix_channel_pair, unix_channel_pair};
 
-use crate::{Block, Block512, serialization::CanonicalSerialize};
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use generic_array::GenericArray;
 use std::{
     cell::RefCell,
     io::{Read, Result, Write},
     rc::Rc,
 };
+
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
+use generic_array::GenericArray;
+
+use swanky_block::{Block, Block512};
+use swanky_serialization::CanonicalSerialize;
 
 /// A trait for managing I/O. `AbstractChannel`s are clonable, and provide basic
 /// read/write capabilities for both common and scuttlebutt-specific types.
@@ -199,7 +209,7 @@ pub trait AbstractChannel {
         self.read_bytes(&mut buf[..])?;
         let fe = match E::from_bytes(&buf) {
             Ok(fe) => fe,
-            Err(e) => return Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
+            Err(e) => return Err(std::io::Error::other(e)),
         };
         Ok(fe)
     }
@@ -210,7 +220,7 @@ pub trait AbstractChannel {
         Ok(())
     }
 }
-impl<'a, C: AbstractChannel> AbstractChannel for &'a mut C {
+impl<C: AbstractChannel> AbstractChannel for &mut C {
     fn read_bytes(&mut self, bytes: &mut [u8]) -> Result<()> {
         C::read_bytes(self, bytes)
     }
@@ -227,20 +237,17 @@ impl<'a, C: AbstractChannel> AbstractChannel for &'a mut C {
 impl AbstractChannel for swanky_channel::Channel<'_> {
     #[inline]
     fn read_bytes(&mut self, bytes: &mut [u8]) -> Result<()> {
-        swanky_channel::Channel::read_bytes(self, bytes)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        swanky_channel::Channel::read_bytes(self, bytes).map_err(std::io::Error::other)
     }
 
     #[inline]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
-        swanky_channel::Channel::write_bytes(self, bytes)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        swanky_channel::Channel::write_bytes(self, bytes).map_err(std::io::Error::other)
     }
 
     #[inline]
     fn flush(&mut self) -> Result<()> {
-        self.force_flush()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        self.force_flush().map_err(std::io::Error::other)
     }
 }
 
@@ -288,8 +295,8 @@ impl<R: Read, W: Write> AbstractChannel for Channel<R, W> {
     }
 
     #[inline(always)]
-    fn read_bytes(&mut self, mut bytes: &mut [u8]) -> Result<()> {
-        self.reader.borrow_mut().read_exact(&mut bytes)
+    fn read_bytes(&mut self, bytes: &mut [u8]) -> Result<()> {
+        self.reader.borrow_mut().read_exact(bytes)
     }
 
     #[inline(always)]
@@ -319,8 +326,8 @@ impl<S: Read + Write> AbstractChannel for SymChannel<S> {
     }
 
     #[inline(always)]
-    fn read_bytes(&mut self, mut bytes: &mut [u8]) -> Result<()> {
-        self.stream.borrow_mut().read_exact(&mut bytes)
+    fn read_bytes(&mut self, bytes: &mut [u8]) -> Result<()> {
+        self.stream.borrow_mut().read_exact(bytes)
     }
 
     #[inline(always)]

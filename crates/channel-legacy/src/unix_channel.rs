@@ -1,8 +1,9 @@
-use crate::{SyncChannel, TrackChannel};
 use std::{
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
 };
+
+use crate::{SyncChannel, TrackChannel};
 
 /// A SyncChannel which uses UnixStreams.
 pub type UnixChannel = SyncChannel<BufReader<UnixStream>, BufWriter<UnixStream>>;

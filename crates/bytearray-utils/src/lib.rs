@@ -1,4 +1,8 @@
-//! Useful utility functions.
+#![deny(missing_docs)]
+//! Functions for working with bits and bytearrays.
+//!
+//! **WARNING:** This crate will be removed in a future version of Swanky. New
+//! code should use `bytemuck` for operations of this sort.
 
 /// Pack a bit slice into bytes.
 pub fn pack_bits(bits: &[bool]) -> Vec<u8> {

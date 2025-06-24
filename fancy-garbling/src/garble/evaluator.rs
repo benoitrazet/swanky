@@ -8,8 +8,9 @@ use crate::{
     util::{output_tweak, tweak, tweak2},
     wire::WireLabel,
 };
-use scuttlebutt::{AbstractChannel, Block};
 use subtle::ConditionallySelectable;
+use swanky_block::Block;
+use swanky_channel_legacy::AbstractChannel;
 
 use super::security_warning::warn_proj;
 

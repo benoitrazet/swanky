@@ -15,8 +15,11 @@ use mac_n_cheese_ir::compilation_format::{
 };
 use parking_lot::{Condvar, Mutex, RwLock};
 use rustc_hash::FxHashMap;
-use scuttlebutt::AesRng;
-use swanky_party::{Party, WhichParty, private::ProverPrivate};
+use swanky_aes_rng::AesRng;
+use swanky_party::{
+    Party, WhichParty,
+    private::{PartyPrivate, ProverPrivate},
+};
 
 use crate::{
     alloc::OwnedAlignedBytes,

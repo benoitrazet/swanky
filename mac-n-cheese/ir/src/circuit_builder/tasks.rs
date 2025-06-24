@@ -3,8 +3,8 @@ use std::any::TypeId;
 use arrayvec::ArrayVec;
 use mac_n_cheese_vole::specialization::FiniteFieldSpecialization;
 use mac_n_cheese_vole::vole::VoleSizes;
-use scuttlebutt::field::{FiniteField, IsSubFieldOf};
-use scuttlebutt::serialization::SequenceSerializer;
+use swanky_field::{FiniteField, IsSubFieldOf};
+use swanky_serialization::SequenceSerializer;
 
 use crate::circuit_builder::PrototypeBuilder;
 use crate::compilation_format::wire_format::{

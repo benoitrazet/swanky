@@ -381,7 +381,7 @@ mod tests {
         plugins::Plugin,
     };
     use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
-    use scuttlebutt::field::F61p;
+    use swanky_field_f61p::F61p;
 
     #[test]
     fn test_vector_add() {

@@ -12,8 +12,12 @@ use crate::{
     utils,
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AbstractChannel, AesRng, Block, Malicious, SemiHonest, cointoss};
 use std::io::ErrorKind;
+use swanky_adversary::{Malicious, SemiHonest};
+use swanky_aes_rng::AesRng;
+use swanky_block::Block;
+use swanky_channel_legacy::AbstractChannel;
+use swanky_cointoss;
 
 // The statistical security parameter.
 const SSP: usize = 40;
@@ -41,7 +45,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
         // Check correlation
         let mut seed = Block::default();
         rng.fill_bytes(seed.as_mut());
-        let seed = cointoss::send(channel, &[seed])?;
+        let seed = swanky_cointoss::send(channel, &[seed])?;
         let mut rng = AesRng::from_seed(seed[0]);
         let mut check = (Block::default(), Block::default());
         let mut chi = Block::default();
@@ -184,7 +188,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
         // Check correlation
         let mut seed = Block::default();
         rng.fill_bytes(seed.as_mut());
-        let seed = cointoss::receive(channel, &[seed])?;
+        let seed = swanky_cointoss::receive(channel, &[seed])?;
         let mut rng = AesRng::from_seed(seed[0]);
         let mut x = Block::default();
         let mut t = (Block::default(), Block::default());

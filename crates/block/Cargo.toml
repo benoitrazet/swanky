@@ -1,0 +1,25 @@
+[package]
+name = "swanky-block"
+description = "128-, 256-, and  512-bit data blocks."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+bytemuck.workspace = true
+rand.workspace = true
+serde = { workspace = true, features = ["derive"] }
+vectoreyes.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+swanky-aes-rng.workspace = true
+
+[[bench]]
+name = "block512"
+harness = false

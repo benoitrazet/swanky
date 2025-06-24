@@ -6,7 +6,7 @@
 
 use digest::Digest as CryptoDigest;
 use ndarray::{Array2, ArrayView1, ArrayView2};
-use scuttlebutt::field::FiniteField;
+use swanky_field::FiniteField;
 
 type HashOutput<T> = digest::Output<T>;
 

@@ -1,7 +1,7 @@
 //! Errors that may be output by this library.
 
-use scuttlebutt::Block;
 use std::fmt::{self, Display, Formatter};
+use swanky_block::Block;
 
 /// Errors that may occur when using the `Fancy` trait. These errors are
 /// API-usage errors, such as trying to add two `Items` with different moduli.

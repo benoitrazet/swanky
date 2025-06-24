@@ -12,8 +12,11 @@ use crate::{
 use itertools::Itertools;
 use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::{CryptoRng, Rng, RngCore, seq::SliceRandom};
-use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest, cointoss};
 use std::collections::{HashMap, HashSet};
+use swanky_adversary::SemiHonest;
+use swanky_block::{Block, Block512};
+use swanky_channel_legacy::AbstractChannel;
+use swanky_cointoss;
 
 const NHASHES: usize = 3;
 
@@ -43,7 +46,7 @@ impl Sender {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(), Error> {
-        let key = cointoss::send(channel, &[rng.r#gen()])?[0];
+        let key = swanky_cointoss::send(channel, &[rng.r#gen()])?[0];
         let inputs = utils::compress_and_hash_inputs(inputs, key);
         let masksize = compute_masksize(inputs.len())?;
         let nbins = channel.read_usize()?;
@@ -80,7 +83,7 @@ impl Sender {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Vec<Block>, Error> {
-        let key = cointoss::send(channel, &[rng.r#gen()])?[0];
+        let key = swanky_cointoss::send(channel, &[rng.r#gen()])?[0];
         let masksize = compute_masksize(inputs.len())?;
         let inputs = utils::compress_and_hash_inputs(inputs, key);
         let nbins = channel.read_usize()?;
@@ -110,7 +113,7 @@ impl Sender {
 
                 // encrypt payload
                 let mut ct = payloads[j];
-                scuttlebutt::utils::xor_inplace(ct.as_mut(), key);
+                swanky_bytearray_utils::xor_inplace(ct.as_mut(), key);
 
                 channel.write_bytes(&tag[0..masksize])?;
                 channel.write_bytes(ct.as_ref())?;
@@ -211,7 +214,7 @@ impl Receiver {
                 if let Some(ct) = hs[item.hash_index].get(tag) {
                     let val = inputs[item.input_index].clone();
                     let key = &output.as_ref()[masksize..masksize + 16];
-                    let payload_bytes = scuttlebutt::utils::xor(ct.as_ref(), key);
+                    let payload_bytes = swanky_bytearray_utils::xor(ct.as_ref(), key);
                     let payload = Block::from(
                         <[u8; 16]>::try_from(payload_bytes.as_slice())
                             .expect("it is exactly 16 bytes long"),
@@ -237,7 +240,7 @@ impl Receiver {
         ),
         Error,
     > {
-        let key = cointoss::receive(channel, &[rng.r#gen()])?[0];
+        let key = swanky_cointoss::receive(channel, &[rng.r#gen()])?[0];
 
         let hashed = utils::compress_and_hash_inputs(inputs, key);
 
@@ -275,11 +278,12 @@ impl SemiHonest for Receiver {}
 mod tests {
     use super::*;
     use crate::utils::rand_vec_vec;
-    use scuttlebutt::{AesRng, Channel};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
+    use swanky_channel_legacy::Channel;
 
     const ITEM_SIZE: usize = 8;
     const SET_SIZE: usize = 1 << 16;

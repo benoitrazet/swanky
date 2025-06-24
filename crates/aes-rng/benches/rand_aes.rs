@@ -2,7 +2,7 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use rand::distributions::{Distribution, Uniform};
 use rand_core::RngCore;
-use scuttlebutt::{AesRng, UniformIntegersUnderBound};
+use swanky_aes_rng::{AesRng, UniformIntegersUnderBound};
 
 mod measurement {
     use criterion::measurement::WallTime;
@@ -73,9 +73,6 @@ fn bench_aes_rand_int_126(c: &mut Criterion<Measurement>) {
     );
 }
 
-// NOTE: The CyclesPerByte is inaccurate, since it doesn't make any attempt to serialize execution.
-// It only calls rdstc. Rather than trying to implement the right thing, we'll just increase the
-// sample size and hope for the best.
 criterion_group! {
     name = aesrng;
     config = Criterion::default().with_measurement(new_measurement()).sample_size(4096);

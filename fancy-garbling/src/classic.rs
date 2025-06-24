@@ -8,8 +8,10 @@ use crate::{
     garble::{Evaluator, Garbler},
 };
 use itertools::Itertools;
-use scuttlebutt::{AesRng, Block, Channel};
 use std::{collections::HashMap, marker::PhantomData, rc::Rc};
+use swanky_aes_rng::AesRng;
+use swanky_block::Block;
+use swanky_channel_legacy::Channel;
 
 /// Static evaluator for a circuit, created by the `garble` function.
 ///

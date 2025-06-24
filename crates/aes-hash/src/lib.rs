@@ -1,12 +1,12 @@
-//! Implementations of correlation-robust hash functions (and their variants)
-//! based on fixed-key AES.
+#![deny(missing_docs)]
+//! Correlation-robust hashing based on fixed-key AES.
 
 use vectoreyes::{
     Aes128EncryptOnly, AesBlockCipher,
     array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
 };
 
-use crate::Block;
+use swanky_block::Block;
 
 /// AES-based correlation-robust hash function.
 ///

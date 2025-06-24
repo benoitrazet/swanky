@@ -10,10 +10,13 @@ use crate::{
 use anyhow::anyhow;
 use blake3::Hash;
 use rand::{Rng, SeedableRng};
-use scuttlebutt::{AesRng, Block, field::FiniteField};
-use scuttlebutt::{ring::FiniteRing, serialization::serde_vec};
 use serde::{Deserialize, Serialize};
 use simple_arith_circuit::Circuit;
+use swanky_aes_rng::AesRng;
+use swanky_block::Block;
+use swanky_field::FiniteField;
+use swanky_field::FiniteRing;
+use swanky_serialization::serde_vec;
 
 /// The proof for a single execution of the protocol. `N` denotes
 /// the number of participants in the MPC.
@@ -413,7 +416,8 @@ impl UnopenedParty {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use scuttlebutt::field::{F61p, F64b};
+    use swanky_field_binary::F64b;
+    use swanky_field_f61p::F61p;
 
     const N: usize = 16;
     const K: usize = 8;
@@ -424,7 +428,7 @@ mod tests {
                 use super::*;
                 #[allow(unused_imports)]
                 use proptest::prelude::*;
-                use scuttlebutt::Block;
+                use swanky_block::Block;
 
                 fn any_seed() -> impl Strategy<Value = Block> {
                     any::<u128>().prop_map(|seed| Block::from(seed))

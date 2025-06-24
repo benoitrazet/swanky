@@ -1,6 +1,6 @@
 use std::cmp;
 
-use scuttlebutt::field::FiniteField;
+use swanky_field::FiniteField;
 
 use crate::{
     circuit_ir::{FunStore, WireCount},

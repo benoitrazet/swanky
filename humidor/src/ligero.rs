@@ -66,13 +66,14 @@ use digest::Digest as CryptoDigest;
 use generic_array::typenum::Unsigned;
 use ndarray::{Array1, Array2, ArrayView1, Axis, concatenate};
 use rand::{CryptoRng, Rng, SeedableRng};
-use scuttlebutt::field::FiniteField;
-use scuttlebutt::field::fft::FieldForFFT;
-#[cfg(test)]
-use scuttlebutt::serialization::CanonicalSerialize;
-use scuttlebutt::{AesRng, Block};
 use sprs::{CsMat, TriMat};
 use std::ops::Range;
+use swanky_aes_rng::AesRng;
+use swanky_block::Block;
+use swanky_field::FiniteField;
+use swanky_field_fft::FieldForFFT;
+#[cfg(test)]
+use swanky_serialization::CanonicalSerialize;
 
 type HashOutput<T> = digest::Output<T>;
 
@@ -100,7 +101,7 @@ pub trait FieldForLigero:
     const FIELD_SIZE: usize;
 }
 
-impl FieldForLigero for scuttlebutt::field::F2e19x3e26 {
+impl FieldForLigero for swanky_field_ff_primes::F2e19x3e26 {
     const FIELD_SIZE: usize = <Self as FiniteField>::NumberOfBitsInBitDecomposition::USIZE;
 }
 
@@ -403,7 +404,7 @@ impl Arbitrary for Secret<TestField, TestHash> {
 }
 
 #[cfg(test)]
-use scuttlebutt::ring::FiniteRing;
+use swanky_field::FiniteRing;
 
 #[cfg(test)]
 proptest! {

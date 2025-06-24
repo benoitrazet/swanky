@@ -1,6 +1,8 @@
-use crate::{AbstractChannel, Channel};
-use sha2::{Digest, Sha256};
 use std::io::{Read, Result, Write};
+
+use sha2::{Digest, Sha256};
+
+use crate::{AbstractChannel, Channel};
 
 /// An instantiation of the `AbstractChannel` trait which computes a running
 /// hash of all bytes read from and written to the channel.
@@ -33,8 +35,8 @@ impl<R: Read, W: Write> AbstractChannel for HashChannel<R, W> {
     }
 
     #[inline]
-    fn read_bytes(&mut self, mut bytes: &mut [u8]) -> Result<()> {
-        self.channel.read_bytes(&mut bytes)?;
+    fn read_bytes(&mut self, bytes: &mut [u8]) -> Result<()> {
+        self.channel.read_bytes(bytes)?;
         self.hash.update(&bytes);
         Ok(())
     }

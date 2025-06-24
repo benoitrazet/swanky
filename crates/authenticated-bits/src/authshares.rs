@@ -9,7 +9,7 @@
 use crate::authbits::{AuthBit, AuthBitGenerator};
 use ocelot::ot::{CorrelatedReceiver, CorrelatedSender};
 use rand::{CryptoRng, Rng};
-use scuttlebutt::Malicious;
+use swanky_adversary::Malicious;
 use swanky_channel::Channel;
 use swanky_party::{
     IS_PROVER, IS_VERIFIER, Party, Prover, Verifier, WhichParty,
@@ -234,7 +234,7 @@ impl<
 mod tests {
     use super::*;
     use ocelot::ot;
-    use scuttlebutt::AesRng;
+    use swanky_aes_rng::AesRng;
 
     /// Generates `AuthShare`s, outputting the produced `AuthShare`s and their
     /// associated generators.

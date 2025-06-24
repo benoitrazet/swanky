@@ -45,8 +45,10 @@ use ocelot::{
 };
 
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
 use std::time::SystemTime;
+use swanky_adversary::SemiHonest;
+use swanky_block::{Block, Block512};
+use swanky_channel_legacy::AbstractChannel;
 
 use std::{
     fs::File,
@@ -1035,12 +1037,14 @@ mod tests {
     use super::*;
     use crate::utils::rand_u64_vec;
     use rand::{prelude::SliceRandom, thread_rng};
-    use scuttlebutt::{AesRng, Block512, Channel};
     use std::{
         collections::HashMap,
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
+    use swanky_block::Block512;
+    use swanky_channel_legacy::Channel;
 
     const ITEM_SIZE: usize = 8;
 

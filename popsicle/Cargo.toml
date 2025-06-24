@@ -17,7 +17,6 @@ workspace = true
 
 [dependencies]
 ocelot.workspace = true
-scuttlebutt.workspace = true
 itertools.workspace = true
 rand.workspace = true
 sha2.workspace = true
@@ -25,6 +24,13 @@ aes-gcm.workspace = true
 fancy-garbling = { workspace = true, features = ["serde"]}
 serde          = { workspace = true, features = ["derive"]}
 serde_json     = { workspace = true}
+swanky-adversary.workspace = true
+swanky-aes-hash.workspace = true
+swanky-aes-rng.workspace = true
+swanky-block.workspace = true
+swanky-bytearray-utils.workspace = true
+swanky-channel-legacy.workspace = true
+swanky-cointoss.workspace = true
 proptest = { workspace = true}
 vectoreyes.workspace = true
 [dev-dependencies]

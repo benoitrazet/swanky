@@ -1,4 +1,4 @@
-use scuttlebutt::Block;
+use swanky_block::Block;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 pub struct PseudorandomCode {

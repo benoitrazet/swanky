@@ -17,7 +17,9 @@ use ocelot::{
     ot::{AlszReceiver as OtReceiver, AlszSender as OtSender},
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
+use swanky_adversary::SemiHonest;
+use swanky_block::{Block, Block512};
+use swanky_channel_legacy::AbstractChannel;
 
 const NHASHES: usize = 3;
 // How many bytes of the hash to use for the equality tests. This affects
@@ -451,11 +453,12 @@ impl SemiHonest for Receiver {}
 mod tests {
     use super::*;
     use crate::utils::rand_vec_vec;
-    use scuttlebutt::{AesRng, Channel};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
+    use swanky_channel_legacy::Channel;
 
     const ITEM_SIZE: usize = 8;
     const SET_SIZE: usize = 1 << 6;

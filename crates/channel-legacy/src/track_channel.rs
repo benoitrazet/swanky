@@ -1,8 +1,9 @@
-use crate::AbstractChannel;
 use std::{
     io::Result,
     sync::{Arc, Mutex},
 };
+
+use crate::AbstractChannel;
 
 /// A channel wrapping another channel for tracking the number of bits read/written.
 pub struct TrackChannel<C>(Arc<Mutex<InternalTrackChannel<C>>>);
@@ -78,10 +79,10 @@ impl<C: AbstractChannel> AbstractChannel for TrackChannel<C> {
         int.channel.write_bytes(bytes)
     }
 
-    fn read_bytes(&mut self, mut bytes: &mut [u8]) -> Result<()> {
+    fn read_bytes(&mut self, bytes: &mut [u8]) -> Result<()> {
         let mut int = self.0.lock().unwrap();
         int.nbits_read += bytes.len() * 8;
-        int.channel.read_bytes(&mut bytes)
+        int.channel.read_bytes(bytes)
     }
 
     fn flush(&mut self) -> Result<()> {

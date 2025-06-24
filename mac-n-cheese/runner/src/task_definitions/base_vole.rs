@@ -30,7 +30,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for BaseVoleTask<P, T> {
 
     fn initialize(
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut scuttlebutt::AesRng,
+        _rng: &mut swanky_aes_rng::AesRng,
         vc: crate::base_vole::VoleContexts<P>,
         _num_runner_threads: usize,
     ) -> eyre::Result<Self> {
@@ -51,7 +51,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for BaseVoleTask<P, T> {
     fn finalize(
         self,
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut scuttlebutt::AesRng,
+        _rng: &mut swanky_aes_rng::AesRng,
     ) -> eyre::Result<()> {
         Ok(())
     }

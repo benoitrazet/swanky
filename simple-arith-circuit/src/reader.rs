@@ -1,13 +1,13 @@
 //! This module implements a reader for "Bristol Fashion" circuit definition files.
 
 use crate::circuit::{Circuit, Index, Op};
-use scuttlebutt::field::F2;
-use scuttlebutt::ring::FiniteRing;
 use std::{
     fs::File,
     io::{BufRead, BufReader},
     path::Path,
 };
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 
 /// Specifies what debug information `Circuit::read_bristol_fashion` emits.
 /// When specified, this emits information through `log::debug!`.
@@ -481,8 +481,8 @@ mod tests {
         let mut wires = Vec::with_capacity(nbits);
         for i in 0..nbits {
             match &bitstr[i] {
-                b'0' => wires.push(scuttlebutt::field::F2::ZERO),
-                b'1' => wires.push(scuttlebutt::field::F2::ONE),
+                b'0' => wires.push(swanky_field_binary::F2::ZERO),
+                b'1' => wires.push(swanky_field_binary::F2::ONE),
                 _ => {
                     panic!("bit must be 0 or 1")
                 }

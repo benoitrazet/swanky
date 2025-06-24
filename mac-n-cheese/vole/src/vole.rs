@@ -8,15 +8,14 @@ use ocelot::svole::ggm_utils::*;
 use party::{IS_PROVER, IS_VERIFIER, Party};
 use rand::prelude::Distribution;
 use rand::{CryptoRng, Rng, SeedableRng, distributions::Uniform};
-use scuttlebutt::field::DegreeModulo;
-use scuttlebutt::{
-    AbstractChannel, AesRng, Block,
-    field::{Degree, FiniteField},
-    ring::FiniteRing,
-    serialization::CanonicalSerialize,
-};
 use std::{marker::PhantomData, ops::Deref};
+use swanky_aes_rng::AesRng;
+use swanky_block::Block;
+use swanky_channel_legacy::AbstractChannel;
+use swanky_field::FiniteRing;
+use swanky_field::{Degree, DegreeModulo, FiniteField};
 use swanky_party as party;
+use swanky_serialization::CanonicalSerialize;
 
 mod lpn_params;
 mod sizes;
@@ -117,7 +116,7 @@ impl<T: MacTypes> VoleSender<T> {
         rng: &mut RNG,
     ) -> eyre::Result<Self> {
         let lpn_seeds = Aes128EncryptOnly::new_with_key(
-            scuttlebutt::cointoss::send(channel, &[rng.r#gen::<Block>()])?[0],
+            swanky_cointoss::send(channel, &[rng.r#gen::<Block>()])?[0],
         );
         let ot = KosReceiver::init(channel, rng)?;
         let ggm_seeds = make_ggm_seeds(&lpn_seeds);
@@ -355,7 +354,7 @@ impl<T: MacTypes> VoleReceiver<T> {
         delta: T::TF,
     ) -> eyre::Result<Self> {
         let lpn_seeds = Aes128EncryptOnly::new_with_key(
-            scuttlebutt::cointoss::receive(channel, &[rng.r#gen::<Block>()])?[0],
+            swanky_cointoss::receive(channel, &[rng.r#gen::<Block>()])?[0],
         );
         let ot = KosSender::init(channel, rng)?;
         let ggm_seeds = make_ggm_seeds(&lpn_seeds);

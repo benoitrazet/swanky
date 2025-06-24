@@ -3,8 +3,8 @@
 //! Note: all number representations in this library are little-endian.
 
 use itertools::Itertools;
-use scuttlebutt::Block;
 use std::collections::HashMap;
+use swanky_block::Block;
 use vectoreyes::{SimdBase, U8x16, U64x2};
 
 use crate::WireLabel;

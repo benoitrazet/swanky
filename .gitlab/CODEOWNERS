@@ -3,6 +3,10 @@
 /diet-mac-and-cheese/ @benoit.razet @cphifer
 /diet-mac-and-cheese @benoit.razet @cphifer
 
+/crates/adversary/ @cphifer
+/crates/adversary @cphifer
+/crates/block/ @cphifer
+/crates/block @cphifer
 /crates/channel/ @marc
 /crates/channel @marc
 /crates/flatbuffer-build/ @marc

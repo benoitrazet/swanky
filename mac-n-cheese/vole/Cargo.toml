@@ -11,7 +11,6 @@ version.workspace = true
 workspace = true
 
 [dependencies]
-scuttlebutt.workspace = true
 ocelot.workspace = true
 vectoreyes.workspace = true
 generic-array.workspace = true
@@ -21,11 +20,19 @@ rand.workspace = true
 keyed_arena.workspace = true
 blake3.workspace = true
 arrayvec.workspace = true
+swanky-aes-rng.workspace = true
+swanky-block.workspace = true
+swanky-channel-legacy.workspace = true
+swanky-cointoss.workspace = true
+swanky-field.workspace = true
+swanky-field-binary.workspace = true
+swanky-field-f61p.workspace = true
+swanky-field-ff-primes.workspace = true
 swanky-party.workspace = true
+swanky-serialization.workspace = true
 
 [dev-dependencies]
 rand.workspace = true
-scuttlebutt.workspace = true
 mimalloc.workspace = true
 
 [[bench]]

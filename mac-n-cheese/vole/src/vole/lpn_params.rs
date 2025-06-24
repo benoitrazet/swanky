@@ -38,8 +38,8 @@ impl LpnParams {
 impl std::fmt::Debug for LpnParams {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let sizes = crate::vole::sizes::VoleSizes::from_lpn_params::<
-            scuttlebutt::field::F2,
-            scuttlebutt::field::F63b,
+            swanky_field_binary::F2,
+            swanky_field_binary::F63b,
         >(*self);
         let total_comms =
             sizes.comms_1s + sizes.comms_2r + sizes.comms_3s + sizes.comms_4r + sizes.comms_5s;

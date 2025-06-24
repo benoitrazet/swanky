@@ -1,6 +1,6 @@
 use generic_array::typenum::Unsigned;
-use scuttlebutt::field::FiniteField;
 use simple_arith_circuit::Circuit;
+use swanky_field::FiniteField;
 
 /// Compute the number of compression rounds. If there are no multiplication gates, we'll have zero rounds.
 pub(crate) fn nrounds<F: FiniteField>(circuit: &Circuit<F>, compression_factor: usize) -> usize {

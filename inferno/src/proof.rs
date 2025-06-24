@@ -13,9 +13,9 @@ use crate::cache::Cache;
 use crate::proof_single::ProofSingle;
 use anyhow::anyhow;
 use rayon::prelude::*;
-use scuttlebutt::AesRng;
-use scuttlebutt::field::FiniteField;
 use simple_arith_circuit::Circuit;
+use swanky_aes_rng::AesRng;
+use swanky_field::FiniteField;
 
 /// The inferno proof. `N` denotes the number of parties in each MPC execution.
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -118,7 +118,7 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
 mod tests {
     use super::*;
     use rand::SeedableRng;
-    use scuttlebutt::field::F64b;
+    use swanky_field_binary::F64b;
 
     const N: usize = 16;
     const K: usize = 8;
@@ -130,7 +130,7 @@ mod tests {
                 use super::*;
                 #[allow(unused_imports)]
                 use proptest::prelude::*;
-                use scuttlebutt::Block;
+                use swanky_block::Block;
 
                 fn any_seed() -> impl Strategy<Value = Block> {
                     any::<u128>().prop_map(|seed| Block::from(seed))

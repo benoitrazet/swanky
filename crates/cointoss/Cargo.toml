@@ -1,0 +1,18 @@
+[package]
+name = "swanky-cointoss"
+description = "A simple coin-tossing protocol."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+rand.workspace = true
+rand_core.workspace = true
+swanky-aes-rng.workspace = true
+swanky-block.workspace = true
+swanky-channel-legacy.workspace = true

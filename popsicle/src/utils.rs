@@ -1,8 +1,9 @@
 //! Util mostly in support of cuckoo hashing.
 
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AesHash, Block};
 use sha2::{Digest, Sha256};
+use swanky_aes_hash::AesHash;
+use swanky_block::Block;
 
 /// Compress an arbitrary vector into a 128-bit chunk, leaving the final 8-bits
 /// as zero. We need to leave 8 bits free in order to add in the hash index when
@@ -52,7 +53,7 @@ pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use scuttlebutt::AesRng;
+    use swanky_aes_rng::AesRng;
 
     #[test]
     fn test_compress_and_hash_inputs() {

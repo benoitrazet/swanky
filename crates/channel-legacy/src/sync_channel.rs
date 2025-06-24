@@ -1,8 +1,9 @@
-use crate::AbstractChannel;
 use std::{
     io::{Read, Result, Write},
     sync::{Arc, Mutex},
 };
+
+use crate::AbstractChannel;
 
 /// A channel that implements `AbstractChannel` as well as `Send` and `Sync`.
 pub struct SyncChannel<R, W> {
@@ -48,8 +49,8 @@ impl<R: Read, W: Write> AbstractChannel for SyncChannel<R, W> {
     }
 
     #[inline(always)]
-    fn read_bytes(&mut self, mut bytes: &mut [u8]) -> Result<()> {
-        self.reader.lock().unwrap().read_exact(&mut bytes)
+    fn read_bytes(&mut self, bytes: &mut [u8]) -> Result<()> {
+        self.reader.lock().unwrap().read_exact(bytes)
     }
 
     #[inline(always)]
