@@ -27,7 +27,6 @@ pretty_env_logger.workspace = true
 rand.workspace = true
 generic-array.workspace = true
 wasm-bindgen.workspace = true
-scuttlebutt.workspace = true
 ocelot.workspace = true
 diet-mac-and-cheese.workspace = true
 mac-n-cheese-sieve-parser.workspace = true

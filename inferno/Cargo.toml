@@ -22,7 +22,6 @@ log.workspace = true
 parking_lot.workspace = true
 rand.workspace = true
 rayon.workspace = true
-scuttlebutt.workspace = true
 swanky-aes-rng.workspace = true
 swanky-block.workspace = true
 swanky-field.workspace = true

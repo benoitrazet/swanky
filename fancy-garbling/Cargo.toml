@@ -18,11 +18,10 @@ workspace = true
 doctest = false
 
 [features]
-serde = ["dep:serde", "dep:serde_json", "scuttlebutt/serde"]
+serde = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
 fancy-garbling-base-conversion.workspace = true
-scuttlebutt.workspace = true
 ocelot.workspace = true
 vectoreyes.workspace = true
 itertools.workspace = true

@@ -16,7 +16,6 @@ proptest = ["dep:proptest"]
 serde = ["dep:serde"]
 
 [dependencies]
-scuttlebutt.workspace = true
 rand.workspace = true
 serde = { workspace = true, features = ["derive"], optional = true }
 proptest = { workspace = true, optional = true }

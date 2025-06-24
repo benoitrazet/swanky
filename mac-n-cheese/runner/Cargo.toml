@@ -36,7 +36,6 @@ ring.workspace = true
 rustc-hash.workspace = true
 rustls-pemfile.workspace = true
 rustls.workspace = true
-scuttlebutt.workspace = true
 smallvec.workspace = true
 subtle.workspace = true
 vectoreyes.workspace = true

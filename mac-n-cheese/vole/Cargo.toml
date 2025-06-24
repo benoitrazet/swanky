@@ -11,7 +11,6 @@ version.workspace = true
 workspace = true
 
 [dependencies]
-scuttlebutt.workspace = true
 ocelot.workspace = true
 vectoreyes.workspace = true
 generic-array.workspace = true
@@ -34,7 +33,6 @@ swanky-serialization.workspace = true
 
 [dev-dependencies]
 rand.workspace = true
-scuttlebutt.workspace = true
 mimalloc.workspace = true
 
 [[bench]]

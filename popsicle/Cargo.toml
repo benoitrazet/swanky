@@ -17,7 +17,6 @@ workspace = true
 
 [dependencies]
 ocelot.workspace = true
-scuttlebutt.workspace = true
 itertools.workspace = true
 rand.workspace = true
 sha2.workspace = true
