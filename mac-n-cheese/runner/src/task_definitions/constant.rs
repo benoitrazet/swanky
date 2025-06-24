@@ -1,9 +1,9 @@
 use eyre::ContextCompat;
 use mac_n_cheese_ir::compilation_format::FieldMacType;
 use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
-use scuttlebutt::serialization::{CanonicalSerialize, SequenceDeserializer};
 use std::{io::Cursor, ops::Deref, sync::Arc};
 use swanky_party::Party;
+use swanky_serialization::{CanonicalSerialize, SequenceDeserializer};
 
 use crate::{
     alloc::TaskDataBuffer,
@@ -25,7 +25,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for ConstantTask<P, T> {
 
     fn initialize(
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut scuttlebutt::AesRng,
+        _rng: &mut swanky_aes_rng::AesRng,
         vc: crate::base_vole::VoleContexts<P>,
         _num_runner_threads: usize,
     ) -> eyre::Result<Self> {
@@ -39,7 +39,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for ConstantTask<P, T> {
     fn finalize(
         self,
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut scuttlebutt::AesRng,
+        _rng: &mut swanky_aes_rng::AesRng,
     ) -> eyre::Result<()> {
         Ok(())
     }

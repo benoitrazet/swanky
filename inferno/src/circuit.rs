@@ -1,7 +1,7 @@
 use crate::secretsharing::{CorrectionSharing, LinearSharing, SecretSharing};
 use rand::{CryptoRng, Rng};
-use scuttlebutt::field::FiniteField;
 use simple_arith_circuit::{Circuit, Op};
+use swanky_field::FiniteField;
 
 /// A trait for additional functionality for circuit execution needed by inferno.
 pub(crate) trait CircuitEvaluator<F: FiniteField, const N: usize> {

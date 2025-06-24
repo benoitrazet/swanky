@@ -1,9 +1,9 @@
 //! Various utility functionalities for tests
 
 #[cfg(test)]
-use scuttlebutt::Block;
+use swanky_block::Block;
 #[cfg(test)]
-use scuttlebutt::Block512;
+use swanky_block::Block512;
 
 #[cfg(test)]
 use std::collections::HashSet;

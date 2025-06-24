@@ -6,12 +6,12 @@
 use eyre::{Result, bail, ensure};
 use generic_array::{GenericArray, typenum::Unsigned};
 use mac_n_cheese_sieve_parser::Number;
-use scuttlebutt::serialization::CanonicalSerialize;
 use std::any::{TypeId, type_name};
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::{F2, F40b, F63b};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F127p, F128p, F384p, F384q, Secp256k1, Secp256k1order};
+use swanky_serialization::CanonicalSerialize;
 
 use crate::number_to_u64;
 

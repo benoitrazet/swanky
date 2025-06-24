@@ -21,7 +21,6 @@
 - **`ocelot`**: A library for oblivious transfer protocols
 - **`popsicle`**: A library for private set intersection
 - **`schmivitz`**: A library for zero-knowledge protocols using VOLE-in-the-head
-- **`scuttlebutt`**: A library of useful multi-party computation utilities
 - **`simple-arith-circuit`**: Simple arithmetic circuit library
 - **`swanky-adversary`**: Traits describing MPC adversaries.
 - **`swanky-aes-hash`**: Correlation-robust hashing based on fixed-key AES.

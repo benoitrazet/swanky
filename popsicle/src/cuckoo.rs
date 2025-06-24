@@ -7,8 +7,8 @@
 //     the current megabin handling is an artifact of older bugs that stalled the system for large sets
 
 use crate::Error;
-use scuttlebutt::Block;
 use std::fmt::Debug;
+use swanky_block::Block;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 #[derive(Clone, Debug)]
@@ -144,7 +144,7 @@ mod tests {
     use crate::utils;
     use itertools::Itertools;
     use rand::Rng;
-    use scuttlebutt::AesRng;
+    use swanky_aes_rng::AesRng;
 
     const NHASHES: usize = 3;
     const ITEMSIZE: usize = 8;

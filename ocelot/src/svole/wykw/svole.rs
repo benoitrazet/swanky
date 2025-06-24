@@ -9,11 +9,11 @@ use rand::{
     Rng, SeedableRng,
     distributions::{Distribution, Uniform},
 };
-use scuttlebutt::{
-    AbstractChannel, AesRng, Block, Malicious, SemiHonest,
-    field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf},
-    ring::FiniteRing,
-};
+use swanky_adversary::{Malicious, SemiHonest};
+use swanky_aes_rng::AesRng;
+use swanky_block::Block;
+use swanky_channel_legacy::AbstractChannel;
+use swanky_field::{Degree, DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
 
 // LPN parameters used in the protocol. We use three stages, two sets of LPN
 // parameters for setup, and one set of LPN parameters for the extend phase.
@@ -252,7 +252,7 @@ impl<T: FiniteField> Sender<T> {
         )?;
         let spsvole = SpsSender::<T>::init(channel, pows, rng)?;
         let seed = rng.r#gen::<Block>();
-        let seed = scuttlebutt::cointoss::receive(channel, &[seed])?[0];
+        let seed = swanky_cointoss::receive(channel, &[seed])?[0];
         let lpn_rng = AesRng::from_seed(seed);
         let mut sender = Self {
             lpn_setup,
@@ -429,7 +429,7 @@ impl<T: FiniteField> Receiver<T> {
         let delta = base_receiver.delta();
         let spsvole = SpsReceiver::<T>::init(channel, pows, delta, rng)?;
         let seed = rng.r#gen::<Block>();
-        let seed = scuttlebutt::cointoss::send(channel, &[seed])?[0];
+        let seed = swanky_cointoss::send(channel, &[seed])?[0];
         let lpn_rng = AesRng::from_seed(seed);
         let mut receiver = Self {
             lpn_setup,
@@ -518,14 +518,15 @@ impl<FF: FiniteField> Malicious for Receiver<FF> {}
 #[cfg(test)]
 mod tests {
     use super::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL, Receiver, Sender};
-    use scuttlebutt::{
-        AesRng, Channel,
-        field::{F2, F40b, F61p, F128b, FiniteField, IsSubFieldOf},
-    };
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
+    use swanky_channel_legacy::Channel;
+    use swanky_field::{FiniteField, IsSubFieldOf};
+    use swanky_field_binary::{F2, F40b, F128b};
+    use swanky_field_f61p::F61p;
 
     fn test_lpn_svole_<V: IsSubFieldOf<T>, T: FiniteField>()
     where

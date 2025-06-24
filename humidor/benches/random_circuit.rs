@@ -4,11 +4,11 @@ use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput};
 use criterion::{criterion_group, criterion_main};
 use humidor::ligero::noninteractive;
 use rand::SeedableRng;
-use scuttlebutt::AesRng;
 use simple_arith_circuit::circuitgen::random_zero_circuit;
+use swanky_aes_rng::AesRng;
 
 type Hash = sha2::Sha256;
-type Field = scuttlebutt::field::F2e19x3e26;
+type Field = swanky_field_ff_primes::F2e19x3e26;
 type Prover = noninteractive::Prover<Field, Hash>;
 type Verifier = noninteractive::Verifier<Field, Hash>;
 

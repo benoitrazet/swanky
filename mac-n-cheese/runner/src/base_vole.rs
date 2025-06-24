@@ -6,12 +6,13 @@ use eyre::Context;
 use mac_n_cheese_ir::compilation_format::{FieldMacType, FieldTypeMacVisitor};
 use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
 use ocelot::svole::base_svole::{Receiver as BaseReceiver, Sender as BaseSender};
-use scuttlebutt::{AbstractChannel, AesRng};
 use std::{
     any::{Any, TypeId},
     io::{Read, Write},
     marker::PhantomData,
 };
+use swanky_aes_rng::AesRng;
+use swanky_channel_legacy::AbstractChannel;
 use swanky_party::{Party, WhichParty};
 
 pub struct VoleContext<P: Party, T: MacTypes> {
@@ -48,8 +49,8 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
     impl<'a, P: Party, C: Read + Write> FieldTypeMacVisitor for V<'a, P, C> {
         type Output = eyre::Result<()>;
         fn visit<
-            VF: scuttlebutt::field::FiniteField + scuttlebutt::field::IsSubFieldOf<TF>,
-            TF: scuttlebutt::field::FiniteField,
+            VF: swanky_field::FiniteField + swanky_field::IsSubFieldOf<TF>,
+            TF: swanky_field::FiniteField,
             S: mac_n_cheese_vole::specialization::FiniteFieldSpecialization<VF, TF>,
         >(
             self,

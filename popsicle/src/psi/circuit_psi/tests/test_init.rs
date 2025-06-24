@@ -7,8 +7,8 @@ mod tests {
         tests::*,
         utils::*,
     };
-    use scuttlebutt::AesRng;
     use std::os::unix::net::UnixStream;
+    use swanky_aes_rng::AesRng;
 
     #[test]
     fn test_psty_init_receiver_succeeded() {

@@ -1,11 +1,9 @@
 use generic_array::GenericArray;
 use generic_array::typenum::Unsigned;
-use scuttlebutt::field::{Degree, DegreeModulo, IsSubFieldOf, SmallBinaryField};
-use scuttlebutt::{
-    AesRng,
-    field::{F2, FiniteField},
-};
 use std::convert::TryFrom;
+use swanky_aes_rng::AesRng;
+use swanky_field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf};
+use swanky_field_binary::{F2, SmallBinaryField};
 use vectoreyes::{
     ExtendingCast, I32x4, SimdBase, SimdBase32, SimdBaseGatherable, U8x16, U16x8, U32x4, U32x8,
     U64x2, U64x4,
@@ -460,15 +458,15 @@ where
 
 #[test]
 fn test_f40b_lpn() {
-    small_binary_lpn_test::<scuttlebutt::field::F40b>();
+    small_binary_lpn_test::<swanky_field_binary::F40b>();
 }
 
 #[test]
 fn test_f56b_lpn() {
-    small_binary_lpn_test::<scuttlebutt::field::F56b>();
+    small_binary_lpn_test::<swanky_field_binary::F56b>();
 }
 
 #[test]
 fn test_f63b_lpn() {
-    small_binary_lpn_test::<scuttlebutt::field::F63b>();
+    small_binary_lpn_test::<swanky_field_binary::F63b>();
 }

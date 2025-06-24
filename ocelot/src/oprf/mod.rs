@@ -6,7 +6,7 @@ mod prc;
 
 use crate::{errors::Error, ot};
 use rand::{CryptoRng, Rng};
-use scuttlebutt::AbstractChannel;
+use swanky_channel_legacy::AbstractChannel;
 
 /// KKRT oblivious PRF sender using ALSZ OT extension with Chou-Orlandi as the base OT.
 pub type KkrtSender = kkrt::Sender<ot::AlszReceiver>;

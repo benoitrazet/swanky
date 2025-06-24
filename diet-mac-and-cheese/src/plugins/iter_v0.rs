@@ -237,7 +237,7 @@ impl Plugin for IterV0 {
 #[cfg(test)]
 mod tests {
     use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
-    use scuttlebutt::field::F61p;
+    use swanky_field_f61p::F61p;
 
     use crate::{
         backend_multifield::tests::{

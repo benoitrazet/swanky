@@ -4,8 +4,9 @@ use popsicle::circuit_psi::{
 
 use fancy_garbling::Fancy;
 use rand::Rng;
-use scuttlebutt::{AesRng, Block};
 use std::{os::unix::net::UnixStream, thread};
+use swanky_aes_rng::AesRng;
+use swanky_block::Block;
 const SET_SIZE: usize = 1 << 8;
 
 pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {

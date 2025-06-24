@@ -1,6 +1,6 @@
 use std::io::Result;
 
-use scuttlebutt::AbstractChannel;
+use swanky_channel_legacy::AbstractChannel;
 use swanky_field::FiniteField;
 
 /// A Fiat-Shamir channel-wrapper.

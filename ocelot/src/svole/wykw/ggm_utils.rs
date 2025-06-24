@@ -1,6 +1,6 @@
 //! Provides an implementation of the GGM construction.
 
-use scuttlebutt::field::{FiniteField, IsSubFieldOf};
+use swanky_field::{FiniteField, IsSubFieldOf};
 use vectoreyes::{
     Aes128EncryptOnly, AesBlockCipher, SimdBase, U8x16, array_utils::ArrayUnrolledExt,
 };
@@ -15,7 +15,7 @@ pub const fn ggm_temporary_storage_size(depth: usize) -> usize {
 /// `depth` levels and return the node values (a.k.a seeds). `aes` is used to
 /// seed the "PRGs" used internally so we don't need to instantiate new PRGs on
 /// each iteration. Instead, we key two instances of AES ahead of time and view
-/// them as PRPs, using the seed as input. We then use the [scuttlebutt::AesHash::cr_hash]
+/// them as PRPs, using the seed as input. We then use the [swanky_aes_hash::AesHash::cr_hash]
 /// construction on top of AES.
 ///
 /// `keys_out` **WILL NOT** be `clear()`ed. Results will be appended to it.
@@ -330,10 +330,10 @@ pub fn ggm_prime<
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    use scuttlebutt::{
-        field::{F2, F61p, F63b, F128b, FiniteField},
-        utils::unpack_bits,
-    };
+    use swanky_bytearray_utils::unpack_bits;
+    use swanky_field::FiniteField;
+    use swanky_field_binary::{F2, F63b, F128b};
+    use swanky_field_f61p::F61p;
 
     fn test_ggm_<VF: FiniteField + IsSubFieldOf<FE>, FE: FiniteField>(
         depth: usize,

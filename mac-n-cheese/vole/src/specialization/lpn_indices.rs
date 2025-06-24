@@ -1,5 +1,6 @@
-use scuttlebutt::{AesRng, field::FiniteField};
 use std::convert::TryFrom;
+use swanky_aes_rng::AesRng;
+use swanky_field::FiniteField;
 use vectoreyes::{
     SimdBase, SimdBase4x64, SimdBase8, SimdBase8x, SimdBase32, U8x32, U16x8, U16x16, U32x8, U64x4,
     array_utils::ArrayUnrolledExt,

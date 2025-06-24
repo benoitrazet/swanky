@@ -1,8 +1,9 @@
 #![allow(clippy::all)]
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{AllWire, util::RngExt};
-use scuttlebutt::{AesRng, Block};
 use std::time::Duration;
+use swanky_aes_rng::AesRng;
+use swanky_block::Block;
 
 use fancy_garbling::WireLabel;
 

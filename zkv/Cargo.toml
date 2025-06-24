@@ -20,5 +20,7 @@ clap.workspace = true
 log.workspace = true
 env_logger.workspace = true
 inferno.workspace = true
-scuttlebutt = { workspace = true, features = ["serde"] }
 simple-arith-circuit.workspace = true
+swanky-aes-rng.workspace = true
+swanky-field.workspace = true
+swanky-field-binary.workspace = true

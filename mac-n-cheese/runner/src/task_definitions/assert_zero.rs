@@ -6,8 +6,8 @@ use mac_n_cheese_ir::compilation_format::wire_format::AssertZeroPrototypeWireFor
 use mac_n_cheese_vole::mac::Mac;
 use mac_n_cheese_vole::mac::MacTypes;
 use parking_lot::Mutex;
-use scuttlebutt::serialization::CanonicalSerialize;
 use swanky_party::Party;
+use swanky_serialization::CanonicalSerialize;
 use vectoreyes::SimdBase;
 use vectoreyes::U8x32;
 
@@ -27,7 +27,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertZeroTask<P, T> {
 
     fn initialize(
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut scuttlebutt::AesRng,
+        _rng: &mut swanky_aes_rng::AesRng,
         _vc: crate::base_vole::VoleContexts<P>,
         num_runner_threads: usize,
     ) -> eyre::Result<Self> {
@@ -44,7 +44,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertZeroTask<P, T> {
     fn finalize(
         mut self,
         c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut scuttlebutt::AesRng,
+        _rng: &mut swanky_aes_rng::AesRng,
     ) -> eyre::Result<()> {
         let mut acu = U8x32::ZERO;
         for out in self.hash_outputs.iter_mut() {

@@ -13,8 +13,6 @@ use eyre::{Result, WrapErr, bail};
 use log::info;
 use mac_n_cheese_sieve_parser::RelationReader as RR;
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
-use scuttlebutt::field::{F2, F40b};
-use scuttlebutt::{AesRng, Channel, SyncChannel};
 use std::env;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
@@ -22,6 +20,9 @@ use std::marker::PhantomData;
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::time::Instant;
+use swanky_aes_rng::AesRng;
+use swanky_channel_legacy::{Channel, SyncChannel};
+use swanky_field_binary::{F2, F40b};
 use swanky_party::{Party, Prover, Verifier, WhichParty};
 
 #[cfg(feature = "jemalloc")]

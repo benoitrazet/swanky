@@ -8,7 +8,7 @@ pub enum Error {
     /// Some other error, given by `String`.
     Other(String),
     /// Coin tossing failed.
-    CoinTossError(scuttlebutt::cointoss::Error),
+    CoinTossError(swanky_cointoss::Error),
     /// Correlation check failed i.e, `w != u'Δ + v`.
     CorrelationCheckFailed,
     /// EQ check failed.
@@ -25,8 +25,8 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<scuttlebutt::cointoss::Error> for Error {
-    fn from(e: scuttlebutt::cointoss::Error) -> Error {
+impl From<swanky_cointoss::Error> for Error {
+    fn from(e: swanky_cointoss::Error) -> Error {
         Error::CoinTossError(e)
     }
 }

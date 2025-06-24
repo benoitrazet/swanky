@@ -1,4 +1,4 @@
-use scuttlebutt::Block;
+use swanky_block::Block;
 
 #[inline]
 #[cfg(not(target_arch = "x86_64"))]

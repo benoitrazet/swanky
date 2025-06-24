@@ -11,8 +11,8 @@ use crate::{
 
 use eyre::{Result, bail};
 use generic_array::GenericArray;
-use scuttlebutt::AesRng;
 use std::marker::PhantomData;
+use swanky_aes_rng::AesRng;
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField};
 use swanky_field_binary::{F2, F40b};
 use swanky_party::{Party, WhichParty, private::ProverPrivateCopy};

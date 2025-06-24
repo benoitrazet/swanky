@@ -13,12 +13,12 @@ use rand::{
     CryptoRng, Rng, SeedableRng,
     distributions::{Distribution, Uniform},
 };
-use scuttlebutt::{
-    AbstractChannel, AesRng, Block, Malicious,
-    field::{Degree, FiniteField as FF},
-    ring::FiniteRing,
-    utils::unpack_bits,
-};
+use swanky_adversary::Malicious;
+use swanky_aes_rng::AesRng;
+use swanky_block::Block;
+use swanky_bytearray_utils::unpack_bits;
+use swanky_channel_legacy::AbstractChannel;
+use swanky_field::{Degree, FiniteField as FF, FiniteRing};
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 pub(super) struct Sender<OT: OtReceiver + Malicious, FE: FF> {
@@ -93,7 +93,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         let ot = OT::init(channel, rng)?;
         let seed0 = rng.r#gen::<Block>();
         let seed1 = rng.r#gen::<Block>();
-        let seeds = scuttlebutt::cointoss::send(channel, &[seed0, seed1])?;
+        let seeds = swanky_cointoss::send(channel, &[seed0, seed1])?;
         let aes0 = Aes128EncryptOnly::new_with_key(seeds[0]);
         let aes1 = Aes128EncryptOnly::new_with_key(seeds[1]);
         Ok(Self {
@@ -246,7 +246,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         let ot = OT::init(channel, &mut rng)?;
         let seed0 = rng.r#gen::<Block>();
         let seed1 = rng.r#gen::<Block>();
-        let seeds = scuttlebutt::cointoss::receive(channel, &[seed0, seed1])?;
+        let seeds = swanky_cointoss::receive(channel, &[seed0, seed1])?;
         let aes0 = Aes128EncryptOnly::new_with_key(seeds[0]);
         let aes1 = Aes128EncryptOnly::new_with_key(seeds[1]);
         Ok(Self {
@@ -365,14 +365,15 @@ mod test {
         SpsReceiver, SpsSender,
     };
     use generic_array::typenum::Unsigned;
-    use scuttlebutt::{
-        AesRng, Channel,
-        field::{Degree, F40b, F61p, F128b, FiniteField as FF},
-    };
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_aes_rng::AesRng;
+    use swanky_channel_legacy::Channel;
+    use swanky_field::{Degree, FiniteField as FF};
+    use swanky_field_binary::{F40b, F128b};
+    use swanky_field_f61p::F61p;
 
     fn test_spsvole_<FE: FF>(cols: usize, weight: usize) {
         let r = Degree::<FE>::USIZE;

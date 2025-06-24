@@ -135,7 +135,8 @@ mod tests {
 
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::{Rng, seq::SliceRandom};
-    use scuttlebutt::{AesRng, Channel};
+    use swanky_aes_rng::AesRng;
+    use swanky_channel_legacy::Channel;
     use swanky_field::{FiniteField, FiniteRing};
     use swanky_field_binary::{F2, F40b};
     use swanky_field_f61p::F61p;

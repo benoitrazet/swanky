@@ -1,6 +1,6 @@
 use eyre::Result;
 
-use scuttlebutt::AbstractChannel;
+use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::{
     Party, WhichParty,

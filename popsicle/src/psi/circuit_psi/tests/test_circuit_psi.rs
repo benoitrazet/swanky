@@ -9,8 +9,9 @@ mod tests {
         utils::*,
         *,
     };
-    use scuttlebutt::{AesRng, Block};
     use std::{collections::HashSet, os::unix::net::UnixStream, thread};
+    use swanky_aes_rng::AesRng;
+    use swanky_block::Block;
 
     // Computes the cardinality of the intersection in the clear
     pub fn cardinality_in_clear(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> usize {
