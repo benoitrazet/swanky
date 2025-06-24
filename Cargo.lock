@@ -2525,6 +2525,7 @@ dependencies = [
  "eyre",
  "generic-array 1.2.0",
  "proptest",
+ "swanky-party",
  "swanky-serialization",
 ]
 
