@@ -333,4 +333,16 @@ mod tests {
         assert!(!validation_a);
         assert!(!validation_b);
     }
+    #[test]
+    fn tampered_party_a_share_fails() {
+        let nshares = 1000;
+        let index = rand::thread_rng().gen_range(0..1000);
+        let (mut output_a, output_b, generator_a, generator_b) = generate(nshares);
+        let (output_c, _output_d, _generator_c, _generator_d) = generate(nshares);
+        output_a[index] = output_c[index];
+        let (validation_a, validation_b, _, _) =
+            validate(generator_a, generator_b, output_a, output_b);
+        assert!(!validation_a);
+        assert!(!validation_b);
+    }
 }
