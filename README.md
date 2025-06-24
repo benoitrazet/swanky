@@ -23,9 +23,15 @@
 - **`schmivitz`**: A library for zero-knowledge protocols using VOLE-in-the-head
 - **`scuttlebutt`**: A library of useful multi-party computation utilities
 - **`simple-arith-circuit`**: Simple arithmetic circuit library
+- **`swanky-adversary`**: Traits describing MPC adversaries.
+- **`swanky-aes-hash`**: Correlation-robust hashing based on fixed-key AES.
 - **`swanky-aes-rng`**: A random number generator based on AES-CTR.
 - **`swanky-authenticated-bits`**: A package for generating authenticated bits
+- **`swanky-block`**: 128-, 256-, and  512-bit data blocks.
+- **`swanky-bytearray-utils`**: Functions for working with bits and bytearrays.
 - **`swanky-channel`**: A channel abstraction to let users avoid manual flushing
+- **`swanky-channel-legacy`**: A (legacy) channel abstraction; use `swanky-channel` for new code!
+- **`swanky-cointoss`**: A simple coin-tossing protocol.
 - **`swanky-field`**: Definitions of the core `FiniteField` and `FiniteRing` traits
 - **`swanky-field-binary`**: Binary finite (extension) fields
 - **`swanky-field-f61p`**: An implementation of `GF(2^61-1)`
