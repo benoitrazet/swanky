@@ -4,7 +4,6 @@
 //! This implementation uses the Ristretto prime order elliptic curve group from
 //! the `curve25519-dalek` library.
 
-use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
 use curve25519_dalek::{
     constants::RISTRETTO_BASEPOINT_TABLE, ristretto::RistrettoPoint, scalar::Scalar,
 };
@@ -13,6 +12,7 @@ use swanky_adversary::SemiHonest;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_ocelot_error::Error;
+use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
 
 /// Oblivious transfer sender.
 pub struct Sender {}

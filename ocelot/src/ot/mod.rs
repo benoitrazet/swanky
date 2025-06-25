@@ -19,16 +19,14 @@ pub mod kos_delta;
 pub mod naor_pinkas;
 
 use curve25519_dalek::RistrettoPoint;
-use rand::{CryptoRng, Rng};
 use swanky_block::Block;
-use swanky_channel_legacy::AbstractChannel;
-use swanky_ocelot_error::Error;
 
 pub(crate) fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Block {
     let h = blake3::keyed_hash(pt.compress().as_bytes(), &tweak.to_le_bytes());
     Block::from(<[u8; 16]>::try_from(&h.as_bytes()[0..16]).unwrap())
 }
 
+pub use swanky_ot_traits::*;
 /// Instantiation of the Chou-Orlandi OT sender.
 pub type ChouOrlandiSender = chou_orlandi::Sender;
 /// Instantiation of the Chou-Orlandi OT receiver.
@@ -53,130 +51,6 @@ pub type KosReceiver = kos::Receiver<ChouOrlandiSender>;
 pub type KosDeltaSender = kos_delta::Sender<ChouOrlandiReceiver>;
 /// Instantiation of the KOS Delta-OT extension receiver, using Chou-Orlandi as the base OT.
 pub type KosDeltaReceiver = kos_delta::Receiver<ChouOrlandiSender>;
-
-/// Trait for one-out-of-two oblivious transfer from the sender's point-of-view.
-pub trait Sender
-where
-    Self: Sized,
-{
-    /// Message type, restricted to types that are mutably-dereferencable as
-    /// `u8` arrays.
-    type Msg: Sized + AsMut<[u8]>;
-    /// Runs any one-time initialization to create the oblivious transfer
-    /// object.
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error>;
-    /// Sends messages.
-    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        inputs: &[(Self::Msg, Self::Msg)],
-        rng: &mut RNG,
-    ) -> Result<(), Error>;
-}
-
-/// Trait for initializing an oblivious transfer object with a fixed key.
-pub trait FixedKeyInitializer
-where
-    Self: Sized,
-{
-    /// Runs any one-time initialization to create the oblivious transfer
-    /// object with a fixed key.
-    fn init_fixed_key<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        s_: [u8; 16],
-        rng: &mut RNG,
-    ) -> Result<Self, Error>;
-}
-
-/// Trait for one-out-of-two oblivious transfer from the receiver's
-/// point-of-view.
-pub trait Receiver
-where
-    Self: Sized,
-{
-    /// Message type, restricted to types that are mutably-dereferencable as
-    /// `u8` arrays.
-    type Msg: Sized + AsMut<[u8]>;
-    /// Runs any one-time initialization to create the oblivious transfer
-    /// object.
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self, Error>;
-    /// Receives messages.
-    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        inputs: &[bool],
-        rng: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error>;
-}
-
-/// Trait for one-out-of-two _correlated_ oblivious transfer from the sender's
-/// point-of-view.
-pub trait CorrelatedSender: Sender
-where
-    Self: Sized,
-{
-    /// Correlated oblivious transfer send. Takes as input a $\Delta$ value
-    /// which specifies the offset between the zero and one message.
-    fn send_correlated<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        m: usize,
-        delta: Self::Msg,
-        rng: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error>;
-}
-
-/// Trait for one-out-of-two _correlated_ oblivious transfer from the receiver's
-/// point-of-view.
-pub trait CorrelatedReceiver: Receiver
-where
-    Self: Sized,
-{
-    /// Correlated oblivious transfer receive.
-    fn receive_correlated<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        inputs: &[bool],
-        rng: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error>;
-}
-
-/// Trait for one-out-of-two _random_ oblivious transfer from the sender's
-/// point-of-view.
-pub trait RandomSender: Sender
-where
-    Self: Sized,
-{
-    /// Random oblivious transfer send. Returns a vector of tuples containing
-    /// the two random messages.
-    fn send_random<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        m: usize,
-        rng: &mut RNG,
-    ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error>;
-}
-
-/// Trait for one-out-of-two _random_ oblivious transfer from the receiver's
-/// point-of-view.
-pub trait RandomReceiver: Receiver
-where
-    Self: Sized,
-{
-    /// Random oblivious transfer receive.
-    fn receive_random<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        deltas: &[bool],
-        rng: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error>;
-}
 
 #[cfg(test)]
 mod tests {

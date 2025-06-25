@@ -49,7 +49,7 @@ impl AlszSender {
     pub(super) fn init<
         C: AbstractChannel,
         RNG: CryptoRng + Rng,
-        BaseOtReceiver: crate::ot::Receiver<Msg = Block>,
+        BaseOtReceiver: swanky_ot_traits::Receiver<Msg = Block>,
     >(
         channel: &mut C,
         rng: &mut RNG,
@@ -125,7 +125,7 @@ impl AlszReceiver {
     pub(super) fn init<
         C: AbstractChannel,
         RNG: CryptoRng + Rng,
-        BaseOtSender: crate::ot::Sender<Msg = Block>,
+        BaseOtSender: swanky_ot_traits::Sender<Msg = Block>,
     >(
         channel: &mut C,
         rng: &mut RNG,

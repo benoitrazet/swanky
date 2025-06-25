@@ -3,13 +3,6 @@
 
 #![allow(non_upper_case_globals)]
 
-use crate::{
-    ot::FixedKeyInitializer,
-    ot::{
-        CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
-        Sender as OtSender,
-    },
-};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
@@ -19,6 +12,10 @@ use swanky_block::Block;
 use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_ocelot_error::Error;
+use swanky_ot_traits::{
+    CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
+    Receiver as OtReceiver, Sender as OtSender,
+};
 
 /// Oblivious transfer sender.
 pub struct Sender<OT: OtReceiver<Msg = Block> + SemiHonest> {

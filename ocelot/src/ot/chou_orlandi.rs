@@ -11,7 +11,6 @@
 //! produced by the protocol will be the same. We fix this by hashing in `i`
 //! during the key derivation phase.
 
-use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
 use curve25519_dalek::{
     constants::RISTRETTO_BASEPOINT_TABLE,
     ristretto::{RistrettoBasepointTable, RistrettoPoint},
@@ -22,6 +21,7 @@ use swanky_adversary::{Malicious, SemiHonest};
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_ocelot_error::Error;
+use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
 
 /// Oblivious transfer sender.
 pub struct Sender {

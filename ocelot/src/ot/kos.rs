@@ -1,14 +1,7 @@
 //! Implementation of the Keller-Orsini-Scholl oblivious transfer extension
 //! protocol (cf. <https://eprint.iacr.org/2015/546>).
 
-use crate::{
-    ot::FixedKeyInitializer,
-    ot::{
-        CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
-        Sender as OtSender,
-        alsz::{Receiver as AlszReceiver, Sender as AlszSender},
-    },
-};
+use crate::ot::alsz::{Receiver as AlszReceiver, Sender as AlszSender};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::io::ErrorKind;
 use swanky_adversary::{Malicious, SemiHonest};
@@ -17,6 +10,10 @@ use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cointoss;
 use swanky_ocelot_error::Error;
+use swanky_ot_traits::{
+    CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
+    Receiver as OtReceiver, Sender as OtSender,
+};
 
 // The statistical security parameter.
 const SSP: usize = 40;

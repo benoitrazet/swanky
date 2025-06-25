@@ -1751,6 +1751,7 @@ dependencies = [
  "swanky-field-binary",
  "swanky-field-f61p",
  "swanky-ocelot-error",
+ "swanky-ot-traits",
  "vectoreyes",
 ]
 
@@ -2725,6 +2726,15 @@ name = "swanky-ocelot-error"
 version = "0.6.0"
 dependencies = [
  "swanky-cointoss",
+]
+
+[[package]]
+name = "swanky-ot-traits"
+version = "0.6.0"
+dependencies = [
+ "rand 0.8.5",
+ "swanky-channel-legacy",
+ "swanky-ocelot-error",
 ]
 
 [[package]]
