@@ -6,7 +6,6 @@
 - **`bristol-fashion`**: A parser for Bristol Fashion circuits.
 - **`diet-mac-and-cheese`**: A diet version of the Mac'n'Cheese protocol
 - **`fancy-garbling`**: A library for boolean and arithmetic garbling
-- **`fancy-garbling-base-conversion`**: Lookup tables useful for the fancy-garbling crate
 - **`humidor`**: A test-bed for Ligero-like protocols
 - **`inferno`**: An implementation of the Limbo zero knowledge proof protocol
 - **`keyed_arena`**: Bump allocator which allows for random access to its allocations

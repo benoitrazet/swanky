@@ -783,7 +783,6 @@ version = "0.6.0"
 dependencies = [
  "clap",
  "criterion",
- "fancy-garbling-base-conversion",
  "itertools 0.14.0",
  "ocelot",
  "rand 0.8.5",
@@ -797,13 +796,6 @@ dependencies = [
  "swanky-block",
  "swanky-channel-legacy",
  "vectoreyes",
-]
-
-[[package]]
-name = "fancy-garbling-base-conversion"
-version = "0.6.0"
-dependencies = [
- "cc",
 ]
 
 [[package]]

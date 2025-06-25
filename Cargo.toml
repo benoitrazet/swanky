@@ -7,7 +7,6 @@ members = [
   "diet-mac-and-cheese/web-mac-and-cheese/wasm",
   "diet-mac-and-cheese/web-mac-and-cheese/websocket",
   "fancy-garbling",
-  "fancy-garbling/base_conversion",
   "humidor",
   "inferno",
   "keyed_arena",
@@ -44,7 +43,6 @@ derived_hash_with_manual_eq = "allow"
 bristol-fashion = { path = "bristol-fashion" }
 diet-mac-and-cheese = { path = "diet-mac-and-cheese" }
 fancy-garbling = { path = "fancy-garbling" }
-fancy-garbling-base-conversion = { path = "fancy-garbling/base_conversion" }
 humidor = { path = "humidor" }
 inferno = { path = "inferno" }
 keyed_arena = { path = "keyed_arena" }
