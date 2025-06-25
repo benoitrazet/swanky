@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 //! Implementation of the Chou-Orlandi oblivious transfer protocol (cf.
 //! <https://eprint.iacr.org/2015/267>).
 //!
@@ -22,6 +23,11 @@ use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_ocelot_error::Error;
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
+
+fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Block {
+    let h = blake3::keyed_hash(pt.compress().as_bytes(), &tweak.to_le_bytes());
+    Block::from(<[u8; 16]>::try_from(&h.as_bytes()[0..16]).unwrap())
+}
 
 /// Oblivious transfer sender.
 pub struct Sender {
@@ -55,8 +61,8 @@ impl OtSender for Sender {
             .map(|i| {
                 let r = channel.read_pt()?;
                 let yr = self.y * r;
-                let k0 = super::hash_pt(self.counter + i as u128, &yr);
-                let k1 = super::hash_pt(self.counter + i as u128, &(yr - ys));
+                let k0 = hash_pt(self.counter + i as u128, &yr);
+                let k1 = hash_pt(self.counter + i as u128, &(yr - ys));
                 Ok((k0, k1))
             })
             .collect::<Result<Vec<(Block, Block)>, Error>>()?;
@@ -112,7 +118,7 @@ impl OtReceiver for Receiver {
                 let c = if *b { one } else { zero };
                 let r = c + &x * RISTRETTO_BASEPOINT_TABLE;
                 channel.write_pt(&r)?;
-                Ok(super::hash_pt(self.counter + i as u128, &(&x * &self.s)))
+                Ok(hash_pt(self.counter + i as u128, &(&x * &self.s)))
             })
             .collect::<Result<Vec<Block>, Error>>()?;
         channel.flush()?;

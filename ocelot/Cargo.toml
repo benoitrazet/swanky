@@ -39,6 +39,7 @@ swanky-bit-matrix-transpose.workspace = true
 swanky-deprecated-bitwise-utils.workspace = true
 swanky-ot-traits.workspace = true
 swanky-ot-dummy.workspace = true
+swanky-ot-chou-orlandi.workspace = true
 
 [build-dependencies]
 cc.workspace = true

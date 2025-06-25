@@ -40,6 +40,7 @@
 - **`swanky-field-test`**: Utilitites for testing correctness of finite field implementations
 - **`swanky-flatbuffer-build`**: Tooling to automate compiling flatbuffer schemas
 - **`swanky-ocelot-error`**: [DEPRECATED] An error type used by crates formerly contained in ocelot
+- **`swanky-ot-chou-orlandi`**: An implementation of the Chou-Orlandi OT protocol
 - **`swanky-ot-dummy`**: Implementation of an insecure OT protocol for testing purposes
 - **`swanky-ot-test`**: Testing utilities for oblivious transfer protocols
 - **`swanky-ot-traits`**: Base traits for Obliivious Transfer protocols

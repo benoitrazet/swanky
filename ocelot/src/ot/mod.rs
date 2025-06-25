@@ -11,7 +11,6 @@
 //!
 
 pub mod alsz;
-pub mod chou_orlandi;
 pub mod explicit_round;
 pub mod kos;
 pub mod kos_delta;
@@ -25,11 +24,12 @@ pub(crate) fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Block {
     Block::from(<[u8; 16]>::try_from(&h.as_bytes()[0..16]).unwrap())
 }
 
+pub use swanky_ot_chou_orlandi as chou_orlandi;
 pub use swanky_ot_traits::*;
 /// Instantiation of the Chou-Orlandi OT sender.
-pub type ChouOrlandiSender = chou_orlandi::Sender;
+pub type ChouOrlandiSender = swanky_ot_chou_orlandi::Sender;
 /// Instantiation of the Chou-Orlandi OT receiver.
-pub type ChouOrlandiReceiver = chou_orlandi::Receiver;
+pub type ChouOrlandiReceiver = swanky_ot_chou_orlandi::Receiver;
 /// Instantiation of the dummy OT sender.
 pub type DummySender = swanky_ot_dummy::Sender;
 /// Instantiation of the dummy OT receiver.

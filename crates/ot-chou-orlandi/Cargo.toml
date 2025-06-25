@@ -1,0 +1,25 @@
+[package]
+name = "swanky-ot-chou-orlandi"
+description = "An implementation of the Chou-Orlandi OT protocol"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+curve25519-dalek.workspace = true
+rand.workspace = true
+swanky-adversary.workspace = true
+swanky-block.workspace = true
+swanky-channel-legacy.workspace = true
+swanky-ocelot-error.workspace = true
+swanky-ot-traits.workspace = true
+blake3.workspace = true
+
+[dev-dependencies]
+swanky-ot-test.workspace = true
+
