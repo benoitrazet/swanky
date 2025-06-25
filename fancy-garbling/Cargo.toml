@@ -21,7 +21,6 @@ doctest = false
 serde = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
-fancy-garbling-base-conversion.workspace = true
 ocelot.workspace = true
 vectoreyes.workspace = true
 itertools.workspace = true
