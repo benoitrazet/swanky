@@ -79,6 +79,7 @@ swanky-flatbuffer-build = { path = "crates/flatbuffer-build" }
 swanky-ocelot-error = { path = "crates/ocelot-error" }
 swanky-ot-chou-orlandi = { path = "crates/ot-chou-orlandi" }
 swanky-ot-dummy = { path = "crates/ot-dummy" }
+swanky-ot-noar-pinkas = { path = "crates/ot-noar-pinkas" }
 swanky-ot-test = { path = "crates/ot-test" }
 swanky-ot-traits = { path = "crates/ot-traits" }
 swanky-party = { path = "crates/party" }

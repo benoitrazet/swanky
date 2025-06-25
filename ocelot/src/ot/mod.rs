@@ -14,15 +14,7 @@ pub mod alsz;
 pub mod explicit_round;
 pub mod kos;
 pub mod kos_delta;
-pub mod naor_pinkas;
-
-use curve25519_dalek::RistrettoPoint;
-use swanky_block::Block;
-
-pub(crate) fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Block {
-    let h = blake3::keyed_hash(pt.compress().as_bytes(), &tweak.to_le_bytes());
-    Block::from(<[u8; 16]>::try_from(&h.as_bytes()[0..16]).unwrap())
-}
+pub use swanky_ot_noar_pinkas as naor_pinkas;
 
 pub use swanky_ot_chou_orlandi as chou_orlandi;
 pub use swanky_ot_traits::*;

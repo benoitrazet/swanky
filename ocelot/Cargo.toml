@@ -40,6 +40,7 @@ swanky-deprecated-bitwise-utils.workspace = true
 swanky-ot-traits.workspace = true
 swanky-ot-dummy.workspace = true
 swanky-ot-chou-orlandi.workspace = true
+swanky-ot-noar-pinkas.workspace = true
 
 [build-dependencies]
 cc.workspace = true

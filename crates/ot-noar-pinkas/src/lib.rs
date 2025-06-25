@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 //! Implementation of the Naor-Pinkas oblivious transfer protocol (cf.
 //! <https://dl.acm.org/citation.cfm?id=365502>).
 //!
@@ -13,6 +14,11 @@ use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_ocelot_error::Error;
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
+
+pub(crate) fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Block {
+    let h = blake3::keyed_hash(pt.compress().as_bytes(), &tweak.to_le_bytes());
+    Block::from(<[u8; 16]>::try_from(&h.as_bytes()[0..16]).unwrap())
+}
 
 /// Oblivious transfer sender.
 pub struct Sender {}
@@ -51,9 +57,9 @@ impl OtSender for Sender {
         for (i, (input, pk)) in inputs.iter().zip(pks.into_iter()).enumerate() {
             let r = Scalar::random(&mut rng);
             let ei0 = &r * RISTRETTO_BASEPOINT_TABLE;
-            let h = super::hash_pt(i as u128, &(pk.0 * r));
+            let h = hash_pt(i as u128, &(pk.0 * r));
             let e01 = h ^ input.0;
-            let h = super::hash_pt(i as u128, &(pk.1 * r));
+            let h = hash_pt(i as u128, &(pk.1 * r));
             let e11 = h ^ input.1;
             channel.write_pt(&ei0)?;
             channel.write_block(&e01)?;
@@ -116,7 +122,7 @@ impl OtReceiver for Receiver {
                     false => e01,
                     true => e11,
                 };
-                let h = super::hash_pt(i as u128, &(ei0 * k));
+                let h = hash_pt(i as u128, &(ei0 * k));
                 Ok(h ^ e1)
             })
             .collect()
