@@ -12,7 +12,6 @@
 
 pub mod alsz;
 pub mod chou_orlandi;
-pub mod dummy;
 pub mod explicit_round;
 pub mod kos;
 pub mod kos_delta;
@@ -32,9 +31,9 @@ pub type ChouOrlandiSender = chou_orlandi::Sender;
 /// Instantiation of the Chou-Orlandi OT receiver.
 pub type ChouOrlandiReceiver = chou_orlandi::Receiver;
 /// Instantiation of the dummy OT sender.
-pub type DummySender = dummy::Sender;
+pub type DummySender = swanky_ot_dummy::Sender;
 /// Instantiation of the dummy OT receiver.
-pub type DummyReceiver = dummy::Receiver;
+pub type DummyReceiver = swanky_ot_dummy::Receiver;
 /// Instantiation of the Naor-Pinkas OT sender.
 pub type NaorPinkasSender = naor_pinkas::Sender;
 /// Instantiation of the Naor-Pinkas OT receiver.

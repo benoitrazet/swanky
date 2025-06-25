@@ -1,5 +1,5 @@
-//! Implementation of an **entirely insecure** oblivious transfer protocol for
-//! testing purposes.
+#![deny(missing_docs)]
+//! Implementation of an insecure OT protocol for testing purposes
 
 use rand::{CryptoRng, Rng};
 use swanky_block::Block;
