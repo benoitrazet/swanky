@@ -35,6 +35,8 @@ swanky-channel-legacy.workspace = true
 swanky-cointoss.workspace = true
 swanky-field.workspace = true
 swanky-ocelot-error.workspace = true
+swanky-bit-matrix-transpose.workspace = true
+swanky-deprecated-bitwise-utils.workspace = true
 
 [build-dependencies]
 cc.workspace = true

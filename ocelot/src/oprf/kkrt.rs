@@ -8,7 +8,6 @@ use super::prc::PseudorandomCode;
 use crate::{
     oprf::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender},
     ot::{Receiver as OtReceiver, Sender as OtSender},
-    utils,
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::marker::PhantomData;
@@ -44,7 +43,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
         let mut ot = OT::init(channel, rng)?;
         let mut s_ = [0u8; 64];
         rng.fill_bytes(&mut s_);
-        let s = utils::u8vec_to_boolvec(&s_);
+        let s = swanky_deprecated_bitwise_utils::u8vec_to_boolvec(&s_);
         let seeds = (0..4).map(|_| rng.r#gen()).collect::<Vec<Block>>();
         let keys = swanky_cointoss::send(channel, &seeds)?;
         let code = PseudorandomCode::new(keys[0], keys[1], keys[2], keys[3]);
@@ -86,7 +85,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
             channel.read_bytes(&mut t1)?;
             scutils::xor_inplace(q, if *b { &t1 } else { &t0 });
         }
-        let qs = utils::transpose(&qs, ncols, nrows);
+        let qs = swanky_bit_matrix_transpose::transpose(&qs, ncols, nrows);
         let seeds = qs
             .chunks(ncols / 8)
             .map(|q| q.try_into().unwrap())
@@ -185,8 +184,8 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
             self.code.encode(*input, (&mut c).into());
             scutils::xor_inplace(t1, c.as_ref());
         }
-        let t0s = utils::transpose(&t0s, nrows, ncols);
-        let t1s = utils::transpose(&t1s, nrows, ncols);
+        let t0s = swanky_bit_matrix_transpose::transpose(&t0s, nrows, ncols);
+        let t1s = swanky_bit_matrix_transpose::transpose(&t1s, nrows, ncols);
         let mut t = vec![0u8; nrows / 8];
         for j in 0..self.rngs.len() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;

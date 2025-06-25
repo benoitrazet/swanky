@@ -1,4 +1,5 @@
-use swanky_block::Block;
+#![deny(missing_docs)]
+//! Transpose a bit matrix
 
 #[inline]
 #[cfg(not(target_arch = "x86_64"))]
@@ -45,6 +46,8 @@ fn transpose_naive(input: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
     output
 }
 
+/// Treat `m` as a `nrows` by `ncols` matrix of bits, and transpose it, writing the result to
+/// `dst`.
 pub fn transpose_pre_allocated(m: &[u8], dst: &mut [u8], nrows: usize, ncols: usize) {
     assert_eq!(dst.len(), nrows * ncols / 8);
     assert_eq!(m.len(), nrows * ncols / 8);
@@ -58,6 +61,8 @@ pub fn transpose_pre_allocated(m: &[u8], dst: &mut [u8], nrows: usize, ncols: us
     }
 }
 
+/// Treat `m` as a `nrows` by `ncols` matrix of bits, and transpose it, returning the result as a
+/// new vector.
 #[inline]
 pub fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
     #[cfg(not(target_arch = "x86_64"))]
@@ -205,31 +210,6 @@ unsafe extern "C" {
 //     output
 // }
 
-#[inline]
-pub fn boolvec_to_u8vec(bv: &[bool]) -> Vec<u8> {
-    let offset = if bv.len() % 8 == 0 { 0 } else { 1 };
-    let mut v = vec![0u8; bv.len() / 8 + offset];
-    for (i, b) in bv.iter().enumerate() {
-        v[i / 8] |= (*b as u8) << (i % 8);
-    }
-    v
-}
-#[inline]
-pub fn u8vec_to_boolvec(v: &[u8]) -> Vec<bool> {
-    let mut bv = Vec::with_capacity(v.len() * 8);
-    for byte in v.iter() {
-        for i in 0..8 {
-            bv.push((1 << i) & byte != 0);
-        }
-    }
-    bv
-}
-
-#[inline(always)]
-pub fn xor_two_blocks(x: &(Block, Block), y: &(Block, Block)) -> (Block, Block) {
-    (x.0 ^ y.0, x.1 ^ y.1)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -257,23 +237,5 @@ mod tests {
         _transpose(128, 1 << 18);
         _transpose(32, 32);
         _transpose(64, 32);
-    }
-
-    #[test]
-    fn test_boolvec_to_u8vec() {
-        let v = (0..128)
-            .map(|_| rand::random::<bool>())
-            .collect::<Vec<bool>>();
-        let v_ = boolvec_to_u8vec(&v);
-        let v__ = u8vec_to_boolvec(&v_);
-        assert_eq!(v, v__);
-    }
-
-    #[test]
-    fn test_u8vec_to_boolvec() {
-        let v = (0..128).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
-        let v_ = u8vec_to_boolvec(&v);
-        let v__ = boolvec_to_u8vec(&v_);
-        assert_eq!(v, v__);
     }
 }

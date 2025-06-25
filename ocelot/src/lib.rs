@@ -5,7 +5,6 @@
 #![deny(missing_docs)]
 // TODO: when https://git.io/JYTnW gets stabilized add the readme as module docs.
 
-mod utils;
 pub use swanky_ocelot_error::Error;
 pub mod oprf;
 pub mod ot;

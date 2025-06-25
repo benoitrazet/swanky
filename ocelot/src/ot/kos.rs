@@ -8,7 +8,6 @@ use crate::{
         Sender as OtSender,
         alsz::{Receiver as AlszReceiver, Sender as AlszSender},
     },
-    utils,
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::io::ErrorKind;
@@ -55,13 +54,13 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
             let q = Block::from(q);
             rng.fill_bytes(chi.as_mut());
             let [lo, hi] = q.carryless_mul_wide(chi);
-            check = utils::xor_two_blocks(&check, &(lo, hi));
+            check = swanky_deprecated_bitwise_utils::xor_two_blocks(&check, &(lo, hi));
         }
         let x = channel.read_block()?;
         let t0 = channel.read_block()?;
         let t1 = channel.read_block()?;
         let [lo, hi] = x.carryless_mul_wide(self.ot.s_);
-        let check = utils::xor_two_blocks(&check, &(lo, hi));
+        let check = swanky_deprecated_bitwise_utils::xor_two_blocks(&check, &(lo, hi));
         if check != (t0, t1) {
             return Err(Error::from(std::io::Error::new(
                 ErrorKind::InvalidData,
@@ -182,7 +181,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
         let m = inputs.len();
         let m = if m % 8 != 0 { m + (8 - m % 8) } else { m };
         let m_ = m + 128 + SSP;
-        let mut r = utils::boolvec_to_u8vec(inputs);
+        let mut r = swanky_deprecated_bitwise_utils::boolvec_to_u8vec(inputs);
         r.extend((0..(m_ - m) / 8).map(|_| rand::random::<u8>()));
         let ts = self.ot.receive_setup(channel, &r, m_)?;
         // Check correlation
@@ -192,7 +191,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
         let mut rng = AesRng::from_seed(seed[0]);
         let mut x = Block::default();
         let mut t = (Block::default(), Block::default());
-        let r_ = utils::u8vec_to_boolvec(&r);
+        let r_ = swanky_deprecated_bitwise_utils::u8vec_to_boolvec(&r);
         let mut chi = Block::default();
         for (j, xj) in r_.into_iter().enumerate() {
             let tj = &ts[j * 16..(j + 1) * 16];
@@ -201,7 +200,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
             rng.fill_bytes(chi.as_mut());
             x ^= if xj { chi } else { Block::default() };
             let [lo, hi] = tj.carryless_mul_wide(chi);
-            t = utils::xor_two_blocks(&t, &(lo, hi));
+            t = swanky_deprecated_bitwise_utils::xor_two_blocks(&t, &(lo, hi));
         }
         channel.write_block(&x)?;
         channel.write_block(&t.0)?;

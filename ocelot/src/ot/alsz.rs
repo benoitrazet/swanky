@@ -9,7 +9,6 @@ use crate::{
         CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
         Sender as OtSender,
     },
-    utils,
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::marker::PhantomData;
@@ -43,7 +42,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> FixedKeyInitializer for Sender<OT
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let mut ot = OT::init(channel, rng)?;
-        let s = utils::u8vec_to_boolvec(&s_);
+        let s = swanky_deprecated_bitwise_utils::u8vec_to_boolvec(&s_);
         let ks = ot.receive(channel, &s, rng)?;
         let rngs = ks
             .into_iter()
@@ -77,7 +76,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
             rng.fill_bytes(q);
             scutils::xor_inplace(q, if *b { &u } else { &zero });
         }
-        Ok(utils::transpose(&qs, nrows, ncols))
+        Ok(swanky_bit_matrix_transpose::transpose(&qs, nrows, ncols))
     }
 }
 
@@ -191,7 +190,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> Receiver<OT> {
             channel.write_bytes(&g)?;
         }
         channel.flush()?;
-        Ok(utils::transpose(&ts, nrows, ncols))
+        Ok(swanky_bit_matrix_transpose::transpose(&ts, nrows, ncols))
     }
 }
 
@@ -229,7 +228,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
         inputs: &[bool],
         _: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error> {
-        let r = utils::boolvec_to_u8vec(inputs);
+        let r = swanky_deprecated_bitwise_utils::boolvec_to_u8vec(inputs);
         let ts = self.receive_setup(channel, &r, inputs.len())?;
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
@@ -252,7 +251,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> CorrelatedReceiver for Receiver<OT>
         inputs: &[bool],
         _: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error> {
-        let r = utils::boolvec_to_u8vec(inputs);
+        let r = swanky_deprecated_bitwise_utils::boolvec_to_u8vec(inputs);
         let ts = self.receive_setup(channel, &r, inputs.len())?;
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
@@ -274,7 +273,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> RandomReceiver for Receiver<OT> {
         inputs: &[bool],
         _: &mut RNG,
     ) -> Result<Vec<Self::Msg>, Error> {
-        let r = utils::boolvec_to_u8vec(inputs);
+        let r = swanky_deprecated_bitwise_utils::boolvec_to_u8vec(inputs);
         let ts = self.receive_setup(channel, &r, inputs.len())?;
         let mut out = Vec::with_capacity(inputs.len());
         for j in 0..inputs.len() {

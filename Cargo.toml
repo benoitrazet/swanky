@@ -62,11 +62,13 @@ swanky-adversary = { path = "crates/adversary" }
 swanky-aes-hash = { path = "crates/aes-hash" }
 swanky-aes-rng = { path = "crates/aes-rng" }
 swanky-authenticated-bits = { path = "crates/authenticated-bits" }
+swanky-bit-matrix-transpose = { path = "crates/bit-matrix-transpose" }
 swanky-block = { path = "crates/block" }
 swanky-bytearray-utils = { path = "crates/bytearray-utils" }
 swanky-channel = { path = "crates/channel" }
 swanky-channel-legacy = { path = "crates/channel-legacy" }
 swanky-cointoss = { path = "crates/cointoss" }
+swanky-deprecated-bitwise-utils = { path = "crates/deprecated-bitwise-utils" }
 swanky-field = { path = "crates/field" }
 swanky-field-binary = { path = "crates/field-binary" }
 swanky-field-f61p = { path = "crates/field-f61p" }

@@ -110,7 +110,7 @@ impl AlszSender {
             )));
         }
         let mut dst = arena.alloc_slice_fill_with(qs.len(), |_| 0);
-        crate::utils::transpose_pre_allocated(&qs, &mut dst, NROWS, ncols);
+        swanky_bit_matrix_transpose::transpose_pre_allocated(&qs, &mut dst, NROWS, ncols);
         Ok(dst)
     }
 }
@@ -185,7 +185,7 @@ impl AlszReceiver {
             )));
         }
         let mut dst = arena.alloc_slice_fill_with(ts.len(), |_| 0);
-        crate::utils::transpose_pre_allocated(&ts, &mut dst, NROWS, ncols);
+        swanky_bit_matrix_transpose::transpose_pre_allocated(&ts, &mut dst, NROWS, ncols);
         Ok(dst)
     }
 }
@@ -340,10 +340,10 @@ impl KosSenderStage2 {
             let q = Block::from(q);
             rng.fill_bytes(chi.as_mut());
             let [lo, hi] = q.carryless_mul_wide(chi);
-            check = crate::utils::xor_two_blocks(&check, &(lo, hi));
+            check = (check.0 ^ lo, check.1 ^ hi);
         }
         let [lo, hi] = x.carryless_mul_wide(self.ot_s);
-        let check = crate::utils::xor_two_blocks(&check, &(lo, hi));
+        check = (check.0 ^ lo, check.1 ^ hi);
         if check != (t0, t1) {
             return Err(Error::Other(
                 "KosSenderStage2 consistency check failed".to_string(),
@@ -493,7 +493,7 @@ impl KosReceiverStage2 {
             rng.fill_bytes(chi.as_mut());
             x ^= if xj { chi } else { Block::default() };
             let [lo, hi] = tj.carryless_mul_wide(chi);
-            t = crate::utils::xor_two_blocks(&t, &(lo, hi));
+            t = (t.0 ^ lo, t.1 ^ hi);
         }
         let outgoing_blocks = [self.our_seed, x, t.0, t.1];
         debug_assert_eq!(outgoing.len(), outgoing_blocks.len() * 16);
