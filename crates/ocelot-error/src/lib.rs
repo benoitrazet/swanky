@@ -1,3 +1,6 @@
+#![deny(missing_docs)]
+//! **DEPRECATED** An error type used by crates formerly contained in ocelot
+
 /// Errors produced by `ocelot`.
 #[derive(Debug)]
 pub enum Error {

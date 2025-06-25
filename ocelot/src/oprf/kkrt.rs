@@ -6,7 +6,6 @@
 
 use super::prc::PseudorandomCode;
 use crate::{
-    errors::Error,
     oprf::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender},
     ot::{Receiver as OtReceiver, Sender as OtSender},
     utils,
@@ -19,6 +18,7 @@ use swanky_block::{Block, Block512};
 use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cointoss;
+use swanky_ocelot_error::Error;
 
 /// KKRT oblivious PRF sender.
 pub struct Sender<OT: OtReceiver + SemiHonest> {

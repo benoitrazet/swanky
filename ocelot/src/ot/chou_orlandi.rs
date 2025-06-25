@@ -11,10 +11,7 @@
 //! produced by the protocol will be the same. We fix this by hashing in `i`
 //! during the key derivation phase.
 
-use crate::{
-    errors::Error,
-    ot::{Receiver as OtReceiver, Sender as OtSender},
-};
+use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
 use curve25519_dalek::{
     constants::RISTRETTO_BASEPOINT_TABLE,
     ristretto::{RistrettoBasepointTable, RistrettoPoint},
@@ -24,6 +21,7 @@ use rand::{CryptoRng, Rng};
 use swanky_adversary::{Malicious, SemiHonest};
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_ocelot_error::Error;
 
 /// Oblivious transfer sender.
 pub struct Sender {

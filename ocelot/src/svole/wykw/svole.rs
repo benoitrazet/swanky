@@ -3,7 +3,6 @@ use super::{
     spsvole::{SpsReceiver, SpsSender},
     utils::Powers,
 };
-use crate::errors::Error;
 use generic_array::typenum::Unsigned;
 use rand::{
     Rng, SeedableRng,
@@ -14,6 +13,7 @@ use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{Degree, DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
+use swanky_ocelot_error::Error;
 
 // LPN parameters used in the protocol. We use three stages, two sets of LPN
 // parameters for setup, and one set of LPN parameters for the extend phase.

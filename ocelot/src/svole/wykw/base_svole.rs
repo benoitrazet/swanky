@@ -5,12 +5,12 @@ use super::{
     copee::{CopeeReceiver, CopeeSender},
     utils::Powers,
 };
-use crate::errors::Error;
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
+use swanky_ocelot_error::Error;
 
 /// The base VOLE sender
 pub struct Sender<FE: FF> {

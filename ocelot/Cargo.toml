@@ -34,6 +34,7 @@ swanky-bytearray-utils.workspace = true
 swanky-channel-legacy.workspace = true
 swanky-cointoss.workspace = true
 swanky-field.workspace = true
+swanky-ocelot-error.workspace = true
 
 [build-dependencies]
 cc.workspace = true

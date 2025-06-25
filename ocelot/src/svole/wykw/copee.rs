@@ -2,10 +2,7 @@
 //! <https://eprint.iacr.org/2020/925>, Figure 15).
 
 use super::utils::Powers;
-use crate::{
-    errors::Error,
-    ot::{KosReceiver, KosSender, RandomReceiver as ROTReceiver, RandomSender as ROTSender},
-};
+use crate::ot::{KosReceiver, KosSender, RandomReceiver as ROTReceiver, RandomSender as ROTSender};
 use generic_array::{GenericArray, typenum::Unsigned};
 use rand::{CryptoRng, Rng};
 use std::marker::PhantomData;
@@ -14,6 +11,7 @@ use swanky_adversary::Malicious;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
+use swanky_ocelot_error::Error;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 pub(super) struct Sender<ROT: ROTSender + Malicious, FE: FF> {

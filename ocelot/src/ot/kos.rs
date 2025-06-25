@@ -2,7 +2,6 @@
 //! protocol (cf. <https://eprint.iacr.org/2015/546>).
 
 use crate::{
-    errors::Error,
     ot::FixedKeyInitializer,
     ot::{
         CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
@@ -18,6 +17,7 @@ use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cointoss;
+use swanky_ocelot_error::Error;
 
 // The statistical security parameter.
 const SSP: usize = 40;

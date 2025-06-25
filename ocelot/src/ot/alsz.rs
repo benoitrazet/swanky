@@ -4,7 +4,6 @@
 #![allow(non_upper_case_globals)]
 
 use crate::{
-    errors::Error,
     ot::FixedKeyInitializer,
     ot::{
         CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver as OtReceiver,
@@ -20,6 +19,7 @@ use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_ocelot_error::Error;
 
 /// Oblivious transfer sender.
 pub struct Sender<OT: OtReceiver<Msg = Block> + SemiHonest> {

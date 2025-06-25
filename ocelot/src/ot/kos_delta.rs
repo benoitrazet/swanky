@@ -1,18 +1,16 @@
 //! Implementation of the Keller-Orsini-Scholl oblivious transfer extension
 //! protocol (cf. <https://eprint.iacr.org/2015/546>).
 
-use crate::{
-    errors::Error,
-    ot::{
-        CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
-        Receiver as OtReceiver, Sender as OtSender,
-        kos::{Receiver as KosReceiver, Sender as KosSender},
-    },
+use crate::ot::{
+    CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
+    Receiver as OtReceiver, Sender as OtSender,
+    kos::{Receiver as KosReceiver, Sender as KosSender},
 };
 use rand::{CryptoRng, Rng};
 use swanky_adversary::{Malicious, SemiHonest};
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_ocelot_error::Error;
 
 /// Oblivious transfer extension sender.
 pub struct Sender<OT: OtReceiver<Msg = Block> + Malicious> {

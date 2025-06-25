@@ -1748,6 +1748,7 @@ dependencies = [
  "swanky-field",
  "swanky-field-binary",
  "swanky-field-f61p",
+ "swanky-ocelot-error",
  "vectoreyes",
 ]
 
@@ -2699,6 +2700,13 @@ version = "0.6.0"
 dependencies = [
  "blake3",
  "tempfile",
+]
+
+[[package]]
+name = "swanky-ocelot-error"
+version = "0.6.0"
+dependencies = [
+ "swanky-cointoss",
 ]
 
 [[package]]

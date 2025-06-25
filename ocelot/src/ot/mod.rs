@@ -18,11 +18,11 @@ pub mod kos;
 pub mod kos_delta;
 pub mod naor_pinkas;
 
-use crate::errors::Error;
 use curve25519_dalek::RistrettoPoint;
 use rand::{CryptoRng, Rng};
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_ocelot_error::Error;
 
 pub(crate) fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Block {
     let h = blake3::keyed_hash(pt.compress().as_bytes(), &tweak.to_le_bytes());

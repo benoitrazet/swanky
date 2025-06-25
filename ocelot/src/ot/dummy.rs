@@ -1,13 +1,11 @@
 //! Implementation of an **entirely insecure** oblivious transfer protocol for
 //! testing purposes.
 
-use crate::{
-    errors::Error,
-    ot::{Receiver as OtReceiver, Sender as OtSender},
-};
+use crate::ot::{Receiver as OtReceiver, Sender as OtSender};
 use rand::{CryptoRng, Rng};
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_ocelot_error::Error;
 
 /// Oblivious transfer sender.
 pub struct Sender {}

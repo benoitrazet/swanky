@@ -1,15 +1,13 @@
 //! Implementation of the hash-based multi-use OPPRF of Kolesnikov, Matania,
 //! Pinkas, Rosulek, and Trieu (cf. <https://eprint.iacr.org/2017/799>).
 
-use crate::{
-    errors::Error,
-    oprf::{Receiver as OprfReceiver, Sender as OprfSender},
-};
+use crate::oprf::{Receiver as OprfReceiver, Sender as OprfSender};
 use rand::{CryptoRng, Rng};
 use std::collections::HashSet;
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
 use swanky_channel_legacy::AbstractChannel;
+use swanky_ocelot_error::Error;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 mod cuckoo;
