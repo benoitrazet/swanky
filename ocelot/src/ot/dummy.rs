@@ -82,3 +82,8 @@ impl std::fmt::Display for Receiver {
         write!(f, "Dummy Receiver")
     }
 }
+
+#[test]
+fn test_functionality() {
+    swanky_ot_test::test_otext::<Sender, Receiver>(128);
+}

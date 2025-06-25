@@ -49,6 +49,7 @@ proptest.workspace = true
 clap.workspace = true
 swanky-field-binary.workspace = true
 swanky-field-f61p.workspace = true
+swanky-ot-test.workspace = true
 
 [[bench]]
 name = "ot"

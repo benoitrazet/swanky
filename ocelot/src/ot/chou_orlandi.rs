@@ -140,3 +140,8 @@ impl SemiHonest for Sender {}
 impl Malicious for Sender {}
 impl SemiHonest for Receiver {}
 impl Malicious for Receiver {}
+
+#[test]
+fn test_functionality() {
+    swanky_ot_test::test_otext::<Sender, Receiver>(128);
+}

@@ -291,3 +291,33 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> std::fmt::Display for Receiver<OT> 
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> SemiHonest for Sender<OT> {}
 impl<OT: OtSender<Msg = Block> + SemiHonest> SemiHonest for Receiver<OT> {}
+
+#[test]
+fn test_functionality() {
+    let ninputs = 1 << 10;
+    swanky_ot_test::test_otext::<
+        Sender<super::ChouOrlandiReceiver>,
+        Receiver<super::ChouOrlandiSender>,
+    >(ninputs);
+    swanky_ot_test::test_cotext::<
+        Sender<super::ChouOrlandiReceiver>,
+        Receiver<super::ChouOrlandiSender>,
+    >(ninputs);
+    swanky_ot_test::test_rotext::<
+        Sender<super::ChouOrlandiReceiver>,
+        Receiver<super::ChouOrlandiSender>,
+    >(ninputs);
+    let ninputs = (1 << 10) + 1;
+    swanky_ot_test::test_otext::<
+        Sender<super::ChouOrlandiReceiver>,
+        Receiver<super::ChouOrlandiSender>,
+    >(ninputs);
+    swanky_ot_test::test_cotext::<
+        Sender<super::ChouOrlandiReceiver>,
+        Receiver<super::ChouOrlandiSender>,
+    >(ninputs);
+    swanky_ot_test::test_rotext::<
+        Sender<super::ChouOrlandiReceiver>,
+        Receiver<super::ChouOrlandiSender>,
+    >(ninputs);
+}

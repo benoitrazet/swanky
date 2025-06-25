@@ -299,3 +299,33 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> SemiHonest for Sender<OT> {}
 impl<OT: OtSender<Msg = Block> + Malicious> SemiHonest for Receiver<OT> {}
 impl<OT: OtReceiver<Msg = Block> + Malicious> Malicious for Sender<OT> {}
 impl<OT: OtSender<Msg = Block> + Malicious> Malicious for Receiver<OT> {}
+
+#[test]
+fn test_functionality() {
+    let ninputs = 1 << 10;
+    swanky_ot_test::test_otext::<
+        Sender<super::ChouOrlandiReceiver>,
+        Receiver<super::ChouOrlandiSender>,
+    >(ninputs);
+    swanky_ot_test::test_cotext::<
+        Sender<super::ChouOrlandiReceiver>,
+        Receiver<super::ChouOrlandiSender>,
+    >(ninputs);
+    swanky_ot_test::test_rotext::<
+        Sender<super::ChouOrlandiReceiver>,
+        Receiver<super::ChouOrlandiSender>,
+    >(ninputs);
+    let ninputs = (1 << 10) + 1;
+    swanky_ot_test::test_otext::<
+        Sender<super::ChouOrlandiReceiver>,
+        Receiver<super::ChouOrlandiSender>,
+    >(ninputs);
+    swanky_ot_test::test_cotext::<
+        Sender<super::ChouOrlandiReceiver>,
+        Receiver<super::ChouOrlandiSender>,
+    >(ninputs);
+    swanky_ot_test::test_rotext::<
+        Sender<super::ChouOrlandiReceiver>,
+        Receiver<super::ChouOrlandiSender>,
+    >(ninputs);
+}

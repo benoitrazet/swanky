@@ -131,3 +131,8 @@ impl std::fmt::Display for Receiver {
 
 impl SemiHonest for Sender {}
 impl SemiHonest for Receiver {}
+
+#[test]
+fn test_functionality() {
+    swanky_ot_test::test_otext::<Sender, Receiver>(128);
+}
