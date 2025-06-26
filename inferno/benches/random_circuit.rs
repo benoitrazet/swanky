@@ -1,6 +1,7 @@
 #![allow(clippy::all)]
-use criterion::{BatchSize, BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use inferno::Proof;
+use std::hint::black_box;
 use std::time::Duration;
 use swanky_aes_rng::AesRng;
 use swanky_field::FiniteField;

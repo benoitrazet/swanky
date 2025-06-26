@@ -69,28 +69,28 @@ fn bench_oprf(c: &mut Criterion) {
     c.bench_function("oprf::kkrt (initialization)", move |bench| {
         bench.iter(|| {
             let result = _bench_oprf_init::<oprf::KkrtSender, oprf::KkrtReceiver>();
-            criterion::black_box(result);
+            std::hint::black_box(result);
         })
     });
     let inputs = rand_block_vec(1 << 12);
     c.bench_function("oprf::kkrt (n = 2^12)", move |bench| {
         bench.iter(|| {
             let result = _bench_oprf::<oprf::KkrtSender, oprf::KkrtReceiver>(inputs.clone());
-            criterion::black_box(result);
+            std::hint::black_box(result);
         })
     });
     let inputs = rand_block_vec(1 << 16);
     c.bench_function("oprf::kkrt (n = 2^16)", move |bench| {
         bench.iter(|| {
             let result = _bench_oprf::<oprf::KkrtSender, oprf::KkrtReceiver>(inputs.clone());
-            criterion::black_box(result);
+            std::hint::black_box(result);
         })
     });
     let inputs = rand_block_vec(1 << 18);
     c.bench_function("oprf::kkrt (n = 2^18)", move |bench| {
         bench.iter(|| {
             let result = _bench_oprf::<oprf::KkrtSender, oprf::KkrtReceiver>(inputs.clone());
-            criterion::black_box(result);
+            std::hint::black_box(result);
         })
     });
 }
@@ -115,7 +115,7 @@ fn bench_oprf_compute(c: &mut Criterion) {
         let input = rand::random::<Block>();
         bench.iter(|| {
             let result = oprf.compute(seed.clone(), input);
-            criterion::black_box(result);
+            std::hint::black_box(result);
         })
     });
 }
@@ -147,7 +147,7 @@ fn bench_opprf(c: &mut Criterion) {
         let points = rand_point_vec(1 << 2);
         bench.iter(|| {
             let result = _bench_opprf(points.clone(), inputs.clone());
-            criterion::black_box(result);
+            std::hint::black_box(result);
         })
     });
     c.bench_function("opprf::kmprt (t = 2^4, n = 2^4)", move |bench| {
@@ -155,7 +155,7 @@ fn bench_opprf(c: &mut Criterion) {
         let points = rand_point_vec(1 << 4);
         bench.iter(|| {
             let result = _bench_opprf(points.clone(), inputs.clone());
-            criterion::black_box(result);
+            std::hint::black_box(result);
         })
     });
     c.bench_function("opprf::kmprt (t = 2^8, n = 2^8)", move |bench| {
@@ -163,7 +163,7 @@ fn bench_opprf(c: &mut Criterion) {
         let points = rand_point_vec(1 << 8);
         bench.iter(|| {
             let result = _bench_opprf(points.clone(), inputs.clone());
-            criterion::black_box(result);
+            std::hint::black_box(result);
         })
     });
 }

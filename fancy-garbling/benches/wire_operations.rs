@@ -14,7 +14,7 @@ fn bench_digits(c: &mut Criterion, p: u16) {
         let w = AllWire::from_block(x, p);
         b.iter(|| {
             let digits = w.digits();
-            criterion::black_box(digits);
+            std::hint::black_box(digits);
         });
     });
 }
@@ -25,7 +25,7 @@ fn bench_unpack(c: &mut Criterion, p: u16) {
         let x = rng.gen_usable_block(p);
         b.iter(|| {
             let w = AllWire::from_block(x, p);
-            criterion::black_box(w);
+            std::hint::black_box(w);
         });
     });
 }
@@ -36,7 +36,7 @@ fn bench_pack(c: &mut Criterion, p: u16) {
         let w = AllWire::rand(rng, p);
         b.iter(|| {
             let x = w.as_block();
-            criterion::black_box(x);
+            std::hint::black_box(x);
         });
     });
 }
@@ -48,7 +48,7 @@ fn bench_plus(c: &mut Criterion, p: u16) {
         let y = AllWire::rand(rng, p);
         b.iter(|| {
             let z = x.plus(&y);
-            criterion::black_box(z);
+            std::hint::black_box(z);
         });
     });
 }
@@ -60,7 +60,7 @@ fn bench_plus_eq(c: &mut Criterion, p: u16) {
         let y = AllWire::rand(rng, p);
         b.iter(|| {
             let z = x.plus_eq(&y);
-            criterion::black_box(z);
+            std::hint::black_box(z);
         });
     });
 }
@@ -72,7 +72,7 @@ fn bench_minus(c: &mut Criterion, p: u16) {
         let y = AllWire::rand(rng, p);
         b.iter(|| {
             let z = x.minus(&y);
-            criterion::black_box(z);
+            std::hint::black_box(z);
         });
     });
 }
@@ -84,7 +84,7 @@ fn bench_minus_eq(c: &mut Criterion, p: u16) {
         let y = AllWire::rand(rng, p);
         b.iter(|| {
             let z = x.minus_eq(&y);
-            criterion::black_box(z);
+            std::hint::black_box(z);
         });
     });
 }
@@ -96,7 +96,7 @@ fn bench_cmul(c: &mut Criterion, p: u16) {
         let c = rng.gen_u16();
         b.iter(|| {
             let z = x.cmul(c);
-            criterion::black_box(z);
+            std::hint::black_box(z);
         });
     });
 }
@@ -108,7 +108,7 @@ fn bench_cmul_eq(c: &mut Criterion, p: u16) {
         let c = rng.gen_u16();
         b.iter(|| {
             let z = x.cmul_eq(c);
-            criterion::black_box(z);
+            std::hint::black_box(z);
         });
     });
 }
@@ -119,7 +119,7 @@ fn bench_negate(c: &mut Criterion, p: u16) {
         let x = AllWire::rand(rng, p);
         b.iter(|| {
             let z = x.negate();
-            criterion::black_box(z);
+            std::hint::black_box(z);
         });
     });
 }
@@ -130,7 +130,7 @@ fn bench_negate_eq(c: &mut Criterion, p: u16) {
         let mut x = AllWire::rand(rng, p);
         b.iter(|| {
             let z = x.negate_eq();
-            criterion::black_box(z);
+            std::hint::black_box(z);
         });
     });
 }
@@ -142,7 +142,7 @@ fn bench_hash(c: &mut Criterion, p: u16) {
         let x = AllWire::rand(rng, p);
         b.iter(|| {
             let z = x.hash(tweak);
-            criterion::black_box(z);
+            std::hint::black_box(z);
         });
     });
 }
@@ -154,7 +154,7 @@ fn bench_hashback(c: &mut Criterion, q: u16) {
         let wire = AllWire::rand(rng, q);
         b.iter(|| {
             let z = wire.hashback(tweak, q);
-            criterion::black_box(z);
+            std::hint::black_box(z);
         });
     });
 }
@@ -163,7 +163,7 @@ fn bench_zero(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::zero ({})", p), move |b| {
         b.iter(|| {
             let z = AllWire::zero(p);
-            criterion::black_box(z);
+            std::hint::black_box(z);
         });
     });
 }
@@ -173,7 +173,7 @@ fn bench_rand(c: &mut Criterion, p: u16) {
         let rng = &mut AesRng::new();
         b.iter(|| {
             let z = AllWire::rand(rng, p);
-            criterion::black_box(z);
+            std::hint::black_box(z);
         });
     });
 }
@@ -183,7 +183,7 @@ fn bench_rand_delta(c: &mut Criterion, p: u16) {
         let rng = &mut AesRng::new();
         b.iter(|| {
             let z = AllWire::rand_delta(rng, p);
-            criterion::black_box(z);
+            std::hint::black_box(z);
         });
     });
 }

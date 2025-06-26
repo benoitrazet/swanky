@@ -172,7 +172,7 @@ fn bench_psi(c: &mut Criterion) {
     c.bench_function("psi::PSTY PAYLOAD (initialization)", move |bench| {
         bench.iter(|| {
             let result = bench_psty_payload_init();
-            criterion::black_box(result)
+            std::hint::black_box(result)
         })
     });
     c.bench_function("psi::PSTY PAYLOAD (n = 2^8)", move |bench| {
@@ -181,7 +181,7 @@ fn bench_psi(c: &mut Criterion) {
         let payload = int_vec_block512(rand_u64_vec(1 << 8, 1 << 30, &mut rng));
         bench.iter(|| {
             let v = bench_psty_payload(rs.clone(), rs.clone(), payload.clone(), payload.clone());
-            criterion::black_box(v)
+            std::hint::black_box(v)
         })
     });
     c.bench_function("psi::PSTY PAYLOAD (n = 2^12)", move |bench| {
@@ -190,7 +190,7 @@ fn bench_psi(c: &mut Criterion) {
         let payload = int_vec_block512(rand_u64_vec(1 << 12, 1 << 30, &mut rng));
         bench.iter(|| {
             let v = bench_psty_payload(rs.clone(), rs.clone(), payload.clone(), payload.clone());
-            criterion::black_box(v)
+            std::hint::black_box(v)
         })
     });
     c.bench_function("psi::PSTY PAYLOAD (n = 2^16)", move |bench| {
@@ -199,7 +199,7 @@ fn bench_psi(c: &mut Criterion) {
         let payload = int_vec_block512(rand_u64_vec(1 << 16, 1 << 30, &mut rng));
         bench.iter(|| {
             let v = bench_psty_payload(rs.clone(), rs.clone(), payload.clone(), payload.clone());
-            criterion::black_box(v)
+            std::hint::black_box(v)
         })
     });
     c.bench_function("psi::PSTY PAYLOAD (n = 2^20)", move |bench| {
@@ -215,7 +215,7 @@ fn bench_psi(c: &mut Criterion) {
                 payload.clone(),
                 megasize,
             );
-            criterion::black_box(v)
+            std::hint::black_box(v)
         })
     });
 }

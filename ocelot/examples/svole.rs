@@ -94,7 +94,7 @@ fn run() {
         for _ in 0..get_trials() {
             vole.send(&mut channel, &mut rng, &mut out).unwrap();
             count += out.len();
-            criterion::black_box(&out);
+            std::hint::black_box(&out);
         }
         println!("[{}] Send time (extend): {:?}", count, start.elapsed());
         let start = Instant::now();
@@ -136,7 +136,7 @@ fn run() {
         vole.receive::<_, F2>(&mut channel, &mut rng, &mut out)
             .unwrap();
         count += out.len();
-        criterion::black_box(&out);
+        std::hint::black_box(&out);
     }
     println!("[{}] Receive time (extend): {:?}", count, start.elapsed());
     println!(

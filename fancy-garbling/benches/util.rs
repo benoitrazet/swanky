@@ -10,7 +10,7 @@ fn bench_tweak(c: &mut Criterion) {
         let i = rng.r#gen::<usize>();
         b.iter(|| {
             let block = util::tweak(i);
-            criterion::black_box(block);
+            std::hint::black_box(block);
         });
     });
 }
@@ -22,7 +22,7 @@ fn bench_tweak2(c: &mut Criterion) {
         let j = rng.r#gen::<u64>();
         b.iter(|| {
             let block = util::tweak2(i, j);
-            criterion::black_box(block);
+            std::hint::black_box(block);
         });
     });
 }
@@ -34,7 +34,7 @@ fn bench_output_tweak(c: &mut Criterion) {
         let k = rng.r#gen::<u16>();
         b.iter(|| {
             let block = util::output_tweak(i, k);
-            criterion::black_box(block);
+            std::hint::black_box(block);
         });
     });
 }
@@ -58,7 +58,7 @@ fn as_base_q_u128(c: &mut Criterion, q: u16) {
         let x = rng.r#gen::<u128>();
         b.iter(|| {
             let ds = util::as_base_q_u128(x, q);
-            criterion::black_box(ds);
+            std::hint::black_box(ds);
         });
     });
 }
@@ -70,7 +70,7 @@ fn from_base_q(c: &mut Criterion, q: u16) {
         let ds = util::as_base_q_u128(x, q);
         b.iter(|| {
             let v = util::from_base_q(&ds, q);
-            criterion::black_box(v);
+            std::hint::black_box(v);
         });
     });
 }
@@ -81,7 +81,7 @@ fn u128_to_bits(c: &mut Criterion, n: usize) {
         let x = rng.r#gen::<u128>();
         b.iter(|| {
             let bits = util::u128_to_bits(x, n);
-            criterion::black_box(bits);
+            std::hint::black_box(bits);
         });
     });
 }
@@ -93,7 +93,7 @@ fn u128_from_bits(c: &mut Criterion, n: usize) {
         let bits = util::u128_to_bits(x, n);
         b.iter(|| {
             let x = util::u128_from_bits(&bits);
-            criterion::black_box(x);
+            std::hint::black_box(x);
         });
     });
 }

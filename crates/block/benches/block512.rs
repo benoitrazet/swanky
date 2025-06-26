@@ -1,6 +1,7 @@
 #![allow(clippy::all)]
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use rand::Rng;
+use std::hint::black_box;
 use swanky_aes_rng::AesRng;
 use swanky_block::Block512;
 
