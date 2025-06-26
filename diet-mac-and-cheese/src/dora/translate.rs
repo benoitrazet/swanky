@@ -253,6 +253,6 @@ fn translate_gate<F: FiniteField + SieveIrDeserialize>(
         }
 
         GateM::New(_, _, _) | GateM::Delete(_, _, _) | GateM::Comment(_) => {}
-        _ => panic!("unsupported gate: {:?}", gate),
+        _ => panic!("unsupported gate: {gate:?}"),
     }
 }

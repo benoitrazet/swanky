@@ -169,10 +169,7 @@ fn main() {
 
     let sum = sum_in_clear(gb_value, ev_value);
     let result = ev_sum(&mut rng_ev.clone(), &mut channel, ev_value);
-    println!(
-        "Garbled Circuit result is : SUM({}, {}) = {}",
-        gb_value, ev_value, result
-    );
+    println!("Garbled Circuit result is : SUM({gb_value}, {ev_value}) = {result}");
     assert!(
         result == sum,
         "The garbled circuit result is incorrect and sould be {sum}"

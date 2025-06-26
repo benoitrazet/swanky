@@ -460,10 +460,7 @@ where
         self.channel.flush()?;
         let zero_check_count = self.do_check_zero()?;
         let mult_check_count = self.do_mult_check()?;
-        debug!(
-            "finalize: mult_check: {:?}, check_zero: {:?}",
-            mult_check_count, zero_check_count
-        );
+        debug!("finalize: mult_check: {mult_check_count:?}, check_zero: {zero_check_count:?}");
         self.log_final_monitor();
         Ok(())
     }

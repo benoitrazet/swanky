@@ -179,7 +179,7 @@ impl<P: Party, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, F40b>> BackendCo
     for DietMacAndCheese<P, F2, F40b, C, SVOLE>
 {
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
-        debug!("CONV_TO_BITS {:?}", w);
+        debug!("CONV_TO_BITS {w:?}");
         Ok(vec![*w])
     }
 
@@ -528,7 +528,7 @@ impl<
 > BackendConvT<P> for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
 {
     fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
-        debug!("CONV_TO_BITS {:?}", a);
+        debug!("CONV_TO_BITS {a:?}");
         let mut v;
 
         match P::WHICH {
@@ -1204,7 +1204,7 @@ where
                 let mut v = Vec::with_capacity((end + 1 - start).try_into()?);
                 for inp in *start..(*end + 1) {
                     let in_wire = self.memory.get(inp);
-                    debug!("CONV GET {:?}", in_wire);
+                    debug!("CONV GET {in_wire:?}");
                     let bits = self.backend.assert_conv_to_bits(in_wire)?;
                     assert_eq!(bits.len(), 1);
                     v.push(bits[0]);
@@ -1217,9 +1217,9 @@ where
             }
         } else {
             let in_wire = self.memory.get(*start);
-            debug!("CONV GET {:?}", in_wire);
+            debug!("CONV GET {in_wire:?}");
             let bits = self.backend.assert_conv_to_bits(in_wire)?;
-            debug!("CONV GET bits {:?}", bits);
+            debug!("CONV GET bits {bits:?}");
             Ok(bits)
         }
     }
@@ -1235,7 +1235,7 @@ where
 
                 for (i, _) in (*start..(*end + 1)).enumerate() {
                     let v = self.backend.assert_conv_from_bits(&[bits[i]])?;
-                    debug!("CONV SET {:?}", v);
+                    debug!("CONV SET {v:?}");
                     let out_wire = end - (i as WireId);
                     // NOTE: Without reverse in case conversation gates are little-endian instead of big-endian
                     // let out_wire = out1 + i as WireId;
@@ -1247,7 +1247,7 @@ where
             }
         } else {
             let v = self.backend.assert_conv_from_bits(bits)?;
-            debug!("CONV SET {:?}", v);
+            debug!("CONV SET {v:?}");
             self.memory.set(*start, &v);
             Ok(())
         }
@@ -2419,7 +2419,7 @@ impl<
     }
 
     fn eval_gate(&mut self, gate: &GateM, fun_store: &FunStore) -> Result<()> {
-        debug!("GATE: {:?}", gate);
+        debug!("GATE: {gate:?}");
         match gate {
             GateM::Conv(gate) => {
                 debug!("CONV IN");
@@ -2451,7 +2451,7 @@ impl<
                 self.evaluate_call_gate(*fun_id, out_ranges, in_ranges, fun_store)?;
             }
             GateM::Comment(str) => {
-                debug!("Comment: {:?}", str);
+                debug!("Comment: {str:?}");
             }
             _ => {
                 let ty = gate.type_id();
@@ -2469,7 +2469,7 @@ impl<
         fun_store: &FunStore,
         inputs: &mut CircInputs,
     ) -> Result<()> {
-        debug!("GATE: {:?}", gate);
+        debug!("GATE: {gate:?}");
         match gate {
             GateM::Conv(gate) => {
                 debug!("CONV IN");
@@ -2501,7 +2501,7 @@ impl<
                 self.evaluate_call_gate(*fun_id, out_ranges, in_ranges, fun_store)?;
             }
             GateM::Comment(str) => {
-                debug!("Comment: {:?}", str);
+                debug!("Comment: {str:?}");
             }
             _ => {
                 let ty = gate.type_id();
@@ -2622,7 +2622,7 @@ pub(crate) mod tests {
     fn setup_logger() {
         // if log-level `RUST_LOG` not already set, then set to info
         match env::var("RUST_LOG") {
-            Ok(val) => println!("loglvl: {}", val),
+            Ok(val) => println!("loglvl: {val}"),
             Err(_) => unsafe { env::set_var("RUST_LOG", "info") },
         };
 

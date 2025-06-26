@@ -42,7 +42,7 @@ fn start_connection_verifier(addr: &String) -> Result<TcpStream> {
     let listener = TcpListener::bind(addr.clone())?;
     match listener.accept() {
         Ok((stream, _addr)) => {
-            println!("accept connections on {:?}", addr);
+            println!("accept connections on {addr:?}");
             Ok(stream)
         }
         _ => {
@@ -55,7 +55,7 @@ fn start_connection_prover(addr: &String) -> Result<TcpStream> {
     loop {
         let c = TcpStream::connect(addr.clone());
         if let Ok(stream) = c {
-            println!("connection accepted on {:?}", addr);
+            println!("connection accepted on {addr:?}");
             return Ok(stream);
         }
     }

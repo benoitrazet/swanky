@@ -216,8 +216,7 @@ mod xml {
                 "true" | "t" | "yes" | "y" | "1" => Ok(Some(true)),
                 "false" | "f" | "no" | "n" | "0" => Ok(Some(false)),
                 s => Err(serde::de::Error::custom(format!(
-                    "Invalid Boolean string: {}",
-                    s
+                    "Invalid Boolean string: {s}"
                 ))),
             },
         }

@@ -387,7 +387,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let private_input_path = dir.path().join("schmivitz_private_inputs");
         let mut private_input = File::create(private_input_path.clone()).unwrap();
-        writeln!(private_input, "{}", private_input_bytes).unwrap();
+        writeln!(private_input, "{private_input_bytes}").unwrap();
 
         let rng = &mut thread_rng();
 
@@ -520,7 +520,7 @@ mod tests {
                 < 0 >;
                 < 1 >;
             @end ";
-        writeln!(private_input, "{}", private_input_bytes)?;
+        writeln!(private_input, "{private_input_bytes}")?;
 
         let rng = &mut thread_rng();
 

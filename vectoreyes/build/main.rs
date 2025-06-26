@@ -38,9 +38,9 @@ fn main() {
                     .contains(target_cpu)
             })
         {
-            panic!("target_cpu {:?} doesn't seem to be valid", target_cpu);
+            panic!("target_cpu {target_cpu:?} doesn't seem to be valid");
         }
-        println!("cargo:rustc-cfg=vectoreyes_target_cpu={:?}", target_cpu);
+        println!("cargo:rustc-cfg=vectoreyes_target_cpu={target_cpu:?}");
     }
     array_utils_impls::generate();
     backend::generate();

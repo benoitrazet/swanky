@@ -9,7 +9,7 @@ use std::sync::Mutex;
 fn to_hex(buf: &[u8]) -> String {
     let mut out = String::new();
     for byte in buf {
-        write!(out, "{:x}", byte).unwrap();
+        write!(out, "{byte:x}").unwrap();
     }
     out
 }
