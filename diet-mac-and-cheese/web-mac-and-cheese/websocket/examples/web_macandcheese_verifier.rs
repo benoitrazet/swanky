@@ -48,10 +48,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
     let field = stream_inp.modulus();
     let type_id = 0;
     inputs.ingest_instances(type_id, instances);
-    info!(
-        "Loaded type_id:{:?} field:{:?} file:{:?}",
-        type_id, field, instance,
-    );
+    info!("Loaded type_id:{type_id:?} field:{field:?} file:{instance:?}",);
 
     let rel = RelationReader::open(relation.as_path())?;
 
@@ -99,7 +96,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
 
 fn main() {
     match env::var("RUST_LOG") {
-        Ok(val) => println!("loglvl: {}", val),
+        Ok(val) => println!("loglvl: {val}"),
         Err(_) => unsafe { env::set_var("RUST_LOG", "info") },
     };
     pretty_env_logger::init_timed();
@@ -158,7 +155,7 @@ fn main() {
     let connection_addr = matches.get_one::<String>("addr").unwrap_or(&binding);
 
     println!("Verifier/Server started");
-    println!("addr: {:?}", connection_addr);
+    println!("addr: {connection_addr:?}");
 
     println!("Waiting for client to connect...");
 

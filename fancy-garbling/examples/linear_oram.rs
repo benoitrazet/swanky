@@ -180,14 +180,10 @@ fn main() {
 
         let result = ev_linear_oram(&mut rng_ev.clone(), &mut channel, ev_index);
         let resut_in_clear = ram_in_clear(ev_index as usize, &gb_ram);
-        println!(
-            "Garbled Circuit result is : RAM([{:?}], at index:{}) = {}",
-            gb_ram, ev_index, result
-        );
+        println!("Garbled Circuit result is : RAM([{gb_ram:?}], at index:{ev_index}) = {result}");
         assert!(
             result == resut_in_clear,
-            "The result is incorrect and should be {}",
-            resut_in_clear
+            "The result is incorrect and should be {resut_in_clear}"
         );
     });
 }

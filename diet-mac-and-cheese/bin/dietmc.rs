@@ -65,7 +65,7 @@ fn start_connection_verifier(addresses: &[String]) -> Result<Vec<TcpStream>> {
         match listener.accept() {
             Ok((stream, _addr)) => {
                 tcp_streams.push(stream);
-                info!("accept connections on {:?}", addr);
+                info!("accept connections on {addr:?}");
             }
             _ => {
                 bail!("Error binding addr: {:?}", addr);
@@ -84,7 +84,7 @@ fn start_connection_prover(addresses: &[String]) -> Result<Vec<TcpStream>> {
             let c = TcpStream::connect(addr.clone());
             if let Ok(stream) = c {
                 tcp_streams.push(stream);
-                info!("connection accepted on {:?}", addr);
+                info!("connection accepted on {addr:?}");
                 break;
             }
         }
@@ -137,25 +137,25 @@ impl<P: Party> Iterator
                 WhichParty::Verifier(_ev) => match TcpListener::bind(&addr) {
                     Ok(listener) => match listener.accept() {
                         Ok((stream, _addr)) => {
-                            info!("accept connection on {}", addr);
+                            info!("accept connection on {addr}");
                             let reader = BufReader::new(stream.try_clone().unwrap());
                             let writer = BufWriter::new(stream);
                             Some(SyncChannel::new(reader, writer))
                         }
                         _ => {
-                            info!("Error accepting addr {}", addr);
+                            info!("Error accepting addr {addr}");
                             None
                         }
                     },
                     _ => {
-                        log::error!("Error binding addr {}", addr);
+                        log::error!("Error binding addr {addr}");
                         None
                     }
                 },
                 WhichParty::Prover(_) => loop {
                     let c = TcpStream::connect(&addr);
                     if let Ok(stream) = c {
-                        info!("connection accepted by {}", addr);
+                        info!("connection accepted by {addr}");
                         let reader = BufReader::new(stream.try_clone().unwrap());
                         let writer = BufWriter::new(stream);
                         return Some(SyncChannel::new(reader, writer));
@@ -180,17 +180,17 @@ fn build_inputs_types_text(args: &Cli) -> Result<(CircInputs, TypeStore)> {
     for (i, instance_path) in instance_paths.iter().enumerate() {
         let instances_stream = InputText::new_public_inputs(instance_path)?;
         inputs.set_instances(i, Box::new(instances_stream));
-        info!("Loaded idx:{:?} file:{:?}", i, instance_path,);
+        info!("Loaded idx:{i:?} file:{instance_path:?}",);
     }
 
     if let Some(witness) = &args.witness {
         // Prover mode
-        info!("witness: {:?}", witness);
+        info!("witness: {witness:?}");
         let witness_paths = path_to_files(witness.to_path_buf())?;
         for (i, witness_path) in witness_paths.iter().enumerate() {
             let witnesses_stream = InputText::new_private_inputs(witness_path)?;
             inputs.set_witnesses(i, Box::new(witnesses_stream));
-            info!("Loaded idx:{:?} file:{:?}", i, witness_path,);
+            info!("Loaded idx:{i:?} file:{witness_path:?}",);
         }
     }
 
@@ -211,17 +211,17 @@ fn build_inputs_flatbuffers(args: &Cli) -> Result<(CircInputs, TypeStore)> {
     for (i, instance_path) in instance_paths.iter().enumerate() {
         let instances = InputFlatbuffers::new_public_inputs(instance_path)?;
         inputs.set_instances(i, Box::new(instances));
-        info!("Loaded idx:{:?} file:{:?}", i, instance_path,);
+        info!("Loaded idx:{i:?} file:{instance_path:?}",);
     }
 
     if let Some(witness) = &args.witness {
         // Prover mode
-        info!("witness: {:?}", witness);
+        info!("witness: {witness:?}");
         let witness_paths = path_to_files(witness.to_path_buf())?;
         for (i, witness_path) in witness_paths.iter().enumerate() {
             let witnesses = InputFlatbuffers::new_private_inputs(witness_path)?;
             inputs.set_witnesses(i, Box::new(witnesses));
-            info!("Loaded idx:{:?} file:{:?}", i, witness_path,);
+            info!("Loaded idx:{i:?} file:{witness_path:?}",);
         }
     }
 
@@ -561,7 +561,7 @@ fn run(args: &Cli) -> Result<()> {
 fn main() -> Result<()> {
     // if log-level `RUST_LOG` not already set, then set to info
     match env::var("RUST_LOG") {
-        Ok(val) => println!("loglvl: {}", val),
+        Ok(val) => println!("loglvl: {val}"),
         Err(_) => unsafe { env::set_var("RUST_LOG", "info") },
     };
 

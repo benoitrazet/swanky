@@ -968,7 +968,7 @@ impl crate::SimdBase16 for I16x8 {
         &self,
     ) -> I16x8 {
         select_impl_block! { scalar { I16x8::from([ // 128-bit Lane #0
-        self.as_array()[0 + 0 * 8], self.as_array()[1 + 0 * 8], self.as_array()[2 + 0 * 8], self.as_array()[3 + 0 * 8], self.as_array()[I0 + 4 + 0 * 8], self.as_array()[I1 + 4 + 0 * 8], self.as_array()[I2 + 4 + 0 * 8], self.as_array()[I3 + 4 + 0 * 8], ]) } avx2 { if I0 > 4 { panic!("I0 ({}) > 4", I0); } if I1 > 4 { panic!("I1 ({}) > 4", I1); } if I2 > 4 { panic!("I2 ({}) > 4", I2); } if I3 > 4 { panic!("I3 ({}) > 4", I3); } Self( avx2::_mm_shufflehi_epi16 ::<I3, I2, I1, I0>(self.0)) } }
+        self.as_array()[0 + 0 * 8], self.as_array()[1 + 0 * 8], self.as_array()[2 + 0 * 8], self.as_array()[3 + 0 * 8], self.as_array()[I0 + 4 + 0 * 8], self.as_array()[I1 + 4 + 0 * 8], self.as_array()[I2 + 4 + 0 * 8], self.as_array()[I3 + 4 + 0 * 8], ]) } avx2 { if I0 > 4 { panic!("I0 ({I0}) > 4"); } if I1 > 4 { panic!("I1 ({I1}) > 4"); } if I2 > 4 { panic!("I2 ({I2}) > 4"); } if I3 > 4 { panic!("I3 ({I3}) > 4"); } Self( avx2::_mm_shufflehi_epi16 ::<I3, I2, I1, I0>(self.0)) } }
     }
 }
 impl crate::SimdBase8x for I16x8 {
@@ -1330,7 +1330,7 @@ impl crate::SimdBase16 for I16x16 {
     ) -> I16x16 {
         select_impl_block! { scalar { I16x16::from([ // 128-bit Lane #0
         self.as_array()[0 + 0 * 8], self.as_array()[1 + 0 * 8], self.as_array()[2 + 0 * 8], self.as_array()[3 + 0 * 8], self.as_array()[I0 + 4 + 0 * 8], self.as_array()[I1 + 4 + 0 * 8], self.as_array()[I2 + 4 + 0 * 8], self.as_array()[I3 + 4 + 0 * 8], // 128-bit Lane #1
-        self.as_array()[0 + 1 * 8], self.as_array()[1 + 1 * 8], self.as_array()[2 + 1 * 8], self.as_array()[3 + 1 * 8], self.as_array()[I0 + 4 + 1 * 8], self.as_array()[I1 + 4 + 1 * 8], self.as_array()[I2 + 4 + 1 * 8], self.as_array()[I3 + 4 + 1 * 8], ]) } avx2 { if I0 > 4 { panic!("I0 ({}) > 4", I0); } if I1 > 4 { panic!("I1 ({}) > 4", I1); } if I2 > 4 { panic!("I2 ({}) > 4", I2); } if I3 > 4 { panic!("I3 ({}) > 4", I3); } Self( avx2::_mm256_shufflehi_epi16 ::<I3, I2, I1, I0>(self.0)) } }
+        self.as_array()[0 + 1 * 8], self.as_array()[1 + 1 * 8], self.as_array()[2 + 1 * 8], self.as_array()[3 + 1 * 8], self.as_array()[I0 + 4 + 1 * 8], self.as_array()[I1 + 4 + 1 * 8], self.as_array()[I2 + 4 + 1 * 8], self.as_array()[I3 + 4 + 1 * 8], ]) } avx2 { if I0 > 4 { panic!("I0 ({I0}) > 4"); } if I1 > 4 { panic!("I1 ({I1}) > 4"); } if I2 > 4 { panic!("I2 ({I2}) > 4"); } if I3 > 4 { panic!("I3 ({I3}) > 4"); } Self( avx2::_mm256_shufflehi_epi16 ::<I3, I2, I1, I0>(self.0)) } }
     }
 }
 #[doc = "`[i32; 4]` as a vector."]
@@ -3707,7 +3707,7 @@ impl crate::SimdBase16 for U16x8 {
         &self,
     ) -> U16x8 {
         select_impl_block! { scalar { U16x8::from([ // 128-bit Lane #0
-        self.as_array()[0 + 0 * 8], self.as_array()[1 + 0 * 8], self.as_array()[2 + 0 * 8], self.as_array()[3 + 0 * 8], self.as_array()[I0 + 4 + 0 * 8], self.as_array()[I1 + 4 + 0 * 8], self.as_array()[I2 + 4 + 0 * 8], self.as_array()[I3 + 4 + 0 * 8], ]) } avx2 { if I0 > 4 { panic!("I0 ({}) > 4", I0); } if I1 > 4 { panic!("I1 ({}) > 4", I1); } if I2 > 4 { panic!("I2 ({}) > 4", I2); } if I3 > 4 { panic!("I3 ({}) > 4", I3); } Self( avx2::_mm_shufflehi_epi16 ::<I3, I2, I1, I0>(self.0)) } }
+        self.as_array()[0 + 0 * 8], self.as_array()[1 + 0 * 8], self.as_array()[2 + 0 * 8], self.as_array()[3 + 0 * 8], self.as_array()[I0 + 4 + 0 * 8], self.as_array()[I1 + 4 + 0 * 8], self.as_array()[I2 + 4 + 0 * 8], self.as_array()[I3 + 4 + 0 * 8], ]) } avx2 { if I0 > 4 { panic!("I0 ({I0}) > 4"); } if I1 > 4 { panic!("I1 ({I1}) > 4"); } if I2 > 4 { panic!("I2 ({I2}) > 4"); } if I3 > 4 { panic!("I3 ({I3}) > 4"); } Self( avx2::_mm_shufflehi_epi16 ::<I3, I2, I1, I0>(self.0)) } }
     }
 }
 impl crate::SimdBase8x for U16x8 {
@@ -4070,7 +4070,7 @@ impl crate::SimdBase16 for U16x16 {
     ) -> U16x16 {
         select_impl_block! { scalar { U16x16::from([ // 128-bit Lane #0
         self.as_array()[0 + 0 * 8], self.as_array()[1 + 0 * 8], self.as_array()[2 + 0 * 8], self.as_array()[3 + 0 * 8], self.as_array()[I0 + 4 + 0 * 8], self.as_array()[I1 + 4 + 0 * 8], self.as_array()[I2 + 4 + 0 * 8], self.as_array()[I3 + 4 + 0 * 8], // 128-bit Lane #1
-        self.as_array()[0 + 1 * 8], self.as_array()[1 + 1 * 8], self.as_array()[2 + 1 * 8], self.as_array()[3 + 1 * 8], self.as_array()[I0 + 4 + 1 * 8], self.as_array()[I1 + 4 + 1 * 8], self.as_array()[I2 + 4 + 1 * 8], self.as_array()[I3 + 4 + 1 * 8], ]) } avx2 { if I0 > 4 { panic!("I0 ({}) > 4", I0); } if I1 > 4 { panic!("I1 ({}) > 4", I1); } if I2 > 4 { panic!("I2 ({}) > 4", I2); } if I3 > 4 { panic!("I3 ({}) > 4", I3); } Self( avx2::_mm256_shufflehi_epi16 ::<I3, I2, I1, I0>(self.0)) } }
+        self.as_array()[0 + 1 * 8], self.as_array()[1 + 1 * 8], self.as_array()[2 + 1 * 8], self.as_array()[3 + 1 * 8], self.as_array()[I0 + 4 + 1 * 8], self.as_array()[I1 + 4 + 1 * 8], self.as_array()[I2 + 4 + 1 * 8], self.as_array()[I3 + 4 + 1 * 8], ]) } avx2 { if I0 > 4 { panic!("I0 ({I0}) > 4"); } if I1 > 4 { panic!("I1 ({I1}) > 4"); } if I2 > 4 { panic!("I2 ({I2}) > 4"); } if I3 > 4 { panic!("I3 ({I3}) > 4"); } Self( avx2::_mm256_shufflehi_epi16 ::<I3, I2, I1, I0>(self.0)) } }
     }
 }
 #[doc = "`[u32; 4]` as a vector."]

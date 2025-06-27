@@ -620,7 +620,7 @@ where
         }
 
         // 2) b)
-        debug!("set {:?}", x);
+        debug!("set {x:?}");
         frame.memframe_unallocated.insert(id, Box::new(*x));
     }
 

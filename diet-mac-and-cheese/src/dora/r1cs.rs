@@ -420,7 +420,7 @@ impl<F: FiniteField> R1CS<F> {
         };
 
         // sanity check: R1CS relation is sat.
-        debug_assert!(ext.check(self), "{:#?}", ext);
+        debug_assert!(ext.check(self), "{ext:#?}");
         ext
     }
 

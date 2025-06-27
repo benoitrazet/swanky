@@ -16,7 +16,7 @@ where
         let c = make_circuit(q);
         bench.iter(|| {
             let gb = garble::<AllWire, _>(&c).unwrap();
-            criterion::black_box(gb);
+            std::hint::black_box(gb);
         });
     });
 }
@@ -35,7 +35,7 @@ where
         let xs = en.encode_garbler_inputs(&inps);
         bench.iter(|| {
             let ys = ev.eval(&c, &xs, &[]).unwrap();
-            criterion::black_box(ys);
+            std::hint::black_box(ys);
         });
     });
 }

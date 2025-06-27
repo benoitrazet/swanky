@@ -62,35 +62,35 @@ fn bench_psi(c: &mut Criterion) {
     c.bench_function("psi::PSZ (initialization)", move |bench| {
         bench.iter(|| {
             let result = _bench_psz_init();
-            criterion::black_box(result)
+            std::hint::black_box(result)
         })
     });
     c.bench_function("psi::PSZ (n = 2^8)", move |bench| {
         let rs = rand_vec_vec(1 << 8);
         bench.iter(|| {
             let v = _bench_psz(rs.clone(), rs.clone());
-            criterion::black_box(v)
+            std::hint::black_box(v)
         })
     });
     c.bench_function("psi::PSZ (n = 2^12)", move |bench| {
         let rs = rand_vec_vec(1 << 12);
         bench.iter(|| {
             let v = _bench_psz(rs.clone(), rs.clone());
-            criterion::black_box(v)
+            std::hint::black_box(v)
         })
     });
     c.bench_function("psi::PSZ (n = 2^16)", move |bench| {
         let rs = rand_vec_vec(1 << 16);
         bench.iter(|| {
             let v = _bench_psz(rs.clone(), rs.clone());
-            criterion::black_box(v)
+            std::hint::black_box(v)
         })
     });
     c.bench_function("psi::PSZ (n = 2^20)", move |bench| {
         let rs = rand_vec_vec(1 << 20);
         bench.iter(|| {
             let v = _bench_psz(rs.clone(), rs.clone());
-            criterion::black_box(v)
+            std::hint::black_box(v)
         })
     });
 }

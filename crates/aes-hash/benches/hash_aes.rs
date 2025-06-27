@@ -1,5 +1,6 @@
 #![allow(clippy::all)]
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 use swanky_aes_hash::AesHash;
 use swanky_block::Block;
 

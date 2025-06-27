@@ -35,7 +35,7 @@ impl From<std::io::Error> for Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Error::IoError(e) => write!(f, "IO error: {}", e),
+            Error::IoError(e) => write!(f, "IO error: {e}"),
             Error::CommitmentCheckFailed => "committment check failed".fmt(f),
         }
     }

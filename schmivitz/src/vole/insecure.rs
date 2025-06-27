@@ -46,11 +46,8 @@ impl RandomVole for InsecureVole {
     ) -> Self::VoleChallenge {
         transcript.append_message(
             b"VOLE type",
-            format!(
-                "Creating {} totally local & insecure VOLEs!!",
-                extended_witness_length
-            )
-            .as_bytes(),
+            format!("Creating {extended_witness_length} totally local & insecure VOLEs!!")
+                .as_bytes(),
         );
         let mut challenge = [0; 16];
         transcript.challenge_bytes(b"insecure VOLE creation challenge", &mut challenge);
