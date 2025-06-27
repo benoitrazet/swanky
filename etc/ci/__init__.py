@@ -453,6 +453,11 @@ def nightly(ctx: click.Context) -> None:
     # Merge the profile data for each executable into a single lcov file.
     for cov_for_exe in code_coverage.iterdir():
         exe = (cov_for_exe / "exe").resolve()
+        if b"__llvm_covmap" not in subprocess.check_output(
+            [llvm_bin / "llvm-objdump", "--section-headers", exe]
+        ):
+            print(f"{exe} does not have LLVM coverage data. Skipping...")
+            continue
         merged = cov_for_exe / "merged.profraw"
         input_file = cov_for_exe / "inputs.txt"
         input_file.write_text("\n".join(map(str, cov_for_exe.glob("*.profraw"))))
