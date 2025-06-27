@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::{ToTokens, TokenStreamExt, format_ident, quote};
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write;
 
@@ -94,6 +94,46 @@ impl Neon {
         format!("{su}{}", ty.bits())
     }
 }
+
+/// Apply the AES operation given the single_round and mix_column intrinsics.
+fn apply_aes(
+    blocks: &dyn ToTokens,
+    key: &dyn ToTokens,
+    single_round: &dyn ToTokens,
+    mix_columns: &dyn ToTokens,
+    size: super::AesSize,
+) -> TokenStream {
+    let mut out = quote! {
+        let key = #key;
+        let mut blocks = #blocks;
+    };
+    for round in 0..size.num_rounds() - 2 {
+        out.append_all(quote! {
+            blocks = blocks.array_map(
+                #[inline(always)]
+                |block| bytemuck::cast(unsafe {
+                    #mix_columns(#single_round(
+                        bytemuck::cast(block),
+                        bytemuck::cast(key[#round]),
+                    ))
+                })
+            );
+        });
+    }
+    let num_rounds = size.num_rounds();
+    out.append_all(quote! {
+        blocks.array_map(#[inline(always)] |block| {
+            let block: U8x16 = bytemuck::cast(unsafe {
+                #single_round(
+                    bytemuck::cast(block),
+                    bytemuck::cast(key[#num_rounds - 2])
+                )
+            });
+            block ^ bytemuck::cast(key[#num_rounds - 1])
+        })
+    });
+    out
+}
 impl VectorBackend for Neon {
     fn check_cpu(&self) -> TokenStream {
         let required_features = REQUIRED_FEATURES;
@@ -165,6 +205,126 @@ impl VectorBackend for Neon {
                         )
                 )
             }
+        })
+    }
+
+    fn aes_key_schedule_type(&self, size: super::AesSize, encrypt_only: bool) -> TokenStream {
+        crate::backend::avx2::aes_key_schedule_type(size, encrypt_only)
+    }
+
+    fn aes_key_expand(
+        &self,
+        size: super::AesSize,
+        encrypt_only: bool,
+        key: &dyn quote::ToTokens,
+    ) -> (TokenStream, Docs) {
+        self.build(&mut |b| {
+            let mut out = TokenStream::new();
+            let vaeseq_u8 = b.intrinsic("vaeseq_u8");
+            out.append_all(quote! {
+                #[inline(always)]
+                fn mm_aeskeygenassist_si128<const RCON: i32>(a: U32x4) -> U32x4 {
+                    /*
+                        Based on https://github.com/DLTcollab/sse2neon/blob/0d6e9b3dd4687a0b98c0645e001f96659aae5854/sse2neon.h
+
+                        Copyright (c) 2015-2022 SSE2NEON Contributors
+
+                        Permission is hereby granted, free of charge, to any person obtaining a copy
+                        of this software and associated documentation files (the "Software"), to deal
+                        in the Software without restriction, including without limitation the rights
+                        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+                        copies of the Software, and to permit persons to whom the Software is
+                        furnished to do so, subject to the following conditions:
+
+                        The above copyright notice and this permission notice shall be included in all
+                        copies or substantial portions of the Software.
+
+                        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+                        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+                        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+                        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+                        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+                        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+                        SOFTWARE.
+                    */
+
+                    let aes_out = U8x16(unsafe {
+                        [#vaeseq_u8(
+                            bytemuck::cast(a.0[0]),
+                            U8x16::ZERO.0[0],
+                        )]
+                    });
+
+                    const MASK: U8x16 = U8x16::from_array([
+                        // Undo ShiftRows step from AESE and extract X1 and X3
+                        0x4, 0x1, 0xE, 0xB,  // SubBytes(X1)
+                        0x1, 0xE, 0xB, 0x4,  // ROT(SubBytes(X1))
+                        0xC, 0x9, 0x6, 0x3,  // SubBytes(X3)
+                        0x9, 0x6, 0x3, 0xC,  // ROT(SubBytes(X3))
+                    ]);
+                    let dest = aes_out.shuffle(MASK);
+                    let r = U32x4::from(U64x2::broadcast(u64::from(RCON as u32) << 32));
+                    U32x4::from(dest) ^ r
+                }
+            });
+            if !encrypt_only {
+                let intrinsic_vaesimcq_u8 = b.intrinsic("vaesimcq_u8");
+                out.append_all(quote! {
+                    fn mm_aesimc_si128(round_key: U32x4) -> U32x4 {
+                        bytemuck::cast(unsafe {
+                            #intrinsic_vaesimcq_u8(bytemuck::cast(round_key.0))
+                        })
+                    }
+                });
+            }
+            out.append_all(super::avx2::key_schedule(
+                size,
+                encrypt_only,
+                key,
+                &quote! { mm_aeskeygenassist_si128 },
+                &quote! { mm_aesimc_si128 },
+            ));
+            out
+        })
+    }
+
+    fn aes_encrypt(
+        &self,
+        size: super::AesSize,
+        key: &dyn quote::ToTokens,
+        _n: &dyn quote::ToTokens,
+        blocks: &dyn quote::ToTokens,
+    ) -> (TokenStream, Docs) {
+        self.build(&mut |b| {
+            let vaeseq_u8 = b.intrinsic("vaeseq_u8");
+            let vaesmcq_u8 = b.intrinsic("vaesmcq_u8");
+            apply_aes(
+                blocks,
+                &quote! { &#key.encrypt_keys },
+                &vaeseq_u8,
+                &vaesmcq_u8,
+                size,
+            )
+        })
+    }
+
+    fn aes_decrypt(
+        &self,
+        size: super::AesSize,
+        key: &dyn quote::ToTokens,
+        _n: &dyn quote::ToTokens,
+        blocks: &dyn quote::ToTokens,
+    ) -> (TokenStream, Docs) {
+        self.build(&mut |b| {
+            let vaesdq_u8 = b.intrinsic("vaesdq_u8");
+            let vaesimcq_u8 = b.intrinsic("vaesimcq_u8");
+            apply_aes(
+                blocks,
+                &quote! { &#key.decrypt_keys },
+                &vaesdq_u8,
+                &vaesimcq_u8,
+                size,
+            )
         })
     }
 }
