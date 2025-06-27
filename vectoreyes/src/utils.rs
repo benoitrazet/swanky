@@ -1,4 +1,4 @@
-use crate::{SimdBase8, U8x16, U64x2};
+use crate::{SimdBase8, U8x16, U32x4, U64x2};
 
 // For compatibility with scuttlebutt::Block
 impl From<u128> for U8x16 {
@@ -89,4 +89,17 @@ fn test_carryless_mul_wide() {
             U8x16::from(69947343163265692377803117866524991745)
         ]
     );
+}
+
+// These won't be used for the scalar backend, hence the allow(unused).
+#[allow(unused)]
+#[derive(Clone)]
+pub(crate) struct AesEncryptOnlyKeySchedule<const NUM_ROUNDS: usize> {
+    pub(crate) encrypt_keys: [U32x4; NUM_ROUNDS],
+}
+#[allow(unused)]
+#[derive(Clone)]
+pub(crate) struct AesKeySchedule<const NUM_ROUNDS: usize> {
+    pub(crate) encrypt_keys: [U32x4; NUM_ROUNDS],
+    pub(crate) decrypt_keys: [U32x4; NUM_ROUNDS],
 }
