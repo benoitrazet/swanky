@@ -23,7 +23,6 @@ num_cpus.workspace = true
 mimalloc = { workspace = true, default-features = false }
 clap = { workspace = true, features = ["derive"] }
 bumpalo.workspace = true
-lazy_static.workspace = true
 arrayvec.workspace = true
 mac-n-cheese-wire-map.workspace = true
 flume.workspace = true

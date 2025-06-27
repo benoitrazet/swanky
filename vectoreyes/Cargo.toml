@@ -22,7 +22,6 @@ aes.workspace = true
 [dev-dependencies]
 aes.workspace = true
 proptest.workspace = true
-lazy_static.workspace = true
 serde_json.workspace = true
 
 [build-dependencies]
