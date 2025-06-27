@@ -1,7 +1,7 @@
 use cfg::Cfg;
 use proc_macro2::TokenStream;
 
-use quote::{ToTokens, quote};
+use quote::{ToTokens, format_ident, quote};
 use types::VectorType;
 
 mod avx2;
@@ -27,6 +27,34 @@ pub enum PairwiseOperator {
     Xor,
     Or,
     And,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AesSize {
+    Aes128,
+    Aes256,
+}
+impl std::fmt::Display for AesSize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.bits())
+    }
+}
+impl AesSize {
+    pub fn all() -> impl Iterator<Item = Self> {
+        [Self::Aes128, Self::Aes256].into_iter()
+    }
+    pub fn bits(&self) -> usize {
+        match self {
+            AesSize::Aes128 => 128,
+            AesSize::Aes256 => 256,
+        }
+    }
+    pub fn num_rounds(&self) -> usize {
+        match self {
+            AesSize::Aes128 => 11,
+            AesSize::Aes256 => 15,
+        }
+    }
 }
 
 /// A vector backend for vectoreyes
@@ -85,6 +113,85 @@ pub trait VectorBackend {
                 PairwiseOperator::Xor => op_body(quote! { ^ }),
                 PairwiseOperator::Or => op_body(quote! { | }),
                 PairwiseOperator::And => op_body(quote! { & }),
+            },
+            self.scalar_docs(),
+        )
+    }
+
+    /// What's type of a scheduled AES key?
+    fn aes_key_schedule_type(&self, size: AesSize, encrypt_only: bool) -> TokenStream {
+        let _ = encrypt_only;
+        let aes_name = format_ident!("Aes{}", size.bits(),);
+        quote! { aes::#aes_name }
+    }
+
+    /// Return an AES key schedule of type `self.aes_key_schedule_type()` from `key`.
+    ///
+    /// `key` is either `U8x32` or `U8x16`, depending on `size`.
+    fn aes_key_expand(
+        &self,
+        size: AesSize,
+        encrypt_only: bool,
+        key: &dyn ToTokens,
+    ) -> (TokenStream, Docs) {
+        let _ = encrypt_only;
+        let name = format_ident!("Aes{size}");
+        (
+            quote! {
+                <aes::#name as aes::cipher::KeyInit>::new_from_slice(#key.as_ref())
+                    .expect("AES size is statically correct")
+            },
+            self.scalar_docs(),
+        )
+    }
+
+    /// Return AES encrypted `blocks` under `key`.
+    ///
+    /// `blocks` is of type `[U8x16; N]` and `key` is of type `self.aes_key_schedule_type()`
+    fn aes_encrypt(
+        &self,
+        size: AesSize,
+        key: &dyn ToTokens,
+        n: &dyn ToTokens,
+        blocks: &dyn ToTokens,
+    ) -> (TokenStream, Docs) {
+        let _ = n;
+        let _ = size;
+        (
+            quote! {
+                let mut out = #blocks;
+                for block in out.iter_mut() {
+                    let block =
+                        aes::cipher::generic_array::GenericArray::from_mut_slice(block.as_mut());
+                    aes::cipher::BlockEncrypt::encrypt_block(#key, block);
+                }
+                out
+            },
+            self.scalar_docs(),
+        )
+    }
+
+    /// Return AES decrypted `blocks` under `key`.
+    ///
+    /// `blocks` is of type `[U8x16; N]` and `key` is of type `self.aes_contents()`
+    fn aes_decrypt(
+        &self,
+        size: AesSize,
+        key: &dyn ToTokens,
+        n: &dyn ToTokens,
+        blocks: &dyn ToTokens,
+    ) -> (TokenStream, Docs) {
+        let _ = n;
+        let _ = size;
+        (
+            quote! {
+                let mut out = #blocks;
+                for block in out.iter_mut() {
+                    let block =
+                        aes::cipher::generic_array::GenericArray::from_mut_slice(block.as_mut());
+                    aes::cipher::BlockDecrypt::decrypt_block(#key, block);
+                }
+                out
             },
             self.scalar_docs(),
         )

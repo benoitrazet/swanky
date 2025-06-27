@@ -1,3 +1,4 @@
+{% if force_scalar_for_test %}
 // TODO: add Aes192
 // This code is based on https://github.com/RustCrypto/block-ciphers/tree/5389542d0306c718eda37bab890bc67772bd1e69/aes
 // That code is MIT/Apache dual-licensed
@@ -380,3 +381,4 @@
         {% endif %}
     {% endfor %}
 {% endfor %}
+{% endif %}
