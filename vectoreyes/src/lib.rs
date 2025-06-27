@@ -444,5 +444,10 @@ pub(crate) mod utils;
 #[allow(clippy::suspicious_else_formatting)]
 // You can't put inline(always) without a closure
 #[allow(clippy::redundant_closure)]
+// These two lints let us have extra parentheses in the generated source (which makes generation
+// easier).
+#[allow(unused_parens)]
+#[allow(clippy::needless_borrow)]
+// </the two lints>
 mod generated;
 pub use generated::implementation::*;
