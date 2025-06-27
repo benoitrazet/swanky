@@ -59,7 +59,7 @@
         {% call(avx2i) avx2() %}
             {% for i in range(4) %}
                 if I{{i}} > 4 {
-                    panic!("I{{i}} ({}) > 4", I{{i}});
+                    panic!("I{{i}} ({I{{i}}}) > 4");
                 }
             {% endfor %}
             Self({{avx2i(ty, "shuffle_hi16")}}::<I3, I2, I1, I0>(self.0))
