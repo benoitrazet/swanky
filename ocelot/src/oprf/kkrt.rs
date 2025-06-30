@@ -18,7 +18,7 @@ use swanky_oprf_traits::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfS
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
 
 /// KKRT oblivious PRF sender.
-pub struct Sender<OT: OtReceiver + SemiHonest> {
+pub struct Sender<OT: OtReceiver + SemiHonest = swanky_ot_alsz_kos::alsz::Receiver> {
     _ot: PhantomData<OT>,
     s: Vec<bool>,
     s_: [u8; 64],
@@ -116,7 +116,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
 }
 
 /// KKRT oblivious PRF receiver.
-pub struct Receiver<OT: OtSender + SemiHonest> {
+pub struct Receiver<OT: OtSender + SemiHonest = swanky_ot_alsz_kos::alsz::Sender> {
     _ot: PhantomData<OT>,
     code: PseudorandomCode,
     rngs: Vec<(AesRng, AesRng)>,

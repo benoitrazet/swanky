@@ -101,7 +101,7 @@ impl Parameters {
 /// This implements the hashing-based OPPRF sender in Figure 7 of the paper. It
 /// uses the table-based one-time OPPRF under-the-hood (Figure 6 of the paper),
 /// which itself uses an OPRF.
-pub struct Sender<OPRF> {
+pub struct Sender<OPRF = super::KkrtSender> {
     oprf: OPRF,
 }
 
@@ -295,7 +295,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
 /// This implements the hashing-based OPPRF receiver in Figure 7 of the paper. It
 /// uses the table-based one-time OPPRF under-the-hood (Figure 6 of the paper),
 /// which itself uses an OPRF.
-pub struct Receiver<OPRF: OprfReceiver + SemiHonest> {
+pub struct Receiver<OPRF: OprfReceiver + SemiHonest = super::KkrtReceiver> {
     oprf: OPRF,
 }
 
