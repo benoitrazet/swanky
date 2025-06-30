@@ -19,12 +19,12 @@ use swanky_ot_traits::{
 const SSP: usize = 40;
 
 /// Oblivious transfer extension sender.
-pub struct Sender<OT: OtReceiver<Msg = Block> + Malicious> {
+pub struct Sender<OT: OtReceiver<Msg = Block> + Malicious = swanky_ot_chou_orlandi::Receiver> {
     pub(super) ot: AlszSender<OT>,
 }
 
 /// Oblivious transfer extension receiver.
-pub struct Receiver<OT: OtSender<Msg = Block> + Malicious> {
+pub struct Receiver<OT: OtSender<Msg = Block> + Malicious = swanky_ot_chou_orlandi::Sender> {
     ot: AlszReceiver<OT>,
 }
 
@@ -303,29 +303,11 @@ impl<OT: OtSender<Msg = Block> + Malicious> Malicious for Receiver<OT> {}
 #[test]
 fn test_functionality() {
     let ninputs = 1 << 10;
-    swanky_ot_test::test_otext::<
-        Sender<super::ChouOrlandiReceiver>,
-        Receiver<super::ChouOrlandiSender>,
-    >(ninputs);
-    swanky_ot_test::test_cotext::<
-        Sender<super::ChouOrlandiReceiver>,
-        Receiver<super::ChouOrlandiSender>,
-    >(ninputs);
-    swanky_ot_test::test_rotext::<
-        Sender<super::ChouOrlandiReceiver>,
-        Receiver<super::ChouOrlandiSender>,
-    >(ninputs);
+    swanky_ot_test::test_otext::<Sender, Receiver>(ninputs);
+    swanky_ot_test::test_cotext::<Sender, Receiver>(ninputs);
+    swanky_ot_test::test_rotext::<Sender, Receiver>(ninputs);
     let ninputs = (1 << 10) + 1;
-    swanky_ot_test::test_otext::<
-        Sender<super::ChouOrlandiReceiver>,
-        Receiver<super::ChouOrlandiSender>,
-    >(ninputs);
-    swanky_ot_test::test_cotext::<
-        Sender<super::ChouOrlandiReceiver>,
-        Receiver<super::ChouOrlandiSender>,
-    >(ninputs);
-    swanky_ot_test::test_rotext::<
-        Sender<super::ChouOrlandiReceiver>,
-        Receiver<super::ChouOrlandiSender>,
-    >(ninputs);
+    swanky_ot_test::test_otext::<Sender, Receiver>(ninputs);
+    swanky_ot_test::test_cotext::<Sender, Receiver>(ninputs);
+    swanky_ot_test::test_rotext::<Sender, Receiver>(ninputs);
 }

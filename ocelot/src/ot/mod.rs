@@ -31,14 +31,14 @@ pub type NaorPinkasSender = naor_pinkas::Sender;
 /// Instantiation of the Naor-Pinkas OT receiver.
 pub type NaorPinkasReceiver = naor_pinkas::Receiver;
 /// Instantiation of the ALSZ OT extension sender, using Chou-Orlandi as the base OT.
-pub type AlszSender = alsz::Sender<ChouOrlandiReceiver>;
+pub type AlszSender = alsz::Sender;
 /// Instantiation of the ALSZ OT extension receiver, using Chou-Orlandi as the base OT.
-pub type AlszReceiver = alsz::Receiver<ChouOrlandiSender>;
+pub type AlszReceiver = alsz::Receiver;
 /// Instantiation of the KOS OT extension sender, using Chou-Orlandi as the base OT.
-pub type KosSender = kos::Sender<ChouOrlandiReceiver>;
+pub type KosSender = kos::Sender;
 /// Instantiation of the KOS OT extension receiver, using Chou-Orlandi as the base OT.
-pub type KosReceiver = kos::Receiver<ChouOrlandiSender>;
+pub type KosReceiver = kos::Receiver;
 /// Instantiation of the KOS Delta-OT extension sender, using Chou-Orlandi as the base OT.
-pub type KosDeltaSender = kos_delta::Sender<ChouOrlandiReceiver>;
+pub type KosDeltaSender = kos_delta::Sender;
 /// Instantiation of the KOS Delta-OT extension receiver, using Chou-Orlandi as the base OT.
-pub type KosDeltaReceiver = kos_delta::Receiver<ChouOrlandiSender>;
+pub type KosDeltaReceiver = kos_delta::Receiver;

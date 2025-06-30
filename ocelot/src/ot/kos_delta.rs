@@ -13,11 +13,11 @@ use swanky_ot_traits::{
 };
 
 /// Oblivious transfer extension sender.
-pub struct Sender<OT: OtReceiver<Msg = Block> + Malicious> {
+pub struct Sender<OT: OtReceiver<Msg = Block> + Malicious = swanky_ot_chou_orlandi::Receiver> {
     ot: KosSender<OT>,
 }
 /// Oblivious transfer extension receiver.
-pub struct Receiver<OT: OtSender<Msg = Block> + Malicious> {
+pub struct Receiver<OT: OtSender<Msg = Block> + Malicious = swanky_ot_chou_orlandi::Sender> {
     ot: KosReceiver<OT>,
 }
 
