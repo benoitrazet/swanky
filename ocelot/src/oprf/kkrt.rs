@@ -4,7 +4,9 @@
 
 #![allow(non_upper_case_globals)]
 
-use super::prc::PseudorandomCode;
+mod prc;
+
+use prc::PseudorandomCode;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;

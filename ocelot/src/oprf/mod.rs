@@ -2,7 +2,6 @@
 
 pub mod kkrt;
 pub mod kmprt;
-mod prc;
 
 /// KKRT oblivious PRF sender using ALSZ OT extension with Chou-Orlandi as the base OT.
 pub type KkrtSender = kkrt::Sender;
