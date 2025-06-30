@@ -1,7 +1,7 @@
 //! Implementation of the Keller-Orsini-Scholl oblivious transfer extension
 //! protocol (cf. <https://eprint.iacr.org/2015/546>).
 
-use crate::ot::alsz::{Receiver as AlszReceiver, Sender as AlszSender};
+use crate::alsz::{Receiver as AlszReceiver, Sender as AlszSender};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::io::ErrorKind;
 use swanky_adversary::{Malicious, SemiHonest};

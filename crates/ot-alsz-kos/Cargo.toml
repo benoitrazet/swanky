@@ -1,0 +1,34 @@
+[package]
+name = "swanky-ot-alsz-kos"
+description = "Oblivious transfer implementations for the ALSZ and KOS protocols"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+swanky-ot-traits.workspace = true
+swanky-block.workspace = true
+rand.workspace = true
+swanky-ocelot-error.workspace = true
+swanky-aes-hash.workspace = true
+swanky-aes-rng.workspace = true
+swanky-channel-legacy.workspace = true
+swanky-bytearray-utils.workspace = true
+swanky-adversary.workspace = true
+swanky-deprecated-bitwise-utils.workspace = true
+swanky-bit-matrix-transpose.workspace = true
+swanky-cointoss.workspace = true
+swanky-ot-chou-orlandi.workspace = true
+keyed_arena.workspace = true
+vectoreyes.workspace = true
+blake3.workspace = true
+bytemuck.workspace = true
+
+[dev-dependencies]
+swanky-ot-test.workspace = true
+

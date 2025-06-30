@@ -1751,6 +1751,7 @@ dependencies = [
  "swanky-field-binary",
  "swanky-field-f61p",
  "swanky-ocelot-error",
+ "swanky-ot-alsz-kos",
  "swanky-ot-chou-orlandi",
  "swanky-ot-dummy",
  "swanky-ot-noar-pinkas",
@@ -2730,6 +2731,30 @@ name = "swanky-ocelot-error"
 version = "0.6.0"
 dependencies = [
  "swanky-cointoss",
+]
+
+[[package]]
+name = "swanky-ot-alsz-kos"
+version = "0.6.0"
+dependencies = [
+ "blake3",
+ "bytemuck",
+ "keyed_arena",
+ "rand 0.8.5",
+ "swanky-adversary",
+ "swanky-aes-hash",
+ "swanky-aes-rng",
+ "swanky-bit-matrix-transpose",
+ "swanky-block",
+ "swanky-bytearray-utils",
+ "swanky-channel-legacy",
+ "swanky-cointoss",
+ "swanky-deprecated-bitwise-utils",
+ "swanky-ocelot-error",
+ "swanky-ot-chou-orlandi",
+ "swanky-ot-test",
+ "swanky-ot-traits",
+ "vectoreyes",
 ]
 
 [[package]]

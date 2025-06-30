@@ -10,13 +10,9 @@
 //! * `kos`: Keller-Orsini-Scholl malicious OT extension (+ correlated and random OT).
 //!
 
-pub mod alsz;
-pub mod explicit_round;
-pub mod kos;
-pub mod kos_delta;
-pub use swanky_ot_noar_pinkas as naor_pinkas;
-
+pub use swanky_ot_alsz_kos::*;
 pub use swanky_ot_chou_orlandi as chou_orlandi;
+pub use swanky_ot_noar_pinkas as naor_pinkas;
 pub use swanky_ot_traits::*;
 /// Instantiation of the Chou-Orlandi OT sender.
 pub type ChouOrlandiSender = swanky_ot_chou_orlandi::Sender;

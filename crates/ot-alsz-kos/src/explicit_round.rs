@@ -3,7 +3,6 @@
 //! implementation of the protocol involve pure computation, and the caller must handle all network
 //! I/O.
 
-use crate::Error;
 use keyed_arena::{AllocationKey, BorrowedAllocation, KeyedArena};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::convert::TryInto;
@@ -11,6 +10,7 @@ use swanky_aes_hash::AesHash;
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_ocelot_error::Error;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16, U64x2, array_utils::ArrayUnrolledExt};
 
 // TODO: alsz and kos should be based on this file?
@@ -205,7 +205,7 @@ impl KosSender {
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         Ok(KosSender {
-            alsz: AlszSender::init::<_, _, super::ChouOrlandiReceiver>(channel, rng)?,
+            alsz: AlszSender::init::<_, _, swanky_ot_chou_orlandi::Receiver>(channel, rng)?,
         })
     }
 
@@ -365,7 +365,7 @@ impl KosReceiver {
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         Ok(KosReceiver {
-            alsz: AlszReceiver::init::<_, _, super::ChouOrlandiSender>(channel, rng)?,
+            alsz: AlszReceiver::init::<_, _, swanky_ot_chou_orlandi::Sender>(channel, rng)?,
         })
     }
 

@@ -1,7 +1,7 @@
 //! Implementation of the Keller-Orsini-Scholl oblivious transfer extension
 //! protocol (cf. <https://eprint.iacr.org/2015/546>).
 
-use crate::ot::kos::{Receiver as KosReceiver, Sender as KosSender};
+use crate::kos::{Receiver as KosReceiver, Sender as KosSender};
 use rand::{CryptoRng, Rng};
 use swanky_adversary::{Malicious, SemiHonest};
 use swanky_block::Block;
@@ -176,37 +176,13 @@ impl<OT: OtSender<Msg = Block> + Malicious> Malicious for Receiver<OT> {}
 #[test]
 fn test_functionality() {
     let ninputs = 1 << 10;
-    swanky_ot_test::test_otext::<
-        Sender<super::ChouOrlandiReceiver>,
-        Receiver<super::ChouOrlandiSender>,
-    >(ninputs);
-    swanky_ot_test::test_cotext::<
-        Sender<super::ChouOrlandiReceiver>,
-        Receiver<super::ChouOrlandiSender>,
-    >(ninputs);
-    swanky_ot_test::test_rotext::<
-        Sender<super::ChouOrlandiReceiver>,
-        Receiver<super::ChouOrlandiSender>,
-    >(ninputs);
-    swanky_ot_test::test_rotext_fixed_key::<
-        Sender<super::ChouOrlandiReceiver>,
-        Receiver<super::ChouOrlandiSender>,
-    >(ninputs);
+    swanky_ot_test::test_otext::<Sender, Receiver>(ninputs);
+    swanky_ot_test::test_cotext::<Sender, Receiver>(ninputs);
+    swanky_ot_test::test_rotext::<Sender, Receiver>(ninputs);
+    swanky_ot_test::test_rotext_fixed_key::<Sender, Receiver>(ninputs);
     let ninputs = (1 << 10) + 1;
-    swanky_ot_test::test_otext::<
-        Sender<super::ChouOrlandiReceiver>,
-        Receiver<super::ChouOrlandiSender>,
-    >(ninputs);
-    swanky_ot_test::test_cotext::<
-        Sender<super::ChouOrlandiReceiver>,
-        Receiver<super::ChouOrlandiSender>,
-    >(ninputs);
-    swanky_ot_test::test_rotext::<
-        Sender<super::ChouOrlandiReceiver>,
-        Receiver<super::ChouOrlandiSender>,
-    >(ninputs);
-    swanky_ot_test::test_rotext_fixed_key::<
-        Sender<super::ChouOrlandiReceiver>,
-        Receiver<super::ChouOrlandiSender>,
-    >(ninputs);
+    swanky_ot_test::test_otext::<Sender, Receiver>(ninputs);
+    swanky_ot_test::test_cotext::<Sender, Receiver>(ninputs);
+    swanky_ot_test::test_rotext::<Sender, Receiver>(ninputs);
+    swanky_ot_test::test_rotext_fixed_key::<Sender, Receiver>(ninputs);
 }
