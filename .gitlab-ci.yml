@@ -38,7 +38,10 @@ nightly-test:
   script:
     - apt-get update && apt-get install -y nix python3 lz4 zstd inetutils-ping curl mtr bind9-dnsutils
     - ulimit -n 524288 || true
-    - ./etc/ci/nix-cache-diagnostic.sh
+    - ./etc/ci/nix-cache-diagnostic.sh || true
+    - ./etc/ci/nix-cache-diagnostic.sh example.com || true
+    - dig -t A @1.1.1.1 cache.nixos.org || true
+    - dig -t A @8.8.8.8 cache.nixos.org || true
     - bash -c "set -euxo pipefail; ./swanky ci nightly 2>&1 | lz4 > ./log.lz4"
     - tar -c ./coverage | zstd -9 -T > ./coverage.tar.zst
   artifacts:
