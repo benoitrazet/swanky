@@ -40,6 +40,7 @@
 - **`swanky-field-test`**: Utilitites for testing correctness of finite field implementations
 - **`swanky-flatbuffer-build`**: Tooling to automate compiling flatbuffer schemas
 - **`swanky-ocelot-error`**: [DEPRECATED] An error type used by crates formerly contained in ocelot
+- **`swanky-oprf-kkrt`**: An implementation of the kkrt OPRF protocol
 - **`swanky-oprf-traits`**: Base traits impl-ed by all our OPRF implementations
 - **`swanky-ot-alsz-kos`**: Oblivious transfer implementations for the ALSZ and KOS protocols
 - **`swanky-ot-chou-orlandi`**: An implementation of the Chou-Orlandi OT protocol

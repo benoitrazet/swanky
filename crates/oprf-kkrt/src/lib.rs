@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 //! Implementation of the batched, related-key oblivious pseudorandom function
 //! (BaRK-OPRF) protocol of Kolesnikov, Kumaresan, Rosulek, and Trieu (cf.
 //! <https://eprint.iacr.org/2016/799>, Figure 2).
@@ -210,7 +211,6 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> SemiHonest for Receiver<OT> {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::oprf;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
@@ -243,7 +243,8 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut oprf = oprf::KkrtSender::init(&mut channel, &mut rng).unwrap();
+            let mut oprf =
+                Sender::<swanky_ot_alsz_kos::alsz::Receiver>::init(&mut channel, &mut rng).unwrap();
             let seeds = oprf.send(&mut channel, n, &mut rng).unwrap();
             let mut results = results.lock().unwrap();
             *results = selections_
@@ -256,7 +257,8 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut oprf = oprf::KkrtReceiver::init(&mut channel, &mut rng).unwrap();
+        let mut oprf =
+            Receiver::<swanky_ot_alsz_kos::alsz::Sender>::init(&mut channel, &mut rng).unwrap();
         let outputs = oprf.receive(&mut channel, &selections, &mut rng).unwrap();
         handle.join().unwrap();
         let results_ = results_.lock().unwrap();
