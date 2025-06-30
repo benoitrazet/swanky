@@ -1332,7 +1332,6 @@ dependencies = [
  "dhat",
  "eyre",
  "flume",
- "lazy_static",
  "mac-n-cheese-ir",
  "mac-n-cheese-sieve-parser",
  "mac-n-cheese-wire-map",
@@ -3045,7 +3044,6 @@ version = "0.6.0"
 dependencies = [
  "aes",
  "bytemuck",
- "lazy_static",
  "num-traits",
  "prettyplease",
  "proc-macro2",

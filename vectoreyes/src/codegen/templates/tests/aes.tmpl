@@ -26,29 +26,6 @@ use crate::AesBlockCipher;
     aes.encrypt_many([block])[0].as_array()
 {% endcall %}
 
-{% call proptest_eq_scalar("aes" ~ key_size ~ "_encrypt_only_convert",
-    {'block': VectorType(core.u8, 16), 'key': key_ty}
-)%}
-    let aes = Aes{{key_size}}EncryptOnly::from(Aes{{key_size}}::new_with_key(key));
-    aes.encrypt_many([block])[0].as_array()
-{% endcall %}
-
-{% call proptest_eq_scalar("fixed_aes" ~ key_size ~ "_encrypt", {'block': VectorType(core.u8, 16)}) %}
-    let aes = Aes{{key_size}}::FIXED_KEY;
-    aes.encrypt_many([block])[0].as_array()
-{% endcall %}
-
-{% call proptest_eq_scalar("fixed_aes_enc_only" ~ key_size ~ "_encrypt", {'block': VectorType(core.u8, 16)}) %}
-    let aes = Aes{{key_size}}EncryptOnly::FIXED_KEY;
-    aes.encrypt_many([block])[0].as_array()
-{% endcall %}
-
-
-{% call proptest_eq_scalar("fixed_aes" ~ key_size ~ "_decrypt", {'block': VectorType(core.u8, 16)}) %}
-    let aes = Aes{{key_size}}::FIXED_KEY;
-    aes.decrypt_many([block])[0].as_array()
-{% endcall %}
-
 {% call proptest_eq_scalar("aes" ~ key_size ~ "_encrypt",
     {'block': VectorType(core.u8, 16), "key": key_ty}
 )%}

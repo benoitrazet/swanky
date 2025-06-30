@@ -7,9 +7,9 @@ use syn::Ident;
 
 use super::code_block::CodeBlock;
 use super::neon::neon_backend;
-use super::types::VectorType;
+use super::types::{Signedness, VectorType, int, vec};
 use super::utils::index_literals;
-use super::{Docs, PairwiseOperator};
+use super::{AesSize, Docs, PairwiseOperator};
 use super::{Scalar, VectorBackend, avx2::avx2_backend, cfg::Cfg};
 
 struct Backends {
@@ -126,11 +126,13 @@ fn implementation(backends: &Backends) -> TokenStream {
     out.append_all(quote! {
         #internals
         use internals::*;
+        use crate::*;
     });
     for ty in VectorType::all() {
         conversions(ty, &mut out);
         binops(backends, ty, &mut out);
     }
+    aes(backends, &mut out);
     out
 }
 
@@ -281,4 +283,99 @@ fn binops(backends: &Backends, ty: VectorType, out: &mut TokenStream) {
     binop("BitOr", "bitwise or", Or);
     binop("BitXor", "bitwise xor", Xor);
     binop("BitAnd", "bitwise and", And);
+}
+
+fn aes(backends: &Backends, out: &mut TokenStream) {
+    for key_size in AesSize::all() {
+        let key_ty = vec(int(Signedness::Unsigned, 8), key_size.bits() / 8);
+        let name_encrypt_only = format_ident!("Aes{key_size}EncryptOnly");
+        let name_both = format_ident!("Aes{key_size}");
+        for encrypt_only in [true, false] {
+            let doc = format!(
+                "A key-scheduled Aes{key_size} block cipher which can {} blocks.",
+                if encrypt_only {
+                    "only encrypt"
+                } else {
+                    "both encrypt and decrypt"
+                }
+            );
+            let name = if encrypt_only {
+                &name_encrypt_only
+            } else {
+                &name_both
+            };
+            let internal_ty = {
+                let mod_name = format_ident!(
+                    "aes_{key_size}{}",
+                    if encrypt_only { "_enc_only" } else { "" }
+                );
+                out.append_all(backends.define_module(mod_name.clone(), &mut |backend| {
+                    let ty = backend.aes_key_schedule_type(key_size, encrypt_only);
+                    quote! { pub(super) type Type = #ty; }
+                }));
+                quote! { #mod_name::Type }
+            };
+            let encrypt_many = standard_fn(
+                backends,
+                "Encrypt blocks with AES-ECB",
+                quote! {
+                    fn encrypt_many<const N: usize>(&self, blocks: [U8x16; N]) -> [U8x16; N]
+                    where
+                        array_utils::ArrayUnrolledOps: array_utils::UnrollableArraySize<N>
+                },
+                &|backend| {
+                    backend.aes_encrypt(
+                        key_size,
+                        &quote! {(&self.0)},
+                        &quote! {N},
+                        &quote! {blocks},
+                    )
+                },
+            );
+            let new_with_key = standard_fn(
+                backends,
+                "Schedule a new AES key.",
+                quote! {fn new_with_key(key: Self::Key) -> Self},
+                &|backend| {
+                    let (inner, docs) =
+                        backend.aes_key_expand(key_size, encrypt_only, &quote! {key});
+                    (quote! { Self({#inner}) }, docs)
+                },
+            );
+            out.append_all(quote! {
+                #[doc=#doc]
+                #[derive(Clone)]
+                pub struct #name(#internal_ty);
+                impl std::fmt::Debug for #name {
+                    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        write!(f, "{}(...)", stringify!(#name))
+                    }
+                }
+                impl AesBlockCipher for #name {
+                    type Key = #key_ty;
+                    // TODO: lift this to a global constant?
+                    const BLOCK_COUNT_HINT: usize = 4;
+                    #new_with_key
+                    #encrypt_many
+                }
+            });
+        }
+        let decrypt_many = standard_fn(
+            backends,
+            "Decrypt blocks with AES-ECB",
+            quote! {
+                fn decrypt_many<const N: usize>(&self, blocks: [U8x16; N]) -> [U8x16; N]
+                where
+                    array_utils::ArrayUnrolledOps: array_utils::UnrollableArraySize<N>
+            },
+            &|backend| {
+                backend.aes_decrypt(key_size, &quote! {(&self.0)}, &quote! {N}, &quote! {blocks})
+            },
+        );
+        out.append_all(quote! {
+            impl AesBlockCipherDecrypt for #name_both {
+                #decrypt_many
+            }
+        });
+    }
 }

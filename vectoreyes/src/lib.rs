@@ -391,13 +391,6 @@ pub trait AesBlockCipher: 'static + Clone + Sync + Send {
     /// The type of the AES key.
     type Key: 'static + Clone + Sync + Send;
 
-    /// If you don't need to use Aes for decryption, it's faster to only perform key scheduling
-    /// for encryption than for both encryption and decryption.
-    type EncryptOnly: AesBlockCipher<Key = Self::Key> + From<Self>;
-
-    /// A pre-scheduled Aes block cipher with a compile-time constant key.
-    const FIXED_KEY: Self;
-
     /// Running `encrypt_many` with this many blocks will typically result in good
     /// performance.
     const BLOCK_COUNT_HINT: usize;
@@ -430,7 +423,7 @@ pub trait AesBlockCipherDecrypt: AesBlockCipher {
 }
 
 pub mod array_utils;
-mod utils;
+pub(crate) mod utils;
 
 // We want to allow `which_lane * 0 + 0` expressions.
 // These also allow for simpler generated code. For example, sometimes we have code which looks
@@ -451,5 +444,10 @@ mod utils;
 #[allow(clippy::suspicious_else_formatting)]
 // You can't put inline(always) without a closure
 #[allow(clippy::redundant_closure)]
+// These two lints let us have extra parentheses in the generated source (which makes generation
+// easier).
+#[allow(unused_parens)]
+#[allow(clippy::needless_borrow)]
+// </the two lints>
 mod generated;
 pub use generated::implementation::*;

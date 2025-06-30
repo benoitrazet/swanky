@@ -1,13 +1,16 @@
 #![deny(missing_docs)]
 //! Correlation-robust hashing based on fixed-key AES.
 
+use std::sync::OnceLock;
+
 use vectoreyes::{
-    Aes128EncryptOnly, AesBlockCipher,
+    Aes128EncryptOnly, AesBlockCipher, U8x16,
     array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
 };
 
 use swanky_block::Block;
 
+#[derive(Clone)]
 /// AES-based correlation-robust hash function.
 ///
 /// This hash function supports the correlation-robust variants given in
@@ -16,12 +19,13 @@ pub struct AesHash {
     aes: Aes128EncryptOnly,
 }
 
-/// `AesHash` with a fixed key.
-pub const AES_HASH: AesHash = AesHash {
-    aes: Aes128EncryptOnly::FIXED_KEY,
-};
-
+static THE_ONE: OnceLock<AesHash> = OnceLock::new();
 impl AesHash {
+    /// A `AesHash` with a fixed key `b"Aes' 16 byte key"`
+    pub fn fixed_key() -> &'static AesHash {
+        THE_ONE.get_or_init(|| Self::new(const { U8x16::from_array(*b"Aes' 16 byte key") }))
+    }
+
     /// Initialize the hash function using `key`.
     #[inline]
     pub fn new(key: Block) -> Self {

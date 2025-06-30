@@ -3,7 +3,7 @@
 use crate::{fancy::HasModulus, util};
 use rand::{CryptoRng, Rng, RngCore};
 use subtle::ConditionallySelectable;
-use swanky_aes_hash::AES_HASH;
+use swanky_aes_hash::AesHash;
 use swanky_block::Block;
 use vectoreyes::{
     SimdBase,
@@ -35,7 +35,7 @@ where
     ArrayUnrolledOps: UnrollableArraySize<Q>,
 {
     let batch = wires.array_map(|x| x.as_block());
-    AES_HASH.tccr_hash_many(tweak, batch)
+    AesHash::fixed_key().tccr_hash_many(tweak, batch)
 }
 
 /// Marker trait indicating an arithmetic wire
@@ -142,7 +142,7 @@ pub trait WireLabel: Clone + HasModulus {
     /// Uses fixed-key AES.
     #[inline(never)]
     fn hash(&self, tweak: Block) -> Block {
-        AES_HASH.tccr_hash(tweak, self.as_block())
+        AesHash::fixed_key().tccr_hash(tweak, self.as_block())
     }
 }
 
