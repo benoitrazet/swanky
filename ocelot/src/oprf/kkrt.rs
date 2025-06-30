@@ -5,7 +5,6 @@
 #![allow(non_upper_case_globals)]
 
 use super::prc::PseudorandomCode;
-use crate::oprf::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
@@ -15,6 +14,7 @@ use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cointoss;
 use swanky_ocelot_error::Error;
+use swanky_oprf_traits::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender};
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
 
 /// KKRT oblivious PRF sender.

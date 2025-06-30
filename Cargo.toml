@@ -77,6 +77,7 @@ swanky-field-fft = { path = "crates/field-fft" }
 swanky-field-test = { path = "crates/field-test" }
 swanky-flatbuffer-build = { path = "crates/flatbuffer-build" }
 swanky-ocelot-error = { path = "crates/ocelot-error" }
+swanky-oprf-traits = { path = "crates/oprf-traits" }
 swanky-ot-alsz-kos = { path = "crates/ot-alsz-kos" }
 swanky-ot-chou-orlandi = { path = "crates/ot-chou-orlandi" }
 swanky-ot-dummy = { path = "crates/ot-dummy" }

@@ -42,6 +42,7 @@ swanky-ot-dummy.workspace = true
 swanky-ot-chou-orlandi.workspace = true
 swanky-ot-noar-pinkas.workspace = true
 swanky-ot-alsz-kos.workspace = true
+swanky-oprf-traits.workspace = true
 
 [build-dependencies]
 cc.workspace = true
