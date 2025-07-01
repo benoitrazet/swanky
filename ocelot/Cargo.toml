@@ -44,6 +44,7 @@ swanky-ot-noar-pinkas.workspace = true
 swanky-ot-alsz-kos.workspace = true
 swanky-oprf-traits.workspace = true
 swanky-oprf-kkrt.workspace = true
+swanky-oprf-kmprt.workspace = true
 
 [build-dependencies]
 cc.workspace = true
@@ -62,13 +63,6 @@ name = "ot"
 harness = false
 
 [[bench]]
-name = "oprf"
-harness = false
-
-[[bench]]
 name = "svole"
 harness = false
 
-[[example]]
-name = "kmprt"
-harness = false

@@ -2,10 +2,6 @@
 //! Oblivious pseudorandom function benchmarks using `criterion`.
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use ocelot::{
-    oprf::{self, Receiver as OprfReceiver, Sender as OprfSender, kkrt, kmprt},
-    ot::chou_orlandi,
-};
 use std::{
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
@@ -14,9 +10,10 @@ use std::{
 use swanky_aes_rng::AesRng;
 use swanky_block::{Block, Block512};
 use swanky_channel_legacy::Channel;
+use swanky_oprf_traits::{Receiver as OprfReceiver, Sender as OprfSender};
 
-type OpprfSender = kmprt::Sender<kkrt::Sender<chou_orlandi::Receiver>>;
-type OpprfReceiver = kmprt::Receiver<kkrt::Receiver<chou_orlandi::Sender>>;
+type OpprfSender = swanky_oprf_kmprt::Sender;
+type OpprfReceiver = swanky_oprf_kmprt::Receiver;
 
 fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
@@ -68,28 +65,31 @@ fn _bench_oprf<S: OprfSender<Input = Block>, R: OprfReceiver<Input = Block>>(inp
 fn bench_oprf(c: &mut Criterion) {
     c.bench_function("oprf::kkrt (initialization)", move |bench| {
         bench.iter(|| {
-            let result = _bench_oprf_init::<oprf::KkrtSender, oprf::KkrtReceiver>();
+            let result = _bench_oprf_init::<swanky_oprf_kkrt::Sender, swanky_oprf_kkrt::Receiver>();
             std::hint::black_box(result);
         })
     });
     let inputs = rand_block_vec(1 << 12);
     c.bench_function("oprf::kkrt (n = 2^12)", move |bench| {
         bench.iter(|| {
-            let result = _bench_oprf::<oprf::KkrtSender, oprf::KkrtReceiver>(inputs.clone());
+            let result =
+                _bench_oprf::<swanky_oprf_kkrt::Sender, swanky_oprf_kkrt::Receiver>(inputs.clone());
             std::hint::black_box(result);
         })
     });
     let inputs = rand_block_vec(1 << 16);
     c.bench_function("oprf::kkrt (n = 2^16)", move |bench| {
         bench.iter(|| {
-            let result = _bench_oprf::<oprf::KkrtSender, oprf::KkrtReceiver>(inputs.clone());
+            let result =
+                _bench_oprf::<swanky_oprf_kkrt::Sender, swanky_oprf_kkrt::Receiver>(inputs.clone());
             std::hint::black_box(result);
         })
     });
     let inputs = rand_block_vec(1 << 18);
     c.bench_function("oprf::kkrt (n = 2^18)", move |bench| {
         bench.iter(|| {
-            let result = _bench_oprf::<oprf::KkrtSender, oprf::KkrtReceiver>(inputs.clone());
+            let result =
+                _bench_oprf::<swanky_oprf_kkrt::Sender, swanky_oprf_kkrt::Receiver>(inputs.clone());
             std::hint::black_box(result);
         })
     });
@@ -103,13 +103,15 @@ fn bench_oprf_compute(c: &mut Criterion) {
             let reader = BufReader::new(receiver.try_clone().unwrap());
             let writer = BufWriter::new(receiver);
             let mut channel = Channel::new(reader, writer);
-            let _ = oprf::KkrtReceiver::init(&mut channel, &mut rng).unwrap();
+            let _: swanky_oprf_kmprt::Receiver =
+                swanky_oprf_kmprt::Receiver::init(&mut channel, &mut rng).unwrap();
         });
         let mut rng = AesRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        let oprf = oprf::KkrtSender::init(&mut channel, &mut rng).unwrap();
+        let oprf: swanky_oprf_kkrt::Sender =
+            swanky_oprf_kkrt::Sender::init(&mut channel, &mut rng).unwrap();
         handle.join().unwrap();
         let seed = rand::random::<Block512>();
         let input = rand::random::<Block>();

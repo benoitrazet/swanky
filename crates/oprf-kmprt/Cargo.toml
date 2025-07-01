@@ -1,0 +1,30 @@
+[package]
+name = "swanky-oprf-kmprt"
+description = "An implementation of the KMPRT OPRF protocol"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+swanky-oprf-kkrt.workspace = true
+rand.workspace = true
+swanky-adversary.workspace = true
+swanky-block.workspace = true
+swanky-channel-legacy.workspace = true
+swanky-ocelot-error.workspace = true
+swanky-oprf-traits.workspace = true
+vectoreyes.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+swanky-aes-rng.workspace = true
+proptest.workspace = true
+
+[[bench]]
+name = "oprf"
+harness = false

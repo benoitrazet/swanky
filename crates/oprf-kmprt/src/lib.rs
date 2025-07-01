@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 //! Implementation of the hash-based multi-use OPPRF of Kolesnikov, Matania,
 //! Pinkas, Rosulek, and Trieu (cf. <https://eprint.iacr.org/2017/799>).
 
@@ -101,7 +102,7 @@ impl Parameters {
 /// This implements the hashing-based OPPRF sender in Figure 7 of the paper. It
 /// uses the table-based one-time OPPRF under-the-hood (Figure 6 of the paper),
 /// which itself uses an OPRF.
-pub struct Sender<OPRF = super::KkrtSender> {
+pub struct Sender<OPRF = swanky_oprf_kkrt::Sender> {
     oprf: OPRF,
 }
 
@@ -295,7 +296,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
 /// This implements the hashing-based OPPRF receiver in Figure 7 of the paper. It
 /// uses the table-based one-time OPPRF under-the-hood (Figure 6 of the paper),
 /// which itself uses an OPRF.
-pub struct Receiver<OPRF: OprfReceiver + SemiHonest = super::KkrtReceiver> {
+pub struct Receiver<OPRF: OprfReceiver + SemiHonest = swanky_oprf_kkrt::Receiver> {
     oprf: OPRF,
 }
 
@@ -393,7 +394,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::oprf::{KmprtReceiver, KmprtSender};
+    use super::{Receiver as KmprtReceiver, Sender as KmprtSender};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
@@ -423,7 +424,8 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut oprf = KmprtSender::init(&mut channel, &mut rng).unwrap();
+            let mut oprf =
+                KmprtSender::<swanky_oprf_kkrt::Sender>::init(&mut channel, &mut rng).unwrap();
             let _ = oprf
                 .send(&mut channel, &points_, ninputs, &mut rng)
                 .unwrap();
@@ -432,7 +434,8 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut oprf = KmprtReceiver::init(&mut channel, &mut rng).unwrap();
+        let mut oprf =
+            KmprtReceiver::<swanky_oprf_kkrt::Receiver>::init(&mut channel, &mut rng).unwrap();
         let outputs = oprf.receive(&mut channel, &xs, &mut rng).unwrap();
         handle.join().unwrap();
         let mut okay = true;

@@ -1752,6 +1752,7 @@ dependencies = [
  "swanky-field-f61p",
  "swanky-ocelot-error",
  "swanky-oprf-kkrt",
+ "swanky-oprf-kmprt",
  "swanky-oprf-traits",
  "swanky-ot-alsz-kos",
  "swanky-ot-chou-orlandi",
@@ -2752,6 +2753,23 @@ dependencies = [
  "swanky-oprf-traits",
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",
+ "vectoreyes",
+]
+
+[[package]]
+name = "swanky-oprf-kmprt"
+version = "0.6.0"
+dependencies = [
+ "criterion",
+ "proptest",
+ "rand 0.8.5",
+ "swanky-adversary",
+ "swanky-aes-rng",
+ "swanky-block",
+ "swanky-channel-legacy",
+ "swanky-ocelot-error",
+ "swanky-oprf-kkrt",
+ "swanky-oprf-traits",
  "vectoreyes",
 ]
 

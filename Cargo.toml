@@ -78,6 +78,7 @@ swanky-field-test = { path = "crates/field-test" }
 swanky-flatbuffer-build = { path = "crates/flatbuffer-build" }
 swanky-ocelot-error = { path = "crates/ocelot-error" }
 swanky-oprf-kkrt = { path = "crates/oprf-kkrt" }
+swanky-oprf-kmprt = { path = "crates/oprf-kmprt" }
 swanky-oprf-traits = { path = "crates/oprf-traits" }
 swanky-ot-alsz-kos = { path = "crates/ot-alsz-kos" }
 swanky-ot-chou-orlandi = { path = "crates/ot-chou-orlandi" }

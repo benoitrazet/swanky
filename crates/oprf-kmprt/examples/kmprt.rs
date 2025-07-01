@@ -1,5 +1,4 @@
 #![allow(clippy::all)]
-use ocelot::oprf::{KmprtReceiver, KmprtSender};
 use rand::Rng;
 use std::time::SystemTime;
 use swanky_aes_rng::AesRng;
@@ -22,7 +21,8 @@ fn run(ninputs: usize, npoints: usize) {
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();
         let start = SystemTime::now();
-        let mut oprf = KmprtSender::init(&mut sender, &mut rng).unwrap();
+        let mut oprf: swanky_oprf_kmprt::Sender =
+            swanky_oprf_kmprt::Sender::init(&mut sender, &mut rng).unwrap();
         println!(
             "Sender init time: {} ms",
             start.elapsed().unwrap().as_millis()
@@ -44,7 +44,8 @@ fn run(ninputs: usize, npoints: usize) {
     });
     let mut rng = AesRng::new();
     let start = SystemTime::now();
-    let mut oprf = KmprtReceiver::init(&mut receiver, &mut rng).unwrap();
+    let mut oprf: swanky_oprf_kmprt::Receiver =
+        swanky_oprf_kmprt::Receiver::init(&mut receiver, &mut rng).unwrap();
     println!(
         "Receiver init time: {} ms",
         start.elapsed().unwrap().as_millis()

@@ -1,7 +1,7 @@
 //! Oblivious PRF traits + instantiations.
 
 pub use swanky_oprf_kkrt as kkrt;
-pub mod kmprt;
+pub use swanky_oprf_kmprt as kmprt;
 
 /// KKRT oblivious PRF sender using ALSZ OT extension with Chou-Orlandi as the base OT.
 pub type KkrtSender = kkrt::Sender;
