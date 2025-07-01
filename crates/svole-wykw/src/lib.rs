@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 //! Implementation of the Weng-Yang-Katz-Wang random subfield VOLE protocol (cf.
 //! <https://eprint.iacr.org/2020/925>).
 

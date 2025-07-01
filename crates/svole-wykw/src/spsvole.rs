@@ -4,7 +4,6 @@ use super::{
     ggm_utils::{ggm, ggm_prime, ggm_prime_temporary_storage_size, ggm_temporary_storage_size},
     utils::Powers,
 };
-use crate::ot::{KosReceiver, KosSender};
 use generic_array::typenum::Unsigned;
 use rand::{
     CryptoRng, Rng, SeedableRng,
@@ -17,6 +16,7 @@ use swanky_bytearray_utils::unpack_bits;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
 use swanky_ocelot_error::Error;
+use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 

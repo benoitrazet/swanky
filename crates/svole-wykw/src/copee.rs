@@ -2,7 +2,6 @@
 //! <https://eprint.iacr.org/2020/925>, Figure 15).
 
 use super::utils::Powers;
-use crate::ot::{KosReceiver, KosSender};
 use generic_array::{GenericArray, typenum::Unsigned};
 use rand::{CryptoRng, Rng};
 use std::marker::PhantomData;
@@ -12,6 +11,7 @@ use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
 use swanky_ocelot_error::Error;
+use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
 use swanky_ot_traits::{RandomReceiver as ROTReceiver, RandomSender as ROTSender};
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 

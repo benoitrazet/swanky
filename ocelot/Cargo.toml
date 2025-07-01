@@ -45,6 +45,7 @@ swanky-ot-alsz-kos.workspace = true
 swanky-oprf-traits.workspace = true
 swanky-oprf-kkrt.workspace = true
 swanky-oprf-kmprt.workspace = true
+swanky-svole-wykw.workspace = true
 
 [build-dependencies]
 cc.workspace = true

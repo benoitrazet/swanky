@@ -1760,6 +1760,7 @@ dependencies = [
  "swanky-ot-noar-pinkas",
  "swanky-ot-test",
  "swanky-ot-traits",
+ "swanky-svole-wykw",
  "vectoreyes",
 ]
 
@@ -2891,6 +2892,31 @@ dependencies = [
  "bytemuck",
  "generic-array 1.2.0",
  "serde",
+ "vectoreyes",
+]
+
+[[package]]
+name = "swanky-svole-wykw"
+version = "0.6.0"
+dependencies = [
+ "blake3",
+ "bytemuck",
+ "generic-array 1.2.0",
+ "proptest",
+ "rand 0.8.5",
+ "subtle",
+ "swanky-adversary",
+ "swanky-aes-rng",
+ "swanky-block",
+ "swanky-bytearray-utils",
+ "swanky-channel-legacy",
+ "swanky-cointoss",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-field-f61p",
+ "swanky-ocelot-error",
+ "swanky-ot-alsz-kos",
+ "swanky-ot-traits",
  "vectoreyes",
 ]
 

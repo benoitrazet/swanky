@@ -5,7 +5,7 @@
 //! sVOLE protocol.
 //!
 
-mod wykw;
+use swanky_svole_wykw as wykw;
 pub use wykw::base_svole;
 pub use wykw::ggm_utils;
 pub use wykw::{

@@ -1,0 +1,34 @@
+[package]
+name = "swanky-svole-wykw"
+description = "An implementation of the WYKW svole protocol"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+blake3.workspace = true
+bytemuck.workspace = true
+generic-array.workspace = true
+rand.workspace = true
+subtle.workspace = true
+swanky-adversary.workspace = true
+swanky-aes-rng.workspace = true
+swanky-block.workspace = true
+swanky-bytearray-utils.workspace = true
+swanky-channel-legacy.workspace = true
+swanky-cointoss.workspace = true
+swanky-field.workspace = true
+swanky-ocelot-error.workspace = true
+swanky-ot-traits.workspace = true
+swanky-ot-alsz-kos.workspace = true
+vectoreyes.workspace = true
+
+[dev-dependencies]
+swanky-field-f61p.workspace = true
+proptest.workspace = true
+swanky-field-binary.workspace = true
