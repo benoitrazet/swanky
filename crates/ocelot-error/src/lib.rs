@@ -38,9 +38,9 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Error::InvalidInputLength => "invalid input length".fmt(f),
-            Error::IoError(e) => write!(f, "IO error: {}", e),
-            Error::Other(s) => write!(f, "other error: {}", s),
-            Error::CoinTossError(e) => write!(f, "coin toss error: {}", e),
+            Error::IoError(e) => write!(f, "IO error: {e}"),
+            Error::Other(s) => write!(f, "other error: {s}"),
+            Error::CoinTossError(e) => write!(f, "coin toss error: {e}"),
             Error::CorrelationCheckFailed => "Correlation check failed!, i.e, w != u'Δ + v".fmt(f),
             Error::EqCheckFailed => "EQ check failed!".fmt(f),
             Error::InvalidOpening => "Invalid commitment opening!".fmt(f),

@@ -72,12 +72,7 @@ pub fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
     #[cfg(target_arch = "x86_64")]
     unsafe {
         let mut m_ = vec![0u8; nrows * ncols / 8];
-        _transpose(
-            m_.as_mut_ptr() as *mut u8,
-            m.as_ptr(),
-            nrows as u64,
-            ncols as u64,
-        );
+        _transpose(m_.as_mut_ptr(), m.as_ptr(), nrows as u64, ncols as u64);
         m_
     }
 }

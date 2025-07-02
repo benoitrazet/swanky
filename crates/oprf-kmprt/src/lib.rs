@@ -15,7 +15,7 @@ mod cuckoo;
 
 impl From<cuckoo::Error> for Error {
     fn from(e: cuckoo::Error) -> Error {
-        Error::Other(format!("Cuckoo hash error: {}", e))
+        Error::Other(format!("Cuckoo hash error: {e}"))
     }
 }
 
@@ -158,7 +158,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                 let h = hash_input_keyed(key, *x, params.m1);
                 // Only add the point if it doesn't already exist in the `h`th
                 // bin.
-                if !hs.iter().any(|&h_| h_ == h) {
+                if !hs.contains(&h) {
                     bins[h].push((*x, *y));
                     hs.push(h);
                 }
@@ -168,7 +168,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                 let h = hash_input_keyed(key, *x, params.m2);
                 // Only add the point if it doesn't already exist in the `h`th
                 // bin.
-                if !hs.iter().any(|&h_| h_ == h) {
+                if !hs.contains(&h) {
                     bins[params.m1 + h].push((*x, *y));
                     hs.push(h);
                 }
@@ -426,8 +426,7 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
             let mut oprf =
                 KmprtSender::<swanky_oprf_kkrt::Sender>::init(&mut channel, &mut rng).unwrap();
-            let _ = oprf
-                .send(&mut channel, &points_, ninputs, &mut rng)
+            oprf.send(&mut channel, &points_, ninputs, &mut rng)
                 .unwrap();
         });
         let mut rng = AesRng::new();
@@ -444,7 +443,7 @@ mod tests {
                 okay = false;
             }
         }
-        assert_eq!(okay, true);
+        assert!(okay);
     }
 
     #[test]

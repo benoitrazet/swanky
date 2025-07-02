@@ -102,12 +102,12 @@ impl<FE: FF> Receiver<FE> {
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
         let r = Degree::<FE>::USIZE;
-        let mut v: Vec<FE> = vec![FE::ZERO; len];
+        let mut v: Vec<FE> = Vec::with_capacity(len);
         let seed = rng.r#gen();
         let mut rng_chi = AesRng::from_seed(seed);
         let mut y: FE = FE::ZERO;
-        for i in 0..len {
-            v[i] = self.copee.receive(channel)?;
+        for _ in 0..len {
+            v.push(self.copee.receive(channel)?);
         }
         y += v.iter().map(|v_i| FE::random(&mut rng_chi) * *v_i).sum();
 

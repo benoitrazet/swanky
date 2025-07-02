@@ -48,7 +48,7 @@ pub fn ggm<FE: FiniteField, T: From<U8x16>, Dst: Extend<(T, T)>>(
         let (prev_levels, current_level_and_beyond) = seeds.split_at_mut((1 << (i + 1)) - 1);
         let prev_level = &prev_levels[(1 << i) - 1..(1 << (i + 1)) - 1];
         let current_level = &mut current_level_and_beyond[0..1 << (i + 1)];
-        debug_assert_eq!(prev_level.len(), 1 << i, "i={}", i);
+        debug_assert_eq!(prev_level.len(), 1 << i, "i={i}");
         debug_assert_eq!(current_level.len(), 1 << (i + 1));
         debug_assert_eq!(current_level.len() % 2, 0);
         debug_assert_eq!(current_level.len(), 2 * prev_level.len());

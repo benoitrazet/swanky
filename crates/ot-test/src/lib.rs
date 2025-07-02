@@ -40,10 +40,7 @@ pub fn test_otext<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Bloc
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
         let mut otext = OTSender::init(&mut channel, &mut rng).unwrap();
-        let ms = m0s
-            .into_iter()
-            .zip(m1s.into_iter())
-            .collect::<Vec<(Block, Block)>>();
+        let ms = m0s.into_iter().zip(m1s).collect::<Vec<(Block, Block)>>();
         otext.send(&mut channel, &ms, &mut rng).unwrap();
     });
     let mut rng = AesRng::new();
@@ -142,7 +139,7 @@ pub fn test_rotext_fixed_key<
     let (sender, receiver) = UnixStream::pair().unwrap();
 
     let key = [1u8; 16];
-    let key_ = key.clone();
+    let key_ = key;
 
     let handle = std::thread::spawn(move || {
         let mut rng = AesRng::new();

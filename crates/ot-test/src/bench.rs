@@ -59,10 +59,7 @@ pub fn bench_block_ot<S: Sender<Msg = Block>, R: Receiver<Msg = Block>>(
         |bench| {
             let m0s = rand_block_vec(size);
             let m1s = rand_block_vec(size);
-            let ms = m0s
-                .into_iter()
-                .zip(m1s.into_iter())
-                .collect::<Vec<(Block, Block)>>();
+            let ms = m0s.into_iter().zip(m1s).collect::<Vec<(Block, Block)>>();
             let bs = rand_bool_vec(size);
             bench.iter(move || bench_block_ot_inner::<S, R>(&bs, ms.clone()));
         },

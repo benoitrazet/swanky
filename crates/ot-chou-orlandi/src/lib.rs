@@ -125,7 +125,7 @@ impl OtReceiver for Receiver {
         self.counter += inputs.len() as u128;
         inputs
             .iter()
-            .zip(ks.into_iter())
+            .zip(ks)
             .map(|(b, k)| {
                 let c0 = channel.read_block()?;
                 let c1 = channel.read_block()?;

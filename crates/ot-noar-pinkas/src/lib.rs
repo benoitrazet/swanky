@@ -112,7 +112,7 @@ impl OtReceiver for Receiver {
         channel.flush()?;
         inputs
             .iter()
-            .zip(ks.into_iter())
+            .zip(ks)
             .enumerate()
             .map(|(i, (b, k))| {
                 let ei0 = channel.read_pt()?;

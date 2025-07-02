@@ -121,7 +121,7 @@ fn lpn_mtx_indices<FE: FiniteField>(
     let mut indices = [0u32; LPN_PARAMS_D];
     for i in 0..LPN_PARAMS_D {
         let mut rand_idx = distribution.sample(&mut rng);
-        while indices[0..i].iter().any(|&x| x == rand_idx) {
+        while indices[0..i].contains(&rand_idx) {
             rand_idx = distribution.sample(&mut rng);
         }
         indices[i] = rand_idx;
@@ -559,7 +559,7 @@ mod tests {
         let mut vs: Vec<T> = Vec::new();
         vole.receive(&mut channel, &mut rng, &mut vs).unwrap();
         let uws = handle.join().unwrap();
-        for i in 0..uws.len() as usize {
+        for i in 0..uws.len() {
             assert_eq!(uws[i].1, uws[i].0 * vole.delta() + vs[i]);
             assert_ne!(uws[i].1, T::ZERO);
         }
@@ -617,7 +617,7 @@ mod tests {
         vs.extend(vs3);
 
         let uws = handle.join().unwrap();
-        for i in 0..uws.len() as usize {
+        for i in 0..uws.len() {
             assert_eq!(uws[i].1, uws[i].0 * vole.delta() + vs[i]);
         }
     }

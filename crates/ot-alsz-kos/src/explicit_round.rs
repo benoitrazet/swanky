@@ -64,7 +64,7 @@ impl AlszSender {
         let seeds = ot.receive(channel, &s_bit_vec, rng)?;
         let rngs = seeds
             .into_iter()
-            .map(|seed| Aes128EncryptOnly::new_with_key(seed))
+            .map(Aes128EncryptOnly::new_with_key)
             .collect();
         Ok(AlszSender { s, rngs })
     }

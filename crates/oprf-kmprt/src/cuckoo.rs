@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use swanky_block::Block;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
@@ -22,7 +24,7 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Error::InvalidSetSize(s) => write!(f, "invalid set size {}", s),
+            Error::InvalidSetSize(s) => write!(f, "invalid set size {s}"),
             Error::CuckooHashFull => write!(f, "hash table is full"),
         }
     }
