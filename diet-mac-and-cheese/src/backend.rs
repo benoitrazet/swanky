@@ -7,12 +7,12 @@ use crate::svole_trait::SvoleT;
 use crate::svole_trait::field_name;
 use eyre::{Result, bail};
 use log::{debug, info, warn};
-use ocelot::svole::LpnParams;
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::private::ProverPrivateCopy;
 use swanky_party::{Party, WhichParty};
+use swanky_svole_wykw::LpnParams;
 
 // Some design decisions:
 // * There is one queue for the multiplication check and another queue for `assert_zero`s.
@@ -470,7 +470,6 @@ where
 mod tests {
     use crate::svole_trait::Svole;
     use crate::{backend::DietMacAndCheese, backend_trait::BackendT, mac::validate};
-    use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     use std::{
         io::{BufReader, BufWriter},
@@ -482,6 +481,7 @@ mod tests {
     use swanky_field_binary::{F2, F40b};
     use swanky_field_f61p::F61p;
     use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier};
+    use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     fn test<V: IsSubFieldOf<T>, T: FiniteField>()
     where

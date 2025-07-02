@@ -4,11 +4,11 @@ use crate::{
     psi::circuit_psi::{circuits::*, *},
 };
 use fancy_garbling::{WireMod2, twopac::semihonest::Garbler};
-use ocelot::ot::AlszSender as OtSender;
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_ot_alsz_kos::alsz::Sender as OtSender;
 
 use self::sender::OpprfSender;
 

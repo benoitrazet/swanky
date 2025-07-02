@@ -2,11 +2,11 @@ use crate::{
     AllWire, ArithmeticWire, Evaluator as Ev, Fancy, FancyArithmetic, FancyBinary, FancyInput,
     FancyReveal, WireMod2, errors::TwopacError, wire::WireLabel,
 };
-use ocelot::ot::Receiver as OtReceiver;
 use rand::{CryptoRng, Rng};
 use swanky_adversary::SemiHonest;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_ot_traits::Receiver as OtReceiver;
 
 /// Semi-honest evaluator.
 pub struct Evaluator<C, RNG, OT, Wire> {

@@ -354,7 +354,6 @@ mod test {
     use crate::backend_trait::BackendT;
     use crate::homcom::FCom;
     use crate::svole_trait::Svole;
-    use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     use std::thread::JoinHandle;
     use std::{
@@ -365,6 +364,7 @@ mod test {
     use swanky_channel_legacy::Channel;
     use swanky_field_binary::{F2, F40b};
     use swanky_party::{Prover, Verifier};
+    use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     #[test]
     fn test_backend_ext_field() -> Result<(), eyre::Error> {

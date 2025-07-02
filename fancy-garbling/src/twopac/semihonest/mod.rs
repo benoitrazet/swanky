@@ -17,9 +17,9 @@ mod tests {
         util::RngExt,
     };
     use itertools::Itertools;
-    use ocelot::ot::{ChouOrlandiReceiver, ChouOrlandiSender};
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::{UnixChannel, unix_channel_pair};
+    use swanky_ot_chou_orlandi::{Receiver as ChouOrlandiReceiver, Sender as ChouOrlandiSender};
 
     fn addition<F: FancyArithmetic>(
         f: &mut F,

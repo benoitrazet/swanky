@@ -21,7 +21,9 @@ doctest = false
 serde = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
-ocelot.workspace = true
+swanky-ot-traits.workspace = true
+swanky-ocelot-error.workspace = true
+
 vectoreyes.workspace = true
 itertools.workspace = true
 clap.workspace = true
@@ -37,6 +39,8 @@ swanky-block.workspace = true
 swanky-channel-legacy.workspace = true
 
 [dev-dependencies]
+swanky-ot-alsz-kos.workspace = true
+swanky-ot-chou-orlandi.workspace = true
 criterion.workspace = true
 
 [[bin]]

@@ -10,23 +10,23 @@ use crate::{
     utils,
 };
 use itertools::Itertools;
-use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::{CryptoRng, Rng, RngCore, seq::SliceRandom};
 use std::collections::{HashMap, HashSet};
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cointoss;
+use swanky_oprf_traits::{Receiver as OprfReceiver, Sender as OprfSender};
 
 const NHASHES: usize = 3;
 
 /// Private set intersection sender.
 pub struct Sender {
-    oprf: oprf::KkrtSender,
+    oprf: swanky_oprf_kkrt::Sender,
 }
 /// Private set intersection receiver.
 pub struct Receiver {
-    oprf: oprf::KkrtReceiver,
+    oprf: swanky_oprf_kkrt::Receiver,
 }
 
 impl Sender {
@@ -35,7 +35,7 @@ impl Sender {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let oprf = oprf::KkrtSender::init(channel, rng)?;
+        let oprf = swanky_oprf_kkrt::Sender::init(channel, rng)?;
         Ok(Self { oprf })
     }
 
@@ -130,7 +130,7 @@ impl Receiver {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let oprf = oprf::KkrtReceiver::init(channel, rng)?;
+        let oprf = swanky_oprf_kkrt::Receiver::init(channel, rng)?;
         Ok(Self { oprf })
     }
 

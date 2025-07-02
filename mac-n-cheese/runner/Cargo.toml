@@ -29,7 +29,7 @@ mac-n-cheese-event-log.workspace = true
 libc.workspace = true
 moka.workspace = true
 num_cpus.workspace = true
-ocelot.workspace = true
+
 parking_lot.workspace = true
 rand.workspace = true
 ring.workspace = true
@@ -49,6 +49,7 @@ swanky-field.workspace = true
 swanky-field-binary.workspace = true
 swanky-party.workspace = true
 swanky-serialization.workspace = true
+swanky-svole-wykw.workspace = true
 
 # Memory allocators
 jemallocator = { workspace = true, optional = true }

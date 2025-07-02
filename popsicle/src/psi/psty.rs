@@ -12,14 +12,12 @@ use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
 };
 use itertools::Itertools;
-use ocelot::{
-    oprf::{KmprtReceiver, KmprtSender},
-    ot::{AlszReceiver as OtReceiver, AlszSender as OtSender},
-};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
 use swanky_channel_legacy::AbstractChannel;
+use swanky_oprf_kmprt::{Receiver as KmprtReceiver, Sender as KmprtSender};
+use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 
 const NHASHES: usize = 3;
 // How many bytes of the hash to use for the equality tests. This affects

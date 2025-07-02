@@ -675,7 +675,6 @@ dependencies = [
  "nix",
  "num-bigint 0.4.6",
  "num-traits",
- "ocelot",
  "pretty_env_logger",
  "proptest",
  "rand 0.8.5",
@@ -693,6 +692,7 @@ dependencies = [
  "swanky-party",
  "swanky-polynomial",
  "swanky-serialization",
+ "swanky-svole-wykw",
  "toml",
 ]
 
@@ -781,7 +781,6 @@ dependencies = [
  "clap",
  "criterion",
  "itertools 0.14.0",
- "ocelot",
  "rand 0.8.5",
  "regex",
  "serde",
@@ -792,6 +791,10 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-block",
  "swanky-channel-legacy",
+ "swanky-ocelot-error",
+ "swanky-ot-alsz-kos",
+ "swanky-ot-chou-orlandi",
+ "swanky-ot-traits",
  "vectoreyes",
 ]
 
@@ -1392,7 +1395,6 @@ dependencies = [
  "generic-array 1.2.0",
  "lz4",
  "mac-n-cheese-vole",
- "ocelot",
  "proptest",
  "rand 0.8.5",
  "rustc-hash 2.1.1",
@@ -1437,7 +1439,6 @@ dependencies = [
  "mimalloc",
  "moka",
  "num_cpus",
- "ocelot",
  "parking_lot",
  "proptest",
  "rand 0.8.5",
@@ -1456,6 +1457,7 @@ dependencies = [
  "swanky-field-binary",
  "swanky-party",
  "swanky-serialization",
+ "swanky-svole-wykw",
  "vectoreyes",
 ]
 
@@ -1485,7 +1487,6 @@ dependencies = [
  "generic-array 1.2.0",
  "keyed_arena",
  "mimalloc",
- "ocelot",
  "rand 0.8.5",
  "swanky-aes-rng",
  "swanky-block",
@@ -1495,8 +1496,10 @@ dependencies = [
  "swanky-field-binary",
  "swanky-field-f61p",
  "swanky-field-ff-primes",
+ "swanky-ot-alsz-kos",
  "swanky-party",
  "swanky-serialization",
+ "swanky-svole-wykw",
  "vectoreyes",
 ]
 
@@ -1722,49 +1725,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ocelot"
-version = "0.6.0"
-dependencies = [
- "arrayvec",
- "blake3",
- "bytemuck",
- "cc",
- "clap",
- "criterion",
- "curve25519-dalek",
- "generic-array 1.2.0",
- "keyed_arena",
- "nix",
- "proptest",
- "rand 0.8.5",
- "subtle",
- "swanky-adversary",
- "swanky-aes-hash",
- "swanky-aes-rng",
- "swanky-bit-matrix-transpose",
- "swanky-block",
- "swanky-bytearray-utils",
- "swanky-channel-legacy",
- "swanky-cointoss",
- "swanky-deprecated-bitwise-utils",
- "swanky-field",
- "swanky-field-binary",
- "swanky-field-f61p",
- "swanky-ocelot-error",
- "swanky-oprf-kkrt",
- "swanky-oprf-kmprt",
- "swanky-oprf-traits",
- "swanky-ot-alsz-kos",
- "swanky-ot-chou-orlandi",
- "swanky-ot-dummy",
- "swanky-ot-noar-pinkas",
- "swanky-ot-test",
- "swanky-ot-traits",
- "swanky-svole-wykw",
- "vectoreyes",
-]
-
-[[package]]
 name = "once_cell"
 version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1883,7 +1843,6 @@ dependencies = [
  "criterion",
  "fancy-garbling",
  "itertools 0.14.0",
- "ocelot",
  "proptest",
  "rand 0.8.5",
  "serde",
@@ -1896,6 +1855,11 @@ dependencies = [
  "swanky-bytearray-utils",
  "swanky-channel-legacy",
  "swanky-cointoss",
+ "swanky-ocelot-error",
+ "swanky-oprf-kkrt",
+ "swanky-oprf-kmprt",
+ "swanky-oprf-traits",
+ "swanky-ot-alsz-kos",
  "vectoreyes",
 ]
 
@@ -2551,13 +2515,14 @@ name = "swanky-authenticated-bits"
 version = "0.6.0"
 dependencies = [
  "eyre",
- "ocelot",
  "proptest",
  "rand 0.8.5",
  "swanky-adversary",
  "swanky-aes-rng",
  "swanky-channel",
  "swanky-field-binary",
+ "swanky-ot-alsz-kos",
+ "swanky-ot-traits",
  "swanky-party",
  "vectoreyes",
 ]
@@ -3367,7 +3332,6 @@ dependencies = [
  "generic-array 1.2.0",
  "log",
  "mac-n-cheese-sieve-parser",
- "ocelot",
  "pretty_env_logger",
  "rand 0.8.5",
  "swanky-aes-rng",
@@ -3387,7 +3351,6 @@ dependencies = [
  "generic-array 1.2.0",
  "log",
  "mac-n-cheese-sieve-parser",
- "ocelot",
  "pretty_env_logger",
  "rand 0.8.5",
  "rustls",

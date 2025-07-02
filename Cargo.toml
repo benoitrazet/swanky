@@ -18,7 +18,6 @@ members = [
   "mac-n-cheese/sieve-parser",
   "mac-n-cheese/vole",
   "mac-n-cheese/wire-map",
-  "ocelot",
   "popsicle",
   "schmivitz",
   "simple-arith-circuit",
@@ -54,7 +53,6 @@ mac-n-cheese-runner = { path = "mac-n-cheese/runner" }
 mac-n-cheese-sieve-parser = { path = "mac-n-cheese/sieve-parser" }
 mac-n-cheese-vole = { path = "mac-n-cheese/vole" }
 mac-n-cheese-wire-map = { path = "mac-n-cheese/wire-map" }
-ocelot = { path = "ocelot" }
 popsicle = { path = "popsicle" }
 schmivitz = { path = "schmivitz" }
 simple-arith-circuit = { path = "simple-arith-circuit" }

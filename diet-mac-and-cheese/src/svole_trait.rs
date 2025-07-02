@@ -2,7 +2,6 @@
 
 use eyre::Result;
 use log::{debug, info};
-use ocelot::svole::{LpnParams, Receiver, Sender};
 use std::any::type_name;
 use std::marker::PhantomData;
 use std::time::Instant;
@@ -15,6 +14,7 @@ use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::either::PartyEither;
 use swanky_party::{IsParty, Party, Verifier, WhichParty};
+use swanky_svole_wykw::{LpnParams, Receiver, Sender};
 
 /// Svole trait.
 ///

@@ -13,10 +13,10 @@ mod tests {
         twopac::semihonest::{Evaluator, Garbler},
     };
 
-    use ocelot::{ot::AlszReceiver as OtReceiver, ot::AlszSender as OtSender};
     use swanky_aes_rng::AesRng;
     use swanky_block::Block512;
     use swanky_channel_legacy::Channel;
+    use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 
     use std::{
         io::{BufReader, BufWriter},

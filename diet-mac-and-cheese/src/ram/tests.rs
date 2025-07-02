@@ -5,12 +5,12 @@ fn test_arithmetic_ram() {
         os::unix::net::UnixStream,
     };
 
-    use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_field_f61p::F61p;
     use swanky_party::{Prover, Verifier};
+    use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     use crate::{DietMacAndCheese, backend_trait::BackendT, svole_trait::Svole};
 
@@ -88,13 +88,13 @@ fn test_boolean_ram() {
         os::unix::net::UnixStream,
     };
 
-    use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F2, F40b};
     use swanky_party::{Prover, Verifier};
+    use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     use crate::{DietMacAndCheese, backend_trait::BackendT, svole_trait::Svole};
 

@@ -4,8 +4,8 @@ use crate::{
     utils::*,
 };
 
-use ocelot::oprf::KmprtReceiver;
 use swanky_block::{Block, Block512};
+use swanky_oprf_kmprt::Receiver as KmprtReceiver;
 
 /// A strut defining the receiver in the base circuit PSI computation.
 /// A receiver here refers to the party which queries the OPPRF in this

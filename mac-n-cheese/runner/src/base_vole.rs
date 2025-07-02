@@ -5,7 +5,6 @@ use crate::{
 use eyre::Context;
 use mac_n_cheese_ir::compilation_format::{FieldMacType, FieldTypeMacVisitor};
 use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
-use ocelot::svole::base_svole::{Receiver as BaseReceiver, Sender as BaseSender};
 use std::{
     any::{Any, TypeId},
     io::{Read, Write},
@@ -14,6 +13,7 @@ use std::{
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_party::{Party, WhichParty};
+use swanky_svole_wykw::base_svole::{Receiver as BaseReceiver, Sender as BaseSender};
 
 pub struct VoleContext<P: Party, T: MacTypes> {
     pub constant_context: MacConstantContext<P, T::TF>,

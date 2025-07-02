@@ -8,7 +8,6 @@ use crate::{mac::Mac, svole_trait::SvoleT};
 use eyre::{Result, bail, ensure};
 use generic_array::GenericArray;
 use log::{debug, warn};
-use ocelot::svole::LpnParams;
 use rand::{Rng, SeedableRng};
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
@@ -19,6 +18,7 @@ use swanky_party::private::{
     ProverPrivate, ProverPrivateCopy, VerifierPrivate, VerifierPrivateCopy,
 };
 use swanky_party::{IsParty, Party, Prover, Verifier, WhichParty};
+use swanky_svole_wykw::LpnParams;
 
 // Size of batches for multiplication / assert-zero
 pub const BATCH_SIZE: usize = 3_000_000;
@@ -686,7 +686,6 @@ mod tests {
     use super::{FCom, Mac};
     use crate::svole_thread::{SvoleAtomic, ThreadSvole};
     use crate::svole_trait::{Svole, SvoleT};
-    use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     use std::{
         io::{BufReader, BufWriter},
@@ -699,6 +698,7 @@ mod tests {
     use swanky_field_f61p::F61p;
     use swanky_party::private::{ProverPrivateCopy, VerifierPrivate};
     use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier};
+    use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     fn test_fcom_random<V: IsSubFieldOf<T>, T: FiniteField>()
     where

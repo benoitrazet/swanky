@@ -1073,7 +1073,6 @@ mod tests {
     use super::{Conv, Dabit, Edabits, f2_to_fe};
     use crate::homcom::FCom;
     use crate::svole_trait::Svole;
-    use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
@@ -1087,6 +1086,7 @@ mod tests {
     use swanky_party::either::PartyEither;
     use swanky_party::private::{ProverPrivateCopy, VerifierPrivate};
     use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier};
+    use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     const DEFAULT_NUM_BUCKET: usize = 5;
     const DEFAULT_NUM_CUT: usize = 5;

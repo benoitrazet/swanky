@@ -3,10 +3,10 @@
 
 use crate::Error;
 use itertools::Itertools;
-use ocelot::oprf::{KmprtReceiver, KmprtSender};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use swanky_block::{Block, Block512};
 use swanky_channel_legacy::AbstractChannel;
+use swanky_oprf_kmprt::{Receiver as KmprtReceiver, Sender as KmprtSender};
 
 /// The party number for each party.
 pub type PartyId = usize;

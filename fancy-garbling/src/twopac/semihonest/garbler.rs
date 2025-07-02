@@ -2,11 +2,11 @@ use crate::{
     AllWire, ArithmeticWire, Fancy, FancyArithmetic, FancyBinary, FancyInput, FancyReveal,
     Garbler as Gb, WireMod2, errors::TwopacError, wire::WireLabel,
 };
-use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, Rng, SeedableRng};
 use swanky_adversary::SemiHonest;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_ot_traits::Sender as OtSender;
 
 /// Semi-honest garbler.
 pub struct Garbler<C, RNG, OT, Wire> {

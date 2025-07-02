@@ -7,10 +7,10 @@
 //! \oplus x_2`$.
 
 use crate::authbits::{AuthBit, AuthBitGenerator};
-use ocelot::ot::{CorrelatedReceiver, CorrelatedSender};
 use rand::{CryptoRng, Rng};
 use swanky_adversary::Malicious;
 use swanky_channel::Channel;
+use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
 use swanky_party::{
     IS_PROVER, IS_VERIFIER, Party, Prover, Verifier, WhichParty,
     either::{PartyEither, PartyEitherCopy},
@@ -233,8 +233,8 @@ impl<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ocelot::ot;
     use swanky_aes_rng::AesRng;
+    use swanky_ot_alsz_kos::kos;
 
     /// Generates `AuthShare`s, outputting the produced `AuthShare`s and their
     /// associated generators.
@@ -243,8 +243,8 @@ mod tests {
     ) -> (
         Vec<AuthShare<PartyA>>,
         Vec<AuthShare<PartyB>>,
-        AuthShareGenerator<PartyA, ot::KosSender, ot::KosReceiver>,
-        AuthShareGenerator<PartyB, ot::KosSender, ot::KosReceiver>,
+        AuthShareGenerator<PartyA, kos::Sender, kos::Receiver>,
+        AuthShareGenerator<PartyB, kos::Sender, kos::Receiver>,
     ) {
         let mut output_a: Vec<AuthShare<PartyA>> = vec![];
         let mut output_b: Vec<AuthShare<PartyB>> = vec![];
@@ -252,14 +252,14 @@ mod tests {
             |c| {
                 let mut rng = AesRng::new();
                 let mut generator =
-                    AuthShareGenerator::<PartyA, ot::KosSender, ot::KosReceiver>::new(c, &mut rng)?;
+                    AuthShareGenerator::<PartyA, kos::Sender, kos::Receiver>::new(c, &mut rng)?;
                 generator.generate(nshares, &mut output_a, c, &mut rng)?;
                 Ok(generator)
             },
             |c| {
                 let mut rng = AesRng::new();
                 let mut generator =
-                    AuthShareGenerator::<PartyB, ot::KosSender, ot::KosReceiver>::new(c, &mut rng)?;
+                    AuthShareGenerator::<PartyB, kos::Sender, kos::Receiver>::new(c, &mut rng)?;
                 generator.generate(nshares, &mut output_b, c, &mut rng)?;
                 Ok(generator)
             },
@@ -270,8 +270,8 @@ mod tests {
 
     /// Validates vectors of `AuthShare`s using their associated generators.
     fn validate(
-        generator_a: AuthShareGenerator<PartyA, ot::KosSender, ot::KosReceiver>,
-        generator_b: AuthShareGenerator<PartyB, ot::KosSender, ot::KosReceiver>,
+        generator_a: AuthShareGenerator<PartyA, kos::Sender, kos::Receiver>,
+        generator_b: AuthShareGenerator<PartyB, kos::Sender, kos::Receiver>,
         output_a: Vec<AuthShare<PartyA>>,
         output_b: Vec<AuthShare<PartyB>>,
     ) -> (bool, bool, U8x16, U8x16) {

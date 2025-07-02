@@ -4,8 +4,8 @@ use crate::{
     utils,
 };
 
-use ocelot::oprf::KmprtSender;
 use swanky_block::{Block, Block512};
+use swanky_oprf_kmprt::Sender as KmprtSender;
 
 /// A struct defining the sender in the base circuit PSI computation.
 /// A sender here refers to the party which programs the OPPRF in this
