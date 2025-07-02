@@ -194,6 +194,7 @@ def unpack_target_dir(cache_dir: Path) -> None:
         manifest_path = _target_dir_manifest(cache_dir, rev)
         if not manifest_path.exists():
             continue
+        _logger.info("Using build cache from commit %r", rev)
         _unpack_target_dir_manifest(cache_dir, manifest_path, ROOT)
         break
     else:
