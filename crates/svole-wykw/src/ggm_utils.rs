@@ -15,7 +15,7 @@ pub const fn ggm_temporary_storage_size(depth: usize) -> usize {
 /// `depth` levels and return the node values (a.k.a seeds). `aes` is used to
 /// seed the "PRGs" used internally so we don't need to instantiate new PRGs on
 /// each iteration. Instead, we key two instances of AES ahead of time and view
-/// them as PRPs, using the seed as input. We then use the [swanky_aes_hash::AesHash::cr_hash]
+/// them as PRPs, using the seed as input. We then use the `swanky_aes_hash::AesHash::cr_hash`
 /// construction on top of AES.
 ///
 /// `keys_out` **WILL NOT** be `clear()`ed. Results will be appended to it.
