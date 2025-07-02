@@ -29,6 +29,11 @@ swanky-ot-alsz-kos.workspace = true
 vectoreyes.workspace = true
 
 [dev-dependencies]
+criterion.workspace = true
 swanky-field-f61p.workspace = true
 proptest.workspace = true
 swanky-field-binary.workspace = true
+
+[[bench]]
+name = "svole"
+harness = false

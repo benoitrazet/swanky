@@ -3,8 +3,8 @@
 
 // TODO: criterion might not be the best choice for larger benchmarks.
 use criterion::{Criterion, criterion_group, criterion_main};
-use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
-use ocelot::svole::{Receiver, Sender};
+use swanky_svole_wykw::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
+use swanky_svole_wykw::{Receiver, Sender};
 
 use std::{
     hint::black_box,
