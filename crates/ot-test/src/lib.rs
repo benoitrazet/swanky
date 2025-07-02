@@ -165,3 +165,5 @@ pub fn test_rotext_fixed_key<
         assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
     }
 }
+
+pub mod bench;

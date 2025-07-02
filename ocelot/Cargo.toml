@@ -60,10 +60,6 @@ swanky-field-f61p.workspace = true
 swanky-ot-test.workspace = true
 
 [[bench]]
-name = "ot"
-harness = false
-
-[[bench]]
 name = "svole"
 harness = false
 

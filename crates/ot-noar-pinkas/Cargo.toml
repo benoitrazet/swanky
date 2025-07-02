@@ -22,4 +22,9 @@ blake3.workspace = true
 
 [dev-dependencies]
 swanky-ot-test.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "ot"
+harness = false
 
