@@ -75,12 +75,6 @@ type VReceiver = Receiver<F40b>;
 fn run() {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
-        #[cfg(target_os = "linux")]
-        {
-            let mut cpu_set = nix::sched::CpuSet::new();
-            cpu_set.set(1).unwrap();
-            nix::sched::sched_setaffinity(nix::unistd::Pid::from_raw(0), &cpu_set).unwrap();
-        }
         let mut rng = AesRng::new();
         let mut channel =
             OurTrackChannel::new(sender.try_clone().unwrap(), sender.try_clone().unwrap());
@@ -101,12 +95,6 @@ fn run() {
         vole.duplicate(&mut channel, &mut rng).unwrap();
         println!("Send time (duplicate): {:?}", start.elapsed());
     });
-    #[cfg(target_os = "linux")]
-    {
-        let mut cpu_set = nix::sched::CpuSet::new();
-        cpu_set.set(3).unwrap();
-        nix::sched::sched_setaffinity(nix::unistd::Pid::from_raw(0), &cpu_set).unwrap();
-    }
     let mut rng = AesRng::new();
     let mut channel =
         OurTrackChannel::new(receiver.try_clone().unwrap(), receiver.try_clone().unwrap());
