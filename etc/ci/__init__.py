@@ -434,6 +434,9 @@ def nightly(ctx: click.Context) -> None:
         cache_test_output=False,
         code_coverage=code_coverage,
     )
+    # Run cargo bench. We don't collect the outputs (since they won't be stable on a VM), but to
+    # make sure they build properly.
+    subprocess.check_call(["cargo", "bench", "--verbose"], cwd=ROOT)
     # Post-process code coverage data.
     # What's the path to rust's llvm-tools?
     llvm_bin = (
