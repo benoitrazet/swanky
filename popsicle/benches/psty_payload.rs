@@ -14,7 +14,6 @@ use rand::{CryptoRng, Rng};
 use std::{
     fs::File,
     io::{BufReader, BufWriter, Write},
-    net::{TcpListener, TcpStream},
     os::unix::net::UnixStream,
     time::Duration,
 };
@@ -115,57 +114,40 @@ fn bench_psty_payload_large(
     let path_delta = "./deltas.txt".to_owned();
     let mut file_deltas = File::create(&path_delta).unwrap();
     file_deltas.write(deltas_json.as_bytes()).unwrap();
+    let (a, b) = UnixStream::pair().unwrap();
 
     std::thread::spawn(move || {
-        let listener = TcpListener::bind("127.0.0.1:3000").unwrap();
-        for stream in listener.incoming() {
-            match stream {
-                Ok(stream) => {
-                    let mut channel = TrackChannel::new(SymChannel::new(stream));
-                    let mut rng = AesRng::new();
+        let stream = b;
+        let mut channel = TrackChannel::new(SymChannel::new(stream));
+        let mut rng = AesRng::new();
 
-                    let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-                    let _ = psi
-                        .full_protocol_large(
-                            &sender_inputs,
-                            &weights,
-                            &path_delta,
-                            &mut channel,
-                            &mut rng,
-                        )
-                        .unwrap();
-                    println!("Done");
-                    return;
-                }
-                Err(e) => {
-                    println!("Error: {}", e);
-                }
-            }
-        }
-        drop(listener);
+        let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
+        let _ = psi
+            .full_protocol_large(
+                &sender_inputs,
+                &weights,
+                &path_delta,
+                &mut channel,
+                &mut rng,
+            )
+            .unwrap();
+        println!("Done");
     });
+    let stream = a;
+    let mut channel = TrackChannel::new(SymChannel::new(stream));
+    let mut rng = AesRng::new();
+    let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
 
-    match TcpStream::connect("127.0.0.1:3000") {
-        Ok(stream) => {
-            let mut channel = TrackChannel::new(SymChannel::new(stream));
-            let mut rng = AesRng::new();
-            let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-
-            // For large examples where computation should be batched per-megabin instead of accross all bins.
-            let _ = psi
-                .full_protocol_large(
-                    &receiver_inputs,
-                    &payloads,
-                    megasize,
-                    &mut channel,
-                    &mut rng,
-                )
-                .unwrap();
-        }
-        Err(e) => {
-            println!("Failed to connect: {}", e);
-        }
-    }
+    // For large examples where computation should be batched per-megabin instead of accross all bins.
+    let _ = psi
+        .full_protocol_large(
+            &receiver_inputs,
+            &payloads,
+            megasize,
+            &mut channel,
+            &mut rng,
+        )
+        .unwrap();
 }
 
 fn bench_psi(c: &mut Criterion) {
