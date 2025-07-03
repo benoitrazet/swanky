@@ -417,7 +417,7 @@ impl UnopenedParty {
 mod tests {
     use super::*;
     use swanky_field_binary::F64b;
-    use swanky_field_f61p::F61p;
+    use swanky_field_ff_primes::F128p;
 
     const N: usize = 16;
     const K: usize = 8;
@@ -451,6 +451,6 @@ mod tests {
         };
     }
 
-    test_serialization!(serialization_f61p, F61p);
+    test_serialization!(serialization_f128p, F128p);
     test_serialization!(test_serialization_f64b, F64b);
 }

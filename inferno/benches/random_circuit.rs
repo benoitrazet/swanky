@@ -6,7 +6,7 @@ use std::time::Duration;
 use swanky_aes_rng::AesRng;
 use swanky_field::FiniteField;
 use swanky_field_binary::F64b;
-use swanky_field_f61p::F61p;
+use swanky_field_ff_primes::F128p;
 
 const N: usize = 16;
 
@@ -69,8 +69,8 @@ pub fn bench_random_circuit_f2(c: &mut Criterion) {
     bench_random_circuit::<F64b>(c, "Random circuit F64b");
 }
 
-pub fn bench_random_circuit_f61p(c: &mut Criterion) {
-    bench_random_circuit::<F61p>(c, "Random circuit F61p");
+pub fn bench_random_circuit_f128p(c: &mut Criterion) {
+    bench_random_circuit::<F128p>(c, "Random circuit F128p");
 }
 
 criterion_group! {
@@ -79,8 +79,8 @@ criterion_group! {
     targets = bench_random_circuit_f2
 }
 criterion_group! {
-    name = random_circuit_f61p;
+    name = random_circuit_f128p;
     config = Criterion::default().measurement_time(Duration::new(10, 0)).sample_size(30);
-    targets = bench_random_circuit_f61p
+    targets = bench_random_circuit_f128p
 }
-criterion_main!(random_circuit_f2, random_circuit_f61p);
+criterion_main!(random_circuit_f2, random_circuit_f128p);

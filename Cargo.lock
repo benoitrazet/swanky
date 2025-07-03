@@ -1094,7 +1094,7 @@ dependencies = [
  "swanky-block",
  "swanky-field",
  "swanky-field-binary",
- "swanky-field-f61p",
+ "swanky-field-ff-primes",
  "swanky-polynomial",
  "swanky-serialization",
 ]

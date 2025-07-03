@@ -25,7 +25,6 @@ rayon.workspace = true
 swanky-aes-rng.workspace = true
 swanky-block.workspace = true
 swanky-field.workspace = true
-swanky-field-f61p.workspace = true
 swanky-polynomial.workspace = true
 swanky-serialization.workspace = true
 serde = { workspace = true, features = ["derive"] }
@@ -38,6 +37,7 @@ proptest.workspace = true
 serde_json.workspace = true
 env_logger.workspace = true
 swanky-field-binary.workspace = true
+swanky-field-ff-primes.workspace = true
 
 [[bench]]
 name = "random_circuit"
