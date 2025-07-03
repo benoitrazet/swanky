@@ -32,7 +32,6 @@ use generic_array::typenum::Unsigned;
 use log::{debug, info, warn};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
-use ocelot::svole::LpnParams;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
@@ -48,6 +47,7 @@ use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F127p, F128p, F384p, F384q, Secp256k1, Secp256k1order};
 use swanky_party::private::{ProverPrivate, ProverPrivateCopy};
 use swanky_party::{IsParty, Party, Prover, WhichParty};
+use swanky_svole_wykw::LpnParams;
 
 // This file implements IR0+ support for diet-mac-n-cheese and is broken up into the following components:
 //

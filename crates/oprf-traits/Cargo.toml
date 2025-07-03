@@ -1,0 +1,17 @@
+[package]
+name = "swanky-oprf-traits"
+description = "Base traits impl-ed by all our OPRF implementations"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+swanky-channel-legacy.workspace = true
+rand.workspace = true
+swanky-ocelot-error.workspace = true
+

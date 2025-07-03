@@ -20,6 +20,7 @@ workspace = true
 jemalloc = ["jemallocator"]
 
 [dependencies]
+swanky-svole-wykw.workspace = true
 blake3.workspace = true
 crypto-bigint.workspace = true
 rand.workspace = true
@@ -38,7 +39,7 @@ swanky-field-f61p.workspace = true
 swanky-field-ff-primes.workspace = true
 swanky-polynomial.workspace = true
 subtle.workspace = true
-ocelot.workspace = true
+
 flatbuffers.workspace = true
 nix.workspace = true
 serde = { workspace = true, features = ["derive"] }

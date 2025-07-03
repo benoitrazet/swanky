@@ -24,7 +24,7 @@ generic-array.workspace = true
 rustls.workspace = true
 rustls-pemfile.workspace = true
 tungstenite.workspace = true
-ocelot.workspace = true
+
 diet-mac-and-cheese.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
 swanky-aes-rng.workspace = true

@@ -4,10 +4,10 @@ use fancy_garbling::{
     circuit::{BinaryCircuit as Circuit, EvaluableCircuit},
     twopac::semihonest::{Evaluator, Garbler},
 };
-use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
 use std::{fs::File, io::BufReader, time::SystemTime};
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::{UnixChannel, unix_channel_pair};
+use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 
 fn circuit(fname: &str) -> Circuit {
     println!("* Circuit: {}", fname);

@@ -3,8 +3,6 @@ use bytemuck::TransparentWrapper;
 use eyre::Context;
 use generic_array::{GenericArray, typenum::Unsigned};
 use keyed_arena::{AllocationKey, KeyedArena};
-use ocelot::ot::explicit_round::{KosReceiver, KosReceiverStage2, KosSender, KosSenderStage2};
-use ocelot::svole::ggm_utils::*;
 use party::{IS_PROVER, IS_VERIFIER, Party};
 use rand::prelude::Distribution;
 use rand::{CryptoRng, Rng, SeedableRng, distributions::Uniform};
@@ -14,8 +12,12 @@ use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field::FiniteRing;
 use swanky_field::{Degree, DegreeModulo, FiniteField};
+use swanky_ot_alsz_kos::explicit_round::{
+    KosReceiver, KosReceiverStage2, KosSender, KosSenderStage2,
+};
 use swanky_party as party;
 use swanky_serialization::CanonicalSerialize;
+use swanky_svole_wykw::ggm_utils::*;
 
 mod lpn_params;
 mod sizes;

@@ -7,7 +7,6 @@ use fancy_garbling::{
     circuit::{BinaryCircuit as Circuit, EvaluableCircuit},
     twopac::semihonest::{Evaluator, Garbler},
 };
-use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
 use std::{
     fs::File,
     io::{BufReader, BufWriter},
@@ -16,6 +15,7 @@ use std::{
 };
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::Channel;
+use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 
 type Reader = BufReader<UnixStream>;
 type Writer = BufWriter<UnixStream>;

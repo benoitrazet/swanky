@@ -1,7 +1,7 @@
 use super::lpn_params::LpnParams;
 use generic_array::typenum::Unsigned;
-use ocelot::ot::explicit_round::{KosReceiver, KosReceiverStage2, KosSender};
 use swanky_field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf};
+use swanky_ot_alsz_kos::explicit_round::{KosReceiver, KosReceiverStage2, KosSender};
 use swanky_serialization::CanonicalSerialize;
 
 #[derive(Debug, Clone, Copy)]

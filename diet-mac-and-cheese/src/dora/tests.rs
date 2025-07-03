@@ -4,12 +4,12 @@ use std::{
     os::unix::net::UnixStream,
 };
 
-use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::Channel;
 use swanky_field::FiniteRing;
 use swanky_field_f61p::F61p;
 use swanky_party::{IS_VERIFIER, Prover, Verifier, private::ProverPrivateCopy};
+use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
 use crate::{
     DietMacAndCheese,

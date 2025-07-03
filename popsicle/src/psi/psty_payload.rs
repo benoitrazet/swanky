@@ -39,10 +39,8 @@ use fancy_garbling::{
 };
 
 use itertools::Itertools;
-use ocelot::{
-    oprf::{KmprtReceiver, KmprtSender},
-    ot::{AlszReceiver as OtReceiver, AlszSender as OtSender},
-};
+use swanky_oprf_kmprt::{Receiver as KmprtReceiver, Sender as KmprtSender};
+use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::time::SystemTime;

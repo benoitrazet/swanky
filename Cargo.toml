@@ -18,7 +18,6 @@ members = [
   "mac-n-cheese/sieve-parser",
   "mac-n-cheese/vole",
   "mac-n-cheese/wire-map",
-  "ocelot",
   "popsicle",
   "schmivitz",
   "simple-arith-circuit",
@@ -54,7 +53,6 @@ mac-n-cheese-runner = { path = "mac-n-cheese/runner" }
 mac-n-cheese-sieve-parser = { path = "mac-n-cheese/sieve-parser" }
 mac-n-cheese-vole = { path = "mac-n-cheese/vole" }
 mac-n-cheese-wire-map = { path = "mac-n-cheese/wire-map" }
-ocelot = { path = "ocelot" }
 popsicle = { path = "popsicle" }
 schmivitz = { path = "schmivitz" }
 simple-arith-circuit = { path = "simple-arith-circuit" }
@@ -62,11 +60,13 @@ swanky-adversary = { path = "crates/adversary" }
 swanky-aes-hash = { path = "crates/aes-hash" }
 swanky-aes-rng = { path = "crates/aes-rng" }
 swanky-authenticated-bits = { path = "crates/authenticated-bits" }
+swanky-bit-matrix-transpose = { path = "crates/bit-matrix-transpose" }
 swanky-block = { path = "crates/block" }
 swanky-bytearray-utils = { path = "crates/bytearray-utils" }
 swanky-channel = { path = "crates/channel" }
 swanky-channel-legacy = { path = "crates/channel-legacy" }
 swanky-cointoss = { path = "crates/cointoss" }
+swanky-deprecated-bitwise-utils = { path = "crates/deprecated-bitwise-utils" }
 swanky-field = { path = "crates/field" }
 swanky-field-binary = { path = "crates/field-binary" }
 swanky-field-f61p = { path = "crates/field-f61p" }
@@ -74,9 +74,20 @@ swanky-field-ff-primes = { path = "crates/field-ff-primes" }
 swanky-field-fft = { path = "crates/field-fft" }
 swanky-field-test = { path = "crates/field-test" }
 swanky-flatbuffer-build = { path = "crates/flatbuffer-build" }
+swanky-ocelot-error = { path = "crates/ocelot-error" }
+swanky-oprf-kkrt = { path = "crates/oprf-kkrt" }
+swanky-oprf-kmprt = { path = "crates/oprf-kmprt" }
+swanky-oprf-traits = { path = "crates/oprf-traits" }
+swanky-ot-alsz-kos = { path = "crates/ot-alsz-kos" }
+swanky-ot-chou-orlandi = { path = "crates/ot-chou-orlandi" }
+swanky-ot-dummy = { path = "crates/ot-dummy" }
+swanky-ot-noar-pinkas = { path = "crates/ot-noar-pinkas" }
+swanky-ot-test = { path = "crates/ot-test" }
+swanky-ot-traits = { path = "crates/ot-traits" }
 swanky-party = { path = "crates/party" }
 swanky-polynomial = { path = "crates/polynomial" }
 swanky-serialization = { path = "crates/serialization" }
+swanky-svole-wykw = { path = "crates/svole-wykw" }
 vectoreyes = { path = "vectoreyes" }
 web-mac-n-cheese-wasm = { path = "diet-mac-and-cheese/web-mac-and-cheese/wasm" }
 web-mac-n-cheese-websocket = { path = "diet-mac-and-cheese/web-mac-and-cheese/websocket" }

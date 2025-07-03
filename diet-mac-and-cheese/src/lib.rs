@@ -44,12 +44,12 @@ mod plugins;
 mod ram;
 mod sieveir_phase2;
 
-use ocelot::svole::{
+use serde::Deserialize;
+use std::fmt::Display;
+use swanky_svole_wykw::{
     LPN_EXTEND_EXTRASMALL, LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_EXTEND_SMALL_MEDIUM,
     LPN_SETUP_EXTRASMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL, LPN_SETUP_SMALL_MEDIUM, LpnParams,
 };
-use serde::Deserialize;
-use std::fmt::Display;
 
 /// The size of LPN parameters to use for sVOLE.
 ///

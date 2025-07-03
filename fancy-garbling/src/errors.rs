@@ -369,7 +369,7 @@ pub enum TwopacError {
     /// An I/O error has occurred.
     IoError(std::io::Error),
     /// An oblivious transfer error has occurred.
-    OtError(ocelot::Error),
+    OtError(swanky_ocelot_error::Error),
     /// The garbler produced an error.
     GarblerError(GarblerError),
     /// The evaluator produced an error.
@@ -380,8 +380,8 @@ pub enum TwopacError {
 
 impl std::error::Error for TwopacError {}
 
-impl From<ocelot::Error> for TwopacError {
-    fn from(e: ocelot::Error) -> TwopacError {
+impl From<swanky_ocelot_error::Error> for TwopacError {
+    fn from(e: swanky_ocelot_error::Error) -> TwopacError {
         TwopacError::OtError(e)
     }
 }

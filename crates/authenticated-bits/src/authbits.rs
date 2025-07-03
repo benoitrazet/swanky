@@ -22,11 +22,11 @@
 //! To open an authenticated bit, the prover sends $`(b_i, M_i)`$ to the
 //! verifier and the verifier checks that $`M_i := K_i \oplus b \Delta`$.
 
-use ocelot::ot::{CorrelatedReceiver, CorrelatedSender};
 use rand::{CryptoRng, Rng};
 use swanky_adversary::Malicious;
 use swanky_channel::Channel;
 use swanky_field_binary::{F2, F128b};
+use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
 use swanky_party::{
     Party, WhichParty,
     either::PartyEither,
@@ -296,8 +296,8 @@ impl<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ocelot::ot::{KosReceiver, KosSender};
     use swanky_aes_rng::AesRng;
+    use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
     use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier, either::PartyEitherCopy};
 
     /// Validates pairs of prover and verifier `AuthBit`s.
