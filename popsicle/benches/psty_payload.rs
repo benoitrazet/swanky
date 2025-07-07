@@ -2,18 +2,15 @@
 //! Private set intersection (PSTY) benchmarks using `criterion`.
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use fancy_garbling::AllWire;
-use fancy_garbling::util::generate_deltas;
 use popsicle::psty_payload::{Receiver, Sender};
 use swanky_aes_rng::AesRng;
 use swanky_block::Block512;
-use swanky_channel_legacy::{Channel, SymChannel, TrackChannel};
+use swanky_channel_legacy::Channel;
 
 use rand::{CryptoRng, Rng};
 
 use std::{
-    fs::File,
-    io::{BufReader, BufWriter, Write},
+    io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
     time::Duration,
 };
@@ -100,56 +97,6 @@ fn bench_psty_payload(
         .unwrap();
 }
 
-fn bench_psty_payload_large(
-    sender_inputs: Vec<Vec<u8>>,
-    receiver_inputs: Vec<Vec<u8>>,
-    payloads: Vec<Block512>,
-    weights: Vec<Block512>,
-    megasize: usize,
-) -> () {
-    let qs = fancy_garbling::util::primes_with_width(65);
-    let deltas = generate_deltas::<AllWire>(&qs);
-    let deltas_json = serde_json::to_string(&deltas).unwrap();
-
-    let path_delta = "./deltas.txt".to_owned();
-    let mut file_deltas = File::create(&path_delta).unwrap();
-    file_deltas.write(deltas_json.as_bytes()).unwrap();
-    let (a, b) = UnixStream::pair().unwrap();
-
-    std::thread::spawn(move || {
-        let stream = b;
-        let mut channel = TrackChannel::new(SymChannel::new(stream));
-        let mut rng = AesRng::new();
-
-        let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-        let _ = psi
-            .full_protocol_large(
-                &sender_inputs,
-                &weights,
-                &path_delta,
-                &mut channel,
-                &mut rng,
-            )
-            .unwrap();
-        println!("Done");
-    });
-    let stream = a;
-    let mut channel = TrackChannel::new(SymChannel::new(stream));
-    let mut rng = AesRng::new();
-    let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-
-    // For large examples where computation should be batched per-megabin instead of accross all bins.
-    let _ = psi
-        .full_protocol_large(
-            &receiver_inputs,
-            &payloads,
-            megasize,
-            &mut channel,
-            &mut rng,
-        )
-        .unwrap();
-}
-
 fn bench_psi(c: &mut Criterion) {
     c.bench_function("psi::PSTY PAYLOAD (initialization)", move |bench| {
         bench.iter(|| {
@@ -172,31 +119,6 @@ fn bench_psi(c: &mut Criterion) {
         let payload = int_vec_block512(rand_u64_vec(1 << 12, 1 << 30, &mut rng));
         bench.iter(|| {
             let v = bench_psty_payload(rs.clone(), rs.clone(), payload.clone(), payload.clone());
-            std::hint::black_box(v)
-        })
-    });
-    c.bench_function("psi::PSTY PAYLOAD (n = 2^16)", move |bench| {
-        let mut rng = AesRng::new();
-        let rs = rand_vec_vec(1 << 16);
-        let payload = int_vec_block512(rand_u64_vec(1 << 16, 1 << 30, &mut rng));
-        bench.iter(|| {
-            let v = bench_psty_payload(rs.clone(), rs.clone(), payload.clone(), payload.clone());
-            std::hint::black_box(v)
-        })
-    });
-    c.bench_function("psi::PSTY PAYLOAD (n = 2^20)", move |bench| {
-        let mut rng = AesRng::new();
-        let rs = rand_vec_vec(1 << 20);
-        let payload = int_vec_block512(rand_u64_vec(1 << 20, 1 << 30, &mut rng));
-        let megasize = 100000;
-        bench.iter(|| {
-            let v = bench_psty_payload_large(
-                rs.clone(),
-                rs.clone(),
-                payload.clone(),
-                payload.clone(),
-                megasize,
-            );
             std::hint::black_box(v)
         })
     });
