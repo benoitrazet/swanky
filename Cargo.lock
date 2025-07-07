@@ -2398,6 +2398,7 @@ dependencies = [
  "swanky-field-binary",
  "swanky-field-f61p",
  "swanky-field-ff-primes",
+ "tempfile",
 ]
 
 [[package]]
