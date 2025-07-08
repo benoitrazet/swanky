@@ -495,7 +495,7 @@ mod tests {
     use swanky_aes_rng::AesRng;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
-    use swanky_field_f61p::F61p;
+    use swanky_field_ff_primes::F128p;
     use swanky_polynomial::Polynomial;
 
     const N: usize = 16;
@@ -519,7 +519,7 @@ mod tests {
     }
 
     test_sharing!(test_sharing_f2, F2);
-    test_sharing!(test_sharing_f61p, F61p);
+    test_sharing!(test_sharing_f128p, F128p);
 
     macro_rules! test_poly_eval {
         ($name:ident, $field:ty) => {
@@ -632,7 +632,7 @@ mod tests {
         };
     }
 
-    test_poly_eval!(test_poly_eval_f61p, F61p);
-    test_serialization!(serialization_f61p, F61p);
+    test_poly_eval!(test_poly_eval_f128p, F128p);
+    test_serialization!(serialization_f128p, F128p);
     test_serialization!(serialization_f2, F2);
 }

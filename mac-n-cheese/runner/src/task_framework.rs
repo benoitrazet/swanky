@@ -121,8 +121,7 @@ impl<P: Party> TaskInput<P> {
             .multi_array_inputs()
             .get_opt(idx)
             .context("Missing single array input")?;
-        #[cfg(debug_assertions)]
-        {
+        if cfg!(debug_assertions) {
             assert_type_is::<P, T>(Type::try_from(*input.ty())?);
         }
         let out = ctx.arena.alloc_slice_fill_default(input.inputs().len());

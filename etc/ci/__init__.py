@@ -434,6 +434,16 @@ def nightly(ctx: click.Context) -> None:
         cache_test_output=False,
         code_coverage=code_coverage,
     )
+    rich.get_console().rule("Benchmarking")
+    # Run cargo bench. We don't collect the outputs (since they won't be stable on a VM), but to
+    # make sure they build properly.
+    subprocess.check_call(
+        ["cargo", "bench", "--verbose"],
+        cwd=ROOT,
+        # Timeout after 30 minutes
+        env=os.environ
+        | {_cargo_target_runner_env_var(_host_triple()): "timeout 1800s"},
+    )
     # Post-process code coverage data.
     # What's the path to rust's llvm-tools?
     llvm_bin = (
