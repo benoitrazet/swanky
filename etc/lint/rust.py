@@ -65,6 +65,16 @@ def crates_in_manifest() -> List[Path]:
     )
 
 
+def crates_in_manifest_are_sorted(ctx: click.Context) -> LintResult:
+    """Check that all workspace members are sorted."""
+    members = root_cargo_toml()["workspace"]["members"]
+    if sorted(members) != members:
+        rich.print("workspace members in /Cargo.toml aren't sorted!")
+        return LintResult.FAILURE
+    else:
+        return LintResult.SUCCESS
+
+
 def crates_enumerated_in_workspace(ctx: click.Context) -> LintResult:
     """Check that all crates in Swanky are listed in the workspace"""
     crates_in_manifest_cargo_tomls = set(
