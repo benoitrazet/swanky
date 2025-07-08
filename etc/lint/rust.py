@@ -18,6 +18,7 @@ import tree_sitter
 
 from etc import ROOT
 from etc.lint import LintResult
+from etc.rust import crate_path
 
 
 def list_cargo_toml_files() -> List[Path]:
@@ -110,6 +111,67 @@ def workspace_members_are_defined_in_workspace(ctx: click.Context) -> LintResult
         return LintResult.FAILURE
     else:
         return LintResult.SUCCESS
+
+
+MISNAMED_CRATES = {
+    "bristol-fashion",
+    "diet-mac-and-cheese",
+    "humidor",
+    "inferno",
+    "keyed_arena",
+    "fancy-garbling",
+    "mac-n-cheese-compiler",
+    "mac-n-cheese-event-log",
+    "mac-n-cheese-inspector",
+    "mac-n-cheese-ir",
+    "mac-n-cheese-runner",
+    "mac-n-cheese-sieve-parser",
+    "mac-n-cheese-vole",
+    "mac-n-cheese-wire-map",
+    "popsicle",
+    "schmivitz",
+    "simple-arith-circuit",
+    "vectoreyes",
+    "web-mac-n-cheese-wasm",
+    "web-mac-n-cheese-websocket",
+    "zkv",
+}
+
+
+def check_crate_paths(ctx: click.Context) -> LintResult:
+    """
+    Check that crate names match their paths
+
+    For example:
+    swanky-cool-crate: ./crates/cool-crate, ./crates/cool/crate (both valid)
+
+    If ./crates/cool exists (and isn't a crate), then we _require_ that cool-crate live under
+    that directory.
+    """
+    result = LintResult.SUCCESS
+    for cargo_toml in list_cargo_toml_files():
+        name = toml.loads(cargo_toml.read_text())["package"]["name"]
+        if name in MISNAMED_CRATES:
+            continue
+
+        def report_error(err: str) -> None:
+            nonlocal result
+            result = LintResult.FAILURE
+            rich.print(f"[bold][underline]{name}[/underline][/bold] is misnamed: {err}")
+
+        if not cargo_toml.parent.is_relative_to(ROOT / "crates"):
+            report_error("Does not live in ./crates")
+            continue
+        if not name.startswith("swanky-"):
+            report_error("does not start with 'swanky-'")
+            continue
+        expected_path = crate_path(name)
+        if cargo_toml.parent != expected_path:
+            report_error(
+                f"Expected at path {expected_path.relative_to(ROOT)}, "
+                + f"not {cargo_toml.parent.relative_to(ROOT)}"
+            )
+    return result
 
 
 def validate_crate_manifests(ctx: click.Context) -> LintResult:

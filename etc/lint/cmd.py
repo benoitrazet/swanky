@@ -53,6 +53,7 @@ LINTS: List[Callable[[click.Context], LintResult]] = [
     lint_rust.crates_enumerated_in_workspace,
     lint_rust.workspace_members_are_defined_in_workspace,
     lint_rust.crates_in_manifest_are_sorted,
+    lint_rust.check_crate_paths,
     lint_rust.cargo_deny,
 ]
 
