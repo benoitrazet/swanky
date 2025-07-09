@@ -53,7 +53,7 @@ members = [
   "crates/simple-arith-circuit",
   "crates/svole-wykw",
   "crates/vectoreyes",
-  "zkv",
+  "crates/zkv",
 ]
 
 [workspace.package]
@@ -122,7 +122,7 @@ swanky-svole-wykw = { path = "crates/svole-wykw" }
 vectoreyes = { path = "crates/vectoreyes" }
 web-mac-n-cheese-wasm = { path = "crates/diet-mac-and-cheese/web-mac-and-cheese/wasm" }
 web-mac-n-cheese-websocket = { path = "crates/diet-mac-and-cheese/web-mac-and-cheese/websocket" }
-zkv = { path = "zkv" }
+zkv = { path = "crates/zkv" }
 # END OUR CRATES
 # Don't remove, or modify, the above "# END OUR CRATES" line. It's used by ./swanky new-crate
 
