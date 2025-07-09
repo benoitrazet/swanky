@@ -48,9 +48,9 @@ members = [
   "crates/party",
   "crates/polynomial",
   "crates/popsicle",
+  "crates/schmivitz",
   "crates/serialization",
   "crates/svole-wykw",
-  "schmivitz",
   "simple-arith-circuit",
   "vectoreyes",
   "zkv",
@@ -85,7 +85,7 @@ mac-n-cheese-sieve-parser = { path = "crates/mac-n-cheese/sieve-parser" }
 mac-n-cheese-vole = { path = "crates/mac-n-cheese/vole" }
 mac-n-cheese-wire-map = { path = "crates/mac-n-cheese/wire-map" }
 popsicle = { path = "crates/popsicle" }
-schmivitz = { path = "schmivitz" }
+schmivitz = { path = "crates/schmivitz" }
 simple-arith-circuit = { path = "simple-arith-circuit" }
 swanky-adversary = { path = "crates/adversary" }
 swanky-aes-hash = { path = "crates/aes-hash" }
