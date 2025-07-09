@@ -27,6 +27,14 @@ members = [
   "crates/humidor",
   "crates/inferno",
   "crates/keyed_arena",
+  "crates/mac-n-cheese/compiler",
+  "crates/mac-n-cheese/event-log",
+  "crates/mac-n-cheese/inspector",
+  "crates/mac-n-cheese/ir",
+  "crates/mac-n-cheese/runner",
+  "crates/mac-n-cheese/sieve-parser",
+  "crates/mac-n-cheese/vole",
+  "crates/mac-n-cheese/wire-map",
   "crates/ocelot-error",
   "crates/oprf-kkrt",
   "crates/oprf-kmprt",
@@ -41,14 +49,6 @@ members = [
   "crates/polynomial",
   "crates/serialization",
   "crates/svole-wykw",
-  "mac-n-cheese/compiler",
-  "mac-n-cheese/event-log",
-  "mac-n-cheese/inspector",
-  "mac-n-cheese/ir",
-  "mac-n-cheese/runner",
-  "mac-n-cheese/sieve-parser",
-  "mac-n-cheese/vole",
-  "mac-n-cheese/wire-map",
   "popsicle",
   "schmivitz",
   "simple-arith-circuit",
@@ -76,14 +76,14 @@ fancy-garbling = { path = "crates/fancy-garbling" }
 humidor = { path = "crates/humidor" }
 inferno = { path = "crates/inferno" }
 keyed_arena = { path = "crates/keyed_arena" }
-mac-n-cheese-compiler = { path = "mac-n-cheese/compiler" }
-mac-n-cheese-event-log = { path = "mac-n-cheese/event-log" }
-mac-n-cheese-inspector = { path = "mac-n-cheese/inspector" }
-mac-n-cheese-ir = { path = "mac-n-cheese/ir" }
-mac-n-cheese-runner = { path = "mac-n-cheese/runner" }
-mac-n-cheese-sieve-parser = { path = "mac-n-cheese/sieve-parser" }
-mac-n-cheese-vole = { path = "mac-n-cheese/vole" }
-mac-n-cheese-wire-map = { path = "mac-n-cheese/wire-map" }
+mac-n-cheese-compiler = { path = "crates/mac-n-cheese/compiler" }
+mac-n-cheese-event-log = { path = "crates/mac-n-cheese/event-log" }
+mac-n-cheese-inspector = { path = "crates/mac-n-cheese/inspector" }
+mac-n-cheese-ir = { path = "crates/mac-n-cheese/ir" }
+mac-n-cheese-runner = { path = "crates/mac-n-cheese/runner" }
+mac-n-cheese-sieve-parser = { path = "crates/mac-n-cheese/sieve-parser" }
+mac-n-cheese-vole = { path = "crates/mac-n-cheese/vole" }
+mac-n-cheese-wire-map = { path = "crates/mac-n-cheese/wire-map" }
 popsicle = { path = "popsicle" }
 schmivitz = { path = "schmivitz" }
 simple-arith-circuit = { path = "simple-arith-circuit" }

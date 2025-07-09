@@ -279,11 +279,11 @@ LIBS_NOT_YET_DOCUMENTED = {
     "crates/diet-mac-and-cheese/web-mac-and-cheese/wasm/src/lib.rs",
     "crates/diet-mac-and-cheese/web-mac-and-cheese/websocket/src/lib.rs",
     "crates/keyed_arena/src/lib.rs",
-    "mac-n-cheese/event-log/src/lib.rs",
-    "mac-n-cheese/ir/src/lib.rs",
-    "mac-n-cheese/sieve-parser/src/lib.rs",
-    "mac-n-cheese/vole/src/lib.rs",
-    "mac-n-cheese/wire-map/src/lib.rs",
+    "crates/mac-n-cheese/event-log/src/lib.rs",
+    "crates/mac-n-cheese/ir/src/lib.rs",
+    "crates/mac-n-cheese/sieve-parser/src/lib.rs",
+    "crates/mac-n-cheese/vole/src/lib.rs",
+    "crates/mac-n-cheese/wire-map/src/lib.rs",
 }
 
 
