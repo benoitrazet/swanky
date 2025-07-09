@@ -3,7 +3,7 @@ from typing import Any, Callable, List
 import click
 import rich
 
-from crates.vectoreyes.cmd import generate as vectoreyes_generate
+from edge.vectoreyes.cmd import generate as vectoreyes_generate
 from etc.fmt import fmt
 from etc.lint import LintResult
 from etc.lint import flatbuffers as lint_flatbuffers

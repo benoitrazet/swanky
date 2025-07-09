@@ -26,7 +26,7 @@ def main(
     ctx.obj[NIX_CACHE_KEY] = nix_cache_key
 
 
-from crates.vectoreyes.cmd import vectoreyes
+from edge.vectoreyes.cmd import vectoreyes
 from etc.ci import ci
 from etc.fmt import fmt
 from etc.graph_deps import graph_deps

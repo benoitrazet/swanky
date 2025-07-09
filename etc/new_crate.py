@@ -54,7 +54,7 @@ def new_crate(ctx: click.Context, name: str, description: str) -> None:
     """
     Create a new crate in Swanky
 
-    A crate template will be instantiated in the crates/ directory
+    A crate template will be instantiated in the edge/ directory
     """
     if not name.startswith("swanky-"):
         raise click.UsageError(

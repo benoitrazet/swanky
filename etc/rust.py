@@ -8,9 +8,9 @@ def crate_path(name: str) -> Path:
     Given a crate named `name`, where should it live?
 
     For example:
-    swanky-cool-crate: ./crates/cool-crate, ./crates/cool/crate (both valid)
+    swanky-cool-crate: ./edge/cool-crate, ./edge/cool/crate (both valid)
 
-    If ./crates/cool exists (and isn't a crate), then we _require_ that cool-crate live under
+    If ./edge/cool exists (and isn't a crate), then we _require_ that cool-crate live under
     that directory.
 
     This function will raise a `ValueError` if `name` doesn't start with `swanky-`
@@ -19,7 +19,7 @@ def crate_path(name: str) -> Path:
     if len(parts) == 0 or parts[0] != "swanky":
         raise ValueError(f"Invalid crate name {repr(name)}")
     del parts[0]
-    dir = ROOT / "crates"
+    dir = ROOT / "edge"
     for i, part in enumerate(parts):
         dir_part = dir / part
         if dir_part.is_dir() and (not (dir_part / "Cargo.toml").exists()):

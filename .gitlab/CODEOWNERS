@@ -1,36 +1,36 @@
-/crates/bristol-fashion/ @isweet
-/crates/bristol-fashion @isweet
-/crates/diet-mac-and-cheese/ @benoit.razet @cphifer
-/crates/diet-mac-and-cheese @benoit.razet @cphifer
+/edge/bristol-fashion/ @isweet
+/edge/bristol-fashion @isweet
+/edge/diet-mac-and-cheese/ @benoit.razet @cphifer
+/edge/diet-mac-and-cheese @benoit.razet @cphifer
 
-/crates/adversary/ @cphifer
-/crates/adversary @cphifer
-/crates/block/ @cphifer
-/crates/block @cphifer
-/crates/channel/ @marc
-/crates/channel @marc
-/crates/flatbuffer-build/ @marc
-/crates/flatbuffer-build @marc
-/crates/party/ @marc @cphifer
-/crates/party @marc @cphifer
-/crates/serialization/ @marc @cphifer
-/crates/serialization @marc @cphifer
-/crates/keyed_arena/ @marc
-/crates/keyed_arena @marc
-/crates/vectoreyes/ @marc
-/crates/vectoreyes @marc
+/edge/adversary/ @cphifer
+/edge/adversary @cphifer
+/edge/block/ @cphifer
+/edge/block @cphifer
+/edge/channel/ @marc
+/edge/channel @marc
+/edge/flatbuffer-build/ @marc
+/edge/flatbuffer-build @marc
+/edge/party/ @marc @cphifer
+/edge/party @marc @cphifer
+/edge/serialization/ @marc @cphifer
+/edge/serialization @marc @cphifer
+/edge/keyed_arena/ @marc
+/edge/keyed_arena @marc
+/edge/vectoreyes/ @marc
+/edge/vectoreyes @marc
 
 [Finite Fields] @marc @cphifer
-/crates/field/
-/crates/field
-/crates/field-binary/
-/crates/field-binary
-/crates/field-f61p/
-/crates/field-f61p
-/crates/field-ff-primes/
-/crates/field-ff-primes
-/crates/field-test/
-/crates/field-test
+/edge/field/
+/edge/field
+/edge/field-binary/
+/edge/field-binary
+/edge/field-f61p/
+/edge/field-f61p
+/edge/field-ff-primes/
+/edge/field-ff-primes
+/edge/field-test/
+/edge/field-test
 
 [CI Infrastructure] @marc @cphifer
 /swanky
