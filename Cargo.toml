@@ -1,13 +1,13 @@
 [workspace]
 resolver = "2"
 members = [
-  "bristol-fashion",
   "crates/adversary",
   "crates/aes-hash",
   "crates/aes-rng",
   "crates/authenticated-bits",
   "crates/bit-matrix-transpose",
   "crates/block",
+  "crates/bristol-fashion",
   "crates/bytearray-utils",
   "crates/channel",
   "crates/channel-legacy",
@@ -70,7 +70,7 @@ derived_hash_with_manual_eq = "allow"
 [workspace.dependencies]
 # Don't remove, or modify, the below "# BEGIN OUR CRATES" line. It's used by ./swanky new-crate
 # BEGIN OUR CRATES
-bristol-fashion = { path = "bristol-fashion" }
+bristol-fashion = { path = "crates/bristol-fashion" }
 diet-mac-and-cheese = { path = "diet-mac-and-cheese" }
 fancy-garbling = { path = "fancy-garbling" }
 humidor = { path = "humidor" }
