@@ -51,7 +51,7 @@ def check_cargo_lock(ctx: click.Context) -> LintResult:
         )
         != 0
     ):
-        rich.print("Cargo.lock isn't up to date. Run `cargo update` to fix this.")
+        rich.print("Cargo.lock isn't up to date. Run `cargo check` to fix this.")
         return LintResult.FAILURE
     return LintResult.SUCCESS
 
