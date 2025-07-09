@@ -211,9 +211,9 @@ This technique isn't specific to the `num` ecosystem, either. Many Rust librarie
 
 #### Crate Layout
 
-All crates should (note: as of this writing, this isn't true):
+Crates must
 
-* live in the `crates/` directory. If the crate lives in a subdirectory of the `crates/` directory, the directory structure must match the name of the crate (to make it easy to find the crate). For example `swanky-ot-kos` might live in `crates/ot-kos` or `crates/ot/kos`, but it shouldn't live in `crates/kos`.
+* live in the `core/` or `edge/` directory. The directory structure must match the name of the crate (to make it easy to find the crate). For example `swanky-ot-kos` might live in `crates/ot-kos` or `crates/ot/kos`, but it shouldn't live in `crates/kos`.
 * be named starting with the `swanky-` prefix. This makes it easy to determine which crates come from Swanky, and which crates are external dependencies.
 
 ### Documentation
