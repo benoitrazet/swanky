@@ -278,7 +278,6 @@ LIBS_NOT_YET_DOCUMENTED = {
     "crates/field-fft/src/lib.rs",
     "crates/diet-mac-and-cheese/web-mac-and-cheese/wasm/src/lib.rs",
     "crates/diet-mac-and-cheese/web-mac-and-cheese/websocket/src/lib.rs",
-    "fancy-garbling/base_conversion/src/lib.rs",
     "keyed_arena/src/lib.rs",
     "mac-n-cheese/event-log/src/lib.rs",
     "mac-n-cheese/ir/src/lib.rs",
