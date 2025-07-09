@@ -25,6 +25,7 @@ members = [
   "crates/field-test",
   "crates/flatbuffer-build",
   "crates/humidor",
+  "crates/inferno",
   "crates/ocelot-error",
   "crates/oprf-kkrt",
   "crates/oprf-kmprt",
@@ -39,7 +40,6 @@ members = [
   "crates/polynomial",
   "crates/serialization",
   "crates/svole-wykw",
-  "inferno",
   "keyed_arena",
   "mac-n-cheese/compiler",
   "mac-n-cheese/event-log",
@@ -74,7 +74,7 @@ bristol-fashion = { path = "crates/bristol-fashion" }
 diet-mac-and-cheese = { path = "crates/diet-mac-and-cheese" }
 fancy-garbling = { path = "crates/fancy-garbling" }
 humidor = { path = "crates/humidor" }
-inferno = { path = "inferno" }
+inferno = { path = "crates/inferno" }
 keyed_arena = { path = "keyed_arena" }
 mac-n-cheese-compiler = { path = "mac-n-cheese/compiler" }
 mac-n-cheese-event-log = { path = "mac-n-cheese/event-log" }
