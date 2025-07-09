@@ -13,6 +13,9 @@ members = [
   "crates/channel-legacy",
   "crates/cointoss",
   "crates/deprecated-bitwise-utils",
+  "crates/diet-mac-and-cheese",
+  "crates/diet-mac-and-cheese/web-mac-and-cheese/wasm",
+  "crates/diet-mac-and-cheese/web-mac-and-cheese/websocket",
   "crates/field",
   "crates/field-binary",
   "crates/field-f61p",
@@ -34,9 +37,6 @@ members = [
   "crates/polynomial",
   "crates/serialization",
   "crates/svole-wykw",
-  "diet-mac-and-cheese",
-  "diet-mac-and-cheese/web-mac-and-cheese/wasm",
-  "diet-mac-and-cheese/web-mac-and-cheese/websocket",
   "fancy-garbling",
   "humidor",
   "inferno",
@@ -71,7 +71,7 @@ derived_hash_with_manual_eq = "allow"
 # Don't remove, or modify, the below "# BEGIN OUR CRATES" line. It's used by ./swanky new-crate
 # BEGIN OUR CRATES
 bristol-fashion = { path = "crates/bristol-fashion" }
-diet-mac-and-cheese = { path = "diet-mac-and-cheese" }
+diet-mac-and-cheese = { path = "crates/diet-mac-and-cheese" }
 fancy-garbling = { path = "fancy-garbling" }
 humidor = { path = "humidor" }
 inferno = { path = "inferno" }
@@ -120,8 +120,8 @@ swanky-polynomial = { path = "crates/polynomial" }
 swanky-serialization = { path = "crates/serialization" }
 swanky-svole-wykw = { path = "crates/svole-wykw" }
 vectoreyes = { path = "vectoreyes" }
-web-mac-n-cheese-wasm = { path = "diet-mac-and-cheese/web-mac-and-cheese/wasm" }
-web-mac-n-cheese-websocket = { path = "diet-mac-and-cheese/web-mac-and-cheese/websocket" }
+web-mac-n-cheese-wasm = { path = "crates/diet-mac-and-cheese/web-mac-and-cheese/wasm" }
+web-mac-n-cheese-websocket = { path = "crates/diet-mac-and-cheese/web-mac-and-cheese/websocket" }
 zkv = { path = "zkv" }
 # END OUR CRATES
 # Don't remove, or modify, the above "# END OUR CRATES" line. It's used by ./swanky new-crate
