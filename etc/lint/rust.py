@@ -1,4 +1,5 @@
 import ctypes
+import difflib
 import functools
 import itertools
 import os
@@ -69,8 +70,15 @@ def crates_in_manifest() -> List[Path]:
 def crates_in_manifest_are_sorted(ctx: click.Context) -> LintResult:
     """Check that all workspace members are sorted."""
     members = root_cargo_toml()["workspace"]["members"]
-    if sorted(members) != members:
+    sorted_members = sorted(members)
+    if sorted_members != members:
         rich.print("workspace members in /Cargo.toml aren't sorted!")
+        rich.get_console().print(
+            rich.syntax.Syntax(
+                "\n".join(difflib.unified_diff(members, sorted_members, lineterm="")),
+                "diff",
+            )
+        )
         return LintResult.FAILURE
     else:
         return LintResult.SUCCESS
@@ -268,8 +276,8 @@ def cargo_deny(ctx: click.Context) -> LintResult:
 LIBS_NOT_YET_DOCUMENTED = {
     "bristol-fashion/src/lib.rs",
     "crates/field-fft/src/lib.rs",
-    "diet-mac-and-cheese/web-mac-and-cheese/wasm/src/lib.rs",
-    "diet-mac-and-cheese/web-mac-and-cheese/websocket/src/lib.rs",
+    "crates/diet-mac-and-cheese/web-mac-and-cheese/wasm/src/lib.rs",
+    "crates/diet-mac-and-cheese/web-mac-and-cheese/websocket/src/lib.rs",
     "fancy-garbling/base_conversion/src/lib.rs",
     "keyed_arena/src/lib.rs",
     "mac-n-cheese/event-log/src/lib.rs",
