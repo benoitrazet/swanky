@@ -17,8 +17,8 @@
 /crates/serialization @marc @cphifer
 /crates/keyed_arena/ @marc
 /crates/keyed_arena @marc
-/vectoreyes/ @marc
-/vectoreyes @marc
+/crates/vectoreyes/ @marc
+/crates/vectoreyes @marc
 
 [Finite Fields] @marc @cphifer
 /crates/field/

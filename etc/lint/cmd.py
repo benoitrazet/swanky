@@ -3,6 +3,7 @@ from typing import Any, Callable, List
 import click
 import rich
 
+from crates.vectoreyes.cmd import generate as vectoreyes_generate
 from etc.fmt import fmt
 from etc.lint import LintResult
 from etc.lint import flatbuffers as lint_flatbuffers
@@ -10,7 +11,6 @@ from etc.lint import gitlab as lint_gitlab
 from etc.lint import rust as lint_rust
 from etc.lint.mypy import mypy as lint_mypy
 from etc.readme import gen_crate_list as readme_gen_crate_list
-from vectoreyes.cmd import generate as vectoreyes_generate
 
 
 def existing_command_as_lint(
