@@ -19,7 +19,7 @@ import tree_sitter
 
 from etc import ROOT
 from etc.lint import LintResult
-from etc.rust import crate_path
+from etc.rust import CrateDir, crate_path
 
 
 def list_cargo_toml_files() -> List[Path]:
@@ -170,10 +170,16 @@ def check_crate_paths(ctx: click.Context) -> LintResult:
         if not name.startswith("swanky-"):
             report_error("does not start with 'swanky-'")
             continue
-        expected_path = crate_path(name)
-        if cargo_toml.parent != expected_path:
+        expected_paths = [
+            crate_path(name, CrateDir.CORE),
+            crate_path(name, CrateDir.EDGE),
+        ]
+        if cargo_toml.parent not in expected_paths:
+            expected_paths_str = ", ".join(
+                str(p.relative_to(ROOT)) for p in expected_paths
+            )
             report_error(
-                f"Expected at path {expected_path.relative_to(ROOT)}, "
+                f"Expected at one of {expected_paths_str}, "
                 + f"not {cargo_toml.parent.relative_to(ROOT)}"
             )
     return result

@@ -6,7 +6,7 @@ from typing import Sequence
 import click
 
 from etc import ROOT, readme
-from etc.rust import crate_path
+from etc.rust import CrateDir, crate_path
 
 _TOML_TEMPLATE = Template(
     """
@@ -49,8 +49,13 @@ _LIB_RS_TEMPLATE = Template(
     help="What's the description of the new crate? If absent, you'll be prompted for it.",
     prompt="Crate Description",
 )
+@click.option(
+    "--core/--edge",
+    default=False,
+    help="Is the crate an edge crate or a core crate?",
+)
 @click.pass_context
-def new_crate(ctx: click.Context, name: str, description: str) -> None:
+def new_crate(ctx: click.Context, name: str, description: str, core: bool) -> None:
     """
     Create a new crate in Swanky
 
@@ -60,7 +65,7 @@ def new_crate(ctx: click.Context, name: str, description: str) -> None:
         raise click.UsageError(
             f"Crate names must start with 'swanky-'. But {repr(name)} were submitted."
         )
-    dst = crate_path(name)
+    dst = crate_path(name, CrateDir.CORE if core else CrateDir.EDGE)
     if dst.exists():
         raise click.ClickException(f"Crate {repr(name)} already exists.")
     dst.mkdir()

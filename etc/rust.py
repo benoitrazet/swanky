@@ -1,9 +1,15 @@
+from enum import Enum
 from pathlib import Path
 
 from etc import ROOT
 
 
-def crate_path(name: str) -> Path:
+class CrateDir(Enum):
+    EDGE = "edge"
+    CORE = "core"
+
+
+def crate_path(name: str, crate_dir: CrateDir) -> Path:
     """
     Given a crate named `name`, where should it live?
 
@@ -14,12 +20,14 @@ def crate_path(name: str) -> Path:
     that directory.
 
     This function will raise a `ValueError` if `name` doesn't start with `swanky-`
+
+    `crate_dir` determines which directory (edge or core) the crate lives in
     """
     parts = name.split("-")
     if len(parts) == 0 or parts[0] != "swanky":
         raise ValueError(f"Invalid crate name {repr(name)}")
     del parts[0]
-    dir = ROOT / "edge"
+    dir = ROOT / crate_dir.value
     for i, part in enumerate(parts):
         dir_part = dir / part
         if dir_part.is_dir() and (not (dir_part / "Cargo.toml").exists()):
