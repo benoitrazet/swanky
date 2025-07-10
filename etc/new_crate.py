@@ -6,6 +6,7 @@ from typing import Sequence
 import click
 
 from etc import ROOT, readme
+from etc.rust import crate_path
 
 _TOML_TEMPLATE = Template(
     """
@@ -59,7 +60,7 @@ def new_crate(ctx: click.Context, name: str, description: str) -> None:
         raise click.UsageError(
             f"Crate names must start with 'swanky-'. But {repr(name)} were submitted."
         )
-    dst = ROOT / "crates" / name.replace("swanky-", "", 1)
+    dst = crate_path(name)
     if dst.exists():
         raise click.ClickException(f"Crate {repr(name)} already exists.")
     dst.mkdir()
@@ -83,6 +84,13 @@ def new_crate(ctx: click.Context, name: str, description: str) -> None:
     lines = (
         lines[0 : begin_idx + 1]
         + sorted(lines[begin_idx + 1 : end_idx] + [f'{name} = {{ path = "{path}" }}'])
+        + lines[end_idx:]
+    )
+    begin_idx = lines.index("members = [")
+    end_idx = lines.index("]", begin_idx)
+    lines = (
+        lines[0 : begin_idx + 1]
+        + sorted(lines[begin_idx + 1 : end_idx] + [f'  "{path}",'])
         + lines[end_idx:]
     )
     cargo_toml = "\n".join(lines)
