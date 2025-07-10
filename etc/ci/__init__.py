@@ -263,6 +263,7 @@ def test_rust(
     cargo_nextest: bool = True,
     cross_compile: _CrossCompile | None = None,
     code_coverage: Path | None = None,
+    cargo_incremental: bool = False,
 ) -> None:
     """
     Test rust code
@@ -274,6 +275,7 @@ def test_rust(
     cross_compile: if set, cross-compile and run on the specified target. Otherwise target the host
     code_coverage: if set, write LLVM code coverage data to this folder. This is incompatible with
                    test caching.
+    cargo_incremental: if set, then enable incremental rust builds
     """
     rich.get_console().rule("Test Rust")
     rich.pretty.pprint(
@@ -289,6 +291,7 @@ def test_rust(
     assert not (code_coverage and cache_test_output)
 
     env = dict(os.environ)
+    env["CARGO_INCREMENTAL"] = str(int(cargo_incremental))
 
     # First, set up the environment for cross-compilation and test caching.
     if cache_test_output:
@@ -564,11 +567,13 @@ def quick(ctx: click.Context, cache_dir: Path) -> None:
             cross_compile=_NEON,
             # These tests are fast enough, that the overhead of cargo-nextest isn't a win.
             cargo_nextest=False,
+            cargo_incremental=True,
         )
         test_rust(
             ctx,
             cargo_args=["--features=serde"],
             cache_test_output=True,
+            cargo_incremental=True,
         )
     finally:
         pack_target_dir(cache_dir)
