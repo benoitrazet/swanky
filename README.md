@@ -6,7 +6,6 @@
 - **`bristol-fashion`**: A parser for Bristol Fashion circuits.
 - **`diet-mac-and-cheese`**: A diet version of the Mac'n'Cheese protocol
 - **`fancy-garbling`**: A library for boolean and arithmetic garbling
-- **`fancy-garbling-base-conversion`**: Lookup tables useful for the fancy-garbling crate
 - **`humidor`**: A test-bed for Ligero-like protocols
 - **`inferno`**: An implementation of the Limbo zero knowledge proof protocol
 - **`keyed_arena`**: Bump allocator which allows for random access to its allocations
@@ -18,7 +17,6 @@
 - **`mac-n-cheese-sieve-parser`**: A parser for SIEVE IR (a zero knoweldge proof circuit format)
 - **`mac-n-cheese-vole`**: An implementation of Vector Oblivious Linear Evaluation
 - **`mac-n-cheese-wire-map`**: An implementation of a sparse array
-- **`ocelot`**: A library for oblivious transfer protocols
 - **`popsicle`**: A library for private set intersection
 - **`schmivitz`**: A library for zero-knowledge protocols using VOLE-in-the-head
 - **`simple-arith-circuit`**: Simple arithmetic circuit library
@@ -26,11 +24,13 @@
 - **`swanky-aes-hash`**: Correlation-robust hashing based on fixed-key AES.
 - **`swanky-aes-rng`**: A random number generator based on AES-CTR.
 - **`swanky-authenticated-bits`**: A package for generating authenticated bits
+- **`swanky-bit-matrix-transpose`**: Transpose a bit matrix
 - **`swanky-block`**: 128-, 256-, and  512-bit data blocks.
 - **`swanky-bytearray-utils`**: Functions for working with bits and bytearrays.
 - **`swanky-channel`**: A channel abstraction to let users avoid manual flushing
 - **`swanky-channel-legacy`**: A (legacy) channel abstraction; use `swanky-channel` for new code!
 - **`swanky-cointoss`**: A simple coin-tossing protocol.
+- **`swanky-deprecated-bitwise-utils`**: [DEPRECATED] Old bitwise utilities from ocelot
 - **`swanky-field`**: Definitions of the core `FiniteField` and `FiniteRing` traits
 - **`swanky-field-binary`**: Binary finite (extension) fields
 - **`swanky-field-f61p`**: An implementation of `GF(2^61-1)`
@@ -38,9 +38,20 @@
 - **`swanky-field-fft`**: FFT implementations for finite fields
 - **`swanky-field-test`**: Utilitites for testing correctness of finite field implementations
 - **`swanky-flatbuffer-build`**: Tooling to automate compiling flatbuffer schemas
+- **`swanky-ocelot-error`**: [DEPRECATED] An error type used by crates formerly contained in ocelot
+- **`swanky-oprf-kkrt`**: An implementation of the kkrt OPRF protocol
+- **`swanky-oprf-kmprt`**: An implementation of the KMPRT OPRF protocol
+- **`swanky-oprf-traits`**: Base traits impl-ed by all our OPRF implementations
+- **`swanky-ot-alsz-kos`**: Oblivious transfer implementations for the ALSZ and KOS protocols
+- **`swanky-ot-chou-orlandi`**: An implementation of the Chou-Orlandi OT protocol
+- **`swanky-ot-dummy`**: Implementation of an insecure OT protocol for testing purposes
+- **`swanky-ot-noar-pinkas`**: An implementation of the Noar-Pinkas OT protocol
+- **`swanky-ot-test`**: Testing utilities for oblivious transfer protocols
+- **`swanky-ot-traits`**: Base traits for Obliivious Transfer protocols
 - **`swanky-party`**: Support for types indexed by a party.
 - **`swanky-polynomial`**: Support for various representations of polynomials over finite fields
 - **`swanky-serialization`**: Traits and utilities for compact serialization into a canonical byte representation
+- **`swanky-svole-wykw`**: An implementation of the WYKW svole protocol
 - **`vectoreyes`**: Cross-platform SIMD types and functions
 - **`web-mac-n-cheese-wasm`**: Web Mac'n'Cheese, the wasm part
 - **`web-mac-n-cheese-websocket`**: Web Mac'n'Cheese, the websocket part

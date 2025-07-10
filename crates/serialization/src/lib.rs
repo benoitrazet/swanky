@@ -114,7 +114,7 @@ pub struct BiggerThanModulus;
 impl std::error::Error for BiggerThanModulus {}
 impl std::fmt::Display for BiggerThanModulus {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
