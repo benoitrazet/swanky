@@ -2,6 +2,7 @@ import ctypes
 import difflib
 import functools
 import itertools
+import json
 import os
 import subprocess
 import threading
@@ -53,6 +54,41 @@ def check_cargo_lock(ctx: click.Context) -> LintResult:
         rich.print("Cargo.lock isn't up to date. Run `cargo update` to fix this.")
         return LintResult.FAILURE
     return LintResult.SUCCESS
+
+
+def check_core_dependencies(ctx: click.Context) -> LintResult:
+    """Check that core crates don't depend on edge crates"""
+    try:
+        metadata = json.loads(
+            subprocess.check_output(
+                ["cargo", "metadata", "--format-version=1", "--locked"],
+                cwd=ROOT,
+            )
+        )
+    except subprocess.SubprocessError:
+        rich.print("`cargo metadata` failed. Is Cargo.lock up-to-date?")
+        return LintResult.FAILURE
+    edge_crates = set()
+    core_crates = set()
+    for member in metadata["workspace_members"]:
+        is_edge = "/edge/" in member
+        is_core = "/core/" in member
+        assert is_core ^ is_edge
+        if is_edge:
+            edge_crates.add(member)
+        else:
+            core_crates.add(member)
+    result = LintResult.SUCCESS
+    for node in metadata["resolve"]["nodes"]:
+        if node["id"] in core_crates:
+            edge_deps = [dep for dep in node["dependencies"] if dep in edge_crates]
+            if len(edge_deps) > 0:
+                result = LintResult.FAILURE
+                rich.print(
+                    f"Core crate {repr(node['id'])} has edge dependencies: "
+                    + repr(edge_deps)
+                )
+    return result
 
 
 def root_cargo_toml() -> Any:

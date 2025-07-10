@@ -55,6 +55,7 @@ LINTS: List[Callable[[click.Context], LintResult]] = [
     lint_rust.crates_in_manifest_are_sorted,
     lint_rust.check_crate_paths,
     lint_rust.cargo_deny,
+    lint_rust.check_core_dependencies,
 ]
 
 
