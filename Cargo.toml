@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+  "core/vectoreyes",
   "edge/adversary",
   "edge/aes-hash",
   "edge/aes-rng",
@@ -52,7 +53,6 @@ members = [
   "edge/serialization",
   "edge/simple-arith-circuit",
   "edge/svole-wykw",
-  "edge/vectoreyes",
   "edge/zkv",
 ]
 
@@ -119,7 +119,7 @@ swanky-party = { path = "edge/party" }
 swanky-polynomial = { path = "edge/polynomial" }
 swanky-serialization = { path = "edge/serialization" }
 swanky-svole-wykw = { path = "edge/svole-wykw" }
-vectoreyes = { path = "edge/vectoreyes" }
+vectoreyes = { path = "core/vectoreyes" }
 web-mac-n-cheese-wasm = { path = "edge/diet-mac-and-cheese/web-mac-and-cheese/wasm" }
 web-mac-n-cheese-websocket = { path = "edge/diet-mac-and-cheese/web-mac-and-cheese/websocket" }
 zkv = { path = "edge/zkv" }

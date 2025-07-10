@@ -17,8 +17,9 @@
 /edge/serialization @marc @cphifer
 /edge/keyed_arena/ @marc
 /edge/keyed_arena @marc
-/edge/vectoreyes/ @marc
-/edge/vectoreyes @marc
+
+/core/vectoreyes/ @marc
+/core/vectoreyes @marc
 
 [Finite Fields] @marc @cphifer
 /edge/field/
