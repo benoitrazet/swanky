@@ -10,6 +10,7 @@ use crate::authbits::{AuthBit, AuthBitGenerator};
 use rand::{CryptoRng, Rng};
 use swanky_adversary::Malicious;
 use swanky_channel::Channel;
+use swanky_field_binary::F2;
 use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
 use swanky_party::{
     IS_PROVER, IS_VERIFIER, Party, Prover, Verifier, WhichParty,
@@ -34,10 +35,48 @@ pub type PartyB = Verifier;
 /// See [`crate::authshares`] for details.
 #[derive(Default, Clone, Copy)]
 pub struct AuthShare<P: Party> {
-    /// Party A's side of the authenticated bit.
+    /// Party A's side of the authenticated share.
     party_a: PartyEitherCopy<P, AuthBit<Prover>, AuthBit<Verifier>>,
-    /// Party B's side of the authenticated bit.
+    /// Party B's side of the authenticated share.
     party_b: PartyEitherCopy<P, AuthBit<Verifier>, AuthBit<Prover>>,
+}
+
+impl<P: Party> AuthShare<P> {
+    /// The given party's bit.
+    ///
+    /// This corresponds to $`x_1`$ for Party A (the "prover"), and $`x_2`$
+    /// for Party B (the "verifier").
+    pub fn bit(self) -> F2 {
+        let bit = match P::WHICH {
+            WhichParty::Prover(ev) => self.party_a.prover_into(ev).bit().into_inner(IS_PROVER),
+            WhichParty::Verifier(ev) => self.party_b.verifier_into(ev).bit().into_inner(IS_PROVER),
+        };
+        F2::from(bit)
+    }
+
+    /// The given party's key.
+    ///
+    /// This corresponds to $`K[x_2]`$ for Party A (the "prover"), and
+    /// $`K[x_1]`$ for Party B (the "verifier").
+    pub fn key(self) -> U8x16 {
+        match P::WHICH {
+            WhichParty::Prover(ev) => self.party_b.prover_into(ev).key().into_inner(IS_VERIFIER),
+            WhichParty::Verifier(ev) => {
+                self.party_a.verifier_into(ev).key().into_inner(IS_VERIFIER)
+            }
+        }
+    }
+
+    /// The given party's MAC.
+    ///
+    /// This corresponds to $`M[x_1]`$ for Party A (the "prover"), and
+    /// $`M[x_2]`$ for Party B (the "verifier").
+    pub fn mac(self) -> U8x16 {
+        match P::WHICH {
+            WhichParty::Prover(ev) => self.party_a.prover_into(ev).mac().into_inner(IS_PROVER),
+            WhichParty::Verifier(ev) => self.party_b.verifier_into(ev).mac().into_inner(IS_PROVER),
+        }
+    }
 }
 
 impl<P: Party> core::ops::BitXor for AuthShare<P> {
@@ -228,6 +267,36 @@ impl<
                 .into_inner(IS_VERIFIER),
         }
     }
+
+    /// Compute $`\langle x \rangle \oplus c`$, where $`c`$ is a public
+    /// constant.
+    ///
+    /// This works by computing $`[x_2]_B \oplus c`$, where $`[x_2]_B`$ is the
+    /// authenticated bit held by Party B.
+    pub fn xor_with_const(&self, authshare: AuthShare<P>, bit: bool) -> AuthShare<P> {
+        match P::WHICH {
+            WhichParty::Prover(ev) => AuthShare {
+                party_a: authshare.party_a,
+                party_b: PartyEitherCopy::prover_new(
+                    ev,
+                    self.party_b
+                        .as_ref()
+                        .prover_into(ev)
+                        .xor_with_const(authshare.party_b.prover_into(ev), bit),
+                ),
+            },
+            WhichParty::Verifier(ev) => AuthShare {
+                party_a: authshare.party_a,
+                party_b: PartyEitherCopy::verifier_new(
+                    ev,
+                    self.party_b
+                        .as_ref()
+                        .verifier_into(ev)
+                        .xor_with_const(authshare.party_b.verifier_into(ev), bit),
+                ),
+            },
+        }
+    }
 }
 
 #[cfg(test)]
@@ -270,8 +339,8 @@ mod tests {
 
     /// Validates vectors of `AuthShare`s using their associated generators.
     fn validate(
-        generator_a: AuthShareGenerator<PartyA, kos::Sender, kos::Receiver>,
-        generator_b: AuthShareGenerator<PartyB, kos::Sender, kos::Receiver>,
+        generator_a: &AuthShareGenerator<PartyA, kos::Sender, kos::Receiver>,
+        generator_b: &AuthShareGenerator<PartyB, kos::Sender, kos::Receiver>,
         output_a: Vec<AuthShare<PartyA>>,
         output_b: Vec<AuthShare<PartyB>>,
     ) -> (bool, bool, U8x16, U8x16) {
@@ -297,7 +366,7 @@ mod tests {
         let nshares = 1000;
         let (output_a, output_b, generator_a, generator_b) = generate(nshares);
         let (validation_a, validation_b, _, _) =
-            validate(generator_a, generator_b, output_a, output_b);
+            validate(&generator_a, &generator_b, output_a, output_b);
         assert!(validation_a);
         assert!(validation_b);
     }
@@ -307,7 +376,7 @@ mod tests {
         let (output_a, output_b, _generator_a, _generator_b) = generate(nshares);
         let (_output_c, _output_d, generator_c, generator_d) = generate(nshares);
         let (validation_a, validation_b, _, _) =
-            validate(generator_c, generator_d, output_a, output_b);
+            validate(&generator_c, &generator_d, output_a, output_b);
         assert!(!validation_a);
         assert!(!validation_b);
     }
@@ -317,7 +386,7 @@ mod tests {
         let (output_a, _output_b, generator_a, generator_b) = generate(nshares);
         let (_output_c, output_d, _generator_c, _generator_d) = generate(nshares);
         let (validation_a, validation_b, _, _) =
-            validate(generator_a, generator_b, output_a, output_d);
+            validate(&generator_a, &generator_b, output_a, output_d);
         assert!(!validation_a);
         assert!(!validation_b);
     }
@@ -329,7 +398,7 @@ mod tests {
         let (_output_c, output_d, _generator_c, _generator_d) = generate(nshares);
         output_b[index] = output_d[index];
         let (validation_a, validation_b, _, _) =
-            validate(generator_a, generator_b, output_a, output_b);
+            validate(&generator_a, &generator_b, output_a, output_b);
         assert!(!validation_a);
         assert!(!validation_b);
     }
@@ -341,8 +410,31 @@ mod tests {
         let (output_c, _output_d, _generator_c, _generator_d) = generate(nshares);
         output_a[index] = output_c[index];
         let (validation_a, validation_b, _, _) =
-            validate(generator_a, generator_b, output_a, output_b);
+            validate(&generator_a, &generator_b, output_a, output_b);
         assert!(!validation_a);
         assert!(!validation_b);
+    }
+
+    #[test]
+    fn xor_with_const_works() {
+        let count = 1000;
+        let mut rng = AesRng::new();
+        let constants: Vec<bool> = (0..count).map(|_| rng.r#gen::<bool>()).collect();
+        let (output_a, output_b, generator_a, generator_b) = generate(count);
+        for ((a, b), bit) in output_a
+            .into_iter()
+            .zip(output_b.into_iter())
+            .zip(constants)
+        {
+            let new_a = generator_a.xor_with_const(a, bit);
+            let new_b = generator_b.xor_with_const(b, bit);
+            // The new authenticated share should still validate.
+            let (validation_a, validation_b, _, _) =
+                validate(&generator_a, &generator_b, vec![new_a], vec![new_b]);
+            assert!(validation_a);
+            assert!(validation_b);
+            // The new authenticated share should equal `⟨x⟩ ⊕ c`.
+            assert_eq!(a.bit() + b.bit() + F2::from(bit), new_a.bit() + new_b.bit());
+        }
     }
 }
