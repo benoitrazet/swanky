@@ -1,6 +1,6 @@
 //! Correlation-robust hashing based on fixed-key AES.
 //!
-//! This module provides objects that enable correlation-robust hashing based on
+//! This crate provides objects that enable correlation-robust hashing based on
 //! fixed-key AES. Such objects are useful for efficient OT extension and
 //! circuit garbling, among other uses, and were introduced by Guo, Katz, Wang,
 //! and Yu \[1\].
@@ -20,7 +20,7 @@
 //! $`H`$ takes both input $`x`$ and a tweak $`t`$; otherwise, the security
 //! notions are similar.
 //!
-//! In this module we provide a correlation-robust hash function
+//! In this crate we provide a correlation-robust hash function
 //! [`CorrelationRobustHash`] (generally used for semi-honest protocols) and a
 //! tweakable circular correlation-robust hash function
 //! [`TweakableCircularCorrelationRobustHash`] (generally used for malicious
