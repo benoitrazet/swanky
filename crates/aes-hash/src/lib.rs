@@ -130,6 +130,18 @@ impl CorrelationRobustHash {
     pub fn hash(&self, input: U8x16) -> U8x16 {
         self.0.encrypt(input) ^ input
     }
+
+    /// Compute the hash function over a batch of inputs.
+    pub fn hash_many<const N: usize>(&self, inputs: [U8x16; N]) -> [U8x16; N]
+    where
+        ArrayUnrolledOps: UnrollableArraySize<N>,
+    {
+        let permutations = self.0.encrypt_many(inputs);
+        permutations.array_zip(inputs).array_map(
+            #[inline(always)]
+            |(permutation, input)| permutation ^ input,
+        )
+    }
 }
 
 /// Tweakable circular correlation-robust hash function for 128-bit inputs.
