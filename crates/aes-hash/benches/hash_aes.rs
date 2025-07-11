@@ -1,28 +1,27 @@
 #![allow(clippy::all)]
 use criterion::{Criterion, criterion_group, criterion_main};
 use std::hint::black_box;
-use swanky_aes_hash::AesHash;
+use swanky_aes_hash::{CorrelationRobustHash, TweakableCircularCorrelationRobustHash};
 use swanky_block::Block;
 
 fn bench_cr_hash(c: &mut Criterion) {
-    c.bench_function("AesHash::cr_hash", |b| {
-        let hash = AesHash::new(rand::random::<Block>());
+    c.bench_function("CorrelationRobustHash", |b| {
+        let hash = CorrelationRobustHash::new(rand::random::<Block>());
         let x = rand::random::<Block>();
-        let i = rand::random::<Block>();
         b.iter(|| {
-            let z = hash.cr_hash(black_box(i), black_box(x));
+            let z = hash.hash(black_box(x));
             black_box(z)
         });
     });
 }
 
 fn bench_tccr_hash(c: &mut Criterion) {
-    c.bench_function("AesHash::tccr_hash", |b| {
-        let hash = AesHash::new(rand::random::<Block>());
+    c.bench_function("TweakableCircularCorrelationRobustHash", |b| {
+        let hash = TweakableCircularCorrelationRobustHash::new(rand::random::<Block>());
         let x = rand::random::<Block>();
-        let i = rand::random::<Block>();
+        let i = rand::random::<u128>();
         b.iter(|| {
-            let z = hash.tccr_hash(black_box(i), black_box(x));
+            let z = hash.hash(black_box(x), black_box(i));
             black_box(z)
         });
     });

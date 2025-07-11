@@ -2494,6 +2494,7 @@ name = "swanky-aes-hash"
 version = "0.6.0"
 dependencies = [
  "criterion",
+ "proptest",
  "rand 0.8.5",
  "swanky-block",
  "vectoreyes",
