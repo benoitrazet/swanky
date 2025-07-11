@@ -161,7 +161,7 @@ impl TweakableCircularCorrelationRobustHash {
         permutation ^ tweaked_permutation
     }
 
-    /// Compute the hash function over a batch of inputs.
+    /// Compute the hash function over a batch of inputs using the same tweak.
     pub fn hash_many<const N: usize>(&self, inputs: [U8x16; N], tweak: u128) -> [U8x16; N]
     where
         ArrayUnrolledOps: UnrollableArraySize<N>,
