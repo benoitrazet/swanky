@@ -189,3 +189,34 @@ impl TweakableCircularCorrelationRobustHash {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{CorrelationRobustHash, TweakableCircularCorrelationRobustHash};
+    use proptest::prelude::*;
+    use vectoreyes::U8x16;
+
+    proptest! {
+        #[test]
+        fn cr_hash_many_works(key in any::<u128>(), inputs in any::<[u128; 4]>()) {
+            let cr_hash = CorrelationRobustHash::new(U8x16::from(key));
+            let inputs = inputs.map(|input| U8x16::from(input));
+            let hashes = cr_hash.hash_many(inputs);
+            for (input, hash) in inputs.into_iter().zip(hashes.into_iter()) {
+                assert_eq!(hash, cr_hash.hash(input));
+            }
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn tccr_hash_many_works(key in any::<u128>(), inputs in any::<[u128; 4]>(), tweak in any::<u128>()) {
+            let tccr_hash = TweakableCircularCorrelationRobustHash::new(U8x16::from(key));
+            let inputs = inputs.map(|input| U8x16::from(input));
+            let hashes = tccr_hash.hash_many(inputs, tweak);
+            for (input, hash) in inputs.into_iter().zip(hashes.into_iter()) {
+                assert_eq!(hash, tccr_hash.hash(input, tweak));
+            }
+        }
+    }
+}
