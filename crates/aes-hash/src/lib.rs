@@ -200,7 +200,7 @@ mod tests {
         #[test]
         fn cr_hash_many_works(key in any::<u128>(), inputs in any::<[u128; 4]>()) {
             let cr_hash = CorrelationRobustHash::new(U8x16::from(key));
-            let inputs = inputs.map(|input| U8x16::from(input));
+            let inputs = inputs.map(U8x16::from);
             let hashes = cr_hash.hash_many(inputs);
             for (input, hash) in inputs.into_iter().zip(hashes.into_iter()) {
                 assert_eq!(hash, cr_hash.hash(input));
@@ -212,7 +212,7 @@ mod tests {
         #[test]
         fn tccr_hash_many_works(key in any::<u128>(), inputs in any::<[u128; 4]>(), tweak in any::<u128>()) {
             let tccr_hash = TweakableCircularCorrelationRobustHash::new(U8x16::from(key));
-            let inputs = inputs.map(|input| U8x16::from(input));
+            let inputs = inputs.map(U8x16::from);
             let hashes = tccr_hash.hash_many(inputs, tweak);
             for (input, hash) in inputs.into_iter().zip(hashes.into_iter()) {
                 assert_eq!(hash, tccr_hash.hash(input, tweak));
