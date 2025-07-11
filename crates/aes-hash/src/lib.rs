@@ -155,21 +155,21 @@ impl TweakableCircularCorrelationRobustHash {
     }
 
     /// Compute the hash function on the given input and tweak.
-    pub fn hash(&self, input: U8x16, tweak: U8x16) -> U8x16 {
+    pub fn hash(&self, input: U8x16, tweak: u128) -> U8x16 {
         let permutation = self.0.encrypt(input);
-        let tweaked_permutation = self.0.encrypt(permutation ^ tweak);
+        let tweaked_permutation = self.0.encrypt(permutation ^ U8x16::from(tweak));
         permutation ^ tweaked_permutation
     }
 
     /// Compute the hash function over a batch of inputs.
-    pub fn hash_many<const N: usize>(&self, inputs: [U8x16; N], tweak: U8x16) -> [U8x16; N]
+    pub fn hash_many<const N: usize>(&self, inputs: [U8x16; N], tweak: u128) -> [U8x16; N]
     where
         ArrayUnrolledOps: UnrollableArraySize<N>,
     {
         let permutations = self.0.encrypt_many(inputs);
         let tweaked_permutations = self.0.encrypt_many(permutations.array_map(
             #[inline(always)]
-            |x| x ^ tweak,
+            |x| x ^ U8x16::from(tweak),
         ));
         permutations.array_zip(tweaked_permutations).array_map(
             #[inline(always)]
