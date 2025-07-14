@@ -253,19 +253,19 @@ impl<
             WhichParty::Verifier(e) => {
                 let mut bit_ser: F2BitDeserializer =
                     SequenceDeserializer::new(channel.as_std_io())?;
-                let mut bits: Vec<F2> = Vec::new();
+                let mut bits: Vec<F2> = Vec::with_capacity(out.len());
                 for _ in 0..out.len() {
                     bits.push(bit_ser.read(channel.as_std_io())?);
                 }
 
                 let mut validation = true;
-                for (i, ab) in out.iter().enumerate() {
+                for (ab, bit) in out.iter().zip(bits.into_iter()) {
                     let mut mac_bytes = [0u8; 16];
                     channel.read_bytes(&mut mac_bytes)?;
                     let mac = U8x16::from(mac_bytes);
 
                     validation &= mac
-                        == if F2::ONE == bits[i] {
+                        == if F2::ONE == bit {
                             ab.key().into_inner(e) ^ self.delta().into_inner(e)
                         } else {
                             ab.key().into_inner(e)
