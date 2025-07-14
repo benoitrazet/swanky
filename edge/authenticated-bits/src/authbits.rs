@@ -195,8 +195,7 @@ impl<
                 let bits = bits_in.prover_into(e);
                 let macs = self.ot.as_mut().prover_into(e).receive_correlated(
                     &mut channel,
-                    // TODO: change how ocelots handles bits. Use F2 instead of bol. Once that
-                    // is done, this won't be necessary.
+                    // TODO: Once OT uses F2 instead of bool this line won't be necessary.
                     &bits.iter().map(|b| bool::from(*b)).collect::<Vec<bool>>(),
                     &mut rng,
                 )?;
@@ -381,7 +380,7 @@ mod tests {
                     .into_inner(IS_VERIFIER);
                 // The generated bits should always be valid when no tampering happens.
                 if !tamper_mac && !tamper_key {
-                    assert!(bool::from(validation));
+                    assert!(validation);
                 }
                 Ok(generator)
             },

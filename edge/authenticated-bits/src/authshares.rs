@@ -47,11 +47,10 @@ impl<P: Party> AuthShare<P> {
     /// This corresponds to $`x_1`$ for Party A (the "prover"), and $`x_2`$
     /// for Party B (the "verifier").
     pub fn bit(self) -> F2 {
-        let bit = match P::WHICH {
+        match P::WHICH {
             WhichParty::Prover(ev) => self.party_a.prover_into(ev).bit().into_inner(IS_PROVER),
             WhichParty::Verifier(ev) => self.party_b.verifier_into(ev).bit().into_inner(IS_PROVER),
-        };
-        bit
+        }
     }
 
     /// The given party's key.
