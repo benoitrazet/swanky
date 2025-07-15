@@ -2,6 +2,7 @@ import ctypes
 import difflib
 import functools
 import itertools
+import json
 import os
 import subprocess
 import threading
@@ -19,7 +20,7 @@ import tree_sitter
 
 from etc import ROOT
 from etc.lint import LintResult
-from etc.rust import crate_path
+from etc.rust import CrateDir, crate_path
 
 
 def list_cargo_toml_files() -> List[Path]:
@@ -50,9 +51,44 @@ def check_cargo_lock(ctx: click.Context) -> LintResult:
         )
         != 0
     ):
-        rich.print("Cargo.lock isn't up to date. Run `cargo update` to fix this.")
+        rich.print("Cargo.lock isn't up to date. Run `cargo check` to fix this.")
         return LintResult.FAILURE
     return LintResult.SUCCESS
+
+
+def check_core_dependencies(ctx: click.Context) -> LintResult:
+    """Check that core crates don't depend on edge crates"""
+    try:
+        metadata = json.loads(
+            subprocess.check_output(
+                ["cargo", "metadata", "--format-version=1", "--locked"],
+                cwd=ROOT,
+            )
+        )
+    except subprocess.SubprocessError:
+        rich.print("`cargo metadata` failed. Is Cargo.lock up-to-date?")
+        return LintResult.FAILURE
+    edge_crates = set()
+    core_crates = set()
+    for member in metadata["workspace_members"]:
+        is_edge = "/edge/" in member
+        is_core = "/core/" in member
+        assert is_core ^ is_edge
+        if is_edge:
+            edge_crates.add(member)
+        else:
+            core_crates.add(member)
+    result = LintResult.SUCCESS
+    for node in metadata["resolve"]["nodes"]:
+        if node["id"] in core_crates:
+            edge_deps = [dep for dep in node["dependencies"] if dep in edge_crates]
+            if len(edge_deps) > 0:
+                result = LintResult.FAILURE
+                rich.print(
+                    f"Core crate {repr(node['id'])} has edge dependencies: "
+                    + repr(edge_deps)
+                )
+    return result
 
 
 def root_cargo_toml() -> Any:
@@ -151,9 +187,9 @@ def check_crate_paths(ctx: click.Context) -> LintResult:
     Check that crate names match their paths
 
     For example:
-    swanky-cool-crate: ./crates/cool-crate, ./crates/cool/crate (both valid)
+    swanky-cool-crate: ./edge/cool-crate, ./edge/cool/crate (both valid)
 
-    If ./crates/cool exists (and isn't a crate), then we _require_ that cool-crate live under
+    If ./edge/cool exists (and isn't a crate), then we _require_ that cool-crate live under
     that directory.
     """
     result = LintResult.SUCCESS
@@ -167,16 +203,19 @@ def check_crate_paths(ctx: click.Context) -> LintResult:
             result = LintResult.FAILURE
             rich.print(f"[bold][underline]{name}[/underline][/bold] is misnamed: {err}")
 
-        if not cargo_toml.parent.is_relative_to(ROOT / "crates"):
-            report_error("Does not live in ./crates")
-            continue
         if not name.startswith("swanky-"):
             report_error("does not start with 'swanky-'")
             continue
-        expected_path = crate_path(name)
-        if cargo_toml.parent != expected_path:
+        expected_paths = [
+            crate_path(name, CrateDir.CORE),
+            crate_path(name, CrateDir.EDGE),
+        ]
+        if cargo_toml.parent not in expected_paths:
+            expected_paths_str = ", ".join(
+                str(p.relative_to(ROOT)) for p in expected_paths
+            )
             report_error(
-                f"Expected at path {expected_path.relative_to(ROOT)}, "
+                f"Expected at one of {expected_paths_str}, "
                 + f"not {cargo_toml.parent.relative_to(ROOT)}"
             )
     return result
@@ -274,16 +313,16 @@ def cargo_deny(ctx: click.Context) -> LintResult:
 
 # As of this writing, these libraries don't require documentation.
 LIBS_NOT_YET_DOCUMENTED = {
-    "crates/bristol-fashion/src/lib.rs",
-    "crates/field-fft/src/lib.rs",
-    "crates/diet-mac-and-cheese/web-mac-and-cheese/wasm/src/lib.rs",
-    "crates/diet-mac-and-cheese/web-mac-and-cheese/websocket/src/lib.rs",
-    "crates/keyed_arena/src/lib.rs",
-    "crates/mac-n-cheese/event-log/src/lib.rs",
-    "crates/mac-n-cheese/ir/src/lib.rs",
-    "crates/mac-n-cheese/sieve-parser/src/lib.rs",
-    "crates/mac-n-cheese/vole/src/lib.rs",
-    "crates/mac-n-cheese/wire-map/src/lib.rs",
+    "edge/bristol-fashion/src/lib.rs",
+    "edge/field-fft/src/lib.rs",
+    "edge/diet-mac-and-cheese/web-mac-and-cheese/wasm/src/lib.rs",
+    "edge/diet-mac-and-cheese/web-mac-and-cheese/websocket/src/lib.rs",
+    "edge/keyed_arena/src/lib.rs",
+    "edge/mac-n-cheese/event-log/src/lib.rs",
+    "edge/mac-n-cheese/ir/src/lib.rs",
+    "edge/mac-n-cheese/sieve-parser/src/lib.rs",
+    "edge/mac-n-cheese/vole/src/lib.rs",
+    "edge/mac-n-cheese/wire-map/src/lib.rs",
 }
 
 

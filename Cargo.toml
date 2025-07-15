@@ -1,59 +1,59 @@
 [workspace]
 resolver = "2"
 members = [
-  "crates/adversary",
-  "crates/aes-hash",
-  "crates/aes-rng",
-  "crates/authenticated-bits",
-  "crates/bit-matrix-transpose",
-  "crates/block",
-  "crates/bristol-fashion",
-  "crates/bytearray-utils",
-  "crates/channel",
-  "crates/channel-legacy",
-  "crates/cointoss",
-  "crates/deprecated-bitwise-utils",
-  "crates/diet-mac-and-cheese",
-  "crates/diet-mac-and-cheese/web-mac-and-cheese/wasm",
-  "crates/diet-mac-and-cheese/web-mac-and-cheese/websocket",
-  "crates/fancy-garbling",
-  "crates/field",
-  "crates/field-binary",
-  "crates/field-f61p",
-  "crates/field-ff-primes",
-  "crates/field-fft",
-  "crates/field-test",
-  "crates/flatbuffer-build",
-  "crates/humidor",
-  "crates/inferno",
-  "crates/keyed_arena",
-  "crates/mac-n-cheese/compiler",
-  "crates/mac-n-cheese/event-log",
-  "crates/mac-n-cheese/inspector",
-  "crates/mac-n-cheese/ir",
-  "crates/mac-n-cheese/runner",
-  "crates/mac-n-cheese/sieve-parser",
-  "crates/mac-n-cheese/vole",
-  "crates/mac-n-cheese/wire-map",
-  "crates/ocelot-error",
-  "crates/oprf-kkrt",
-  "crates/oprf-kmprt",
-  "crates/oprf-traits",
-  "crates/ot-alsz-kos",
-  "crates/ot-chou-orlandi",
-  "crates/ot-dummy",
-  "crates/ot-noar-pinkas",
-  "crates/ot-test",
-  "crates/ot-traits",
-  "crates/party",
-  "crates/polynomial",
-  "crates/popsicle",
-  "crates/schmivitz",
-  "crates/serialization",
-  "crates/simple-arith-circuit",
-  "crates/svole-wykw",
-  "crates/vectoreyes",
-  "crates/zkv",
+  "core/vectoreyes",
+  "edge/adversary",
+  "edge/aes-hash",
+  "edge/aes-rng",
+  "edge/authenticated-bits",
+  "edge/bit-matrix-transpose",
+  "edge/block",
+  "edge/bristol-fashion",
+  "edge/bytearray-utils",
+  "edge/channel",
+  "edge/channel-legacy",
+  "edge/cointoss",
+  "edge/deprecated-bitwise-utils",
+  "edge/diet-mac-and-cheese",
+  "edge/diet-mac-and-cheese/web-mac-and-cheese/wasm",
+  "edge/diet-mac-and-cheese/web-mac-and-cheese/websocket",
+  "edge/fancy-garbling",
+  "edge/field",
+  "edge/field-binary",
+  "edge/field-f61p",
+  "edge/field-ff-primes",
+  "edge/field-fft",
+  "edge/field-test",
+  "edge/flatbuffer-build",
+  "edge/humidor",
+  "edge/inferno",
+  "edge/keyed_arena",
+  "edge/mac-n-cheese/compiler",
+  "edge/mac-n-cheese/event-log",
+  "edge/mac-n-cheese/inspector",
+  "edge/mac-n-cheese/ir",
+  "edge/mac-n-cheese/runner",
+  "edge/mac-n-cheese/sieve-parser",
+  "edge/mac-n-cheese/vole",
+  "edge/mac-n-cheese/wire-map",
+  "edge/ocelot-error",
+  "edge/oprf-kkrt",
+  "edge/oprf-kmprt",
+  "edge/oprf-traits",
+  "edge/ot-alsz-kos",
+  "edge/ot-chou-orlandi",
+  "edge/ot-dummy",
+  "edge/ot-noar-pinkas",
+  "edge/ot-test",
+  "edge/ot-traits",
+  "edge/party",
+  "edge/polynomial",
+  "edge/popsicle",
+  "edge/schmivitz",
+  "edge/serialization",
+  "edge/simple-arith-circuit",
+  "edge/svole-wykw",
+  "edge/zkv",
 ]
 
 [workspace.package]
@@ -70,59 +70,59 @@ derived_hash_with_manual_eq = "allow"
 [workspace.dependencies]
 # Don't remove, or modify, the below "# BEGIN OUR CRATES" line. It's used by ./swanky new-crate
 # BEGIN OUR CRATES
-bristol-fashion = { path = "crates/bristol-fashion" }
-diet-mac-and-cheese = { path = "crates/diet-mac-and-cheese" }
-fancy-garbling = { path = "crates/fancy-garbling" }
-humidor = { path = "crates/humidor" }
-inferno = { path = "crates/inferno" }
-keyed_arena = { path = "crates/keyed_arena" }
-mac-n-cheese-compiler = { path = "crates/mac-n-cheese/compiler" }
-mac-n-cheese-event-log = { path = "crates/mac-n-cheese/event-log" }
-mac-n-cheese-inspector = { path = "crates/mac-n-cheese/inspector" }
-mac-n-cheese-ir = { path = "crates/mac-n-cheese/ir" }
-mac-n-cheese-runner = { path = "crates/mac-n-cheese/runner" }
-mac-n-cheese-sieve-parser = { path = "crates/mac-n-cheese/sieve-parser" }
-mac-n-cheese-vole = { path = "crates/mac-n-cheese/vole" }
-mac-n-cheese-wire-map = { path = "crates/mac-n-cheese/wire-map" }
-popsicle = { path = "crates/popsicle" }
-schmivitz = { path = "crates/schmivitz" }
-simple-arith-circuit = { path = "crates/simple-arith-circuit" }
-swanky-adversary = { path = "crates/adversary" }
-swanky-aes-hash = { path = "crates/aes-hash" }
-swanky-aes-rng = { path = "crates/aes-rng" }
-swanky-authenticated-bits = { path = "crates/authenticated-bits" }
-swanky-bit-matrix-transpose = { path = "crates/bit-matrix-transpose" }
-swanky-block = { path = "crates/block" }
-swanky-bytearray-utils = { path = "crates/bytearray-utils" }
-swanky-channel = { path = "crates/channel" }
-swanky-channel-legacy = { path = "crates/channel-legacy" }
-swanky-cointoss = { path = "crates/cointoss" }
-swanky-deprecated-bitwise-utils = { path = "crates/deprecated-bitwise-utils" }
-swanky-field = { path = "crates/field" }
-swanky-field-binary = { path = "crates/field-binary" }
-swanky-field-f61p = { path = "crates/field-f61p" }
-swanky-field-ff-primes = { path = "crates/field-ff-primes" }
-swanky-field-fft = { path = "crates/field-fft" }
-swanky-field-test = { path = "crates/field-test" }
-swanky-flatbuffer-build = { path = "crates/flatbuffer-build" }
-swanky-ocelot-error = { path = "crates/ocelot-error" }
-swanky-oprf-kkrt = { path = "crates/oprf-kkrt" }
-swanky-oprf-kmprt = { path = "crates/oprf-kmprt" }
-swanky-oprf-traits = { path = "crates/oprf-traits" }
-swanky-ot-alsz-kos = { path = "crates/ot-alsz-kos" }
-swanky-ot-chou-orlandi = { path = "crates/ot-chou-orlandi" }
-swanky-ot-dummy = { path = "crates/ot-dummy" }
-swanky-ot-noar-pinkas = { path = "crates/ot-noar-pinkas" }
-swanky-ot-test = { path = "crates/ot-test" }
-swanky-ot-traits = { path = "crates/ot-traits" }
-swanky-party = { path = "crates/party" }
-swanky-polynomial = { path = "crates/polynomial" }
-swanky-serialization = { path = "crates/serialization" }
-swanky-svole-wykw = { path = "crates/svole-wykw" }
-vectoreyes = { path = "crates/vectoreyes" }
-web-mac-n-cheese-wasm = { path = "crates/diet-mac-and-cheese/web-mac-and-cheese/wasm" }
-web-mac-n-cheese-websocket = { path = "crates/diet-mac-and-cheese/web-mac-and-cheese/websocket" }
-zkv = { path = "crates/zkv" }
+bristol-fashion = { path = "edge/bristol-fashion" }
+diet-mac-and-cheese = { path = "edge/diet-mac-and-cheese" }
+fancy-garbling = { path = "edge/fancy-garbling" }
+humidor = { path = "edge/humidor" }
+inferno = { path = "edge/inferno" }
+keyed_arena = { path = "edge/keyed_arena" }
+mac-n-cheese-compiler = { path = "edge/mac-n-cheese/compiler" }
+mac-n-cheese-event-log = { path = "edge/mac-n-cheese/event-log" }
+mac-n-cheese-inspector = { path = "edge/mac-n-cheese/inspector" }
+mac-n-cheese-ir = { path = "edge/mac-n-cheese/ir" }
+mac-n-cheese-runner = { path = "edge/mac-n-cheese/runner" }
+mac-n-cheese-sieve-parser = { path = "edge/mac-n-cheese/sieve-parser" }
+mac-n-cheese-vole = { path = "edge/mac-n-cheese/vole" }
+mac-n-cheese-wire-map = { path = "edge/mac-n-cheese/wire-map" }
+popsicle = { path = "edge/popsicle" }
+schmivitz = { path = "edge/schmivitz" }
+simple-arith-circuit = { path = "edge/simple-arith-circuit" }
+swanky-adversary = { path = "edge/adversary" }
+swanky-aes-hash = { path = "edge/aes-hash" }
+swanky-aes-rng = { path = "edge/aes-rng" }
+swanky-authenticated-bits = { path = "edge/authenticated-bits" }
+swanky-bit-matrix-transpose = { path = "edge/bit-matrix-transpose" }
+swanky-block = { path = "edge/block" }
+swanky-bytearray-utils = { path = "edge/bytearray-utils" }
+swanky-channel = { path = "edge/channel" }
+swanky-channel-legacy = { path = "edge/channel-legacy" }
+swanky-cointoss = { path = "edge/cointoss" }
+swanky-deprecated-bitwise-utils = { path = "edge/deprecated-bitwise-utils" }
+swanky-field = { path = "edge/field" }
+swanky-field-binary = { path = "edge/field-binary" }
+swanky-field-f61p = { path = "edge/field-f61p" }
+swanky-field-ff-primes = { path = "edge/field-ff-primes" }
+swanky-field-fft = { path = "edge/field-fft" }
+swanky-field-test = { path = "edge/field-test" }
+swanky-flatbuffer-build = { path = "edge/flatbuffer-build" }
+swanky-ocelot-error = { path = "edge/ocelot-error" }
+swanky-oprf-kkrt = { path = "edge/oprf-kkrt" }
+swanky-oprf-kmprt = { path = "edge/oprf-kmprt" }
+swanky-oprf-traits = { path = "edge/oprf-traits" }
+swanky-ot-alsz-kos = { path = "edge/ot-alsz-kos" }
+swanky-ot-chou-orlandi = { path = "edge/ot-chou-orlandi" }
+swanky-ot-dummy = { path = "edge/ot-dummy" }
+swanky-ot-noar-pinkas = { path = "edge/ot-noar-pinkas" }
+swanky-ot-test = { path = "edge/ot-test" }
+swanky-ot-traits = { path = "edge/ot-traits" }
+swanky-party = { path = "edge/party" }
+swanky-polynomial = { path = "edge/polynomial" }
+swanky-serialization = { path = "edge/serialization" }
+swanky-svole-wykw = { path = "edge/svole-wykw" }
+vectoreyes = { path = "core/vectoreyes" }
+web-mac-n-cheese-wasm = { path = "edge/diet-mac-and-cheese/web-mac-and-cheese/wasm" }
+web-mac-n-cheese-websocket = { path = "edge/diet-mac-and-cheese/web-mac-and-cheese/websocket" }
+zkv = { path = "edge/zkv" }
 # END OUR CRATES
 # Don't remove, or modify, the above "# END OUR CRATES" line. It's used by ./swanky new-crate
 
@@ -166,7 +166,7 @@ dhat = "0.3.3"
 digest = "0.10.7"
 env_logger = "0.11.8"
 eyre = "0.6.12"
-flatbuffers = "25.2.10" # Keep this version in sync with crates/flatbuffer-build/src/flatc-ver.txt
+flatbuffers = "25.2.10" # Keep this version in sync with edge/flatbuffer-build/src/flatc-ver.txt
 flume = "0.11.1"
 generic-array = "1.2.0"
 hex = "0.4.3"
