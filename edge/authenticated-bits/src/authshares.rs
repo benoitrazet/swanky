@@ -47,11 +47,10 @@ impl<P: Party> AuthShare<P> {
     /// This corresponds to $`x_1`$ for Party A (the "prover"), and $`x_2`$
     /// for Party B (the "verifier").
     pub fn bit(self) -> F2 {
-        let bit = match P::WHICH {
+        match P::WHICH {
             WhichParty::Prover(ev) => self.party_a.prover_into(ev).bit().into_inner(IS_PROVER),
             WhichParty::Verifier(ev) => self.party_b.verifier_into(ev).bit().into_inner(IS_PROVER),
-        };
-        F2::from(bit)
+        }
     }
 
     /// The given party's key.
@@ -171,7 +170,7 @@ impl<
         channel: &mut Channel,
         mut rng: RNG,
     ) -> eyre::Result<()> {
-        let bits: Vec<_> = (0..nshares).map(|_| rng.r#gen::<bool>()).collect();
+        let bits: Vec<_> = (0..nshares).map(|_| rng.r#gen::<F2>()).collect();
 
         let mut party_a_auth_bits = Vec::with_capacity(nshares);
         let mut party_b_auth_bits = Vec::with_capacity(nshares);
@@ -273,7 +272,7 @@ impl<
     ///
     /// This works by computing $`[x_2]_B \oplus c`$, where $`[x_2]_B`$ is the
     /// authenticated bit held by Party B.
-    pub fn xor_with_const(&self, authshare: AuthShare<P>, bit: bool) -> AuthShare<P> {
+    pub fn xor_with_const(&self, authshare: AuthShare<P>, bit: F2) -> AuthShare<P> {
         match P::WHICH {
             WhichParty::Prover(ev) => AuthShare {
                 party_a: authshare.party_a,
@@ -419,7 +418,7 @@ mod tests {
     fn xor_with_const_works() {
         let count = 1000;
         let mut rng = AesRng::new();
-        let constants: Vec<bool> = (0..count).map(|_| rng.r#gen::<bool>()).collect();
+        let constants: Vec<F2> = (0..count).map(|_| rng.r#gen::<F2>()).collect();
         let (output_a, output_b, generator_a, generator_b) = generate(count);
         for ((a, b), bit) in output_a
             .into_iter()
@@ -434,7 +433,7 @@ mod tests {
             assert!(validation_a);
             assert!(validation_b);
             // The new authenticated share should equal `⟨x⟩ ⊕ c`.
-            assert_eq!(a.bit() + b.bit() + F2::from(bit), new_a.bit() + new_b.bit());
+            assert_eq!(a.bit() + b.bit() + bit, new_a.bit() + new_b.bit());
         }
     }
 }
