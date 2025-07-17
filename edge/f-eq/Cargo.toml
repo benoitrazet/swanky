@@ -1,0 +1,19 @@
+[package]
+name = "swanky-f-eq"
+description = "Two-party function F_eq that allows parties to check if their inputs are equal. This functionality is commonly used in several cryptographic protocols including Garbled Circuits."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+swanky-party.workspace = true
+swanky-channel.workspace = true
+swanky-aes-rng.workspace = true
+sha2.workspace = true
+rand.workspace = true
+eyre.workspace = true
