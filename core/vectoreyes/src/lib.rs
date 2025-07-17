@@ -373,7 +373,9 @@ pub trait ExtendingCast<T: SimdBase>: SimdBase {
     fn extending_cast_from(t: T) -> Self;
 }
 
-/// A utility trait you probably won't need to use. See [Simd].
+/// A [[Scalar]] type which has a vector type of length `N`.
+///
+/// See [[Simd]] for how this trait is used.
 pub trait HasVector<const N: usize>: Scalar {
     /// The vector of `[Self; N]`.
     type Vector: SimdBase<Scalar = Self>;
@@ -381,10 +383,18 @@ pub trait HasVector<const N: usize>: Scalar {
 
 /// An alternative way of naming SIMD types.
 ///
+/// This allows for functions to be written which are generic in the type or length of a vector.
+///
 /// # Example
 /// ```
 /// # use vectoreyes::*;
 /// type MyVector = Simd<u8, 16>; // The same as U8x16.
+///
+/// fn my_length_generic_code<const N: usize>(x: Simd<u32, N>, y: Simd<u32, N>) -> Simd<u32, N>
+///     where u32: HasVector<N>
+/// {
+///     x + x + y
+/// }
 /// ```
 pub type Simd<T, const N: usize> = <T as HasVector<N>>::Vector;
 
