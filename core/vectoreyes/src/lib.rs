@@ -166,7 +166,24 @@ scalar_impls!((i64, u64), (i32, u32), (i16, u16), (i8, u8));
 /// alignment requirements.
 ///
 /// # Effects of signedness on shift operations
-/// When `Scalar` is _signed_, this will shift in sign bits, as opposed to zeroes.
+/// When `Scalar` is _signed_, shift operations are signed shifts. When `Scalar` is _unsigned_,
+/// shift operations are unsigned shifts.
+///
+/// ## Example
+/// A signed shift right will add the sign bit
+/// ```
+/// # use vectoreyes::*;
+/// assert_eq!(
+///     U64x2::from([0xffffffffffffffff, 0x2]) >> 1,
+///     U64x2::from([0x7fffffffffffffff, 0x1]),
+/// );
+/// assert_eq!(
+///     // Because the sign bit of 0xffffffffffffffff is 1, shifting right will cause a 1 to be
+///     // inserted which, in this case, results in the same 0xffffffffffffffff value.
+///     U64x2::from(I64x2::from(U64x2::from([0xffffffffffffffff, 0x2])) >> 1),
+///     U64x2::from([0xffffffffffffffff, 0x1]),
+/// );
+/// ```
 pub trait SimdBase:
     'static
     + Sized
