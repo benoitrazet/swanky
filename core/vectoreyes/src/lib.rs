@@ -400,7 +400,7 @@ pub trait AesBlockCipher: 'static + Clone + Sync + Send {
     /// performance.
     const BLOCK_COUNT_HINT: usize;
 
-    /// If you need to AES with a particular key, be careful about endianness issues.
+    /// Run the AES key schedule operation with a given key.
     fn new_with_key(key: Self::Key) -> Self;
 
     /// Encrypt a single 128-bit AES block.
