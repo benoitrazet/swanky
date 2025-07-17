@@ -26,10 +26,16 @@ impl<P: Party> EqualityFunctionality<P> {
         RNG: CryptoRng + Rng,
     {
         let result = match P::WHICH {
-            WhichParty::Prover(e) => {}
-            WhichParty::Verifier(e) => {}
+            WhichParty::Prover(e) => EqualityFunctionality {
+                hash: Sha256::new(),
+                commitment_salt: ProverPrivate::new(rng.r#gen()),
+            },
+            WhichParty::Verifier(e) => EqualityFunctionality {
+                hash: Sha256::new(),
+                commitment_salt: ProverPrivate::empty(e),
+            },
         };
-        todo!()
+        Ok(result)
     }
     // Add `value` to the running hash.
     pub fn input(&mut self, value: &[u8]) -> () {
@@ -48,5 +54,34 @@ impl<P: Party> EqualityFunctionality<P> {
             WhichParty::Verifier(e) => {}
         }
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use swanky_aes_rng::AesRng;
+
+    fn generate() -> eyre::Result<(
+        EqualityFunctionality<Prover>,
+        EqualityFunctionality<Verifier>,
+    )> {
+        let (eq_pr, eq_vr) = swanky_channel::local::local_channel_pair(
+            |c| {
+                let mut rng = AesRng::new();
+                EqualityFunctionality::<Prover>::new(&mut rng)
+            },
+            |c| {
+                let mut rng = AesRng::new();
+                EqualityFunctionality::<Verifier>::new(&mut rng)
+            },
+        )?;
+        Ok((eq_pr, eq_vr))
+    }
+
+    #[test]
+    fn setup_works() {
+        let res = generate();
+        assert!(!res.is_err());
     }
 }
