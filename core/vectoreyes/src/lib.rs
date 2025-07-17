@@ -1,11 +1,21 @@
 #![deny(missing_docs)]
 #![allow(unsafe_op_in_unsafe_fn)]
-//! `vectoreyes` is a (almost entirely) safe wrapper library around vectorized
+//! VectorEyes is a (almost entirely) safe and cross-platform wrapper library around vectorized
 //! operations.
 //!
+//! While a normal `add` CPU instruction will add two numbers together, a
+//! [SIMD/Vectorized](https://en.wikipedia.org/wiki/Single_instruction,_multiple_data) `add`
+//! instruction will perform multiple additions from the same instruction. This will amortize the
+//! per-instruction cost (e.g. of the CPU decoding the instruction) across all the additions of the
+//! single instruction. This can provide large speed boosts on many platforms.
+//!
+//! Unfortunately, using these operations require using per-platform unsafe intrinsics. To make
+//! this easier, VectorEyes provide safe functions which will function identically on all
+//! platforms.
+//!
 //! # Backends
-//! `vectoreyes` chooses what backend to execute vector operations with at
-//! compile-time.
+//! VectorEyes chooses what backend to execute vector operations with at compile-time.
+//!
 //! ## AVX2
 //! x86-64 CPUs that support the `AVX`, `AVX2`, `SSE4.1`, `AES`, `SSE4.2`, and
 //! `PCLMULQDQ` features will use the `AVX2` backend.
