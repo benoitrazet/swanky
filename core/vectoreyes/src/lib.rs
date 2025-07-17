@@ -13,6 +13,26 @@
 //! this easier, VectorEyes provide safe functions which will function identically on all
 //! platforms.
 //!
+//! The core of this crate is vector types like [U64x2]. This the vector equivalent of `[u64; 2]`.
+//! It is a 128-bit vector containing 2 lanes each with a `u64`.
+//!
+//! # Example
+//! These two functions perform the same operation, but the simd variant takes may take better
+//! advantage of the CPU hardware.
+//! ```
+//! # use vectoreyes::*;
+//! fn double_without_simd(arr: [u64; 2]) -> [u64; 2] {
+//!     [arr[0] + arr[0], arr[1] + arr[1]]
+//! }
+//! fn double_with_simd(arr: U64x2) -> U64x2 {
+//!     arr + arr
+//! }
+//! assert_eq!(
+//!     U64x2::from(double_without_simd([1, 2])),
+//!     double_with_simd(U64x2::from([1, 2])),
+//! );
+//! ```
+//!
 //! # Backends
 //! VectorEyes chooses what backend to execute vector operations with at compile-time.
 //!
