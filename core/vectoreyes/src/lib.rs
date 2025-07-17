@@ -1,18 +1,21 @@
 #![deny(missing_docs)]
 #![allow(unsafe_op_in_unsafe_fn)]
-//! VectorEyes is a (almost entirely) safe wrapper library around vectorized operations.
+//! `vectoreyes` is a (almost entirely) safe wrapper library around vectorized
+//! operations.
 //!
 //! # Backends
-//! VectorEyes chooses what backend to execute vector operations with at compile-time.
+//! `vectoreyes` chooses what backend to execute vector operations with at
+//! compile-time.
 //! ## AVX2
-//! x86-64 CPUs that support the `AVX`, `AVX2`, `SSE4.1`, `AES`, `SSE4.2`, and `PCLMULQDQ` features
-//! will use the `AVX2` backend.
+//! x86-64 CPUs that support the `AVX`, `AVX2`, `SSE4.1`, `AES`, `SSE4.2`, and
+//! `PCLMULQDQ` features will use the `AVX2` backend.
 //!
 //! ## Neon
 //! This is available on aarch64/arm64 machines with `neon` and `aes` features.
 //!
 //! ## Scalar
-//! This is a fallback implementation that works on all CPUs. It's not particularlly performant.
+//! This is a fallback implementation that works on all CPUs. It's not
+//! particularly performant.
 //!
 //! # Cargo Configuration
 //! ## Native CPU Setup
@@ -24,17 +27,19 @@
 //! rustdocflags = ["-C", "target-cpu=native", "--cfg=vectoreyes-target-cpu-native"]
 //! ```
 //! ## Specific CPU Selection
-//! If you want to compile for some specific CPU
+//! If you want to compile for some specific CPU, add the following to your
+//! `.cargo/config` file:
 //! ```toml
 //! [build]
 //! rustflags = ["-C", "target-cpu=TARGET", "--cfg=vectoreyes-target-cpu=\"TARGET\""]
 //! rustdocflags = ["-C", "target-cpu=TARGET", "--cfg=vectoreyes-target-cpu=\"TARGET\""]
 //! ```
 //! ## Maximal Compatibility
-//! If you do not put any of the above in your `.cargo/config` file, vectoreyes will always use its
-//! `scalar` backend, which does not use vector instructions.
+//! If you do not put any of the above in your `.cargo/config` file,
+//! `vectoreyes` will always use its `scalar` backend, which does not use vector
+//! instructions.
 //!
-//! **NOTE:** many functions are currently missing from this library. Please
+//! **NOTE:** Many functions are currently missing from this library. Please
 //! consult the Intel documentation to see if a non-implemented intrinsic would
 //! more directly accomplish your goal, and we can add it!
 
@@ -44,9 +49,9 @@ use std::ops::*;
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VectorBackend {
-    /// The fallback scalar backend (doesn't use vector instructions)
+    /// The fallback scalar backend (doesn't use vector instructions).
     Scalar,
-    /// A vector backend targeting [AVX2](https://en.wikipedia.org/wiki/Advanced_Vector_Extensions#Advanced_Vector_Extensions_2)
+    /// A vector backend targeting [AVX2](https://en.wikipedia.org/wiki/Advanced_Vector_Extensions#Advanced_Vector_Extensions_2).
     Avx2,
     /// A vector backend targeting [ARM Neon](https://developer.arm.com/Architectures/Neon).
     Neon,
@@ -57,9 +62,9 @@ pub const VECTOR_BACKEND: VectorBackend = current_vector_backend();
 
 /// Panic if the current binary uses features unsupported by the current CPU.
 ///
-/// Vectoreyes uses compile-time flags to select which backend to use and which CPU features to
+/// `vectoreyes` uses compile-time flags to select which backend to use and which CPU features to
 /// require. If this backend is used on an unsupported CPU, it will result in an "Illegal
-/// instruction" error (technically, _all_ Rust code--not even just vectoreyes code--may result in
+/// instruction" error (technically, _all_ Rust code--not even just `vectoreyes` code--may result in
 /// undefined behavior if run on a CPU that doesn't support the compile-time selected feature
 /// flags).
 ///
@@ -125,7 +130,7 @@ scalar_impls!((i64, u64), (i32, u32), (i16, u16), (i8, u8));
 /// This type should have the same size as `[T; Self::Lanes]`, though it may have increased
 /// alignment requirements.
 ///
-/// # Effects of Signedness on shift operations
+/// # Effects of signedness on shift operations
 /// When `Scalar` is _signed_, this will shift in sign bits, as opposed to zeroes.
 pub trait SimdBase:
     'static
@@ -213,7 +218,7 @@ pub trait SimdBase:
     /// Create a vector by setting every element to element 0 of `of`.
     fn broadcast_lo(of: Self::BroadcastLoInput) -> Self;
 
-    /// Get the `I`-th element of this vector
+    /// Get the `I`-th element of this vector.
     fn extract<const I: usize>(&self) -> Self::Scalar;
 
     /// Convert the vector to an array.
@@ -238,9 +243,9 @@ pub trait SimdBase:
     /// corresponding element of `other`, and all 0's otherwise.
     fn cmp_gt(&self, other: Self) -> Self;
 
-    /// Interleave the elements of the low half of `self` and `other`
+    /// Interleave the elements of the low half of `self` and `other`.
     fn unpack_lo(&self, other: Self) -> Self;
-    /// Interleave the elements of the high half of `self` and `other`
+    /// Interleave the elements of the high half of `self` and `other`.
     fn unpack_hi(&self, other: Self) -> Self;
 
     /// Make a vector consisting of the maximum elements of `self` and other.
@@ -251,15 +256,15 @@ pub trait SimdBase:
 
 /// A vector supporting the gather operation.
 pub trait SimdBaseGatherable<IV: SimdBase>: SimdBase {
-    /// Construct a vector by accessing values at `base + indices[i]`
+    /// Construct a vector by accessing values at `base + indices[i]`.
     ///
     /// # Safety
-    /// This operation is safe if `std::ptr::read(base.add(indices[i]))` is safe for all `i`
+    /// This operation is safe if `std::ptr::read(base.add(indices[i]))` is safe for all `i`.
     unsafe fn gather(base: *const Self::Scalar, indices: IV) -> Self;
     /// Construct a vector by accessing values at `base + indices[i]`, only if the mask is set.
     ///
     /// # Safety
-    /// This operation is safe if `std::ptr::read(base.add(indices[i]))` is safe for all `i`
+    /// This operation is safe if `std::ptr::read(base.add(indices[i]))` is safe for all `i`.
     unsafe fn gather_masked(base: *const Self::Scalar, indices: IV, mask: Self, src: Self) -> Self;
 }
 
@@ -292,7 +297,7 @@ pub trait SimdBase8x: SimdBase {
     ) -> Self;
 }
 
-/// A vector supporting saturating arithmetic on each entry
+/// A vector supporting saturating arithmetic on each entry.
 pub trait SimdSaturatingArithmetic: SimdBase {
     /// Pairwise add vectors. On overflow, the entry's value goes to the maximum scalar value.
     fn saturating_add(&self, other: Self) -> Self;
@@ -360,7 +365,7 @@ where
 
 /// Lossily cast a vector by {zero,sign}-extending its values.
 pub trait ExtendingCast<T: SimdBase>: SimdBase {
-    /// Cast from one vector to another by sign or zero exending the values from the source until it
+    /// Cast from one vector to another by sign or zero extending the values from the source until it
     /// fills the destination.
     ///
     /// This operation is neccessarily lossy. The lowest-index values in `t` are kept. Other values
@@ -370,7 +375,7 @@ pub trait ExtendingCast<T: SimdBase>: SimdBase {
 
 /// A utility trait you probably won't need to use. See [Simd].
 pub trait HasVector<const N: usize>: Scalar {
-    /// The vector of `[Self; N]`
+    /// The vector of `[Self; N]`.
     type Vector: SimdBase<Scalar = Self>;
 }
 
@@ -383,7 +388,7 @@ pub trait HasVector<const N: usize>: Scalar {
 /// ```
 pub type Simd<T, const N: usize> = <T as HasVector<N>>::Vector;
 
-/// An AES block cipher, suitable for encryption
+/// An AES block cipher, suitable for encryption.
 ///
 /// This cipher can be used for encryption. Decryption operations are handled in the subtrait
 /// [`AesBlockCipherDecrypt`].
@@ -398,25 +403,25 @@ pub trait AesBlockCipher: 'static + Clone + Sync + Send {
     /// If you need to AES with a particular key, be careful about endianness issues.
     fn new_with_key(key: Self::Key) -> Self;
 
-    /// AES-ECB encrypt `block`
+    /// Encrypt a single 128-bit AES block.
     #[inline(always)]
     fn encrypt(&self, block: U8x16) -> U8x16 {
         self.encrypt_many([block])[0]
     }
-    /// AES-ECB encrypt `blocks`
+    /// Encrypt an array of `N` 128-bit AES blocks using ECB mode.
     fn encrypt_many<const N: usize>(&self, blocks: [U8x16; N]) -> [U8x16; N]
     where
         array_utils::ArrayUnrolledOps: array_utils::UnrollableArraySize<N>;
 }
 
-/// An AES block cipher, suitable for encryption and decryption
+/// An AES block cipher, suitable for encryption and decryption.
 pub trait AesBlockCipherDecrypt: AesBlockCipher {
-    /// AES-ECB decrypt `block`
+    /// Decrypt a single 128-bit AES block.
     #[inline(always)]
     fn decrypt(&self, block: U8x16) -> U8x16 {
         self.decrypt_many([block])[0]
     }
-    /// AES-ECB decrypt `blocks`
+    /// Decrypt an array of `N` 128-bit AES blocks using ECB mode.
     fn decrypt_many<const N: usize>(&self, blocks: [U8x16; N]) -> [U8x16; N]
     where
         array_utils::ArrayUnrolledOps: array_utils::UnrollableArraySize<N>;
