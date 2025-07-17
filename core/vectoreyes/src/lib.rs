@@ -152,9 +152,9 @@ pub trait SimdBase:
     + BitAnd
     + BitAndAssign
     + AddAssign
-    + Add
+    + Add<Output = Self>
     + SubAssign
-    + Sub
+    + Sub<Output = Self>
     + ShlAssign<u64>
     + Shl<u64, Output = Self>
     + ShrAssign<u64>
