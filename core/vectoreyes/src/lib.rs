@@ -403,12 +403,12 @@ pub trait AesBlockCipher: 'static + Clone + Sync + Send {
     /// If you need to AES with a particular key, be careful about endianness issues.
     fn new_with_key(key: Self::Key) -> Self;
 
-    /// Encrypt a single 128-bit value.
+    /// Encrypt a single 128-bit AES block.
     #[inline(always)]
     fn encrypt(&self, block: U8x16) -> U8x16 {
         self.encrypt_many([block])[0]
     }
-    /// Encrypt an array of `N` 128-bit values.
+    /// Encrypt an array of `N` 128-bit AES blocks using ECB mode.
     fn encrypt_many<const N: usize>(&self, blocks: [U8x16; N]) -> [U8x16; N]
     where
         array_utils::ArrayUnrolledOps: array_utils::UnrollableArraySize<N>;
@@ -416,12 +416,12 @@ pub trait AesBlockCipher: 'static + Clone + Sync + Send {
 
 /// An AES block cipher, suitable for encryption and decryption.
 pub trait AesBlockCipherDecrypt: AesBlockCipher {
-    /// Decrypt a single 128-bit value.
+    /// Decrypt a single 128-bit AES block.
     #[inline(always)]
     fn decrypt(&self, block: U8x16) -> U8x16 {
         self.decrypt_many([block])[0]
     }
-    /// Decrypt an array of `N` 128-bit values.
+    /// Decrypt an array of `N` 128-bit AES blocks using ECB mode.
     fn decrypt_many<const N: usize>(&self, blocks: [U8x16; N]) -> [U8x16; N]
     where
         array_utils::ArrayUnrolledOps: array_utils::UnrollableArraySize<N>;
