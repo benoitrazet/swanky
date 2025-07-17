@@ -49,9 +49,14 @@
 //! `vectoreyes` will always use its `scalar` backend, which does not use vector
 //! instructions.
 //!
-//! **NOTE:** Many functions are currently missing from this library. Please
-//! consult the Intel documentation to see if a non-implemented intrinsic would
-//! more directly accomplish your goal, and we can add it!
+//! # Limitations
+//! VectorEyes was designed around the AVX2 backend. For example, shuffle operations tend to be
+//! constrained to 128-bit lanes because that's how the Intel intrinsics are constrained. As a
+//! result, while code that uses VectorEyes might be optimal for an Intel platform, it might not be
+//! optimal for an ARM platform with different intrinsics. (This is a limitation, generally, with
+//! cross-platform SIMD libraries like VectorEyes.)
+//!
+//! In addition, many SIMD intrinsics are currently not wrapped in VectorEyes.
 
 use std::ops::*;
 
