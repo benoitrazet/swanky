@@ -57,8 +57,26 @@ impl<P: Party> EqualityFunctionality<P> {
     // If `P = Verifier` receive the commitment, send the hashed value over, receive the decommitment, and do the equality.
     pub fn finalize(self, channel: &mut Channel) -> eyre::Result<()> {
         match P::WHICH {
-            WhichParty::Prover(e) => {}
-            WhichParty::Verifier(e) => {}
+            WhichParty::Prover(e) => {
+                // Prover send commitment
+                let _ = channel.write_bytes(self.hash.finalize().as_slice())?;
+                // Prover receives h_verifier
+                let mut verifier_hash = Vec::new();
+                channel.read_bytes(&mut verifier_hash)?;
+                // Prover sends the commitment salt as a way to decomit. The prover
+                // can abhort and skip this step and this protocol allows that.
+                let _ = channel.write_bytes(&self.commitment_salt.into_inner(e))?;
+            }
+            WhichParty::Verifier(e) => {
+                // Verifier receives commitment
+                let mut prover_com = Vec::new();
+                channel.read_bytes(&mut prover_com)?;
+                // Verifier sends hash
+                let _ = channel.write_bytes(self.hash.finalize().as_slice())?;
+                // Verifier receives decomitment
+                let mut prover_salt = Vec::new();
+                channel.read_bytes(&mut prover_salt)?;
+            }
         }
         todo!()
     }
