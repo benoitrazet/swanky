@@ -4,11 +4,13 @@
 
 use sha2::{Digest, Sha256};
 use swanky_channel::Channel;
-use swanky_party::{Party, Prover, Verifier, WhichParty, private::ProverPrivate};
+use swanky_party::{Party, WhichParty, private::ProverPrivate};
 
 use rand::{CryptoRng, Rng};
 
-struct EqualityFunctionality<P: Party> {
+/// A struct which stores the hash function and salt used
+/// in the F_eq protocol.
+pub struct EqualityFunctionality<P: Party> {
     hash: Sha256,
     commitment_salt: ProverPrivate<P, [u8; 32]>,
 }
@@ -35,7 +37,7 @@ impl<P: Party> EqualityFunctionality<P> {
         };
         Ok(result)
     }
-    // Add `value` to the running hash.
+    /// Add `value` to the running hash.
     pub fn input(&mut self, value: &[u8]) {
         match P::WHICH {
             WhichParty::Prover(e) => {
@@ -50,9 +52,9 @@ impl<P: Party> EqualityFunctionality<P> {
             }
         }
     }
-    // Run the protocol:
-    // If `P = Prover` send the committed hashed value over, receive the result, decommit, and do the equality.
-    // If `P = Verifier` receive the commitment, send the hashed value over, receive the decommitment, and do the equality.
+    /// Runs the protocol and checks the equality of the two hash values:
+    /// If `P = Prover` send the committed hashed value over, receive the result, decommit, and do the equality.
+    /// If `P = Verifier` receive the commitment, send the hashed value over, receive the decommitment, and do the equality.
     pub fn finalize(&mut self, channel: &mut Channel) -> eyre::Result<bool> {
         match P::WHICH {
             WhichParty::Prover(e) => {
@@ -96,6 +98,7 @@ impl<P: Party> EqualityFunctionality<P> {
 mod tests {
     use super::*;
     use swanky_aes_rng::AesRng;
+    use swanky_party::{Prover, Verifier};
 
     fn check_equality(input_pr: &[u8], input_vr: &[u8]) -> eyre::Result<(bool, bool)> {
         let (res_pr, res_vr) = swanky_channel::local::local_channel_pair(
