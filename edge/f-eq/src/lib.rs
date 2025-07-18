@@ -61,7 +61,7 @@ impl<P: Party> EqualityFunctionality<P> {
                 // Prover send commitment
                 let _ = channel.write_bytes(self.hash.finalize().as_slice())?;
                 // Prover receives h_verifier
-                let mut verifier_hash = Vec::new();
+                let mut verifier_hash = vec![0u8; 32];
                 channel.read_bytes(&mut verifier_hash)?;
                 // Prover sends the commitment salt as a way to decomit. The prover
                 // can abhort and skip this step and this protocol allows that.
@@ -69,12 +69,12 @@ impl<P: Party> EqualityFunctionality<P> {
             }
             WhichParty::Verifier(e) => {
                 // Verifier receives commitment
-                let mut prover_com = Vec::new();
+                let mut prover_com = vec![0u8; 32];
                 channel.read_bytes(&mut prover_com)?;
                 // Verifier sends hash
                 let _ = channel.write_bytes(self.hash.finalize().as_slice())?;
                 // Verifier receives decomitment
-                let mut prover_salt = Vec::new();
+                let mut prover_salt = vec![0u8; 32];
                 channel.read_bytes(&mut prover_salt)?;
             }
         }
