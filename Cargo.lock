@@ -2517,9 +2517,11 @@ name = "swanky-authenticated-bits"
 version = "0.6.0"
 dependencies = [
  "eyre",
+ "itertools 0.14.0",
  "proptest",
  "rand 0.8.5",
  "swanky-adversary",
+ "swanky-aes-hash",
  "swanky-aes-rng",
  "swanky-channel",
  "swanky-field",

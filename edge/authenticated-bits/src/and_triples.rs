@@ -1,0 +1,188 @@
+//! AND triples.
+//!
+//! An AND triple is a random authenticated AND triple $`(\langle x \rangle,
+//! \langle y \rangle, \langle z \rangle)`$ [1] such that $`x \cdot y = z`$.
+//!
+//! [1] See [`crate::authshares`] for the definition of the $`\langle x
+//! \rangle`$ notation.
+
+use crate::leaky_and_triples::{LeakyAndTriple, LeakyAndTripleGenerator};
+use rand::{CryptoRng, Rng};
+use swanky_adversary::Malicious;
+use swanky_channel::Channel;
+use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
+use swanky_party::Party;
+use vectoreyes::U8x16;
+
+/// An AND triple.
+///
+/// See [`crate::and_triples`] for details.
+#[derive(Clone, Copy)]
+pub struct AndTriple<P: Party>(
+    // A `LeakyAndTriple` is still an AND triple.
+    LeakyAndTriple<P>,
+);
+
+impl<P: Party> From<LeakyAndTriple<P>> for AndTriple<P> {
+    fn from(value: LeakyAndTriple<P>) -> Self {
+        Self(value)
+    }
+}
+
+impl<P: Party> From<AndTriple<P>> for LeakyAndTriple<P> {
+    fn from(value: AndTriple<P>) -> Self {
+        value.0
+    }
+}
+
+/// A type for generating [`AndTriple`]s.
+pub struct AndTripleGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver> {
+    leaky_generator: LeakyAndTripleGenerator<P, OTS, OTR>,
+}
+
+impl<
+    P: Party,
+    OTS: CorrelatedSender<Msg = U8x16> + Malicious,
+    OTR: CorrelatedReceiver<Msg = U8x16> + Malicious,
+> AndTripleGenerator<P, OTS, OTR>
+{
+    /// Create a new [`AndTripleGenerator`].
+    pub fn new<RNG: CryptoRng + Rng>(channel: &mut Channel, rng: RNG) -> eyre::Result<Self> {
+        let leaky_generator = LeakyAndTripleGenerator::new(channel, rng)?;
+        Ok(Self { leaky_generator })
+    }
+
+    /// Create a new [`AndTripleGenerator`] with a supplied $`\Delta`$ value.
+    ///
+    /// # Panics
+    /// This panics if $`\mathsf{lsb}(\Delta_\mathsf{A}) \neq 1`$ or if
+    /// $`\mathsf{lsb}(\Delta_\mathsf{B}) \neq 0`$.
+    pub fn new_with_delta<RNG: CryptoRng + Rng>(
+        delta: U8x16,
+        channel: &mut Channel,
+        rng: RNG,
+    ) -> eyre::Result<Self> {
+        let leaky_generator = LeakyAndTripleGenerator::new_with_delta(delta, channel, rng)?;
+        Ok(Self { leaky_generator })
+    }
+
+    /// Generate a vector of AND triples.
+    pub fn generate<RNG: CryptoRng + Rng>(
+        &mut self,
+        ntriples: usize,
+        out: &mut Vec<AndTriple<P>>,
+        channel: &mut Channel,
+        rng: RNG,
+    ) -> eyre::Result<()> {
+        let bucket_size = if ntriples < 320 {
+            5
+        } else if ntriples < 3100 {
+            4
+        } else if ntriples < 280000 {
+            3
+        } else {
+            return Err(eyre::Error::msg(
+                "Too many triples: Must be less than 280,000",
+            ));
+        };
+        let nleaky = ntriples * bucket_size;
+        let mut leaky_ands = Vec::with_capacity(nleaky);
+        self.leaky_generator
+            .generate(nleaky, &mut leaky_ands, channel, rng)?;
+        // 🦺 TODO 🦺: Shuffle leaky ANDs
+        for bucket in leaky_ands.chunks(bucket_size) {
+            let triple = self.leaky_generator.combine(bucket, channel)?;
+            out.push(triple.into());
+        }
+        Ok(())
+    }
+
+    /// Open the AND triples in `triples`.
+    ///
+    /// This corresponds to opening each of the underlying authenticated shares.
+    pub fn open(&self, triples: &[AndTriple<P>], channel: &mut Channel) -> eyre::Result<()> {
+        // An AND triple is _also_ a leaky-AND triple (with no leak), so use
+        // that method here.
+        //
+        // TODO: Don't do this copy!
+        let triples: Vec<LeakyAndTriple<P>> =
+            triples.iter().map(|triple| (*triple).into()).collect();
+        self.leaky_generator.open(&triples, channel)
+    }
+
+    /// The $`\Delta`$ value used to validate the other party's shares.
+    pub fn delta(&self) -> U8x16 {
+        self.leaky_generator.delta()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::authshares::{PartyA, PartyB};
+    use swanky_aes_rng::AesRng;
+    use swanky_ot_alsz_kos::kos;
+
+    fn generate(
+        ntriples: usize,
+    ) -> (
+        Vec<AndTriple<PartyA>>,
+        Vec<AndTriple<PartyB>>,
+        AndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
+        AndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
+    ) {
+        let mut output_a: Vec<AndTriple<PartyA>> = vec![];
+        let mut output_b: Vec<AndTriple<PartyB>> = vec![];
+        let (generator_a, generator_b) = swanky_channel::local::local_channel_pair(
+            |c| {
+                let mut rng = AesRng::new();
+                let mut generator =
+                    AndTripleGenerator::<PartyA, kos::Sender, kos::Receiver>::new(c, &mut rng)?;
+                generator.generate(ntriples, &mut output_a, c, &mut rng)?;
+                Ok(generator)
+            },
+            |c| {
+                let mut rng = AesRng::new();
+                let mut generator =
+                    AndTripleGenerator::<PartyB, kos::Sender, kos::Receiver>::new(c, &mut rng)?;
+                generator.generate(ntriples, &mut output_b, c, &mut rng)?;
+                Ok(generator)
+            },
+        )
+        .unwrap();
+        (output_a, output_b, generator_a, generator_b)
+    }
+
+    fn validate(
+        generator_a: &AndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
+        generator_b: &AndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
+        output_a: Vec<AndTriple<PartyA>>,
+        output_b: Vec<AndTriple<PartyB>>,
+    ) -> (bool, bool, U8x16, U8x16) {
+        let ((validation_a, delta_a), (validation_b, delta_b)) =
+            swanky_channel::local::local_channel_pair(
+                |c| {
+                    let result = generator_a.open(&output_a, c);
+                    let delta = generator_a.delta();
+                    Ok((result.is_ok(), delta))
+                },
+                |c| {
+                    let result = generator_b.open(&output_b, c);
+                    let delta = generator_b.delta();
+                    Ok((result.is_ok(), delta))
+                },
+            )
+            .unwrap();
+        (validation_a, validation_b, delta_a, delta_b)
+    }
+
+    #[test]
+    fn honest_generation_works() {
+        let ntriples = 1000;
+        let (output_a, output_b, generator_a, generator_b) = generate(ntriples);
+        let (validation_a, validation_b, _, _) =
+            validate(&generator_a, &generator_b, output_a, output_b);
+        assert!(validation_a);
+        assert!(validation_b);
+    }
+}

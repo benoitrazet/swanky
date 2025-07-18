@@ -17,5 +17,7 @@
 //!   (authenticated) secret share.
 #![deny(missing_docs)]
 
+pub mod and_triples;
 pub mod authbits;
 pub mod authshares;
+mod leaky_and_triples;

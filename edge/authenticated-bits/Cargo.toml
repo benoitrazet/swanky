@@ -18,10 +18,13 @@ swanky-channel.workspace = true
 swanky-field-binary.workspace = true
 swanky-field.workspace = true
 swanky-serialization.workspace = true
+swanky-aes-hash.workspace = true
+swanky-aes-rng.workspace = true
 vectoreyes.workspace = true
+
+itertools.workspace = true
 rand.workspace = true
 proptest.workspace = true
-swanky-aes-rng.workspace = true
 eyre.workspace = true
 
 [dev-dependencies]
