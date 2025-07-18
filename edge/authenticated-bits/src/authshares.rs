@@ -15,7 +15,7 @@ use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
 use swanky_party::{
     IS_PROVER, IS_VERIFIER, Party, Prover, Verifier, WhichParty,
     either::{PartyEither, PartyEitherCopy},
-    private::VerifierPrivateCopy,
+    private::{VerifierPrivate, VerifierPrivateCopy},
 };
 use vectoreyes::U8x16;
 
@@ -213,8 +213,14 @@ impl<
     /// Open the authenticated shares in `shares`.
     ///
     /// This corresponds to opening all the authenticated bits that make up the
-    /// authenticated shares.
-    pub fn open(&self, shares: &[AuthShare<P>], channel: &mut Channel) -> eyre::Result<bool> {
+    /// authenticated shares. The resulting opened combined shares are returned
+    /// in the `outputs` vector.
+    pub fn open(
+        &self,
+        shares: &[AuthShare<P>],
+        outputs: &mut Vec<F2>,
+        channel: &mut Channel,
+    ) -> eyre::Result<()> {
         let (party_a_shares, party_b_shares): (Vec<_>, Vec<_>) = shares
             .iter()
             .map(|authshare| (authshare.party_a, authshare.party_b))
@@ -226,12 +232,13 @@ impl<
 
                 let party_a_shares =
                     PartyEitherCopy::pull_either_outside(&party_a_shares).prover_into(ev);
-                party_a.open(party_a_shares, channel)?;
+                party_a.open(party_a_shares, VerifierPrivate::empty(IS_PROVER), channel)?;
                 let party_b_shares =
                     PartyEitherCopy::pull_either_outside(&party_b_shares).prover_into(ev);
-
-                let result = party_b.open(party_b_shares, channel)?;
-                Ok(result.into_inner(IS_VERIFIER))
+                party_b.open(party_b_shares, VerifierPrivate::new(outputs), channel)?;
+                for (bit_a, bit_b) in party_a_shares.iter().zip(outputs.iter_mut()) {
+                    *bit_b += bit_a.bit().into_inner(IS_PROVER);
+                }
             }
             WhichParty::Verifier(ev) => {
                 let party_a = self.party_a.as_ref().verifier_into(ev);
@@ -239,14 +246,16 @@ impl<
 
                 let party_a_shares =
                     PartyEitherCopy::pull_either_outside(&party_a_shares).verifier_into(ev);
-                let result = party_a.open(party_a_shares, channel)?;
+                party_a.open(party_a_shares, VerifierPrivate::new(outputs), channel)?;
                 let party_b_shares =
                     PartyEitherCopy::pull_either_outside(&party_b_shares).verifier_into(ev);
-                party_b.open(party_b_shares, channel)?;
-
-                Ok(result.into_inner(IS_VERIFIER))
+                party_b.open(party_b_shares, VerifierPrivate::empty(IS_PROVER), channel)?;
+                for (bit_a, bit_b) in outputs.iter_mut().zip(party_b_shares.iter()) {
+                    *bit_a += bit_b.bit().into_inner(IS_PROVER);
+                }
             }
         }
+        Ok(())
     }
 
     /// The $`\Delta`$ value used to validate the other party's share.
@@ -346,14 +355,16 @@ mod tests {
         let ((validation_a, delta_a), (validation_b, delta_b)) =
             swanky_channel::local::local_channel_pair(
                 |c| {
-                    let result = generator_a.open(&output_a, c)?;
+                    let mut outputs = vec![];
+                    let result = generator_a.open(&output_a, &mut outputs, c);
                     let delta = generator_a.delta();
-                    Ok((result, delta))
+                    Ok((result.is_ok(), delta))
                 },
                 |c| {
-                    let result = generator_b.open(&output_b, c)?;
+                    let mut outputs = vec![];
+                    let result = generator_b.open(&output_b, &mut outputs, c);
                     let delta = generator_b.delta();
-                    Ok((result, delta))
+                    Ok((result.is_ok(), delta))
                 },
             )
             .unwrap();
