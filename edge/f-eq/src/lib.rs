@@ -16,8 +16,7 @@ struct EqualityFunctionality<P: Party> {
 impl<P: Party> EqualityFunctionality<P> {
     /// Create a new [`EqualityFunctionality`].
     ///
-    /// The verifier's generates the hash function's key `hash_key`, both parties
-    /// setup their local hash functions using that key, and the prover samples a
+    /// The parties initialize their hash functions, and the sender samples a
     /// salt `commitment_salt` at random that they will later use to commit to their
     /// value.
     pub fn new<RNG>(mut rng: RNG) -> eyre::Result<Self>
@@ -41,8 +40,8 @@ impl<P: Party> EqualityFunctionality<P> {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 // We compute the commitment as H(H(value)||salt)
-                let hash_prover = Sha256::digest(value);
-                self.hash.update(hash_prover);
+                let hash_sender = Sha256::digest(value);
+                self.hash.update(hash_sender);
                 self.hash
                     .update(self.commitment_salt.as_mut().into_inner(e));
             }
@@ -57,37 +56,37 @@ impl<P: Party> EqualityFunctionality<P> {
     pub fn finalize(&mut self, channel: &mut Channel) -> eyre::Result<bool> {
         match P::WHICH {
             WhichParty::Prover(e) => {
-                // Prover send commitment
-                let prover_commitment = self.hash.clone().finalize();
-                channel.write_bytes(prover_commitment.as_slice())?;
-                // Prover receives h_verifier
-                let mut verifier_hash = vec![0u8; 32];
-                channel.read_bytes(&mut verifier_hash)?;
-                // Prover sends the commitment salt as a way to decommit. The prover
+                // Sender send commitment
+                let sender_commitment = self.hash.clone().finalize();
+                channel.write_bytes(sender_commitment.as_slice())?;
+                // Sender receives h_verifier
+                let mut receiver_hash = vec![0u8; 32];
+                channel.read_bytes(&mut receiver_hash)?;
+                // Sender sends the commitment salt as a way to decommit. The prover
                 // can abhort and skip this step and this protocol allows that.
                 channel.write_bytes(self.commitment_salt.as_mut().into_inner(e))?;
-                // The Prover salts the Verifier's value
-                let mut verifier_salted = Sha256::new();
-                verifier_salted.update(verifier_hash);
-                verifier_salted.update(self.commitment_salt.as_mut().into_inner(e));
-                // The Prover compares the salted values
-                Ok(prover_commitment == verifier_salted.finalize())
+                // The Sender salts the Receiver's value
+                let mut receriver_salted = Sha256::new();
+                receriver_salted.update(receiver_hash);
+                receriver_salted.update(self.commitment_salt.as_mut().into_inner(e));
+                // The Sender compares the salted values
+                Ok(sender_commitment == receriver_salted.finalize())
             }
             WhichParty::Verifier(_e) => {
                 // Verifier receives commitment
-                let mut prover_com = vec![0u8; 32];
-                channel.read_bytes(&mut prover_com)?;
-                // Verifier sends hash
+                let mut sender_commitment = vec![0u8; 32];
+                channel.read_bytes(&mut sender_commitment)?;
+                // Receiver sends hash
                 channel.write_bytes(self.hash.clone().finalize().as_slice())?;
-                // Verifier receives decommitment
-                let mut prover_salt = vec![0u8; 32];
-                channel.read_bytes(&mut prover_salt)?;
-                //The Verifier salts its value
-                let mut verifier_salted = Sha256::new();
-                verifier_salted.update(self.hash.clone().finalize());
-                verifier_salted.update(prover_salt);
-                //The Verifier compares the salted valuesS
-                Ok(verifier_salted.finalize().as_slice() == prover_com)
+                // Receiver receives decommitment
+                let mut sender_salt = vec![0u8; 32];
+                channel.read_bytes(&mut sender_salt)?;
+                //The Receiver salts its value
+                let mut receriver_salted = Sha256::new();
+                receriver_salted.update(self.hash.clone().finalize());
+                receriver_salted.update(sender_salt);
+                //The Receiver compares the salted valuesS
+                Ok(receriver_salted.finalize().as_slice() == sender_commitment)
             }
         }
     }
@@ -116,6 +115,7 @@ mod tests {
         Ok((res_pr, res_vr))
     }
     #[test]
+    //TODO: turn to proptest
     fn same_inputs_work() {
         let mut rng = AesRng::new();
         let input: [u8; 32] = rng.r#gen();
@@ -124,6 +124,7 @@ mod tests {
         assert!(res.0);
     }
     #[test]
+    //TODO: turn to proptest
     fn different_inputs_work() {
         let mut rng = AesRng::new();
         let input_pr: [u8; 32] = rng.r#gen();
