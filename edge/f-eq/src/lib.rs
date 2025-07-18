@@ -40,10 +40,17 @@ impl<P: Party> EqualityFunctionality<P> {
     // Add `value` to the running hash.
     pub fn input(&mut self, value: &[u8]) -> () {
         match P::WHICH {
-            WhichParty::Prover(e) => {}
-            WhichParty::Verifier(e) => {}
+            WhichParty::Prover(e) => {
+                let mut salted_value = self.commitment_salt.as_mut().into_inner(e);
+                for i in 0..value.len() {
+                    salted_value[i] += value[i];
+                }
+                self.hash.update(salted_value);
+            }
+            WhichParty::Verifier(e) => {
+                self.hash.update(value);
+            }
         }
-        todo!()
     }
     // Run the protocol:
     // If `P = Prover` send the committed hashed value over, receive the result, decommit, and do the equality.
