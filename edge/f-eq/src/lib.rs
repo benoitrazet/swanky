@@ -6,7 +6,6 @@ use sha2::{Digest, Sha256};
 use swanky_channel::Channel;
 use swanky_party::{Party, Prover, Verifier, WhichParty, private::ProverPrivate};
 
-use eyre;
 use rand::{CryptoRng, Rng};
 
 struct EqualityFunctionality<P: Party> {
@@ -26,7 +25,7 @@ impl<P: Party> EqualityFunctionality<P> {
         RNG: CryptoRng + Rng,
     {
         let result = match P::WHICH {
-            WhichParty::Prover(e) => EqualityFunctionality {
+            WhichParty::Prover(_e) => EqualityFunctionality {
                 hash: Sha256::new(),
                 commitment_salt: ProverPrivate::new(rng.r#gen()),
             },
@@ -38,7 +37,7 @@ impl<P: Party> EqualityFunctionality<P> {
         Ok(result)
     }
     // Add `value` to the running hash.
-    pub fn input(&mut self, value: &[u8]) -> () {
+    pub fn input(&mut self, value: &[u8]) {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 // We compute the commitment as H(H(value)||salt)
@@ -47,7 +46,7 @@ impl<P: Party> EqualityFunctionality<P> {
                 self.hash
                     .update(self.commitment_salt.as_mut().into_inner(e));
             }
-            WhichParty::Verifier(e) => {
+            WhichParty::Verifier(_e) => {
                 self.hash.update(value);
             }
         }
@@ -60,26 +59,26 @@ impl<P: Party> EqualityFunctionality<P> {
             WhichParty::Prover(e) => {
                 // Prover send commitment
                 let prover_commitment = self.hash.clone().finalize();
-                let _ = channel.write_bytes(prover_commitment.as_slice())?;
+                channel.write_bytes(prover_commitment.as_slice())?;
                 // Prover receives h_verifier
                 let mut verifier_hash = vec![0u8; 32];
                 channel.read_bytes(&mut verifier_hash)?;
                 // Prover sends the commitment salt as a way to decommit. The prover
                 // can abhort and skip this step and this protocol allows that.
-                let _ = channel.write_bytes(self.commitment_salt.as_mut().into_inner(e))?;
+                channel.write_bytes(self.commitment_salt.as_mut().into_inner(e))?;
                 // The Prover salts the Verifier's value
                 let mut verifier_salted = Sha256::new();
                 verifier_salted.update(verifier_hash);
                 verifier_salted.update(self.commitment_salt.as_mut().into_inner(e));
                 // The Prover compares the salted values
-                return Ok(prover_commitment == verifier_salted.finalize());
+                Ok(prover_commitment == verifier_salted.finalize())
             }
-            WhichParty::Verifier(e) => {
+            WhichParty::Verifier(_e) => {
                 // Verifier receives commitment
                 let mut prover_com = vec![0u8; 32];
                 channel.read_bytes(&mut prover_com)?;
                 // Verifier sends hash
-                let _ = channel.write_bytes(self.hash.clone().finalize().as_slice())?;
+                channel.write_bytes(self.hash.clone().finalize().as_slice())?;
                 // Verifier receives decommitment
                 let mut prover_salt = vec![0u8; 32];
                 channel.read_bytes(&mut prover_salt)?;
@@ -88,7 +87,7 @@ impl<P: Party> EqualityFunctionality<P> {
                 verifier_salted.update(self.hash.clone().finalize());
                 verifier_salted.update(prover_salt);
                 //The Verifier compares the salted valuesS
-                return Ok(verifier_salted.finalize().as_slice() == prover_com);
+                Ok(verifier_salted.finalize().as_slice() == prover_com)
             }
         }
     }
@@ -122,7 +121,7 @@ mod tests {
         let input: [u8; 32] = rng.r#gen();
         let res = check_equality(&input, &input).unwrap();
         assert_eq!(res.0, res.1);
-        assert_eq!(res.0, true);
+        assert!(res.0);
     }
     #[test]
     fn different_inputs_work() {
@@ -131,6 +130,6 @@ mod tests {
         let input_vr: [u8; 32] = rng.r#gen();
         let res = check_equality(&input_pr, &input_vr).unwrap();
         assert_eq!(res.0, res.1);
-        assert_eq!(res.0, false);
+        assert!(!res.0);
     }
 }
