@@ -55,30 +55,42 @@ impl<P: Party> EqualityFunctionality<P> {
     // Run the protocol:
     // If `P = Prover` send the committed hashed value over, receive the result, decommit, and do the equality.
     // If `P = Verifier` receive the commitment, send the hashed value over, receive the decommitment, and do the equality.
-    pub fn finalize(self, channel: &mut Channel) -> eyre::Result<bool> {
+    pub fn finalize(&mut self, channel: &mut Channel) -> eyre::Result<bool> {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 // Prover send commitment
-                let _ = channel.write_bytes(self.hash.finalize().as_slice())?;
+                let prover_commitment = self.hash.clone().finalize();
+                let _ = channel.write_bytes(prover_commitment.as_slice())?;
                 // Prover receives h_verifier
                 let mut verifier_hash = vec![0u8; 32];
                 channel.read_bytes(&mut verifier_hash)?;
-                // Prover sends the commitment salt as a way to decomit. The prover
+                // Prover sends the commitment salt as a way to decommit. The prover
                 // can abhort and skip this step and this protocol allows that.
-                let _ = channel.write_bytes(&self.commitment_salt.into_inner(e))?;
+                let _ = channel.write_bytes(self.commitment_salt.as_mut().into_inner(e))?;
+                // The Prover salts the Verifier's value
+                let mut verifier_salted = Sha256::new();
+                verifier_salted.update(verifier_hash);
+                verifier_salted.update(self.commitment_salt.as_mut().into_inner(e));
+                // The Prover compares the salted values
+                return Ok(prover_commitment == verifier_salted.finalize());
             }
             WhichParty::Verifier(e) => {
                 // Verifier receives commitment
                 let mut prover_com = vec![0u8; 32];
                 channel.read_bytes(&mut prover_com)?;
                 // Verifier sends hash
-                let _ = channel.write_bytes(self.hash.finalize().as_slice())?;
-                // Verifier receives decomitment
+                let _ = channel.write_bytes(self.hash.clone().finalize().as_slice())?;
+                // Verifier receives decommitment
                 let mut prover_salt = vec![0u8; 32];
                 channel.read_bytes(&mut prover_salt)?;
+                //The Verifier salts its value
+                let mut verifier_salted = Sha256::new();
+                verifier_salted.update(self.hash.clone().finalize());
+                verifier_salted.update(prover_salt);
+                //The Verifier compares the salted valuesS
+                return Ok(verifier_salted.finalize().as_slice() == prover_com);
             }
         }
-        todo!()
     }
 }
 
