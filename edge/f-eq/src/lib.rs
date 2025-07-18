@@ -55,7 +55,7 @@ impl<P: Party> EqualityFunctionality<P> {
     // Run the protocol:
     // If `P = Prover` send the committed hashed value over, receive the result, decommit, and do the equality.
     // If `P = Verifier` receive the commitment, send the hashed value over, receive the decommitment, and do the equality.
-    pub fn finalize(self, channel: &mut Channel) -> eyre::Result<()> {
+    pub fn finalize(self, channel: &mut Channel) -> eyre::Result<bool> {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 // Prover send commitment
@@ -87,26 +87,38 @@ mod tests {
     use super::*;
     use swanky_aes_rng::AesRng;
 
-    fn generate() -> eyre::Result<(
-        EqualityFunctionality<Prover>,
-        EqualityFunctionality<Verifier>,
-    )> {
-        let (eq_pr, eq_vr) = swanky_channel::local::local_channel_pair(
+    fn check_equality(input_pr: &[u8], input_vr: &[u8]) -> eyre::Result<(bool, bool)> {
+        let (res_pr, res_vr) = swanky_channel::local::local_channel_pair(
             |c| {
                 let mut rng = AesRng::new();
-                EqualityFunctionality::<Prover>::new(&mut rng)
+                let mut f_eq = EqualityFunctionality::<Prover>::new(&mut rng)?;
+                f_eq.input(input_pr);
+                f_eq.finalize(c)
             },
             |c| {
                 let mut rng = AesRng::new();
-                EqualityFunctionality::<Verifier>::new(&mut rng)
+                let mut f_eq = EqualityFunctionality::<Verifier>::new(&mut rng)?;
+                f_eq.input(input_vr);
+                f_eq.finalize(c)
             },
         )?;
-        Ok((eq_pr, eq_vr))
+        Ok((res_pr, res_vr))
     }
-
     #[test]
-    fn setup_works() {
-        let res = generate();
-        assert!(!res.is_err());
+    fn same_inputs_work() {
+        let mut rng = AesRng::new();
+        let input: [u8; 32] = rng.r#gen();
+        let res = check_equality(&input, &input).unwrap();
+        assert_eq!(res.0, res.1);
+        assert_eq!(res.0, true);
+    }
+    #[test]
+    fn different_inputs_work() {
+        let mut rng = AesRng::new();
+        let input_pr: [u8; 32] = rng.r#gen();
+        let input_vr: [u8; 32] = rng.r#gen();
+        let res = check_equality(&input_pr, &input_vr).unwrap();
+        assert_eq!(res.0, res.1);
+        assert_eq!(res.0, false);
     }
 }
