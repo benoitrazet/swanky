@@ -41,11 +41,11 @@ impl<P: Party> EqualityFunctionality<P> {
     pub fn input(&mut self, value: &[u8]) -> () {
         match P::WHICH {
             WhichParty::Prover(e) => {
-                let mut salted_value = self.commitment_salt.as_mut().into_inner(e);
-                for i in 0..value.len() {
-                    salted_value[i] += value[i];
-                }
-                self.hash.update(salted_value);
+                // We compute the commitment as H(H(value)||salt)
+                let hash_prover = Sha256::digest(value);
+                self.hash.update(hash_prover);
+                self.hash
+                    .update(self.commitment_salt.as_mut().into_inner(e));
             }
             WhichParty::Verifier(e) => {
                 self.hash.update(value);
