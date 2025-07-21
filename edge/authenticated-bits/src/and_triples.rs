@@ -1,8 +1,8 @@
 //! Authenticated AND triples.
 //!
 //! An authenticated AND triple is a random authenticated triple $`(\langle x
-//! \rangle, \langle y \rangle, \langle z \rangle)`$ [1] such that $`x \cdot y =
-//! z`$.
+//! \rangle, \langle y \rangle, \langle z \rangle)`$ [^1] such that $`x \cdot y
+//! = z`$.
 //!
 //! # Details
 //!
@@ -15,15 +15,15 @@
 //! technique: the parties generate a bunch of leaky AND triples, randomly
 //! shuffle these, and the "bucket" them into buckets of size $`B`$, where $`B`$
 //! depends on the total number of authenticated AND triples desired. Each
-//! bucket is them combined into a single (authenticated) AND triple. See [2]
-//! for details.
+//! bucket is them combined into a single (authenticated) AND triple. See Katz
+//! et al. [^2] for details.
 //!
-//! [1] See [`crate::authshares`] for the definition of the $`\langle x
+//! [^1]: See [`crate::authshares`] for the definition of the $`\langle x
 //! \rangle`$ notation.
 //!
-//! [2] J. Katz, S. Ranellucci, M. Rosulek, X. Wang. "Optimizing Authenticated
+//! [^2]: J. Katz, S. Ranellucci, M. Rosulek, X. Wang. "Optimizing Authenticated
 //! Garbling for Faster Secure Two-Party Computation".
-//! https://eprint.iacr.org/2018/578.pdf
+//! <https://eprint.iacr.org/2018/578.pdf>
 
 use crate::leaky_and_triples::{LeakyAndTriple, LeakyAndTripleGenerator};
 use rand::{CryptoRng, Rng};

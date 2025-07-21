@@ -102,11 +102,12 @@ impl<
 
     /// Generate a vector of leaky AND triples.
     ///
-    /// This implements the $`\Pi_{\mathsf{Land}}`$ protocol (Figure 5) from [1].
+    /// This implements the $`\Pi_{\mathsf{Land}}`$ protocol (Figure 5) from
+    /// Katz et al. [^1].
     ///
     /// [1] J. Katz, S. Ranellucci, M. Rosulek, X. Wang. "Optimizing
     /// Authenticated Garbling for Faster Secure Two-Party Computation".
-    /// https://eprint.iacr.org/2018/578.pdf
+    /// <https://eprint.iacr.org/2018/578.pdf>
     pub(crate) fn generate<RNG: CryptoRng + Rng>(
         &mut self,
         ntriples: usize,
