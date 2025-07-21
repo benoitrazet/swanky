@@ -23,6 +23,7 @@ swanky-aes-hash.workspace = true
 swanky-aes-rng.workspace = true
 vectoreyes.workspace = true
 
+bytemuck.workspace = true
 itertools.workspace = true
 rand.workspace = true
 proptest.workspace = true

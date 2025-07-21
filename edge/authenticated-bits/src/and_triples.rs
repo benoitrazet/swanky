@@ -26,6 +26,7 @@
 //! <https://eprint.iacr.org/2018/578.pdf>
 
 use crate::leaky_and_triples::{LeakyAndTriple, LeakyAndTripleGenerator};
+use bytemuck::TransparentWrapper;
 use rand::{CryptoRng, Rng, SeedableRng, seq::SliceRandom};
 use swanky_adversary::Malicious;
 use swanky_aes_rng::AesRng;
@@ -37,7 +38,8 @@ use vectoreyes::U8x16;
 /// An AND triple.
 ///
 /// See [`crate::and_triples`] for details.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, TransparentWrapper)]
+#[repr(transparent)]
 pub struct AndTriple<P: Party>(
     // A `LeakyAndTriple` is still an AND triple.
     LeakyAndTriple<P>,
@@ -133,12 +135,9 @@ impl<
     /// This corresponds to opening each of the underlying authenticated shares.
     pub fn open(&self, triples: &[AndTriple<P>], channel: &mut Channel) -> eyre::Result<()> {
         // An AND triple is _also_ a leaky-AND triple (with no leak), so use
-        // that method here.
-        //
-        // TODO: Don't do this copy!
-        let triples: Vec<LeakyAndTriple<P>> =
-            triples.iter().map(|triple| (*triple).into()).collect();
-        self.leaky_generator.open(&triples, channel)
+        // that `open` method here.
+        self.leaky_generator
+            .open(AndTriple::peel_slice(triples), channel)
     }
 
     /// The $`\Delta`$ value used to validate the other party's shares.
