@@ -2524,6 +2524,7 @@ dependencies = [
  "swanky-aes-hash",
  "swanky-aes-rng",
  "swanky-channel",
+ "swanky-cointoss",
  "swanky-field",
  "swanky-field-binary",
  "swanky-ot-alsz-kos",

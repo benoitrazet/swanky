@@ -113,7 +113,7 @@ impl<
         ntriples: usize,
         out: &mut Vec<LeakyAndTriple<P>>,
         channel: &mut Channel,
-        rng: RNG,
+        rng: &mut RNG,
     ) -> eyre::Result<()> {
         let nshares = 3 * ntriples;
         let delta = F128b::from(self.auth_share_generator.delta());

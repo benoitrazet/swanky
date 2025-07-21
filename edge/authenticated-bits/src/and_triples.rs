@@ -26,8 +26,9 @@
 //! <https://eprint.iacr.org/2018/578.pdf>
 
 use crate::leaky_and_triples::{LeakyAndTriple, LeakyAndTripleGenerator};
-use rand::{CryptoRng, Rng};
+use rand::{CryptoRng, Rng, SeedableRng, seq::SliceRandom};
 use swanky_adversary::Malicious;
+use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
 use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
 use swanky_party::Party;
@@ -91,7 +92,7 @@ impl<
         ntriples: usize,
         out: &mut Vec<AndTriple<P>>,
         channel: &mut Channel,
-        rng: RNG,
+        rng: &mut RNG,
     ) -> eyre::Result<()> {
         let bucket_size = if ntriples < 320 {
             5
@@ -108,7 +109,17 @@ impl<
         let mut leaky_ands = Vec::with_capacity(nleaky);
         self.leaky_generator
             .generate(nleaky, &mut leaky_ands, channel, rng)?;
-        // 🦺 TODO 🦺: Shuffle leaky ANDs
+        // Run a coin-tossing protocol to determine a seed for permuting the
+        // generated leaky AND triples.
+        let seed = rng.r#gen::<U8x16>();
+        let random = match P::WHICH {
+            swanky_party::WhichParty::Prover(_) => swanky_cointoss::send(channel, &[seed])?[0],
+            swanky_party::WhichParty::Verifier(_) => swanky_cointoss::receive(channel, &[seed])?[0],
+        };
+        // Do the permutation.
+        let mut shuffle_rng = AesRng::from_seed(random);
+        leaky_ands.shuffle(&mut shuffle_rng);
+        // Bucket the leaky AND triples and combine them into (non-leaky) AND triples.
         for bucket in leaky_ands.chunks(bucket_size) {
             let triple = self.leaky_generator.combine(bucket, channel)?;
             out.push(triple.into());
