@@ -51,12 +51,6 @@ impl<P: Party> From<LeakyAndTriple<P>> for AndTriple<P> {
     }
 }
 
-impl<P: Party> From<AndTriple<P>> for LeakyAndTriple<P> {
-    fn from(value: AndTriple<P>) -> Self {
-        value.0
-    }
-}
-
 /// A type for generating [`AndTriple`]s.
 pub struct AndTripleGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver> {
     leaky_generator: LeakyAndTripleGenerator<P, OTS, OTR>,
