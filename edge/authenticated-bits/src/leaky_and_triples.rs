@@ -26,7 +26,7 @@ use vectoreyes::{SimdBase, U8x16};
 ///
 /// See [`crate::leaky_and_triples`] for details.
 #[derive(Clone, Copy)]
-pub struct LeakyAndTriple<P: Party> {
+pub(crate) struct LeakyAndTriple<P: Party> {
     /// The authenticated share $`\langle x \rangle`$.
     x: AuthShare<P>,
     /// The authenticated share $`\langle y \rangle`$.
@@ -37,7 +37,8 @@ pub struct LeakyAndTriple<P: Party> {
 }
 
 /// A type for generating [`LeakyAndTriple`]s.
-pub struct LeakyAndTripleGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver> {
+pub(crate) struct LeakyAndTripleGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver>
+{
     auth_share_generator: AuthShareGenerator<P, OTS, OTR>,
 }
 
@@ -48,7 +49,10 @@ impl<
 > LeakyAndTripleGenerator<P, OTS, OTR>
 {
     /// Create a new [`LeakyAndTripleGenerator`].
-    pub fn new<RNG: CryptoRng + Rng>(channel: &mut Channel, mut rng: RNG) -> eyre::Result<Self> {
+    pub(crate) fn new<RNG: CryptoRng + Rng>(
+        channel: &mut Channel,
+        mut rng: RNG,
+    ) -> eyre::Result<Self> {
         let delta = rng.r#gen::<F128b>();
         // We require that for Party A (the Prover) `lsb(Δ) = 1`, and for Party
         // B (the Verifier) `lsb(Δ) = 0`. So adjust `delta` as needed.
@@ -77,7 +81,7 @@ impl<
     /// # Panics
     /// This panics if $`\mathsf{lsb}(\Delta_\mathsf{A}) \neq 1`$ or if
     /// $`\mathsf{lsb}(\Delta_\mathsf{B}) \neq 0`$.
-    pub fn new_with_delta<RNG: CryptoRng + Rng>(
+    pub(crate) fn new_with_delta<RNG: CryptoRng + Rng>(
         delta: U8x16,
         channel: &mut Channel,
         rng: RNG,
@@ -103,7 +107,7 @@ impl<
     /// [1] J. Katz, S. Ranellucci, M. Rosulek, X. Wang. "Optimizing
     /// Authenticated Garbling for Faster Secure Two-Party Computation".
     /// https://eprint.iacr.org/2018/578.pdf
-    pub fn generate<RNG: CryptoRng + Rng>(
+    pub(crate) fn generate<RNG: CryptoRng + Rng>(
         &mut self,
         ntriples: usize,
         out: &mut Vec<LeakyAndTriple<P>>,
@@ -232,7 +236,11 @@ impl<
     /// Open the (leaky) AND triples in `triples`.
     ///
     /// This corresponds to opening each of the underlying authenticated shares.
-    pub fn open(&self, triples: &[LeakyAndTriple<P>], channel: &mut Channel) -> eyre::Result<()> {
+    pub(crate) fn open(
+        &self,
+        triples: &[LeakyAndTriple<P>],
+        channel: &mut Channel,
+    ) -> eyre::Result<()> {
         let (xs, ys, zs): (Vec<_>, Vec<_>, Vec<_>) = triples
             .iter()
             .map(|triple| (triple.x, triple.y, triple.z))
@@ -290,7 +298,7 @@ impl<
     /// [1] X. Wang, S. Ranellucci, J. Katz. "Authenticated Garbling and
     /// Efficient Maliciously Secure Two-Party Computation".
     /// https://eprint.iacr.org/2017/030.pdf
-    pub fn combine(
+    pub(crate) fn combine(
         &mut self,
         bucket: &[LeakyAndTriple<P>],
         channel: &mut Channel,
@@ -322,7 +330,7 @@ impl<
     }
 
     /// The $`\Delta`$ value used to validate the other party's shares.
-    pub fn delta(&self) -> U8x16 {
+    pub(crate) fn delta(&self) -> U8x16 {
         self.auth_share_generator.delta()
     }
 }
