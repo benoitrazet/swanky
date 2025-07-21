@@ -94,16 +94,17 @@ impl<
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> eyre::Result<()> {
-        let bucket_size = if ntriples < 320 {
-            5
-        } else if ntriples < 3100 {
-            4
-        } else if ntriples < 280000 {
+        // See Table 4 from https://eprint.iacr.org/2017/030.pdf.
+        //
+        // These numbers are for a statistical security of 40 bits.
+        let bucket_size = if ntriples >= 280000 {
             3
+        } else if ntriples >= 3100 {
+            4
+        } else if ntriples >= 320 {
+            5
         } else {
-            return Err(eyre::Error::msg(
-                "Too many triples: Must be less than 280,000",
-            ));
+            return Err(eyre::Error::msg("Too few triples: Must be >= 320"));
         };
         let nleaky = ntriples * bucket_size;
         let mut leaky_ands = Vec::with_capacity(nleaky);

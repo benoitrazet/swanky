@@ -274,13 +274,13 @@ impl<
     /// [`AndTriple`].
     ///
     /// This implements the $`\Pi_{\mathsf{aAND}}`$ protocol (Figure 9) from
-    /// [1].
+    /// Wang et al. [^1].
     ///
     /// # Security
     /// This assumes that the bucket is of the correct size. The bucket size
     /// depends on the number of (non-leaky) AND triples to be created:
     ///
-    /// | ≤ # Triples | Bucket Size |
+    /// | ≥ # Triples | Bucket Size |
     /// | :---------: | :---------: |
     /// |         320 |           5 |
     /// |       3,100 |           4 |
@@ -288,17 +288,19 @@ impl<
     ///
     /// That is, if you want to create `N` triples, you need to generate `B · N`
     /// leaky-AND triples---where `B` is the bucket size---randomly permute the
-    /// triples, and then call `combine` on buckets of size `B`.
+    /// triples, and then call `combine` on buckets of size `B`. See Table 4
+    /// from Wang et al. [^1] (the number of triples above is for a statistical
+    /// security parameter of 40 bits).
     ///
-    /// This implies that _there is no security guarantee_ when generating more
-    /// than 280,000 triples!
+    /// This implies that _there is no security guarantee_ when generating fewer
+    /// than 320 triples!
     ///
     /// # Panics
     /// This panics if `bucket` is empty.
     ///
-    /// [1] X. Wang, S. Ranellucci, J. Katz. "Authenticated Garbling and
+    /// [^1]: X. Wang, S. Ranellucci, J. Katz. "Authenticated Garbling and
     /// Efficient Maliciously Secure Two-Party Computation".
-    /// https://eprint.iacr.org/2017/030.pdf
+    /// <https://eprint.iacr.org/2017/030.pdf>
     pub(crate) fn combine(
         &mut self,
         bucket: &[LeakyAndTriple<P>],
