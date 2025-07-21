@@ -454,9 +454,9 @@ pub trait ExtendingCast<T: SimdBase>: SimdBase {
     fn extending_cast_from(t: T) -> Self;
 }
 
-/// A [[Scalar]] type which has a vector type of length `N`.
+/// A [Scalar] type which has a vector type of length `N`.
 ///
-/// See [[Simd]] for how this trait is used.
+/// See [Simd] for how this trait is used.
 pub trait HasVector<const N: usize>: Scalar {
     /// The vector of `[Self; N]`.
     type Vector: SimdBase<Scalar = Self>;
