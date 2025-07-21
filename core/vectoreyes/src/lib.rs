@@ -13,12 +13,33 @@
 //! this easier, VectorEyes provide safe functions which will function identically on all
 //! platforms.
 //!
-//! The core of this crate is vector types like [U64x2]. This the vector equivalent of `[u64; 2]`.
-//! It is a 128-bit vector containing 2 lanes each with a `u64`.
+//! The core of this crate is vector types (such as `[U64x2]`). You can think of vectors as arrays
+//! with some extra SIMD operations on top.
 //!
-//! # Example
-//! These two functions perform the same operation, but the simd variant takes may take better
-//! advantage of the CPU hardware.
+//! Just like arrays vectors have an element type ([`u64`] in the example above), and an element
+//! count, frequently referred to as _lanes_ (2 in the above example).
+//!
+//! In fact, you can freely convert between arrays and vectors!
+//!
+//! ```
+//! # use vectoreyes::*;
+//! // These two represent the same thing.
+//! let vector_form = U64x2::from([123_u64, 456_u64]);
+//! let array_form: [u64; 2] = vector_form.into();
+//! ```
+//!
+//! However, the vector form has _special SIMD powers_! These two functions perform the same
+//! operation, but the SIMD variant may[^may_be_faster] take better advantage of the CPU hardware.
+//!
+//! [^may_be_faster]: As always, only a Sith deals in absolutes. The Rust compiler can, in some
+//! cases, employ _autovectorization_ to compile code which doesn't use SIMD operations into code
+//! which uses SIMD instructions. Unfortunately, the compiler can't always autovectorize the way we
+//! want it to, which is why VectorEyes exists!
+//!
+//! While normal _bog-standard_ arrays don't implement the `+` operator, our vector types do!
+//! Adding two vectors together performs pairwise addition, using (for the vector backends) a
+//! single CPU instruction!.
+//!
 //! ```
 //! # use vectoreyes::*;
 //! fn double_without_simd(arr: [u64; 2]) -> [u64; 2] {
@@ -32,6 +53,14 @@
 //!     double_with_simd(U64x2::from([1, 2])),
 //! );
 //! ```
+//!
+//! # Vector Sizes
+//! There aren't vector types for every conceivable `(type, element count)` pair. Instead, we have
+//! vector types that correspond to the vector registers that many CPUs have. Because these
+//! registers are 128- or 256-bits wide, we choose vector types which also have this size. For
+//! example, there's a [`U64x2`] type and a [`U32x4`] type, since both are 128-bits wide. But
+//! there's no `U32x2` type, because that'd only be 64-bits wide.
+//!
 //!
 //! # Backends
 //! VectorEyes chooses what backend to execute vector operations with at compile-time.
