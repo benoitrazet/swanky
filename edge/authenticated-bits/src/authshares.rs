@@ -1,6 +1,6 @@
 //! Authenticated shares.
 //!
-//! An authenticated share $`\langle x \rangle = \langle x_1 | x_2 \rangle`$
+//! An authenticated share $`\langle x \rangle := \langle x_1 | x_2 \rangle`$
 //! is a pair of authenticated bits $`[x_1]_A`$, $`[x_2]_B`$, where $`[x_1]_A`$
 //! denotes that $`[x_1]`$ is an authenticated bit held by Party A, and likewise,
 //! $`[x_2]_B`$ is an authenticated bit held by Party B. We define $`x = x_1
