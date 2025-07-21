@@ -1,10 +1,10 @@
 //! Leaky AND triples.
 //!
-//! An AND triple is a random authenticated AND triple $`(\langle x \rangle,
-//! \langle y \rangle, \langle z \rangle)`$ [1] such that $`x \cdot y = z`$. A
-//! _leaky_ AND triple is an AND triple where the adversary can guess the value
-//! of $`x`$: if correct this remains undetected, of incorrect the adversary is
-//! caught.
+//! An authenticated AND triple is a random authenticated triple $`(\langle x
+//! \rangle, \langle y \rangle, \langle z \rangle)`$ [1] such that $`x \cdot y =
+//! z`$. A _leaky_ AND triple is an authenticated AND triple where the adversary
+//! can guess the value of $`x`$: if correct this remains undetected, if
+//! incorrect the adversary is caught.
 //!
 //! [1] See [`crate::authshares`] for the definition of the $`\langle x
 //! \rangle`$ notation.
