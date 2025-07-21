@@ -1,7 +1,7 @@
 //! Authenticated bits.
 //!
 //! See [`crate`] for a high-level description of authenticated bits. This
-//! module provides the [`AuthBit`] type, which contains an authenticated bit,
+//! module provides the [`AuthBit`] type, which represents an authenticated bit,
 //! alongside the [`AuthBitGenerator`] type, which provides a means for
 //! generating a vector of [`AuthBit`]s.
 //!
@@ -30,9 +30,8 @@ use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
 use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
 use swanky_party::{
     Party, WhichParty,
-    either::PartyEither,
-    either::PartyEitherCopy,
-    private::{ProverPrivateCopy, VerifierPrivateCopy},
+    either::{PartyEither, PartyEitherCopy},
+    private::{ProverPrivateCopy, VerifierPrivate, VerifierPrivateCopy},
 };
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 use vectoreyes::U8x16;
@@ -226,53 +225,56 @@ impl<
             }
         }
     }
-    /// Open the authenticated bits in `out`.
+    /// Open the authenticated bits in `authbits`.
     ///
-    /// This corresponds to the prover sending $`(b, M)`$ to the verifier, who checks
-    /// that $`K = M \oplus b \Delta`$.
+    /// This corresponds to the prover sending $`(b, M)`$ to the verifier, who
+    /// checks that $`K = M \oplus b \Delta`$. The resulting opened bits are
+    /// returned to the verifier in the `outputs` vector.
     pub fn open(
         &self,
-        out: &[AuthBit<P>],
+        authbits: &[AuthBit<P>],
+        outputs: VerifierPrivate<P, &mut Vec<F2>>,
         channel: &mut Channel,
-    ) -> eyre::Result<VerifierPrivateCopy<P, bool>> {
+    ) -> eyre::Result<()> {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 let mut bit_ser: F2BitSerializer =
                     SequenceSerializer::new(&mut channel.as_std_io())?;
-                for b in out.iter() {
+                for b in authbits.iter() {
                     bit_ser.write(channel.as_std_io(), b.bit().into_inner(e))?;
                 }
                 bit_ser.finish(channel.as_std_io())?;
 
-                for ab in out.iter() {
+                for ab in authbits.iter() {
                     channel.write_bytes(ab.mac().into_inner(e).as_ref())?;
                 }
-                Ok(VerifierPrivateCopy::empty(e))
             }
             WhichParty::Verifier(e) => {
                 let mut bit_ser: F2BitDeserializer =
                     SequenceDeserializer::new(channel.as_std_io())?;
-                let mut bits: Vec<F2> = Vec::with_capacity(out.len());
-                for _ in 0..out.len() {
-                    bits.push(bit_ser.read(channel.as_std_io())?);
+                let bits_ = outputs.into_inner(e);
+                for _ in 0..authbits.len() {
+                    bits_.push(bit_ser.read(channel.as_std_io())?);
                 }
-
                 let mut validation = true;
-                for (ab, bit) in out.iter().zip(bits.into_iter()) {
+                for (ab, bit) in authbits.iter().zip(bits_.iter()) {
                     let mut mac_bytes = [0u8; 16];
                     channel.read_bytes(&mut mac_bytes)?;
                     let mac = U8x16::from(mac_bytes);
 
                     validation &= mac
-                        == if F2::ONE == bit {
+                        == if F2::ONE == *bit {
                             ab.key().into_inner(e) ^ self.delta().into_inner(e)
                         } else {
                             ab.key().into_inner(e)
                         };
                 }
-                Ok(VerifierPrivateCopy::new(validation))
+                if !validation {
+                    return Err(eyre::Error::msg("Validation check failed"));
+                }
             }
         }
+        Ok(())
     }
 
     /// The verifier's $`\Delta`$ value.
@@ -311,6 +313,7 @@ mod tests {
     use swanky_field::FiniteRing;
     use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
     use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier, either::PartyEitherCopy};
+
     /// Validates pairs of prover and verifier `AuthBit`s.
     fn validate(pr: &[AuthBit<Prover>], vr: &[AuthBit<Verifier>], delta: U8x16) -> bool {
         pr.iter()
@@ -359,7 +362,7 @@ mod tests {
                         },
                     ));
                 }
-                generator.open(&output_pr, channel_pr)?;
+                generator.open(&output_pr, VerifierPrivate::empty(IS_PROVER), channel_pr)?;
                 Ok(generator)
             },
             |channel_vr| {
@@ -375,12 +378,14 @@ mod tests {
                         VerifierAuthBit { key: rng.r#gen() },
                     ));
                 }
-                let validation = generator
-                    .open(&output_vr, channel_vr)?
-                    .into_inner(IS_VERIFIER);
+                let mut output = vec![];
+                let validation =
+                    generator.open(&output_vr, VerifierPrivate::new(&mut output), channel_vr);
                 // The generated bits should always be valid when no tampering happens.
                 if !tamper_mac && !tamper_key {
-                    assert!(validation);
+                    assert!(validation.is_ok());
+                } else {
+                    assert!(validation.is_err());
                 }
                 Ok(generator)
             },
