@@ -33,7 +33,7 @@ pub type PartyB = Verifier;
 /// An authenticated share.
 ///
 /// See [`crate::authshares`] for details.
-#[derive(Default, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct AuthShare<P: Party> {
     /// Party A's side of the authenticated share.
     party_a: PartyEitherCopy<P, AuthBit<Prover>, AuthBit<Verifier>>,

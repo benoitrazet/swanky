@@ -40,7 +40,7 @@ use vectoreyes::U8x16;
 ///
 /// The prover holds a bit that they wish to authenticate and receive a MAC
 /// which corresponds to that authentication.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Clone, Copy)]
 struct ProverAuthBit {
     /// MAC authenticating the bit.
     mac: U8x16,
@@ -51,7 +51,7 @@ struct ProverAuthBit {
 ///
 /// The verifier holds a local `key` that verifies the integrity of the prover's
 /// MAC.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Clone, Copy)]
 struct VerifierAuthBit {
     /// Key authenticating the prover's MAC.
     key: U8x16,
@@ -59,7 +59,7 @@ struct VerifierAuthBit {
 /// An authenticated bit.
 ///
 /// See [`crate::authbits`] for details.
-#[derive(Default, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct AuthBit<P: Party>(PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>);
 
 impl<P: Party> AuthBit<P> {
@@ -225,6 +225,7 @@ impl<
             }
         }
     }
+
     /// Open the authenticated bits in `authbits`.
     ///
     /// This corresponds to the prover sending $`(b, M)`$ to the verifier, who
