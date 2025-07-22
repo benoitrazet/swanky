@@ -285,20 +285,55 @@ pub trait SimdBase:
     /// A vector where every element is zero.
     const ZERO: Self;
     /// Is `self == Self::ZERO`?
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert!(U32x4::from([0, 0, 0, 0]).is_zero());
+    /// assert!(!U32x4::from([1, 0, 0, 0]).is_zero());
+    /// ```
     fn is_zero(&self) -> bool;
 
     /// Create a new vector by setting element 0 to `value`, and the rest of the elements to `0`.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(U32x4::from([64, 0, 0, 0]), U32x4::set_lo(64));
+    /// ````
     fn set_lo(value: Self::Scalar) -> Self;
 
     /// Create a new vector by setting every element to `value`.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(U32x4::from([64, 64, 64, 64]), U32x4::broadcast(64));
+    /// ````
     fn broadcast(value: Self::Scalar) -> Self;
 
     /// A vector of `[Self::Scalar; 128 / (8 * std::mem::size_of::<Self::Scalar>())]`
     type BroadcastLoInput: SimdBase<Scalar = Self::Scalar>;
     /// Create a vector by setting every element to element 0 of `of`.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(U32x4::from([1, 1, 1, 1]), U32x4::broadcast_lo(U32x4::from([1, 2, 3, 4])));
+    /// ````
     fn broadcast_lo(of: Self::BroadcastLoInput) -> Self;
 
     /// Get the `I`-th element of this vector.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// let v = U32x4::from([1, 2, 3, 4]);
+    /// assert_eq!(v.extract::<0>(), 1);
+    /// assert_eq!(v.extract::<1>(), 2);
+    /// assert_eq!(v.extract::<2>(), 3);
+    /// assert_eq!(v.extract::<3>(), 4);
+    /// ````
     fn extract<const I: usize>(&self) -> Self::Scalar;
 
     /// Convert the vector to an array.
@@ -308,29 +343,105 @@ pub trait SimdBase:
     }
 
     /// Shift each element left by `BITS`.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(U32x4::from([1, 2, 3, 4]).shift_left::<1>(), U32x4::from([2, 4, 6, 8]));
+    /// ````
     fn shift_left<const BITS: usize>(&self) -> Self;
     /// Shift each element right by `BITS`.
     /// # Effects of Signedness
     /// When `T` is _signed_, this will shift in sign bits, as opposed to zeroes.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(U32x4::from([1, 2, 3, 4]).shift_right::<1>(), U32x4::from([0, 1, 1, 2]));
+    /// assert_eq!(I32x4::from([-1, -2, -3, -4]).shift_right::<1>(), I32x4::from([-1, -1, -2, -2]));
+    /// ````
     fn shift_right<const BITS: usize>(&self) -> Self;
 
     /// Compute `self & (! other)`.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U64x2::from([0b11, 0b00]).and_not(U64x2::from([0b10, 0b10])),
+    ///     U64x2::from([0b01, 0b00]),
+    /// );
+    /// ````
     fn and_not(&self, other: Self) -> Self;
 
     /// Create a vector where each element is all 1's if the elements are equal, and all 0's otherwise.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U64x2::from([1, 2]).cmp_eq(U64x2::from([1, 3])),
+    ///     U64x2::from([0xffffffffffffffff, 0]),
+    /// );
+    /// ````
     fn cmp_eq(&self, other: Self) -> Self;
     /// Create a vector where each element is all 1's if the element of `self` is greater than the
     /// corresponding element of `other`, and all 0's otherwise.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U64x2::from([1, 28]).cmp_gt(U64x2::from([1, 3])),
+    ///     U64x2::from([0, 0xffffffffffffffff]),
+    /// );
+    /// ````
     fn cmp_gt(&self, other: Self) -> Self;
 
     /// Interleave the elements of the low half of `self` and `other`.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U32x4::from([101, 102, 103, 104]).unpack_lo(U32x4::from([201, 202, 203, 204])),
+    ///     U32x4::from([101, 201, 102, 202]),
+    /// );
+    /// ````
     fn unpack_lo(&self, other: Self) -> Self;
     /// Interleave the elements of the high half of `self` and `other`.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U32x4::from([101, 102, 103, 104]).unpack_hi(U32x4::from([201, 202, 203, 204])),
+    ///     U32x4::from([103, 203, 104, 204]),
+    /// );
+    /// ````
     fn unpack_hi(&self, other: Self) -> Self;
 
     /// Make a vector consisting of the maximum elements of `self` and other.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U32x4::from([1, 2, 3, 4]).max(U32x4::from([0, 9, 0, 0])),
+    ///     U32x4::from([1, 9, 3, 4]),
+    /// );
+    /// ````
     fn max(&self, other: Self) -> Self;
     /// Make a vector consisting of the minimum elements of `self` and other.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U32x4::from([1, 2, 3, 4]).min(U32x4::from([0, 9, 0, 0])),
+    ///     U32x4::from([0, 2, 0, 0]),
+    /// );
+    /// ````
     fn min(&self, other: Self) -> Self;
 }
 
@@ -380,6 +491,16 @@ pub trait SimdBaseGatherable<IV: SimdBase>: SimdBase {
 pub trait SimdBase4x: SimdBase {
     /// If `Bi` is true, then that lane will be filled by `if_true`. Otherwise the lane
     /// will be filled from `self`.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U64x4::from([11, 12, 13, 14])
+    ///         .blend::<true, true, true, false>(U64x4::from([21, 22, 23, 24])),
+    ///     U64x4::from([11, 22, 23, 24]),
+    /// );
+    /// ````
     fn blend<const B3: bool, const B2: bool, const B1: bool, const B0: bool>(
         &self,
         if_true: Self,
@@ -390,6 +511,17 @@ pub trait SimdBase4x: SimdBase {
 pub trait SimdBase8x: SimdBase {
     /// If `Bi` is true, then that lane will be filled by `if_true`. Otherwise the lane
     /// will be filled from `self`.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U32x8::from([11, 12, 13, 14, 15, 16, 17, 18])
+    ///         .blend::<true, true, true, false, false, true, true, false>(
+    ///             U32x8::from([21, 22, 23, 24, 25, 26, 27, 28])),
+    ///     U32x8::from([11, 22, 23, 14, 15, 26, 27, 28]),
+    /// );
+    /// ````
     fn blend<
         const B7: bool,
         const B6: bool,
@@ -423,11 +555,38 @@ where
 {
     /// Split the vector into groups of 16 bytes. Within each group, shift the _entire_ bytes left
     /// by `AMOUNT`.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U8x16::from([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]).shift_bytes_left::<1>(),
+    ///     U8x16::from([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]),
+    /// );
+    /// ```
     fn shift_bytes_left<const AMOUNT: usize>(&self) -> Self;
     /// Split the vector into groups of 16 bytes. Within each group, shift the _entire_ bytes right
     /// by `AMOUNT`.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U8x16::from([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]).shift_bytes_right::<1>(),
+    ///     U8x16::from([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 0]),
+    /// );
+    /// ```
     fn shift_bytes_right<const AMOUNT: usize>(&self) -> Self;
     /// Get the sign/most significant bits of the elements of the vector.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     (U8x16::from([0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1]) << 7).most_significant_bits(),
+    ///     0b1111001001010000,
+    /// );
+    /// ```
     fn most_significant_bits(&self) -> u32;
 }
 
@@ -436,11 +595,37 @@ pub trait SimdBase16: SimdBase + SimdSaturatingArithmetic
 where
     Self::Scalar: Scalar<Unsigned = u16, Signed = i16>,
 {
-    /// Shuffle within the lower 64-bits of each 128-bit lane.
+    /// Shuffle within the lower 64-bits of each 128-bit subvector.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U16x16::from([
+    ///         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+    ///     ]).shuffle_lo::<0, 1, 1, 3>(),
+    ///     U16x16::from([
+    ///         3, 1, 1, 0, 4, 5, 6, 7, 11, 9, 9, 8, 12, 13, 14, 15
+    ///     ]),
+    /// );
+    /// ```
     fn shuffle_lo<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(
         &self,
     ) -> Self;
-    /// Shuffle within the upper 64-bits of each 128-bit lane.
+    /// Shuffle within the upper 64-bits of each 128-bit subvector.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U16x16::from([
+    ///         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+    ///     ]).shuffle_hi::<0, 1, 1, 3>(),
+    ///     U16x16::from([
+    ///         0, 1, 2, 3, 7, 5, 5, 4, 8, 9, 10, 11, 15, 13, 13, 12
+    ///     ]),
+    /// );
+    /// ```
     fn shuffle_hi<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(
         &self,
     ) -> Self;
@@ -451,7 +636,20 @@ pub trait SimdBase32: SimdBase
 where
     Self::Scalar: Scalar<Unsigned = u32, Signed = i32>,
 {
-    /// Shuffle within 128-bit lanes.
+    /// Shuffle within 128-bit subvector.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U32x8::from([
+    ///         0, 1, 2, 3, 4, 5, 6, 7
+    ///     ]).shuffle::<0, 1, 1, 3>(),
+    ///     U32x8::from([
+    ///         3, 1, 1, 0, 7, 5, 5, 4
+    ///     ]),
+    /// );
+    /// ```
     fn shuffle<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(&self) -> Self;
 }
 
@@ -461,6 +659,21 @@ where
     Self::Scalar: Scalar<Unsigned = u64, Signed = i64>,
 {
     /// Zero out the upper-32 bits of each word, and then perform pairwise multiplication.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U64x4::from([6, 7, 8, 9]).mul_lo(U64x4::from([1, 2, 3, 4])),
+    ///     U64x4::from([6, 14, 24, 36]),
+    /// );
+    /// assert_eq!(
+    ///     U64x4::from([6, 7, 8, 9]).mul_lo(
+    ///         U64x4::from([1, 2, 3, 4]) | U64x4::broadcast(u64::MAX << 32)
+    ///     ),
+    ///     U64x4::from([6, 14, 24, 36]),
+    /// );
+    /// ```
     fn mul_lo(&self, other: Self) -> Self;
 }
 
@@ -469,7 +682,16 @@ pub trait SimdBase4x64: SimdBase64 + SimdBase4x
 where
     Self::Scalar: Scalar<Unsigned = u64, Signed = i64>,
 {
-    /// Shuffle across 128-bit lanes.
+    /// Shuffle the 64-bit values.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U64x4::from([0, 1, 2, 3]).shuffle::<0, 1, 1, 3>(),
+    ///     U64x4::from([3, 1, 1, 0]),
+    /// );
+    /// ```
     fn shuffle<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(&self) -> Self;
 }
 
@@ -481,8 +703,16 @@ pub trait ExtendingCast<T: SimdBase>: SimdBase {
     /// Cast from one vector to another by sign or zero extending the values from the source until it
     /// fills the destination.
     ///
-    /// This operation is neccessarily lossy. The lowest-index values in `t` are kept. Other values
-    /// are discarded.
+    /// The lowest-index values in `t` are kept. Any values which don't fit are discarded.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// assert_eq!(
+    ///     U64x2::extending_cast_from(U32x4::from([1, 2, 3, 4])),
+    ///     U64x2::from([1, 2]),
+    /// );
+    /// ```
     fn extending_cast_from(t: T) -> Self;
 }
 
