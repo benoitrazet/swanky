@@ -1,6 +1,21 @@
 #![deny(missing_docs)]
-//! Two-party function F_eq that allows parties to check if their inputs are equal. This functionality is commonly used in several cryptographic protocols including Garbled Circuits.
-// This name isn't great, I'm open to improvements.
+//! Two-party function F_eq that allows parties to check if their inputs are equal.
+//!
+//! In the literature this is typically handled by an ideal functionality F_eq which receives
+//! the inputs and return the valuation of the equality check.
+//!
+//! In practice,
+//! 1. Party_A and Party_B use the same hash function to locally hash their inputs, we
+//! use SHA256 in our implementation.
+//! 2. Party_A commits to their input and sends the commitment to Party_B. In our code,
+//! SHA256 is updated with a random salt and the salted value is sent over to Party_B.
+//! 3. Party_B sends their hashed value after receiving A's commitment.
+//! 4. Party_A may abort at this point. If they behave honestly, they open their commitment and
+//! check the equality. In our code, we decommit by sending the salt which Party_B uses to updated
+//! their hashed value.
+//! 5. Party_B receives the decommited value and checks the equality (similarly to Party_A).
+//!
+//! This functionality is commonly used in several cryptographic protocols including Garbled Circuits.
 
 use sha2::{Digest, Sha256};
 use swanky_channel::Channel;
@@ -8,8 +23,9 @@ use swanky_party::{Party, WhichParty, private::ProverPrivate};
 
 use rand::{CryptoRng, Rng};
 
-/// A struct which stores the hash function and salt used
-/// in the F_eq protocol.
+/// The equality functionality.
+///
+/// See [`crate`] for details.
 pub struct EqualityFunctionality<P: Party> {
     hash: Sha256,
     commitment_salt: ProverPrivate<P, [u8; 32]>,
@@ -17,10 +33,6 @@ pub struct EqualityFunctionality<P: Party> {
 
 impl<P: Party> EqualityFunctionality<P> {
     /// Create a new [`EqualityFunctionality`].
-    ///
-    /// The parties initialize their hash functions, and the sender samples a
-    /// salt `commitment_salt` at random that they will later use to commit to their
-    /// value.
     pub fn new<RNG>(mut rng: RNG) -> eyre::Result<Self>
     where
         RNG: CryptoRng + Rng,

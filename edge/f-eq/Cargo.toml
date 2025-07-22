@@ -17,3 +17,4 @@ swanky-aes-rng.workspace = true
 sha2.workspace = true
 rand.workspace = true
 eyre.workspace = true
+proptest.workspace = true
