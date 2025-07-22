@@ -21,6 +21,45 @@
 //!
 //! To open an authenticated bit, the prover sends $`(b_i, M_i)`$ to the
 //! verifier and the verifier checks that $`M_i := K_i \oplus b \Delta`$.
+//!
+//! # Example
+//!
+//! ```
+//! # use rand::Rng;
+//! # use swanky_authenticated_bits::authbits::{AuthBit, AuthBitGenerator};
+//! # use swanky_field_binary::F2;
+//! # use swanky_ot_alsz_kos::kos;
+//! # use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
+//! # use swanky_party::either::PartyEitherCopy;
+//! # use swanky_party::private::VerifierPrivate;
+//! # fn main() -> eyre::Result<()> {
+//! let (bits_prover, bits_verifier) = swanky_channel::local::local_channel_pair(
+//!     |c| {
+//!         // The prover.
+//!         let mut rng = swanky_aes_rng::AesRng::new();
+//!         let bits = rng.r#gen::<[F2; 10]>();
+//!         let mut authbits: Vec<AuthBit<Prover>> = vec![];
+//!         let mut generator: AuthBitGenerator<_, kos::Sender, kos::Receiver> = AuthBitGenerator::new(c, &mut rng)?;
+//!         generator.generate(PartyEitherCopy::prover_new(IS_PROVER, &bits), &mut authbits, c, &mut rng)?;
+//!         generator.open(&authbits, VerifierPrivate::empty(IS_PROVER), c)?;
+//!         Ok(bits.to_vec())
+//!     },
+//!     |c| {
+//!         // The verifier.
+//!         let mut rng = swanky_aes_rng::AesRng::new();
+//!         let count = 10;
+//!         let mut bits = vec![];
+//!         let mut authbits: Vec<AuthBit<Verifier>> = vec![];
+//!         let mut generator: AuthBitGenerator<_, kos::Sender, kos::Receiver> = AuthBitGenerator::new(c, &mut rng)?;
+//!         generator.generate(PartyEitherCopy::verifier_new(IS_VERIFIER, count), &mut authbits, c, &mut rng)?;
+//!         generator.open(&authbits, VerifierPrivate::new(&mut bits), c)?;
+//!         Ok(bits)
+//!     }
+//! )?;
+//! assert_eq!(bits_prover, bits_verifier);
+//! # Ok(())
+//! # }
+//! ```
 
 use rand::{CryptoRng, Rng};
 use swanky_adversary::Malicious;
