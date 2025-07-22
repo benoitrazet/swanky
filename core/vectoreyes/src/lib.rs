@@ -334,17 +334,45 @@ pub trait SimdBase:
     fn min(&self, other: Self) -> Self;
 }
 
-/// A vector supporting the gather operation.
+/// A vector supporting the gather operation (indexing into an array using indices from a vector).
 pub trait SimdBaseGatherable<IV: SimdBase>: SimdBase {
     /// Construct a vector by accessing values at `base + indices[i]`.
     ///
     /// # Safety
     /// This operation is safe if `std::ptr::read(base.add(indices[i]))` is safe for all `i`.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// let arr: Vec<i32> = (0..=1024).map(|x| x + 1).collect();
+    /// let out = unsafe {
+    ///     // SAFETY: All the indices are within bounds.
+    ///     I32x4::gather(arr.as_ptr(), U64x4::from([32, 647, 827, 920]))
+    /// };
+    /// assert_eq!(out, I32x4::from([33, 648, 828, 921]));
+    /// ```
     unsafe fn gather(base: *const Self::Scalar, indices: IV) -> Self;
-    /// Construct a vector by accessing values at `base + indices[i]`, only if the mask is set.
+    /// Construct a vector by accessing values at `base + indices[i]`, if the mask's MSB is set.
+    /// Else return `src[i]`.
     ///
     /// # Safety
     /// This operation is safe if `std::ptr::read(base.add(indices[i]))` is safe for all `i`.
+    ///
+    /// # Example
+    /// ```
+    /// # use vectoreyes::*;
+    /// let arr: Vec<i32> = (0..=1024).map(|x| x + 1).collect();
+    /// let out = unsafe {
+    ///     // SAFETY: All the indices are within bounds.
+    ///     I32x4::gather_masked(
+    ///         arr.as_ptr(),
+    ///         U64x4::from([32, 647, 827, 920]),
+    ///         I32x4::from([-1, -1, 0, 0]),
+    ///         I32x4::from([1, 2, 3, 4]),
+    ///     )
+    /// };
+    /// assert_eq!(out, I32x4::from([33, 648, 3, 4]));
+    /// ```
     unsafe fn gather_masked(base: *const Self::Scalar, indices: IV, mask: Self, src: Self) -> Self;
 }
 
