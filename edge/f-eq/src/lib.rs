@@ -97,6 +97,8 @@ impl<P: Party> EqualityFunctionality<P> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+    use proptest::test_runner::TestRunner;
     use swanky_aes_rng::AesRng;
     use swanky_party::{Prover, Verifier};
 
@@ -117,23 +119,28 @@ mod tests {
         )?;
         Ok((res_pr, res_vr))
     }
-    #[test]
-    //TODO: turn to proptest
-    fn same_inputs_work() {
-        let mut rng = AesRng::new();
-        let input: [u8; 32] = rng.r#gen();
-        let res = check_equality(&input, &input).unwrap();
-        assert_eq!(res.0, res.1);
-        assert!(res.0);
+    proptest! {
+        #[test]
+        fn same_inputs_work(input in any::<[u8; 32]>()) {
+            let res = check_equality(&input, &input).unwrap();
+            assert_eq!(res.0, res.1);
+            assert!(res.0);
+        }
     }
+
     #[test]
-    //TODO: turn to proptest
     fn different_inputs_work() {
-        let mut rng = AesRng::new();
-        let input_pr: [u8; 32] = rng.r#gen();
-        let input_vr: [u8; 32] = rng.r#gen();
-        let res = check_equality(&input_pr, &input_vr).unwrap();
-        assert_eq!(res.0, res.1);
-        assert!(!res.0);
+        let mut runner = TestRunner::default();
+        runner
+            .run(
+                &(any::<[u8; 32]>(), any::<[u8; 32]>()),
+                |(input_pr, input_vr)| {
+                    let res = check_equality(&input_pr, &input_vr).unwrap();
+                    assert_eq!(res.0, res.1);
+                    assert!(!res.0);
+                    Ok(())
+                },
+            )
+            .unwrap();
     }
 }
