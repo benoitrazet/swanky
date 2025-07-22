@@ -421,9 +421,11 @@ pub trait SimdBase8: SimdBase + SimdSaturatingArithmetic
 where
     Self::Scalar: Scalar<Unsigned = u8, Signed = i8>,
 {
-    /// Shift within 128-bit lanes.
+    /// Split the vector into groups of 16 bytes. Within each group, shift the _entire_ bytes left
+    /// by `AMOUNT`.
     fn shift_bytes_left<const AMOUNT: usize>(&self) -> Self;
-    /// Shift within 128-bit lanes.
+    /// Split the vector into groups of 16 bytes. Within each group, shift the _entire_ bytes right
+    /// by `AMOUNT`.
     fn shift_bytes_right<const AMOUNT: usize>(&self) -> Self;
     /// Get the sign/most significant bits of the elements of the vector.
     fn most_significant_bits(&self) -> u32;
