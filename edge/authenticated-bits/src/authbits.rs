@@ -388,9 +388,8 @@ mod tests {
             |channel_pr| {
                 let mut rng = AesRng::new();
                 let bits = PartyEitherCopy::prover_new(IS_PROVER, bits_in);
-                let mut generator: AuthBitGenerator<_, KosSender, KosReceiver> =
-                    AuthBitGenerator::new::<&mut AesRng>(channel_pr, &mut rng)?;
-                generator.generate::<&mut AesRng>(bits, &mut output_pr, channel_pr, &mut rng)?;
+                let mut generator = AuthBitGenerator::new(channel_pr, &mut rng)?;
+                generator.generate(bits, &mut output_pr, channel_pr, &mut rng)?;
                 if tamper_mac {
                     // Tamper the MAC of the first `AuthBit`.
                     output_pr[0] = AuthBit(PartyEitherCopy::prover_new(
@@ -407,9 +406,8 @@ mod tests {
             |channel_vr| {
                 let mut rng = AesRng::new();
                 let count = PartyEitherCopy::verifier_new(IS_VERIFIER, bits_in.len());
-                let mut generator: AuthBitGenerator<_, KosSender, KosReceiver> =
-                    AuthBitGenerator::new::<&mut AesRng>(channel_vr, &mut rng).unwrap();
-                generator.generate::<&mut AesRng>(count, &mut output_vr, channel_vr, &mut rng)?;
+                let mut generator = AuthBitGenerator::new(channel_vr, &mut rng).unwrap();
+                generator.generate(count, &mut output_vr, channel_vr, &mut rng)?;
                 if tamper_key {
                     // Tamper the key of the first `AuthBit`.
                     output_vr[0] = AuthBit(PartyEitherCopy::verifier_new(
