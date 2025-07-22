@@ -37,7 +37,7 @@ have a lesser stability guarantee.
 - **`swanky-adversary`**: Traits describing MPC adversaries.
 - **`swanky-aes-hash`**: Correlation-robust hashing based on fixed-key AES.
 - **`swanky-aes-rng`**: A random number generator based on AES-CTR.
-- **`swanky-authenticated-bits`**: A package for generating authenticated bits
+- **`swanky-authenticated-bits`**: Authenticated bits, shares, and AND triples
 - **`swanky-bit-matrix-transpose`**: Transpose a bit matrix
 - **`swanky-block`**: 128-, 256-, and  512-bit data blocks.
 - **`swanky-bytearray-utils`**: Functions for working with bits and bytearrays.
