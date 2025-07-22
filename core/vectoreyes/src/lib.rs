@@ -54,6 +54,9 @@
 //! );
 //! ```
 //!
+//! The documentation for every method on a vector (e.g. [`I64x2::and_not`]) lists the equivalent
+//! scalar code, as well as information on how the operation is implemented on each backend.
+//!
 //! # Vector Sizes
 //! There aren't vector types for every conceivable `(type, element count)` pair. Instead, we have
 //! vector types that correspond to the vector registers that many CPUs have. Because these
@@ -187,8 +190,6 @@ macro_rules! scalar_impls {
 }
 scalar_impls!((i64, u64), (i32, u32), (i16, u16), (i8, u8));
 /// A vector equivalent to `[T; Self::Lanes]`.
-///
-/// Note that each implemented method shows an equivalent scalar implementation.
 ///
 /// # Representation
 /// This type should have the same size as `[T; Self::Lanes]`, though it may have increased
