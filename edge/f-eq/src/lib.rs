@@ -6,13 +6,13 @@
 //!
 //! In practice,
 //! 1. Party_A and Party_B use the same hash function to locally hash their inputs, we
-//! use SHA256 in our implementation.
+//!    use SHA256 in our implementation.
 //! 2. Party_A commits to their input and sends the commitment to Party_B. In our code,
-//! SHA256 is updated with a random salt and the salted value is sent over to Party_B.
+//!    SHA256 is updated with a random salt and the salted value is sent over to Party_B.
 //! 3. Party_B sends their hashed value after receiving A's commitment.
 //! 4. Party_A may abort at this point. If they behave honestly, they open their commitment and
-//! check the equality. In our code, we decommit by sending the salt which Party_B uses to updated
-//! their hashed value.
+//!    check the equality. In our code, we decommit by sending the salt which Party_B uses to updated
+//!    their hashed value.
 //! 5. Party_B receives the decommited value and checks the equality (similarly to Party_A).
 //!
 //! This functionality is commonly used in several cryptographic protocols including Garbled Circuits.
