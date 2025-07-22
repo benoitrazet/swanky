@@ -251,8 +251,6 @@ pub trait SimdBase:
     + AsMut<[Self::Scalar]>
 {
     /// The number of elements of this vector.
-    ///
-    /// **Note:** this number is _not_ the number of 128-bit lanes in this vector.
     const LANES: usize;
 
     /// The equivalent array type of this vector.
