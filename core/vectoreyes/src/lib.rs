@@ -406,6 +406,9 @@ pub trait SimdBase8x: SimdBase {
 }
 
 /// A vector supporting saturating arithmetic on each entry.
+///
+/// Saturating operations clamp their outputs to the scalar's maximum or minimum value on
+/// overflow/underflow.
 pub trait SimdSaturatingArithmetic: SimdBase {
     /// Pairwise add vectors. On overflow, the entry's value goes to the maximum scalar value.
     fn saturating_add(&self, other: Self) -> Self;
