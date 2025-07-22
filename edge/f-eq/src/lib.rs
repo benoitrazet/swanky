@@ -67,14 +67,14 @@ impl<P: Party> EqualityFunctionality<P> {
     /// Runs the protocol and checks the equality of the two hash values:
     /// If `P = Prover` send the committed hashed value over, receive the result, decommit, and do the equality.
     /// If `P = Verifier` receive the commitment, send the hashed value over, receive the decommitment, and do the equality.
-    pub fn finalize(&mut self, channel: &mut Channel) -> eyre::Result<bool> {
+    pub fn finalize(mut self, channel: &mut Channel) -> eyre::Result<bool> {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 // Sender send commitment
-                let sender_commitment = self.hash.clone().finalize();
+                let sender_commitment = self.hash.finalize();
                 channel.write_bytes(sender_commitment.as_slice())?;
                 // Sender receives h_verifier
-                let mut receiver_hash = vec![0u8; 32];
+                let mut receiver_hash = [0u8; 32];
                 channel.read_bytes(&mut receiver_hash)?;
                 // Sender sends the commitment salt as a way to decommit. The prover
                 // can abhort and skip this step and this protocol allows that.
@@ -88,16 +88,17 @@ impl<P: Party> EqualityFunctionality<P> {
             }
             WhichParty::Verifier(_e) => {
                 // Verifier receives commitment
-                let mut sender_commitment = vec![0u8; 32];
+                let mut sender_commitment = [0u8; 32];
+                let hash_receiver = self.hash.finalize();
                 channel.read_bytes(&mut sender_commitment)?;
                 // Receiver sends hash
-                channel.write_bytes(self.hash.clone().finalize().as_slice())?;
+                channel.write_bytes(hash_receiver.as_slice())?;
                 // Receiver receives decommitment
-                let mut sender_salt = vec![0u8; 32];
+                let mut sender_salt = [0u8; 32];
                 channel.read_bytes(&mut sender_salt)?;
                 //The Receiver salts its value
                 let mut receriver_salted = Sha256::new();
-                receriver_salted.update(self.hash.clone().finalize());
+                receriver_salted.update(hash_receiver);
                 receriver_salted.update(sender_salt);
                 //The Receiver compares the salted valuesS
                 Ok(receriver_salted.finalize().as_slice() == sender_commitment)
