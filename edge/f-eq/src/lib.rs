@@ -61,15 +61,7 @@ impl<P: Party> EqualityFunctionality<P> {
     }
     /// Add a sequence of bytes to the sequence of values to perform equality on.
     pub fn input(&mut self, value: &[u8]) {
-        match P::WHICH {
-            WhichParty::Prover(_e) => {
-                let hash_sender = Sha256::digest(value);
-                self.hash.update(hash_sender);
-            }
-            WhichParty::Verifier(_e) => {
-                self.hash.update(value);
-            }
-        }
+        self.hash.update(value);
     }
     /// Runs the equality check on all the inputs provided in `input`.
     /// If `P = Prover` (i.e. the Sender) send the committed hashed value over, receive the result,  
@@ -80,10 +72,11 @@ impl<P: Party> EqualityFunctionality<P> {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 // Sender computes the commitment as H(H(value)||salt)
-                self.hash
-                    .update(self.commitment_salt.as_mut().into_inner(e));
+                let mut salted_hash = Sha256::new();
+                salted_hash.update(self.hash.finalize());
+                salted_hash.update(self.commitment_salt.as_mut().into_inner(e));
                 // Sender sendsS commitment
-                let sender_commitment = self.hash.finalize();
+                let sender_commitment = salted_hash.finalize();
                 channel.write_bytes(sender_commitment.as_slice())?;
                 // Sender receives receiver_hash
                 let mut receiver_hash = [0u8; 32];
