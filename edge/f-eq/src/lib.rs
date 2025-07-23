@@ -6,9 +6,14 @@
 //!
 //! In practice,
 //! 1. Party_A and Party_B use the same hash function to locally hash their inputs, we
-//!    use SHA256 in our implementation.
-//! 2. Party_A commits to their input and sends the commitment to Party_B. In our code,
-//!    SHA256 is updated with a random salt and the salted value is sent over to Party_B.
+//!    use SHA256 in our implementation. Each party may update their local hash with as
+//!    many inputs as they would like: by doing so we batch calls to F_eq so that any none
+//!    equality triggers a failure. We do not care about logging which input caused the
+//!    failure because any failure is an effect of cheating behavior and the protocol should
+//!    terminate.
+//! 2. Party_A commits to their input byt salting it and sends the commitment to Party_B.
+//!    In our code, SHA256 is updated with a random salt and the salted value is sent over
+//!    to Party_B.
 //! 3. Party_B sends their hashed value after receiving A's commitment.
 //! 4. Party_A may abort at this point. If they behave honestly, they open their commitment and
 //!    check the equality. In our code, we decommit by sending the salt which Party_B uses to updated
@@ -16,6 +21,11 @@
 //! 5. Party_B receives the decommited value and checks the equality (similarly to Party_A).
 //!
 //! This functionality is commonly used in several cryptographic protocols including Garbled Circuits.
+//!
+//! Notes:
+//! 1. Party_A can abort after receiving Party_B's value.
+//! 2. The bashed hashing does not separate values. Meaning that H(0110 || 1001) = H(0 || 1101001).
+//!    This is not a concern for our use cases.
 
 use sha2::{Digest, Sha256};
 use swanky_channel::Channel;
@@ -52,12 +62,9 @@ impl<P: Party> EqualityFunctionality<P> {
     /// Add `value` to the running hash.
     pub fn input(&mut self, value: &[u8]) {
         match P::WHICH {
-            WhichParty::Prover(e) => {
-                // We compute the commitment as H(H(value)||salt)
+            WhichParty::Prover(_e) => {
                 let hash_sender = Sha256::digest(value);
                 self.hash.update(hash_sender);
-                self.hash
-                    .update(self.commitment_salt.as_mut().into_inner(e));
             }
             WhichParty::Verifier(_e) => {
                 self.hash.update(value);
@@ -70,7 +77,10 @@ impl<P: Party> EqualityFunctionality<P> {
     pub fn finalize(mut self, channel: &mut Channel) -> eyre::Result<bool> {
         match P::WHICH {
             WhichParty::Prover(e) => {
-                // Sender send commitment
+                // Sender computesS the commitment as H(H(value)||salt)
+                self.hash
+                    .update(self.commitment_salt.as_mut().into_inner(e));
+                // Sender sendsS commitment
                 let sender_commitment = self.hash.finalize();
                 channel.write_bytes(sender_commitment.as_slice())?;
                 // Sender receives h_verifier
