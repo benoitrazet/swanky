@@ -348,6 +348,8 @@ impl<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+    use rand::SeedableRng;
     use swanky_aes_rng::AesRng;
     use swanky_field::FiniteRing;
     use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
@@ -355,6 +357,10 @@ mod tests {
 
     /// Validates pairs of prover and verifier `AuthBit`s.
     fn validate(pr: &[AuthBit<Prover>], vr: &[AuthBit<Verifier>], delta: U8x16) -> bool {
+        assert!(!pr.is_empty());
+        assert!(!vr.is_empty());
+        assert_eq!(pr.len(), vr.len());
+
         pr.iter()
             .zip(vr)
             .map(|(ab_pr, ab_vr)| {
@@ -374,6 +380,8 @@ mod tests {
     /// MAC. If `tamper_key` is true, tamper with the verifier's key.
     fn generate(
         bits_in: &[F2],
+        seed_prover: U8x16,
+        seed_verifier: U8x16,
         tamper_mac: bool,
         tamper_key: bool,
     ) -> (
@@ -382,11 +390,12 @@ mod tests {
         AuthBitGenerator<Prover, KosSender, KosReceiver>,
         AuthBitGenerator<Verifier, KosSender, KosReceiver>,
     ) {
+        assert!(!bits_in.is_empty());
         let mut output_pr: Vec<AuthBit<Prover>> = vec![];
         let mut output_vr: Vec<AuthBit<Verifier>> = vec![];
         let (prover, verifier) = swanky_channel::local::local_channel_pair(
             |channel_pr| {
-                let mut rng = AesRng::new();
+                let mut rng = AesRng::from_seed(seed_prover);
                 let bits = PartyEitherCopy::prover_new(IS_PROVER, bits_in);
                 let mut generator = AuthBitGenerator::new(channel_pr, &mut rng)?;
                 generator.generate(bits, &mut output_pr, channel_pr, &mut rng)?;
@@ -404,7 +413,7 @@ mod tests {
                 Ok(generator)
             },
             |channel_vr| {
-                let mut rng = AesRng::new();
+                let mut rng = AesRng::from_seed(seed_verifier);
                 let count = PartyEitherCopy::verifier_new(IS_VERIFIER, bits_in.len());
                 let mut generator = AuthBitGenerator::new(channel_vr, &mut rng).unwrap();
                 generator.generate(count, &mut output_vr, channel_vr, &mut rng)?;
@@ -431,88 +440,105 @@ mod tests {
         (output_pr, output_vr, prover, verifier)
     }
 
-    #[test]
-    fn xor_with_const_works() {
-        let count = 1000;
-        let mut rng = AesRng::new();
-        let bits: Vec<F2> = (0..count).map(|_| rng.r#gen::<F2>()).collect();
-        let public_bits: Vec<F2> = (0..count).map(|_| rng.r#gen::<F2>()).collect();
-        let (output_pr, output_vr, prover, verifier) = generate(&bits, false, false);
-        for ((authbit_pr, authbit_vr), public_bit) in output_pr
-            .into_iter()
-            .zip(output_vr.into_iter())
-            .zip(public_bits.into_iter())
-        {
-            let new_authbit_pr = prover.xor_with_const(authbit_pr, public_bit);
-            let new_authbit_vr = verifier.xor_with_const(authbit_vr, public_bit);
-            // The new authenticated bits should still validate.
-            let validation = validate(
-                &[new_authbit_pr],
-                &[new_authbit_vr],
-                verifier.delta().into_inner(IS_VERIFIER),
-            );
-            assert!(validation);
-            // The new authenticated bits should equal `bit ^ public_bit`.
-            assert_eq!(
-                new_authbit_pr.bit().into_inner(IS_PROVER),
-                authbit_pr.bit().into_inner(IS_PROVER) + public_bit
-            );
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+        #[test]
+        fn xor_with_const_works(bits in proptest::collection::vec(any::<bool>(), 1..1000),
+                                public_bits in proptest::collection::vec(any::<bool>(), 1..1000),
+                                seed_prover in any::<u128>(),
+                                seed_verifier in any::<u128>()) {
+            let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
+            let public_bits: Vec<F2> = public_bits.into_iter().map(F2::from).collect();
+            let (output_pr, output_vr, prover, verifier) = generate(&bits, U8x16::from(seed_prover), U8x16::from(seed_verifier), false, false);
+            for ((authbit_pr, authbit_vr), public_bit) in output_pr
+                .into_iter()
+                .zip(output_vr.into_iter())
+                .zip(public_bits.into_iter())
+            {
+                let new_authbit_pr = prover.xor_with_const(authbit_pr, public_bit);
+                let new_authbit_vr = verifier.xor_with_const(authbit_vr, public_bit);
+                // The new authenticated bits should still validate.
+                let validation = validate(
+                    &[new_authbit_pr],
+                    &[new_authbit_vr],
+                    verifier.delta().into_inner(IS_VERIFIER),
+                );
+                assert!(validation);
+                // The new authenticated bits should equal `bit ^ public_bit`.
+                assert_eq!(
+                    new_authbit_pr.bit().into_inner(IS_PROVER),
+                    authbit_pr.bit().into_inner(IS_PROVER) + public_bit
+                );
+            }
         }
     }
 
-    #[test]
-    // TODO: Turn this into a proptest
-    fn honest_generation_works() {
-        let count = 1000;
-        let mut rng = AesRng::new();
-        let bits: Vec<F2> = (0..count).map(|_| rng.r#gen::<F2>()).collect();
-        let (output_pr, output_vr, _, verifier) = generate(&bits, false, false);
-        let validation = validate(
-            &output_pr,
-            &output_vr,
-            verifier.delta().into_inner(IS_VERIFIER),
-        );
-        assert!(validation);
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+        #[test]
+        fn honest_generation_works(bits in proptest::collection::vec(any::<bool>(), 1..1000),
+                                   seed_prover in any::<u128>(),
+                                   seed_verifier in any::<u128>()) {
+            let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
+            let (output_pr, output_vr, _, verifier) = generate(&bits, U8x16::from(seed_prover), U8x16::from(seed_verifier), false, false);
+            let validation = validate(
+                &output_pr,
+                &output_vr,
+                verifier.delta().into_inner(IS_VERIFIER),
+            );
+            assert!(validation);
+        }
     }
 
-    #[test]
-    // TODO: Turn this into a proptest
-    fn tampered_mac_fails() {
-        let count = 1000;
-        let mut rng = AesRng::new();
-        let bits: Vec<F2> = (0..count).map(|_| rng.r#gen::<F2>()).collect();
-        let (output_pr, output_vr, _, verifier) = generate(&bits, true, false);
-        let validation = validate(
-            &output_pr,
-            &output_vr,
-            verifier.delta().into_inner(IS_VERIFIER),
-        );
-        assert!(!validation);
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+        #[test]
+        fn tampered_mac_fails(bits in proptest::collection::vec(any::<bool>(), 1..1000),
+                              seed_prover in any::<u128>(),
+                              seed_verifier in any::<u128>()) {
+            let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
+            let (output_pr, output_vr, _, verifier) = generate(&bits, U8x16::from(seed_prover), U8x16::from(seed_verifier), true, false);
+            let validation = validate(
+                &output_pr,
+                &output_vr,
+                verifier.delta().into_inner(IS_VERIFIER),
+            );
+            assert!(!validation);
+        }
     }
 
-    #[test]
-    // TODO: Turn this into a proptest
-    fn tampered_key_fails() {
-        let count = 1000;
-        let mut rng = AesRng::new();
-        let bits: Vec<F2> = (0..count).map(|_| rng.r#gen::<F2>()).collect();
-        let (output_pr, output_vr, _, verifier) = generate(&bits, false, true);
-        let validation = validate(
-            &output_pr,
-            &output_vr,
-            verifier.delta().into_inner(IS_VERIFIER),
-        );
-        assert!(!validation);
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+        #[test]
+        fn tampered_key_fails(bits in proptest::collection::vec(any::<bool>(), 1..1000),
+                              seed_prover in any::<u128>(),
+                              seed_verifier in any::<u128>()) {
+            let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
+            let (output_pr, output_vr, _, verifier) = generate(&bits, U8x16::from(seed_prover), U8x16::from(seed_verifier), false, true);
+            let validation = validate(
+                &output_pr,
+                &output_vr,
+                verifier.delta().into_inner(IS_VERIFIER),
+            );
+            assert!(!validation);
+        }
     }
 
-    #[test]
-    // TODO: Turn this into a proptest
-    fn tampered_delta_fails() {
-        let count = 1000;
-        let mut rng = AesRng::new();
-        let bits: Vec<F2> = (0..count).map(|_| rng.r#gen::<F2>()).collect();
-        let (output_pr, output_vr, _, _) = generate(&bits, false, false);
-        let validation = validate(&output_pr, &output_vr, rng.r#gen::<U8x16>());
-        assert!(!validation);
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+        #[test]
+        fn tampered_delta_fails(bits in proptest::collection::vec(any::<bool>(), 1..1000),
+                                delta in any::<u128>(),
+                                seed_prover in any::<u128>(),
+                                seed_verifier in any::<u128>()) {
+            let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
+            let (output_pr, output_vr, _, _) = generate(&bits, U8x16::from(seed_prover), U8x16::from(seed_verifier), false, false);
+            let validation = validate(&output_pr, &output_vr, U8x16::from(delta));
+            // If all bits are 0, then `delta` never comes into play, so
+            // validation "succeeds". Hence, only assert if this is not the case.
+            if !bits.into_iter().all(|bit| bit == F2::ZERO) {
+                assert!(!validation);
+            }
+        }
     }
 }
