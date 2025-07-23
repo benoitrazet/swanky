@@ -304,11 +304,10 @@ When testing pure functions, use property-based-testing from [the `proptest` cra
 When tests require the use of randomness, use the `proptest` crate to generate
 any necessary randomness. This makes it easier to reproduce failing tests (since
 the particular random values chosen are captured by the test infrastructure).
-Note that using `proptest` may cause a large slowdown in the test runtime. This
-is because `proptest` runs the test against a large number of random values.
-This can be controlled using
-[`#![proptest_config](ProptestConfig::with_cases(...))]`](https://proptest-rs.github.io/proptest/proptest/tutorial/config.html),
-and should be used to reduce the running time of the tests.
+Note that because `proptest` runs many iterations of the test, it might make
+sense to reduce the number of iterations for slow-running tests. This can be
+done using
+[`#![proptest_config](ProptestConfig::with_cases(...))]`](https://proptest-rs.github.io/proptest/proptest/tutorial/config.html).
 
 #### Assets for Tests
 
