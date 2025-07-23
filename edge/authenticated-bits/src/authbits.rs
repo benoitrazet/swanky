@@ -212,12 +212,11 @@ impl<
         };
         Ok(result)
     }
-    /// Generate a vector of authenticated of bits.
+    /// Generate a vector of authenticated bits.
     ///
-    /// - `bits_in`: The bits to authenticate. The prover specifies the bits themselves, and the verifier specifies the _number_ of bits.
-    /// - `out`: Where the generated authenticated bits should be stored.
-    /// - `channel`: The [`Channel`] to use.
-    /// - `rng`: The random number generator to use.
+    /// The prover supplies the bits to authenticate, and the verifier specifies
+    /// the number of bits. The resulting authenticated bits are
+    /// [`Vec::extend`]ed into `out`.
     pub fn generate<RNG>(
         &mut self,
         bits_in: PartyEitherCopy<P, &[F2], usize>,
