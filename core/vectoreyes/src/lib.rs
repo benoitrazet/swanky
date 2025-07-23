@@ -13,7 +13,7 @@
 //! this easier, VectorEyes provide safe functions which will function identically on all
 //! platforms.
 //!
-//! The core of this crate is vector types (such as `[U64x2]`). You can think of vectors as arrays
+//! The core of this crate is vector types (such as [`U64x2`]). You can think of vectors as arrays
 //! with some extra SIMD operations on top.
 //!
 //! Just like arrays vectors have an element type ([`u64`] in the example above), and an element
@@ -38,7 +38,7 @@
 //!
 //! While normal _bog-standard_ arrays don't implement the `+` operator, our vector types do!
 //! Adding two vectors together performs pairwise addition, using (for the vector backends) a
-//! single CPU instruction!.
+//! single CPU instruction!
 //!
 //! ```
 //! # use vectoreyes::*;
@@ -718,9 +718,9 @@ pub trait ExtendingCast<T: SimdBase>: SimdBase {
     fn extending_cast_from(t: T) -> Self;
 }
 
-/// A [Scalar] type which has a vector type of length `N`.
+/// A [`Scalar`] type which has a vector type of length `N`.
 ///
-/// See [Simd] for how this trait is used.
+/// See [`Simd`] for how this trait is used.
 pub trait HasVector<const N: usize>: Scalar {
     /// The vector of `[Self; N]`.
     type Vector: SimdBase<Scalar = Self>;
