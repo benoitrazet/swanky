@@ -63,7 +63,7 @@ impl<P: Party> EqualityFunctionality<P> {
         self.hash.update(value);
     }
     /// Runs the equality check on all the inputs provided in [`input(&mut self, value: &[u8])`].
-    pub fn finalize(mut self, channel: &mut Channel) -> eyre::Result<()> {
+    pub fn finalize(self, channel: &mut Channel) -> eyre::Result<()> {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 // Sender computes the commitment as H(H(value)||salt)
@@ -120,6 +120,7 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
     use proptest::test_runner::TestRunner;
+    use rand::SeedableRng;
     use swanky_aes_rng::AesRng;
     use swanky_party::{Prover, Verifier};
 
@@ -135,6 +136,28 @@ mod tests {
                 let mut rng = AesRng::new();
                 let mut f_eq = EqualityFunctionality::<Verifier>::new(&mut rng)?;
                 f_eq.input(input_vr);
+                f_eq.finalize(c)
+            },
+        )?;
+        Ok(())
+    }
+
+    fn batched_check_equality(inputs_pr: &[[u8; 32]], inputs_vr: &[[u8; 32]]) -> eyre::Result<()> {
+        swanky_channel::local::local_channel_pair(
+            |c| {
+                let mut rng = AesRng::new();
+                let mut f_eq = EqualityFunctionality::<Prover>::new(&mut rng)?;
+                for input_pr in inputs_pr.iter() {
+                    f_eq.input(input_pr);
+                }
+                f_eq.finalize(c)
+            },
+            |c| {
+                let mut rng = AesRng::new();
+                let mut f_eq = EqualityFunctionality::<Verifier>::new(&mut rng)?;
+                for input_vr in inputs_vr.iter() {
+                    f_eq.input(input_vr);
+                }
                 f_eq.finalize(c)
             },
         )?;
@@ -162,5 +185,24 @@ mod tests {
                 },
             )
             .unwrap();
+    }
+    proptest! {
+        #[test]
+        fn batched_same_inputs_work(ninputs in 1..10, seed in any::<u128>()) {
+            let mut rng = AesRng::from_seed(seed.into());
+            let inputs: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.r#gen::<[u8; 32]>()).collect();
+            let res = batched_check_equality(&inputs, &inputs);
+            assert!(res.is_ok());
+        }
+    }
+    proptest! {
+        #[test]
+        fn batched_different_inputs_fail(ninputs in 1..10, seed in any::<u128>()) {
+            let mut rng = AesRng::from_seed(seed.into());
+            let inputs_pr: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.r#gen::<[u8; 32]>()).collect();
+            let inputs_vr: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.r#gen::<[u8; 32]>()).collect();
+            let res = batched_check_equality(&inputs_pr, &inputs_vr);
+            assert!(res.is_err());
+        }
     }
 }
