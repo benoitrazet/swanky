@@ -1,37 +1,37 @@
 #![deny(missing_docs)]
-//! Two-party function F_eq that allows parties to check if their inputs are equal.
+//! Two-party function $\mathcal{F}_{\mathsf{eq}}$ that allows parties to check if their inputs are equal.
 //!
 //! In the literature this is typically handled by an ideal functionality F_eq which receives
 //! the inputs and return the valuation of the equality check.
 //!
 //! In practice,
-//! 1. Party_A and Party_B use the same hash function to locally hash their inputs, we
+//! 1. Party A and Party B use the same hash function to locally hash their inputs, we
 //!    use SHA256 in our implementation. Each party may update their local hash with as
-//!    many inputs as they would like: by doing so we batch calls to F_eq so that any none
+//!    many inputs as they would like: by doing so we batch calls to F_eq so that any one
 //!    equality triggers a failure. We do not care about logging which input caused the
 //!    failure because any failure is an effect of cheating behavior and the protocol should
 //!    terminate.
-//! 2. Party_A commits to their input byt salting it and sends the commitment to Party_B.
+//! 2. Party A commits to their input by salting it and sends the commitment to Party B.
 //!    In our code, SHA256 is updated with a random salt and the salted value is sent over
-//!    to Party_B.
-//! 3. Party_B sends their hashed value after receiving A's commitment.
-//! 4. Party_A may abort at this point. If they behave honestly, they open their commitment and
-//!    check the equality. In our code, we decommit by sending the salt which Party_B uses to updated
+//!    to Party B.
+//! 3. Party B sends their hashed value after receiving A's commitment.
+//! 4. Party A may abort at this point. If they behave honestly, they open their commitment and
+//!    check the equality. In our code, we decommit by sending the salt which Party B uses to updated
 //!    their hashed value.
-//! 5. Party_B receives the decommited value and checks the equality (similarly to Party_A).
+//! 5. Party B receives the decommited value and checks the equality (similarly to Party A).
 //!
 //! This functionality is commonly used in several cryptographic protocols including Garbled Circuits.
 //!
 //! Notes:
-//! 1. Party_A can abort after receiving Party_B's value.
-//! 2. The bashed hashing does not separate values. Meaning that H(0110 || 1001) = H(0 || 1101001).
+//! 1. Party A can abort after receiving Party B's value.
+//! 2. The bashed hashing does not separate values. Meaning that:
+//!    $`\mathcal{F}_{\mathsf{eq}}(0x1234 || 0x5678)`$ is the same as $`\mathcal{F}_{\mathsf{eq}}(0x12 || 0x345678)`$
 //!    This is not a concern for our use cases.
 
+use rand::{CryptoRng, Rng};
 use sha2::{Digest, Sha256};
 use swanky_channel::Channel;
 use swanky_party::{Party, WhichParty, private::ProverPrivate};
-
-use rand::{CryptoRng, Rng};
 
 /// The equality functionality.
 ///
@@ -59,7 +59,7 @@ impl<P: Party> EqualityFunctionality<P> {
         };
         Ok(result)
     }
-    /// Add `value` to the running hash.
+    /// Add a sequence of bytes to the sequence of values to perform equality on.
     pub fn input(&mut self, value: &[u8]) {
         match P::WHICH {
             WhichParty::Prover(_e) => {
@@ -71,35 +71,37 @@ impl<P: Party> EqualityFunctionality<P> {
             }
         }
     }
-    /// Runs the protocol and checks the equality of the two hash values:
-    /// If `P = Prover` send the committed hashed value over, receive the result, decommit, and do the equality.
-    /// If `P = Verifier` receive the commitment, send the hashed value over, receive the decommitment, and do the equality.
+    /// Runs the equality check on all the inputs provided in `input`.
+    /// If `P = Prover` (i.e. the Sender) send the committed hashed value over, receive the result,  
+    /// decommit, and do the equality.
+    /// If `P = Verifier` (i.e. the Receiver) receive the commitment, send the hashed value over,
+    /// receive the decommitment, and do the equality.
     pub fn finalize(mut self, channel: &mut Channel) -> eyre::Result<bool> {
         match P::WHICH {
             WhichParty::Prover(e) => {
-                // Sender computesS the commitment as H(H(value)||salt)
+                // Sender computes the commitment as H(H(value)||salt)
                 self.hash
                     .update(self.commitment_salt.as_mut().into_inner(e));
                 // Sender sendsS commitment
                 let sender_commitment = self.hash.finalize();
                 channel.write_bytes(sender_commitment.as_slice())?;
-                // Sender receives h_verifier
+                // Sender receives receiver_hash
                 let mut receiver_hash = [0u8; 32];
                 channel.read_bytes(&mut receiver_hash)?;
-                // Sender sends the commitment salt as a way to decommit. The prover
+                // Sender sends the commitment salt as a way to decommit. The sender
                 // can abhort and skip this step and this protocol allows that.
                 channel.write_bytes(self.commitment_salt.as_mut().into_inner(e))?;
                 // The Sender salts the Receiver's value
-                let mut receriver_salted = Sha256::new();
-                receriver_salted.update(receiver_hash);
-                receriver_salted.update(self.commitment_salt.as_mut().into_inner(e));
+                let mut receiver_salted = Sha256::new();
+                receiver_salted.update(receiver_hash);
+                receiver_salted.update(self.commitment_salt.as_mut().into_inner(e));
                 // The Sender compares the salted values
-                Ok(sender_commitment == receriver_salted.finalize())
+                Ok(sender_commitment == receiver_salted.finalize())
             }
             WhichParty::Verifier(_e) => {
-                // Verifier receives commitment
                 let mut sender_commitment = [0u8; 32];
                 let hash_receiver = self.hash.finalize();
+                // Receiver receives commitment
                 channel.read_bytes(&mut sender_commitment)?;
                 // Receiver sends hash
                 channel.write_bytes(hash_receiver.as_slice())?;
@@ -107,11 +109,11 @@ impl<P: Party> EqualityFunctionality<P> {
                 let mut sender_salt = [0u8; 32];
                 channel.read_bytes(&mut sender_salt)?;
                 //The Receiver salts its value
-                let mut receriver_salted = Sha256::new();
-                receriver_salted.update(hash_receiver);
-                receriver_salted.update(sender_salt);
+                let mut receiver_salted = Sha256::new();
+                receiver_salted.update(hash_receiver);
+                receiver_salted.update(sender_salt);
                 //The Receiver compares the salted valuesS
-                Ok(receriver_salted.finalize().as_slice() == sender_commitment)
+                Ok(receiver_salted.finalize().as_slice() == sender_commitment)
             }
         }
     }
@@ -142,6 +144,7 @@ mod tests {
         )?;
         Ok((res_pr, res_vr))
     }
+
     proptest! {
         #[test]
         fn same_inputs_work(input in any::<[u8; 32]>()) {
@@ -152,7 +155,7 @@ mod tests {
     }
 
     #[test]
-    fn different_inputs_work() {
+    fn different_inputs_fail() {
         let mut runner = TestRunner::default();
         runner
             .run(
