@@ -62,14 +62,14 @@ impl<P: Party> EqualityFunctionality<P> {
     pub fn input(&mut self, value: &[u8]) {
         self.hash.update(value);
     }
-    /// Runs the equality check on all the inputs provided in [`input`].
+    /// Runs the equality check on all the inputs provided in [`input(&mut self, value: &[u8])`].
     pub fn finalize(mut self, channel: &mut Channel) -> eyre::Result<()> {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 // Sender computes the commitment as H(H(value)||salt)
                 let mut salted_hash = Sha256::new();
                 salted_hash.update(self.hash.finalize());
-                salted_hash.update(self.commitment_salt.as_mut().into_inner(e));
+                salted_hash.update(self.commitment_salt.as_ref().into_inner(e));
                 // Sender sends commitment
                 let sender_commitment = salted_hash.finalize();
                 channel.write_bytes(sender_commitment.as_slice())?;
@@ -78,14 +78,14 @@ impl<P: Party> EqualityFunctionality<P> {
                 channel.read_bytes(&mut receiver_hash)?;
                 // Sender sends the commitment salt as a way to decommit. The sender
                 // can abhort and skip this step and this protocol allows that.
-                channel.write_bytes(self.commitment_salt.as_mut().into_inner(e))?;
+                channel.write_bytes(self.commitment_salt.as_ref().into_inner(e))?;
                 // The Sender salts the Receiver's value
                 let mut receiver_salted = Sha256::new();
                 receiver_salted.update(receiver_hash);
-                receiver_salted.update(self.commitment_salt.as_mut().into_inner(e));
+                receiver_salted.update(self.commitment_salt.as_ref().into_inner(e));
                 // The Sender compares the salted values
-                if !(sender_commitment == receiver_salted.finalize()) {
-                    return Err(eyre::Error::msg("Validation check failed"));
+                if sender_commitment != receiver_salted.finalize() {
+                    Err(eyre::Error::msg("Validation check failed"))
                 } else {
                     Ok(())
                 }
@@ -105,8 +105,8 @@ impl<P: Party> EqualityFunctionality<P> {
                 receiver_salted.update(hash_receiver);
                 receiver_salted.update(sender_salt);
                 //The Receiver compares the salted valuesS
-                if !(sender_commitment == *receiver_salted.finalize()) {
-                    return Err(eyre::Error::msg("Validation check failed"));
+                if sender_commitment != *receiver_salted.finalize() {
+                    Err(eyre::Error::msg("Validation check failed"))
                 } else {
                     Ok(())
                 }
