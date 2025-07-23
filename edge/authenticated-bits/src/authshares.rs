@@ -5,6 +5,54 @@
 //! denotes that $`[x_1]`$ is an authenticated bit held by Party A, and likewise,
 //! $`[x_2]_B`$ is an authenticated bit held by Party B. We define $`x = x_1
 //! \oplus x_2`$.
+//!
+//! This module provides authenticted shares through the [`AuthShare`] type,
+//! alongside [`AuthShareGenerator`] for generating such shares.
+//!
+//! # Details
+//!
+//! [`AuthShare`]s are simply pairs of [`AuthBit`]s where each party plays the
+//! role of the prover for one of the bits, and verifier for the other.
+//!
+//! # Example
+//!
+//! ```
+//! # use rand::Rng;
+//! # use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
+//! # use swanky_field_binary::F2;
+//! # use swanky_ot_alsz_kos::kos;
+//! # use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
+//! # use swanky_party::either::PartyEitherCopy;
+//! # use swanky_party::private::VerifierPrivate;
+//! # fn main() -> eyre::Result<()> {
+//! let nshares = 1000;
+//! let (bits_a, bits_b) = swanky_channel::local::local_channel_pair(
+//!     |c| {
+//!         // Party A (the "prover").
+//!         let mut rng = swanky_aes_rng::AesRng::new();
+//!         let mut authshares: Vec<AuthShare<Prover>> = vec![];
+//!         let mut bits: Vec<F2> = vec![];
+//!         let mut generator: AuthShareGenerator<_, kos::Sender, kos::Receiver> = AuthShareGenerator::new(c, &mut rng)?;
+//!         generator.generate(nshares, &mut authshares, c, &mut rng)?;
+//!         generator.open(&authshares, &mut bits, c)?;
+//!         Ok(bits)
+//!     },
+//!     |c| {
+//!         // Party B (the "verifier").
+//!         let mut rng = swanky_aes_rng::AesRng::new();
+//!         let mut authshares: Vec<AuthShare<Verifier>> = vec![];
+//!         let mut bits: Vec<F2> = vec![];
+//!         let mut generator: AuthShareGenerator<_, kos::Sender, kos::Receiver> = AuthShareGenerator::new(c, &mut rng)?;
+//!         generator.generate(nshares, &mut authshares, c, &mut rng)?;
+//!         generator.open(&authshares, &mut bits, c)?;
+//!         Ok(bits)
+//!     }
+//! )?;
+//! assert_eq!(bits_a, bits_b);
+//! # Ok(())
+//! # }
+
+//! ```
 
 use crate::authbits::{AuthBit, AuthBitGenerator};
 use rand::{CryptoRng, Rng};
