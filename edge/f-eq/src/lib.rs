@@ -1,13 +1,13 @@
 #![deny(missing_docs)]
-//! Two-party function $\mathcal{F}_{\mathsf{eq}}$ that allows parties to check if their inputs are equal.
+//! Two-party function $`\mathcal{F}_{\mathsf{eq}}`$ that allows parties to check if their inputs are equal in an oblivious manner.
 //!
-//! In the literature this is typically handled by an ideal functionality F_eq which receives
+//! In the literature this is typically handled by an ideal functionality $`\mathcal{F}_{\mathsf{eq}}`$ which receives
 //! the inputs and return the valuation of the equality check.
 //!
 //! In practice,
 //! 1. Party A and Party B use the same hash function to locally hash their inputs, we
 //!    use SHA256 in our implementation. Each party may update their local hash with as
-//!    many inputs as they would like: by doing so we batch calls to F_eq so that any one
+//!    many inputs as they would like: by doing so we batch calls to $`\mathcal{F}_{\mathsf{eq}}`$ so that any one
 //!    equality triggers a failure. We do not care about logging which input caused the
 //!    failure because any failure is an effect of cheating behavior and the protocol should
 //!    terminate.
@@ -16,8 +16,7 @@
 //!    to Party B.
 //! 3. Party B sends their hashed value after receiving A's commitment.
 //! 4. Party A may abort at this point. If they behave honestly, they open their commitment and
-//!    check the equality. In our code, we decommit by sending the salt which Party B uses to updated
-//!    their hashed value.
+//!    check the equality. In our code, we decommit by sending the salt to Party B.
 //! 5. Party B receives the decommited value and checks the equality (similarly to Party A).
 //!
 //! This functionality is commonly used in several cryptographic protocols including Garbled Circuits.
@@ -25,7 +24,7 @@
 //! Notes:
 //! 1. Party A can abort after receiving Party B's value.
 //! 2. The bashed hashing does not separate values. Meaning that:
-//!    $`\mathcal{F}_{\mathsf{eq}}(0x1234 || 0x5678)`$ is the same as $`\mathcal{F}_{\mathsf{eq}}(0x12 || 0x345678)`$
+//!    $`\mathcal{F}_{\mathsf{eq}}(0x1234 || 0x5678)`$ is the same as $`\mathcal{F}_{\mathsf{eq}}(0x12 || 0x345678)`$.
 //!    This is not a concern for our use cases.
 
 use rand::{CryptoRng, Rng};
@@ -63,11 +62,7 @@ impl<P: Party> EqualityFunctionality<P> {
     pub fn input(&mut self, value: &[u8]) {
         self.hash.update(value);
     }
-    /// Runs the equality check on all the inputs provided in `input`.
-    /// If `P = Prover` (i.e. the Sender) send the committed hashed value over, receive the result,  
-    /// decommit, and do the equality.
-    /// If `P = Verifier` (i.e. the Receiver) receive the commitment, send the hashed value over,
-    /// receive the decommitment, and do the equality.
+    /// Runs the equality check on all the inputs provided in [`input`].
     pub fn finalize(mut self, channel: &mut Channel) -> eyre::Result<()> {
         match P::WHICH {
             WhichParty::Prover(e) => {
@@ -75,7 +70,7 @@ impl<P: Party> EqualityFunctionality<P> {
                 let mut salted_hash = Sha256::new();
                 salted_hash.update(self.hash.finalize());
                 salted_hash.update(self.commitment_salt.as_mut().into_inner(e));
-                // Sender sendsS commitment
+                // Sender sends commitment
                 let sender_commitment = salted_hash.finalize();
                 channel.write_bytes(sender_commitment.as_slice())?;
                 // Sender receives receiver_hash
