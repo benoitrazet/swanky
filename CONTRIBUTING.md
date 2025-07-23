@@ -299,7 +299,15 @@ CI will enforce the use of workspace inheritance.
 
 All code in Swanky _should_ be tested via Rust tests. Ideally, tests would test both valid input (the happy path) and invalid inputs.
 
-When testing pure functions, we like to use property-based-testing from [the `proptest` crate](https://proptest-rs.github.io/proptest/intro.html). This crate uses will test a function against random values, to see if its invariants hold. This is preferable (where applicable) to writing explicit unit test cases, since it is easier to maintain, and more directly encodes assumptions on test inputs.
+When testing pure functions, use property-based-testing from [the `proptest` crate](https://proptest-rs.github.io/proptest/intro.html). This crate tests a function against random values, to see if its invariants hold. This is preferable (where applicable) to writing explicit unit test cases, since it is easier to maintain, and more directly encodes assumptions on test inputs.
+
+When tests require the use of randomness, use the `proptest` crate to generate
+any necessary randomness. This makes it easier to reproduce failing tests (since
+the particular random values chosen are captured by the test infrastructure).
+Note that because `proptest` runs many iterations of the test, it might make
+sense to reduce the number of iterations for slow-running tests. This can be
+done using
+[`#![proptest_config](ProptestConfig::with_cases(...))]`](https://proptest-rs.github.io/proptest/proptest/tutorial/config.html).
 
 #### Assets for Tests
 
