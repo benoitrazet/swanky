@@ -80,6 +80,8 @@
 //! particularly performant.
 //!
 //! # Cargo Configuration
+//! If using VectorEyes from the `swanky` repo, all this configuration has already been done for
+//! you!
 //! ## Native CPU Setup
 //! Compile on the machine that you'll be running your code on, and add the
 //! following to your `.cargo/config` file:
