@@ -489,7 +489,7 @@ mod tests {
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(10))]
         #[test]
-        fn tampered_party_a_share_fails(nshares in 0..1000usize, index in any::<proptest::sample::Index>(),
+        fn tampered_party_a_share_fails(nshares in 1..1000usize, index in any::<proptest::sample::Index>(),
                                         seed_party_a in any::<u128>(), seed_party_b in any::<u128>()) {
             let mut rng_a = AesRng::from_seed(U8x16::from(seed_party_a));
             let mut rng_b = AesRng::from_seed(U8x16::from(seed_party_b));
