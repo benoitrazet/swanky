@@ -76,7 +76,7 @@ impl<P: Party> EqualityFunctionality<P> {
     /// decommit, and do the equality.
     /// If `P = Verifier` (i.e. the Receiver) receive the commitment, send the hashed value over,
     /// receive the decommitment, and do the equality.
-    pub fn finalize(mut self, channel: &mut Channel) -> eyre::Result<bool> {
+    pub fn finalize(mut self, channel: &mut Channel) -> eyre::Result<()> {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 // Sender computes the commitment as H(H(value)||salt)
@@ -96,7 +96,11 @@ impl<P: Party> EqualityFunctionality<P> {
                 receiver_salted.update(receiver_hash);
                 receiver_salted.update(self.commitment_salt.as_mut().into_inner(e));
                 // The Sender compares the salted values
-                Ok(sender_commitment == receiver_salted.finalize())
+                if !(sender_commitment == receiver_salted.finalize()) {
+                    return Err(eyre::Error::msg("Validation check failed"));
+                } else {
+                    Ok(())
+                }
             }
             WhichParty::Verifier(_e) => {
                 let mut sender_commitment = [0u8; 32];
@@ -113,7 +117,11 @@ impl<P: Party> EqualityFunctionality<P> {
                 receiver_salted.update(hash_receiver);
                 receiver_salted.update(sender_salt);
                 //The Receiver compares the salted valuesS
-                Ok(receiver_salted.finalize().as_slice() == sender_commitment)
+                if !(sender_commitment == *receiver_salted.finalize()) {
+                    return Err(eyre::Error::msg("Validation check failed"));
+                } else {
+                    Ok(())
+                }
             }
         }
     }
@@ -127,8 +135,8 @@ mod tests {
     use swanky_aes_rng::AesRng;
     use swanky_party::{Prover, Verifier};
 
-    fn check_equality(input_pr: &[u8], input_vr: &[u8]) -> eyre::Result<(bool, bool)> {
-        let (res_pr, res_vr) = swanky_channel::local::local_channel_pair(
+    fn check_equality(input_pr: &[u8], input_vr: &[u8]) -> eyre::Result<()> {
+        swanky_channel::local::local_channel_pair(
             |c| {
                 let mut rng = AesRng::new();
                 let mut f_eq = EqualityFunctionality::<Prover>::new(&mut rng)?;
@@ -142,15 +150,14 @@ mod tests {
                 f_eq.finalize(c)
             },
         )?;
-        Ok((res_pr, res_vr))
+        Ok(())
     }
 
     proptest! {
         #[test]
         fn same_inputs_work(input in any::<[u8; 32]>()) {
-            let res = check_equality(&input, &input).unwrap();
-            assert_eq!(res.0, res.1);
-            assert!(res.0);
+            let res = check_equality(&input, &input);
+            assert!(res.is_ok());
         }
     }
 
@@ -161,9 +168,8 @@ mod tests {
             .run(
                 &(any::<[u8; 32]>(), any::<[u8; 32]>()),
                 |(input_pr, input_vr)| {
-                    let res = check_equality(&input_pr, &input_vr).unwrap();
-                    assert_eq!(res.0, res.1);
-                    assert!(!res.0);
+                    let res = check_equality(&input_pr, &input_vr);
+                    assert!(res.is_err());
                     Ok(())
                 },
             )
