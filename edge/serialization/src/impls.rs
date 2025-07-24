@@ -130,3 +130,52 @@ impl CanonicalSerialize for () {
         Default::default()
     }
 }
+#[cfg(test)]
+mod test {
+    use super::*;
+    use proptest::prelude::*;
+    fn roundtrip<T: CanonicalSerialize>(t: T) -> T {
+        T::from_bytes(&t.to_bytes()).unwrap()
+    }
+    macro_rules! test_serialize {
+        ($(fn $name:ident => $strategy:expr),*$(,)?) => {$(
+            proptest! {
+                #[test]
+                fn $name(x in $strategy) {
+                    prop_assert_eq!(x, roundtrip(x));
+                }
+            }
+        )*};
+    }
+    test_serialize! {
+        fn roundtrip_i8 => any::<i8>(),
+        fn roundtrip_u8 => any::<u8>(),
+        fn roundtrip_i16 => any::<i16>(),
+        fn roundtrip_u16 => any::<u16>(),
+        fn roundtrip_i32 => any::<i32>(),
+        fn roundtrip_u32 => any::<u32>(),
+        fn roundtrip_i64 => any::<i64>(),
+        fn roundtrip_u64 => any::<u64>(),
+        fn roundtrip_i128 => any::<i128>(),
+        fn roundtrip_u128 => any::<u128>(),
+        fn roundtrip_usize => any::<usize>(),
+        fn roundtrip_isize => any::<isize>(),
+        fn roundtrip_unit => any::<()>(),
+        fn roundtrip_vectoreyes_i8x16 => any::<[i8; 16]>().prop_map(vectoreyes::I8x16::from),
+        fn roundtrip_vectoreyes_i8x32 => any::<[i8; 32]>().prop_map(vectoreyes::I8x32::from),
+        fn roundtrip_vectoreyes_i16x8 => any::<[i16; 8]>().prop_map(vectoreyes::I16x8::from),
+        fn roundtrip_vectoreyes_i16x16 => any::<[i16; 16]>().prop_map(vectoreyes::I16x16::from),
+        fn roundtrip_vectoreyes_i32x4 => any::<[i32; 4]>().prop_map(vectoreyes::I32x4::from),
+        fn roundtrip_vectoreyes_i32x8 => any::<[i32; 8]>().prop_map(vectoreyes::I32x8::from),
+        fn roundtrip_vectoreyes_i64x2 => any::<[i64; 2]>().prop_map(vectoreyes::I64x2::from),
+        fn roundtrip_vectoreyes_i64x4 => any::<[i64; 4]>().prop_map(vectoreyes::I64x4::from),
+        fn roundtrip_vectoreyes_u8x16 => any::<[u8; 16]>().prop_map(vectoreyes::U8x16::from),
+        fn roundtrip_vectoreyes_u8x32 => any::<[u8; 32]>().prop_map(vectoreyes::U8x32::from),
+        fn roundtrip_vectoreyes_u16x8 => any::<[u16; 8]>().prop_map(vectoreyes::U16x8::from),
+        fn roundtrip_vectoreyes_u16x16 => any::<[u16; 16]>().prop_map(vectoreyes::U16x16::from),
+        fn roundtrip_vectoreyes_u32x4 => any::<[u32; 4]>().prop_map(vectoreyes::U32x4::from),
+        fn roundtrip_vectoreyes_u32x8 => any::<[u32; 8]>().prop_map(vectoreyes::U32x8::from),
+        fn roundtrip_vectoreyes_u64x2 => any::<[u64; 2]>().prop_map(vectoreyes::U64x2::from),
+        fn roundtrip_vectoreyes_u64x4 => any::<[u64; 4]>().prop_map(vectoreyes::U64x4::from),
+    }
+}
