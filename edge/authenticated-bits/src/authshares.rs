@@ -403,24 +403,20 @@ mod tests {
         generator_b: &AuthShareGenerator<PartyB, kos::Sender, kos::Receiver>,
         output_a: Vec<AuthShare<PartyA>>,
         output_b: Vec<AuthShare<PartyB>>,
-    ) -> (bool, bool, U8x16, U8x16) {
-        let ((validation_a, delta_a), (validation_b, delta_b)) =
-            swanky_channel::local::local_channel_pair(
-                |c| {
-                    let mut outputs = vec![];
-                    let result = generator_a.open(&output_a, &mut outputs, c);
-                    let delta = generator_a.delta();
-                    Ok((result.is_ok(), delta))
-                },
-                |c| {
-                    let mut outputs = vec![];
-                    let result = generator_b.open(&output_b, &mut outputs, c);
-                    let delta = generator_b.delta();
-                    Ok((result.is_ok(), delta))
-                },
-            )
-            .unwrap();
-        (validation_a, validation_b, delta_a, delta_b)
+    ) -> (bool, bool) {
+        swanky_channel::local::local_channel_pair(
+            |c| {
+                let mut outputs = vec![];
+                let result = generator_a.open(&output_a, &mut outputs, c);
+                Ok(result.is_ok())
+            },
+            |c| {
+                let mut outputs = vec![];
+                let result = generator_b.open(&output_b, &mut outputs, c);
+                Ok(result.is_ok())
+            },
+        )
+        .unwrap()
     }
 
     proptest! {
@@ -429,7 +425,7 @@ mod tests {
         fn honest_generation_works(nshares in 1..1000usize,
                                    seed_party_a in any::<u128>(), seed_party_b in any::<u128>()) {
             let (output_a, output_b, generator_a, generator_b) = generate(nshares, U8x16::from(seed_party_a), U8x16::from(seed_party_b));
-            let (validation_a, validation_b, _, _) =
+            let (validation_a, validation_b) =
                 validate(&generator_a, &generator_b, output_a, output_b);
             prop_assert!(validation_a);
             prop_assert!(validation_b);
@@ -445,7 +441,7 @@ mod tests {
             let mut rng_b = AesRng::from_seed(U8x16::from(seed_party_b));
             let (output_a, _, generator_a, generator_b) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
             let (_output_c, output_d, _, _) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
-            let (validation_a, validation_b, _, _) =
+            let (validation_a, validation_b) =
                 validate(&generator_a, &generator_b, output_a, output_d);
             prop_assert!(!validation_a);
             prop_assert!(!validation_b);
@@ -463,7 +459,7 @@ mod tests {
             let (output_a, mut output_b, generator_a, generator_b) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
             let (_output_c, output_d, _, _) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
             output_b[index] = output_d[index];
-            let (validation_a, validation_b, _, _) =
+            let (validation_a, validation_b) =
                 validate(&generator_a, &generator_b, output_a, output_b);
             prop_assert!(!validation_a);
             prop_assert!(!validation_b);
@@ -481,7 +477,7 @@ mod tests {
             let (mut output_a, output_b, generator_a, generator_b) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
             let (output_c, _output_d, _, _) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
             output_a[index] = output_c[index];
-            let (validation_a, validation_b, _, _) =
+            let (validation_a, validation_b) =
                 validate(&generator_a, &generator_b, output_a, output_b);
             prop_assert!(!validation_a);
             prop_assert!(!validation_b);
@@ -504,7 +500,7 @@ mod tests {
                 let new_a = generator_a.xor_with_const(a, bit);
                 let new_b = generator_b.xor_with_const(b, bit);
                 // The new authenticated share should still validate.
-                let (validation_a, validation_b, _, _) =
+                let (validation_a, validation_b) =
                     validate(&generator_a, &generator_b, vec![new_a], vec![new_b]);
                 prop_assert!(validation_a);
                 prop_assert!(validation_b);
