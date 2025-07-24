@@ -7,15 +7,19 @@
 //!
 //! # Details
 //!
-//! To generate [`AuthBit`]s, the prover holds a vector of bits $`b_i`$ of
-//! length $`n`$, and the verifier holds a long term key $`\Delta`$.
+//! The protocol is briefly described by Nielsen et al. [^1] in Section 3.1, but
+//! essentially, authenticated bits are _just_ the outputs of correlated
+//! oblivious transfer (called Δ-ROT in the paper).
 //!
-//! The prover and verifier perform a correlated OT per bit so that the prover
-//! receives $`M_i := K_i \oplus b_i \Delta`$ and the verifier receives $`K_i`$.
-//! In other words:
+//! In more detail, to generate [`AuthBit`]s, the prover holds a vector of bits
+//! $`b_i`$ of length $`n`$, and the verifier holds a long term key $`\Delta`$.
+//!
+//! The prover and verifier perform a Δ-ROT per bit so that the prover receives
+//! $`M_i := K_i \oplus b_i \Delta`$ and the verifier receives $`K_i`$. In other
+//! words:
 //!
 //! - If $`b_i = 1`$: the prover receives $`M_{i,0} := K_i \oplus \Delta`$.
-//! - if $`b_i = 0`$: the prover receives $`M_{i,1} := K_i`$.
+//! - If $`b_i = 0`$: the prover receives $`M_{i,1} := K_i`$.
 //!
 //! The verifier receives both $`M_{i,0}`$ and $`M_{i,1} = K_i`$.
 //!
@@ -23,6 +27,9 @@
 //! verifier and the verifier checks that $`M_i := K_i \oplus b \Delta`$.
 //!
 //! # Example
+//!
+//! Below is an example that shows the generation and opening of 10
+//! [`AuthBit`]s.
 //!
 //! ```
 //! # use rand::Rng;
@@ -60,6 +67,10 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! [^1]: J.B. Nielsen, T. Schneider, R. Trifiletti. "Constant Round Maliciously
+//!     Secure 2PC with Function-independent Preprocessing using LEGO".
+//!     <https://eprint.iacr.org/2016/1069.pdf>
 
 use rand::{CryptoRng, Rng};
 use swanky_adversary::Malicious;
@@ -97,7 +108,9 @@ struct VerifierAuthBit {
 }
 /// An authenticated bit.
 ///
-/// See [`crate::authbits`] for details.
+/// See [`crate::authbits`] for details. XORing authenticated bits is an
+/// entirely local operation, and hence [`AuthBit`] implements
+/// [`std::ops::BitXor`] and [`std::ops::BitXorAssign`].
 #[derive(Default, Clone, Copy)]
 pub struct AuthBit<P: Party>(PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>);
 
@@ -160,6 +173,14 @@ impl<P: Party> std::ops::BitXorAssign for AuthBit<P> {
 }
 
 /// A type for generating [`AuthBit`]s.
+///
+/// For authenticated bit _verifiers_, the generator contains the particular
+/// $`\Delta`$ value to verify against. This means that generated [`AuthBit`]s
+/// _must_ be opened using the same generator that generated them! Odd behavior
+/// may result if a different generator is used: when verifying one bits,
+/// verification will fail (with overwhelming probability), but when verifying
+/// zero bits, verification will not (because the $`\Delta`$ value is never used
+/// in the verification of a zero bit)!
 pub struct AuthBitGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver> {
     /// The verifier's global $`\Delta`$.
     delta: VerifierPrivateCopy<P, U8x16>,
