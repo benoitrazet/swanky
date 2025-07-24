@@ -74,8 +74,7 @@ impl<P: Party> EqualityFunctionality<P> {
                 let sender_commitment = salted_hash.finalize();
                 channel.write_bytes(sender_commitment.as_slice())?;
                 // Sender receives receiver_hash
-                let mut receiver_hash = [0u8; 32];
-                channel.read_bytes(&mut receiver_hash)?;
+                let receiver_hash: [u8; 32] = channel.read()?;
                 // Sender sends the commitment salt as a way to decommit. The sender
                 // can abhort and skip this step and this protocol allows that.
                 channel.write_bytes(self.commitment_salt.as_ref().into_inner(e))?;
@@ -91,15 +90,13 @@ impl<P: Party> EqualityFunctionality<P> {
                 Ok(())
             }
             WhichParty::Verifier(_e) => {
-                let mut sender_commitment = [0u8; 32];
                 let hash_receiver = self.hash.finalize();
                 // Receiver receives commitment
-                channel.read_bytes(&mut sender_commitment)?;
+                let sender_commitment: [u8; 32] = channel.read()?;
                 // Receiver sends hash
                 channel.write_bytes(hash_receiver.as_slice())?;
                 // Receiver receives decommitment
-                let mut sender_salt = [0u8; 32];
-                channel.read_bytes(&mut sender_salt)?;
+                let sender_salt: [u8; 32] = channel.read()?;
                 //The Receiver salts its value
                 let mut receiver_salted = Sha256::new();
                 receiver_salted.update(hash_receiver);
