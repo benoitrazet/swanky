@@ -1,9 +1,15 @@
+use std::mem::MaybeUninit;
+
 use super::{
     ByteElementDeserializer, ByteElementSerializer, BytesDeserializationCannotFail,
     CanonicalSerialize,
 };
-use generic_array::GenericArray;
-use generic_array::typenum::{self, U};
+use generic_array::functional::FunctionalSequence;
+use generic_array::sequence::Flatten;
+use generic_array::typenum::{self, Const, Prod, ToUInt, U, Unsigned};
+use generic_array::{ArrayLength, GenericArray};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 macro_rules! pod_impl {
     ($($ty:ty),*$(,)?) => {$(
@@ -130,6 +136,80 @@ impl CanonicalSerialize for () {
         Default::default()
     }
 }
+
+impl<T: CanonicalSerialize, N: ArrayLength> CanonicalSerialize for GenericArray<T, N>
+where
+    <N as ArrayLength>::ArrayType<T>: Copy,
+    <T as CanonicalSerialize>::ByteReprLen: std::ops::Mul<N>,
+    <<T as CanonicalSerialize>::ByteReprLen as std::ops::Mul<N>>::Output: ArrayLength,
+{
+    type Serializer = ByteElementSerializer<Self>;
+    type Deserializer = ByteElementDeserializer<Self>;
+    type ByteReprLen = Prod<T::ByteReprLen, N>;
+    type FromBytesError = T::FromBytesError;
+
+    fn from_bytes(
+        bytes: &GenericArray<u8, Self::ByteReprLen>,
+    ) -> Result<Self, Self::FromBytesError> {
+        let (chunks, remainder) = GenericArray::<u8, T::ByteReprLen>::chunks_from_slice(bytes);
+        let mut out: GenericArray<MaybeUninit<T>, N> = GenericArray::uninit();
+        debug_assert!(remainder.is_empty());
+        if bytes.is_empty() {
+            // We need to handle zero bytes separately. This only occurs if:
+            debug_assert!(N::USIZE == 0 || <T::ByteReprLen as Unsigned>::USIZE == 0);
+            // In this case, chunks_from_slice() doesn't know how many chunks to create (because
+            // division by zero is undefined). In this instance, we just initialize all the members
+            // separately.
+            //
+            // The bytes.is_empty() branch should be eliminated in release mode because byte.len()
+            // is a constant.
+            for dst in out.iter_mut() {
+                dst.write(T::from_bytes(&Default::default())?);
+            }
+        } else {
+            debug_assert_eq!(chunks.len(), N::USIZE);
+            for (dst, chunk) in out.iter_mut().zip(chunks.iter()) {
+                dst.write(T::from_bytes(chunk)?);
+            }
+        }
+        Ok(unsafe {
+            // SAFETY: we've initialized every element of the array.
+            GenericArray::assume_init(out)
+        })
+    }
+
+    fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
+        self.map(|x| x.to_bytes()).flatten()
+    }
+}
+
+/// NOTE: because [`serde`] only `impl`s serialization for arrays up to 32 elements in length, and
+/// [`CanonicalSerialize`] requires [`Serialize`], we inherit this restriction.
+impl<T: CanonicalSerialize, const N: usize> CanonicalSerialize for [T; N]
+where
+    Const<N>: ToUInt,
+    U<N>: ArrayLength,
+    <U<N> as ArrayLength>::ArrayType<T>: Copy,
+    <T as CanonicalSerialize>::ByteReprLen: std::ops::Mul<U<N>>,
+    <<T as CanonicalSerialize>::ByteReprLen as std::ops::Mul<U<N>>>::Output: ArrayLength,
+    [T; N]: Serialize + DeserializeOwned,
+{
+    type Serializer = ByteElementSerializer<Self>;
+    type Deserializer = ByteElementDeserializer<Self>;
+    type ByteReprLen = <GenericArray<T, U<N>> as CanonicalSerialize>::ByteReprLen;
+    type FromBytesError = <GenericArray<T, U<N>> as CanonicalSerialize>::FromBytesError;
+
+    fn from_bytes(
+        bytes: &GenericArray<u8, Self::ByteReprLen>,
+    ) -> Result<Self, Self::FromBytesError> {
+        Ok(GenericArray::<T, U<N>>::from_bytes(bytes)?.into_array())
+    }
+
+    fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
+        GenericArray::<T, U<N>>::from_slice(self.as_slice()).to_bytes()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -177,5 +257,37 @@ mod test {
         fn roundtrip_vectoreyes_u32x8 => any::<[u32; 8]>().prop_map(vectoreyes::U32x8::from),
         fn roundtrip_vectoreyes_u64x2 => any::<[u64; 2]>().prop_map(vectoreyes::U64x2::from),
         fn roundtrip_vectoreyes_u64x4 => any::<[u64; 4]>().prop_map(vectoreyes::U64x4::from),
+        fn roundtrip_array_0 => any::<u8>(),
+        fn roundtrip_array_1 => any::<u16>(),
+        fn roundtrip_array_2 => any::<[u8; 0]>(),
+        fn roundtrip_array_3 => any::<[u16; 0]>(),
+        fn roundtrip_array_4 => any::<[u8; 1]>(),
+        fn roundtrip_array_5 => any::<[u16; 1]>(),
+        fn roundtrip_array_6 => any::<[u8; 2]>(),
+        fn roundtrip_array_7 => any::<[u16; 2]>(),
+        fn roundtrip_array_8 => any::<[u8; 0]>(),
+        fn roundtrip_array_9 => any::<[u16; 0]>(),
+        fn roundtrip_array_10 => any::<[[u8; 0]; 0]>(),
+        fn roundtrip_array_11 => any::<[[u16; 0]; 0]>(),
+        fn roundtrip_array_12 => any::<[[u8; 1]; 0]>(),
+        fn roundtrip_array_13 => any::<[[u16; 1]; 0]>(),
+        fn roundtrip_array_14 => any::<[[u8; 2]; 0]>(),
+        fn roundtrip_array_15 => any::<[[u16; 2]; 0]>(),
+        fn roundtrip_array_16 => any::<[u8; 1]>(),
+        fn roundtrip_array_17 => any::<[u16; 1]>(),
+        fn roundtrip_array_18 => any::<[[u8; 0]; 1]>(),
+        fn roundtrip_array_19 => any::<[[u16; 0]; 1]>(),
+        fn roundtrip_array_20 => any::<[[u8; 1]; 1]>(),
+        fn roundtrip_array_21 => any::<[[u16; 1]; 1]>(),
+        fn roundtrip_array_22 => any::<[[u8; 2]; 1]>(),
+        fn roundtrip_array_23 => any::<[[u16; 2]; 1]>(),
+        fn roundtrip_array_24 => any::<[u8; 2]>(),
+        fn roundtrip_array_25 => any::<[u16; 2]>(),
+        fn roundtrip_array_26 => any::<[[u8; 0]; 2]>(),
+        fn roundtrip_array_27 => any::<[[u16; 0]; 2]>(),
+        fn roundtrip_array_28 => any::<[[u8; 1]; 2]>(),
+        fn roundtrip_array_29 => any::<[[u16; 1]; 2]>(),
+        fn roundtrip_array_30 => any::<[[u8; 2]; 2]>(),
+        fn roundtrip_array_31 => any::<[[u16; 2]; 2]>(),
     }
 }
