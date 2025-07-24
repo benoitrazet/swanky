@@ -1,6 +1,6 @@
 [package]
 name = "swanky-f-eq"
-description = "Two-party functionality for checking equality of inputs in an oblivious manner. This functionality is commonly used in several cryptographic protocols including Garbled Circuits."
+description = "Two-party functionality for checking equality of inputs in an oblivious manner."
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
