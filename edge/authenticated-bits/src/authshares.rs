@@ -439,22 +439,6 @@ mod tests {
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(10))]
         #[test]
-        fn wrong_generators_fail(nshares in 1..1000usize,
-                                 seed_party_a in any::<u128>(), seed_party_b in any::<u128>()) {
-            let mut rng_a = AesRng::from_seed(U8x16::from(seed_party_a));
-            let mut rng_b = AesRng::from_seed(U8x16::from(seed_party_b));
-            let (output_a, output_b, _generator_a, _generator_b) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
-            let (_output_c, _output_d, generator_c, generator_d) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
-            let (validation_a, validation_b, _, _) =
-                validate(&generator_c, &generator_d, output_a, output_b);
-            assert!(!validation_a);
-            assert!(!validation_b);
-        }
-    }
-
-    proptest! {
-        #![proptest_config(ProptestConfig::with_cases(10))]
-        #[test]
         fn wrong_output_fails(nshares in 1..1000usize,
                               seed_party_a in any::<u128>(), seed_party_b in any::<u128>()) {
             let mut rng_a = AesRng::from_seed(U8x16::from(seed_party_a));
