@@ -296,9 +296,7 @@ impl<
                 }
                 let mut validation = true;
                 for (ab, bit) in authbits.iter().zip(bits_.iter()) {
-                    let mut mac_bytes = [0u8; 16];
-                    channel.read_bytes(&mut mac_bytes)?;
-                    let mac = U8x16::from(mac_bytes);
+                    let mac = channel.read::<U8x16>()?;
 
                     validation &= mac
                         == if F2::ONE == *bit {
