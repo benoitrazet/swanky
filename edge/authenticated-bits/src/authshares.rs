@@ -443,8 +443,8 @@ mod tests {
                               seed_party_a in any::<u128>(), seed_party_b in any::<u128>()) {
             let mut rng_a = AesRng::from_seed(U8x16::from(seed_party_a));
             let mut rng_b = AesRng::from_seed(U8x16::from(seed_party_b));
-            let (output_a, _output_b, generator_a, generator_b) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
-            let (_output_c, output_d, _generator_c, _generator_d) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
+            let (output_a, _, generator_a, generator_b) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
+            let (_output_c, output_d, _, _) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
             let (validation_a, validation_b, _, _) =
                 validate(&generator_a, &generator_b, output_a, output_d);
             assert!(!validation_a);
@@ -461,7 +461,7 @@ mod tests {
             let mut rng_b = AesRng::from_seed(U8x16::from(seed_party_b));
             let index = index.index(nshares);
             let (output_a, mut output_b, generator_a, generator_b) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
-            let (_output_c, output_d, _generator_c, _generator_d) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
+            let (_output_c, output_d, _, _) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
             output_b[index] = output_d[index];
             let (validation_a, validation_b, _, _) =
                 validate(&generator_a, &generator_b, output_a, output_b);
@@ -479,7 +479,7 @@ mod tests {
             let mut rng_b = AesRng::from_seed(U8x16::from(seed_party_b));
             let index = index.index(nshares);
             let (mut output_a, output_b, generator_a, generator_b) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
-            let (output_c, _output_d, _generator_c, _generator_d) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
+            let (output_c, _output_d, _, _) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
             output_a[index] = output_c[index];
             let (validation_a, validation_b, _, _) =
                 validate(&generator_a, &generator_b, output_a, output_b);
