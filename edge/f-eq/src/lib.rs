@@ -168,7 +168,7 @@ mod tests {
         #[test]
         fn same_inputs_work(input in any::<[u8; 32]>()) {
             let res = check_equality(&input, &input);
-            assert!(res.is_ok());
+            prop_assert!(res.is_ok());
         }
     }
 
@@ -180,7 +180,7 @@ mod tests {
                 &(any::<[u8; 32]>(), any::<[u8; 32]>()),
                 |(input_pr, input_vr)| {
                     let res = check_equality(&input_pr, &input_vr);
-                    assert!(res.is_err());
+                    prop_assert!(res.is_err());
                     Ok(())
                 },
             )
@@ -192,7 +192,7 @@ mod tests {
             let mut rng = AesRng::from_seed(seed.into());
             let inputs: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.r#gen::<[u8; 32]>()).collect();
             let res = batched_check_equality(&inputs, &inputs);
-            assert!(res.is_ok());
+            prop_assert!(res.is_ok());
         }
     }
     proptest! {
@@ -202,7 +202,7 @@ mod tests {
             let inputs_pr: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.r#gen::<[u8; 32]>()).collect();
             let inputs_vr: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.r#gen::<[u8; 32]>()).collect();
             let res = batched_check_equality(&inputs_pr, &inputs_vr);
-            assert!(res.is_err());
+            prop_assert!(res.is_err());
         }
     }
 }
