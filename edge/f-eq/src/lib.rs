@@ -84,11 +84,11 @@ impl<P: Party> EqualityFunctionality<P> {
                 receiver_salted.update(receiver_hash);
                 receiver_salted.update(self.commitment_salt.as_ref().into_inner(e));
                 // The Sender compares the salted values
-                if sender_commitment != receiver_salted.finalize() {
-                    Err(eyre::Error::msg("Validation check failed"))
-                } else {
-                    Ok(())
-                }
+                eyre::ensure!(
+                    sender_commitment == receiver_salted.finalize(),
+                    "Validation check failed"
+                );
+                Ok(())
             }
             WhichParty::Verifier(_e) => {
                 let mut sender_commitment = [0u8; 32];
@@ -105,11 +105,11 @@ impl<P: Party> EqualityFunctionality<P> {
                 receiver_salted.update(hash_receiver);
                 receiver_salted.update(sender_salt);
                 //The Receiver compares the salted valuesS
-                if sender_commitment != *receiver_salted.finalize() {
-                    Err(eyre::Error::msg("Validation check failed"))
-                } else {
-                    Ok(())
-                }
+                eyre::ensure!(
+                    sender_commitment == *receiver_salted.finalize(),
+                    "Validation check failed"
+                );
+                Ok(())
             }
         }
     }
