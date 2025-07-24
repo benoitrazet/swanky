@@ -431,8 +431,8 @@ mod tests {
             let (output_a, output_b, generator_a, generator_b) = generate(nshares, U8x16::from(seed_party_a), U8x16::from(seed_party_b));
             let (validation_a, validation_b, _, _) =
                 validate(&generator_a, &generator_b, output_a, output_b);
-            assert!(validation_a);
-            assert!(validation_b);
+            prop_assert!(validation_a);
+            prop_assert!(validation_b);
         }
     }
 
@@ -447,8 +447,8 @@ mod tests {
             let (_output_c, output_d, _, _) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
             let (validation_a, validation_b, _, _) =
                 validate(&generator_a, &generator_b, output_a, output_d);
-            assert!(!validation_a);
-            assert!(!validation_b);
+            prop_assert!(!validation_a);
+            prop_assert!(!validation_b);
         }
     }
 
@@ -465,8 +465,8 @@ mod tests {
             output_b[index] = output_d[index];
             let (validation_a, validation_b, _, _) =
                 validate(&generator_a, &generator_b, output_a, output_b);
-            assert!(!validation_a);
-            assert!(!validation_b);
+            prop_assert!(!validation_a);
+            prop_assert!(!validation_b);
         }
     }
 
@@ -483,8 +483,8 @@ mod tests {
             output_a[index] = output_c[index];
             let (validation_a, validation_b, _, _) =
                 validate(&generator_a, &generator_b, output_a, output_b);
-            assert!(!validation_a);
-            assert!(!validation_b);
+            prop_assert!(!validation_a);
+            prop_assert!(!validation_b);
         }
     }
 
@@ -506,10 +506,10 @@ mod tests {
                 // The new authenticated share should still validate.
                 let (validation_a, validation_b, _, _) =
                     validate(&generator_a, &generator_b, vec![new_a], vec![new_b]);
-                assert!(validation_a);
-                assert!(validation_b);
+                prop_assert!(validation_a);
+                prop_assert!(validation_b);
                 // The new authenticated share should equal `⟨x⟩ ⊕ c`.
-                assert_eq!(a.bit() + b.bit() + bit, new_a.bit() + new_b.bit());
+                prop_assert_eq!(a.bit() + b.bit() + bit, new_a.bit() + new_b.bit());
             }
         }
     }
