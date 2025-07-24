@@ -14,7 +14,7 @@ pub use impls::{ValueTooBigForIsize, ValueTooBigForUsize};
 
 /// Types that implement this trait have a canonical serialization and a fixed
 /// serialization size.
-pub trait CanonicalSerialize: Copy + Serialize + DeserializeOwned {
+pub trait CanonicalSerialize: 'static + Copy + Serialize + DeserializeOwned {
     /// A way to serialize field elements of this type.
     ///
     /// See [`SequenceSerializer`] for more info.
