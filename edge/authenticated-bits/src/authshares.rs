@@ -168,7 +168,7 @@ impl<
         nshares: usize,
         shares: &mut Vec<AuthShare<P>>,
         channel: &mut Channel,
-        mut rng: RNG,
+        rng: &mut RNG,
     ) -> eyre::Result<()> {
         let bits: Vec<_> = (0..nshares).map(|_| rng.r#gen::<F2>()).collect();
 
@@ -182,8 +182,8 @@ impl<
                 let party_a = self.party_a.as_mut().prover_into(ev);
                 let party_b = self.party_b.as_mut().prover_into(ev);
 
-                party_a.generate(bits, &mut party_a_auth_bits, channel, &mut rng)?;
-                party_b.generate(nshares, &mut party_b_auth_bits, channel, &mut rng)?;
+                party_a.generate(bits, &mut party_a_auth_bits, channel, rng)?;
+                party_b.generate(nshares, &mut party_b_auth_bits, channel, rng)?;
 
                 shares.extend(party_a_auth_bits.into_iter().zip(party_b_auth_bits).map(
                     |(party_a_val, party_b_val)| AuthShare {
@@ -196,8 +196,8 @@ impl<
                 let party_a = self.party_a.as_mut().verifier_into(ev);
                 let party_b = self.party_b.as_mut().verifier_into(ev);
 
-                party_a.generate(nshares, &mut party_b_auth_bits, channel, &mut rng)?;
-                party_b.generate(bits, &mut party_a_auth_bits, channel, &mut rng)?;
+                party_a.generate(nshares, &mut party_b_auth_bits, channel, rng)?;
+                party_b.generate(bits, &mut party_a_auth_bits, channel, rng)?;
 
                 shares.extend(party_a_auth_bits.into_iter().zip(party_b_auth_bits).map(
                     |(party_a_val, party_b_val)| AuthShare {
