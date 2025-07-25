@@ -45,6 +45,7 @@ have a lesser stability guarantee.
 - **`swanky-channel-legacy`**: A (legacy) channel abstraction; use `swanky-channel` for new code!
 - **`swanky-cointoss`**: A simple coin-tossing protocol.
 - **`swanky-deprecated-bitwise-utils`**: [DEPRECATED] Old bitwise utilities from ocelot
+- **`swanky-f-eq`**: Two-party functionality for checking equality of inputs in an oblivious manner.
 - **`swanky-field`**: Definitions of the core `FiniteField` and `FiniteRing` traits
 - **`swanky-field-binary`**: Binary finite (extension) fields
 - **`swanky-field-f61p`**: An implementation of `GF(2^61-1)`
