@@ -20,10 +20,10 @@ swanky-f-eq.workspace = true
 swanky-field-binary.workspace = true
 swanky-field.workspace = true
 swanky-serialization.workspace = true
-swanky-aes-hash.workspace = true
 swanky-aes-rng.workspace = true
 vectoreyes.workspace = true
 
+blake3.workspace = true
 bytemuck.workspace = true
 itertools.workspace = true
 rand.workspace = true

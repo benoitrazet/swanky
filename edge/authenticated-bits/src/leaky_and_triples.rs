@@ -13,14 +13,13 @@ use crate::authshares::{AuthShare, AuthShareGenerator};
 use itertools::Itertools;
 use rand::{CryptoRng, Rng};
 use swanky_adversary::Malicious;
-use swanky_aes_hash::CorrelationRobustHash;
 use swanky_channel::Channel;
 use swanky_f_eq::EqualityFunctionality;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
 use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
 use swanky_party::{Party, WhichParty};
-use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
+use swanky_serialization::{CanonicalSerialize, SequenceDeserializer, SequenceSerializer};
 use vectoreyes::{SimdBase, U8x16};
 
 /// A leaky AND triple.
@@ -344,8 +343,17 @@ impl<
 }
 
 fn hash(input: F128b) -> F128b {
-    // 🦺 SECURITY TODO 🦺: confirm that a correlation-robust hash is sufficient here.
-    F128b::from(CorrelationRobustHash::fixed_key().hash(U8x16::from(input)))
+    // Implement the hash function using Blake3.
+    //
+    // TODO: It _might_ be safe to use a correlation-robust fixed-key hash
+    // function here. However, the proof as-is is in the random oracle model,
+    // and effort would need to be spent to validate that it is still secure in
+    // the correlation-robust hash function model!
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&U8x16::from(input).to_bytes());
+    let hash = *hasher.finalize().as_bytes();
+    let result: [u8; 16] = hash[0..16].try_into().unwrap();
+    F128b::from(U8x16::from(result))
 }
 
 // Extract the least-significant bit from a `F128b` value.
