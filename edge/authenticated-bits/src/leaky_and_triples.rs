@@ -1,13 +1,20 @@
 //! Leaky AND triples.
 //!
 //! An authenticated AND triple is a random authenticated triple $`(\langle x
-//! \rangle, \langle y \rangle, \langle z \rangle)`$ [1] such that $`x \cdot y =
-//! z`$. A _leaky_ AND triple is an authenticated AND triple where the adversary
-//! can guess the value of $`x`$: if correct this remains undetected, if
-//! incorrect the adversary is caught.
+//! \rangle, \langle y \rangle, \langle z \rangle)`$ [^1] such that $`x \cdot y
+//! = z`$. A _leaky_ AND triple is an authenticated AND triple where the
+//! adversary can guess the value of $`x`$: if correct this remains undetected,
+//! if incorrect the adversary is caught.
 //!
-//! [1] See [`crate::authshares`] for the definition of the $`\langle x
+//! The leaky AND triple generation protocol implemented here is from Figure 5
+//! of Katz et al. [^2].
+//!
+//! [^1]: See [`crate::authshares`] for the definition of the $`\langle x
 //! \rangle`$ notation.
+//!
+//! [^2]: J. Katz, S. Ranellucci, M. Rosulek, X. Wang. "Optimizing Authenticated
+//! Garbling for Faster Secure Two-Party Computation".
+//! <https://eprint.iacr.org/2018/578.pdf>
 
 use crate::authshares::{AuthShare, AuthShareGenerator};
 use itertools::Itertools;
