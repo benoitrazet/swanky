@@ -1,0 +1,20 @@
+[package]
+name = "swanky-f-eq"
+description = "Two-party functionality for checking equality of inputs in an oblivious manner."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+swanky-party.workspace = true
+swanky-channel.workspace = true
+swanky-aes-rng.workspace = true
+sha2.workspace = true
+rand.workspace = true
+eyre.workspace = true
+proptest.workspace = true

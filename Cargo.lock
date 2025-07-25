@@ -924,6 +924,7 @@ version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8c8444bc9d71b935156cc0ccab7f622180808af7867b1daae6547d773591703"
 dependencies = [
+ "serde",
  "typenum",
 ]
 
@@ -2606,6 +2607,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-f-eq"
+version = "0.6.0"
+dependencies = [
+ "eyre",
+ "proptest",
+ "rand 0.8.5",
+ "sha2",
+ "swanky-aes-rng",
+ "swanky-channel",
+ "swanky-party",
+]
+
+[[package]]
 name = "swanky-field"
 version = "0.6.0"
 dependencies = [
@@ -2869,6 +2883,7 @@ version = "0.6.0"
 dependencies = [
  "bytemuck",
  "generic-array 1.2.0",
+ "proptest",
  "serde",
  "vectoreyes",
 ]

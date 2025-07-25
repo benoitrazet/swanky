@@ -299,7 +299,15 @@ CI will enforce the use of workspace inheritance.
 
 All code in Swanky _should_ be tested via Rust tests. Ideally, tests would test both valid input (the happy path) and invalid inputs.
 
-When testing pure functions, we like to use property-based-testing from [the `proptest` crate](https://proptest-rs.github.io/proptest/intro.html). This crate uses will test a function against random values, to see if its invariants hold. This is preferable (where applicable) to writing explicit unit test cases, since it is easier to maintain, and more directly encodes assumptions on test inputs.
+When testing pure functions, use property-based-testing from [the `proptest` crate](https://proptest-rs.github.io/proptest/intro.html). This crate tests a function against random values, to see if its invariants hold. This is preferable (where applicable) to writing explicit unit test cases, since it is easier to maintain, and more directly encodes assumptions on test inputs.
+
+When tests require the use of randomness, use the `proptest` crate to generate
+any necessary randomness. This makes it easier to reproduce failing tests (since
+the particular random values chosen are captured by the test infrastructure).
+Note that because `proptest` runs many iterations of the test, it might make
+sense to reduce the number of iterations for slow-running tests. This can be
+done using
+[`#![proptest_config](ProptestConfig::with_cases(...))]`](https://proptest-rs.github.io/proptest/proptest/tutorial/config.html).
 
 #### Assets for Tests
 
@@ -449,6 +457,73 @@ fn range(n: usize) -> impl Iterator<Item = usize> {
 All of our Rust code _must_ pass cargo clippy. You can check that your code conforms to our configuration with `cargo clippy`. (Some projects deviate from this configuration if some warnings are too noisy for their application, or not noisy enough.)
 
 If you find that a clippy lint that we have enabled is not a good match for your project, you can disable it in your code. The lint should be disabled for as small a scope as possible (e.g. disable the lint for a single function rather than a whole crate), and the reason for disabling the lint should be documented in a comment.
+
+### Retry-Safe Code
+
+Most protocols, unless it's explicitly designed to be retry-safe (which tends to be rare in our
+cryptographic use-cases), should take `self` and return `Self` on success, rather than taking
+`&mut self` as an argument.
+
+If `Self` is returned, then it should be the last element of the resulting tuple.
+
+* **Good**
+  - `fn my_protocol_function(self, x: u128) -> Result<(u128, Self)>`
+  - `fn my_protocol_function(self, x: u128) -> Result<Self>`
+* **Bad**
+  - `fn my_protocol_function(self, x: u128) -> Result<(Self, u128)>` (`Self` should be the last tuple element!)
+  - `fn my_protocol_function(&mut self, x: u128)`
+
+#### Rationale
+
+Consider the following code:
+
+```rust
+struct MyOneTimePad {
+    key: Option<u128>,
+}
+impl MyOneTimePad {
+    fn encrypt_and_send(&mut self, c: &mut Channel, msg: u128) -> Result<()> {
+        let key = self.key.expect("don't re-use a one-time-pad!");
+        c.write(key ^ msg)?;
+        self.key = None;
+        Ok(())
+    }
+}
+```
+
+This code is secure only so long as only one `key ^ msg` is ever sent to the other party (`key`
+ought to be zeroed before it can be reused). The problem is that this code has a subtle bug: what
+if there's a temporary network failure, and the caller retries.
+
+```rust
+let otp: MyOneTimePad;
+loop {
+    let msg: u128 = rand::random();
+    match pad.encrypt_and_send(c) {
+        Ok(()) => return Ok(()),
+        Err(e) if e.kind() == ErrorKind::NetworkError => {
+            // Ignore it! Try again!
+        }
+        Err(e) => return Err(e),
+    }
+}
+```
+
+Because `encrypt_and_send()` zeroes out the key _after_ a _successful_ write, subsequent
+invocations of this function can leak the key. While this error might be easy to catch in this
+simple example, these errors aren't always easy to catch.
+
+To avoid this sort of error, unless you want your API to support being re-invoked in the event of
+an error, it's preferable for APIs to _consume and return_ `self` on success. Like this:
+
+```rust
+impl MyOneTimePad {
+    fn encrypt_and_send(self, c: &mut Channel, msg: u128) -> Result<Self> { /* ... */ }
+}
+```
+
+Now, the Rust type-system will prevent `MyOneTimePad` from being re-used in the event of an error,
+because each operation only returns `Self` after a _successful_ invocation.
 
 ## Swanky API Guidelines
 

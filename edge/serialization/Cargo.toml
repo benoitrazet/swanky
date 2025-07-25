@@ -16,3 +16,7 @@ serde.workspace = true
 generic-array.workspace = true
 vectoreyes.workspace = true
 bytemuck.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
