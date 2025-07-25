@@ -15,6 +15,7 @@ use rand::{CryptoRng, Rng};
 use swanky_adversary::Malicious;
 use swanky_aes_hash::CorrelationRobustHash;
 use swanky_channel::Channel;
+use swanky_f_eq::EqualityFunctionality;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
 use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
@@ -225,13 +226,17 @@ impl<
                 send_lsb(channel)?;
             }
         }
-        for (((x, y, z), _s), d) in shares.into_iter().tuples().zip(ss).zip(ds) {
-            // 🦺 SECURITY TODO 🦺: send stuff to `Feq`.
+        let mut feq = EqualityFunctionality::<P>::new(rng);
+        for (((x, y, z), s), d) in shares.into_iter().tuples().zip(ss).zip(ds) {
+            // A and B send `L := S + dΔ` to `Feq`.
+            feq.input(U8x16::from(s + d * delta));
+            // Compute `⟨z'⟩ := ⟨z⟩ ⊕ d`.
             let z_new = self.auth_share_generator.xor_with_const(z, d);
             let triple = LeakyAndTriple { x, y, z: z_new };
             out.push(triple)
         }
-        Ok(())
+        // Check the equality on all the `L` values.
+        feq.finalize(channel)
     }
 
     /// Open the (leaky) AND triples in `triples`.

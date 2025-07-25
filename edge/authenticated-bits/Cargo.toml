@@ -16,6 +16,7 @@ swanky-adversary.workspace = true
 swanky-party.workspace = true
 swanky-channel.workspace = true
 swanky-cointoss.workspace = true
+swanky-f-eq.workspace = true
 swanky-field-binary.workspace = true
 swanky-field.workspace = true
 swanky-serialization.workspace = true
