@@ -42,11 +42,11 @@ pub struct EqualityFunctionality<P: Party> {
 
 impl<P: Party> EqualityFunctionality<P> {
     /// Create a new [`EqualityFunctionality`].
-    pub fn new<RNG>(mut rng: RNG) -> eyre::Result<Self>
+    pub fn new<RNG>(rng: &mut RNG) -> Self
     where
         RNG: CryptoRng + Rng,
     {
-        let result = match P::WHICH {
+        match P::WHICH {
             WhichParty::Prover(_e) => EqualityFunctionality {
                 hash: Sha256::new(),
                 commitment_salt: ProverPrivate::new(rng.r#gen()),
@@ -125,13 +125,13 @@ mod tests {
         swanky_channel::local::local_channel_pair(
             |c| {
                 let mut rng = AesRng::new();
-                let mut f_eq = EqualityFunctionality::<Prover>::new(&mut rng)?;
+                let mut f_eq = EqualityFunctionality::<Prover>::new(&mut rng);
                 f_eq.input(input_pr);
                 f_eq.finalize(c)
             },
             |c| {
                 let mut rng = AesRng::new();
-                let mut f_eq = EqualityFunctionality::<Verifier>::new(&mut rng)?;
+                let mut f_eq = EqualityFunctionality::<Verifier>::new(&mut rng);
                 f_eq.input(input_vr);
                 f_eq.finalize(c)
             },
@@ -143,7 +143,7 @@ mod tests {
         swanky_channel::local::local_channel_pair(
             |c| {
                 let mut rng = AesRng::new();
-                let mut f_eq = EqualityFunctionality::<Prover>::new(&mut rng)?;
+                let mut f_eq = EqualityFunctionality::<Prover>::new(&mut rng);
                 for input_pr in inputs_pr.iter() {
                     f_eq.input(input_pr);
                 }
@@ -151,7 +151,7 @@ mod tests {
             },
             |c| {
                 let mut rng = AesRng::new();
-                let mut f_eq = EqualityFunctionality::<Verifier>::new(&mut rng)?;
+                let mut f_eq = EqualityFunctionality::<Verifier>::new(&mut rng);
                 for input_vr in inputs_vr.iter() {
                     f_eq.input(input_vr);
                 }
