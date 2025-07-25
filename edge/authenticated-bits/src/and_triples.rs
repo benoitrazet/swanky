@@ -18,6 +18,15 @@
 //! bucket is them combined into a single (authenticated) AND triple. See Katz
 //! et al. [^2] for details.
 //!
+//! # Security
+//!
+//! The generation protocol for leaky AND triples requires that the
+//! least-significant bit of the $`\Delta`$ value be fixed, and hence the
+//! protocol achieves at most 127-bits of security.
+//!
+//! In addition, the parameters for combining leaky AND triples into
+//! authenticated AND triples assumes 40-bits of statistical security.
+//!
 //! [^1]: See [`crate::authshares`] for the definition of the $`\langle x
 //! \rangle`$ notation.
 //!
