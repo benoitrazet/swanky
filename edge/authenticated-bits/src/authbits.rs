@@ -40,7 +40,7 @@ use vectoreyes::U8x16;
 ///
 /// The prover holds a bit that they wish to authenticate and receive a MAC
 /// which corresponds to that authentication.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Clone, Copy)]
 struct ProverAuthBit {
     /// MAC authenticating the bit.
     mac: U8x16,
@@ -51,7 +51,7 @@ struct ProverAuthBit {
 ///
 /// The verifier holds a local `key` that verifies the integrity of the prover's
 /// MAC.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Clone, Copy)]
 struct VerifierAuthBit {
     /// Key authenticating the prover's MAC.
     key: U8x16,
@@ -59,7 +59,7 @@ struct VerifierAuthBit {
 /// An authenticated bit.
 ///
 /// See [`crate::authbits`] for details.
-#[derive(Default, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct AuthBit<P: Party>(PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>);
 
 impl<P: Party> AuthBit<P> {
@@ -184,7 +184,7 @@ impl<
         bits_in: PartyEitherCopy<P, &[F2], usize>,
         out: &mut Vec<AuthBit<P>>,
         mut channel: &mut Channel,
-        mut rng: RNG,
+        rng: &mut RNG,
     ) -> eyre::Result<()>
     where
         RNG: CryptoRng + Rng,
@@ -196,7 +196,7 @@ impl<
                     &mut channel,
                     // TODO: Once OT uses F2 instead of bool this line won't be necessary.
                     &bits.iter().map(|b| bool::from(*b)).collect::<Vec<bool>>(),
-                    &mut rng,
+                    rng,
                 )?;
 
                 out.extend(bits.iter().zip(macs).map(|(bit, mac)| {
@@ -213,7 +213,7 @@ impl<
                     &mut channel,
                     bits_in.verifier_into(e),
                     delta,
-                    &mut rng,
+                    rng,
                 )?;
                 out.extend(
                     keys.into_iter().map(|key| {
@@ -225,6 +225,7 @@ impl<
             }
         }
     }
+
     /// Open the authenticated bits in `authbits`.
     ///
     /// This corresponds to the prover sending $`(b, M)`$ to the verifier, who
@@ -350,8 +351,8 @@ mod tests {
                 let mut rng = AesRng::new();
                 let bits = PartyEitherCopy::prover_new(IS_PROVER, bits_in);
                 let mut generator: AuthBitGenerator<_, KosSender, KosReceiver> =
-                    AuthBitGenerator::new::<&mut AesRng>(channel_pr, &mut rng)?;
-                generator.generate::<&mut AesRng>(bits, &mut output_pr, channel_pr, &mut rng)?;
+                    AuthBitGenerator::new(channel_pr, &mut rng)?;
+                generator.generate(bits, &mut output_pr, channel_pr, &mut rng)?;
                 if tamper_mac {
                     // Tamper the MAC of the first `AuthBit`.
                     output_pr[0] = AuthBit(PartyEitherCopy::prover_new(
@@ -369,8 +370,8 @@ mod tests {
                 let mut rng = AesRng::new();
                 let count = PartyEitherCopy::verifier_new(IS_VERIFIER, bits_in.len());
                 let mut generator: AuthBitGenerator<_, KosSender, KosReceiver> =
-                    AuthBitGenerator::new::<&mut AesRng>(channel_vr, &mut rng).unwrap();
-                generator.generate::<&mut AesRng>(count, &mut output_vr, channel_vr, &mut rng)?;
+                    AuthBitGenerator::new(channel_vr, &mut rng).unwrap();
+                generator.generate(count, &mut output_vr, channel_vr, &mut rng)?;
                 if tamper_key {
                     // Tamper the key of the first `AuthBit`.
                     output_vr[0] = AuthBit(PartyEitherCopy::verifier_new(

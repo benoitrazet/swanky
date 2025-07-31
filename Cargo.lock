@@ -2517,12 +2517,17 @@ dependencies = [
 name = "swanky-authenticated-bits"
 version = "0.6.0"
 dependencies = [
+ "blake3",
+ "bytemuck",
  "eyre",
+ "itertools 0.14.0",
  "proptest",
  "rand 0.8.5",
  "swanky-adversary",
  "swanky-aes-rng",
  "swanky-channel",
+ "swanky-cointoss",
+ "swanky-f-eq",
  "swanky-field",
  "swanky-field-binary",
  "swanky-ot-alsz-kos",
