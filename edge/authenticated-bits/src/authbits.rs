@@ -90,7 +90,7 @@ use vectoreyes::U8x16;
 ///
 /// The prover holds a bit that they wish to authenticate and receive a MAC
 /// which corresponds to that authentication.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Clone, Copy)]
 struct ProverAuthBit {
     /// MAC authenticating the bit.
     mac: U8x16,
@@ -101,7 +101,7 @@ struct ProverAuthBit {
 ///
 /// The verifier holds a local `key` that verifies the integrity of the prover's
 /// MAC.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Clone, Copy)]
 struct VerifierAuthBit {
     /// Key authenticating the prover's MAC.
     key: U8x16,
@@ -111,7 +111,7 @@ struct VerifierAuthBit {
 /// See [`crate::authbits`] for details. XORing authenticated bits is an
 /// entirely local operation, and hence [`AuthBit`] implements
 /// [`std::ops::BitXor`] and [`std::ops::BitXorAssign`].
-#[derive(Default, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct AuthBit<P: Party>(PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>);
 
 impl<P: Party> AuthBit<P> {
@@ -243,7 +243,7 @@ impl<
         bits_in: PartyEitherCopy<P, &[F2], usize>,
         out: &mut Vec<AuthBit<P>>,
         mut channel: &mut Channel,
-        mut rng: RNG,
+        rng: &mut RNG,
     ) -> eyre::Result<()>
     where
         RNG: CryptoRng + Rng,
@@ -255,7 +255,7 @@ impl<
                     &mut channel,
                     // TODO: Once OT uses F2 instead of bool this line won't be necessary.
                     &bits.iter().map(|b| bool::from(*b)).collect::<Vec<bool>>(),
-                    &mut rng,
+                    rng,
                 )?;
 
                 out.extend(bits.iter().zip(macs).map(|(bit, mac)| {
@@ -272,7 +272,7 @@ impl<
                     &mut channel,
                     bits_in.verifier_into(e),
                     delta,
-                    &mut rng,
+                    rng,
                 )?;
                 out.extend(
                     keys.into_iter().map(|key| {
@@ -284,6 +284,7 @@ impl<
             }
         }
     }
+
     /// Open the authenticated bits in `authbits`.
     ///
     /// This corresponds to the prover sending $`(b, M)`$ to the verifier, who

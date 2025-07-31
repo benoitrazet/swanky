@@ -17,6 +17,7 @@ members = [
   "edge/diet-mac-and-cheese",
   "edge/diet-mac-and-cheese/web-mac-and-cheese/wasm",
   "edge/diet-mac-and-cheese/web-mac-and-cheese/websocket",
+  "edge/f-eq",
   "edge/fancy-garbling",
   "edge/field",
   "edge/field-binary",
@@ -98,6 +99,7 @@ swanky-channel = { path = "edge/channel" }
 swanky-channel-legacy = { path = "edge/channel-legacy" }
 swanky-cointoss = { path = "edge/cointoss" }
 swanky-deprecated-bitwise-utils = { path = "edge/deprecated-bitwise-utils" }
+swanky-f-eq = { path = "edge/f-eq" }
 swanky-field = { path = "edge/field" }
 swanky-field-binary = { path = "edge/field-binary" }
 swanky-field-f61p = { path = "edge/field-f61p" }
@@ -168,7 +170,7 @@ env_logger = "0.11.8"
 eyre = "0.6.12"
 flatbuffers = "25.2.10" # Keep this version in sync with edge/flatbuffer-build/src/flatc-ver.txt
 flume = "0.11.1"
-generic-array = "1.2.0"
+generic-array = { version = "1.2.0", features = ["serde"] }
 hex = "0.4.3"
 io-uring = "0.7.8"
 itertools = "0.14.0"

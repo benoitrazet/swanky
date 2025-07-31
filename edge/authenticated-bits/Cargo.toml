@@ -1,6 +1,6 @@
 [package]
 name = "swanky-authenticated-bits"
-description = "A package for generating authenticated bits"
+description = "Authenticated bits, shares, and AND triples"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -15,13 +15,19 @@ swanky-ot-traits.workspace = true
 swanky-adversary.workspace = true
 swanky-party.workspace = true
 swanky-channel.workspace = true
+swanky-cointoss.workspace = true
+swanky-f-eq.workspace = true
 swanky-field-binary.workspace = true
 swanky-field.workspace = true
 swanky-serialization.workspace = true
+swanky-aes-rng.workspace = true
 vectoreyes.workspace = true
+
+blake3.workspace = true
+bytemuck.workspace = true
+itertools.workspace = true
 rand.workspace = true
 proptest.workspace = true
-swanky-aes-rng.workspace = true
 eyre.workspace = true
 
 [dev-dependencies]
