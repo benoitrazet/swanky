@@ -482,9 +482,9 @@ mod tests {
                     &[new_authbit_vr],
                     verifier.delta().into_inner(IS_VERIFIER),
                 );
-                assert!(validation);
+                prop_assert!(validation);
                 // The new authenticated bits should equal `bit ^ public_bit`.
-                assert_eq!(
+                prop_assert_eq!(
                     new_authbit_pr.bit().into_inner(IS_PROVER),
                     authbit_pr.bit().into_inner(IS_PROVER) + public_bit
                 );
@@ -505,7 +505,7 @@ mod tests {
                 &output_vr,
                 verifier.delta().into_inner(IS_VERIFIER),
             );
-            assert!(validation);
+            prop_assert!(validation);
         }
     }
 
@@ -522,7 +522,7 @@ mod tests {
                 &output_vr,
                 verifier.delta().into_inner(IS_VERIFIER),
             );
-            assert!(!validation);
+            prop_assert!(!validation);
         }
     }
 
@@ -539,7 +539,7 @@ mod tests {
                 &output_vr,
                 verifier.delta().into_inner(IS_VERIFIER),
             );
-            assert!(!validation);
+            prop_assert!(!validation);
         }
     }
 
@@ -556,7 +556,7 @@ mod tests {
             // If all bits are 0, then `delta` never comes into play, so
             // validation "succeeds". Hence, only assert if this is not the case.
             if !bits.into_iter().all(|bit| bit == F2::ZERO) {
-                assert!(!validation);
+                prop_assert!(!validation);
             }
         }
     }
