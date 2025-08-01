@@ -153,6 +153,7 @@ impl<
 mod tests {
     use super::*;
     use crate::authshares::{PartyA, PartyB};
+    use proptest::prelude::*;
     use swanky_aes_rng::AesRng;
     use swanky_ot_alsz_kos::kos;
 
@@ -209,13 +210,15 @@ mod tests {
         (validation_a, validation_b, delta_a, delta_b)
     }
 
-    #[test]
-    fn honest_generation_works() {
-        let ntriples = 1000;
-        let (output_a, output_b, generator_a, generator_b) = generate(ntriples);
-        let (validation_a, validation_b, _, _) =
-            validate(&generator_a, &generator_b, output_a, output_b);
-        assert!(validation_a);
-        assert!(validation_b);
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+        #[test]
+        fn honest_generation_works(ntriples in 320..1000usize) {
+            let (output_a, output_b, generator_a, generator_b) = generate(ntriples);
+            let (validation_a, validation_b, _, _) =
+                validate(&generator_a, &generator_b, output_a, output_b);
+            prop_assert!(validation_a);
+            prop_assert!(validation_b);
+        }
     }
 }
