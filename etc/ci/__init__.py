@@ -399,7 +399,6 @@ def ci() -> None:
     os.environ.update(
         {
             "RUST_BACKTRACE": "1",
-            "PROPTEST_CASES": "256",
             "SWANKY_FLATBUFFER_DO_NOT_GENERATE": "1",
             "RUSTC_WRAPPER": str(ROOT / "etc/ci/wrappers/rustc.py"),
             "CARGO_INCREMENTAL": "0",
