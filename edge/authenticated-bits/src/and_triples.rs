@@ -159,6 +159,8 @@ mod tests {
 
     fn generate(
         ntriples: usize,
+        seed_prover: U8x16,
+        seed_verifier: U8x16,
     ) -> (
         Vec<AndTriple<PartyA>>,
         Vec<AndTriple<PartyB>>,
@@ -169,14 +171,14 @@ mod tests {
         let mut output_b: Vec<AndTriple<PartyB>> = vec![];
         let (generator_a, generator_b) = swanky_channel::local::local_channel_pair(
             |c| {
-                let mut rng = AesRng::new();
+                let mut rng = AesRng::from_seed(seed_prover);
                 let mut generator =
                     AndTripleGenerator::<PartyA, kos::Sender, kos::Receiver>::new(c, &mut rng)?;
                 generator.generate(ntriples, &mut output_a, c, &mut rng)?;
                 Ok(generator)
             },
             |c| {
-                let mut rng = AesRng::new();
+                let mut rng = AesRng::from_seed(seed_verifier);
                 let mut generator =
                     AndTripleGenerator::<PartyB, kos::Sender, kos::Receiver>::new(c, &mut rng)?;
                 generator.generate(ntriples, &mut output_b, c, &mut rng)?;
@@ -213,8 +215,10 @@ mod tests {
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(10))]
         #[test]
-        fn honest_generation_works(ntriples in 320..1000usize) {
-            let (output_a, output_b, generator_a, generator_b) = generate(ntriples);
+        fn honest_generation_works(ntriples in 320..1000usize,
+                                   seed_prover in any::<u128>(),
+                                   seed_verifier in any::<u128>()) {
+            let (output_a, output_b, generator_a, generator_b) = generate(ntriples, seed_prover.into(), seed_verifier.into());
             let (validation_a, validation_b, _, _) =
                 validate(&generator_a, &generator_b, output_a, output_b);
             prop_assert!(validation_a);
