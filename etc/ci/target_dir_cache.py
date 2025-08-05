@@ -1,3 +1,44 @@
+"""
+Cache Design
+============
+
+Unlike many CI caching setups which use remote (e.g. over HTTP) caches, Swanky's caching setup operates exclusively on the CI runner's local disk (via a docker volume). This makes our CI much simpler _and_ much faster.
+
+Hashing Files
+-------------
+
+Like with other CI caching schemes, Swanky's CI setup needs to hash files. As some of our compiled files can get quite large, reading an entire file to hash it can be slow (both due to CPU and due to I/O).
+
+We avoid re-hashing files that we've already hashed by caching the hashes. Once we've hashed a file, we store its hash, along with a cache key, in the file's `xattrs <https://en.wikipedia.org/wiki/Extended_file_attributes>`_. For a cache key, we use (among some other metadata) the file's `mtime` (last  modified timestamp) and it's `inode number <https://en.wikipedia.org/wiki/Inode>`_. This allows us to detect if a file's hash cache is stale, which lets us re-hash it.
+
+Copying Files
+-------------
+
+As part of the CI caching setup, we need to copy files from the cache to ``./target``. To do this efficiently, we want to use `copy-on-write <https://en.wikipedia.org/wiki/Copy-on-write>`_ semantics on filesystems that support it (such as XFS and recent ZFS). This results in copies that take $O(1)$ time, regardless of the size of the file. To achieve this, we use the `copy_file_range() <https://www.man7.org/linux/man-pages/man2/copy_file_range.2.html>`_ system call.
+
+(Note: ``copy_file_range()`` differs from a `hard link <https://en.wikipedia.org/wiki/Hard_link>`_ in that, with ``copy_file_range()``, changing the new file won't affect the old file.)
+
+Caching Builds
+--------------
+To cache builds, our goal is to take advantage of Cargo's caching infrastructure (rather than supplanting it with something like `sccache <https://github.com/mozilla/sccache>`_). Roughly, we want to 'zip' up ``./target`` after a CI run has completed and 'unzip' the most recent ``./target`` directory before the CI run starts.
+
+Each packed ``./target`` directory is associated with the git commit that generated it. On a subsequent CI job, we look through the git log and unpack the ``./target`` directory associated with the most recent git commit.
+
+Content-Addressable Storage
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+While we could, in theory, actually use ``.zip`` files for (un)packing a ``./target`` directory, decompressing a zip file takes time linear in the size of the output file (in contrast to the logical copying procedure described above).
+
+Instead, when we pack a ``./target`` directory, we just record the hashes (using the hashing scheme above) of the ``./target`` files. For each ``./target`` file, we copy (using the above copying scheme) the file to ``/cache/<HASH OF FILE>/``, if that path doesn't already exist. (This provides a `content-adressable storage scheme <https://en.wikipedia.org/wiki/Content-addressable_storage>`_.)
+
+To unpack a ``./target`` directory, we go through the manifest and copy the relevant files from ``/cache/<HASH>`` to ``./target`` using ``copy_file_range()``. After copying the file, since we know what its hash is (because we looked up the file by hash), we populate the file's xattr hash cache.
+
+Modification Times
+^^^^^^^^^^^^^^^^^^
+
+Cargo uses file modification time metadata to determine when a file has been changed. By default, copying a file will set its modification time to the current time. This would tell cargo that every copied file has changed, and it'd invalidate the cache.
+"""
+
 import base64
 import ctypes
 import itertools
