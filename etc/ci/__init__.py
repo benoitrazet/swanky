@@ -201,6 +201,7 @@ class _CrossCompile:
             ]
             + rustc_flags
         )
+        env["RUSTDOCFLAGS"] = env["RUSTFLAGS"]
         # Check that the expected vectoreyes backend matches what's actualy in use
         vectoreyes_backend = (
             subprocess.check_output(
