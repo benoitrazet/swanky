@@ -471,7 +471,7 @@ impl Manifest {
     pub fn hash(&self) -> u64 {
         self.hash
     }
-    pub fn manifest(&self) -> fb::Manifest {
+    pub fn manifest(&self) -> fb::Manifest<'_> {
         unsafe {
             // SAFETY: the buffer was validated on construction
             fb::root_as_manifest_unchecked(&self.buffer)

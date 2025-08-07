@@ -235,7 +235,7 @@ impl TypeStore {
 
     /// Return an [`Iterator`] over the [`TypeId`]-[`TypeSpecification`] pairs
     /// in the [`TypeStore`].
-    pub fn iter(&self) -> std::collections::btree_map::Iter<TypeId, TypeSpecification> {
+    pub fn iter(&self) -> std::collections::btree_map::Iter<'_, TypeId, TypeSpecification> {
         self.0.iter()
     }
 }
@@ -859,12 +859,12 @@ impl FieldInputs {
     }
 
     /// Make an iterator for witness tape.
-    pub fn wit_iter<F>(&mut self) -> TapeF<F> {
+    pub fn wit_iter<F>(&mut self) -> TapeF<'_, F> {
         TapeF(self.wit(), PhantomData)
     }
 
     /// Make an iterator for the instance tape.
-    pub fn ins_iter<F>(&mut self) -> TapeF<F> {
+    pub fn ins_iter<F>(&mut self) -> TapeF<'_, F> {
         TapeF(self.ins(), PhantomData)
     }
 }

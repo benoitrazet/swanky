@@ -105,7 +105,7 @@ pub struct TaskInput<P: Party> {
     pub task_dependencies: TaskDependencies<P>,
 }
 impl<P: Party> TaskInput<P> {
-    pub fn task_data(&self) -> AlignedBytes {
+    pub fn task_data(&self) -> AlignedBytes<'_> {
         self.task_data
             .as_ref()
             .map::<AlignedBytes, _>(|x| <OwnedAlignedBytes as AsRef<AlignedSlice<u8>>>::as_ref(x))
