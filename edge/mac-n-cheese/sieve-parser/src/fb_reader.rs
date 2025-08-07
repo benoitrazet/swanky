@@ -60,7 +60,7 @@ impl MessageReader {
             current_file: None,
         }
     }
-    fn next_root(&mut self) -> eyre::Result<Option<fb::Root>> {
+    fn next_root(&mut self) -> eyre::Result<Option<fb::Root<'_>>> {
         while !self.paths.is_empty() || self.current_file.is_some() {
             match self.current_file.as_mut() {
                 Some(file) => {
@@ -103,7 +103,7 @@ impl MessageReader {
         }
         Ok(None)
     }
-    fn next_relation(&mut self) -> eyre::Result<Option<fb::Relation>> {
+    fn next_relation(&mut self) -> eyre::Result<Option<fb::Relation<'_>>> {
         match self.next_root()? {
             Some(root) => Ok(Some(root.message_as_relation().with_context(|| {
                 format!("wanted relation, got {:?}", root.message_type())
@@ -116,8 +116,8 @@ impl MessageReader {
     ) -> eyre::Result<
         Option<(
             ValueStreamKind,
-            Option<fb::Type>,
-            Option<flatbuffers::Vector<flatbuffers::ForwardsUOffset<fb::Value>>>,
+            Option<fb::Type<'_>>,
+            Option<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<fb::Value<'_>>>>,
         )>,
     > {
         match self.next_root()? {

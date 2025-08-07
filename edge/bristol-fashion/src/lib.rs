@@ -142,7 +142,7 @@ impl<R: BufRead> Reader<R> {
         Self { reader, line, row }
     }
 
-    fn next_line(&mut self) -> Result<Option<SplitWhitespace>, Error> {
+    fn next_line(&mut self) -> Result<Option<SplitWhitespace<'_>>, Error> {
         self.line.clear();
         let n = self.reader.read_line(&mut self.line)?;
         self.row += 1;
@@ -153,7 +153,7 @@ impl<R: BufRead> Reader<R> {
         })
     }
 
-    fn expect_line(&mut self) -> Result<SplitWhitespace, Error> {
+    fn expect_line(&mut self) -> Result<SplitWhitespace<'_>, Error> {
         let row = self.row;
         let ret = self.next_line()?;
         ret.ok_or_else(|| Error::ParseBristolError(format!("unexpected EOF on line {}", row)))

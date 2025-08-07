@@ -150,7 +150,7 @@ impl KeyedArena {
         &self,
         len: usize,
         f: F,
-    ) -> BorrowedAllocation<T> {
+    ) -> BorrowedAllocation<'_, T> {
         let slice = self.arena.alloc_slice_fill_with(len, f);
         assert_eq!(slice.len(), len);
         // borrow this _after_ the slice is built, in case it also wants to allocate.
@@ -182,7 +182,7 @@ impl KeyedArena {
     pub fn borrow_mut<T: 'static + Copy + Sized + Send>(
         &self,
         key: AllocationKey<T>,
-    ) -> BorrowedAllocation<T> {
+    ) -> BorrowedAllocation<'_, T> {
         let mut allocations = self.allocations.borrow_mut();
         let allocation = &mut allocations[key.idx];
         assert_eq!(allocation.type_id, TypeId::of::<T>());

@@ -166,7 +166,7 @@ impl<X> RcRefCell<X> {
     }
 
     /// Get access to the mutable reference.
-    fn get_refmut(&self) -> RefMut<X> {
+    fn get_refmut(&self) -> RefMut<'_, X> {
         (*self.0).borrow_mut()
     }
 }

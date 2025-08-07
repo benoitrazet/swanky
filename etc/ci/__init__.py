@@ -201,6 +201,7 @@ class _CrossCompile:
             ]
             + rustc_flags
         )
+        env["RUSTDOCFLAGS"] = env["RUSTFLAGS"]
         # Check that the expected vectoreyes backend matches what's actualy in use
         vectoreyes_backend = (
             subprocess.check_output(
@@ -532,7 +533,7 @@ def nightly(ctx: click.Context) -> None:
 @click.option(
     "--cache-dir",
     help="[Usually for CI use] path to cache Swanky artifacts",
-    type=click.Path(path_type=Path),
+    type=click.Path(path_type=Path, resolve_path=True),
     required=True,
 )
 @click.pass_context

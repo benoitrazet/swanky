@@ -78,7 +78,7 @@ impl<W: Clone + HasModulus> Bundle<W> {
     }
 
     /// Access the underlying iterator
-    pub fn iter(&self) -> std::slice::Iter<W> {
+    pub fn iter(&self) -> std::slice::Iter<'_, W> {
         self.0.iter()
     }
 

@@ -1024,12 +1024,11 @@ impl<
             let a = &r[idx];
             self.fcom_f2.open(channel, &a.bits, &mut a_vec.as_mut())?;
             self.fcom_fe.open(channel, &[a.value], &mut a_m.as_mut())?;
-            if let WhichParty::Verifier(ev) = P::WHICH {
-                if convert_bits_to_field::<FE>(a_vec.as_ref().into_inner(ev))
+            if let WhichParty::Verifier(ev) = P::WHICH
+                && convert_bits_to_field::<FE>(a_vec.as_ref().into_inner(ev))
                     != a_m.as_ref().into_inner(ev)[0]
-                {
-                    bail!("Wrong open random edabit");
-                }
+            {
+                bail!("Wrong open random edabit");
             }
         }
 

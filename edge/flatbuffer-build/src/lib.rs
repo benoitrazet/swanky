@@ -18,8 +18,10 @@ fn flatbuffer_version() -> &'static str {
 }
 
 const PREFIX: &[u8] = b"// CACHE KEY ";
-const HEADER: &[u8] =
-    b"#![cfg_attr(rustfmt, rustfmt_skip)]\n#![allow(clippy::all)]\n#![allow(unused_imports, unsafe_op_in_unsafe_fn)]\n";
+const HEADER: &[u8] = b"#![cfg_attr(rustfmt, rustfmt_skip)]
+#![allow(clippy::all)]
+#![allow(unused_imports, unsafe_op_in_unsafe_fn, mismatched_lifetime_syntaxes)]
+";
 
 const FLATC_VERSION_MSG: &str = "Running `flatc --version' failed. Do you have flatbuffer installed? Or, did you \
     untentionally change a .fbs file or a _generated.rs file?";

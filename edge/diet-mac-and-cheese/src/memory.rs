@@ -492,25 +492,23 @@ where
         }
 
         // Resizing the memframe_vector if necessary
-        if memframe_is_vector {
-            if let Some(s) = compiled_info.body_max {
-                if (s + 1)
-                    > self.stack[self.top]
-                        .memframe_vector
-                        .len()
-                        .try_into()
-                        .unwrap()
-                {
-                    let how_many = if s + 1 < compiled_info.args_count {
-                        1
-                    } else {
-                        s + 1 - compiled_info.args_count
-                    };
-                    self.stack[self.top]
-                        .memframe_vector
-                        .resize(how_many.try_into().unwrap(), Default::default());
-                }
-            }
+        if memframe_is_vector
+            && let Some(s) = compiled_info.body_max
+            && (s + 1)
+                > self.stack[self.top]
+                    .memframe_vector
+                    .len()
+                    .try_into()
+                    .unwrap()
+        {
+            let how_many = if s + 1 < compiled_info.args_count {
+                1
+            } else {
+                s + 1 - compiled_info.args_count
+            };
+            self.stack[self.top]
+                .memframe_vector
+                .resize(how_many.try_into().unwrap(), Default::default());
         }
     }
 
