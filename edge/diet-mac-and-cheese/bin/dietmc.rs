@@ -243,7 +243,7 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
     match args.witness {
         None => {
             // Verifier mode
-            let mut conns = start_connection_verifier(&[args.connection_addr.clone()])?;
+            let mut conns = start_connection_verifier(std::slice::from_ref(&args.connection_addr))?;
             let stream = conns.pop().unwrap();
 
             let reader = BufReader::new(stream.try_clone()?);
@@ -278,7 +278,7 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
         }
         Some(_) => {
             // Prover mode
-            let mut conns = start_connection_prover(&[args.connection_addr.clone()])?;
+            let mut conns = start_connection_prover(std::slice::from_ref(&args.connection_addr))?;
             let stream = conns.pop().unwrap();
 
             let reader = BufReader::new(stream.try_clone()?);
