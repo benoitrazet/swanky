@@ -370,9 +370,8 @@ fn lsb(input: F128b) -> F2 {
 
 #[cfg(test)]
 mod tests {
-    use crate::authshares::{PartyA, PartyB};
-
     use super::*;
+    use crate::authshares::{PartyA, PartyB};
     use proptest::prelude::*;
     use swanky_aes_rng::AesRng;
     use swanky_ot_alsz_kos::kos;
@@ -434,45 +433,51 @@ mod tests {
         (validation_a, validation_b, delta_a, delta_b)
     }
 
-    #[test]
-    fn honest_generation_works() {
-        let ntriples = 10000;
-        let (output_a, output_b, generator_a, generator_b) = generate(ntriples);
-        let (validation_a, validation_b, _, _) =
-            validate(&generator_a, &generator_b, output_a, output_b);
-        assert!(validation_a);
-        assert!(validation_b);
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+        #[test]
+        fn honest_generation_works(ntriples in 1..10000usize) {
+            let (output_a, output_b, generator_a, generator_b) = generate(ntriples);
+            let (validation_a, validation_b, _, _) =
+                validate(&generator_a, &generator_b, output_a, output_b);
+            prop_assert!(validation_a);
+            prop_assert!(validation_b);
+        }
     }
 
-    #[test]
-    fn combine_works() {
-        let ntriples = 320 * 5;
-        let (output_a, output_b, mut generator_a, mut generator_b) = generate(ntriples);
-        swanky_channel::local::local_channel_pair(
-            |channel| {
-                for bucket in output_a.chunks(5) {
-                    let triple = generator_a.combine(bucket, channel).unwrap();
-                    let result = generator_a.open(&[triple], channel);
-                    assert!(result.is_ok());
-                }
-                Ok(())
-            },
-            |channel| {
-                for bucket in output_b.chunks(5) {
-                    let triple = generator_b.combine(bucket, channel).unwrap();
-                    let result = generator_b.open(&[triple], channel);
-                    assert!(result.is_ok());
-                }
-                Ok(())
-            },
-        )
-        .unwrap();
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+        #[test]
+        fn combine_works(ntriples in 320..3100usize) {
+            let bucket_size = 5;
+            let nleaky = ntriples * bucket_size;
+            let (output_a, output_b, mut generator_a, mut generator_b) = generate(nleaky);
+            swanky_channel::local::local_channel_pair(
+                |channel| {
+                    for bucket in output_a.chunks_exact(bucket_size) {
+                        let triple = generator_a.combine(bucket, channel).unwrap();
+                        let result = generator_a.open(&[triple], channel);
+                        assert!(result.is_ok());
+                    }
+                    Ok(())
+                },
+                |channel| {
+                    for bucket in output_b.chunks_exact(bucket_size) {
+                        let triple = generator_b.combine(bucket, channel).unwrap();
+                        let result = generator_b.open(&[triple], channel);
+                        assert!(result.is_ok());
+                    }
+                    Ok(())
+                },
+            )
+            .unwrap();
+        }
     }
 
     proptest! {
         #[test]
         fn lsb_works(input in any::<u128>()) {
-            assert_eq!(lsb(F128b::from(U8x16::from(input))), F2::from((input & 1) != 0));
+            prop_assert_eq!(lsb(F128b::from(U8x16::from(input))), F2::from((input & 1) != 0));
         }
     }
 }

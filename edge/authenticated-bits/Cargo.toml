@@ -32,3 +32,4 @@ eyre.workspace = true
 
 [dev-dependencies]
 swanky-ot-alsz-kos.workspace = true
+proptest.workspace = true
