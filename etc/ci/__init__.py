@@ -4,6 +4,7 @@ import json
 import os
 import platform
 import shlex
+import shutil
 import subprocess
 from base64 import urlsafe_b64encode
 from dataclasses import dataclass
@@ -257,6 +258,15 @@ def _host_triple() -> str:
     )
 
 
+def _host_build_rustflags() -> list[str]:
+    """What are the standard CI rustflags"""
+    return [
+        "-Clinker-flavor=gcc",
+        "-Clinker=clang",
+        f"-Clink-arg=-fuse-ld={_linker(_host_triple())}",
+    ]
+
+
 def test_rust(
     ctx: click.Context,
     cargo_args: list[str],
@@ -324,14 +334,7 @@ def test_rust(
         # flags that we've set in .cargo/config.toml
         cargo_args += [
             "--config=build.rustflags = "
-            + json.dumps(
-                [
-                    "-Clinker-flavor=gcc",
-                    "-Clinker=clang",
-                    f"-Clink-arg=-fuse-ld={_linker(_host_triple())}",
-                ]
-                + instrument_coverage_flags
-            )
+            + json.dumps(_host_build_rustflags() + instrument_coverage_flags)
         ]
     if code_coverage:
         code_coverage.mkdir(parents=True, exist_ok=True)
@@ -529,16 +532,12 @@ def nightly(ctx: click.Context) -> None:
     split_cobertura(coverage_out / "cobertura.xml", coverage_out / "coverage-split")
 
 
-@ci.command()
-@click.option(
-    "--cache-dir",
-    help="[Usually for CI use] path to cache Swanky artifacts",
-    type=click.Path(path_type=Path, resolve_path=True),
-    required=True,
-)
-@click.pass_context
-def quick(ctx: click.Context, cache_dir: Path) -> None:
-    """Run the quick (non-nightly) CI tests"""
+def _setup_cache_dir(ctx: click.Context, cache_dir: Path) -> Path:
+    """
+    Update the environment for CI caching and unpack a cache
+
+    **Returns:** The cache-key-prefixed cache_dir path
+    """
     cache_dir = (
         cache_dir
         / urlsafe_b64encode(
@@ -558,8 +557,22 @@ def quick(ctx: click.Context, cache_dir: Path) -> None:
             "SWANKY_CACHE_DIR": str(cache_dir),
         }
     )
+    unpack_target_dir(cache_dir)
+    return cache_dir
+
+
+@ci.command()
+@click.option(
+    "--cache-dir",
+    help="[Usually for CI use] path to cache Swanky artifacts",
+    type=click.Path(path_type=Path, resolve_path=True),
+    required=True,
+)
+@click.pass_context
+def quick(ctx: click.Context, cache_dir: Path) -> None:
+    """Run the quick (non-nightly) CI tests"""
+    cache_dir = _setup_cache_dir(ctx, cache_dir)
     try:
-        unpack_target_dir(cache_dir)
         non_rust_tests(ctx)
         test_rust(
             ctx,
@@ -578,3 +591,46 @@ def quick(ctx: click.Context, cache_dir: Path) -> None:
         )
     finally:
         pack_target_dir(cache_dir)
+
+
+@ci.command()
+@click.option(
+    "--cache-dir",
+    help="[Usually for CI use] path to cache Swanky artifacts",
+    type=click.Path(path_type=Path, resolve_path=True),
+    required=True,
+)
+@click.option(
+    "--docs-dir",
+    help="[Usually for CI use] path to write the swanky docs",
+    type=click.Path(path_type=Path, resolve_path=True),
+    required=True,
+)
+@click.option(
+    "--branch",
+    help="[Usually for CI use] what shortname should these docs be labelled as",
+    required=True,
+)
+@click.pass_context
+def push_docs(ctx: click.Context, cache_dir: Path, docs_dir: Path, branch: str) -> None:
+    """Publish the swanky docs"""
+    _setup_cache_dir(ctx, cache_dir)
+    # NOTE: the docs might already be in the cache
+    subprocess.check_call(
+        [
+            "cargo",
+            "doc",
+            "--no-deps",
+            "--verbose",
+            "--config=build.rustflags = " + json.dumps(_host_build_rustflags()),
+        ]
+    )
+    tmp = docs_dir / f".tmp-{uuid4()}"
+    shutil.copytree(os.path.join(os.environ["CARGO_TARGET_DIR"], "doc"), tmp)
+    rev = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip()
+    dst = docs_dir / f"rev-{rev}"
+    tmp.rename(dst)
+    final_dst = docs_dir / branch
+    if final_dst.exists():
+        final_dst.unlink()
+    final_dst.symlink_to(dst)
