@@ -469,6 +469,11 @@ def nightly(ctx: click.Context) -> None:
     # Merge the profile data for each executable into a single lcov file.
     for cov_for_exe in code_coverage.iterdir():
         exe = (cov_for_exe / "exe").resolve()
+        if "rustdoctest" in str(exe):
+            # doctests binaries are written to /tmp and then deleted once they're run. By the time
+            # we reach this loop, the binaries are gone. We also don't care about code coverage on
+            # doctest code, so it's fine to skip it.
+            continue
         if b"__llvm_covmap" not in subprocess.check_output(
             [llvm_bin / "llvm-objdump", "--section-headers", exe]
         ):
