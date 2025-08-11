@@ -257,6 +257,15 @@ def _host_triple() -> str:
     )
 
 
+def _host_build_rustflags() -> list[str]:
+    """What are the standard CI rustflags"""
+    return [
+        "-Clinker-flavor=gcc",
+        "-Clinker=clang",
+        f"-Clink-arg=-fuse-ld={_linker(_host_triple())}",
+    ]
+
+
 def test_rust(
     ctx: click.Context,
     cargo_args: list[str],
@@ -324,14 +333,7 @@ def test_rust(
         # flags that we've set in .cargo/config.toml
         cargo_args += [
             "--config=build.rustflags = "
-            + json.dumps(
-                [
-                    "-Clinker-flavor=gcc",
-                    "-Clinker=clang",
-                    f"-Clink-arg=-fuse-ld={_linker(_host_triple())}",
-                ]
-                + instrument_coverage_flags
-            )
+            + json.dumps(_host_build_rustflags() + instrument_coverage_flags)
         ]
     if code_coverage:
         code_coverage.mkdir(parents=True, exist_ok=True)
