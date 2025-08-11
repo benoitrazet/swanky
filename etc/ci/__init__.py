@@ -531,16 +531,12 @@ def nightly(ctx: click.Context) -> None:
     split_cobertura(coverage_out / "cobertura.xml", coverage_out / "coverage-split")
 
 
-@ci.command()
-@click.option(
-    "--cache-dir",
-    help="[Usually for CI use] path to cache Swanky artifacts",
-    type=click.Path(path_type=Path, resolve_path=True),
-    required=True,
-)
-@click.pass_context
-def quick(ctx: click.Context, cache_dir: Path) -> None:
-    """Run the quick (non-nightly) CI tests"""
+def _setup_cache_dir(ctx: click.Context, cache_dir: Path) -> Path:
+    """
+    Update the environment for CI caching and unpack a cache
+
+    **Returns:** The cache-key-prefixed cache_dir path
+    """
     cache_dir = (
         cache_dir
         / urlsafe_b64encode(
@@ -560,8 +556,22 @@ def quick(ctx: click.Context, cache_dir: Path) -> None:
             "SWANKY_CACHE_DIR": str(cache_dir),
         }
     )
+    unpack_target_dir(cache_dir)
+    return cache_dir
+
+
+@ci.command()
+@click.option(
+    "--cache-dir",
+    help="[Usually for CI use] path to cache Swanky artifacts",
+    type=click.Path(path_type=Path, resolve_path=True),
+    required=True,
+)
+@click.pass_context
+def quick(ctx: click.Context, cache_dir: Path) -> None:
+    """Run the quick (non-nightly) CI tests"""
+    cache_dir = _setup_cache_dir(ctx, cache_dir)
     try:
-        unpack_target_dir(cache_dir)
         non_rust_tests(ctx)
         test_rust(
             ctx,
