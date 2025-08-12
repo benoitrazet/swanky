@@ -619,22 +619,23 @@ def quick(ctx: click.Context, cache_dir: Path) -> None:
 @click.pass_context
 def push_docs(ctx: click.Context, cache_dir: Path, docs_dir: Path, branch: str) -> None:
     """Publish the swanky docs"""
-    _setup_cache_dir(ctx, cache_dir)
-    # NOTE: the docs might already be in the cache
-    subprocess.check_call(
-        [
-            "cargo",
-            "doc",
-            "--no-deps",
-            "--verbose",
-            "--config=build.rustflags = " + json.dumps(_host_build_rustflags()),
-        ]
-    )
-    tmp = docs_dir / f".tmp-{uuid4()}"
-    shutil.copytree(os.path.join(os.environ["CARGO_TARGET_DIR"], "doc"), tmp)
     rev = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip()
     dst = docs_dir / f"rev-{rev}"
-    tmp.rename(dst)
+    if not dst.exists():
+        _setup_cache_dir(ctx, cache_dir)
+        # NOTE: the docs might already be in the cache
+        subprocess.check_call(
+            [
+                "cargo",
+                "doc",
+                "--no-deps",
+                "--verbose",
+                "--config=build.rustflags = " + json.dumps(_host_build_rustflags()),
+            ]
+        )
+        tmp = docs_dir / f".tmp-{uuid4()}"
+        shutil.copytree(os.path.join(os.environ["CARGO_TARGET_DIR"], "doc"), tmp)
+        tmp.rename(dst)
     final_dst = docs_dir / branch
     if final_dst.exists():
         final_dst.unlink()
