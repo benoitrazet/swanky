@@ -6,7 +6,7 @@
 //! $`[x_2]_B`$ is an authenticated bit held by Party B. We define $`x = x_1
 //! \oplus x_2`$.
 //!
-//! This module provides authenticted shares through the [`AuthShare`] type,
+//! This module provides authenticated shares through the [`AuthShare`] type,
 //! alongside [`AuthShareGenerator`] for generating such shares.
 //!
 //! # Details
@@ -80,7 +80,8 @@ pub type PartyB = Verifier;
 
 /// An authenticated share.
 ///
-/// See [`crate::authshares`] for details.
+/// See [`crate::authshares`] for details. [`AuthShare`]s can be generated using
+/// [`AuthShareGenerator`].
 #[derive(Clone, Copy)]
 pub struct AuthShare<P: Party> {
     /// Party A's side of the authenticated share.

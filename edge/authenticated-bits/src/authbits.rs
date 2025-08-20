@@ -108,9 +108,8 @@ struct VerifierAuthBit {
 }
 /// An authenticated bit.
 ///
-/// See [`crate::authbits`] for details. XORing authenticated bits is an
-/// entirely local operation, and hence [`AuthBit`] implements
-/// [`std::ops::BitXor`] and [`std::ops::BitXorAssign`].
+/// See [`crate::authbits`] for details. [`AuthBit`]s can be generated using
+/// [`AuthBitGenerator`].
 #[derive(Clone, Copy)]
 pub struct AuthBit<P: Party>(PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>);
 
