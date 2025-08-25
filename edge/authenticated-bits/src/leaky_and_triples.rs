@@ -43,10 +43,28 @@ pub(crate) struct LeakyAndTriple<P: Party> {
     z: AuthShare<P>,
 }
 
+impl<P: Party> LeakyAndTriple<P> {
+    /// The authenticated share $`\langle x \rangle`$.
+    pub(crate) fn x(&self) -> AuthShare<P> {
+        self.x
+    }
+
+    /// The authenticated share $`\langle y \rangle`$.
+    pub(crate) fn y(&self) -> AuthShare<P> {
+        self.y
+    }
+
+    /// The authenticated share $`\langle z \rangle`$ such that $`z = x \cdot
+    /// y`$.
+    pub(crate) fn z(&self) -> AuthShare<P> {
+        self.z
+    }
+}
+
 /// A type for generating [`LeakyAndTriple`]s.
 pub(crate) struct LeakyAndTripleGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver>
 {
-    auth_share_generator: AuthShareGenerator<P, OTS, OTR>,
+    pub(crate) auth_share_generator: AuthShareGenerator<P, OTS, OTR>,
 }
 
 impl<
