@@ -61,6 +61,24 @@ impl<P: Party> From<LeakyAndTriple<P>> for AndTriple<P> {
     }
 }
 
+impl<P: Party> AndTriple<P> {
+    /// The authenticated share $`\langle x \rangle`$.
+    pub fn x(&self) -> AuthShare<P> {
+        self.0.x()
+    }
+
+    /// The authenticated share $`\langle y \rangle`$.
+    pub fn y(&self) -> AuthShare<P> {
+        self.0.y()
+    }
+
+    /// The authenticated share $`\langle z \rangle`$ such that $`z = x \cdot
+    /// y`$.
+    pub fn z(&self) -> AuthShare<P> {
+        self.0.z()
+    }
+}
+
 /// A type for generating [`AndTriple`]s.
 pub struct AndTripleGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver> {
     leaky_generator: LeakyAndTripleGenerator<P, OTS, OTR>,
