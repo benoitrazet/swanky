@@ -93,6 +93,10 @@ impl<
     }
 
     /// Generate a vector of AND triples.
+    ///
+    /// # Panics
+    /// This panics if `ntriples < 320`, as 320 is the minimum number
+    /// of ntriples that can be generated.
     pub fn generate<RNG: CryptoRng + Rng>(
         &mut self,
         ntriples: usize,
@@ -110,7 +114,7 @@ impl<
         } else if ntriples >= 320 {
             5
         } else {
-            return Err(eyre::Error::msg("Too few triples: Must be >= 320"));
+            panic!("Too few triples: Must be >= 320");
         };
         let nleaky = ntriples * bucket_size;
         let mut leaky_ands = Vec::with_capacity(nleaky);
