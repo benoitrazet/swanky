@@ -46,7 +46,8 @@ use vectoreyes::U8x16;
 
 /// An AND triple.
 ///
-/// See [`crate::and_triples`] for details.
+/// See [`crate::and_triples`] for details. [`AndTriple`]s can be generated using
+/// [`AndTripleGenerator`].
 #[derive(Clone, Copy, TransparentWrapper)]
 #[repr(transparent)]
 pub struct AndTriple<P: Party>(
