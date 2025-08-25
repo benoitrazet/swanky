@@ -180,70 +180,81 @@ mod tests {
     use swanky_aes_rng::AesRng;
     use swanky_ot_alsz_kos::kos;
 
-    fn generate(
-        ntriples: usize,
-        seed_prover: U8x16,
-        seed_verifier: U8x16,
+    fn generators(
+        mut rng_a: &mut AesRng,
+        mut rng_b: &mut AesRng,
     ) -> (
-        Vec<AndTriple<PartyA>>,
-        Vec<AndTriple<PartyB>>,
         AndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
         AndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
     ) {
-        let mut output_a: Vec<AndTriple<PartyA>> = vec![];
-        let mut output_b: Vec<AndTriple<PartyB>> = vec![];
-        let (generator_a, generator_b) = swanky_channel::local::local_channel_pair(
+        swanky_channel::local::local_channel_pair(
             |c| {
-                let mut rng = AesRng::from_seed(seed_prover);
-                let mut generator =
-                    AndTripleGenerator::<PartyA, kos::Sender, kos::Receiver>::new(c, &mut rng)?;
-                generator.generate(ntriples, &mut output_a, c, &mut rng)?;
+                let generator =
+                    AndTripleGenerator::<PartyA, kos::Sender, kos::Receiver>::new(c, &mut rng_a)?;
                 Ok(generator)
             },
             |c| {
-                let mut rng = AesRng::from_seed(seed_verifier);
-                let mut generator =
-                    AndTripleGenerator::<PartyB, kos::Sender, kos::Receiver>::new(c, &mut rng)?;
-                generator.generate(ntriples, &mut output_b, c, &mut rng)?;
+                let generator =
+                    AndTripleGenerator::<PartyB, kos::Sender, kos::Receiver>::new(c, &mut rng_b)?;
                 Ok(generator)
             },
         )
-        .unwrap();
-        (output_a, output_b, generator_a, generator_b)
+        .unwrap()
     }
 
-    fn validate(
+    fn generate_triples(
+        ntriples: usize,
+        generator_a: &mut AndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
+        generator_b: &mut AndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
+        mut rng_a: &mut AesRng,
+        mut rng_b: &mut AesRng,
+    ) -> (Vec<AndTriple<PartyA>>, Vec<AndTriple<PartyB>>) {
+        swanky_channel::local::local_channel_pair(
+            |c| {
+                let mut triples: Vec<AndTriple<PartyA>> = vec![];
+                generator_a.generate(ntriples, &mut triples, c, &mut rng_a)?;
+                Ok(triples)
+            },
+            |c| {
+                let mut triples: Vec<AndTriple<PartyB>> = vec![];
+                generator_b.generate(ntriples, &mut triples, c, &mut rng_b)?;
+                Ok(triples)
+            },
+        )
+        .unwrap()
+    }
+
+    fn validate_triples(
         generator_a: &AndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
         generator_b: &AndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
-        output_a: Vec<AndTriple<PartyA>>,
-        output_b: Vec<AndTriple<PartyB>>,
-    ) -> (bool, bool, U8x16, U8x16) {
-        let ((validation_a, delta_a), (validation_b, delta_b)) =
-            swanky_channel::local::local_channel_pair(
-                |c| {
-                    let result = generator_a.open(&output_a, c);
-                    let delta = generator_a.delta();
-                    Ok((result.is_ok(), delta))
-                },
-                |c| {
-                    let result = generator_b.open(&output_b, c);
-                    let delta = generator_b.delta();
-                    Ok((result.is_ok(), delta))
-                },
-            )
-            .unwrap();
-        (validation_a, validation_b, delta_a, delta_b)
+        triples_a: Vec<AndTriple<PartyA>>,
+        triples_b: Vec<AndTriple<PartyB>>,
+    ) -> (bool, bool) {
+        swanky_channel::local::local_channel_pair(
+            |c| {
+                let result = generator_a.open(&triples_a, c);
+                Ok(result.is_ok())
+            },
+            |c| {
+                let result = generator_b.open(&triples_b, c);
+                Ok(result.is_ok())
+            },
+        )
+        .unwrap()
     }
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(10))]
         #[test]
         fn honest_generation_works(ntriples in 320..1000usize,
-                                   seed_prover in any::<u128>(),
-                                   seed_verifier in any::<u128>()) {
-            let (output_a, output_b, generator_a, generator_b) = generate(ntriples, seed_prover.into(), seed_verifier.into());
-            let (validation_a, validation_b, _, _) =
-                validate(&generator_a, &generator_b, output_a, output_b);
+                                   seed_a in any::<u128>(),
+                                   seed_b in any::<u128>()) {
+            let mut rng_a = AesRng::from_seed(seed_a.into());
+            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (triples_a, triples_b) = generate_triples(ntriples, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            let (validation_a, validation_b) =
+                validate_triples(&generator_a, &generator_b, triples_a, triples_b);
             prop_assert!(validation_a);
             prop_assert!(validation_b);
         }
