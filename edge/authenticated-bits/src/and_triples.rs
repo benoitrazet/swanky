@@ -34,14 +34,19 @@
 //! Garbling for Faster Secure Two-Party Computation".
 //! <https://eprint.iacr.org/2018/578.pdf>
 
-use crate::leaky_and_triples::{LeakyAndTriple, LeakyAndTripleGenerator};
+use crate::{
+    authshares::{AuthShare, AuthShareGenerator},
+    leaky_and_triples::{LeakyAndTriple, LeakyAndTripleGenerator},
+};
 use bytemuck::TransparentWrapper;
 use rand::{CryptoRng, Rng, SeedableRng, seq::SliceRandom};
 use swanky_adversary::Malicious;
 use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
-use swanky_party::Party;
+use swanky_party::{Party, WhichParty};
 use vectoreyes::U8x16;
 
 /// An AND triple.
@@ -166,9 +171,69 @@ impl<
             .open(AndTriple::peel_slice(triples), channel)
     }
 
+    /// Turn a random AND triple into a "known" AND triple.
+    ///
+    /// Given random AND triple $`(\langle x \rangle, \langle y \rangle, \langle
+    /// z \rangle)`$ such that $`x \cdot y = z`$ and authenticated shares
+    /// $`\langle a \rangle`$ and $`\langle b \rangle`$, output AND triple
+    /// $`(\langle a \rangle, \langle b \rangle, \langle c \rangle`$ such that
+    /// $`a \cdot b = c`$.
+    pub fn to_known_triple(
+        &self,
+        random: &AndTriple<P>,
+        a: &AuthShare<P>,
+        b: &AuthShare<P>,
+        channel: &mut Channel,
+    ) -> eyre::Result<AuthShare<P>> {
+        let f = *a ^ random.x();
+        let g = *b ^ random.y();
+        let (f, g) = match P::WHICH {
+            WhichParty::Prover(_) => {
+                channel.write(&f.bit())?;
+                channel.write(&g.bit())?;
+                let f2: F2 = channel.read()?;
+                let g2: F2 = channel.read()?;
+                let f = f.bit() + f2;
+                let g = g.bit() + g2;
+                (f, g)
+            }
+            WhichParty::Verifier(_) => {
+                let f1: F2 = channel.read()?;
+                let g1: F2 = channel.read()?;
+                channel.write(&f.bit())?;
+                channel.write(&g.bit())?;
+                let f = f.bit() + f1;
+                let g = g.bit() + g1;
+                (f, g)
+            }
+        };
+        let mut c = random.z();
+        if f == F2::ONE {
+            c = c ^ random.y();
+        }
+        if g == F2::ONE {
+            c = c ^ random.x();
+        }
+        let c = self
+            .leaky_generator
+            .auth_share_generator
+            .xor_with_const(c, f * g);
+        Ok(c)
+    }
+
     /// The $`\Delta`$ value used to validate the other party's shares.
     pub fn delta(&self) -> U8x16 {
         self.leaky_generator.delta()
+    }
+
+    /// Return the [`AuthShareGenerator`] associated with this generator.
+    pub fn auth_share_generator(&self) -> &AuthShareGenerator<P, OTS, OTR> {
+        &self.leaky_generator.auth_share_generator
+    }
+
+    /// Return the _mutable_ [`AuthShareGenerator`] associated with this generator.
+    pub fn auth_share_generator_mut(&mut self) -> &mut AuthShareGenerator<P, OTS, OTR> {
+        &mut self.leaky_generator.auth_share_generator
     }
 }
 
@@ -224,6 +289,38 @@ mod tests {
         .unwrap()
     }
 
+    fn generate_shares(
+        nshares: usize,
+        generator_a: &mut AndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
+        generator_b: &mut AndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
+        mut rng_a: &mut AesRng,
+        mut rng_b: &mut AesRng,
+    ) -> (Vec<AuthShare<PartyA>>, Vec<AuthShare<PartyB>>) {
+        swanky_channel::local::local_channel_pair(
+            |c| {
+                let mut shares: Vec<AuthShare<PartyA>> = vec![];
+                generator_a.auth_share_generator_mut().generate(
+                    nshares,
+                    &mut shares,
+                    c,
+                    &mut rng_a,
+                )?;
+                Ok(shares)
+            },
+            |c| {
+                let mut shares: Vec<AuthShare<PartyB>> = vec![];
+                generator_b.auth_share_generator_mut().generate(
+                    nshares,
+                    &mut shares,
+                    c,
+                    &mut rng_b,
+                )?;
+                Ok(shares)
+            },
+        )
+        .unwrap()
+    }
+
     fn validate_triples(
         generator_a: &AndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
         generator_b: &AndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
@@ -257,6 +354,90 @@ mod tests {
                 validate_triples(&generator_a, &generator_b, triples_a, triples_b);
             prop_assert!(validation_a);
             prop_assert!(validation_b);
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+        #[test]
+        fn fixing_and_triples_works(ntriples in 320..1000usize,
+                                    seed_a in any::<u128>(),
+                                    seed_b in any::<u128>()) {
+            let mut rng_a = AesRng::from_seed(seed_a.into());
+            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (triples_a, triples_b) = generate_triples(
+                ntriples,
+                &mut generator_a,
+                &mut generator_b,
+                &mut rng_a,
+                &mut rng_b,
+            );
+            let (shares_a, shares_b) = generate_shares(
+                ntriples * 2,
+                &mut generator_a,
+                &mut generator_b,
+                &mut rng_a,
+                &mut rng_b,
+            );
+            // Convert the random triples to known triples.
+            let mut cs_a = vec![];
+            let mut cs_b = vec![];
+            swanky_channel::local::local_channel_pair(
+                |channel| {
+                    for (triple, shares) in triples_a.iter().zip(shares_a.chunks_exact(2)) {
+                        let c = generator_a.to_known_triple(triple, &shares[0], &shares[1], channel)?;
+                        cs_a.push(c);
+                    }
+                    Ok(())
+                },
+                |channel| {
+                    for (triple, shares) in triples_b.iter().zip(shares_b.chunks_exact(2)) {
+                        let c = generator_b.to_known_triple(triple, &shares[0], &shares[1], channel)?;
+                        cs_b.push(c);
+                    }
+                    Ok(())
+                },
+            )
+            .unwrap();
+            // Open the shares and triples to check validity.
+            let ((shares_a, cs_a), (shares_b, cs_b)) = swanky_channel::local::local_channel_pair(
+                |channel| {
+                    let mut shares: Vec<F2> = vec![];
+                    let mut cs: Vec<F2> = vec![];
+                    generator_a
+                        .auth_share_generator()
+                        .open(&shares_a, &mut shares, channel)?;
+                    generator_a
+                        .auth_share_generator()
+                        .open(&cs_a, &mut cs, channel)?;
+                    Ok((shares, cs))
+                },
+                |channel| {
+                    let mut shares: Vec<F2> = vec![];
+                    let mut cs: Vec<F2> = vec![];
+                    generator_b
+                        .auth_share_generator()
+                        .open(&shares_b, &mut shares, channel)?;
+                    generator_b
+                        .auth_share_generator()
+                        .open(&cs_b, &mut cs, channel)?;
+                    Ok((shares, cs))
+                },
+            )
+            .unwrap();
+            // Check validity of all the triples.
+            for i in 0..ntriples {
+                // `auth_share_generator().open()` should ensure that the opened
+                // shares are the same.
+                assert_eq!(shares_a[2 * i], shares_b[2 * i]);
+                assert_eq!(shares_a[2 * i + 1], shares_b[2 * i + 1]);
+                assert_eq!(cs_a[i], cs_b[i]);
+                let a = shares_a[2 * i];
+                let b = shares_a[2 * i + 1];
+                let c = cs_a[i];
+                assert_eq!(a * b, c);
+            }
         }
     }
 }
