@@ -185,6 +185,24 @@ impl<
         b: &AuthShare<P>,
         channel: &mut Channel,
     ) -> eyre::Result<AuthShare<P>> {
+        // The protocol works as follows. The random AND triple `⟨x⟩, ⟨y⟩, ⟨z⟩`
+        // is used to "mask" the `⟨a⟩` and `⟨b⟩` shares so they can be opened.
+        // These are then used to compute `⟨c⟩ := ⟨a b⟩`.
+        //
+        // In particular, the parties compute:
+        // ```
+        //     ⟨c⟩ := ⟨z⟩ ⊕ f ⟨y⟩ ⊕ g ⟨x⟩ ⊕ f g
+        // ```
+        // where `f := ⟨a⟩ ⊕ ⟨x⟩` and `g := ⟨b⟩ ⊕ ⟨y⟩` are opened between each
+        // party. Note that the above formula can be expanded into:
+        // ```
+        //     ⟨z⟩ ⊕ (⟨a⟩ ⊕ ⟨x⟩) ⟨y⟩ ⊕ (⟨b⟩ ⊕ ⟨y⟩) ⟨x⟩ ⊕ (⟨a⟩ ⊕ ⟨x⟩) (⟨b⟩ ⊕ ⟨y⟩)
+        // =>  ⟨z⟩ ⊕ ⟨a⟩⟨y⟩ ⊕ ⟨x⟩⟨y⟩ ⊕ ⟨b⟩⟨x⟩ ⊕ ⟨y⟩⟨x⟩ ⊕ ⟨a⟩⟨b⟩ ⊕ ⟨a⟩⟨y⟩ ⊕ ⟨x⟩⟨b⟩ ⊕ ⟨x⟩⟨y⟩
+        // =>  ⟨a⟩⟨b⟩
+        // ```
+        // which is what we want.
+
+        // Compute openings of `f := ⟨a⟩ ⊕ ⟨x⟩` and `g := ⟨b⟩ ⊕ ⟨y⟩`.
         let f = *a ^ random.x();
         let g = *b ^ random.y();
         let (f, g) = match P::WHICH {
@@ -207,6 +225,7 @@ impl<
                 (f, g)
             }
         };
+        // Compute `⟨c⟩ := ⟨z⟩ ⊕ f ⟨y⟩ ⊕ g ⟨x⟩ ⊕ f g`.
         let mut c = random.z();
         if f == F2::ONE {
             c = c ^ random.y();
