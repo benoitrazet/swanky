@@ -185,9 +185,11 @@ impl<
         b: &AuthShare<P>,
         channel: &mut Channel,
     ) -> eyre::Result<AuthShare<P>> {
-        // The protocol works as follows. The random AND triple `⟨x⟩, ⟨y⟩, ⟨z⟩`
-        // is used to "mask" the `⟨a⟩` and `⟨b⟩` shares so they can be opened.
-        // These are then used to compute `⟨c⟩ := ⟨a b⟩`.
+        // We convert from a random triple to a known triple using a trick from
+        // [1] (although at this point it's largely considered a "standard
+        // technique"). The protocol works as follows. The random AND triple
+        // `⟨x⟩, ⟨y⟩, ⟨z⟩` is used to "mask" the `⟨a⟩` and `⟨b⟩` shares so they
+        // can be opened. These are then used to compute `⟨c⟩ := ⟨a b⟩`.
         //
         // In particular, the parties compute:
         // ```
@@ -201,6 +203,9 @@ impl<
         // =>  ⟨a⟩⟨b⟩
         // ```
         // which is what we want.
+        //
+        // [1]: "Efficient multiparty protocols using circuit randomization." D.
+        //     Beaver. CRYPTO 1991.
 
         // Compute openings of `f := ⟨a⟩ ⊕ ⟨x⟩` and `g := ⟨b⟩ ⊕ ⟨y⟩`.
         let f = *a ^ random.x();
