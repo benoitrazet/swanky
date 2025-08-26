@@ -43,10 +43,28 @@ pub(crate) struct LeakyAndTriple<P: Party> {
     z: AuthShare<P>,
 }
 
+impl<P: Party> LeakyAndTriple<P> {
+    /// The authenticated share $`\langle x \rangle`$.
+    pub(crate) fn x(&self) -> AuthShare<P> {
+        self.x
+    }
+
+    /// The authenticated share $`\langle y \rangle`$.
+    pub(crate) fn y(&self) -> AuthShare<P> {
+        self.y
+    }
+
+    /// The authenticated share $`\langle z \rangle`$ such that $`z = x \cdot
+    /// y`$.
+    pub(crate) fn z(&self) -> AuthShare<P> {
+        self.z
+    }
+}
+
 /// A type for generating [`LeakyAndTriple`]s.
 pub(crate) struct LeakyAndTripleGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver>
 {
-    auth_share_generator: AuthShareGenerator<P, OTS, OTR>,
+    pub(crate) auth_share_generator: AuthShareGenerator<P, OTS, OTR>,
 }
 
 impl<
@@ -373,41 +391,54 @@ mod tests {
     use super::*;
     use crate::authshares::{PartyA, PartyB};
     use proptest::prelude::*;
+    use rand::SeedableRng;
     use swanky_aes_rng::AesRng;
     use swanky_ot_alsz_kos::kos;
 
-    fn generate(
-        ntriples: usize,
+    fn generators(
+        mut rng_a: &mut AesRng,
+        mut rng_b: &mut AesRng,
     ) -> (
-        Vec<LeakyAndTriple<PartyA>>,
-        Vec<LeakyAndTriple<PartyB>>,
         LeakyAndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
         LeakyAndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
     ) {
-        let mut output_a: Vec<LeakyAndTriple<PartyA>> = vec![];
-        let mut output_b: Vec<LeakyAndTriple<PartyB>> = vec![];
-        let (generator_a, generator_b) = swanky_channel::local::local_channel_pair(
+        swanky_channel::local::local_channel_pair(
             |c| {
-                let mut rng = AesRng::new();
-                let mut generator =
-                    LeakyAndTripleGenerator::<PartyA, kos::Sender, kos::Receiver>::new(
-                        c, &mut rng,
-                    )?;
-                generator.generate(ntriples, &mut output_a, c, &mut rng)?;
+                let generator = LeakyAndTripleGenerator::<PartyA, kos::Sender, kos::Receiver>::new(
+                    c, &mut rng_a,
+                )?;
                 Ok(generator)
             },
             |c| {
-                let mut rng = AesRng::new();
-                let mut generator =
-                    LeakyAndTripleGenerator::<PartyB, kos::Sender, kos::Receiver>::new(
-                        c, &mut rng,
-                    )?;
-                generator.generate(ntriples, &mut output_b, c, &mut rng)?;
+                let generator = LeakyAndTripleGenerator::<PartyB, kos::Sender, kos::Receiver>::new(
+                    c, &mut rng_b,
+                )?;
                 Ok(generator)
             },
         )
-        .unwrap();
-        (output_a, output_b, generator_a, generator_b)
+        .unwrap()
+    }
+
+    fn generate_triples(
+        ntriples: usize,
+        generator_a: &mut LeakyAndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
+        generator_b: &mut LeakyAndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
+        mut rng_a: &mut AesRng,
+        mut rng_b: &mut AesRng,
+    ) -> (Vec<LeakyAndTriple<PartyA>>, Vec<LeakyAndTriple<PartyB>>) {
+        swanky_channel::local::local_channel_pair(
+            |c| {
+                let mut triples: Vec<LeakyAndTriple<PartyA>> = vec![];
+                generator_a.generate(ntriples, &mut triples, c, &mut rng_a)?;
+                Ok(triples)
+            },
+            |c| {
+                let mut triples: Vec<LeakyAndTriple<PartyB>> = vec![];
+                generator_b.generate(ntriples, &mut triples, c, &mut rng_b)?;
+                Ok(triples)
+            },
+        )
+        .unwrap()
     }
 
     fn validate(
@@ -415,31 +446,32 @@ mod tests {
         generator_b: &LeakyAndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
         output_a: Vec<LeakyAndTriple<PartyA>>,
         output_b: Vec<LeakyAndTriple<PartyB>>,
-    ) -> (bool, bool, U8x16, U8x16) {
-        let ((validation_a, delta_a), (validation_b, delta_b)) =
-            swanky_channel::local::local_channel_pair(
-                |c| {
-                    let result = generator_a.open(&output_a, c);
-                    let delta = generator_a.delta();
-                    Ok((result.is_ok(), delta))
-                },
-                |c| {
-                    let result = generator_b.open(&output_b, c);
-                    let delta = generator_b.delta();
-                    Ok((result.is_ok(), delta))
-                },
-            )
-            .unwrap();
-        (validation_a, validation_b, delta_a, delta_b)
+    ) -> (bool, bool) {
+        swanky_channel::local::local_channel_pair(
+            |c| {
+                let result = generator_a.open(&output_a, c);
+                Ok(result.is_ok())
+            },
+            |c| {
+                let result = generator_b.open(&output_b, c);
+                Ok(result.is_ok())
+            },
+        )
+        .unwrap()
     }
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(10))]
         #[test]
-        fn honest_generation_works(ntriples in 1..10000usize) {
-            let (output_a, output_b, generator_a, generator_b) = generate(ntriples);
-            let (validation_a, validation_b, _, _) =
-                validate(&generator_a, &generator_b, output_a, output_b);
+        fn honest_generation_works(ntriples in 1..10000usize,
+                                   seed_a in any::<u128>(),
+                                   seed_b in any::<u128>()) {
+            let mut rng_a = AesRng::from_seed(seed_a.into());
+            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (triples_a, triples_b) = generate_triples(ntriples, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            let (validation_a, validation_b) =
+                validate(&generator_a, &generator_b, triples_a, triples_b);
             prop_assert!(validation_a);
             prop_assert!(validation_b);
         }
@@ -448,13 +480,18 @@ mod tests {
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(10))]
         #[test]
-        fn combine_works(ntriples in 320..3100usize) {
+        fn combine_works(ntriples in 320..3100usize,
+                         seed_a in any::<u128>(),
+                         seed_b in any::<u128>()) {
             let bucket_size = 5;
             let nleaky = ntriples * bucket_size;
-            let (output_a, output_b, mut generator_a, mut generator_b) = generate(nleaky);
+            let mut rng_a = AesRng::from_seed(seed_a.into());
+            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (triples_a, triples_b) = generate_triples(nleaky, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
             swanky_channel::local::local_channel_pair(
                 |channel| {
-                    for bucket in output_a.chunks_exact(bucket_size) {
+                    for bucket in triples_a.chunks_exact(bucket_size) {
                         let triple = generator_a.combine(bucket, channel).unwrap();
                         let result = generator_a.open(&[triple], channel);
                         assert!(result.is_ok());
@@ -462,7 +499,7 @@ mod tests {
                     Ok(())
                 },
                 |channel| {
-                    for bucket in output_b.chunks_exact(bucket_size) {
+                    for bucket in triples_b.chunks_exact(bucket_size) {
                         let triple = generator_b.combine(bucket, channel).unwrap();
                         let result = generator_b.open(&[triple], channel);
                         assert!(result.is_ok());

@@ -34,19 +34,25 @@
 //! Garbling for Faster Secure Two-Party Computation".
 //! <https://eprint.iacr.org/2018/578.pdf>
 
-use crate::leaky_and_triples::{LeakyAndTriple, LeakyAndTripleGenerator};
+use crate::{
+    authshares::{AuthShare, AuthShareGenerator},
+    leaky_and_triples::{LeakyAndTriple, LeakyAndTripleGenerator},
+};
 use bytemuck::TransparentWrapper;
 use rand::{CryptoRng, Rng, SeedableRng, seq::SliceRandom};
 use swanky_adversary::Malicious;
 use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
-use swanky_party::Party;
+use swanky_party::{Party, WhichParty};
 use vectoreyes::U8x16;
 
 /// An AND triple.
 ///
-/// See [`crate::and_triples`] for details.
+/// See [`crate::and_triples`] for details. [`AndTriple`]s can be generated using
+/// [`AndTripleGenerator`].
 #[derive(Clone, Copy, TransparentWrapper)]
 #[repr(transparent)]
 pub struct AndTriple<P: Party>(
@@ -57,6 +63,24 @@ pub struct AndTriple<P: Party>(
 impl<P: Party> From<LeakyAndTriple<P>> for AndTriple<P> {
     fn from(value: LeakyAndTriple<P>) -> Self {
         Self(value)
+    }
+}
+
+impl<P: Party> AndTriple<P> {
+    /// The authenticated share $`\langle x \rangle`$.
+    pub fn x(&self) -> AuthShare<P> {
+        self.0.x()
+    }
+
+    /// The authenticated share $`\langle y \rangle`$.
+    pub fn y(&self) -> AuthShare<P> {
+        self.0.y()
+    }
+
+    /// The authenticated share $`\langle z \rangle`$ such that $`z = x \cdot
+    /// y`$.
+    pub fn z(&self) -> AuthShare<P> {
+        self.0.z()
     }
 }
 
@@ -92,6 +116,10 @@ impl<
     }
 
     /// Generate a vector of AND triples.
+    ///
+    /// # Panics
+    /// This panics if `ntriples < 320`, as 320 is the minimum number
+    /// of ntriples that can be generated.
     pub fn generate<RNG: CryptoRng + Rng>(
         &mut self,
         ntriples: usize,
@@ -109,7 +137,7 @@ impl<
         } else if ntriples >= 320 {
             5
         } else {
-            return Err(eyre::Error::msg("Too few triples: Must be >= 320"));
+            panic!("Too few triples: Must be >= 320");
         };
         let nleaky = ntriples * bucket_size;
         let mut leaky_ands = Vec::with_capacity(nleaky);
@@ -143,9 +171,93 @@ impl<
             .open(AndTriple::peel_slice(triples), channel)
     }
 
+    /// Turn a random AND triple into a "known" AND triple.
+    ///
+    /// Given random AND triple $`(\langle x \rangle, \langle y \rangle, \langle
+    /// z \rangle)`$ such that $`x \cdot y = z`$ and authenticated shares
+    /// $`\langle a \rangle`$ and $`\langle b \rangle`$, output AND triple
+    /// $`(\langle a \rangle, \langle b \rangle, \langle c \rangle`$ such that
+    /// $`a \cdot b = c`$.
+    pub fn to_known_triple(
+        &self,
+        random: &AndTriple<P>,
+        a: &AuthShare<P>,
+        b: &AuthShare<P>,
+        channel: &mut Channel,
+    ) -> eyre::Result<AuthShare<P>> {
+        // We convert from a random triple to a known triple using a trick from
+        // [1] (although at this point it's largely considered a "standard
+        // technique"). The protocol works as follows. The random AND triple
+        // `⟨x⟩, ⟨y⟩, ⟨z⟩` is used to "mask" the `⟨a⟩` and `⟨b⟩` shares so they
+        // can be opened. These are then used to compute `⟨c⟩ := ⟨a b⟩`.
+        //
+        // In particular, the parties compute:
+        // ```
+        //     ⟨c⟩ := ⟨z⟩ ⊕ f ⟨y⟩ ⊕ g ⟨x⟩ ⊕ f g
+        // ```
+        // where `f := ⟨a⟩ ⊕ ⟨x⟩` and `g := ⟨b⟩ ⊕ ⟨y⟩` are opened between each
+        // party. Note that the above formula can be expanded into:
+        // ```
+        //     ⟨z⟩ ⊕ (⟨a⟩ ⊕ ⟨x⟩) ⟨y⟩ ⊕ (⟨b⟩ ⊕ ⟨y⟩) ⟨x⟩ ⊕ (⟨a⟩ ⊕ ⟨x⟩) (⟨b⟩ ⊕ ⟨y⟩)
+        // =>  ⟨z⟩ ⊕ ⟨a⟩⟨y⟩ ⊕ ⟨x⟩⟨y⟩ ⊕ ⟨b⟩⟨x⟩ ⊕ ⟨y⟩⟨x⟩ ⊕ ⟨a⟩⟨b⟩ ⊕ ⟨a⟩⟨y⟩ ⊕ ⟨x⟩⟨b⟩ ⊕ ⟨x⟩⟨y⟩
+        // =>  ⟨a⟩⟨b⟩
+        // ```
+        // which is what we want.
+        //
+        // [1]: "Efficient multiparty protocols using circuit randomization." D.
+        //     Beaver. CRYPTO 1991.
+
+        // Compute openings of `f := ⟨a⟩ ⊕ ⟨x⟩` and `g := ⟨b⟩ ⊕ ⟨y⟩`.
+        let f = *a ^ random.x();
+        let g = *b ^ random.y();
+        let (f, g) = match P::WHICH {
+            WhichParty::Prover(_) => {
+                channel.write(&f.bit())?;
+                channel.write(&g.bit())?;
+                let f2: F2 = channel.read()?;
+                let g2: F2 = channel.read()?;
+                let f = f.bit() + f2;
+                let g = g.bit() + g2;
+                (f, g)
+            }
+            WhichParty::Verifier(_) => {
+                let f1: F2 = channel.read()?;
+                let g1: F2 = channel.read()?;
+                channel.write(&f.bit())?;
+                channel.write(&g.bit())?;
+                let f = f.bit() + f1;
+                let g = g.bit() + g1;
+                (f, g)
+            }
+        };
+        // Compute `⟨c⟩ := ⟨z⟩ ⊕ f ⟨y⟩ ⊕ g ⟨x⟩ ⊕ f g`.
+        let mut c = random.z();
+        if f == F2::ONE {
+            c = c ^ random.y();
+        }
+        if g == F2::ONE {
+            c = c ^ random.x();
+        }
+        let c = self
+            .leaky_generator
+            .auth_share_generator
+            .xor_with_const(c, f * g);
+        Ok(c)
+    }
+
     /// The $`\Delta`$ value used to validate the other party's shares.
     pub fn delta(&self) -> U8x16 {
         self.leaky_generator.delta()
+    }
+
+    /// Return the [`AuthShareGenerator`] associated with this generator.
+    pub fn auth_share_generator(&self) -> &AuthShareGenerator<P, OTS, OTR> {
+        &self.leaky_generator.auth_share_generator
+    }
+
+    /// Return the _mutable_ [`AuthShareGenerator`] associated with this generator.
+    pub fn auth_share_generator_mut(&mut self) -> &mut AuthShareGenerator<P, OTS, OTR> {
+        &mut self.leaky_generator.auth_share_generator
     }
 }
 
@@ -157,72 +269,199 @@ mod tests {
     use swanky_aes_rng::AesRng;
     use swanky_ot_alsz_kos::kos;
 
-    fn generate(
-        ntriples: usize,
-        seed_prover: U8x16,
-        seed_verifier: U8x16,
+    fn generators(
+        mut rng_a: &mut AesRng,
+        mut rng_b: &mut AesRng,
     ) -> (
-        Vec<AndTriple<PartyA>>,
-        Vec<AndTriple<PartyB>>,
         AndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
         AndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
     ) {
-        let mut output_a: Vec<AndTriple<PartyA>> = vec![];
-        let mut output_b: Vec<AndTriple<PartyB>> = vec![];
-        let (generator_a, generator_b) = swanky_channel::local::local_channel_pair(
+        swanky_channel::local::local_channel_pair(
             |c| {
-                let mut rng = AesRng::from_seed(seed_prover);
-                let mut generator =
-                    AndTripleGenerator::<PartyA, kos::Sender, kos::Receiver>::new(c, &mut rng)?;
-                generator.generate(ntriples, &mut output_a, c, &mut rng)?;
+                let generator =
+                    AndTripleGenerator::<PartyA, kos::Sender, kos::Receiver>::new(c, &mut rng_a)?;
                 Ok(generator)
             },
             |c| {
-                let mut rng = AesRng::from_seed(seed_verifier);
-                let mut generator =
-                    AndTripleGenerator::<PartyB, kos::Sender, kos::Receiver>::new(c, &mut rng)?;
-                generator.generate(ntriples, &mut output_b, c, &mut rng)?;
+                let generator =
+                    AndTripleGenerator::<PartyB, kos::Sender, kos::Receiver>::new(c, &mut rng_b)?;
                 Ok(generator)
             },
         )
-        .unwrap();
-        (output_a, output_b, generator_a, generator_b)
+        .unwrap()
     }
 
-    fn validate(
+    fn generate_triples(
+        ntriples: usize,
+        generator_a: &mut AndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
+        generator_b: &mut AndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
+        mut rng_a: &mut AesRng,
+        mut rng_b: &mut AesRng,
+    ) -> (Vec<AndTriple<PartyA>>, Vec<AndTriple<PartyB>>) {
+        swanky_channel::local::local_channel_pair(
+            |c| {
+                let mut triples: Vec<AndTriple<PartyA>> = vec![];
+                generator_a.generate(ntriples, &mut triples, c, &mut rng_a)?;
+                Ok(triples)
+            },
+            |c| {
+                let mut triples: Vec<AndTriple<PartyB>> = vec![];
+                generator_b.generate(ntriples, &mut triples, c, &mut rng_b)?;
+                Ok(triples)
+            },
+        )
+        .unwrap()
+    }
+
+    fn generate_shares(
+        nshares: usize,
+        generator_a: &mut AndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
+        generator_b: &mut AndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
+        mut rng_a: &mut AesRng,
+        mut rng_b: &mut AesRng,
+    ) -> (Vec<AuthShare<PartyA>>, Vec<AuthShare<PartyB>>) {
+        swanky_channel::local::local_channel_pair(
+            |c| {
+                let mut shares: Vec<AuthShare<PartyA>> = vec![];
+                generator_a.auth_share_generator_mut().generate(
+                    nshares,
+                    &mut shares,
+                    c,
+                    &mut rng_a,
+                )?;
+                Ok(shares)
+            },
+            |c| {
+                let mut shares: Vec<AuthShare<PartyB>> = vec![];
+                generator_b.auth_share_generator_mut().generate(
+                    nshares,
+                    &mut shares,
+                    c,
+                    &mut rng_b,
+                )?;
+                Ok(shares)
+            },
+        )
+        .unwrap()
+    }
+
+    fn validate_triples(
         generator_a: &AndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
         generator_b: &AndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
-        output_a: Vec<AndTriple<PartyA>>,
-        output_b: Vec<AndTriple<PartyB>>,
-    ) -> (bool, bool, U8x16, U8x16) {
-        let ((validation_a, delta_a), (validation_b, delta_b)) =
-            swanky_channel::local::local_channel_pair(
-                |c| {
-                    let result = generator_a.open(&output_a, c);
-                    let delta = generator_a.delta();
-                    Ok((result.is_ok(), delta))
-                },
-                |c| {
-                    let result = generator_b.open(&output_b, c);
-                    let delta = generator_b.delta();
-                    Ok((result.is_ok(), delta))
-                },
-            )
-            .unwrap();
-        (validation_a, validation_b, delta_a, delta_b)
+        triples_a: Vec<AndTriple<PartyA>>,
+        triples_b: Vec<AndTriple<PartyB>>,
+    ) -> (bool, bool) {
+        swanky_channel::local::local_channel_pair(
+            |c| {
+                let result = generator_a.open(&triples_a, c);
+                Ok(result.is_ok())
+            },
+            |c| {
+                let result = generator_b.open(&triples_b, c);
+                Ok(result.is_ok())
+            },
+        )
+        .unwrap()
     }
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(10))]
         #[test]
         fn honest_generation_works(ntriples in 320..1000usize,
-                                   seed_prover in any::<u128>(),
-                                   seed_verifier in any::<u128>()) {
-            let (output_a, output_b, generator_a, generator_b) = generate(ntriples, seed_prover.into(), seed_verifier.into());
-            let (validation_a, validation_b, _, _) =
-                validate(&generator_a, &generator_b, output_a, output_b);
+                                   seed_a in any::<u128>(),
+                                   seed_b in any::<u128>()) {
+            let mut rng_a = AesRng::from_seed(seed_a.into());
+            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (triples_a, triples_b) = generate_triples(ntriples, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            let (validation_a, validation_b) =
+                validate_triples(&generator_a, &generator_b, triples_a, triples_b);
             prop_assert!(validation_a);
             prop_assert!(validation_b);
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+        #[test]
+        fn fixing_and_triples_works(ntriples in 320..1000usize,
+                                    seed_a in any::<u128>(),
+                                    seed_b in any::<u128>()) {
+            let mut rng_a = AesRng::from_seed(seed_a.into());
+            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (triples_a, triples_b) = generate_triples(
+                ntriples,
+                &mut generator_a,
+                &mut generator_b,
+                &mut rng_a,
+                &mut rng_b,
+            );
+            let (shares_a, shares_b) = generate_shares(
+                ntriples * 2,
+                &mut generator_a,
+                &mut generator_b,
+                &mut rng_a,
+                &mut rng_b,
+            );
+            // Convert the random triples to known triples.
+            let mut cs_a = vec![];
+            let mut cs_b = vec![];
+            swanky_channel::local::local_channel_pair(
+                |channel| {
+                    for (triple, shares) in triples_a.iter().zip(shares_a.chunks_exact(2)) {
+                        let c = generator_a.to_known_triple(triple, &shares[0], &shares[1], channel)?;
+                        cs_a.push(c);
+                    }
+                    Ok(())
+                },
+                |channel| {
+                    for (triple, shares) in triples_b.iter().zip(shares_b.chunks_exact(2)) {
+                        let c = generator_b.to_known_triple(triple, &shares[0], &shares[1], channel)?;
+                        cs_b.push(c);
+                    }
+                    Ok(())
+                },
+            )
+            .unwrap();
+            // Open the shares and triples to check validity.
+            let ((shares_a, cs_a), (shares_b, cs_b)) = swanky_channel::local::local_channel_pair(
+                |channel| {
+                    let mut shares: Vec<F2> = vec![];
+                    let mut cs: Vec<F2> = vec![];
+                    generator_a
+                        .auth_share_generator()
+                        .open(&shares_a, &mut shares, channel)?;
+                    generator_a
+                        .auth_share_generator()
+                        .open(&cs_a, &mut cs, channel)?;
+                    Ok((shares, cs))
+                },
+                |channel| {
+                    let mut shares: Vec<F2> = vec![];
+                    let mut cs: Vec<F2> = vec![];
+                    generator_b
+                        .auth_share_generator()
+                        .open(&shares_b, &mut shares, channel)?;
+                    generator_b
+                        .auth_share_generator()
+                        .open(&cs_b, &mut cs, channel)?;
+                    Ok((shares, cs))
+                },
+            )
+            .unwrap();
+            // Check validity of all the triples.
+            for i in 0..ntriples {
+                // `auth_share_generator().open()` should ensure that the opened
+                // shares are the same.
+                assert_eq!(shares_a[2 * i], shares_b[2 * i]);
+                assert_eq!(shares_a[2 * i + 1], shares_b[2 * i + 1]);
+                assert_eq!(cs_a[i], cs_b[i]);
+                let a = shares_a[2 * i];
+                let b = shares_a[2 * i + 1];
+                let c = cs_a[i];
+                assert_eq!(a * b, c);
+            }
         }
     }
 }

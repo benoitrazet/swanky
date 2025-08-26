@@ -18,13 +18,13 @@
 //! $`M_i := K_i \oplus b_i \Delta`$ and the verifier receives $`K_i`$. In other
 //! words:
 //!
-//! - If $`b_i = 1`$: the prover receives $`M_{i,0} := K_i \oplus \Delta`$.
-//! - If $`b_i = 0`$: the prover receives $`M_{i,1} := K_i`$.
+//! - If $`b_i = 1`$, the prover receives $`M_{i,1} := K_i \oplus \Delta`$.
+//! - If $`b_i = 0`$, the prover receives $`M_{i,0} := K_i`$.
 //!
-//! The verifier receives both $`M_{i,0}`$ and $`M_{i,1} = K_i`$.
+//! The verifier receives both $`M_{i,0}`$ and $`M_{i,1}`$.
 //!
 //! To open an authenticated bit, the prover sends $`(b_i, M_i)`$ to the
-//! verifier and the verifier checks that $`M_i := K_i \oplus b \Delta`$.
+//! verifier and the verifier checks that $`M_i = K_i \oplus b \Delta`$.
 //!
 //! # Example
 //!
@@ -108,9 +108,8 @@ struct VerifierAuthBit {
 }
 /// An authenticated bit.
 ///
-/// See [`crate::authbits`] for details. XORing authenticated bits is an
-/// entirely local operation, and hence [`AuthBit`] implements
-/// [`std::ops::BitXor`] and [`std::ops::BitXorAssign`].
+/// See [`crate::authbits`] for details. [`AuthBit`]s can be generated using
+/// [`AuthBitGenerator`].
 #[derive(Clone, Copy)]
 pub struct AuthBit<P: Party>(PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>);
 
