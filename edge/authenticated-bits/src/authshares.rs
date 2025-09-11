@@ -130,27 +130,15 @@ impl<P: Party> AuthShare<P> {
 impl<P: Party> core::ops::BitXor for AuthShare<P> {
     type Output = Self;
     fn bitxor(self, rhs: Self) -> Self::Output {
-        match P::WHICH {
-            WhichParty::Prover(ev) => AuthShare {
-                party_a: PartyEitherCopy::prover_new(
-                    ev,
-                    self.party_a.prover_into(ev) ^ rhs.party_a.prover_into(ev),
-                ),
-                party_b: PartyEitherCopy::prover_new(
-                    ev,
-                    self.party_b.prover_into(ev) ^ rhs.party_b.prover_into(ev),
-                ),
-            },
-            WhichParty::Verifier(ev) => AuthShare {
-                party_a: PartyEitherCopy::verifier_new(
-                    ev,
-                    self.party_a.verifier_into(ev) ^ rhs.party_a.verifier_into(ev),
-                ),
-                party_b: PartyEitherCopy::verifier_new(
-                    ev,
-                    self.party_b.verifier_into(ev) ^ rhs.party_b.verifier_into(ev),
-                ),
-            },
+        AuthShare {
+            party_a: self
+                .party_a
+                .zip(rhs.party_a)
+                .map(|(lhs, rhs)| lhs ^ rhs, |(lhs, rhs)| lhs ^ rhs),
+            party_b: self
+                .party_b
+                .zip(rhs.party_b)
+                .map(|(lhs, rhs)| lhs ^ rhs, |(lhs, rhs)| lhs ^ rhs),
         }
     }
 }
