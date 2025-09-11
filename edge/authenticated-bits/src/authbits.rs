@@ -288,7 +288,7 @@ impl<
     ///
     /// This corresponds to the prover sending $`(b, M)`$ to the verifier, who
     /// checks that $`K = M \oplus b \Delta`$. The resulting opened bits are
-    /// returned to the verifier in the `outputs` vector.
+    /// [`Vec::push`]ed to `outputs`.
     pub fn open(
         &self,
         authbits: &[AuthBit<P>],
@@ -312,11 +312,15 @@ impl<
                 let mut bit_ser: F2BitDeserializer =
                     SequenceDeserializer::new(channel.as_std_io())?;
                 let bits_ = outputs.into_inner(e);
+                // We only want to validate the bits we added to the `outputs`
+                // vector, so we save the existing length so we can only
+                // validate the [`Vec::push`]ed bits.
+                let outputs_initial_len = bits_.len();
                 for _ in 0..authbits.len() {
                     bits_.push(bit_ser.read(channel.as_std_io())?);
                 }
                 let mut validation = true;
-                for (ab, bit) in authbits.iter().zip(bits_.iter()) {
+                for (ab, bit) in authbits.iter().zip(bits_[outputs_initial_len..].iter()) {
                     let mac = channel.read::<U8x16>()?;
 
                     validation &= mac
