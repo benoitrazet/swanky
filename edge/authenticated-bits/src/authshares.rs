@@ -262,14 +262,18 @@ impl<
     /// Open the authenticated shares in `shares`.
     ///
     /// This corresponds to opening all the authenticated bits that make up the
-    /// authenticated shares. The resulting opened combined shares are returned
-    /// in the `outputs` vector.
+    /// authenticated shares. The resulting opened combined shares are
+    /// [`Vec::push`]ed to `outputs`.
     pub fn open(
         &self,
         shares: &[AuthShare<P>],
         outputs: &mut Vec<F2>,
         channel: &mut Channel,
     ) -> eyre::Result<()> {
+        // We only want to use the bits that are added to `outputs`, so we grab the
+        // initial length here and use it to avoid touching anything already
+        // existing in `outputs`.
+        let output_starting_len = outputs.len();
         let (party_a_shares, party_b_shares): (Vec<_>, Vec<_>) = shares
             .iter()
             .map(|authshare| (authshare.party_a, authshare.party_b))
@@ -285,7 +289,10 @@ impl<
                 let party_b_shares =
                     PartyEitherCopy::pull_either_outside(&party_b_shares).prover_into(ev);
                 party_b.open(party_b_shares, VerifierPrivate::new(outputs), channel)?;
-                for (bit_a, bit_b) in party_a_shares.iter().zip(outputs.iter_mut()) {
+                for (bit_a, bit_b) in party_a_shares
+                    .iter()
+                    .zip(outputs[output_starting_len..].iter_mut())
+                {
                     *bit_b += bit_a.bit().into_inner(IS_PROVER);
                 }
             }
@@ -299,7 +306,10 @@ impl<
                 let party_b_shares =
                     PartyEitherCopy::pull_either_outside(&party_b_shares).verifier_into(ev);
                 party_b.open(party_b_shares, VerifierPrivate::empty(IS_PROVER), channel)?;
-                for (bit_a, bit_b) in outputs.iter_mut().zip(party_b_shares.iter()) {
+                for (bit_a, bit_b) in outputs[output_starting_len..]
+                    .iter_mut()
+                    .zip(party_b_shares.iter())
+                {
                     *bit_a += bit_b.bit().into_inner(IS_PROVER);
                 }
             }
