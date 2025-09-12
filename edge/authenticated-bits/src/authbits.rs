@@ -575,4 +575,63 @@ mod tests {
             }
         }
     }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+        #[test]
+        fn bitxor_works(nbits in 320..1000,
+                        seed_prover in any::<u128>(),
+                        seed_verifier in any::<u128>()) {
+            let mut rng_a = AesRng::from_seed(seed_prover.into());
+            let mut rng_b = AesRng::from_seed(seed_verifier.into());
+            let bits1: Vec<_> = (0..nbits).map(|_| rng_a.r#gen::<F2>()).collect();
+            let bits2: Vec<_> = (0..nbits).map(|_| rng_a.r#gen::<F2>()).collect();
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (output_a, output_b) = generate(
+                &bits1,
+                &mut generator_a,
+                &mut generator_b,
+                &mut rng_a,
+                &mut rng_b,
+                false,
+                false,
+            );
+            let (output_c, output_d) = generate(
+                &bits2,
+                &mut generator_a,
+                &mut generator_b,
+                &mut rng_a,
+                &mut rng_b,
+                false,
+                false,
+            );
+            // `results = (a ^ c, b ^ d)`
+            let results: Vec<_> = output_a
+                .iter()
+                .zip(output_b.iter())
+                .zip(output_c.iter().zip(output_d.iter()))
+                .map(|((a, b), (c, d))| (*a ^ *c, *b ^ *d))
+                .collect();
+            // Test that `bitxor` works as intended.
+            for (result, ((a, b), (c, d))) in results.iter().zip(
+                output_a
+                    .iter()
+                    .zip(output_b.iter())
+                    .zip(output_c.iter().zip(output_d.iter())),
+            ) {
+                assert_eq!(
+                    result.0.bit().into_inner(IS_PROVER),
+                    a.bit().into_inner(IS_PROVER) + c.bit().into_inner(IS_PROVER)
+                );
+                assert_eq!(
+                    result.0.mac().into_inner(IS_PROVER),
+                    a.mac().into_inner(IS_PROVER) ^ c.mac().into_inner(IS_PROVER)
+                );
+                assert_eq!(
+                    result.1.key().into_inner(IS_VERIFIER),
+                    b.key().into_inner(IS_VERIFIER) ^ d.key().into_inner(IS_VERIFIER)
+                );
+            }
+        }
+    }
 }
