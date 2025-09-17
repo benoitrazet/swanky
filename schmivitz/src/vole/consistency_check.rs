@@ -7,6 +7,7 @@ use crate::parameters::REPETITION_PARAM;
 use crate::parameters::SECURITY_PARAM;
 use crate::vole::commit_reconstruct::B;
 use crate::vole::crypto_primitives::CHALL1_LENGTH;
+use rayon::prelude::*;
 use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::F128b;
 use swanky_field_binary::F8b;
@@ -70,22 +71,41 @@ fn to_field_f128_and_pad<I: Iterator<Item = F2>>(x: I, x_len: usize) -> Vec<F128
 /// Apply `to_field_f128_and_pad` to every column in lock step and emit a sequence of
 /// 128 [`F128b`] values.
 #[inline(never)]
+#[allow(dead_code)]
 fn to_field_f128_and_pad_lockstep(x: &[F128b]) -> Vec<[F128b; SECURITY_PARAM]> {
     let floor = x.len() / 128;
     let how_many = floor + if (x.len() - (floor) * 128) != 0 { 1 } else { 0 };
     let mut out = Vec::with_capacity(how_many);
 
     let mut b_128 = [[0u8; 128 / 8]; 128];
+    let mut b_128_alt = [[0u8; 128]; 128 / 8];
     let mut byte_num = 0;
     let mut bit_num: usize = 0;
     for b in x.iter() {
         let bs = b.bit_decomposition();
-        for (i, b) in bs.iter().enumerate() {
-            b_128[i][byte_num] |= if !*b { 0 } else { 1 << bit_num };
+        let hot_bit = 1 << bit_num;
+        let mut b_vec = [0u8; SECURITY_PARAM];
+        for (p, b) in b_vec.iter_mut().zip(bs.iter()) {
+            *p = u8::from(*b).wrapping_neg() & hot_bit;
         }
+
+        let t = &mut b_128_alt[byte_num];
+        for (e, b_128_alt_byte_num_i) in t.iter_mut().enumerate() {
+            *b_128_alt_byte_num_i |= b_vec[e];
+        }
+
         if bit_num == 7 {
             bit_num = 0; // restart at the beginning of byte
             if byte_num == (128 / 8) - 1 {
+                // This double loop is optimal that way to maximize the cache hit for reads.
+                // The writes will be batched on write-back
+                // NOTE: this loop is the bottle-neck
+                for i in 0..SECURITY_PARAM / 8 {
+                    for k in 0..SECURITY_PARAM {
+                        b_128[k][i] = b_128_alt[i][k];
+                    }
+                }
+
                 let arr: [F128b; SECURITY_PARAM] =
                     b_128.map(|v| F128b::from_bytes(&v.into()).unwrap());
                 out.push(arr);
@@ -94,6 +114,7 @@ fn to_field_f128_and_pad_lockstep(x: &[F128b]) -> Vec<[F128b; SECURITY_PARAM]> {
                 byte_num = 0;
                 // reset
                 b_128 = [[0u8; 128 / 8]; 128];
+                b_128_alt = [[0u8; 128]; 128 / 8];
             } else {
                 byte_num += 1;
             }
@@ -104,12 +125,119 @@ fn to_field_f128_and_pad_lockstep(x: &[F128b]) -> Vec<[F128b; SECURITY_PARAM]> {
 
     // Still have to push a last value if the previous loop terminated before processing `SECURITY_PARAMETER` bits.
     if (bit_num != 0) | (byte_num != 0) {
+        // transpose from b_128_alt to b_128
+        for i in 0..SECURITY_PARAM / 8 {
+            for k in 0..SECURITY_PARAM {
+                b_128[k][i] = b_128_alt[i][k];
+            }
+        }
         let arr: [F128b; SECURITY_PARAM] = b_128.map(|v| F128b::from_bytes(&v.into()).unwrap());
         out.push(arr);
     }
 
     assert_eq!(out.len(), how_many);
     out
+}
+
+#[allow(dead_code)]
+struct ColumnEnumState<'a> {
+    x: &'a [F128b],
+    index: usize,
+    length: usize,
+}
+
+impl<'a> ColumnEnumState<'a> {
+    #[allow(dead_code)]
+    pub fn new(x: &'a [F128b]) -> Self {
+        Self {
+            x,
+            index: 0,
+            length: x.len(),
+        }
+    }
+}
+
+impl<'a> Iterator for ColumnEnumState<'a> {
+    type Item = [F128b; SECURITY_PARAM];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index == self.length {
+            return None;
+        }
+
+        let mut b_128 = [[0u8; 128 / 8]; 128];
+        let mut b_128_alt = [[0u8; 128]; 128 / 8];
+        let mut byte_num = 0;
+        let mut bit_num: usize = 0;
+
+        let mut out = [F128b::ZERO; 128];
+        for _j in 0..128 {
+            let b = self.x[self.index];
+            // Advance immediately so the iterator consumes exactly the inputs it processes,
+            // even when we early-break on a full 128-block.
+            self.index += 1;
+
+            let bs = b.bit_decomposition();
+            let hot_bit = 1 << bit_num;
+            let mut b_vec = [0u8; SECURITY_PARAM];
+            for (p, b) in b_vec.iter_mut().zip(bs.iter()) {
+                *p = u8::from(*b).wrapping_neg() & hot_bit;
+            }
+
+            let t = &mut b_128_alt[byte_num];
+            for (e, b_128_alt_byte_num_i) in t.iter_mut().enumerate() {
+                *b_128_alt_byte_num_i |= b_vec[e];
+            }
+
+            if bit_num == 7 {
+                bit_num = 0; // restart at the beginning of byte
+                if byte_num == (128 / 8) - 1 {
+                    // This double loop is optimal that way to maximize the cache hit for reads.
+                    // The writes will be batched on write-back
+                    // NOTE: this loop is the bottle-neck
+                    for i in 0..SECURITY_PARAM / 8 {
+                        for k in 0..SECURITY_PARAM {
+                            b_128[k][i] = b_128_alt[i][k];
+                        }
+                    }
+
+                    let arr: [F128b; SECURITY_PARAM] =
+                        b_128.map(|v| F128b::from_bytes(&v.into()).unwrap());
+                    out = arr;
+                    break;
+
+                    // reset
+                    //byte_num = 0;
+                    // reset
+                    //b_128 = [[0u8; 128 / 8]; 128];
+                    //b_128_alt = [[0u8; 128]; 128 / 8];
+                } else {
+                    byte_num += 1;
+                }
+            } else {
+                bit_num += 1;
+            }
+
+            if self.length == self.index {
+                // Still have to push a last value if the previous loop terminated before processing `SECURITY_PARAMETER` bits.
+                if (bit_num != 0) | (byte_num != 0) {
+                    // transpose from b_128_alt to b_128
+                    for i in 0..SECURITY_PARAM / 8 {
+                        for k in 0..SECURITY_PARAM {
+                            b_128[k][i] = b_128_alt[i][k];
+                        }
+                    }
+
+                    let arr: [F128b; SECURITY_PARAM] =
+                        b_128.map(|v| F128b::from_bytes(&v.into()).unwrap());
+                    out = arr;
+                    break;
+                }
+            }
+        }
+
+        return Some(out);
+    }
 }
 
 /// Hash as produced by [`vole_hash`].
@@ -276,27 +404,164 @@ pub(crate) fn vole_hash_lockstep(
 
     // NOTE (optimize): This packed `f128b` of `x0` is a convenient holder for bits, and should
     // not be treated like a field element.
-    let x0_vec = to_field_f128_and_pad_lockstep(&pack_f128b(x0));
+    let t = std::time::Instant::now();
+    //let x0_vec = to_field_f128_and_pad_lockstep(&pack_f128b(x0));
+
+    log::info!(
+        "to_field_f128_and_pad_lockstep running time: {:?}",
+        t.elapsed()
+    );
+
     // NOTE: we dont need to compute how_many, we could directly use `x0_vec.len()`.
-    assert_eq!(x0_vec.len(), how_many);
+    // assert_eq!(x0_vec.len(), how_many);
+
+    // There are different **options** to hashing the elements. The most runtime effective option is option #2, and the
+    // most memory efficient option is option #3 because it is streaming the columns.
+
+    // OPTION #1: naive
+    // This option simply create the enumerator for the columns transposed of the field values and hashes with powers the columns sequentially.
+    /*
+    let packed_x0 = pack_f128b(x0);
+    let x0_vec = ColumnEnumState::new(&packed_x0);
+    let mut w0 = s0;
+    let mut w1 = s1;
+    let mut h0 = [F128b::ZERO; SECURITY_PARAM];
+    let mut h1 = [F128b::ZERO; SECURITY_PARAM];
+
+    for x0 in x0_vec {
+        for (j, x_j) in x0.iter().enumerate() {
+            h0[j] += w0 * x_j;
+            h1[j] += w1 * x_j;
+        }
+        w0 *= s0;
+        w1 *= s1;
+    }
+    */
+    /* END OPTION #1 */
+
+    // OPTION #2: par_iter()
+    // This option transposes the field values into a vector before hashing with powers the columns in parallel using rayon.
+    // One downside of this option is that it needs the vector of values to be explicitly and it cannot just use the enumerator.
+
+    /*
+    let x0_vec = to_field_f128_and_pad_lockstep(&pack_f128b(x0));
+    fn powers(base: F128b, n: usize) -> Vec<F128b> {
+        let mut out = Vec::with_capacity(n);
+        let mut p = base;
+        for _ in 0..n {
+            out.push(p);
+            p *= base;
+        }
+        out
+    }
+    fn accumulate_cols(
+        x0_vec: &[[F128b; SECURITY_PARAM]],
+        s0: F128b,
+        s1: F128b,
+    ) -> ([F128b; SECURITY_PARAM], [F128b; SECURITY_PARAM]) {
+        let how_many = x0_vec.len();
+        let w0 = powers(s0, how_many);
+        let w1 = powers(s1, how_many);
+
+        let mut h0 = [F128b::ZERO; SECURITY_PARAM];
+        let mut h1 = [F128b::ZERO; SECURITY_PARAM];
+
+        // Parallelize over (h0[j], h1[j]) pairs; each thread owns disjoint &mut slots.
+        h0[..]
+            .par_iter_mut()
+            .zip(h1[..].par_iter_mut())
+            .enumerate()
+            .for_each(|(j, (h0j, h1j))| {
+                let mut acc0 = F128b::ZERO;
+                let mut acc1 = F128b::ZERO;
+                for i in 0..how_many {
+                    let x = x0_vec[i][j]; // strided access across rows
+                    acc0 += w0[i] * x;
+                    acc1 += w1[i] * x;
+                }
+                *h0j = acc0;
+                *h1j = acc1;
+            });
+
+        (h0, h1)
+    }
+
+    let (h0, h1) = accumulate_cols(&x0_vec, s0, s1);
+    */
+    // END OPTION #2
+
+    // OPTION #3: parallel producer/consumer
+    // This option creates an enumerator for the column of the transposed field values and then splits the columns in
+    // N blocks and spawn threads to do the hashing with powers.
+
+    // use std::sync::mpsc::Sender; // unbounded buffers for messages
+    use std::sync::mpsc::{sync_channel, SyncSender}; // SyncChannel uses fixed size buffers, which is useful to control memory.
+    use std::{sync::mpsc::channel, thread};
+
+    let packed_x0 = pack_f128b(x0);
+    let x0_vec = ColumnEnumState::new(&packed_x0);
+
+    const N: usize = 1; // number of threads
+    let mut senders: Vec<SyncSender<[F128b; SECURITY_PARAM / N]>> = Vec::with_capacity(N);
+    let mut receivs = Vec::with_capacity(N);
+    let (result_sender, result_receiver) = channel();
+    for _ in 0..N {
+        let (tx, rx) = sync_channel(100);
+        senders.push(tx);
+        receivs.push(rx);
+    }
+    let mut handles = Vec::new();
+
+    let mut num = 0;
+
+    for recv in receivs {
+        let send_i = result_sender.clone();
+        let handle = thread::spawn(move || {
+            let i = num;
+            let mut w0 = s0;
+            let mut w1 = s1;
+            let mut h0 = [F128b::ZERO; SECURITY_PARAM / N];
+            let mut h1 = [F128b::ZERO; SECURITY_PARAM / N];
+            for slice in recv.iter() {
+                for (j, v) in slice.iter().enumerate() {
+                    h0[j] += v * w0;
+                    h1[j] += v * w1;
+                }
+
+                w0 *= s0;
+                w1 *= s1;
+            }
+            send_i.send((i, h0, h1)).unwrap();
+        });
+        handles.push(handle);
+        num += 1;
+    }
+
+    for arr in x0_vec {
+        let mut i = 0;
+        for _ in 0..N {
+            senders[i]
+                .send(
+                    arr[i * (SECURITY_PARAM / N)..(i + 1) * (SECURITY_PARAM / N)]
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap();
+            i += 1;
+        }
+    }
+    drop(senders);
 
     let mut h0 = [F128b::ZERO; SECURITY_PARAM];
     let mut h1 = [F128b::ZERO; SECURITY_PARAM];
-    let mut s0_power = s0;
-    let mut s1_power = s1;
-    for i in 0..how_many {
-        // This is where performing in lockstep is beneficial, saving on
-        // computing `s0_power`/`s1_power` only once for every row.
-        for j in 0..SECURITY_PARAM {
-            // This loop is the parallel part
-            h0[j] += s0_power * x0_vec[i][j];
-            h1[j] += s1_power * x0_vec[i][j];
-        }
-        // NOTE: difference from FAEST spec where the powers are in
-        // reverse order, this is also valid.
-        s0_power *= s0;
-        s1_power *= s1;
+    for _ in 0..N {
+        let (i, h0_i, h1_i) = result_receiver.recv().unwrap();
+        h0[i * (SECURITY_PARAM / N)..(i + 1) * (SECURITY_PARAM / N)].copy_from_slice(&h0_i);
+        h1[i * (SECURITY_PARAM / N)..(i + 1) * (SECURITY_PARAM / N)].copy_from_slice(&h1_i);
     }
+
+    // END OPTION #3
+
     let mut h2 = [F128b::ZERO; SECURITY_PARAM];
     let mut h3 = [F128b::ZERO; SECURITY_PARAM];
     for j in 0..SECURITY_PARAM {

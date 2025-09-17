@@ -73,7 +73,7 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l_hat: usize) -> Commit {
     /*
     for i in 0..REPETITION_PARAM {
         let (com_i, decom_i, seeds) = commit(prg_seeds[i], iv, 8);
-        let (u_i, v_i) = convert_to_vole(&seeds, iv, l, true);
+        let (u_i, v_i) = convert_to_vole(&seeds, iv, l_hat, true);
         com.push(com_i);
         decom[i] = decom_i;
         u.push(u_i);
