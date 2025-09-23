@@ -69,7 +69,7 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l_hat: usize) -> Commit {
     let mut decom: [Decom; REPETITION_PARAM] = Default::default();
     let mut com = Vec::with_capacity(REPETITION_PARAM);
 
-    // Without multithreading
+    // Without multithreading: this is > 5x slower than with multithreading
     /*
     for i in 0..REPETITION_PARAM {
         let (com_i, decom_i, seeds) = commit(prg_seeds[i], iv, 8);
@@ -94,25 +94,33 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l_hat: usize) -> Commit {
 
     for i in 0..REPETITION_PARAM {
         let tx = txs[i].clone();
-        let prg_seeds_i = prg_seeds[i];
-        let handle = thread::spawn(move || {
-            let (com_i, decom_i, seeds) = commit(prg_seeds_i, iv, 8);
-            let (u_i, v_i) = convert_to_vole(&seeds, iv, l_hat, true);
 
-            tx.send((com_i, decom_i, u_i, v_i)).unwrap();
+        // NOTE: we could move the call to `commit` to the thread but this would not save a significant amount of time.
+        let (com_i, decom_i, seeds) = commit(prg_seeds[i], iv, 8);
+        com.push(com_i);
+        decom[i] = decom_i;
+
+        let handle = thread::spawn(move || {
+            let t_convert_to_vole = std::time::Instant::now();
+            let u_i_v_i = convert_to_vole(&seeds, iv, l_hat, true);
+            log::info!(
+                "multithreaded prover convert_to_vole running time: {:?}",
+                t_convert_to_vole.elapsed()
+            );
+
+            tx.send(u_i_v_i).unwrap();
         });
         handles.push(handle);
     }
 
     for i in 0..REPETITION_PARAM {
-        let (com_i, decom_i, u_i, v_i) = rxs[i].recv().unwrap();
-        com.push(com_i);
-        decom[i] = decom_i;
+        let (u_i, v_i) = rxs[i].recv().unwrap();
         u.push(u_i);
         v.push(v_i);
     }
+
     log::info!(
-        "multithreaded convert_to_vole running time: {:?}",
+        "multithreaded convert_to_vole prover running time: {:?}",
         t.elapsed()
     );
     // End multithreading
@@ -211,6 +219,7 @@ pub(crate) fn vole_reconstruct(
     */
 
     // With multithreading:
+    let t = std::time::Instant::now();
     let mut txs = Vec::with_capacity(REPETITION_PARAM);
     let mut rxs = Vec::with_capacity(REPETITION_PARAM);
     for _ in 0..REPETITION_PARAM {
@@ -228,7 +237,12 @@ pub(crate) fn vole_reconstruct(
 
         let tx = txs[i].clone();
         let handle = thread::spawn(move || {
+            let t_convert_to_vole = std::time::Instant::now();
             let q_i = convert_to_vole_verifier(&seeds, iv, l_hat, bools_to_u8(&delta));
+            log::info!(
+                "multithreaded verifier convert_to_vole: {:?}",
+                t_convert_to_vole.elapsed()
+            );
             tx.send(q_i).unwrap();
         });
         handles.push(handle);
@@ -238,6 +252,10 @@ pub(crate) fn vole_reconstruct(
         let q_i = rxs[i].recv().unwrap();
         qs.push(q_i);
     }
+    log::info!(
+        "multithreaded convert_to_vole verifier running time: {:?}",
+        t.elapsed()
+    );
     // End multithreading
 
     // hash the commitments
