@@ -33,6 +33,7 @@ pub(crate) fn convert_to_vole(
     let mut prgs: Vec<Vec<u64>> = vec![];
     for (idx, seed) in seeds.iter().enumerate() {
         if idx == 0 && !is_prover {
+            // NOTE: the verifier is faster because it does not call a PRG.
             prgs.push(vec![0u64; (l_hat / 64) + 1]);
         } else {
             let prg = PRG::new(*seed, iv);

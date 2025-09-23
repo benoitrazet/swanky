@@ -126,6 +126,7 @@ impl PRG {
                 *block = GenericArray::from(self.counter_to_bytes());
                 self.incr();
             }
+            // NOTE: this encryption here is a bottleneck
             self.aes0.encrypt_blocks(&mut blocks);
 
             // moving blocks to u64 values and pushing them into the vector.
