@@ -13,6 +13,7 @@ use crate::vole::crypto_primitives::{h2_chall1, Chall1, Chall3, Com, Seed, H1, H
 use crate::vole::AsSecretBytes;
 use generic_array::typenum::U16;
 use generic_array::GenericArray;
+use rayon::prelude::*;
 use sha3::{digest::Update, Shake128};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F8b, F2};
@@ -162,11 +163,14 @@ pub(crate) fn create_vole_prover<Secret: AsSecretBytes>(
     u_mut.truncate(l + SECURITY_PARAM);
 
     // Line 16 and FAEST.AES.AESProve Line 2.
+    let t = std::time::Instant::now();
+    // NOTE: using `into_par_iter` from rayon here brings a 10x perf improvement on this part.
     let v_lifted = v
-        .into_iter()
+        .into_par_iter()
         .take(l + SECURITY_PARAM)
         .map(|vi| F8b::form_superfield(&vi.into()))
         .collect();
+    log::info!("v_lifted running time: {:?}", t.elapsed());
 
     VoleProver {
         iv,
