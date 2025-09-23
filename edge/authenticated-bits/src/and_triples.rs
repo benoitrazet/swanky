@@ -40,13 +40,15 @@ use crate::{
 };
 use bytemuck::TransparentWrapper;
 use rand::{CryptoRng, Rng, SeedableRng, seq::SliceRandom};
+use std::io::{Cursor, Seek};
 use swanky_adversary::Malicious;
 use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
 use swanky_field::FiniteRing;
-use swanky_field_binary::F2;
+use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer};
 use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
-use swanky_party::{Party, WhichParty};
+use swanky_party::{Party, WhichParty, either::PartyEither, private::VerifierPrivate};
+use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 use vectoreyes::U8x16;
 
 /// An AND triple.
@@ -171,20 +173,30 @@ impl<
             .open(AndTriple::peel_slice(triples), channel)
     }
 
-    /// Turn a random AND triple into a "known" AND triple.
+    /// Turn random AND triples into a "known" AND triples.
     ///
     /// Given random AND triple $`(\langle x \rangle, \langle y \rangle, \langle
     /// z \rangle)`$ such that $`x \cdot y = z`$ and authenticated shares
-    /// $`\langle a \rangle`$ and $`\langle b \rangle`$, output AND triple
-    /// $`(\langle a \rangle, \langle b \rangle, \langle c \rangle`$ such that
-    /// $`a \cdot b = c`$.
+    /// $`\langle a \rangle`$ and $`\langle b \rangle`$, output authenticated
+    /// share $`\langle c \rangle`$ such that $`a \cdot b = c`$.
+    ///
+    /// Resulting authenticated shares are [`Vec::push`]ed to the `outputs`
+    /// vector.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the lengths of `randoms`, `inputs_a`, and `inputs_b` are not
+    /// equal.
     pub fn to_known_triple(
         &self,
-        random: &AndTriple<P>,
-        a: &AuthShare<P>,
-        b: &AuthShare<P>,
+        randoms: &[AndTriple<P>],
+        inputs_a: &[AuthShare<P>],
+        inputs_b: &[AuthShare<P>],
+        outputs: &mut Vec<AuthShare<P>>,
         channel: &mut Channel,
-    ) -> eyre::Result<AuthShare<P>> {
+    ) -> eyre::Result<()> {
+        assert_eq!(randoms.len(), inputs_a.len());
+        assert_eq!(randoms.len(), inputs_b.len());
         // We convert from a random triple to a known triple using a trick from
         // [1] (although at this point it's largely considered a "standard
         // technique"). The protocol works as follows. The random AND triple
@@ -207,42 +219,117 @@ impl<
         // [1]: "Efficient multiparty protocols using circuit randomization." D.
         //     Beaver. CRYPTO 1991.
 
-        // Compute openings of `f := ⟨a⟩ ⊕ ⟨x⟩` and `g := ⟨b⟩ ⊕ ⟨y⟩`.
-        let f = *a ^ random.x();
-        let g = *b ^ random.y();
-        let (f, g) = match P::WHICH {
-            WhichParty::Prover(_) => {
-                channel.write(&f.bit())?;
-                channel.write(&g.bit())?;
-                let f2: F2 = channel.read()?;
-                let g2: F2 = channel.read()?;
-                let f = f.bit() + f2;
-                let g = g.bit() + g2;
-                (f, g)
+        // In order to reduce the round complexity, Party A sends its values of
+        // `f := ⟨a⟩ ⊕ ⟨x⟩` and `g := ⟨b⟩ ⊕ ⟨y⟩` for all inputs first, followed
+        // by Party B sending its values. This results in a single round of
+        // communication between the parties.
+        //
+        // However, this does complicate the code, as now Party B needs to store
+        // the `f` and `g` bits sent by Party A as intermediate values. We do
+        // this in a compact way by using [`F2BitSerializer`].
+
+        let mut channel = channel.as_std_io();
+        // Contains the intermediate bits `f` and `g` send by Party A.
+        let mut intermediates = Cursor::new(vec![]);
+        // Only Party B needs to serialize the intermediate values.
+        let mut vec_ser = VerifierPrivate::new(F2BitSerializer::new(&mut intermediates)?);
+        let mut serde = match P::WHICH {
+            WhichParty::Prover(ev) => {
+                PartyEither::prover_new(ev, F2BitSerializer::new(&mut channel)?)
             }
-            WhichParty::Verifier(_) => {
-                let f1: F2 = channel.read()?;
-                let g1: F2 = channel.read()?;
-                channel.write(&f.bit())?;
-                channel.write(&g.bit())?;
-                let f = f.bit() + f1;
-                let g = g.bit() + g1;
-                (f, g)
+            WhichParty::Verifier(ev) => {
+                PartyEither::verifier_new(ev, F2BitDeserializer::new(&mut channel)?)
             }
         };
-        // Compute `⟨c⟩ := ⟨z⟩ ⊕ f ⟨y⟩ ⊕ g ⟨x⟩ ⊕ f g`.
-        let mut c = random.z();
-        if f == F2::ONE {
-            c = c ^ random.y();
+        // Round 1a: Party A --> Party B.
+        for (random, (a, b)) in randoms.iter().zip(inputs_a.iter().zip(inputs_b.iter())) {
+            // Compute Party A's openings of `f := ⟨a⟩ ⊕ ⟨x⟩` and `g := ⟨b⟩ ⊕ ⟨y⟩`.
+            let f = *a ^ random.x();
+            let g = *b ^ random.y();
+            match P::WHICH {
+                WhichParty::Prover(ev) => {
+                    let ser = serde.as_mut().prover_into(ev);
+                    ser.write(&mut channel, f.bit())?;
+                    ser.write(&mut channel, g.bit())?;
+                }
+                WhichParty::Verifier(ev) => {
+                    let de = serde.as_mut().verifier_into(ev);
+                    let f1: F2 = de.read(&mut channel)?;
+                    let g1: F2 = de.read(&mut channel)?;
+                    // Store `f1` and `g1` to be used in Round 1b.
+                    vec_ser
+                        .as_mut()
+                        .into_inner(ev)
+                        .write(&mut intermediates, f1)?;
+                    vec_ser
+                        .as_mut()
+                        .into_inner(ev)
+                        .write(&mut intermediates, g1)?;
+                }
+            };
         }
-        if g == F2::ONE {
-            c = c ^ random.x();
+        // Finalize Round 1a.
+        match P::WHICH {
+            WhichParty::Prover(ev) => serde.prover_into(ev).finish(&mut channel)?,
+            WhichParty::Verifier(ev) => {
+                vec_ser.into_inner(ev).finish(&mut intermediates)?;
+                intermediates.rewind()?;
+            }
         }
-        let c = self
-            .leaky_generator
-            .auth_share_generator
-            .xor_with_const(c, f * g);
-        Ok(c)
+        // Only Party B needs to deserialize the intermediate values.
+        let mut vec_de = VerifierPrivate::new(F2BitDeserializer::new(&mut intermediates)?);
+        let mut serde = match P::WHICH {
+            WhichParty::Prover(ev) => {
+                PartyEither::prover_new(ev, F2BitDeserializer::new(&mut channel)?)
+            }
+            WhichParty::Verifier(ev) => {
+                PartyEither::verifier_new(ev, F2BitSerializer::new(&mut channel)?)
+            }
+        };
+
+        // Round 1b: Party B --> Party A.
+        for (random, (a, b)) in randoms.iter().zip(inputs_a.iter().zip(inputs_b.iter())) {
+            // Compute openings of `f := ⟨a⟩ ⊕ ⟨x⟩` and `g := ⟨b⟩ ⊕ ⟨y⟩`.
+            let f = *a ^ random.x();
+            let g = *b ^ random.y();
+            let (f, g) = match P::WHICH {
+                WhichParty::Prover(ev) => {
+                    let de = serde.as_mut().prover_into(ev);
+                    let f2: F2 = de.read(&mut channel)?;
+                    let g2: F2 = de.read(&mut channel)?;
+                    let f = f.bit() + f2;
+                    let g = g.bit() + g2;
+                    (f, g)
+                }
+                WhichParty::Verifier(ev) => {
+                    let ser = serde.as_mut().verifier_into(ev);
+                    ser.write(&mut channel, f.bit())?;
+                    ser.write(&mut channel, g.bit())?;
+                    let f = f.bit() + vec_de.as_mut().into_inner(ev).read(&mut intermediates)?;
+                    let g = g.bit() + vec_de.as_mut().into_inner(ev).read(&mut intermediates)?;
+                    (f, g)
+                }
+            };
+            // Compute `⟨c⟩ := ⟨z⟩ ⊕ f ⟨y⟩ ⊕ g ⟨x⟩ ⊕ f g`.
+            let mut c = random.z();
+            if f == F2::ONE {
+                c = c ^ random.y();
+            }
+            if g == F2::ONE {
+                c = c ^ random.x();
+            }
+            let c = self
+                .leaky_generator
+                .auth_share_generator
+                .xor_with_const(c, f * g);
+            outputs.push(c);
+        }
+        // Finalize Round 1b.
+        match P::WHICH {
+            WhichParty::Prover(_) => (),
+            WhichParty::Verifier(ev) => serde.verifier_into(ev).finish(&mut channel)?,
+        }
+        Ok(())
     }
 
     /// The $`\Delta`$ value used to validate the other party's shares.
@@ -398,7 +485,7 @@ mod tests {
                 &mut rng_b,
             );
             let (shares_a, shares_b) = generate_shares(
-                ntriples * 2,
+                2 * ntriples,
                 &mut generator_a,
                 &mut generator_b,
                 &mut rng_a,
@@ -409,17 +496,23 @@ mod tests {
             let mut cs_b = vec![];
             swanky_channel::local::local_channel_pair(
                 |channel| {
-                    for (triple, shares) in triples_a.iter().zip(shares_a.chunks_exact(2)) {
-                        let c = generator_a.to_known_triple(triple, &shares[0], &shares[1], channel)?;
-                        cs_a.push(c);
-                    }
+                    generator_a.to_known_triple(
+                        &triples_a,
+                        &shares_a[..ntriples],
+                        &shares_a[ntriples..],
+                        &mut cs_a,
+                        channel,
+                    )?;
                     Ok(())
                 },
                 |channel| {
-                    for (triple, shares) in triples_b.iter().zip(shares_b.chunks_exact(2)) {
-                        let c = generator_b.to_known_triple(triple, &shares[0], &shares[1], channel)?;
-                        cs_b.push(c);
-                    }
+                    generator_b.to_known_triple(
+                        &triples_b,
+                        &shares_b[..ntriples],
+                        &shares_b[ntriples..],
+                        &mut cs_b,
+                        channel,
+                    )?;
                     Ok(())
                 },
             )
@@ -454,13 +547,14 @@ mod tests {
             for i in 0..ntriples {
                 // `auth_share_generator().open()` should ensure that the opened
                 // shares are the same.
-                assert_eq!(shares_a[2 * i], shares_b[2 * i]);
-                assert_eq!(shares_a[2 * i + 1], shares_b[2 * i + 1]);
-                assert_eq!(cs_a[i], cs_b[i]);
-                let a = shares_a[2 * i];
-                let b = shares_a[2 * i + 1];
+                prop_assert_eq!(shares_a[2 * i], shares_b[2 * i]);
+                prop_assert_eq!(shares_a[2 * i + 1], shares_b[2 * i + 1]);
+                prop_assert_eq!(cs_a[i], cs_b[i]);
+                // Check that the AND relation holds.
+                let a = shares_a[i];
+                let b = shares_a[ntriples + i];
                 let c = cs_a[i];
-                assert_eq!(a * b, c);
+                prop_assert_eq!(a * b, c);
             }
         }
     }
