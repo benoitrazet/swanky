@@ -723,4 +723,58 @@ mod test {
             assert_eq!(*a + *b, *c);
         }
     }
+
+    #[test]
+    fn test_transpose_lockstep_equals_enumerator() {
+        use super::{pack_f128b, to_field_f128_and_pad_lockstep, ColumnEnumState};
+        use crate::parameters::REPETITION_PARAM;
+        use swanky_field_binary::F8b;
+
+        fn f8(x: u8) -> F8b {
+            F8b::from_bytes(&[x].into()).unwrap()
+        }
+
+        // Try different lengths
+        let lengths = [
+            0usize, 1, 15, 16, 17, 127, 128, 129, 200, 255, 256, 511, 512, 513,
+        ];
+
+        for &len in &lengths {
+            // Build len rows of 16 bytes each to pack into F128b values
+            let mut rows: Vec<[F8b; REPETITION_PARAM]> = Vec::with_capacity(len);
+            for i in 0..len {
+                let mut row = [F8b::ZERO; REPETITION_PARAM];
+                for (j, cell) in row.iter_mut().enumerate() {
+                    // Deterministic, non-trivial pattern
+                    let byte = (i as u8)
+                        .wrapping_mul(31)
+                        .wrapping_add(j as u8)
+                        .wrapping_mul(17);
+                    *cell = f8(byte);
+                }
+                rows.push(row);
+            }
+
+            let packed = pack_f128b(&rows);
+
+            let via_lockstep = to_field_f128_and_pad_lockstep(&packed);
+            let via_enum: Vec<[F128b; SECURITY_PARAM]> = ColumnEnumState::new(&packed).collect();
+
+            assert_eq!(
+                via_lockstep.len(),
+                via_enum.len(),
+                "mismatched chunk count for len={}",
+                len
+            );
+            for (i, (a, b)) in via_lockstep.iter().zip(via_enum.iter()).enumerate() {
+                for j in 0..SECURITY_PARAM {
+                    assert_eq!(
+                        a[j], b[j],
+                        "mismatch at len={}, chunk={}, col={} ",
+                        len, i, j
+                    );
+                }
+            }
+        }
+    }
 }
