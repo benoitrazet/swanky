@@ -17,7 +17,7 @@ use swanky_serialization::CanonicalSerialize;
 /// Packs bits of the input into `F128b`s. This does not do a field-to-field transformation;
 /// it uses `F128b` as a representation of 128 bits, not as a polynomial!
 fn pack_f128b(arrs: &[[F8b; REPETITION_PARAM]]) -> Vec<F128b> {
-    arrs.iter()
+    arrs.into_par_iter()
         .map(|xi| {
             let xi_bytes = xi.map(|xij| xij.to_bytes()[0]);
             F128b::from_bytes(&xi_bytes.into())
