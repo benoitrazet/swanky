@@ -335,6 +335,7 @@ mod test {
     use crate::vole::crypto_primitives::CHALL2_LENGTH;
     use crate::vole::functionality::compute_chall_3;
     use rand::thread_rng;
+    use rayon::prelude::*;
     use sha3::digest::{ExtendableOutput, Update, XofReader};
     use sha3::Shake128;
     use swanky_field::{FiniteRing, IsSubFieldOf};
@@ -424,12 +425,13 @@ mod test {
         let delta_lifted: F128b = F8b::form_superfield(&vole_v.delta);
         let q_lifted: Vec<F128b> = vole_v
             .q
-            .iter()
-            .map(|qi| F8b::form_superfield(qi.into()))
+            .into_par_iter()
+            .map(|qi| F8b::form_superfield(&qi.into()))
             .collect();
         for pos in 0..how_many {
             assert_eq!(v[pos] + u[pos] * delta_lifted, q_lifted[pos]);
         }
+        log::info!("6: t_finalcheck: {:?}", t_finalcheck.elapsed());
 
         assert!(b);
     }
