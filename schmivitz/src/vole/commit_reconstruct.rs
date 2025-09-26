@@ -8,6 +8,7 @@ use crate::vole::all_but_one_vc::{commit, open, reconstruct, Decom, Pdecom};
 use crate::vole::convert_to_vole::{convert_to_vole, convert_to_vole_verifier};
 use crate::vole::crypto_primitives::{Chall3, Com, H1, H1_LENGTH, IV, PRG};
 use generic_array::{arr, typenum::U16, GenericArray};
+use rayon::iter::*;
 use std::{sync::mpsc::channel, thread};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F8b, F2};
@@ -130,13 +131,12 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l_hat: usize) -> Commit {
     let u_0 = u[0].clone(); // TODO: opt transmute here
     let mut corr: [Vec<F2>; REPETITION_PARAM - 1] = Default::default();
     for i in 1..REPETITION_PARAM {
-        let mut ci = Vec::with_capacity(l_hat);
         debug_assert_eq!(l_hat, u_0.len());
         let u_i = &u[i];
-        for j in 0..l_hat {
-            let c = u_0[j] + u_i[j];
-            ci.push(c);
-        }
+        let ci: Vec<F2> = (0..l_hat)
+            .into_par_iter()
+            .map(|j| u_0[j] + u_i[j])
+            .collect();
         corr[i - 1] = ci;
     }
     log::info!("corrections running time: {:?}", t.elapsed());
@@ -144,10 +144,10 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l_hat: usize) -> Commit {
 
     // Convert to a row-wise, fixed-size representation.
     let t = std::time::Instant::now();
-    let mut v_out = Vec::with_capacity(l_hat);
-    for i in 0..l_hat {
-        v_out.push(core::array::from_fn(|tau| v[tau][i]));
-    }
+    let v_out: Vec<[F8b; REPETITION_PARAM]> = (0..l_hat)
+        .into_par_iter()
+        .map(|i| core::array::from_fn(|tau| v[tau][i]))
+        .collect();
     log::info!("pack to F8b running time: {:?}", t.elapsed());
 
     // hash the commitments
