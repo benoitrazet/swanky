@@ -160,10 +160,8 @@ impl<
         let mut shuffle_rng = AesRng::from_seed(random);
         leaky_ands.shuffle(&mut shuffle_rng);
         // Bucket the leaky AND triples and combine them into (non-leaky) AND triples.
-        for bucket in leaky_ands.chunks(bucket_size) {
-            let triple = self.leaky_generator.combine(bucket, channel)?;
-            out.push(triple.into());
-        }
+        self.leaky_generator
+            .combine(&leaky_ands, out, bucket_size, channel)?;
         Ok(())
     }
 

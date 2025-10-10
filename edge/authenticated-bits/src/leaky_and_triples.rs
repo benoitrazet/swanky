@@ -16,7 +16,10 @@
 //! Garbling for Faster Secure Two-Party Computation".
 //! <https://eprint.iacr.org/2018/578.pdf>
 
-use crate::authshares::{AuthShare, AuthShareGenerator};
+use crate::{
+    and_triples::AndTriple,
+    authshares::{AuthShare, AuthShareGenerator},
+};
 use itertools::Itertools;
 use rand::{CryptoRng, Rng};
 use swanky_adversary::Malicious;
@@ -299,8 +302,7 @@ impl<
         Ok(())
     }
 
-    /// Combine a "bucket" of [`LeakyAndTriple`]s to produce a single
-    /// [`AndTriple`].
+    /// Combines a vector of [`LeakyAndTriple`]s into [`AndTriple`]s.
     ///
     /// This implements the $`\Pi_{\mathsf{aAND}}`$ protocol (Figure 9) from
     /// Wang et al. [^1].
@@ -317,48 +319,74 @@ impl<
     ///
     /// That is, if you want to create `N` triples, you need to generate `B · N`
     /// leaky-AND triples---where `B` is the bucket size---randomly permute the
-    /// triples, and then call `combine` on buckets of size `B`. See Table 4
-    /// from Wang et al. [^1] (the number of triples above is for a statistical
+    /// triples, and then call `combine` with bucket size `B`. See Table 4 from
+    /// Wang et al. [^1] (the number of triples above is for a statistical
     /// security parameter of 40 bits).
     ///
     /// This implies that _there is no security guarantee_ when generating fewer
     /// than 320 triples!
     ///
     /// # Panics
-    /// This panics if `bucket` is empty.
+    /// This panics if `bucket_size ∉ {3, 4, 5}`, if `bucket_size` does not
+    /// divide `leaky_ands.len()`, or if `leaky_ands` is empty.
     ///
     /// [^1]: X. Wang, S. Ranellucci, J. Katz. "Authenticated Garbling and
     /// Efficient Maliciously Secure Two-Party Computation".
     /// <https://eprint.iacr.org/2017/030.pdf>
     pub(crate) fn combine(
-        &mut self,
-        bucket: &[LeakyAndTriple<P>],
+        &self,
+        leaky_ands: &[LeakyAndTriple<P>],
+        out: &mut Vec<AndTriple<P>>,
+        bucket_size: usize,
         channel: &mut Channel,
-    ) -> eyre::Result<LeakyAndTriple<P>> {
-        assert!(!bucket.is_empty());
-        bucket
-            .iter()
-            .skip(1)
-            .try_fold(*bucket.first().unwrap(), |acc, triple| {
-                // Compute `⟨d⟩ := ⟨y⟩ ⊕ ⟨y'⟩` and open `⟨d⟩`.
-                let d = acc.y ^ triple.y;
-                let mut d_vector = Vec::with_capacity(1);
-                self.auth_share_generator
-                    .open(&[d], &mut d_vector, channel)?;
-                // Compute the resulting triple as:
-                //   ⟨x''⟩ := ⟨x⟩ ⊕ ⟨x'⟩
-                //   ⟨y''⟩ := ⟨y⟩
-                //   ⟨z''⟩ := ⟨z⟩ ⊕ ⟨z'⟩ ⊕ d ⟨x'⟩
-                Ok(LeakyAndTriple {
+    ) -> eyre::Result<()> {
+        assert!(bucket_size == 3 || bucket_size == 4 || bucket_size == 5);
+        assert_eq!(leaky_ands.len() % bucket_size, 0);
+        assert!(!leaky_ands.is_empty());
+
+        let nbuckets = leaky_ands.len() / bucket_size;
+        let mut ds = Vec::with_capacity((bucket_size - 1) * nbuckets);
+        let mut ds_opened = Vec::with_capacity((bucket_size - 1) * nbuckets);
+
+        for bucket in leaky_ands.chunks_exact(bucket_size) {
+            // Compute `⟨d⟩ := ⟨y⟩ ⊕ ⟨y'⟩`.
+            bucket.iter().skip(1).map(|triple| triple.y()).fold(
+                bucket.first().unwrap().y(),
+                |y, y_| {
+                    ds.push(y ^ y_);
+                    y
+                },
+            );
+        }
+
+        // Open the `⟨d⟩`s in one shot. This is much more efficient than opening
+        // the `⟨d⟩`s on a per-bucket basis.
+        self.auth_share_generator
+            .open(&ds, &mut ds_opened, channel)?;
+
+        for (bucket, ds_opened) in leaky_ands
+            .chunks_exact(bucket_size)
+            .zip(ds_opened.chunks_exact(bucket_size - 1))
+        {
+            // Compute the resulting triple as:
+            //   ⟨x''⟩ := ⟨x⟩ ⊕ ⟨x'⟩
+            //   ⟨y''⟩ := ⟨y⟩
+            //   ⟨z''⟩ := ⟨z⟩ ⊕ ⟨z'⟩ ⊕ d ⟨x'⟩
+            let result = bucket.iter().skip(1).zip(ds_opened).fold(
+                *bucket.first().unwrap(),
+                |acc, (triple, d)| LeakyAndTriple {
                     x: acc.x ^ triple.x,
                     y: acc.y,
-                    z: if d_vector[0] == F2::ONE {
+                    z: if *d == F2::ONE {
                         acc.z ^ triple.z ^ triple.x
                     } else {
                         acc.z ^ triple.z
                     },
-                })
-            })
+                },
+            );
+            out.push(result.into());
+        }
+        Ok(())
     }
 
     /// The $`\Delta`$ value used to validate the other party's shares.
@@ -390,6 +418,7 @@ fn lsb(input: F128b) -> F2 {
 mod tests {
     use super::*;
     use crate::authshares::{PartyA, PartyB};
+    use bytemuck::TransparentWrapper;
     use proptest::prelude::*;
     use rand::SeedableRng;
     use swanky_aes_rng::AesRng;
@@ -491,19 +520,17 @@ mod tests {
             let (triples_a, triples_b) = generate_triples(nleaky, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
             swanky_channel::local::local_channel_pair(
                 |channel| {
-                    for bucket in triples_a.chunks_exact(bucket_size) {
-                        let triple = generator_a.combine(bucket, channel).unwrap();
-                        let result = generator_a.open(&[triple], channel);
-                        assert!(result.is_ok());
-                    }
+                    let mut out = vec![];
+                    generator_a.combine(&triples_a, &mut out, bucket_size, channel).unwrap();
+                    let result = generator_a.open(AndTriple::peel_slice(&out), channel);
+                    assert!(result.is_ok());
                     Ok(())
                 },
                 |channel| {
-                    for bucket in triples_b.chunks_exact(bucket_size) {
-                        let triple = generator_b.combine(bucket, channel).unwrap();
-                        let result = generator_b.open(&[triple], channel);
-                        assert!(result.is_ok());
-                    }
+                    let mut out = vec![];
+                    generator_b.combine(&triples_b, &mut out, bucket_size, channel).unwrap();
+                    let result = generator_b.open(AndTriple::peel_slice(&out), channel);
+                    assert!(result.is_ok());
                     Ok(())
                 },
             )
