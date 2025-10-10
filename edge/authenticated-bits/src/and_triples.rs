@@ -119,9 +119,13 @@ impl<
 
     /// Generate a vector of AND triples.
     ///
+    /// # Security
+    /// This method utilizes parameters fixed for a statistical security
+    /// parameter of 40-bits.
+    ///
     /// # Panics
-    /// This panics if `ntriples < 320`, as 320 is the minimum number
-    /// of ntriples that can be generated.
+    /// This panics if `ntriples < 320`, as 320 is the minimum number of triples
+    /// that can be generated.
     pub fn generate<RNG: CryptoRng + Rng>(
         &mut self,
         ntriples: usize,
