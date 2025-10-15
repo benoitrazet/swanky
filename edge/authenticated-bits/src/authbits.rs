@@ -80,7 +80,7 @@ use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender, Receiver, Sender};
 use swanky_party::{
     Party, WhichParty,
     either::{PartyEither, PartyEitherCopy},
-    private::{ProverPrivateCopy, VerifierPrivate, VerifierPrivateCopy},
+    private::{ProverPrivate, ProverPrivateCopy, VerifierPrivate, VerifierPrivateCopy},
 };
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 use vectoreyes::U8x16;
@@ -114,30 +114,38 @@ pub struct AuthBit<P: Party>(PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>)
 
 impl<P: Party> AuthBit<P> {
     /// The [`ProverAuthBit`] component.
-    fn to_prover(self) -> ProverPrivateCopy<P, ProverAuthBit> {
+    fn prover(self) -> ProverPrivateCopy<P, ProverAuthBit> {
         self.0.into_privates().0
     }
+    /// The [`ProverAuthBit`] component as a mutable reference.
+    fn prover_mut(&mut self) -> ProverPrivate<P, &mut ProverAuthBit> {
+        self.0.as_mut().into_privates().0
+    }
     /// The [`VerifierAuthBit`] component.
-    fn to_verifier(self) -> VerifierPrivateCopy<P, VerifierAuthBit> {
+    fn verifier(self) -> VerifierPrivateCopy<P, VerifierAuthBit> {
         self.0.into_privates().1
+    }
+    /// The [`VerifierAuthBit`] component as a mutable reference.
+    fn verifier_mut(&mut self) -> VerifierPrivate<P, &mut VerifierAuthBit> {
+        self.0.as_mut().into_privates().1
     }
     /// Output the verifier's key associated with this [`AuthBit`].
     pub fn key(&self) -> VerifierPrivateCopy<P, U8x16> {
-        self.to_verifier().map(|vab| vab.key)
+        self.verifier().map(|vab| vab.key)
     }
     /// Output the prover's MAC associated with this [`AuthBit`].
     pub fn mac(&self) -> ProverPrivateCopy<P, U8x16> {
-        self.to_prover().map(|vab| vab.mac)
+        self.prover().map(|vab| vab.mac)
     }
     /// Output the prover's bit associated with this [`AuthBit`].
     pub fn bit(&self) -> ProverPrivateCopy<P, F2> {
-        self.to_prover().map(|vab| vab.bit)
+        self.prover().map(|vab| vab.bit)
     }
 }
 
 /// XOR two authenticated bits. Linear operations on authenticated bits are "free"
 /// (i.e. can be done locally).
-impl<P: Party> std::ops::BitXor for AuthBit<P> {
+impl<P: Party> core::ops::BitXor for AuthBit<P> {
     type Output = Self;
     fn bitxor(self, rhs: Self) -> Self::Output {
         let pairs = self.0.zip(rhs.0);
@@ -150,6 +158,27 @@ impl<P: Party> std::ops::BitXor for AuthBit<P> {
                 key: lhs.key ^ rhs.key,
             },
         ))
+    }
+}
+
+impl<P: Party> core::ops::BitXorAssign for AuthBit<P> {
+    fn bitxor_assign(&mut self, rhs: Self) {
+        match P::WHICH {
+            WhichParty::Prover(ev) => {
+                self.prover_mut().into_inner(ev).mac ^= rhs.prover().into_inner(ev).mac;
+                self.prover_mut().into_inner(ev).bit += rhs.prover().into_inner(ev).bit;
+            }
+            WhichParty::Verifier(ev) => {
+                self.verifier_mut().into_inner(ev).key ^= rhs.verifier().into_inner(ev).key;
+            }
+        }
+        self.0.zip(rhs.0).map(
+            |(mut lhs, rhs)| {
+                lhs.mac ^= rhs.mac;
+                lhs.bit += rhs.bit
+            },
+            |(mut lhs, rhs)| lhs.key ^= rhs.key,
+        );
     }
 }
 
@@ -570,7 +599,7 @@ mod tests {
             let bits1: Vec<_> = (0..nbits).map(|_| rng_a.r#gen::<F2>()).collect();
             let bits2: Vec<_> = (0..nbits).map(|_| rng_a.r#gen::<F2>()).collect();
             let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
-            let (output_a, output_b) = generate(
+            let (mut output_a, mut output_b) = generate(
                 &bits1,
                 &mut generator_a,
                 &mut generator_b,
@@ -613,6 +642,29 @@ mod tests {
                 assert_eq!(
                     result.1.key().into_inner(IS_VERIFIER),
                     b.key().into_inner(IS_VERIFIER) ^ d.key().into_inner(IS_VERIFIER)
+                );
+            }
+            // Test that `bitxor_assign` works as intended.
+            for ((a, b), (c, d)) in output_a
+                .iter_mut()
+                .zip(output_b.iter_mut())
+                .zip(output_c.iter().zip(output_d.iter()))
+            {
+                *a ^= *c;
+                *b ^= *d;
+            }
+            for (result, (a, b)) in results.iter().zip(output_a.iter().zip(output_b.iter())) {
+                assert_eq!(
+                    result.0.bit().into_inner(IS_PROVER),
+                    a.bit().into_inner(IS_PROVER)
+                );
+                assert_eq!(
+                    result.0.mac().into_inner(IS_PROVER),
+                    a.mac().into_inner(IS_PROVER)
+                );
+                assert_eq!(
+                    result.1.key().into_inner(IS_VERIFIER),
+                    b.key().into_inner(IS_VERIFIER)
                 );
             }
         }
