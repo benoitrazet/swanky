@@ -129,9 +129,9 @@ impl<P: Party> AndTripleGenerator<P> {
         // See Table 4 from https://eprint.iacr.org/2017/030.pdf.
         //
         // These numbers are for a statistical security of 40 bits.
-        let bucket_size = if ntriples >= 280000 {
+        let bucket_size = if ntriples >= 280_000 {
             3
-        } else if ntriples >= 3100 {
+        } else if ntriples >= 3_100 {
             4
         } else if ntriples >= 320 {
             5
