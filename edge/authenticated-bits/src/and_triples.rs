@@ -41,12 +41,10 @@ use crate::{
 use bytemuck::TransparentWrapper;
 use rand::{CryptoRng, Rng, SeedableRng, seq::SliceRandom};
 use std::io::{Cursor, Seek};
-use swanky_adversary::Malicious;
 use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer};
-use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
 use swanky_party::{Party, WhichParty, either::PartyEither, private::VerifierPrivate};
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 use vectoreyes::U8x16;
@@ -87,16 +85,11 @@ impl<P: Party> AndTriple<P> {
 }
 
 /// A type for generating [`AndTriple`]s.
-pub struct AndTripleGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver> {
-    leaky_generator: LeakyAndTripleGenerator<P, OTS, OTR>,
+pub struct AndTripleGenerator<P: Party> {
+    leaky_generator: LeakyAndTripleGenerator<P>,
 }
 
-impl<
-    P: Party,
-    OTS: CorrelatedSender<Msg = U8x16> + Malicious,
-    OTR: CorrelatedReceiver<Msg = U8x16> + Malicious,
-> AndTripleGenerator<P, OTS, OTR>
-{
+impl<P: Party> AndTripleGenerator<P> {
     /// Create a new [`AndTripleGenerator`].
     pub fn new<RNG: CryptoRng + Rng>(channel: &mut Channel, rng: RNG) -> eyre::Result<Self> {
         let leaky_generator = LeakyAndTripleGenerator::new(channel, rng)?;
@@ -340,12 +333,12 @@ impl<
     }
 
     /// Return the [`AuthShareGenerator`] associated with this generator.
-    pub fn auth_share_generator(&self) -> &AuthShareGenerator<P, OTS, OTR> {
+    pub fn auth_share_generator(&self) -> &AuthShareGenerator<P> {
         &self.leaky_generator.auth_share_generator
     }
 
     /// Return the _mutable_ [`AuthShareGenerator`] associated with this generator.
-    pub fn auth_share_generator_mut(&mut self) -> &mut AuthShareGenerator<P, OTS, OTR> {
+    pub fn auth_share_generator_mut(&mut self) -> &mut AuthShareGenerator<P> {
         &mut self.leaky_generator.auth_share_generator
     }
 }
@@ -356,34 +349,22 @@ mod tests {
     use crate::authshares::{PartyA, PartyB};
     use proptest::prelude::*;
     use swanky_aes_rng::AesRng;
-    use swanky_ot_alsz_kos::kos;
 
     fn generators(
         mut rng_a: &mut AesRng,
         mut rng_b: &mut AesRng,
-    ) -> (
-        AndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
-        AndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
-    ) {
+    ) -> (AndTripleGenerator<PartyA>, AndTripleGenerator<PartyB>) {
         swanky_channel::local::local_channel_pair(
-            |c| {
-                let generator =
-                    AndTripleGenerator::<PartyA, kos::Sender, kos::Receiver>::new(c, &mut rng_a)?;
-                Ok(generator)
-            },
-            |c| {
-                let generator =
-                    AndTripleGenerator::<PartyB, kos::Sender, kos::Receiver>::new(c, &mut rng_b)?;
-                Ok(generator)
-            },
+            |c| AndTripleGenerator::<PartyA>::new(c, &mut rng_a),
+            |c| AndTripleGenerator::<PartyB>::new(c, &mut rng_b),
         )
         .unwrap()
     }
 
     fn generate_triples(
         ntriples: usize,
-        generator_a: &mut AndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
-        generator_b: &mut AndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
+        generator_a: &mut AndTripleGenerator<PartyA>,
+        generator_b: &mut AndTripleGenerator<PartyB>,
         mut rng_a: &mut AesRng,
         mut rng_b: &mut AesRng,
     ) -> (Vec<AndTriple<PartyA>>, Vec<AndTriple<PartyB>>) {
@@ -404,8 +385,8 @@ mod tests {
 
     fn generate_shares(
         nshares: usize,
-        generator_a: &mut AndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
-        generator_b: &mut AndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
+        generator_a: &mut AndTripleGenerator<PartyA>,
+        generator_b: &mut AndTripleGenerator<PartyB>,
         mut rng_a: &mut AesRng,
         mut rng_b: &mut AesRng,
     ) -> (Vec<AuthShare<PartyA>>, Vec<AuthShare<PartyB>>) {
@@ -435,8 +416,8 @@ mod tests {
     }
 
     fn validate_triples(
-        generator_a: &AndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
-        generator_b: &AndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
+        generator_a: &AndTripleGenerator<PartyA>,
+        generator_b: &AndTripleGenerator<PartyB>,
         triples_a: Vec<AndTriple<PartyA>>,
         triples_b: Vec<AndTriple<PartyB>>,
     ) -> (bool, bool) {

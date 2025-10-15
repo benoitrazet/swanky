@@ -20,7 +20,6 @@
 //! # use rand::Rng;
 //! # use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 //! # use swanky_field_binary::F2;
-//! # use swanky_ot_alsz_kos::kos;
 //! # use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
 //! # use swanky_party::either::PartyEitherCopy;
 //! # use swanky_party::private::VerifierPrivate;
@@ -32,7 +31,7 @@
 //!         let mut rng = swanky_aes_rng::AesRng::new();
 //!         let mut authshares: Vec<AuthShare<Prover>> = vec![];
 //!         let mut bits: Vec<F2> = vec![];
-//!         let mut generator: AuthShareGenerator<_, kos::Sender, kos::Receiver> = AuthShareGenerator::new(c, &mut rng)?;
+//!         let mut generator: AuthShareGenerator<_> = AuthShareGenerator::new(c, &mut rng)?;
 //!         generator.generate(nshares, &mut authshares, c, &mut rng)?;
 //!         generator.open(&authshares, &mut bits, c)?;
 //!         Ok(bits)
@@ -42,7 +41,7 @@
 //!         let mut rng = swanky_aes_rng::AesRng::new();
 //!         let mut authshares: Vec<AuthShare<Verifier>> = vec![];
 //!         let mut bits: Vec<F2> = vec![];
-//!         let mut generator: AuthShareGenerator<_, kos::Sender, kos::Receiver> = AuthShareGenerator::new(c, &mut rng)?;
+//!         let mut generator: AuthShareGenerator<_> = AuthShareGenerator::new(c, &mut rng)?;
 //!         generator.generate(nshares, &mut authshares, c, &mut rng)?;
 //!         generator.open(&authshares, &mut bits, c)?;
 //!         Ok(bits)
@@ -56,10 +55,8 @@
 
 use crate::authbits::{AuthBit, AuthBitGenerator};
 use rand::{CryptoRng, Rng};
-use swanky_adversary::Malicious;
 use swanky_channel::Channel;
 use swanky_field_binary::F2;
-use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
 use swanky_party::{
     IS_PROVER, IS_VERIFIER, Party, Prover, Verifier, WhichParty,
     either::{PartyEither, PartyEitherCopy},
@@ -144,19 +141,12 @@ impl<P: Party> core::ops::BitXor for AuthShare<P> {
 }
 
 /// A type for generating [`AuthShare`]s.
-pub struct AuthShareGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver> {
-    party_a:
-        PartyEither<P, AuthBitGenerator<Prover, OTS, OTR>, AuthBitGenerator<Verifier, OTS, OTR>>,
-    party_b:
-        PartyEither<P, AuthBitGenerator<Verifier, OTS, OTR>, AuthBitGenerator<Prover, OTS, OTR>>,
+pub struct AuthShareGenerator<P: Party> {
+    party_a: PartyEither<P, AuthBitGenerator<Prover>, AuthBitGenerator<Verifier>>,
+    party_b: PartyEither<P, AuthBitGenerator<Verifier>, AuthBitGenerator<Prover>>,
 }
 
-impl<
-    P: Party,
-    OTS: CorrelatedSender<Msg = U8x16> + Malicious,
-    OTR: CorrelatedReceiver<Msg = U8x16> + Malicious,
-> AuthShareGenerator<P, OTS, OTR>
-{
+impl<P: Party> AuthShareGenerator<P> {
     /// Create a new [`AuthShareGenerator`].
     pub fn new<RNG: CryptoRng + Rng>(channel: &mut Channel, mut rng: RNG) -> eyre::Result<Self> {
         let delta = rng.r#gen::<U8x16>();
@@ -171,8 +161,8 @@ impl<
     ) -> eyre::Result<Self> {
         match P::WHICH {
             WhichParty::Prover(ev) => {
-                let party_a = AuthBitGenerator::<Prover, OTS, OTR>::new(channel, &mut rng)?;
-                let party_b = AuthBitGenerator::<Verifier, OTS, OTR>::new_with_delta(
+                let party_a = AuthBitGenerator::<Prover>::new(channel, &mut rng)?;
+                let party_b = AuthBitGenerator::<Verifier>::new_with_delta(
                     VerifierPrivateCopy::new(delta),
                     channel,
                     &mut rng,
@@ -183,12 +173,12 @@ impl<
                 })
             }
             WhichParty::Verifier(ev) => {
-                let party_a = AuthBitGenerator::<Verifier, OTS, OTR>::new_with_delta(
+                let party_a = AuthBitGenerator::<Verifier>::new_with_delta(
                     VerifierPrivateCopy::new(delta),
                     channel,
                     &mut rng,
                 )?;
-                let party_b = AuthBitGenerator::<Prover, OTS, OTR>::new(channel, &mut rng)?;
+                let party_b = AuthBitGenerator::<Prover>::new(channel, &mut rng)?;
                 Ok(AuthShareGenerator {
                     party_a: PartyEither::verifier_new(ev, party_a),
                     party_b: PartyEither::verifier_new(ev, party_b),
@@ -360,7 +350,6 @@ mod tests {
     use proptest::prelude::*;
     use rand::SeedableRng;
     use swanky_aes_rng::AesRng;
-    use swanky_ot_alsz_kos::kos;
 
     /// Generates `AuthShare`s, outputting the produced `AuthShare`s and their
     /// associated generators.
@@ -371,23 +360,21 @@ mod tests {
     ) -> (
         Vec<AuthShare<PartyA>>,
         Vec<AuthShare<PartyB>>,
-        AuthShareGenerator<PartyA, kos::Sender, kos::Receiver>,
-        AuthShareGenerator<PartyB, kos::Sender, kos::Receiver>,
+        AuthShareGenerator<PartyA>,
+        AuthShareGenerator<PartyB>,
     ) {
         let mut output_a: Vec<AuthShare<PartyA>> = vec![];
         let mut output_b: Vec<AuthShare<PartyB>> = vec![];
         let (generator_a, generator_b) = swanky_channel::local::local_channel_pair(
             |c| {
                 let mut rng = AesRng::from_seed(seed_party_a);
-                let mut generator =
-                    AuthShareGenerator::<PartyA, kos::Sender, kos::Receiver>::new(c, &mut rng)?;
+                let mut generator = AuthShareGenerator::<PartyA>::new(c, &mut rng)?;
                 generator.generate(nshares, &mut output_a, c, &mut rng)?;
                 Ok(generator)
             },
             |c| {
                 let mut rng = AesRng::from_seed(seed_party_b);
-                let mut generator =
-                    AuthShareGenerator::<PartyB, kos::Sender, kos::Receiver>::new(c, &mut rng)?;
+                let mut generator = AuthShareGenerator::<PartyB>::new(c, &mut rng)?;
                 generator.generate(nshares, &mut output_b, c, &mut rng)?;
                 Ok(generator)
             },
@@ -398,8 +385,8 @@ mod tests {
 
     /// Validates vectors of `AuthShare`s using their associated generators.
     fn validate(
-        generator_a: &AuthShareGenerator<PartyA, kos::Sender, kos::Receiver>,
-        generator_b: &AuthShareGenerator<PartyB, kos::Sender, kos::Receiver>,
+        generator_a: &AuthShareGenerator<PartyA>,
+        generator_b: &AuthShareGenerator<PartyB>,
         output_a: Vec<AuthShare<PartyA>>,
         output_b: Vec<AuthShare<PartyB>>,
     ) -> (bool, bool) {

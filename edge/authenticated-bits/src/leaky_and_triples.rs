@@ -22,12 +22,10 @@ use crate::{
 };
 use itertools::Itertools;
 use rand::{CryptoRng, Rng};
-use swanky_adversary::Malicious;
 use swanky_channel::Channel;
 use swanky_f_eq::EqualityFunctionality;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
-use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
 use swanky_party::{Party, WhichParty};
 use swanky_serialization::{CanonicalSerialize, SequenceDeserializer, SequenceSerializer};
 use vectoreyes::{SimdBase, U8x16};
@@ -65,17 +63,11 @@ impl<P: Party> LeakyAndTriple<P> {
 }
 
 /// A type for generating [`LeakyAndTriple`]s.
-pub(crate) struct LeakyAndTripleGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver>
-{
-    pub(crate) auth_share_generator: AuthShareGenerator<P, OTS, OTR>,
+pub(crate) struct LeakyAndTripleGenerator<P: Party> {
+    pub(crate) auth_share_generator: AuthShareGenerator<P>,
 }
 
-impl<
-    P: Party,
-    OTS: CorrelatedSender<Msg = U8x16> + Malicious,
-    OTR: CorrelatedReceiver<Msg = U8x16> + Malicious,
-> LeakyAndTripleGenerator<P, OTS, OTR>
-{
+impl<P: Party> LeakyAndTripleGenerator<P> {
     /// Create a new [`LeakyAndTripleGenerator`].
     pub(crate) fn new<RNG: CryptoRng + Rng>(
         channel: &mut Channel,
@@ -422,36 +414,25 @@ mod tests {
     use proptest::prelude::*;
     use rand::SeedableRng;
     use swanky_aes_rng::AesRng;
-    use swanky_ot_alsz_kos::kos;
 
     fn generators(
         mut rng_a: &mut AesRng,
         mut rng_b: &mut AesRng,
     ) -> (
-        LeakyAndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
-        LeakyAndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
+        LeakyAndTripleGenerator<PartyA>,
+        LeakyAndTripleGenerator<PartyB>,
     ) {
         swanky_channel::local::local_channel_pair(
-            |c| {
-                let generator = LeakyAndTripleGenerator::<PartyA, kos::Sender, kos::Receiver>::new(
-                    c, &mut rng_a,
-                )?;
-                Ok(generator)
-            },
-            |c| {
-                let generator = LeakyAndTripleGenerator::<PartyB, kos::Sender, kos::Receiver>::new(
-                    c, &mut rng_b,
-                )?;
-                Ok(generator)
-            },
+            |c| LeakyAndTripleGenerator::<PartyA>::new(c, &mut rng_a),
+            |c| LeakyAndTripleGenerator::<PartyB>::new(c, &mut rng_b),
         )
         .unwrap()
     }
 
     fn generate_triples(
         ntriples: usize,
-        generator_a: &mut LeakyAndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
-        generator_b: &mut LeakyAndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
+        generator_a: &mut LeakyAndTripleGenerator<PartyA>,
+        generator_b: &mut LeakyAndTripleGenerator<PartyB>,
         mut rng_a: &mut AesRng,
         mut rng_b: &mut AesRng,
     ) -> (Vec<LeakyAndTriple<PartyA>>, Vec<LeakyAndTriple<PartyB>>) {
@@ -471,8 +452,8 @@ mod tests {
     }
 
     fn validate(
-        generator_a: &LeakyAndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
-        generator_b: &LeakyAndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
+        generator_a: &LeakyAndTripleGenerator<PartyA>,
+        generator_b: &LeakyAndTripleGenerator<PartyB>,
         output_a: Vec<LeakyAndTriple<PartyA>>,
         output_b: Vec<LeakyAndTriple<PartyB>>,
     ) -> (bool, bool) {

@@ -35,7 +35,6 @@
 //! # use rand::Rng;
 //! # use swanky_authenticated_bits::authbits::{AuthBit, AuthBitGenerator};
 //! # use swanky_field_binary::F2;
-//! # use swanky_ot_alsz_kos::kos;
 //! # use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
 //! # use swanky_party::either::PartyEitherCopy;
 //! # use swanky_party::private::VerifierPrivate;
@@ -46,7 +45,7 @@
 //!         let mut rng = swanky_aes_rng::AesRng::new();
 //!         let bits = rng.r#gen::<[F2; 10]>();
 //!         let mut authbits: Vec<AuthBit<Prover>> = vec![];
-//!         let mut generator: AuthBitGenerator<_, kos::Sender, kos::Receiver> = AuthBitGenerator::new(c, &mut rng)?;
+//!         let mut generator: AuthBitGenerator<_> = AuthBitGenerator::new(c, &mut rng)?;
 //!         generator.generate(PartyEitherCopy::prover_new(IS_PROVER, &bits), &mut authbits, c, &mut rng)?;
 //!         generator.open(&authbits, VerifierPrivate::empty(IS_PROVER), c)?;
 //!         Ok(bits.to_vec())
@@ -57,7 +56,7 @@
 //!         let count = 10;
 //!         let mut bits = vec![];
 //!         let mut authbits: Vec<AuthBit<Verifier>> = vec![];
-//!         let mut generator: AuthBitGenerator<_, kos::Sender, kos::Receiver> = AuthBitGenerator::new(c, &mut rng)?;
+//!         let mut generator: AuthBitGenerator<_> = AuthBitGenerator::new(c, &mut rng)?;
 //!         generator.generate(PartyEitherCopy::verifier_new(IS_VERIFIER, count), &mut authbits, c, &mut rng)?;
 //!         generator.open(&authbits, VerifierPrivate::new(&mut bits), c)?;
 //!         Ok(bits)
@@ -73,11 +72,11 @@
 //!     <https://eprint.iacr.org/2016/1069.pdf>
 
 use rand::{CryptoRng, Rng};
-use swanky_adversary::Malicious;
 use swanky_channel::Channel;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
-use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
+use swanky_ot_alsz_kos::kos;
+use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender, Receiver, Sender};
 use swanky_party::{
     Party, WhichParty,
     either::{PartyEither, PartyEitherCopy},
@@ -163,19 +162,14 @@ impl<P: Party> std::ops::BitXor for AuthBit<P> {
 /// verification will fail (with overwhelming probability), but when verifying
 /// zero bits, verification will not (because the $`\Delta`$ value is never used
 /// in the verification of a zero bit)!
-pub struct AuthBitGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver> {
+pub struct AuthBitGenerator<P: Party> {
     /// The verifier's global $`\Delta`$.
     delta: VerifierPrivateCopy<P, U8x16>,
     /// The party-specific correlated OT instantiation.
-    ot: PartyEither<P, OTR, OTS>,
+    ot: PartyEither<P, kos::Receiver, kos::Sender>,
 }
 
-impl<
-    P: Party,
-    OTS: CorrelatedSender<Msg = U8x16> + Malicious,
-    OTR: CorrelatedReceiver<Msg = U8x16> + Malicious,
-> AuthBitGenerator<P, OTS, OTR>
-{
+impl<P: Party> AuthBitGenerator<P> {
     /// Create a new [`AuthBitGenerator`].
     ///
     /// The verifier's $`\Delta`$ value is randomly generated using `rng`.
@@ -206,15 +200,16 @@ impl<
         let result = match P::WHICH {
             WhichParty::Prover(e) => AuthBitGenerator {
                 delta: VerifierPrivateCopy::empty(e),
-                ot: PartyEither::prover_new(e, OTR::init(channel, &mut rng)?),
+                ot: PartyEither::prover_new(e, kos::Receiver::init(channel, &mut rng)?),
             },
             WhichParty::Verifier(e) => AuthBitGenerator {
                 delta: VerifierPrivateCopy::new(delta.into_inner(e)),
-                ot: PartyEither::verifier_new(e, OTS::init(channel, &mut rng)?),
+                ot: PartyEither::verifier_new(e, kos::Sender::init(channel, &mut rng)?),
             },
         };
         Ok(result)
     }
+
     /// Generate a vector of authenticated bits.
     ///
     /// The prover supplies the bits to authenticate, and the verifier specifies
@@ -357,27 +352,15 @@ mod tests {
     use rand::SeedableRng;
     use swanky_aes_rng::AesRng;
     use swanky_field::FiniteRing;
-    use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
     use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier, either::PartyEitherCopy};
 
     fn generators(
         mut rng_a: &mut AesRng,
         mut rng_b: &mut AesRng,
-    ) -> (
-        AuthBitGenerator<Prover, KosSender, KosReceiver>,
-        AuthBitGenerator<Verifier, KosSender, KosReceiver>,
-    ) {
+    ) -> (AuthBitGenerator<Prover>, AuthBitGenerator<Verifier>) {
         swanky_channel::local::local_channel_pair(
-            |c| {
-                let generator =
-                    AuthBitGenerator::<Prover, KosSender, KosReceiver>::new(c, &mut rng_a)?;
-                Ok(generator)
-            },
-            |c| {
-                let generator =
-                    AuthBitGenerator::<Verifier, KosSender, KosReceiver>::new(c, &mut rng_b)?;
-                Ok(generator)
-            },
+            |c| AuthBitGenerator::<Prover>::new(c, &mut rng_a),
+            |c| AuthBitGenerator::<Verifier>::new(c, &mut rng_b),
         )
         .unwrap()
     }
@@ -407,8 +390,8 @@ mod tests {
     /// MAC. If `tamper_key` is true, tamper with the verifier's key.
     fn generate(
         bits_in: &[F2],
-        generator_a: &mut AuthBitGenerator<Prover, KosSender, KosReceiver>,
-        generator_b: &mut AuthBitGenerator<Verifier, KosSender, KosReceiver>,
+        generator_a: &mut AuthBitGenerator<Prover>,
+        generator_b: &mut AuthBitGenerator<Verifier>,
         mut rng_a: &mut AesRng,
         mut rng_b: &mut AesRng,
         tamper_mac: bool,

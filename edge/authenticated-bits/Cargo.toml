@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 swanky-ot-traits.workspace = true
+swanky-ot-alsz-kos.workspace = true
 swanky-adversary.workspace = true
 swanky-party.workspace = true
 swanky-channel.workspace = true
@@ -31,5 +32,4 @@ proptest.workspace = true
 eyre.workspace = true
 
 [dev-dependencies]
-swanky-ot-alsz-kos.workspace = true
 proptest.workspace = true
