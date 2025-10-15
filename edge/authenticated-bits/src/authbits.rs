@@ -296,6 +296,11 @@ impl<P: Party> AuthBitGenerator<P> {
     /// This corresponds to the prover sending $`(b, M)`$ to the verifier, who
     /// checks that $`K = M \oplus b \Delta`$. The resulting opened bits are
     /// [`Vec::push`]ed to `outputs`.
+    ///
+    /// # Errors
+    ///
+    /// This method returns an error if any [`AuthBit`] fails validation.
+    /// In this case, no opened bits are added to `outputs`.
     pub fn open(
         &self,
         authbits: &[AuthBit<P>],
@@ -324,6 +329,8 @@ impl<P: Party> AuthBitGenerator<P> {
                 // validate the [`Vec::push`]ed bits.
                 let outputs_initial_len = bits_.len();
                 for _ in 0..authbits.len() {
+                    // Optimistically add the opened bits to the output vector.
+                    // We remove these added values below if validation fails.
                     bits_.push(bit_ser.read(channel.as_std_io())?);
                 }
                 let mut validation = true;
@@ -338,6 +345,10 @@ impl<P: Party> AuthBitGenerator<P> {
                         };
                 }
                 if !validation {
+                    // Validation failed, so the bits added to the output vector
+                    // are not necessarily valid. So truncate the vector back to
+                    // its original size.
+                    bits_.truncate(outputs_initial_len);
                     return Err(eyre::Error::msg("Validation check failed"));
                 }
             }
