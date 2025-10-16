@@ -351,55 +351,52 @@ mod tests {
     use rand::SeedableRng;
     use swanky_aes_rng::AesRng;
 
-    /// Generates `AuthShare`s, outputting the produced `AuthShare`s and their
-    /// associated generators.
-    fn generate(
-        nshares: usize,
-        seed_party_a: U8x16,
-        seed_party_b: U8x16,
-    ) -> (
-        Vec<AuthShare<PartyA>>,
-        Vec<AuthShare<PartyB>>,
-        AuthShareGenerator<PartyA>,
-        AuthShareGenerator<PartyB>,
-    ) {
-        let mut output_a: Vec<AuthShare<PartyA>> = vec![];
-        let mut output_b: Vec<AuthShare<PartyB>> = vec![];
-        let (generator_a, generator_b) = swanky_channel::local::local_channel_pair(
-            |c| {
-                let mut rng = AesRng::from_seed(seed_party_a);
-                let mut generator = AuthShareGenerator::<PartyA>::new(c, &mut rng)?;
-                generator.generate(nshares, &mut output_a, c, &mut rng)?;
-                Ok(generator)
-            },
-            |c| {
-                let mut rng = AesRng::from_seed(seed_party_b);
-                let mut generator = AuthShareGenerator::<PartyB>::new(c, &mut rng)?;
-                generator.generate(nshares, &mut output_b, c, &mut rng)?;
-                Ok(generator)
-            },
+    fn generators(
+        mut rng_a: &mut AesRng,
+        mut rng_b: &mut AesRng,
+    ) -> (AuthShareGenerator<PartyA>, AuthShareGenerator<PartyB>) {
+        swanky_channel::local::local_channel_pair(
+            |c| AuthShareGenerator::<PartyA>::new(c, &mut rng_a),
+            |c| AuthShareGenerator::<PartyB>::new(c, &mut rng_b),
         )
-        .unwrap();
-        (output_a, output_b, generator_a, generator_b)
+        .unwrap()
     }
 
-    /// Validates vectors of `AuthShare`s using their associated generators.
-    fn validate(
+    /// Generates `AuthShare`s.
+    fn generate(
+        nshares: usize,
+        generator_a: &mut AuthShareGenerator<PartyA>,
+        generator_b: &mut AuthShareGenerator<PartyB>,
+        mut rng_a: &mut AesRng,
+        mut rng_b: &mut AesRng,
+    ) -> (Vec<AuthShare<PartyA>>, Vec<AuthShare<PartyB>>) {
+        let mut output_a: Vec<AuthShare<PartyA>> = vec![];
+        let mut output_b: Vec<AuthShare<PartyB>> = vec![];
+        swanky_channel::local::local_channel_pair(
+            |c| generator_a.generate(nshares, &mut output_a, c, &mut rng_a),
+            |c| generator_b.generate(nshares, &mut output_b, c, &mut rng_b),
+        )
+        .unwrap();
+        (output_a, output_b)
+    }
+
+    /// Open vectors of `AuthShare`s using their associated generators.
+    fn open(
         generator_a: &AuthShareGenerator<PartyA>,
         generator_b: &AuthShareGenerator<PartyB>,
         output_a: Vec<AuthShare<PartyA>>,
         output_b: Vec<AuthShare<PartyB>>,
-    ) -> (bool, bool) {
+    ) -> ((bool, Vec<F2>), (bool, Vec<F2>)) {
         swanky_channel::local::local_channel_pair(
             |c| {
                 let mut outputs = vec![];
                 let result = generator_a.open(&output_a, &mut outputs, c);
-                Ok(result.is_ok())
+                Ok((result.is_ok(), outputs))
             },
             |c| {
                 let mut outputs = vec![];
                 let result = generator_b.open(&output_b, &mut outputs, c);
-                Ok(result.is_ok())
+                Ok((result.is_ok(), outputs))
             },
         )
         .unwrap()
@@ -410,9 +407,11 @@ mod tests {
         #[test]
         fn honest_generation_works(nshares in 1..1000usize,
                                    seed_party_a in any::<u128>(), seed_party_b in any::<u128>()) {
-            let (output_a, output_b, generator_a, generator_b) = generate(nshares, U8x16::from(seed_party_a), U8x16::from(seed_party_b));
-            let (validation_a, validation_b) =
-                validate(&generator_a, &generator_b, output_a, output_b);
+            let mut rng_a = AesRng::from_seed(seed_party_a.into());
+            let mut rng_b = AesRng::from_seed(seed_party_b.into());
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (output_a, output_b) = generate(nshares, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            let ((validation_a, _), (validation_b, _)) = open(&generator_a, &generator_b, output_a, output_b);
             prop_assert!(validation_a);
             prop_assert!(validation_b);
         }
@@ -425,10 +424,10 @@ mod tests {
                               seed_party_a in any::<u128>(), seed_party_b in any::<u128>()) {
             let mut rng_a = AesRng::from_seed(U8x16::from(seed_party_a));
             let mut rng_b = AesRng::from_seed(U8x16::from(seed_party_b));
-            let (output_a, _, generator_a, generator_b) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
-            let (_output_c, output_d, _, _) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
-            let (validation_a, validation_b) =
-                validate(&generator_a, &generator_b, output_a, output_d);
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (output_a, _) = generate(nshares, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            let (_, output_d) = generate(nshares, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            let ((validation_a, _), (validation_b, _)) = open(&generator_a, &generator_b, output_a, output_d);
             prop_assert!(!validation_a);
             prop_assert!(!validation_b);
         }
@@ -442,11 +441,11 @@ mod tests {
             let mut rng_a = AesRng::from_seed(U8x16::from(seed_party_a));
             let mut rng_b = AesRng::from_seed(U8x16::from(seed_party_b));
             let index = index.index(nshares);
-            let (output_a, mut output_b, generator_a, generator_b) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
-            let (_output_c, output_d, _, _) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (output_a, mut output_b) = generate(nshares, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            let (_, output_d) = generate(nshares, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
             output_b[index] = output_d[index];
-            let (validation_a, validation_b) =
-                validate(&generator_a, &generator_b, output_a, output_b);
+            let ((validation_a, _), (validation_b, _)) = open(&generator_a, &generator_b, output_a, output_b);
             prop_assert!(!validation_a);
             prop_assert!(!validation_b);
         }
@@ -460,11 +459,11 @@ mod tests {
             let mut rng_a = AesRng::from_seed(U8x16::from(seed_party_a));
             let mut rng_b = AesRng::from_seed(U8x16::from(seed_party_b));
             let index = index.index(nshares);
-            let (mut output_a, output_b, generator_a, generator_b) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
-            let (output_c, _output_d, _, _) = generate(nshares, rng_a.r#gen::<U8x16>(), rng_b.r#gen::<U8x16>());
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (mut output_a, output_b) = generate(nshares, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            let (output_c, _) = generate(nshares, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
             output_a[index] = output_c[index];
-            let (validation_a, validation_b) =
-                validate(&generator_a, &generator_b, output_a, output_b);
+            let ((validation_a, _), (validation_b, _)) = open(&generator_a, &generator_b, output_a, output_b);
             prop_assert!(!validation_a);
             prop_assert!(!validation_b);
         }
@@ -475,9 +474,12 @@ mod tests {
         #[test]
         fn xor_with_const_works(constants in proptest::collection::vec(any::<bool>(), 1..1000),
                                 seed_party_a in any::<u128>(), seed_party_b in any::<u128>()) {
+            let mut rng_a = AesRng::from_seed(U8x16::from(seed_party_a));
+            let mut rng_b = AesRng::from_seed(U8x16::from(seed_party_b));
             let constants: Vec<F2> = constants.into_iter().map(F2::from).collect();
             let count = constants.len();
-            let (output_a, output_b, generator_a, generator_b) = generate(count, U8x16::from(seed_party_a), U8x16::from(seed_party_b));
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (output_a, output_b) = generate(count, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
             for ((a, b), bit) in output_a
                 .into_iter()
                 .zip(output_b.into_iter())
@@ -486,8 +488,7 @@ mod tests {
                 let new_a = generator_a.xor_with_const(a, bit);
                 let new_b = generator_b.xor_with_const(b, bit);
                 // The new authenticated share should still validate.
-                let (validation_a, validation_b) =
-                    validate(&generator_a, &generator_b, vec![new_a], vec![new_b]);
+                let ((validation_a, _), (validation_b, _)) = open(&generator_a, &generator_b, vec![new_a], vec![new_b]);
                 prop_assert!(validation_a);
                 prop_assert!(validation_b);
                 // The new authenticated share should equal `⟨x⟩ ⊕ c`.
