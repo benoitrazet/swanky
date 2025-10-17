@@ -18,6 +18,7 @@ members = [
   "edge/diet-mac-and-cheese/web-mac-and-cheese/wasm",
   "edge/diet-mac-and-cheese/web-mac-and-cheese/websocket",
   "edge/f-eq",
+  "edge/f-rand",
   "edge/fancy-garbling",
   "edge/field",
   "edge/field-binary",
@@ -100,6 +101,7 @@ swanky-channel-legacy = { path = "edge/channel-legacy" }
 swanky-cointoss = { path = "edge/cointoss" }
 swanky-deprecated-bitwise-utils = { path = "edge/deprecated-bitwise-utils" }
 swanky-f-eq = { path = "edge/f-eq" }
+swanky-f-rand = { path = "edge/f-rand" }
 swanky-field = { path = "edge/field" }
 swanky-field-binary = { path = "edge/field-binary" }
 swanky-field-f61p = { path = "edge/field-f61p" }

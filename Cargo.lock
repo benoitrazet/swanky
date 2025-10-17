@@ -2583,11 +2583,15 @@ dependencies = [
 name = "swanky-cointoss"
 version = "0.6.0"
 dependencies = [
+ "eyre",
  "rand 0.8.5",
  "rand_core 0.6.4",
  "swanky-aes-rng",
  "swanky-block",
+ "swanky-channel",
  "swanky-channel-legacy",
+ "swanky-party",
+ "vectoreyes",
 ]
 
 [[package]]
@@ -2609,6 +2613,21 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-channel",
  "swanky-party",
+]
+
+[[package]]
+name = "swanky-f-rand"
+version = "0.6.0"
+dependencies = [
+ "blake3",
+ "criterion",
+ "eyre",
+ "rand 0.8.5",
+ "swanky-aes-rng",
+ "swanky-channel",
+ "swanky-party",
+ "swanky-serialization",
+ "vectoreyes",
 ]
 
 [[package]]
