@@ -337,29 +337,17 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
         triples: &[LeakyAndTriple<P>],
         channel: &mut Channel,
     ) -> eyre::Result<()> {
-        let (xs, ys, zs): (Vec<_>, Vec<_>, Vec<_>) = triples
+        let shares: Vec<AuthShare<_>> = triples
             .iter()
-            .map(|triple| (triple.x, triple.y, triple.z))
-            .multiunzip();
-        let mut output_x = Vec::with_capacity(triples.len());
-        self.auth_share_generator
-            .open(&xs, &mut output_x, channel)?;
-        let mut output_y = Vec::with_capacity(triples.len());
-        self.auth_share_generator
-            .open(&ys, &mut output_y, channel)?;
-        let mut output_z = Vec::with_capacity(triples.len());
-        self.auth_share_generator
-            .open(&zs, &mut output_z, channel)?;
+            .flat_map(|triple| vec![triple.x, triple.y, triple.z])
+            .collect();
+        let mut out = Vec::with_capacity(3 * triples.len());
+        self.auth_share_generator.open(&shares, &mut out, channel)?;
         // Confirm when testing that all the triples are indeed valid.
         #[cfg(test)]
         {
-            for (i, ((x, y), z)) in output_x
-                .iter()
-                .zip(output_y.iter())
-                .zip(output_z.iter())
-                .enumerate()
-            {
-                assert_eq!(x * y, *z, "Iteration {i} failed");
+            for (i, triple) in out.chunks_exact(3).enumerate() {
+                assert_eq!(triple[0] * triple[1], triple[2], "Iteration {i} failed");
             }
         }
         Ok(())
