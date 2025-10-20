@@ -2583,15 +2583,11 @@ dependencies = [
 name = "swanky-cointoss"
 version = "0.6.0"
 dependencies = [
- "eyre",
  "rand 0.8.5",
  "rand_core 0.6.4",
  "swanky-aes-rng",
  "swanky-block",
- "swanky-channel",
  "swanky-channel-legacy",
- "swanky-party",
- "vectoreyes",
 ]
 
 [[package]]
