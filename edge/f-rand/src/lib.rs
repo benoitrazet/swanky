@@ -61,14 +61,12 @@ pub fn random_seed<P: Party, RNG: CryptoRng + Rng>(
     // 3. The sender sends `s₀` to the receiver, who checks that `H(s₀) = c`,
     //    aborting if not.
     // 4. Both parties output `s₀ ⊕ s₁`.
-    let mut hasher = blake3::Hasher::new();
     let seed_mine = rng.r#gen::<U8x16>();
     let seed = match P::WHICH {
         swanky_party::WhichParty::Prover(_) => {
-            hasher.update(&seed_mine.to_bytes());
-            let com = *hasher.finalize().as_bytes();
+            let com = *blake3::hash(&seed_mine.to_bytes()).as_bytes();
             channel.write(&com)?;
-            let seed_theirs = channel.read()?;
+            let seed_theirs = channel.read::<U8x16>()?;
             channel.write(&seed_mine)?;
             seed_mine ^ seed_theirs
         }
@@ -76,8 +74,7 @@ pub fn random_seed<P: Party, RNG: CryptoRng + Rng>(
             let com = channel.read::<[u8; 32]>()?;
             channel.write(&seed_mine)?;
             let seed_theirs = channel.read::<U8x16>()?;
-            hasher.update(&seed_theirs.to_bytes());
-            let com_ = *hasher.finalize().as_bytes();
+            let com_ = *blake3::hash(&seed_theirs.to_bytes()).as_bytes();
             eyre::ensure!(com_ == com, "Commitment check failed");
             seed_mine ^ seed_theirs
         }
