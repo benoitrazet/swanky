@@ -2,7 +2,7 @@
 Convert vector commitments to VOLEs.
 */
 #![allow(clippy::needless_range_loop)]
-use crate::vole::crypto_primitives::{Seed, IV, PRG};
+use crate::vole::crypto_primitives::{PRG_Stream, Seed, IV, PRG};
 use swanky_field_binary::F8b;
 use swanky_field_binary::F2;
 use swanky_serialization::CanonicalSerialize;
@@ -30,15 +30,13 @@ pub(crate) fn convert_to_vole(
     let mut v_res = Vec::with_capacity(l_hat);
 
     // u64 packs 64 bits/booleans.
-    let mut prgs: Vec<Vec<u64>> = vec![];
+    let mut prgss: [PRG_Stream; 256] = core::array::from_fn(|_| PRG_Stream::default());
     for (idx, seed) in seeds.iter().enumerate() {
         if idx == 0 && !is_prover {
-            // NOTE: the verifier is faster because it does not call a PRG.
-            prgs.push(vec![0u64; (l_hat / 64) + 1]);
+            // NOTE: the verifier is slightly faster here because it calls a dummy PRG.
+            prgss[idx] = PRG_Stream::new_dummy(*seed, iv);
         } else {
-            let prg = PRG::new(*seed, iv);
-            let v = prg.prg_compact(l_hat);
-            prgs.push(v);
+            prgss[idx] = PRG_Stream::new(*seed, iv);
         }
     }
 
@@ -57,7 +55,7 @@ pub(crate) fn convert_to_vole(
         i2_plus_1_arr[i] = i * 2 + 1;
     }
 
-    for pos in 0..(l_hat / 64) + 1 {
+    for _ in 0..(l_hat / 64) + 1 {
         // possibly more but does not matter for performance.
 
         let mut v = [0_u64; 8];
