@@ -2879,6 +2879,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-party2"
+version = "0.6.0"
+dependencies = [
+ "bytemuck",
+]
+
+[[package]]
 name = "swanky-polynomial"
 version = "0.6.0"
 dependencies = [
