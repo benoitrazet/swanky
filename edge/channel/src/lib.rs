@@ -10,6 +10,7 @@ use std::io::{Read, Write};
 use bytemuck::TransparentWrapper;
 use generic_array::GenericArray;
 use swanky_party::{Party, private::PartyPrivate};
+use swanky_party2::GenericParty;
 use swanky_serialization::CanonicalSerialize;
 
 pub mod local;
@@ -356,6 +357,59 @@ impl<'inner> Channel<'inner> {
         p: impl PartyPrivate<P, T>,
     ) -> eyre::Result<T> {
         match p.into_option() {
+            Some(t) => {
+                self.write(&t)?;
+                Ok(t)
+            }
+            None => self.read(),
+        }
+    }
+
+    /// Turn a `swanky_party2::PartyPrivate<P, T>` into a `T` by communicating it.
+    ///
+    /// (The `2` in `communicate2` refers to `swanky_party2`, since `communicate()` refers to
+    /// `swanky_party`)
+    ///
+    /// If `P` can see its value, then send it over the wire and return it. Otherwise, read the
+    /// peer's value from over the wire and return that.
+    ///
+    /// # Example
+    /// ```
+    /// use swanky_channel::{Channel, local::local_channel_pair};
+    /// use swanky_party2::{private::PartyPrivateCopy, party_system};
+    ///
+    /// party_system! {
+    ///     // These names are arbitrary; they're representative of parties for oblivious transfer.
+    ///     pub mod ot {
+    ///         Sender,
+    ///         Receiver,
+    ///     }
+    /// }
+    /// use ot::*;
+    /// fn do_work<P: Party>(c: &mut Channel) -> eyre::Result<i32> {
+    ///     // Only the sender knows x. We're party P. If P == Sender, then _we_ know x.
+    ///     let x: PartyPrivateCopy<Sender, P, i32> = PartyPrivateCopy::new(4586);
+    ///     // If we're the sender, send x to the receiver. If P == Receiver, then recieve x.
+    ///     let x: i32 = c.communicate2(x)?;
+    ///     // Now both parties know x.
+    ///     Ok(x)
+    /// }
+    /// let (a, b) = local_channel_pair(
+    ///     |c| do_work::<Sender>(c),
+    ///     |c| do_work::<Receiver>(c),
+    /// ).unwrap();
+    /// assert_eq!(a, b);
+    /// ```
+    #[inline]
+    pub fn communicate2<
+        PrivateTo: GenericParty<PartySystem = P::PartySystem>,
+        P: GenericParty,
+        T: CanonicalSerialize,
+    >(
+        &mut self,
+        p: swanky_party2::private::PartyPrivateCopy<PrivateTo, P, T>,
+    ) -> eyre::Result<T> {
+        match Option::<T>::from(p) {
             Some(t) => {
                 self.write(&t)?;
                 Ok(t)
