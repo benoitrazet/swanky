@@ -137,6 +137,28 @@ pub trait GenericParty:
     /// The underlying [`RawEither`](raw::RawEither) implementation
     type RawImpl: either::raw::internal::Impl<Self>;
 }
+
+/// The opposite/peer party of `P`
+/// # Example
+/// ```
+/// # use swanky_party2::*;
+/// use std::any::TypeId;
+/// party_system! {
+///     mod ps {
+///         Alice,
+///         Bob,
+///     }
+/// }
+/// use ps::*;
+/// assert_eq!(TypeId::of::<Bob>(), TypeId::of::<OppositeParty<Alice>>());
+/// assert_eq!(TypeId::of::<Alice>(), TypeId::of::<OppositeParty<Bob>>());
+/// ```
+pub type OppositeParty<P> = party_map::PartyMap<
+    P,
+    <<P as GenericParty>::PartySystem as PartySystem>::Party1,
+    <<P as GenericParty>::PartySystem as PartySystem>::Party0,
+>;
+
 /// Party0 of `P`'s [`PartySystem`]
 ///
 /// # Example
