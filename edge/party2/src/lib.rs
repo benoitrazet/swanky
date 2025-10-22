@@ -1,6 +1,7 @@
 //! Support for types indexed by a _party_.
 #[macro_use]
 mod macros;
+pub mod either;
 pub mod ty_eq;
 
 #[doc(hidden)]
@@ -21,8 +22,18 @@ use crate::ty_eq::{EqualityProposition, Witness};
 ///     type Output<P: TheParty0>;
 /// }
 /// ```
-pub trait TheParty0: GenericParty<PartySystem: PartySystem<Party0 = Self>> {}
-impl<P: GenericParty<PartySystem: PartySystem<Party0 = Self>>> TheParty0 for P {}
+pub trait TheParty0:
+    GenericParty<RawImpl = either::raw::internal::Party0Impl, PartySystem: PartySystem<Party0 = Self>>
+{
+}
+impl<
+    P: GenericParty<
+            RawImpl = either::raw::internal::Party0Impl,
+            PartySystem: PartySystem<Party0 = Self>,
+        >,
+> TheParty0 for P
+{
+}
 
 /// A trait alias for [`GenericParty`]s which are `Party1` of its [`PartySystem`].
 ///
@@ -37,8 +48,18 @@ impl<P: GenericParty<PartySystem: PartySystem<Party0 = Self>>> TheParty0 for P {
 ///     type Output<P: TheParty1>;
 /// }
 /// ```
-pub trait TheParty1: GenericParty<PartySystem: PartySystem<Party1 = Self>> {}
-impl<P: GenericParty<PartySystem: PartySystem<Party1 = Self>>> TheParty1 for P {}
+pub trait TheParty1:
+    GenericParty<RawImpl = either::raw::internal::Party1Impl, PartySystem: PartySystem<Party1 = Self>>
+{
+}
+impl<
+    P: GenericParty<
+            RawImpl = either::raw::internal::Party1Impl,
+            PartySystem: PartySystem<Party1 = Self>,
+        >,
+> TheParty1 for P
+{
+}
 
 /// A pair of parties that will operate opposite each other.
 ///
@@ -110,6 +131,9 @@ pub trait GenericParty:
     type PartySystem: PartySystem;
     /// Evidence of which party (`Party0` or `Party1`) `Self` is
     const GENERIC_WHICH: GenericWhichParty<Self>;
+    #[doc(hidden)]
+    /// The underlying [`RawEither`](raw::RawEither) implementation
+    type RawImpl: either::raw::internal::Impl<Self>;
 }
 /// Party0 of `P`'s [`PartySystem`]
 ///

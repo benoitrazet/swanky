@@ -104,6 +104,7 @@ macro_rules! party_system {
                 type PartySystem = PartySystem;
                 const GENERIC_WHICH: $crate::GenericWhichParty<Self> =
                     $crate::GenericWhichParty::Party0($crate::ty_eq::Witness::EQUAL_TYPES);
+                type RawImpl = $crate::__macro_internal::Party0Impl;
             }
             impl $crate::GenericParty for $party1 {
                 type IsParty0 = $crate::ty_eq::NotNeccessarilyTrueEqualityProposition;
@@ -112,6 +113,7 @@ macro_rules! party_system {
                 type PartySystem = PartySystem;
                 const GENERIC_WHICH: $crate::GenericWhichParty<Self> =
                     $crate::GenericWhichParty::Party1($crate::ty_eq::Witness::EQUAL_TYPES);
+                type RawImpl = $crate::__macro_internal::Party1Impl;
             }
             impl<P: Party> From<$crate::GenericWhichParty<P>> for WhichParty<P> {
                 #[inline]
@@ -137,4 +139,5 @@ macro_rules! party_system {
 
 #[doc(hidden)]
 pub mod __macro_internal {
+    pub use crate::either::raw::internal::{Party0Impl, Party1Impl};
 }
