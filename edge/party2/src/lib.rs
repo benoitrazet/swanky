@@ -1,9 +1,12 @@
 //! Support for types indexed by a _party_.
+#![warn(missing_docs)]
+
 #[macro_use]
 mod macros;
 
 pub mod either;
 pub mod party_map;
+pub mod private;
 pub mod ty_eq;
 
 #[doc(hidden)]
