@@ -105,16 +105,15 @@ fn to_field_f128_and_pad_lockstep(x: &[F128b]) -> Vec<[F128b; SECURITY_PARAM]> {
     out
 }
 
-#[allow(dead_code)]
 struct ColumnEnumState<'a> {
-    x: &'a [F128b],
+    x: &'a [[F8b; REPETITION_PARAM]],
     index: usize,
     length: usize,
 }
 
 impl<'a> ColumnEnumState<'a> {
     #[allow(dead_code)]
-    pub fn new(x: &'a [F128b]) -> Self {
+    pub fn new(x: &'a [[F8b; REPETITION_PARAM]]) -> Self {
         Self {
             x,
             index: 0,
@@ -143,11 +142,15 @@ impl<'a> Iterator for ColumnEnumState<'a> {
             // even when we early-break on a full 128-block.
             self.index += 1;
 
-            let bs = b.bit_decomposition();
             let hot_bit = 1 << bit_num;
             let mut b_vec = [0u8; SECURITY_PARAM];
-            for (p, b) in b_vec.iter_mut().zip(bs.iter()) {
-                *p = u8::from(*b).wrapping_neg() & hot_bit;
+            let mut col = 0;
+            for b8 in b {
+                let bs = b8.bit_decomposition();
+                for b1 in bs.iter() {
+                    b_vec[col] = u8::from(*b1).wrapping_neg() & hot_bit;
+                    col += 1;
+                }
             }
 
             let t = &mut b_128_alt[byte_num];
@@ -171,12 +174,6 @@ impl<'a> Iterator for ColumnEnumState<'a> {
                         b_128.map(|v| F128b::from_bytes(&v.into()).unwrap());
                     out = arr;
                     break;
-
-                    // reset
-                    //byte_num = 0;
-                    // reset
-                    //b_128 = [[0u8; 128 / 8]; 128];
-                    //b_128_alt = [[0u8; 128]; 128 / 8];
                 } else {
                     byte_num += 1;
                 }
@@ -485,8 +482,7 @@ impl VoleHasher {
         use std::sync::mpsc::{sync_channel, SyncSender}; // SyncChannel uses fixed size buffers, which is useful to control memory.
         use std::{sync::mpsc::channel, thread};
 
-        let packed_x0 = pack_f128b(x0);
-        let x0_vec = ColumnEnumState::new(&packed_x0);
+        let x0_vec = ColumnEnumState::new(&x0);
 
         const N: usize = 1; // number of threads
         let mut senders: Vec<SyncSender<[F128b; SECURITY_PARAM / N]>> = Vec::with_capacity(N);
@@ -733,7 +729,7 @@ mod test {
             let packed = pack_f128b(&rows);
 
             let via_lockstep = to_field_f128_and_pad_lockstep(&packed);
-            let via_enum: Vec<[F128b; SECURITY_PARAM]> = ColumnEnumState::new(&packed).collect();
+            let via_enum: Vec<[F128b; SECURITY_PARAM]> = ColumnEnumState::new(&rows).collect();
 
             assert_eq!(
                 via_lockstep.len(),
