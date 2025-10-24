@@ -8,7 +8,7 @@ use crate::vole::commit_reconstruct::{
     apply_corrections_to_q, l_hat, vole_commit, vole_open, vole_reconstruct, Commit, Corrections,
 };
 use crate::vole::commit_reconstruct::{compute_secret_key, recompose_d, B};
-use crate::vole::consistency_check::{vole_hash, vole_hash_lockstep, HashConsistency};
+use crate::vole::consistency_check::{HashConsistency, VoleHasher};
 use crate::vole::crypto_primitives::{h2_chall1, Chall1, Chall3, Com, Seed, H1, H3, IV};
 use crate::vole::AsSecretBytes;
 use generic_array::typenum::U16;
@@ -128,26 +128,15 @@ pub(crate) fn create_vole_prover<Secret: AsSecretBytes>(
     // line 7-8
     // hash u
     let t = std::time::Instant::now();
-    let u_tilda = vole_hash(
-        &chall1,
-        u[0..l + SECURITY_PARAM].iter().copied(),
-        l + SECURITY_PARAM,
-        u[l + SECURITY_PARAM..l + 2 * SECURITY_PARAM + B]
-            .iter()
-            .copied(),
-        SECURITY_PARAM + B,
-    );
+    let hasher = VoleHasher::from_seed(chall1, l);
+    let u_tilda = hasher.hash(&u);
     log::info!("vole_hash(u) running time: {:?}", t.elapsed());
 
     // line 9
     // hash v column-wise
     let t = std::time::Instant::now();
     let mut v_tilda: Vec<F2> = Vec::with_capacity((SECURITY_PARAM + B) * SECURITY_PARAM);
-    let tmp = vole_hash_lockstep(
-        &chall1,
-        &v[0..l + SECURITY_PARAM],
-        &v[l + SECURITY_PARAM..l_hat(l)],
-    );
+    let tmp = hasher.hash_matrix(&v);
     for newt in tmp {
         v_tilda.extend(&newt);
     }
@@ -268,11 +257,8 @@ pub(crate) fn create_vole_verifier(
     // hash column-wise Q\tilda + D\tilda
     let t = std::time::Instant::now();
     let mut q_tilda: Vec<F2> = Vec::with_capacity((SECURITY_PARAM + B) * SECURITY_PARAM);
-    let tmp = vole_hash_lockstep(
-        &chall1,
-        &q_f8arrs[0..l + SECURITY_PARAM],
-        &q_f8arrs[l + SECURITY_PARAM..l_hat(*l)],
-    );
+    let hasher = VoleHasher::from_seed(chall1, *l);
+    let tmp = hasher.hash_matrix(&q_f8arrs);
     for newt in tmp {
         q_tilda.extend(&newt);
     }

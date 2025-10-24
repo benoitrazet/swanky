@@ -2124,6 +2124,7 @@ dependencies = [
  "diet-mac-and-cheese",
  "eyre",
  "generic-array 1.1.0",
+ "itertools 0.13.0",
  "log",
  "mac-n-cheese-sieve-parser",
  "merlin",

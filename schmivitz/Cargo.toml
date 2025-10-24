@@ -25,6 +25,7 @@ blake3.workspace = true
 diet-mac-and-cheese.workspace = true
 eyre.workspace = true
 generic-array.workspace = true
+itertools.workspace = true
 log.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
 merlin.workspace = true
