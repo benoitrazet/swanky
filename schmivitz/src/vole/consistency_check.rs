@@ -484,7 +484,7 @@ impl VoleHasher {
 
         let x0_vec = ColumnEnumState::new(&x0);
 
-        const N: usize = 1; // number of threads
+        const N: usize = 2; // number of threads
         let mut senders: Vec<SyncSender<[F128b; SECURITY_PARAM / N]>> = Vec::with_capacity(N);
         let mut receivs = Vec::with_capacity(N);
         let (result_sender, result_receiver) = channel();
