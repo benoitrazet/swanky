@@ -130,6 +130,7 @@ impl PRG {
 const NUM_BLOCKS: usize = 8;
 
 #[allow(clippy::upper_case_acronyms)]
+#[allow(non_camel_case_types)]
 /// Pseudo random generator stream structure.
 ///
 /// The bits are packed into `u64`. If the last `u64` has a capacity to contain more
@@ -194,7 +195,7 @@ impl PRG_Stream {
     /// Returns the next 64 pseudo-random bits from the stream as a little-endian u64,
     /// refilling the AES-backed block buffer as needed.
     pub(crate) fn prg_next(&mut self) -> u64 {
-        // When the PRG is dummy is always return 0s.
+        // When the PRG is dummy it always return 0s.
         if self.is_dummy {
             return 0u64;
         }
@@ -218,6 +219,7 @@ impl PRG_Stream {
         return r;
     }
 
+    #[inline(always)]
     fn prg_refill(&mut self) {
         // encrypt blocks in place
         for i in 0..NUM_BLOCKS {
