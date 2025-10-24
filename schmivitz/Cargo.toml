@@ -25,6 +25,7 @@ blake3.workspace = true
 diet-mac-and-cheese.workspace = true
 eyre.workspace = true
 generic-array.workspace = true
+itertools.workspace = true
 log.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
 merlin.workspace = true
@@ -36,7 +37,6 @@ swanky-field.workspace = true
 swanky-field-binary.workspace = true
 swanky-serialization.workspace = true
 rayon.workspace = true
-itertools.workspace = true
 
 [dev-dependencies]
 rand.workspace = true
