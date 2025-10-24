@@ -11,7 +11,7 @@ use crate::vole::crypto_primitives::CHALL1_LENGTH;
 use generic_array::sequence::Concat;
 use generic_array::{
     sequence::Split,
-    typenum::{U16, U32, U48, U64, U80, U96},
+    typenum::{U16, U96},
     GenericArray,
 };
 use itertools::izip;
@@ -145,10 +145,10 @@ impl VoleHasher {
     pub(crate) fn from_seed(seed: [u8; CHALL1_LENGTH], ell: usize) -> Self {
         // Line 2.
         let seed_ga: GenericArray<u8, U96> = GenericArray::from(seed);
-        let (r0_bytes, rest): (GenericArray<u8, U16>, GenericArray<u8, U80>) = seed_ga.split();
-        let (r1_bytes, rest): (GenericArray<u8, U16>, GenericArray<u8, U64>) = rest.split();
-        let (r2_bytes, rest): (GenericArray<u8, U16>, GenericArray<u8, U48>) = rest.split();
-        let (r3_bytes, rest): (GenericArray<u8, U16>, GenericArray<u8, U32>) = rest.split();
+        let (r0_bytes, rest): (GenericArray<u8, U16>, _) = seed_ga.split();
+        let (r1_bytes, rest): (GenericArray<u8, U16>, _) = rest.split();
+        let (r2_bytes, rest): (GenericArray<u8, U16>, _) = rest.split();
+        let (r3_bytes, rest): (GenericArray<u8, U16>, _) = rest.split();
         // Note: In the spec, `t` is 64 bits; here it's called `s1` and has 128 bits.
         let (s_bytes, t_bytes): (GenericArray<u8, U16>, GenericArray<u8, U16>) = rest.split();
 
@@ -168,7 +168,8 @@ impl VoleHasher {
         // This differs from the FAEST spec where the powers are in reverse order; this is also valid!
         let mut s0_powers = Vec::with_capacity(ell_prime / SECURITY_PARAM - 1);
         s0_powers.push(s0);
-        for i in 1..ell_prime / SECURITY_PARAM - 1 {
+        // The bounds written in the spec are _inclusive_, hence the `+1` at the end.
+        for i in 1..(ell_prime / SECURITY_PARAM - 1) + 1 {
             s0_powers.push(s0_powers[i - 1] * s0);
         }
 
@@ -177,7 +178,8 @@ impl VoleHasher {
         // This differs from the FAEST spec because it uses a different field.
         let mut s1_powers = Vec::with_capacity((ell_prime / 64) - 1);
         s1_powers.push(s1);
-        for i in 1..ell_prime / 64 - 1 {
+        // The bounds written in the spec are _inclusive_, hence the `+1` at the end.
+        for i in 1..(ell_prime / 64 - 1) + 1 {
             s1_powers.push(s1_powers[i - 1] * s1);
         }
 
@@ -202,11 +204,15 @@ impl VoleHasher {
         // Line 7. This pads and converts to a field -- it is called `y_hat` in the spec.
         let x0_vec = self.to_field_128(x0);
 
-        // Lines 10 - 11.
+        // Line 10.
         let mut h0 = F128b::ZERO;
-        let mut h1 = F128b::ZERO;
-        for (x0_i, s0_i, s1_i) in izip!(x0_vec, &self.s0_powers, &self.s1_powers) {
+        for (x0_i, s0_i) in izip!(&x0_vec, &self.s0_powers) {
             h0 += s0_i * x0_i;
+        }
+
+        // Line 11.
+        let mut h1 = F128b::ZERO;
+        for (x0_i, s1_i) in izip!(x0_vec, &self.s1_powers) {
             h1 += s1_i * x0_i;
         }
 
@@ -268,11 +274,17 @@ impl VoleHasher {
         let x0_vec = to_field_f128_and_pad_lockstep(&pack_f128b(x0));
 
         let mut h0 = [F128b::ZERO; SECURITY_PARAM];
-        let mut h1 = [F128b::ZERO; SECURITY_PARAM];
-        for (x0_i, s0_i, s1_i) in izip!(x0_vec, &self.s0_powers, &self.s1_powers) {
+        for (x0_i, s0_i) in izip!(&x0_vec, &self.s0_powers) {
             for j in 0..SECURITY_PARAM {
                 // This loop is the parallel part
                 h0[j] += s0_i * x0_i[j];
+            }
+        }
+
+        let mut h1 = [F128b::ZERO; SECURITY_PARAM];
+        for (x0_i, s1_i) in izip!(x0_vec, &self.s1_powers) {
+            for j in 0..SECURITY_PARAM {
+                // This loop is the parallel part
                 h1[j] += s1_i * x0_i[j];
             }
         }
