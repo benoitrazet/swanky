@@ -23,6 +23,7 @@ rand.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
+proptest.workspace = true
 
 [[bench]]
 name = "main"

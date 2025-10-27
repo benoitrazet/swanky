@@ -168,65 +168,78 @@ pub fn random_seed<P: Party, RNG: CryptoRng + Rng>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
     use swanky_aes_rng::AesRng;
     use swanky_party::{Prover, Verifier};
     use vectoreyes::{SimdBase, array_utils::ArrayUnrolledExt};
 
-    #[test]
-    fn random_seed_works() {
-        let mut rng_a = AesRng::new();
-        let mut rng_b = AesRng::new();
-        let (result_a, result_b) = swanky_channel::local::local_channel_pair(
-            |c| random_seed::<Prover, _>(c, &mut rng_a),
-            |c| random_seed::<Verifier, _>(c, &mut rng_b),
-        )
-        .unwrap();
-        assert_eq!(result_a, result_b);
+    proptest! {
+        #[test]
+        fn random_seed_works(seed_a in any::<u128>(),
+                             seed_b in any::<u128>()) {
+            let mut rng_a = AesRng::from_seed(seed_a.into());
+            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let (result_a, result_b) = swanky_channel::local::local_channel_pair(
+                |c| random_seed::<Prover, _>(c, &mut rng_a),
+                |c| random_seed::<Verifier, _>(c, &mut rng_b),
+            )
+            .unwrap();
+            assert_eq!(result_a, result_b);
+        }
     }
 
-    #[test]
-    fn bad_prover_commitment_fails() {
-        let mut rng_a = AesRng::new();
-        let mut rng_b = AesRng::new();
-        let result = swanky_channel::local::local_channel_pair(
-            |c| {
-                run_with_entry_point!(
-                    random_seed::<Prover, _>(c, &mut rng_a),
-                    entry_points::PROVER_WRITE_COMMITMENT,
-                    |old| old.array_map(|byte| !byte)
-                )
-            },
-            |c| random_seed::<Verifier, _>(c, &mut rng_b),
-        );
-        assert!(result.is_err());
+    proptest! {
+        #[test]
+        fn bad_prover_commitment_fails(seed_a in any::<u128>(),
+                                       seed_b in any::<u128>()) {
+            let mut rng_a = AesRng::from_seed(seed_a.into());
+            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let result = swanky_channel::local::local_channel_pair(
+                |c| {
+                    run_with_entry_point!(
+                        random_seed::<Prover, _>(c, &mut rng_a),
+                        entry_points::PROVER_WRITE_COMMITMENT,
+                        |old| old.array_map(|byte| !byte)
+                    )
+                },
+                |c| random_seed::<Verifier, _>(c, &mut rng_b),
+            );
+            assert!(result.is_err());
+        }
     }
 
-    #[test]
-    fn bad_prover_decommitment_fails() {
-        let mut rng_a = AesRng::new();
-        let mut rng_b = AesRng::new();
-        let result = swanky_channel::local::local_channel_pair(
-            |c| {
-                run_with_entry_point!(
-                    random_seed::<Prover, _>(c, &mut rng_a),
-                    entry_points::PROVER_WRITE_SEED,
-                    |old| old.as_array().array_map(|byte| !byte).into()
-                )
-            },
-            |c| random_seed::<Verifier, _>(c, &mut rng_b),
-        );
-        assert!(result.is_err());
+    proptest! {
+        #[test]
+        fn bad_prover_decommitment_fails(seed_a in any::<u128>(),
+                                         seed_b in any::<u128>()) {
+            let mut rng_a = AesRng::from_seed(seed_a.into());
+            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let result = swanky_channel::local::local_channel_pair(
+                |c| {
+                    run_with_entry_point!(
+                        random_seed::<Prover, _>(c, &mut rng_a),
+                        entry_points::PROVER_WRITE_SEED,
+                        |old| old.as_array().array_map(|byte| !byte).into()
+                    )
+                },
+                |c| random_seed::<Verifier, _>(c, &mut rng_b),
+            );
+            assert!(result.is_err());
+        }
     }
 
-    #[test]
-    fn random_i32_works() {
-        let mut rng_a = AesRng::new();
-        let mut rng_b = AesRng::new();
-        let (result_a, result_b) = swanky_channel::local::local_channel_pair(
-            |c| random::<Prover, i32, _>(c, &mut rng_a),
-            |c| random::<Verifier, i32, _>(c, &mut rng_b),
-        )
-        .unwrap();
-        assert_eq!(result_a, result_b);
+    proptest! {
+        #[test]
+        fn random_i32_works(seed_a in any::<u128>(),
+                            seed_b in any::<u128>()) {
+            let mut rng_a = AesRng::from_seed(seed_a.into());
+            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let (result_a, result_b) = swanky_channel::local::local_channel_pair(
+                |c| random::<Prover, i32, _>(c, &mut rng_a),
+                |c| random::<Verifier, i32, _>(c, &mut rng_b),
+            )
+            .unwrap();
+            assert_eq!(result_a, result_b);
+        }
     }
 }
