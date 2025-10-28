@@ -53,6 +53,8 @@
 
 //! ```
 
+use std::{iter::Copied, slice::Iter};
+
 use crate::authbits::{AuthBit, AuthBitGenerator};
 use rand::{CryptoRng, Rng};
 use swanky_channel::Channel;
@@ -202,8 +204,9 @@ impl<P: Party> AuthShareGenerator<P> {
         let mut party_a_auth_bits = Vec::with_capacity(nshares);
         let mut party_b_auth_bits = Vec::with_capacity(nshares);
 
-        let bits = PartyEitherCopy::prover_new(IS_PROVER, bits.as_slice());
-        let nshares = PartyEitherCopy::verifier_new(IS_VERIFIER, nshares);
+        let bits = PartyEither::prover_new(IS_PROVER, bits.iter().copied());
+        let nshares: PartyEither<_, Copied<Iter<'_, F2>>, _> =
+            PartyEither::verifier_new(IS_VERIFIER, nshares);
         match P::WHICH {
             WhichParty::Prover(ev) => {
                 let party_a = self.party_a.as_mut().prover_into(ev);

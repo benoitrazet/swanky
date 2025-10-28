@@ -244,30 +244,31 @@ impl<P: Party> AuthBitGenerator<P> {
     /// The prover supplies the bits to authenticate, and the verifier specifies
     /// the number of bits. The resulting authenticated bits are
     /// [`Vec::extend`]ed into `out`.
-    pub fn generate<RNG>(
+    pub fn generate<RNG: CryptoRng + Rng, I: Iterator<Item = F2>>(
         &mut self,
-        bits_in: PartyEitherCopy<P, &[F2], usize>,
+        bits_in: PartyEither<P, I, usize>,
         out: &mut Vec<AuthBit<P>>,
         mut channel: &mut Channel,
         rng: &mut RNG,
-    ) -> eyre::Result<()>
-    where
-        RNG: CryptoRng + Rng,
-    {
+    ) -> eyre::Result<()> {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 let bits = bits_in.prover_into(e);
-                let macs = self.ot.as_mut().prover_into(e).receive_correlated(
-                    &mut channel,
-                    // TODO: Once OT uses F2 instead of bool this line won't be necessary.
-                    &bits.iter().map(|b| bool::from(*b)).collect::<Vec<bool>>(),
-                    rng,
-                )?;
+                // TODO: Once OT uses F2 instead of bool this line won't be necessary.
+                let bits = bits.map(bool::from).collect::<Vec<bool>>();
+                let macs =
+                    self.ot
+                        .as_mut()
+                        .prover_into(e)
+                        .receive_correlated(&mut channel, &bits, rng)?;
 
-                out.extend(bits.iter().zip(macs).map(|(bit, mac)| {
+                out.extend(bits.into_iter().zip(macs).map(|(bit, mac)| {
                     AuthBit(PartyEitherCopy::prover_new(
                         e,
-                        ProverAuthBit { bit: *bit, mac },
+                        ProverAuthBit {
+                            bit: bit.into(),
+                            mac,
+                        },
                     ))
                 }));
                 Ok(())
@@ -387,6 +388,8 @@ impl<P: Party> AuthBitGenerator<P> {
 
 #[cfg(test)]
 mod tests {
+    use std::{iter::Copied, slice::Iter};
+
     use super::*;
     use proptest::prelude::*;
     use rand::SeedableRng;
@@ -441,7 +444,7 @@ mod tests {
         swanky_channel::local::local_channel_pair(
             |channel_pr| {
                 let mut outputs = vec![];
-                let bits = PartyEitherCopy::prover_new(IS_PROVER, bits_in);
+                let bits = PartyEither::prover_new(IS_PROVER, bits_in.iter().copied());
                 generator_a.generate(bits, &mut outputs, channel_pr, &mut rng_a)?;
                 if tamper_mac {
                     // Tamper the MAC of the first `AuthBit`.
@@ -458,7 +461,8 @@ mod tests {
             },
             |channel_vr| {
                 let mut outputs = vec![];
-                let count = PartyEitherCopy::verifier_new(IS_VERIFIER, bits_in.len());
+                let count: PartyEither<_, Copied<Iter<'_, F2>>, _> =
+                    PartyEither::verifier_new(IS_VERIFIER, bits_in.len());
                 generator_b.generate(count, &mut outputs, channel_vr, &mut rng_b)?;
                 if tamper_key {
                     // Tamper the key of the first `AuthBit`.
