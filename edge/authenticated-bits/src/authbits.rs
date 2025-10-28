@@ -36,8 +36,10 @@
 //! # use swanky_authenticated_bits::authbits::{AuthBit, AuthBitGenerator};
 //! # use swanky_field_binary::F2;
 //! # use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
-//! # use swanky_party::either::PartyEitherCopy;
+//! # use swanky_party::either::PartyEither;
 //! # use swanky_party::private::VerifierPrivate;
+//! # use std::iter::Copied;
+//! # use std::slice::Iter;
 //! # fn main() -> eyre::Result<()> {
 //! let (bits_prover, bits_verifier) = swanky_channel::local::local_channel_pair(
 //!     |c| {
@@ -46,7 +48,7 @@
 //!         let bits = rng.r#gen::<[F2; 10]>();
 //!         let mut authbits: Vec<AuthBit<Prover>> = vec![];
 //!         let mut generator: AuthBitGenerator<_> = AuthBitGenerator::new(c, &mut rng)?;
-//!         generator.generate(PartyEitherCopy::prover_new(IS_PROVER, &bits), &mut authbits, c, &mut rng)?;
+//!         generator.generate(PartyEither::prover_new(IS_PROVER, bits.iter().copied()), &mut authbits, c, &mut rng)?;
 //!         generator.open(&authbits, VerifierPrivate::empty(IS_PROVER), c)?;
 //!         Ok(bits.to_vec())
 //!     },
@@ -57,7 +59,8 @@
 //!         let mut bits = vec![];
 //!         let mut authbits: Vec<AuthBit<Verifier>> = vec![];
 //!         let mut generator: AuthBitGenerator<_> = AuthBitGenerator::new(c, &mut rng)?;
-//!         generator.generate(PartyEitherCopy::verifier_new(IS_VERIFIER, count), &mut authbits, c, &mut rng)?;
+//!         let input: PartyEither<_, Copied<Iter<'_, F2>>, _> = PartyEither::verifier_new(IS_VERIFIER, count);
+//!         generator.generate(input, &mut authbits, c, &mut rng)?;
 //!         generator.open(&authbits, VerifierPrivate::new(&mut bits), c)?;
 //!         Ok(bits)
 //!     }
