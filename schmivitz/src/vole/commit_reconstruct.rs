@@ -32,7 +32,7 @@ pub(crate) fn bools_to_u8(d: &[bool]) -> u8 {
 
 /// Type for corrections applied to voles.
 #[derive(Clone, Default)]
-pub(crate) struct Corrections([Vec<F2>; REPETITION_PARAM - 1]);
+pub(crate) struct Corrections(pub(crate) [Vec<F2>; REPETITION_PARAM - 1]);
 
 /// hash the commitments coming from the small-domain VOLE
 fn hash_commitments(com: &[Com]) -> Com {
@@ -96,28 +96,25 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l_hat: usize) -> Commit {
     for i in 0..REPETITION_PARAM {
         let tx = txs[i].clone();
 
-        // NOTE: we could move the call to `commit` to the thread but this would not save a significant amount of time.
-        let (com_i, decom_i, seeds) = commit(prg_seeds[i], iv, 8);
-        com.push(com_i);
-        decom[i] = decom_i;
-
+        let prg_seed = prg_seeds[i];
         let handle = thread::spawn(move || {
-            let t_convert_to_vole = std::time::Instant::now();
+            // for smaller circuits the `commit/reconstruct` part is not negligeable compared to the
+            // `convert_to_vole` part, therefore it is more efficient to execute both in
+            // threads
+            let (com_i, decom_i, seeds) = commit(prg_seed, iv, 8);
             let u_i_v_i = convert_to_vole(&seeds, iv, l_hat, true);
-            log::info!(
-                "multithreaded prover convert_to_vole running time: {:?}",
-                t_convert_to_vole.elapsed()
-            );
 
-            tx.send(u_i_v_i).unwrap();
+            tx.send((com_i, decom_i, u_i_v_i)).unwrap();
         });
         handles.push(handle);
     }
 
     for i in 0..REPETITION_PARAM {
-        let (u_i, v_i) = rxs[i].recv().unwrap();
+        let (com_i, decom_i, (u_i, v_i)) = rxs[i].recv().unwrap();
         u.push(u_i);
         v.push(v_i);
+        com.push(com_i);
+        decom[i] = decom_i;
     }
 
     log::info!(
@@ -181,12 +178,12 @@ pub(crate) fn chal_dec(chal: &[u8], i: usize) -> Vec<bool> {
 /// Function to open voles and return the associated partial decommitment.
 ///
 /// This function implements steps 20-22 of Fig 8.2
-pub(crate) fn vole_open(chal: &[u8], decom: &[Decom]) -> Vec<Pdecom> {
-    let mut pdecom = Vec::with_capacity(REPETITION_PARAM);
+pub(crate) fn vole_open(chal: &[u8], decom: &[Decom]) -> [Pdecom; REPETITION_PARAM] {
+    let mut pdecom: [Pdecom; REPETITION_PARAM] = Default::default();
     for i in 0..REPETITION_PARAM {
         let delta_i = chal_dec(chal, i);
         let pdecom_i = open(&decom[i], delta_i);
-        pdecom.push(pdecom_i);
+        pdecom[i] = pdecom_i;
     }
     pdecom
 }
@@ -231,26 +228,24 @@ pub(crate) fn vole_reconstruct(
 
     for i in 0..REPETITION_PARAM {
         let delta = chal_dec(chal, i);
-        let (com_i, seeds) = reconstruct(pdecom[i].clone(), delta.clone(), iv);
-        com.push(com_i);
-        assert_eq!(seeds.len(), 256);
+        let pdecom = pdecom[i].clone();
 
         let tx = txs[i].clone();
         let handle = thread::spawn(move || {
-            let t_convert_to_vole = std::time::Instant::now();
+            // for smaller circuits the `commit/reconstruct` part is not negligeable compared to the
+            // `convert_to_vole` part, therefore it is more efficient to execute both in
+            // threads
+            let (com_i, seeds) = reconstruct(pdecom, delta.clone(), iv);
             let q_i = convert_to_vole_verifier(&seeds, iv, l_hat, bools_to_u8(&delta));
-            log::info!(
-                "multithreaded verifier convert_to_vole: {:?}",
-                t_convert_to_vole.elapsed()
-            );
-            tx.send(q_i).unwrap();
+            tx.send((com_i, q_i)).unwrap();
         });
         handles.push(handle);
     }
 
     for i in 0..REPETITION_PARAM {
-        let q_i = rxs[i].recv().unwrap();
+        let (com_i, q_i) = rxs[i].recv().unwrap();
         qs.push(q_i);
+        com.push(com_i);
     }
     log::info!(
         "multithreaded convert_to_vole verifier running time: {:?}",
