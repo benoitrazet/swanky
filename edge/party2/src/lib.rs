@@ -129,9 +129,11 @@ pub trait GenericParty:
     'static + Send + Sync + Copy + Eq + Ord + std::hash::Hash + std::fmt::Debug + Sized + Default
 {
     /// An [`EqualityProposition`] that says that `Self == Party0`
-    type IsParty0: EqualityProposition<Self, <Self::PartySystem as PartySystem>::Party0>;
+    type IsParty0: EqualityProposition<Self, <Self::PartySystem as PartySystem>::Party0>
+        + EqualityProposition<<Self::PartySystem as PartySystem>::Party0, Self>;
     /// An [`EqualityProposition`] that says that `Self == Party1`
-    type IsParty1: EqualityProposition<Self, <Self::PartySystem as PartySystem>::Party1>;
+    type IsParty1: EqualityProposition<Self, <Self::PartySystem as PartySystem>::Party1>
+        + EqualityProposition<<Self::PartySystem as PartySystem>::Party1, Self>;
     /// The `PartySystem` that this Party is a member of
     type PartySystem: PartySystem;
     /// Evidence of which party (`Party0` or `Party1`) `Self` is
