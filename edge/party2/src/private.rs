@@ -8,7 +8,10 @@
 
 use crate::{
     GenericParty, GenericWhichParty, OppositeParty, Party0, Party1,
-    either::raw::{EitherBound, RawEither, bounds, is_t0, is_t1},
+    either::{
+        PartyEither,
+        raw::{EitherBound, RawEither, bounds, is_t0, is_t1},
+    },
     ty_eq::{EqualityProposition as EqProp, Witness, generics},
 };
 use bytemuck::TransparentWrapper;
@@ -487,6 +490,20 @@ private! {
     /// }
     /// ```
     type PartyPrivateCopy: Copy => bounds::Copy;
+}
+
+// TODO: Add this to the macro so it also applies to copy types
+impl<PrivateTo: GenericParty, P: GenericParty<PartySystem = PrivateTo::PartySystem>, T0, T1>
+    From<PartyEither<P, T0, T1>>
+    for PartyPrivate<PrivateTo, P, RawEither<bounds::Any, PrivateTo, T0, T1>>
+{
+    #[inline(always)]
+    fn from(value: PartyEither<P, T0, T1>) -> Self {
+        match const { private_which::<PrivateTo, P>() } {
+            PrivateWhich::Full(w) => Self::new(value.into_inner(w.sym())),
+            PrivateWhich::Empty(w) => Self::empty(w),
+        }
+    }
 }
 
 mod copy_conversions;
