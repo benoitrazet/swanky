@@ -244,6 +244,13 @@ macro_rules! private {
                     PrivateWhich::Empty(e) => Self::empty(e),
                 }
             }
+            #[inline(always)]
+            pub fn new_with(constructor: impl FnOnce() -> T) -> Self {
+                match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(_) => Self::new(constructor()),
+                    PrivateWhich::Empty(e) => Self::empty(e),
+                }
+            }
             /// Construct an empty `PartyPrivate`, given that `PrivateTo != P`
             ///
             /// # Example
