@@ -2,7 +2,7 @@
 Convert vector commitments to VOLEs.
 */
 #![allow(clippy::needless_range_loop)]
-use crate::vole::crypto_primitives::{PRG_Stream, Seed, IV, PRG};
+use crate::vole::crypto_primitives::{PRG_Stream, Seed, IV};
 use swanky_field_binary::F8b;
 use swanky_field_binary::F2;
 use swanky_serialization::CanonicalSerialize;
@@ -126,6 +126,7 @@ pub(crate) fn convert_to_vole(
 /// This function is the naive version of [`convert_to_vole`] that does not
 /// operate on packed boolean field values.
 fn convert_to_vole_prover_naive(seeds: &[Seed], iv: IV, l_hat: usize) -> (Vec<F2>, Vec<F8b>) {
+    use crate::vole::crypto_primitives::PRG;
     use swanky_field::FiniteRing;
     assert!(seeds.len() == 256);
     let mut u_res = vec![F2::ZERO; l_hat];
@@ -174,6 +175,7 @@ pub(crate) fn convert_to_vole_verifier(
 // NOTE: the return type is different than ConvertToVOLE in the paper, where is should be a Vec<Vec<F2>>
 #[cfg(test)]
 fn convert_to_vole_verifier_naive(seeds: &[Seed], iv: IV, l_hat: usize, delta: u8) -> Vec<F8b> {
+    use crate::vole::crypto_primitives::PRG;
     use swanky_field::FiniteRing;
     assert_eq!(seeds.len(), 256);
     let mut v_res = vec![F8b::ZERO; l_hat];
