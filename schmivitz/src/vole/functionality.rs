@@ -176,7 +176,7 @@ pub(crate) fn create_vole_prover<Secret: AsSecretBytes>(
 
 /// Partial decommitment produced by the prover.
 pub struct PartialDecommitment {
-    pdecom: Vec<Pdecom>,
+    pdecom: [Pdecom; REPETITION_PARAM],
     corrections: Corrections,
     iv: IV,
     u_tilda: HashConsistency,
