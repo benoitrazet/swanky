@@ -223,7 +223,7 @@ impl PRG_Stream {
     fn prg_refill(&mut self) {
         // encrypt blocks in place
         for i in 0..NUM_BLOCKS {
-            self.blocks[i] = GenericArray::from(self.counter.to_le_bytes());
+            self.blocks[i] = GenericArray::from(self.counter_to_bytes());
             self.incr();
         }
         self.block_number = 0;
