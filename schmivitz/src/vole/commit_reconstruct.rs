@@ -210,7 +210,7 @@ pub(crate) fn vole_reconstruct(
         let delta = chal_dec(chal, i);
         let (com_i, seeds) = reconstruct(pdecom[i].clone(), delta.clone(), iv);
         com.push(com_i);
-        let q_i = convert_to_vole_verifier(&seeds, iv, l, bools_to_u8(&delta));
+        let q_i = convert_to_vole_verifier(&seeds, iv, l_hat, bools_to_u8(&delta));
         qs.push(q_i);
     }
     */
