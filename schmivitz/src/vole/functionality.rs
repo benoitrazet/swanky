@@ -452,8 +452,8 @@ mod test {
                 Ok(val) => println!("loglvl: {}", val),
                 Err(_) => env::set_var("RUST_LOG", "info"),
             };
-
             pretty_env_logger::init_timed();
+
             let t = std::time::Instant::now();
             test_vole_prover_and_verifier(10_000_000);
             log::info!("VOLE-it-Head completed in: {:?}", t.elapsed());
