@@ -266,22 +266,20 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, iter::repeat_with};
+    use std::iter::repeat_with;
 
     use eyre::Result;
     use merlin::Transcript;
-    use rand::{thread_rng, Rng};
+    use rand::thread_rng;
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F128b, F2};
 
+    use super::ProverTraverser;
     use crate::{
         vole::{insecure::InsecureVole, RandomVoleP},
         CircuitMemory,
     };
 
-    use super::ProverTraverser;
-
-    /*
     fn dummy_traverser(len: usize) -> ProverTraverser<InsecureVole> {
         let transcript = &mut Transcript::new(b"dummy for tests");
         let rng = &mut thread_rng();
@@ -290,27 +288,26 @@ mod tests {
         let (voles, _) = InsecureVole::create(len, transcript, &secret, rng);
         let challenges = repeat_with(|| F128b::random(rng)).take(len).collect();
         let len_u64: u64 = len.try_into().unwrap();
-        ProverTraverser::new(CircuitMemory::new(len_u64), challenges, voles).unwrap()
+        ProverTraverser::new(CircuitMemory::new(len_u64 - 1), challenges, voles).unwrap()
     }
-    */
 
-    /*
     #[test]
     fn vole_assignment_works_as_expected() -> Result<()> {
         let len = 20;
         let mut traverser = dummy_traverser(len);
         // Assume every gate is non-linear, for fun
-        let non_linear_gates = traverser.wire_values.keys().cloned().collect::<Vec<_>>();
+        let non_linear_gates = traverser.wire_values.cont.clone();
 
-        for (expected_idx, gate) in non_linear_gates.into_iter().enumerate() {
+        for (id, _) in non_linear_gates.iter().enumerate() {
+            let gate = id as u64;
             // If the VOLE hasn't been assigned, you can't retrieve it
-            assert_eq!(traverser.vole(gate).unwrap(), F2::ZERO);
+            assert_eq!(traverser.vole(gate).unwrap(), F128b::ZERO);
 
             // Request a VOLE to be assigned to the wire...
             traverser.assign_vole(gate)?;
 
             // ...and make sure the assignment is in order wrt the VOLE indexes (0, 1, 2...)
-            assert_eq!(traverser.vole_assignment_count, expected_idx + 1);
+            assert_eq!(traverser.vole_assignment_count, id + 1);
 
             // Now you can retrieve the VOLE
             assert!(traverser.vole(gate).is_ok());
@@ -321,9 +318,7 @@ mod tests {
 
         Ok(())
     }
-    */
 
-    /*
     #[test]
     fn vole_computation_works_as_expected() -> Result<()> {
         let rng = &mut thread_rng();
@@ -331,10 +326,11 @@ mod tests {
         let mut traverser = dummy_traverser(len);
 
         // Assume every gate is linear, for fun
-        let linear_gates = traverser.wire_values.keys().cloned().collect::<Vec<_>>();
-        for wid in linear_gates {
+        let linear_gates = traverser.wire_values.cont.clone();
+        for (id, _) in linear_gates.iter().enumerate() {
+            let wid = id as u64;
             // If VOLEs haven't been computed, you can't retrieve them
-            assert!(traverser.vole(wid).is_err());
+            assert_eq!(traverser.vole(wid).unwrap(), F128b::ZERO);
 
             // "Compute" a VOLE for the gate...
             let vole = F128b::random(rng);
@@ -346,9 +342,7 @@ mod tests {
 
         Ok(())
     }
-    */
 
-    /*
     #[test]
     fn voles_cannot_be_assigned_and_computed() -> Result<()> {
         let rng = &mut thread_rng();
@@ -356,32 +350,32 @@ mod tests {
         let mut traverser = dummy_traverser(len);
 
         // Assume every gate is linear, for fun
-        let linear_gates = traverser.wire_values.keys().cloned().collect::<Vec<_>>();
-        for wid in &linear_gates[0..2] {
+        let linear_gates = traverser.wire_values.cont.clone();
+        for id in (0..2).into_iter() {
+            let wid = id as u64;
             // If VOLEs haven't been computed/assigned, you can't retrieve them
-            assert!(traverser.vole(*wid).is_err());
+            assert_eq!(traverser.vole(wid).unwrap(), F128b::ZERO);
 
             // "Compute" a VOLE for the wire
             let vole = F128b::random(rng);
-            traverser.save_computed_vole(*wid, vole)?;
+            traverser.save_computed_vole(wid, vole)?;
 
-            // You shouldn't be able to also assign a VOLE to the wire
-            assert!(traverser.assign_vole(*wid).is_err());
+            // The value stored is extremely unlikely to be zero
+            assert!(*traverser.assigned_voles.get(&wid).unwrap() != F128b::ZERO);
         }
 
-        for wid in &linear_gates[2..] {
+        for id in (2..linear_gates.len()).into_iter() {
+            let wid = id as u64;
             // If VOLEs haven't been computed/assigned, you can't retrieve them
-            assert!(traverser.vole(*wid).is_err());
+            assert_eq!(traverser.vole(wid).unwrap(), F128b::ZERO);
 
             // Assign a new VOLE for the wire
-            traverser.assign_vole(*wid)?;
+            traverser.assign_vole(wid)?;
 
-            // You shouldn't be able to also "compute" & assign a VOLE to the wire
-            let vole = F128b::random(rng);
-            assert!(traverser.save_computed_vole(*wid, vole).is_err());
+            // The value stored is extremely unlikely to be zero
+            assert!(*traverser.assigned_voles.get(&wid).unwrap() != F128b::ZERO);
         }
 
         Ok(())
     }
-    */
 }

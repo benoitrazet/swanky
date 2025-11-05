@@ -335,7 +335,7 @@ pub fn load_circuit_from_strings_prover(
 #[derive(Debug)]
 pub(crate) struct CircuitMemory<F> {
     /// NOTE: the use of Vec instead of HashMap/BTreeMap brings a >2x performance increase on benchmarked circuits for AES-256 and SHA256.
-    cont: Vec<F>,
+    pub(crate) cont: Vec<F>,
 }
 
 /// This is an arbitrary constant for the size of the vector, enough to support circuits
