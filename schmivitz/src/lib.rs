@@ -21,3 +21,7 @@ pub mod proof;
 pub mod vole;
 
 pub use proof::Proof;
+
+pub mod circuit;
+pub use circuit::Circuit;
+pub(crate) use circuit::{CircuitMemory, GateM};
