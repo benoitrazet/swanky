@@ -52,15 +52,29 @@ where
     VoleP: RandomVoleP,
     VoleV: RandomVoleV<Decommitment = VoleP::Decommitment>,
 {
+    /// TODO: docstring
+    pub fn proof_size_estimate(&self) -> usize {
+        // This is only a part of the proof size, it does not include the partial decommitment part because this is abstracted with traits.
+        let witness_commitment_bytes = self.witness_commitment.len() / 8;
+        let degree_1_commitment_bytes = 16;
+        let decommitment_challenge_bytes = SECURITY_PARAM / 8;
+
+        let partial_decommitment_size = self.partial_decommitment.proof_size_estimate();
+
+        return witness_commitment_bytes
+            + degree_1_commitment_bytes
+            + decommitment_challenge_bytes
+            + partial_decommitment_size;
+    }
+
     /// Create a proof of knowledge of a witness that satisfies the given circuit.
     pub fn prove<R>(circuit: &Circuit, transcript: &mut Transcript, rng: &mut R) -> Result<Self>
     where
         R: CryptoRng + RngCore,
     {
-        let reader = RelationReader::new(circuit.clone())?;
-        Self::validate_circuit_header(&reader)?;
-
+        let t = std::time::Instant::now();
         let mut transcript = transcript::Transcript::from(transcript);
+        log::info!("0: load transcript: {:?}", t.elapsed());
 
         // Evaluate the circuit in the clear to get the full witness and all wire values
         let t = std::time::Instant::now();
@@ -68,24 +82,30 @@ where
         circuit_preparer.execute(&circuit)?;
 
         let (witness, wire_values, polynomial_count) = circuit_preparer.into_parts();
+        log::info!("1: circuit preparer: {:?}", t.elapsed());
 
+        let t = std::time::Instant::now();
         // Update transcript with general public information
         transcript.append_public_values();
 
         // Get a set of (l + SECURITY_PARAM) random VOLEs
         let (voles, _vole_challenge) =
             VoleP::create(witness.len(), transcript.as_mut(), &witness, rng);
+        log::info!("2: VoleP::create: {:?}", t.elapsed());
 
+        let t = std::time::Instant::now();
         // Commit to extended witness (`d` in the paper)
         let witness_commitment: Vec<F2> = zip(witness, voles.witness_mask())
             .map(|(w, u)| w - u)
             .collect();
+        log::info!("3: witness_commitment: {:?}", t.elapsed());
 
         // TODO:
         // Add u~ to the transcript
         // Add hV to the transcript
 
         // Add witness commitment to the transcript and generate a challenge for each polynomial
+        let t = std::time::Instant::now();
         transcript.append_witness_commitment(witness_commitment.as_slice());
         let witness_challenges = transcript.extract_witness_challenges(polynomial_count);
 
@@ -96,6 +116,9 @@ where
         circuit_traverser.execute(&circuit)?;
         let (degree_0_aggregation, degree_1_aggregation, voles) = circuit_traverser.into_parts()?;
 
+        log::info!("4: circuit_traverser.into_parts: {:?}", t.elapsed());
+
+        let t = std::time::Instant::now();
         // Compute masks for the aggregated coefficients (`v*`, `u*` in the paper)
         let degree_0_mask = combine(voles.aggregate_commitment_masks());
         let degree_1_mask = combine(voles.aggregate_commitment_values());
@@ -111,6 +134,7 @@ where
         // Decommit the VOLEs
         let partial_decommitment = voles.decommit(&decommitment_challenge);
 
+        log::info!("5: decommit: {:?}", t.elapsed());
         // Form the proof
         Ok(Self {
             witness_commitment,
@@ -141,6 +165,7 @@ where {
         let mut transcript = transcript::Transcript::from(transcript);
         transcript.append_public_values();
 
+        let t = std::time::Instant::now();
         // Reconstruct VOLEs and update transcript with any necessary components.
         let reconstructed_voles = VoleV::reconstruct(
             &self.partial_decommitment,
@@ -148,15 +173,20 @@ where {
             transcript.as_mut(),
         );
         self.validate_proof(&reconstructed_voles)?;
+        log::info!("1: VoleV::reconstruct: {:?}", t.elapsed());
 
         // TODO:
         // Add u~ from the proof into the transcript
         // Add hV (from VOLE) to the transcript
 
         // Add `d` to transcript and generate challenges for each polynomial
+        let t = std::time::Instant::now();
         transcript.append_witness_commitment(self.witness_commitment.as_slice());
+        log::info!("2: append_witness_commitment {:?}", t.elapsed());
         // TODO: Should we be doing something with these challenges?
+        let t = std::time::Instant::now();
         let witness_challenges = transcript.extract_witness_challenges(self.polynomial_count);
+        log::info!("3: extract_witness_challenges {:?}", t.elapsed());
 
         // Compute masked witnesses Q' = Q[..l] + d * Delta
         let d_delta = self
@@ -180,7 +210,9 @@ where {
                 F8b::form_superfield(&masked_witness.into())
             })
             .collect::<Vec<_>>();
+        log::info!("4: reconstructed voles with masks {:?}", t.elapsed());
 
+        let t = std::time::Instant::now();
         // Combine mask VOLEs to get q*
         let validation_mask = combine(reconstructed_voles.mask_voles());
 
@@ -193,7 +225,9 @@ where {
         )?;
         verifier_traverser.execute(&circuit)?;
         let validation_aggregate = verifier_traverser.into_parts()?;
+        log::info!("5: circuit traverser {:?}", t.elapsed());
 
+        let t = std::time::Instant::now();
         // Finally, compute c~ = aggregate + q*
         let validation = validation_aggregate + validation_mask;
         let degree_0_commitment =
@@ -207,6 +241,7 @@ where {
         if self.decommitment_challenge != decommitment_challenge {
             bail!("Verification failed: VOLE challenge did not match expected value");
         }
+        log::info!("6: last check {:?}", t.elapsed());
 
         Ok(())
     }
