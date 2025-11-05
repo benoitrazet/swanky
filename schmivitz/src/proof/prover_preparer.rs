@@ -189,14 +189,16 @@ impl<StreamReader: ValueStreamReaderT> FunctionBodyVisitor for ProverPreparer<St
         self.save_wire(dst, product)
     }
 
-    fn addc(
-        &mut self,
-        _ty: TypeId,
-        _dst: WireId,
-        _left: WireId,
-        _right: &Number,
-    ) -> eyre::Result<()> {
-        bail!("Invalid input: VOLE-in-the-head does not support `addc` gates");
+    fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> eyre::Result<()> {
+        // Assumption: There is exactly one type ID for these circuits and it is F2.
+        assert_eq!(ty, 0);
+
+        let sum = match self.wire_values.get(&left) {
+            Some(l_val) => l_val + F2::from_number(right)?,
+            _ => bail!("Malformed circuit: used a wire that has not yet been defined"),
+        };
+
+        self.save_wire(dst, sum)
     }
     fn mulc(
         &mut self,

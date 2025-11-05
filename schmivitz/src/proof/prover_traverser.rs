@@ -308,8 +308,15 @@ impl<Vole: RandomVoleP> FunctionBodyVisitor for ProverTraverser<Vole> {
         Ok(())
     }
 
-    fn addc(&mut self, _ty: TypeId, _dst: WireId, _left: WireId, _right: &Number) -> Result<()> {
-        bail!("Invalid input: VOLE-in-the-head does not support `addc` gates");
+    fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, _right: &Number) -> Result<()> {
+        // Assumption: There is exactly one type ID for these circuits and it is F2.
+        assert_eq!(ty, 0);
+
+        // Compute the correct VOLE for the output wire
+        let sum_vole = self.vole(left)?;
+        self.save_computed_vole(dst, sum_vole)
+
+        // Linear gates don't contribute to the aggregated values being computed
     }
 
     fn mulc(&mut self, _ty: TypeId, _dst: WireId, _left: WireId, _right: &Number) -> Result<()> {

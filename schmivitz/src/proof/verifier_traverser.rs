@@ -285,8 +285,19 @@ impl FunctionBodyVisitor for VerifierTraverser {
         Ok(())
     }
 
-    fn addc(&mut self, _ty: TypeId, _dst: WireId, _left: WireId, _right: &Number) -> Result<()> {
-        bail!("Invalid input: VOLE-in-the-head does not support `addc` gates");
+    fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> Result<()> {
+        // Assumption: There is exactly one type ID for these circuits and it is F2.
+        assert_eq!(ty, 0);
+
+        // Compute the correct masked witness for the output wire
+        let t = if F2::from_number(right)? == F2::ZERO {
+            F128b::ZERO
+        } else {
+            F128b::ONE
+        };
+        self.save_computed_masked_witness(dst, self.masked_witness(left)? - t * self.verifier_key)
+
+        // Linear gates don't contribute to the aggregate being computed
     }
 
     fn mulc(&mut self, _ty: TypeId, _dst: WireId, _left: WireId, _right: &Number) -> Result<()> {
