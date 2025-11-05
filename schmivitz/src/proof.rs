@@ -276,90 +276,19 @@ impl AsSecretBytes for Vec<F2> {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, io::Cursor};
-
     use eyre::Result;
-    use mac_n_cheese_sieve_parser::text_parser::RelationReader;
     use merlin::Transcript;
     use rand::thread_rng;
     use std::io::Write;
+    use std::{fs::File, io::Cursor};
     use tempfile::tempdir;
 
-    use crate::vole::insecure::{InsecureCommitments, InsecureVole};
+    use crate::{
+        circuit::load_circuit_prover,
+        vole::insecure::{InsecureCommitments, InsecureVole},
+    };
 
-    use super::Proof;
-
-    #[test]
-    fn header_cannot_include_plugins() {
-        let plugin = "version 2.0.0;
-            circuit;
-            @type field 2;
-            @plugin mux_v0;
-            @begin
-            @end ";
-        let plugin_cursor = &mut Cursor::new(plugin.as_bytes());
-        let reader = RelationReader::new(plugin_cursor).unwrap();
-        assert!(
-            Proof::<InsecureVole, InsecureCommitments>::validate_circuit_header(&reader).is_err()
-        );
-    }
-
-    #[test]
-    fn header_cannot_include_conversions() {
-        // The conversion is from self->self because adding an extra type is a different failure case
-        let trivial_conversion = "version 2.0.0;
-            circuit;
-            @type field 2;
-            @convert(@out: 0:1, @in: 0:1);
-            @begin
-            @end ";
-        let conversion_cursor = &mut Cursor::new(trivial_conversion.as_bytes());
-        let reader = RelationReader::new(conversion_cursor).unwrap();
-        assert!(
-            Proof::<InsecureVole, InsecureCommitments>::validate_circuit_header(&reader).is_err()
-        );
-    }
-
-    #[test]
-    fn header_cannot_include_non_boolean_fields() {
-        let big_field = "version 2.0.0;
-            circuit;
-            @type field 2305843009213693951;
-            @begin
-            @end ";
-        let big_field_cursor = &mut Cursor::new(big_field.as_bytes());
-        let reader = RelationReader::new(big_field_cursor).unwrap();
-        assert!(
-            Proof::<InsecureVole, InsecureCommitments>::validate_circuit_header(&reader).is_err()
-        );
-
-        let extra_field = "version 2.0.0;
-            circuit;
-            @type field 2;
-            @type field 2305843009213693951;
-            @begin
-            @end ";
-        let extra_field_cursor = &mut Cursor::new(extra_field.as_bytes());
-        let reader = RelationReader::new(extra_field_cursor).unwrap();
-        assert!(
-            Proof::<InsecureVole, InsecureCommitments>::validate_circuit_header(&reader).is_err()
-        );
-    }
-
-    #[test]
-    fn tiny_header_works() -> eyre::Result<()> {
-        let tiny_header = "version 2.0.0;
-            circuit;
-            @type field 2;
-            @begin
-            @end ";
-        let tiny_header_cursor = &mut Cursor::new(tiny_header.as_bytes());
-        let reader = RelationReader::new(tiny_header_cursor)?;
-        assert!(
-            Proof::<InsecureVole, InsecureCommitments>::validate_circuit_header(&reader).is_ok()
-        );
-        Ok(())
-    }
+    use super::{Circuit, Proof};
 
     // Get a fresh transcript
     fn transcript() -> Transcript {
