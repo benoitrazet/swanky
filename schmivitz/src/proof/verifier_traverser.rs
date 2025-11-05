@@ -1,12 +1,16 @@
-use std::collections::HashMap;
-
+use diet_mac_and_cheese::fields::SieveIrDeserialize;
 use eyre::{bail, eyre, Result};
 use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
     TypeId, TypedCount, TypedWireRange, WireId, WireRange,
 };
+use std::borrow::Borrow;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F128b;
+use swanky_field_binary::F2;
+
+use crate::CircuitMemory;
+use crate::{Circuit, GateM};
 
 /// A [`VerifierTraverser`] allows the verifier to execute the gate-by-gate evaluation portion of
 /// the VOLE-in-the-head verification protocol.
@@ -35,7 +39,7 @@ pub(crate) struct VerifierTraverser {
     /// This is constructed during circuit traversal; it holds computed masked witnesses for
     /// linear gates and assigned masked witnesses (pulled out of `masked_witnesses`) for
     /// non-linear gates.
-    assigned_masked_witnesses: HashMap<WireId, F128b>,
+    assigned_masked_witnesses: CircuitMemory<F128b>,
 
     /// Count of how many of the provided masked witnesses have been assigned.
     assigned_witness_count: usize,
@@ -52,6 +56,7 @@ impl VerifierTraverser {
         challenges: Vec<F128b>,
         verifier_key: F128b,
         masked_witnesses: Vec<F128b>,
+        max_wire_id: WireId,
     ) -> Result<Self> {
         if challenges.len() > masked_witnesses.len() {
             bail!(
@@ -65,7 +70,7 @@ impl VerifierTraverser {
             challenge_count: 0,
             verifier_key,
             masked_witnesses,
-            assigned_masked_witnesses: HashMap::new(),
+            assigned_masked_witnesses: CircuitMemory::new(max_wire_id),
             assigned_witness_count: 0,
             aggregate: F128b::ZERO,
         })
@@ -168,6 +173,76 @@ impl VerifierTraverser {
             );
         }
         Ok(self.aggregate)
+    }
+
+    /// Execute a circuit.
+    pub(crate) fn execute(&mut self, circ: &Circuit) -> Result<()> {
+        for g in circ.gates.iter().cloned() {
+            match g {
+                GateM::Add(ty, dst, left, right) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(ty, 0);
+
+                    // Compute the correct masked witness for the output wire
+                    self.save_computed_masked_witness(
+                        dst,
+                        self.masked_witness(left)? + self.masked_witness(right)?,
+                    )?;
+
+                    // Linear gates don't contribute to the aggregate being computed
+                }
+                GateM::Mul(ty, dst, left, right) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(ty, 0);
+
+                    // Assign the next masked witness to the destination wire
+                    self.assign_masked_witness(dst)?;
+                    let challenge = self.next_challenge()?;
+
+                    // Compute the contibution to the aggregate: ci​(Δ) = q_left * ​q_right ​− q_dst * ​Δ
+                    let eval = self.masked_witness(left)? * self.masked_witness(right)?
+                        - (self.masked_witness(dst)? * self.verifier_key);
+
+                    self.aggregate += challenge * eval;
+                }
+                GateM::AddConstant(ty, dst, left, right) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(ty, 0);
+
+                    // Compute the correct masked witness for the output wire
+                    let t = if F2::from_number(right.borrow())? == F2::ZERO {
+                        F128b::ZERO
+                    } else {
+                        F128b::ONE
+                    };
+                    self.save_computed_masked_witness(
+                        dst,
+                        self.masked_witness(left)? - t * self.verifier_key,
+                    )?;
+
+                    // Linear gates don't contribute to the aggregate being computed
+                }
+                GateM::Witness(ty, dst) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(ty, 0);
+
+                    // For each of the output wires:
+                    for wid in dst.start..=dst.end {
+                        // Assign a fresh masked witness to the wire
+                        self.assign_masked_witness(wid)?;
+
+                        // Private input gates don't define a polynomial that would contribute to the aggregate
+                        // being computed, so we ignore the challenge
+                    }
+                }
+                _ => bail!(
+                    "Invalid input: VOLE-in-the-head does not support gate {:?}",
+                    g
+                ),
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -307,7 +382,13 @@ mod tests {
         let challenges = repeat_with(|| F128b::random(rng)).take(len).collect();
         let verifier_key = F128b::random(rng);
         let masked_witnesses = repeat_with(|| F128b::random(rng)).take(len).collect();
-        VerifierTraverser::new(challenges, verifier_key, masked_witnesses).unwrap()
+        VerifierTraverser::new(
+            challenges,
+            verifier_key,
+            masked_witnesses,
+            len.try_into().unwrap(),
+        )
+        .unwrap()
     }
 
     #[test]
@@ -317,7 +398,7 @@ mod tests {
 
         for wid in 0..len {
             // If the wire ID hasn't been assigned a witness, you can't retrieve it
-            assert!(traverser.masked_witness(wid).is_err());
+            assert_eq!(traverser.masked_witness(wid).unwrap(), F128b::ZERO);
 
             // Request a masked witness to be assigned to the wire...
             traverser.assign_masked_witness(wid)?;
@@ -339,14 +420,17 @@ mod tests {
     fn masked_witness_computation_works_as_expected() -> Result<()> {
         let rng = &mut thread_rng();
         let len = 25;
+        let len_u64: u64 = len.try_into().unwrap();
         let mut traverser = dummy_traverser(len);
 
         // Form a random set of unique wire ids (might be smaller than 25 due to repeats)
-        let wire_ids: HashSet<_> = repeat_with(|| rng.gen::<u8>() as u64).take(len).collect();
+        let wire_ids: HashSet<_> = repeat_with(|| (rng.gen::<u8>() as u64) % len_u64)
+            .take(len)
+            .collect();
 
         for wid in wire_ids {
             // If the wire ID doesn't have an associated computed masked witness, retrieval fails
-            assert!(traverser.masked_witness(wid).is_err());
+            assert_eq!(traverser.masked_witness(wid).unwrap(), F128b::ZERO);
 
             // "Compute" a masked witness for the gate...
             let witness = F128b::random(rng);
@@ -354,41 +438,6 @@ mod tests {
 
             // ...and make sure they were assigned as expected
             assert_eq!(traverser.masked_witness(wid)?, witness)
-        }
-
-        Ok(())
-    }
-
-    #[test]
-    fn masked_witnesses_cannot_be_assigned_and_computed() -> Result<()> {
-        let rng = &mut thread_rng();
-        let len = 20;
-        let mut traverser = dummy_traverser(len as usize);
-
-        for wid in 0..len / 2 {
-            // If masked witnesses haven't been computed/assigned, you can't retrieve them
-            assert!(traverser.masked_witness(wid).is_err());
-
-            // "Compute" a witness for the wire
-            let witness = F128b::random(rng);
-            traverser.save_computed_masked_witness(wid, witness)?;
-
-            // You shouldn't be able to also assign a witness to the wire
-            assert!(traverser.assign_masked_witness(wid).is_err());
-        }
-
-        for wid in len / 2..len {
-            // If masked witnesses haven't been computed/assigned, you can't retrieve them
-            assert!(traverser.masked_witness(wid).is_err());
-
-            // Assign a new witness for the wire
-            traverser.assign_masked_witness(wid)?;
-
-            // You shouldn't be able to also "compute" & assign a witness to the wire
-            let witness = F128b::random(rng);
-            assert!(traverser
-                .save_computed_masked_witness(wid, witness)
-                .is_err());
         }
 
         Ok(())

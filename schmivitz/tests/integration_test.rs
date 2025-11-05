@@ -1,14 +1,11 @@
-use std::{fs::File, io::Cursor};
-
 use eyre::Result;
 use merlin::Transcript;
 use rand::thread_rng;
 use schmivitz::{
+    circuit::load_circuit_from_strings_prover,
     vole::functionality::{VoleProver, VoleVerifier},
-    Proof,
+    Circuit, Proof,
 };
-use std::io::Write;
-use tempfile::tempdir;
 
 // Get a fresh transcript
 fn transcript() -> Transcript {
@@ -19,28 +16,15 @@ fn transcript() -> Transcript {
 fn create_proof(
     circuit_bytes: &'static str,
     private_input_bytes: &'static str,
-) -> (
-    Result<Proof<VoleProver, VoleVerifier>>,
-    Cursor<&'static [u8]>,
-) {
-    let circuit = Cursor::new(circuit_bytes.as_bytes());
-
-    let dir = tempdir().unwrap();
-    let private_input_path = dir.path().join("schmivitz_private_inputs");
-    let mut private_input = File::create(private_input_path.clone()).unwrap();
-    writeln!(private_input, "{}", private_input_bytes).unwrap();
+) -> (Result<Proof<VoleProver, VoleVerifier>>, Circuit) {
+    let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
 
     let rng = &mut thread_rng();
 
-    (
-        Proof::prove::<_, _>(
-            &mut circuit.clone(),
-            &private_input_path,
-            &mut transcript(),
-            rng,
-        ),
-        circuit,
-    )
+    let t = std::time::Instant::now();
+    let t1 = Proof::prove::<_>(&circuit, &mut transcript(), rng);
+    log::info!("proof time: {:?}", t.elapsed());
+    (t1, circuit)
 }
 
 #[test]

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::File, path::Path};
+use std::{fs::File, path::Path};
 
 use eyre::{bail, eyre};
 use mac_n_cheese_sieve_parser::{
@@ -8,6 +8,9 @@ use mac_n_cheese_sieve_parser::{
 };
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::F2;
+
+use crate::{Circuit, CircuitMemory, GateM};
+use diet_mac_and_cheese::fields::SieveIrDeserialize;
 
 /// A [`ProverPreparer`] allows the prover to prepare for VOLE-in-the-head by evaluating the
 /// circuit in the clear and determining the full extended witness.
@@ -28,7 +31,7 @@ where
     StreamReader: ValueStreamReaderT,
 {
     /// Complete map of values on every wire in the circuit.
-    wire_values: HashMap<WireId, F2>,
+    wire_values: CircuitMemory<F2>,
 
     /// Set of wire values that correspond to elements in the extended witness.
     witness: Vec<F2>,
@@ -37,7 +40,7 @@ where
     challenge_count: usize,
 
     /// Private input stream, used in circuit evaluation.
-    private_inputs: StreamReader,
+    private_inputs: Option<StreamReader>,
 }
 
 impl ProverPreparer<ValueStreamReader<File>> {
@@ -45,10 +48,19 @@ impl ProverPreparer<ValueStreamReader<File>> {
         let private_inputs =
             ValueStreamReader::open(ValueStreamKind::Private, private_inputs_path)?;
         Ok(Self {
-            wire_values: HashMap::default(),
+            wire_values: Default::default(),
             witness: Vec::default(),
             challenge_count: 0,
-            private_inputs,
+            private_inputs: Some(private_inputs),
+        })
+    }
+
+    pub(crate) fn new(max_wire_id: WireId) -> eyre::Result<Self> {
+        Ok(Self {
+            wire_values: CircuitMemory::new(max_wire_id),
+            witness: Vec::default(),
+            challenge_count: 0,
+            private_inputs: None,
         })
     }
 }
@@ -75,8 +87,70 @@ impl<StreamReader: ValueStreamReaderT> ProverPreparer<StreamReader> {
     /// Get the witness, wire values, and number of challenges required.
     ///
     /// These values will be empty if the circuit has not yet been traversed.
-    pub(crate) fn into_parts(self) -> (Vec<F2>, HashMap<WireId, F2>, usize) {
+    pub(crate) fn into_parts(self) -> (Vec<F2>, CircuitMemory<F2>, usize) {
         (self.witness, self.wire_values, self.challenge_count)
+    }
+
+    /// Execute a circuit.
+    pub(crate) fn execute(&mut self, circuit: &Circuit) -> eyre::Result<()> {
+        let mut priv_input_pos: usize = 0;
+        for g in circuit.gates.iter().cloned() {
+            match g {
+                GateM::Add(ty, dst, left, right) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(ty, 0);
+
+                    let sum = match (self.wire_values.get(&left), self.wire_values.get(&right)) {
+                        (Some(l_val), Some(r_val)) => l_val + r_val,
+                        _ => bail!("Malformed circuit: used a wire that has not yet been defined"),
+                    };
+
+                    self.save_wire(dst, sum)?;
+                }
+                GateM::Mul(ty, dst, left, right) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(ty, 0);
+
+                    self.challenge_count += 1;
+
+                    let product = match (self.wire_values.get(&left), self.wire_values.get(&right))
+                    {
+                        (Some(l_val), Some(r_val)) => l_val * r_val,
+                        _ => bail!("Malformed circuit: used a wire that has not yet been defined"),
+                    };
+
+                    // Save product to the witness and associate it with its wire ID
+                    self.witness.push(product);
+                    self.save_wire(dst, product)?;
+                }
+                GateM::AddConstant(ty, dst, left, right) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(ty, 0);
+
+                    let sum = match self.wire_values.get(&left) {
+                        Some(l_val) => l_val + F2::from_number(&right)?,
+                        _ => bail!("Malformed circuit: used a wire that has not yet been defined"),
+                    };
+
+                    self.save_wire(dst, sum)?;
+                }
+                GateM::Witness(ty, dst) => {
+                    assert_eq!(ty, 0);
+                    for wid in dst.start..=dst.end {
+                        let f2 = circuit.private_inputs[priv_input_pos];
+                        priv_input_pos += 1;
+
+                        self.witness.push(f2);
+                        self.save_wire(wid, f2)?;
+                    }
+                }
+                _ => bail!(
+                    "Invalid input: VOLE-in-the-head does not support gate {:?}",
+                    g
+                ),
+            }
+        }
+        Ok(())
     }
 }
 
@@ -151,6 +225,8 @@ impl<StreamReader: ValueStreamReaderT> FunctionBodyVisitor for ProverPreparer<St
             // Extract each input from the input stream and check that it's in F2
             let value = self
                 .private_inputs
+                .as_mut()
+                .unwrap()
                 .next()?
                 .ok_or_else(|| eyre!("Expected a private input but stream is empty"))?;
             let maybe_f2: Option<F2> = F2::try_from_int(value).into();
@@ -212,9 +288,14 @@ impl<StreamReader: ValueStreamReaderT> RelationVisitor for ProverPreparer<Stream
 
 #[cfg(test)]
 mod tests {
-    use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, ValueStreamReader};
+    use rand::thread_rng;
     use std::io::Cursor;
 
+    use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, ValueStreamReader};
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
+
+    use crate::circuit::CircuitIngestor;
     use crate::proof::prover_preparer::ProverPreparer;
 
     /// Stream reader that produces an arbitrary-length stream of random inputs in F_2.
@@ -255,10 +336,20 @@ mod tests {
 
     /// Take a string description of a circuit and parse it with the circuit preparer.
     fn prepare_circuit(circuit: &str) -> eyre::Result<ProverPreparer<RandomStreamReader>> {
+        let rng = &mut thread_rng();
+        // Generate a private input vector with 100 random inputs
+        let random_private_inputs: Vec<F2> =
+            (0..100).into_iter().map(|_| F2::random(rng)).collect();
+
         let cursor = &mut Cursor::new(circuit.as_bytes());
         let reader = RelationReader::new(cursor)?;
+        let mut circ = CircuitIngestor::new_prover(random_private_inputs)?;
+        reader.read(&mut circ)?;
+
+        let circuit_loaded = circ.to_circuit();
+
         let mut counter: ProverPreparer<RandomStreamReader> = ProverPreparer::default();
-        reader.read(&mut counter)?;
+        counter.execute(&circuit_loaded)?;
         Ok(counter)
     }
 
@@ -362,8 +453,8 @@ mod tests {
         // This evaluates on a random input; over time we'll check them all
         let counter = prepare_circuit(one_add)?;
         assert_eq!(
-            counter.wire_values[&0] + counter.wire_values[&1],
-            counter.wire_values[&2]
+            counter.wire_values.get(&0).unwrap() + counter.wire_values.get(&1).unwrap(),
+            *counter.wire_values.get(&2).unwrap()
         );
 
         Ok(())
@@ -383,8 +474,8 @@ mod tests {
         // This evaluates on a random input; over time we'll check them all
         let counter = prepare_circuit(one_mul)?;
         assert_eq!(
-            counter.wire_values[&0] * counter.wire_values[&1],
-            counter.wire_values[&2]
+            counter.wire_values.get(&0).unwrap() * counter.wire_values.get(&1).unwrap(),
+            *counter.wire_values.get(&2).unwrap()
         );
 
         Ok(())

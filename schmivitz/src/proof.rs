@@ -8,23 +8,19 @@
 //! Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
 //!
 use eyre::{bail, Result};
-use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, Type};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
-use std::{
-    io::{Read, Seek},
-    iter::zip,
-    marker::PhantomData,
-    path::Path,
-};
+use rayon::iter::*;
+use std::{iter::zip, marker::PhantomData};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F8b, F2};
 
 use crate::{
-    parameters::{FIELD_SIZE, SECURITY_PARAM},
+    parameters::SECURITY_PARAM,
     proof::{prover_preparer::ProverPreparer, prover_traverser::ProverTraverser},
     vole::{AsSecretBytes, RandomVoleP, RandomVoleV},
 };
+use crate::{vole::DecommitmentSerde, Circuit};
 
 use self::verifier_traverser::VerifierTraverser;
 
@@ -57,14 +53,8 @@ where
     VoleV: RandomVoleV<Decommitment = VoleP::Decommitment>,
 {
     /// Create a proof of knowledge of a witness that satisfies the given circuit.
-    pub fn prove<T, R>(
-        circuit: &mut T,
-        private_input: &Path,
-        transcript: &mut Transcript,
-        rng: &mut R,
-    ) -> Result<Self>
+    pub fn prove<R>(circuit: &Circuit, transcript: &mut Transcript, rng: &mut R) -> Result<Self>
     where
-        T: Read + Seek + Clone,
         R: CryptoRng + RngCore,
     {
         let reader = RelationReader::new(circuit.clone())?;
@@ -73,8 +63,10 @@ where
         let mut transcript = transcript::Transcript::from(transcript);
 
         // Evaluate the circuit in the clear to get the full witness and all wire values
-        let mut circuit_preparer = ProverPreparer::new_from_path(private_input)?;
-        reader.read(&mut circuit_preparer)?;
+        let t = std::time::Instant::now();
+        let mut circuit_preparer = ProverPreparer::new(circuit.max_wire_id)?;
+        circuit_preparer.execute(&circuit)?;
+
         let (witness, wire_values, polynomial_count) = circuit_preparer.into_parts();
 
         // Update transcript with general public information
@@ -101,7 +93,7 @@ where
         // gate / polynomial (`A_i0` and `A_i1` in the paper) and start to aggregate these with
         // the challenges.
         let mut circuit_traverser = ProverTraverser::new(wire_values, witness_challenges, voles)?;
-        RelationReader::new(circuit)?.read(&mut circuit_traverser)?;
+        circuit_traverser.execute(&circuit)?;
         let (degree_0_aggregation, degree_1_aggregation, voles) = circuit_traverser.into_parts()?;
 
         // Compute masks for the aggregated coefficients (`v*`, `u*` in the paper)
@@ -172,10 +164,8 @@ where
 
     /// Verify the proof.
     ///
-    pub fn verify<T>(&self, circuit: &mut T, transcript: &mut Transcript) -> Result<()>
-    where
-        T: Read + Seek + Clone,
-    {
+    pub fn verify(&self, circuit: &Circuit, transcript: &mut Transcript) -> Result<()>
+where {
         let mut transcript = transcript::Transcript::from(transcript);
         transcript.append_public_values();
 
@@ -227,9 +217,9 @@ where
             witness_challenges,
             reconstructed_voles.verifier_key(),
             masked_witnesses,
+            circuit.max_wire_id,
         )?;
-        let reader = RelationReader::new(circuit)?;
-        reader.read(&mut verifier_traverser)?;
+        verifier_traverser.execute(&circuit)?;
         let validation_aggregate = verifier_traverser.into_parts()?;
 
         // Finally, compute c~ = aggregate + q*
@@ -370,28 +360,23 @@ mod tests {
     fn create_proof(
         circuit_bytes: &'static str,
         private_input_bytes: &'static str,
-    ) -> (
-        Result<Proof<InsecureVole, InsecureCommitments>>,
-        Cursor<&'static [u8]>,
-    ) {
-        let circuit = Cursor::new(circuit_bytes.as_bytes());
+    ) -> Result<(Result<Proof<InsecureVole, InsecureCommitments>>, Circuit)> {
+        let mut circuit_cursor = Cursor::new(circuit_bytes.as_bytes());
 
         let dir = tempdir().unwrap();
         let private_input_path = dir.path().join("schmivitz_private_inputs");
         let mut private_input = File::create(private_input_path.clone()).unwrap();
         writeln!(private_input, "{}", private_input_bytes).unwrap();
 
+        let circuit = load_circuit_prover(&mut circuit_cursor, &private_input_path)?;
         let rng = &mut thread_rng();
 
-        (
-            Proof::<InsecureVole, InsecureCommitments>::prove::<_, _>(
-                &mut circuit.clone(),
-                &private_input_path,
-                &mut transcript(),
-                rng,
-            ),
-            circuit,
-        )
+        let proof = Proof::<InsecureVole, InsecureCommitments>::prove::<_>(
+            &circuit,
+            &mut transcript(),
+            rng,
+        );
+        Ok((proof, circuit))
     }
 
     #[test]
@@ -411,7 +396,7 @@ mod tests {
                 < 1 >;
             @end";
 
-        let (proof, mut mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
+        let (proof, mut mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes)?;
         assert!(proof?.verify(&mut mini_circuit, &mut transcript()).is_ok());
 
         Ok(())
@@ -447,7 +432,7 @@ mod tests {
                 < 0 >;
             @end ";
 
-        let (proof, mut small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes);
+        let (proof, mut small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes)?;
         assert!(proof?.verify(&mut small_circuit, &mut transcript()).is_ok());
 
         Ok(())
@@ -467,7 +452,7 @@ mod tests {
         @end ";
 
         // This uses the output of `transcript()` as-is to prove. This should work
-        let (proof, mut small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes);
+        let (proof, mut small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes)?;
         assert!(proof.is_ok());
 
         // If we use a different transcript to verify, it'll fail
@@ -497,7 +482,7 @@ mod tests {
               $13 <- @mul(0: $0, $8);
               $14 <- @mul(0: $0, $9);
             @end ";
-        let small_circuit = &mut Cursor::new(small_circuit_bytes.as_bytes());
+        let small_circuit_text = &mut Cursor::new(small_circuit_bytes.as_bytes());
 
         let dir = tempdir()?;
         let private_input_path = dir.path().join("basic_happy_small_test_path");
@@ -514,11 +499,11 @@ mod tests {
             @end ";
         writeln!(private_input, "{}", private_input_bytes)?;
 
+        let small_circuit = load_circuit_prover(small_circuit_text, &private_input_path)?;
         let rng = &mut thread_rng();
 
-        let proof = Proof::<InsecureVole, InsecureCommitments>::prove::<_, _>(
-            &mut small_circuit.clone(),
-            &private_input_path,
+        let proof = Proof::<InsecureVole, InsecureCommitments>::prove::<_>(
+            &small_circuit,
             &mut transcript(),
             rng,
         )?;
@@ -535,7 +520,7 @@ mod tests {
         let mut too_few_challenges = proof.clone();
         too_few_challenges.polynomial_count = too_few_challenges.polynomial_count + 1;
         assert!(too_few_challenges
-            .verify(small_circuit, &mut transcript())
+            .verify(&small_circuit, &mut transcript())
             .is_err());
 
         Ok(())
