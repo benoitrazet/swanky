@@ -115,3 +115,73 @@ fn prove_works_on_slightly_larger_circuit() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn prove_aes256() -> Result<()> {
+    use std::env;
+    // if log-level `RUST_LOG` not already set, then set to info
+    match env::var("RUST_LOG") {
+        Ok(val) => println!("loglvl: {}", val),
+        Err(_) => env::set_var("RUST_LOG", "info"),
+    };
+    pretty_env_logger::init_timed();
+
+    let circuit_bytes = include_str!("../circuits/aes_256_conv.sieve");
+    let private_input_bytes = include_str!("../circuits/aes_256_conv_private.sieve");
+
+    let t = std::time::Instant::now();
+    let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
+    log::info!("parsing: {:?}", t.elapsed());
+
+    let t = std::time::Instant::now();
+    let rng = &mut thread_rng();
+    let proof = Proof::<VoleProver, VoleVerifier>::prove::<_>(&circuit, &mut transcript(), rng);
+    log::info!("Elapsed prover   aes256: {:?}", t.elapsed());
+
+    log::info!(
+        "proof size estimate: {:?}",
+        (proof.as_ref()).unwrap().proof_size_estimate()
+    );
+
+    let t = std::time::Instant::now();
+    let verif = proof?.verify(&circuit, &mut transcript());
+    assert!(verif.is_ok());
+    log::info!("Elapsed verifier aes256: {:?}", t.elapsed());
+
+    Ok(())
+}
+
+#[test]
+fn prove_sha256() -> Result<()> {
+    use std::env;
+    // if log-level `RUST_LOG` not already set, then set to info
+    match env::var("RUST_LOG") {
+        Ok(val) => println!("loglvl: {}", val),
+        Err(_) => env::set_var("RUST_LOG", "info"),
+    };
+    pretty_env_logger::init_timed();
+
+    let circuit_bytes = include_str!("../circuits/sha256_conv.sieve");
+    let private_input_bytes = include_str!("../circuits/sha256_conv_private.sieve");
+
+    let t = std::time::Instant::now();
+    let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
+    log::info!("parsing: {:?}", t.elapsed());
+
+    let t = std::time::Instant::now();
+    let rng = &mut thread_rng();
+    let proof = Proof::<VoleProver, VoleVerifier>::prove::<_>(&circuit, &mut transcript(), rng);
+    log::info!("Elapsed prover   sha256: {:?}", t.elapsed());
+
+    log::info!(
+        "proof size estimate: {:?}",
+        (proof.as_ref()).unwrap().proof_size_estimate()
+    );
+
+    let t = std::time::Instant::now();
+    let verif = proof?.verify(&circuit, &mut transcript());
+    assert!(verif.is_ok());
+    log::info!("Elapsed verifier sha256: {:?}", t.elapsed());
+
+    Ok(())
+}
