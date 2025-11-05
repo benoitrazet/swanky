@@ -51,6 +51,35 @@ fn prove_doesnt_explode() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn prove_addc_doesnt_explode() -> Result<()> {
+    let mini_circuit_bytes = "version 2.0.0;
+        circuit;
+        @type field 2;
+        @begin
+          $0 <- @private(0);
+          $1 <- @mul(0: $0, $0);
+          $2 <- @add(0: $0, $0);
+          $3 <- @addc(0: $0, < 1 >);
+          $4 <- @private(0);
+          $5 <- @mul(0: $3, $4);
+          $6 <- @addc(0: $5, < 1 >);
+        @end ";
+    let private_input_bytes = "version 2.0.0;
+        private_input;
+        @type field 2;
+        @begin
+            < 1 >;
+            < 1 >;
+        @end ";
+
+    let (proof, mut mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
+    let verif = proof?.verify(&mut mini_circuit, &mut transcript());
+    assert!(verif.is_ok());
+
+    Ok(())
+}
+
 const SMALL_CIRCUIT: &str = "version 2.0.0;
     circuit;
     @type field 2;
