@@ -34,6 +34,16 @@ pub(crate) fn bools_to_u8(d: &[bool]) -> u8 {
 #[derive(Clone, Default)]
 pub(crate) struct Corrections([Vec<F2>; REPETITION_PARAM - 1]);
 
+impl Corrections {
+    pub(crate) fn length(&self) -> usize {
+        let s = self.0[0].len();
+        for v in self.0.iter() {
+            assert_eq!(v.len(), s)
+        }
+        s
+    }
+}
+
 /// hash the commitments coming from the small-domain VOLE
 fn hash_commitments(com: &[Com]) -> Com {
     assert_eq!(com.len(), REPETITION_PARAM);

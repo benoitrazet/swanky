@@ -24,6 +24,12 @@ pub(crate) mod crypto_primitives;
 pub mod functionality;
 pub(crate) mod integration;
 
+/// Trait capturing the interface of serializable/deserializable Decommitment
+pub trait DecommitmentSerde {
+    /// For now only a only a proof size estimate until we get full ser/de capabilities.
+    fn proof_size_estimate(&self) -> usize;
+}
+
 /// The prover's secret must have a bytes-wise representation.
 ///
 /// Note: Ideally this would not require new allocation into a `Vec` but
@@ -61,7 +67,7 @@ where
     ///
     /// This must only contain information that is safe to be sent to the verifier at the end of
     /// the protocol.
-    type Decommitment;
+    type Decommitment: DecommitmentSerde;
 
     /// Type of the challenge generated when creating the VOLEs.
     type VoleChallenge;
