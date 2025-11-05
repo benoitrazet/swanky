@@ -122,34 +122,6 @@ where
         })
     }
 
-    /// Validate that the circuit can be processed by the system, according to the header info.
-    ///
-    /// Note that the system can still fail to form proofs over circuits that pass this check, like
-    /// if it includes an unsupported gate.
-    ///
-    /// Requirements:
-    /// - Must not allow any plugins
-    /// - Must not allow any conversions
-    /// - Must not allow any types other than $`\mathbb F_2`$
-    fn validate_circuit_header<T: Read + Seek>(circuit_reader: &RelationReader<T>) -> Result<()> {
-        let header = circuit_reader.header();
-        if !header.plugins.is_empty() {
-            bail!("Invalid circuit: VOLE-in-the-head does not support any plugins")
-        }
-
-        if !header.conversion.is_empty() {
-            bail!("Invalid circuit: VOLE-in-the-head does not support conversions")
-        }
-
-        let expected_modulus = Number::from(FIELD_SIZE as u64);
-        match header.types[..] {
-            [Type::Field { modulus }] if modulus == expected_modulus => {}
-            _ => bail!("Invalid circuit: VOLE-in-the-head only supports elements in F_2"),
-        }
-
-        Ok(())
-    }
-
     /// This makes sure the proof is correctly formed e.g. everything is the right length.
     fn validate_proof(&self, voles: &VoleV) -> Result<()> {
         // There should be one witness commitment for every element in the extended witness
