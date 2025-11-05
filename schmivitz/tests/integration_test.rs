@@ -124,7 +124,7 @@ fn prove_aes256() -> Result<()> {
         Ok(val) => println!("loglvl: {}", val),
         Err(_) => env::set_var("RUST_LOG", "info"),
     };
-    pretty_env_logger::init_timed();
+    let _ = pretty_env_logger::try_init_timed();
 
     let circuit_bytes = include_str!("../circuits/aes_256_conv.sieve");
     let private_input_bytes = include_str!("../circuits/aes_256_conv_private.sieve");
@@ -159,7 +159,7 @@ fn prove_sha256() -> Result<()> {
         Ok(val) => println!("loglvl: {}", val),
         Err(_) => env::set_var("RUST_LOG", "info"),
     };
-    pretty_env_logger::init_timed();
+    let _ = pretty_env_logger::try_init_timed();
 
     let circuit_bytes = include_str!("../circuits/sha256_conv.sieve");
     let private_input_bytes = include_str!("../circuits/sha256_conv_private.sieve");
