@@ -440,7 +440,7 @@ mod test {
 
     #[test]
     fn test_vole_prover_verifier() {
-        let perf = true; // toggle to true for using this test for performance testing the generation of VOLEs
+        let perf = false; // toggle to true for using this test for performance testing the generation of VOLEs
         if !perf {
             test_vole_prover_and_verifier(100);
         } else {
