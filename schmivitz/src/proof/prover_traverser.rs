@@ -3,8 +3,8 @@ use mac_n_cheese_sieve_parser::WireId;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F128b, F2};
 
+use crate::circuit::{Circuit, CircuitMemory, GateM};
 use crate::vole::RandomVoleP;
-use crate::{Circuit, CircuitMemory, GateM};
 
 /// A [`ProverTraverser`] allows the prover to execute the gate-by-gate evaluation portion of the
 /// VOLE-in-the-head protocol.
@@ -276,8 +276,8 @@ mod tests {
 
     use super::ProverTraverser;
     use crate::{
+        circuit::CircuitMemory,
         vole::{insecure::InsecureVole, RandomVoleP},
-        CircuitMemory,
     };
 
     fn dummy_traverser(len: usize) -> ProverTraverser<InsecureVole> {

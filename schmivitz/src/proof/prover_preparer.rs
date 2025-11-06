@@ -2,7 +2,7 @@ use eyre::bail;
 use mac_n_cheese_sieve_parser::WireId;
 use swanky_field_binary::F2;
 
-use crate::{Circuit, CircuitMemory, GateM};
+use crate::circuit::{Circuit, CircuitMemory, GateM};
 use diet_mac_and_cheese::fields::SieveIrDeserialize;
 
 /// A [`ProverPreparer`] allows the prover to prepare for VOLE-in-the-head by evaluating the

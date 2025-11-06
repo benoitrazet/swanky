@@ -3,8 +3,9 @@ use merlin::Transcript;
 use rand::thread_rng;
 use schmivitz::{
     circuit::load_circuit_from_strings_prover,
+    circuit::Circuit,
     vole::functionality::{VoleProver, VoleVerifier},
-    Circuit, Proof,
+    Proof,
 };
 
 // Get a fresh transcript

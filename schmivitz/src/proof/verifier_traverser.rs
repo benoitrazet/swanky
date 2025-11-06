@@ -6,8 +6,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::F128b;
 use swanky_field_binary::F2;
 
-use crate::CircuitMemory;
-use crate::{Circuit, GateM};
+use crate::circuit::{Circuit, CircuitMemory, GateM};
 
 /// A [`VerifierTraverser`] allows the verifier to execute the gate-by-gate evaluation portion of
 /// the VOLE-in-the-head verification protocol.

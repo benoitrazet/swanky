@@ -15,12 +15,12 @@ use std::{iter::zip, marker::PhantomData};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F8b, F2};
 
+use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
     parameters::SECURITY_PARAM,
     proof::{prover_preparer::ProverPreparer, prover_traverser::ProverTraverser},
     vole::{AsSecretBytes, RandomVoleP, RandomVoleV},
 };
-use crate::{vole::DecommitmentSerde, Circuit};
 
 use self::verifier_traverser::VerifierTraverser;
 
