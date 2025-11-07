@@ -147,7 +147,8 @@ pub fn random_seed<P: Party, RNG: CryptoRng + Rng>(
     // The protocol works as follows:
     //
     // 1. The sender generates its seed `s₀`, computes `c ← H(s₀)`, and sends
-    //    `c` to the receiver.
+    //    `c` to the receiver. Since `s₀` is random we can view `H` as a
+    //    commitment scheme (in the random oracle model).
     // 2. The receiver generates its seed `s₁` and sends `s₁` to the sender.
     // 3. The sender sends `s₀` to the receiver, who checks that `H(s₀) = c`,
     //    aborting if not.
