@@ -3,10 +3,10 @@ use swanky_aes_rng::AesRng;
 use swanky_party::{Prover, Verifier};
 
 fn bench_random_seed(c: &mut Criterion<WallTime>) {
-    const COUNT: usize = 1;
+    const COUNT: usize = 1000;
     let mut rng_a = AesRng::new();
     let mut rng_b = AesRng::new();
-    c.bench_function("random_seed", |b| {
+    c.bench_function(&format!("random_seed::{COUNT}"), |b| {
         b.iter(|| {
             swanky_channel::local::local_channel_pair(
                 |c| {
