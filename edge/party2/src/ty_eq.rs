@@ -12,10 +12,10 @@ mod sealed {
 /// `Generic` lets you write name a generic type with a placeholder.
 ///
 /// Suppose we know that `T0 == T1`. All of the following should then be true:
-/// - `&T0 == T1`
+/// - `&T0 == &T1`
 /// - `&mut [T0] == &mut [T1]`
 /// - `&mut HashSet<T0> == &mut HashSet<T1>`
-/// - `&mut HashMap<String, T0> == &mut HashSet<String, T1>`
+/// - `&mut HashMap<String, T0> == &mut HashMap<String, T1>`
 /// - and many more!
 ///
 /// Rather than trying to enumerate (in this crate) all of the possible ways you could write a
