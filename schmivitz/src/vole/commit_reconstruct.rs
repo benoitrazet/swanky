@@ -102,19 +102,19 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l_hat: usize) -> Commit {
             // `convert_to_vole` part, therefore it is more efficient to execute both in
             // threads
             let (com_i, decom_i, seeds) = commit(prg_seed, iv, 8);
-            let u_i_v_i = convert_to_vole(&seeds, iv, l_hat, true);
+            let (u_i, v_i) = convert_to_vole(&seeds, iv, l_hat, true);
 
-            tx.send((com_i, decom_i, u_i_v_i)).unwrap();
+            tx.send((com_i, decom_i, u_i, v_i)).unwrap();
         });
         handles.push(handle);
     }
 
     for i in 0..REPETITION_PARAM {
-        let (com_i, decom_i, (u_i, v_i)) = rxs[i].recv().unwrap();
-        u.push(u_i);
-        v.push(v_i);
+        let (com_i, decom_i, u_i, v_i) = rxs[i].recv().unwrap();
         com.push(com_i);
         decom[i] = decom_i;
+        u.push(u_i);
+        v.push(v_i);
     }
 
     log::info!(
