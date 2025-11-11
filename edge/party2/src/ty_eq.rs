@@ -131,7 +131,7 @@ pub trait EqualityProposition<T0: ?Sized, T1: ?Sized>:
     sealed::Sealed + 'static + Sized + Copy + Eq + Send + Sync + Ord + std::fmt::Debug + std::hash::Hash
 {
     /// The type of a transitive [`EqualityProposition`] that `T0 == T2`, given `T0 == T1` and
-    /// `T1== T2`
+    /// `T1 == T2`
     type AndThen<T2: ?Sized, W: EqualityProposition<T1, T2>>: EqualityProposition<T0, T2>;
     /// The type of an [`EqualityProposition`] that `T1 == T0`
     type Sym: EqualityProposition<T1, T0>;
