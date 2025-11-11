@@ -9,7 +9,9 @@ mod sealed {
     pub trait Sealed {}
 }
 
-/// `Generic` lets you write name a generic type with a placeholder.
+/// `Generic` lets you name a generic type with a placeholder.
+/// This is useful in conjunction with [`Witness`] and
+/// [`EqualityProposition`] to reason about generic types.
 ///
 /// Suppose we know that `T0 == T1`. All of the following should then be true:
 /// - `&T0 == &T1`
