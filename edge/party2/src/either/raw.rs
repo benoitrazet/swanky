@@ -403,12 +403,12 @@ pub trait EitherBound<T0, T1> {
     /// [`RawEither`] is a type-alias for this associated type. (We prefer using the [`RawEither`]
     /// type alias because it's shorter.)
     type RawEither<P: GenericParty>: IsSameType<RawEither<bounds::Any, P, T0, T1>>;
-    /// A `TypeEquality` that shows that `RawEither<Self, Party0, T0, T1> == T0`
+    /// An `EqualityProposition` that shows that `RawEither<Self, Party0, T0, T1> == T0`
     ///
     /// This is used internally in [`is_t0`]
     #[doc(hidden)]
     type Witness0<P: TheParty0>: EqProp<T0, RawEither<Self, P, T0, T1>>;
-    /// A `TypeEquality` that shows that `RawEither<Self, Party1, T0, T1> == T1`
+    /// An `EqualityProposition` that shows that `RawEither<Self, Party1, T0, T1> == T1`
     ///
     /// This is used internally in [`is_t1`]
     #[doc(hidden)]
