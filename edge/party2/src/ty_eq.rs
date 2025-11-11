@@ -45,7 +45,8 @@ mod sealed {
 ///     TypeId::of::<GenericOut<MyHashMapGeneric<String>, i32>>(),
 /// );
 ///
-/// // Now that we have these wrappers, we can use them for type conversions.
+/// // Now that we have these wrappers, we can use them to prove the
+/// // last two type equalities in the list above:
 ///
 /// fn convert_set<T: std::hash::Hash + Eq>(
 ///     ev: Witness<impl EqualityProposition<T, i32>>,
