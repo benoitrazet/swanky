@@ -23,7 +23,9 @@ use tempfile::tempdir;
 
 /// Gates
 ///
-/// This is a super set of what voleith is supporting and copied from diet-mac-and-cheese
+/// This is a super set of what voleith is supporting and copied from diet-mac-and-cheese.
+/// Note that conversation gates and function call gates are excluded from this list to reduce the amount
+/// of data-structure that is not supported in this crate.
 #[derive(Clone, Debug)]
 pub enum GateM {
     /// Write the value to the given `WireId`.
@@ -57,17 +59,11 @@ pub enum GateM {
     /// `WireRange`.
     Witness(TypeId, WireRange),
 
-    /// Convert values in one field to values in another.
-    //Conv(Box<ConvGate>),
-
     /// Allocate a new, uninitialized range of wires.
     New(TypeId, WireId, WireId),
 
     /// Delete/free a range of wires.
     Delete(TypeId, WireId, WireId),
-
-    /// Call a function.
-    //Call(Box<CallGate>),
 
     /// Get a random challenge value, storing the result.
     Challenge(TypeId, WireId),
