@@ -32,6 +32,19 @@ fn pack_f128b(arrs: &[[F8b; REPETITION_PARAM]]) -> Vec<F128b> {
         .unwrap()
 }
 
+fn transpose_u8_matrix<const LIN: usize, const COL: usize>(
+    input: &[[u8; COL]; LIN],
+    output: &mut [[u8; LIN]; COL],
+) {
+    // This double loop is optimal that way to maximize the cache hit for reads.
+    // The writes will be batched on write-back
+    for i in 0..LIN {
+        for k in 0..COL {
+            output[k][i] = input[i][k];
+        }
+    }
+}
+
 /// Take a sequence of [`F128b`] values, interpret every value into its bit decomposition,
 /// that becomes a n*128 boolean matrix where n is the length of the sequence.
 /// Apply `to_field_f128` (which includes padding) to every column in lock step and emit a sequence of
@@ -63,14 +76,8 @@ fn to_field_f128_and_pad_lockstep(x: &[F128b]) -> Vec<[F128b; SECURITY_PARAM]> {
         if bit_num == 7 {
             bit_num = 0; // restart at the beginning of byte
             if byte_num == (128 / 8) - 1 {
-                // This double loop is optimal that way to maximize the cache hit for reads.
-                // The writes will be batched on write-back
-                // NOTE: this loop is the bottle-neck
-                for i in 0..SECURITY_PARAM / 8 {
-                    for k in 0..SECURITY_PARAM {
-                        b_128[k][i] = b_128_alt[i][k];
-                    }
-                }
+                // NOTE: this loop is the bottle-neck in this function
+                transpose_u8_matrix(&b_128_alt, &mut b_128);
 
                 let arr: [F128b; SECURITY_PARAM] =
                     b_128.map(|v| F128b::from_bytes(&v.into()).unwrap());
@@ -92,11 +99,8 @@ fn to_field_f128_and_pad_lockstep(x: &[F128b]) -> Vec<[F128b; SECURITY_PARAM]> {
     // Still have to push a last value if the previous loop terminated before processing `SECURITY_PARAMETER` bits.
     if (bit_num != 0) | (byte_num != 0) {
         // transpose from b_128_alt to b_128
-        for i in 0..SECURITY_PARAM / 8 {
-            for k in 0..SECURITY_PARAM {
-                b_128[k][i] = b_128_alt[i][k];
-            }
-        }
+        transpose_u8_matrix(&b_128_alt, &mut b_128);
+
         let arr: [F128b; SECURITY_PARAM] = b_128.map(|v| F128b::from_bytes(&v.into()).unwrap());
         out.push(arr);
     }
@@ -163,12 +167,8 @@ impl<'a> Iterator for ColumnEnumState<'a> {
                 if byte_num == (128 / 8) - 1 {
                     // This double loop is optimal that way to maximize the cache hit for reads.
                     // The writes will be batched on write-back
-                    // NOTE: this loop is the bottle-neck
-                    for i in 0..SECURITY_PARAM / 8 {
-                        for k in 0..SECURITY_PARAM {
-                            b_128[k][i] = b_128_alt[i][k];
-                        }
-                    }
+                    // NOTE: this loop is the bottle-neck in this function
+                    transpose_u8_matrix(&b_128_alt, &mut b_128);
 
                     let arr: [F128b; SECURITY_PARAM] =
                         b_128.map(|v| F128b::from_bytes(&v.into()).unwrap());
@@ -185,11 +185,7 @@ impl<'a> Iterator for ColumnEnumState<'a> {
                 // Still have to push a last value if the previous loop terminated before processing `SECURITY_PARAMETER` bits.
                 if (bit_num != 0) | (byte_num != 0) {
                     // transpose from b_128_alt to b_128
-                    for i in 0..SECURITY_PARAM / 8 {
-                        for k in 0..SECURITY_PARAM {
-                            b_128[k][i] = b_128_alt[i][k];
-                        }
-                    }
+                    transpose_u8_matrix(&b_128_alt, &mut b_128);
 
                     let arr: [F128b; SECURITY_PARAM] =
                         b_128.map(|v| F128b::from_bytes(&v.into()).unwrap());
