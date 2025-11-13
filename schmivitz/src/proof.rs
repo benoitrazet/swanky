@@ -191,20 +191,20 @@ where {
         // Compute masked witnesses Q' = Q[..l] + d * Delta
         let t = std::time::Instant::now();
         let verifier_key = reconstructed_voles.verifier_key_array();
-        let witness_commitment = &self.witness_commitment;
-        let d_delta = (0..witness_commitment.len())
-            .into_par_iter()
-            .map(|i| {
-                let witness_com = F8b::from(witness_commitment[i]);
+        let d_delta = self
+            .witness_commitment
+            .par_iter()
+            .map(|e| {
+                let witness_com = F8b::from(*e);
                 verifier_key.map(|key| witness_com * key)
             })
             .collect::<Vec<_>>();
 
         let witness_voles = reconstructed_voles.witness_voles();
-        let masked_witnesses: Vec<F128b> = (0..reconstructed_voles.witness_voles().len())
-            .into_par_iter()
-            .map(|i| {
-                let (qs, dds) = (witness_voles[i], d_delta[i]);
+        let masked_witnesses: Vec<F128b> = witness_voles
+            .par_iter()
+            .zip(d_delta.par_iter())
+            .map(|(qs, dds)| {
                 let masked_witness: [F8b; 16] = zip(qs, dds)
                     .map(|(q, dd)| q + dd)
                     .collect::<Vec<_>>()
