@@ -328,7 +328,7 @@ pub fn load_circuit_from_strings_prover(
 #[derive(Debug)]
 pub(crate) struct CircuitMemory<F> {
     /// NOTE: the use of Vec instead of HashMap/BTreeMap brings a >2x performance increase on benchmarked circuits for AES-256 and SHA256.
-    pub(crate) cont: Vec<F>,
+    cont: Vec<F>,
 }
 
 /// This is an arbitrary constant for the size of the vector, enough to support circuits
@@ -344,6 +344,11 @@ impl<F: Default + Clone> Default for CircuitMemory<F> {
 }
 
 impl<F: Default + Clone + Copy> CircuitMemory<F> {
+    // NOTE: This accessor for the internal memory is only used in unit tests.
+    pub(crate) fn get_memory(&self) -> &[F] {
+        &self.cont
+    }
+
     pub(crate) fn new(max_wire_id: WireId) -> Self {
         let size = max_wire_id as usize + 1;
         return CircuitMemory {

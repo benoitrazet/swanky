@@ -296,7 +296,8 @@ mod tests {
         let len = 20;
         let mut traverser = dummy_traverser(len);
         // Assume every gate is non-linear, for fun
-        let non_linear_gates = traverser.wire_values.cont.clone();
+        let non_linear_gates: Vec<F2> =
+            traverser.wire_values.get_memory().iter().copied().collect();
 
         for (id, _) in non_linear_gates.iter().enumerate() {
             let gate = id as u64;
@@ -326,7 +327,7 @@ mod tests {
         let mut traverser = dummy_traverser(len);
 
         // Assume every gate is linear, for fun
-        let linear_gates = traverser.wire_values.cont.clone();
+        let linear_gates: Vec<F2> = traverser.wire_values.get_memory().iter().copied().collect();
         for (id, _) in linear_gates.iter().enumerate() {
             let wid = id as u64;
             // If VOLEs haven't been computed, you can't retrieve them
@@ -350,7 +351,7 @@ mod tests {
         let mut traverser = dummy_traverser(len);
 
         // Assume every gate is linear, for fun
-        let linear_gates = traverser.wire_values.cont.clone();
+        let linear_gates: Vec<F2> = traverser.wire_values.get_memory().iter().copied().collect();
         for id in (0..2).into_iter() {
             let wid = id as u64;
             // If VOLEs haven't been computed/assigned, you can't retrieve them
