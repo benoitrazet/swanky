@@ -94,7 +94,7 @@ fn ingest_private_inputs_from_path(path: &Path) -> eyre::Result<Vec<F2>> {
 pub(crate) struct CircuitIngestor {
     gates: Vec<GateM>,
     priv_inputs: Vec<F2>,
-    private_input_count: usize,
+    private_input_count: u64,
     is_prover: bool,
     max_wire_id: WireId,
 }
@@ -178,12 +178,9 @@ impl FunctionBodyVisitor for CircuitIngestor {
     }
 
     fn private_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()> {
-        // Assumption: There is exactly one type ID for these circuits and it is F2.
-        assert_eq!(ty, 0);
-
         if self.is_prover {
-            let how_many_wires: usize = (dst.end - dst.start + 1).try_into().unwrap();
-            if self.private_input_count + how_many_wires > self.priv_inputs.len() {
+            let how_many_wires = dst.end - dst.start + 1;
+            if self.private_input_count + how_many_wires > (self.priv_inputs.len() as u64) {
                 bail!("Not enough private inputs for this circuit. The circuit requires more than {} private inputs", self.private_input_count + 1);
             }
             self.private_input_count += how_many_wires;
