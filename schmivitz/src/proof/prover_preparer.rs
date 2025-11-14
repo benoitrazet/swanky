@@ -18,7 +18,7 @@ use diet_mac_and_cheese::fields::SieveIrDeserialize;
 /// - there are gates other than `private-input`, `add`, `addc`, or `mul`
 /// - there is more than one type ID used for any gate
 /// - any private input to the circuit is not in $`F2`$
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct ProverPreparer {
     /// Complete map of values on every wire in the circuit.
     wire_values: CircuitMemory<F2>,
@@ -191,7 +191,7 @@ mod tests {
 
         let circuit_loaded = circ.to_circuit();
 
-        let mut counter: ProverPreparer = ProverPreparer::default();
+        let mut counter: ProverPreparer = ProverPreparer::new(circuit_loaded.max_wire_id)?;
         counter.execute(&circuit_loaded)?;
         Ok(counter)
     }

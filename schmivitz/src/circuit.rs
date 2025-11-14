@@ -331,18 +331,6 @@ pub(crate) struct CircuitMemory<F> {
     cont: Vec<F>,
 }
 
-/// This is an arbitrary constant for the size of the vector, enough to support circuits
-/// like AES-256 or SHA-256. This should only be used for creating a default memory.
-const MEMORY_LIMIT: usize = 200_000;
-
-impl<F: Default + Clone> Default for CircuitMemory<F> {
-    fn default() -> Self {
-        CircuitMemory {
-            cont: vec![F::default(); MEMORY_LIMIT],
-        }
-    }
-}
-
 impl<F: Default + Clone + Copy> CircuitMemory<F> {
     // NOTE: This accessor for the internal memory is only used in unit tests.
     pub(crate) fn get_memory(&self) -> &[F] {
