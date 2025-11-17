@@ -2612,6 +2612,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-f-rand"
+version = "0.6.0"
+dependencies = [
+ "blake3",
+ "criterion",
+ "eyre",
+ "proptest",
+ "rand 0.8.5",
+ "swanky-aes-rng",
+ "swanky-channel",
+ "swanky-party",
+ "swanky-serialization",
+ "vectoreyes",
+]
+
+[[package]]
 name = "swanky-field"
 version = "0.6.0"
 dependencies = [

@@ -1,0 +1,30 @@
+[package]
+name = "swanky-f-rand"
+description = "Two-party functionality for generating unbiased random values."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+swanky-aes-rng.workspace = true
+swanky-channel.workspace = true
+swanky-party.workspace = true
+swanky-serialization.workspace = true
+vectoreyes.workspace = true
+
+blake3.workspace = true
+eyre.workspace = true
+rand.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+proptest.workspace = true
+
+[[bench]]
+name = "main"
+harness = false
