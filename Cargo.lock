@@ -2131,6 +2131,7 @@ dependencies = [
  "pretty_env_logger",
  "proptest",
  "rand",
+ "rayon",
  "sha3",
  "swanky-field",
  "swanky-field-binary",

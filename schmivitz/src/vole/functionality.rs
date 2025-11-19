@@ -13,6 +13,7 @@ use crate::vole::crypto_primitives::{h2_chall1, Chall1, Chall3, Com, Seed, H1, H
 use crate::vole::AsSecretBytes;
 use generic_array::typenum::U16;
 use generic_array::GenericArray;
+use rayon::prelude::*;
 use sha3::{digest::Update, Shake128};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F8b, F2};
@@ -151,11 +152,14 @@ pub(crate) fn create_vole_prover<Secret: AsSecretBytes>(
     u_mut.truncate(l + SECURITY_PARAM);
 
     // Line 16 and FAEST.AES.AESProve Line 2.
+    let t = std::time::Instant::now();
+    // NOTE: using `into_par_iter` from rayon here brings a 10x perf improvement on this part.
     let v_lifted = v
-        .into_iter()
+        .into_par_iter()
         .take(l + SECURITY_PARAM)
         .map(|vi| F8b::form_superfield(&vi.into()))
         .collect();
+    log::info!("v_lifted running time: {:?}", t.elapsed());
 
     VoleProver {
         iv,
@@ -172,7 +176,7 @@ pub(crate) fn create_vole_prover<Secret: AsSecretBytes>(
 
 /// Partial decommitment produced by the prover.
 pub struct PartialDecommitment {
-    pdecom: Vec<Pdecom>,
+    pdecom: [Pdecom; REPETITION_PARAM],
     corrections: Corrections,
     iv: IV,
     u_tilda: HashConsistency,
@@ -317,6 +321,7 @@ mod test {
     use crate::vole::crypto_primitives::CHALL2_LENGTH;
     use crate::vole::functionality::compute_chall_3;
     use rand::thread_rng;
+    use rayon::prelude::*;
     use sha3::digest::{ExtendableOutput, Update, XofReader};
     use sha3::Shake128;
     use swanky_field::{FiniteRing, IsSubFieldOf};
@@ -364,9 +369,15 @@ mod test {
             .take(1000)
             .collect::<Vec<F2>>();
 
+        let t_create_vole_prover = std::time::Instant::now();
         let vole_prover = create_vole_prover(&statement_sig, &secret, how_many);
+        log::info!(
+            "1: t_create_vole_prover: {:?}",
+            t_create_vole_prover.elapsed()
+        );
 
         // Let's clone u and v so that we can test the VOLE fundamental equality at the end.
+        let t_copy_challenges = std::time::Instant::now();
         let u = vole_prover.u.clone();
         let v = vole_prover.v.clone();
 
@@ -380,23 +391,33 @@ mod test {
         let dummy_a_tilda = F128b::ZERO;
         let dummy_b_tilda = F128b::ZERO;
         let chall3 = compute_chall_3(&chall2, dummy_a_tilda, dummy_b_tilda);
-        let decommitment_prover = decommit(vole_prover, &chall3);
+        log::info!("2: t_copy_challenges: {:?}", t_copy_challenges.elapsed());
 
+        let t_decommit_prover = std::time::Instant::now();
+        let decommitment_prover = decommit(vole_prover, &chall3);
+        log::info!("3: t_decommit_prover: {:?}", t_decommit_prover.elapsed());
+
+        let t_vole_verifier = std::time::Instant::now();
         let vole_v = create_vole_verifier(&statement_sig, &decommitment_prover, &chall3);
+        log::info!("4: t_vole_verifier: {:?}", t_vole_verifier.elapsed());
 
         assert_eq!(vole_v.q.len(), vole_v.l + SECURITY_PARAM);
 
+        let t_verify = std::time::Instant::now();
         let b = verify(&chall3, chall2, dummy_a_tilda, dummy_b_tilda);
+        log::info!("5: t_verify: {:?}", t_verify.elapsed());
 
+        let t_finalcheck = std::time::Instant::now();
         let delta_lifted: F128b = F8b::form_superfield(&vole_v.delta);
         let q_lifted: Vec<F128b> = vole_v
             .q
-            .iter()
-            .map(|qi| F8b::form_superfield(qi.into()))
+            .into_par_iter()
+            .map(|qi| F8b::form_superfield(&qi.into()))
             .collect();
         for pos in 0..how_many {
             assert_eq!(v[pos] + u[pos] * delta_lifted, q_lifted[pos]);
         }
+        log::info!("6: t_finalcheck: {:?}", t_finalcheck.elapsed());
 
         assert!(b);
     }

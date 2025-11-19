@@ -2,7 +2,7 @@
 Convert vector commitments to VOLEs.
 */
 #![allow(clippy::needless_range_loop)]
-use crate::vole::crypto_primitives::{Seed, IV, PRG};
+use crate::vole::crypto_primitives::{PRG_Stream, Seed, IV};
 use swanky_field_binary::F8b;
 use swanky_field_binary::F2;
 use swanky_serialization::CanonicalSerialize;
@@ -30,47 +30,54 @@ pub(crate) fn convert_to_vole(
     let mut v_res = Vec::with_capacity(l_hat);
 
     // u64 packs 64 bits/booleans.
-    let mut prgs: Vec<Vec<u64>> = vec![];
+    let mut prgss: [PRG_Stream; 256] = core::array::from_fn(|_| PRG_Stream::default());
     for (idx, seed) in seeds.iter().enumerate() {
         if idx == 0 && !is_prover {
-            prgs.push(vec![0u64; (l_hat / 64) + 1]);
+            // NOTE: the verifier is slightly faster here because it calls a dummy PRG.
+            prgss[idx] = PRG_Stream::new_dummy(*seed, iv);
         } else {
-            let prg = PRG::new(*seed, iv);
-            let v = prg.prg_compact(l_hat);
-            prgs.push(v);
+            prgss[idx] = PRG_Stream::new(*seed, iv);
         }
     }
 
     // `r` is only the last 2 layers of the original structure from the spec.
     // Only 2 layers are used using a swap operation in the loop.
     // Again, u64 to do 64 boolean/bit operations at once.
-    let mut r = [[0_u64; 256]; 2];
+    let mut r0 = [0_u64; 256];
+    let mut r1 = [0_u64; 256];
     let mut remaining = l_hat;
-    for pos in 0..(l_hat / 64) + 1 {
+
+    // precompute an array of 2*i indices and another array for 2*i+1
+    let mut i2_arr = [0usize; 128];
+    let mut i2_plus_1_arr = [0usize; 128];
+    for i in 0..i2_arr.len() {
+        i2_arr[i] = i * 2;
+        i2_plus_1_arr[i] = i * 2 + 1;
+    }
+
+    for _ in 0..(l_hat / 64) + 1 {
         // possibly more but does not matter for performance.
 
         let mut v = [0_u64; 8];
         for x in 0..256 {
-            r[0][x] = prgs[x][pos];
+            r0[x] = prgss[x].prg_next();
         }
         let mut i_bound = 128;
+        // the bound for the loop is 8 = log(256)
         for j in 0..8 {
-            // 8 = log(256)
             for i in 0..i_bound {
-                let i2 = 2 * i;
-                let i2_plus_1 = i2 + 1;
-                v[j] ^= r[0][i2_plus_1];
-                r[1][i] = r[0][i2] ^ r[0][i2_plus_1];
+                v[j] ^= r0[i2_plus_1_arr[i]];
+                r1[i] = r0[i2_arr[i]] ^ r0[i2_plus_1_arr[i]];
             }
 
             // swap the top-level to the lower level
             for i in 0..i_bound {
-                r[0][i] = r[1][i];
+                r0[i] = r1[i];
             }
             i_bound /= 2;
         }
 
-        let u = r[0][0];
+        let u = r0[0];
         // if there are more than 64 then we dont have to check how
         // many are remaining for the next 64 steps.
         if remaining >= 64 {
@@ -119,6 +126,7 @@ pub(crate) fn convert_to_vole(
 /// This function is the naive version of [`convert_to_vole`] that does not
 /// operate on packed boolean field values.
 fn convert_to_vole_prover_naive(seeds: &[Seed], iv: IV, l_hat: usize) -> (Vec<F2>, Vec<F8b>) {
+    use crate::vole::crypto_primitives::PRG;
     use swanky_field::FiniteRing;
     assert!(seeds.len() == 256);
     let mut u_res = vec![F2::ZERO; l_hat];
@@ -167,6 +175,7 @@ pub(crate) fn convert_to_vole_verifier(
 // NOTE: the return type is different than ConvertToVOLE in the paper, where is should be a Vec<Vec<F2>>
 #[cfg(test)]
 fn convert_to_vole_verifier_naive(seeds: &[Seed], iv: IV, l_hat: usize, delta: u8) -> Vec<F8b> {
+    use crate::vole::crypto_primitives::PRG;
     use swanky_field::FiniteRing;
     assert_eq!(seeds.len(), 256);
     let mut v_res = vec![F8b::ZERO; l_hat];

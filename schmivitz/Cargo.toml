@@ -36,6 +36,7 @@ sha3.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true
 swanky-serialization.workspace = true
+rayon.workspace = true
 
 [dev-dependencies]
 rand.workspace = true

@@ -8,6 +8,7 @@ use crate::vole::all_but_one_vc::{commit, open, reconstruct, Decom, Pdecom};
 use crate::vole::convert_to_vole::{convert_to_vole, convert_to_vole_verifier};
 use crate::vole::crypto_primitives::{Chall3, Com, H1, H1_LENGTH, IV, PRG};
 use generic_array::{arr, typenum::U16, GenericArray};
+use rayon::iter::*;
 use std::{sync::mpsc::channel, thread};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F8b, F2};
@@ -69,11 +70,11 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l_hat: usize) -> Commit {
     let mut decom: [Decom; REPETITION_PARAM] = Default::default();
     let mut com = Vec::with_capacity(REPETITION_PARAM);
 
-    // Without multithreading
+    // Without multithreading: this is > 5x slower than with multithreading
     /*
     for i in 0..REPETITION_PARAM {
         let (com_i, decom_i, seeds) = commit(prg_seeds[i], iv, 8);
-        let (u_i, v_i) = convert_to_vole(&seeds, iv, l, true);
+        let (u_i, v_i) = convert_to_vole(&seeds, iv, l_hat, true);
         com.push(com_i);
         decom[i] = decom_i;
         u.push(u_i);
@@ -94,9 +95,13 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l_hat: usize) -> Commit {
 
     for i in 0..REPETITION_PARAM {
         let tx = txs[i].clone();
-        let prg_seeds_i = prg_seeds[i];
+
+        let prg_seed = prg_seeds[i];
         let handle = thread::spawn(move || {
-            let (com_i, decom_i, seeds) = commit(prg_seeds_i, iv, 8);
+            // for smaller circuits the `commit/reconstruct` part is not negligeable compared to the
+            // `convert_to_vole` part, therefore it is more efficient to execute both in
+            // threads
+            let (com_i, decom_i, seeds) = commit(prg_seed, iv, 8);
             let (u_i, v_i) = convert_to_vole(&seeds, iv, l_hat, true);
 
             tx.send((com_i, decom_i, u_i, v_i)).unwrap();
@@ -111,8 +116,9 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l_hat: usize) -> Commit {
         u.push(u_i);
         v.push(v_i);
     }
+
     log::info!(
-        "multithreaded convert_to_vole running time: {:?}",
+        "multithreaded convert_to_vole prover running time: {:?}",
         t.elapsed()
     );
     // End multithreading
@@ -122,13 +128,12 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l_hat: usize) -> Commit {
     let u_0 = u[0].clone(); // TODO: opt transmute here
     let mut corr: [Vec<F2>; REPETITION_PARAM - 1] = Default::default();
     for i in 1..REPETITION_PARAM {
-        let mut ci = Vec::with_capacity(l_hat);
         debug_assert_eq!(l_hat, u_0.len());
         let u_i = &u[i];
-        for j in 0..l_hat {
-            let c = u_0[j] + u_i[j];
-            ci.push(c);
-        }
+        let ci: Vec<F2> = (0..l_hat)
+            .into_par_iter()
+            .map(|j| u_0[j] + u_i[j])
+            .collect();
         corr[i - 1] = ci;
     }
     log::info!("corrections running time: {:?}", t.elapsed());
@@ -136,10 +141,10 @@ pub(crate) fn vole_commit(r: IV, iv: IV, l_hat: usize) -> Commit {
 
     // Convert to a row-wise, fixed-size representation.
     let t = std::time::Instant::now();
-    let mut v_out = Vec::with_capacity(l_hat);
-    for i in 0..l_hat {
-        v_out.push(core::array::from_fn(|tau| v[tau][i]));
-    }
+    let v_out: Vec<[F8b; REPETITION_PARAM]> = (0..l_hat)
+        .into_par_iter()
+        .map(|i| core::array::from_fn(|tau| v[tau][i]))
+        .collect();
     log::info!("pack to F8b running time: {:?}", t.elapsed());
 
     // hash the commitments
@@ -173,12 +178,12 @@ pub(crate) fn chal_dec(chal: &[u8], i: usize) -> Vec<bool> {
 /// Function to open voles and return the associated partial decommitment.
 ///
 /// This function implements steps 20-22 of Fig 8.2
-pub(crate) fn vole_open(chal: &[u8], decom: &[Decom]) -> Vec<Pdecom> {
-    let mut pdecom = Vec::with_capacity(REPETITION_PARAM);
+pub(crate) fn vole_open(chal: &[u8], decom: &[Decom]) -> [Pdecom; REPETITION_PARAM] {
+    let mut pdecom: [Pdecom; REPETITION_PARAM] = Default::default();
     for i in 0..REPETITION_PARAM {
         let delta_i = chal_dec(chal, i);
         let pdecom_i = open(&decom[i], delta_i);
-        pdecom.push(pdecom_i);
+        pdecom[i] = pdecom_i;
     }
     pdecom
 }
@@ -205,12 +210,13 @@ pub(crate) fn vole_reconstruct(
         let delta = chal_dec(chal, i);
         let (com_i, seeds) = reconstruct(pdecom[i].clone(), delta.clone(), iv);
         com.push(com_i);
-        let q_i = convert_to_vole_verifier(&seeds, iv, l, bools_to_u8(&delta));
+        let q_i = convert_to_vole_verifier(&seeds, iv, l_hat, bools_to_u8(&delta));
         qs.push(q_i);
     }
     */
 
     // With multithreading:
+    let t = std::time::Instant::now();
     let mut txs = Vec::with_capacity(REPETITION_PARAM);
     let mut rxs = Vec::with_capacity(REPETITION_PARAM);
     for _ in 0..REPETITION_PARAM {
@@ -222,22 +228,29 @@ pub(crate) fn vole_reconstruct(
 
     for i in 0..REPETITION_PARAM {
         let delta = chal_dec(chal, i);
-        let (com_i, seeds) = reconstruct(pdecom[i].clone(), delta.clone(), iv);
-        com.push(com_i);
-        assert_eq!(seeds.len(), 256);
+        let pdecom = pdecom[i].clone();
 
         let tx = txs[i].clone();
         let handle = thread::spawn(move || {
+            // for smaller circuits the `commit/reconstruct` part is not negligeable compared to the
+            // `convert_to_vole` part, therefore it is more efficient to execute both in
+            // threads
+            let (com_i, seeds) = reconstruct(pdecom, delta.clone(), iv);
             let q_i = convert_to_vole_verifier(&seeds, iv, l_hat, bools_to_u8(&delta));
-            tx.send(q_i).unwrap();
+            tx.send((com_i, q_i)).unwrap();
         });
         handles.push(handle);
     }
 
     for i in 0..REPETITION_PARAM {
-        let q_i = rxs[i].recv().unwrap();
+        let (com_i, q_i) = rxs[i].recv().unwrap();
         qs.push(q_i);
+        com.push(com_i);
     }
+    log::info!(
+        "multithreaded convert_to_vole verifier running time: {:?}",
+        t.elapsed()
+    );
     // End multithreading
 
     // hash the commitments
