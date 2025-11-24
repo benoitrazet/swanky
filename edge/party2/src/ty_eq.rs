@@ -1,5 +1,139 @@
 #![deny(unsafe_code)]
 //! Utilities for describing equalities between types.
+//!
+//! An important requirement of the `party2` core API is _low-cost
+//! abstraction_; that is, making your code generic over a
+//! [`crate::PartySystem`] should not incur any surprise memory or
+//! runtime costs.
+//!
+//! The realities of making this happen are, given certain
+//! 'limitations' of the Rust type system, somewhat complicated in
+//! general -- ideally, we need to convince the type system that
+//! the compiler-generated concretions of party-generic code have
+//! types that are _actually equal_ to the 'thing' on the inside for
+//! the given party.
+//! This 'convincing' cannot be completely hidden; we need to, in
+//! part, reflect type-level facts at the value level such that Rust
+//! _can_ infer what we want and generate the most efficient code
+//! possible.
+//!
+//! This module defines this reflection, ultimately providing a
+//! library capable of reasoning about equalities between complex
+//! generic types (with a respectable starting point of commonly-used
+//! standard library data structures like `Option` and `HashMap`).
+//!
+//! ## Type equality propositions
+//!
+//! As alluded to above, we occasionally need to reason about type
+//! equality at the value level and type level simultaneously so that
+//! our abstractions incur no unnecessary runtime or memory costs.
+//!
+//! To accomplish this in Rust, we use a trait, as this allows us to
+//! simultaneously express type-level constraints _and_ provide
+//! value-level manipulation via methods and associated items.
+//! We restrict any misuse of the trait in downstream code (i.e.
+//! implementing it in ways that are unsound with respect to Rust's
+//! type system) by 'sealing' the trait.
+//!
+//! The trait `EqualityProposition<T0, T1>` represents the logical
+//! statement `T0 == T1`, which may be true or false.
+//!
+//! More complex equality propositions can be derived from this basic
+//! starting point:
+//!
+//! - `T1 == T0` (equality is symmetric)
+//! - If (in addition to `T0 == T1`) `T1 == T2`, then `T0 == T2`
+//!   (equality is transitive)
+//! - `G<T0> == G<T1>` (type constructors are well-defined)
+//! - Disjunctions with other `EqualityProposition`s of the same type
+//!
+//! These implied propositions are provided as associated types of the
+//! `EqualityProposition` trait, as they are all themselves
+//! `EqualityProposition`s (or "type-level functions" that return
+//! `EqualityProposition`s).
+//!
+//! Generics and disjunctions are somewhat more involved due to
+//! limitations of the type system, so their introduction is left to
+//! the documentation of those respective types (see [`Generic`] and
+//! [`JoinedTypeEqualityWitness`]).
+//!
+//! But how do we know if an `EqualityProposition` is true or not?
+//! And, knowing this, what can we _do_ with an `EqualityProposition`
+//! that is useful?
+//!
+//! For the first question, `EqualityProposition` provides an
+//! associated `const SUMMON: Option<Witness<Self>>` that is `Some(w)`
+//! if and only if the `EqualityProposition` is actually true.
+//! We will say more about `Witness<P>` shortly; for now, it suffices
+//! to say that having a value of this type is how we _know_ that `P`
+//! is a true equality proposition.
+//!
+//! For the second, the answer is simple: Casting!
+//! A true type equality means that the types are truly and safely
+//! interchangeable -- and, importantly, have the same representation
+//! in memory.
+//!
+//! ## The concrete `EqualityProposition`s
+//!
+//! Before introducing `Witness`, recall that `EqualityProposition` is
+//! a _sealed_ trait, meaning we provide the only types implementing
+//! it.
+//! There are, in fact, only two such types:
+//!
+//! - `TrueEqualityProposition`: Exactly what it says; this explicitly
+//!   implements `EqualityProposition<T, T>`, which is the simplest
+//!   type equality imaginable (at is known true by the reflexive
+//!   property, and -- arguably more importantly -- the Rust compiler
+//!   itself).
+//! - `NotNecessarilyTrueEqualityProposition`: This is **in practice**
+//!   always a _false_ equality proposition; it is given an obnoxious
+//!   name because _we can't stop you from using this where the
+//!   expected `EqualityProposition` is in fact true_.
+//!   As everything defined here doesn't depend on having a concrete
+//!   notion of a known-false equality proposition, this doesn't
+//!   affect anything.
+//!
+//! A `TrueEqualityProposition`, as expected, is _always_ able to
+//! `SUMMON` a witness; under the hood, it's just a unit-like
+//! structure type.
+//!
+//! On the other hand, `NotNecessarilyTrueEqualityProposition` can
+//! _never_ produce a witness, as it is an enumeration type with no
+//! constructors.
+//!
+//! Each of these types implements `EqualityProposition`, but
+//! naturally only `TrueEqualityProposition` can be `Witness`ed.
+//!
+//! ## `Witness`ing truth / not-necessarily-truth of `EqualityProposition`s
+//!
+//! So, finally, what is a `Witness<P>`?
+//!
+//! Simply put, for a generic `P: EqualityProposition<T0, T1>`, it is
+//! a value-level 'lowering' of the `EqualityProposition` itself,
+//! whose existence implies that the proposition holds.
+//! This implication holds under the Curry-Howard isomorphism: Types
+//! are propositions, and values of types are witnesses to those
+//! corresponding propositions' truth.
+//!
+//! Where `EqualityProposition` provided associated types (that acted
+//! essentially as type-level functions to transform the proposition),
+//! `Witness` provides a set of _methods_ acting on the corresponding
+//! witness to a proposition, allowing it to be turned into a witness
+//! for the symmetric equality proposition, a witness to a transitive
+//! equality (given a witness to the intermediate equality), and so
+//! on.
+//!
+//! Everything is tied together through the key property of
+//! `EqualityProposition`: That `SUMMON` is `Some(w)` (where `w:
+//! Witness<Self>`) if and only if the `EqualityProposition` is true.
+//!
+//! See the documentation of the types mentioned here for additional
+//! detail regarding the practical use of these concepts; of
+//! particular importance is [`Generic`], which is what us allows to
+//! take our basic reasoning (which applies perfectly well to
+//! primitive types out of the box) and allow its use over generic
+//! types, exploiting the fact that type constructors are implicitly
+//! well-defined.
 use std::marker::PhantomData;
 
 mod sealed {
