@@ -2510,6 +2510,7 @@ version = "0.6.0"
 dependencies = [
  "blake3",
  "bytemuck",
+ "criterion",
  "eyre",
  "itertools 0.14.0",
  "proptest",
