@@ -38,6 +38,7 @@ have a lesser stability guarantee.
 - **`swanky-aes-hash`**: Correlation-robust hashing based on fixed-key AES.
 - **`swanky-aes-rng`**: A random number generator based on AES-CTR.
 - **`swanky-authenticated-bits`**: Authenticated bits, shares, and AND triples
+- **`swanky-authenticated-garbling`**: Authenticated malicious garbling in the presence of a malicious garbler and evaluator
 - **`swanky-bit-matrix-transpose`**: Transpose a bit matrix
 - **`swanky-block`**: 128-, 256-, and  512-bit data blocks.
 - **`swanky-bytearray-utils`**: Functions for working with bits and bytearrays.

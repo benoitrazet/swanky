@@ -2529,6 +2529,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-authenticated-garbling"
+version = "0.6.0"
+
+[[package]]
 name = "swanky-bit-matrix-transpose"
 version = "0.6.0"
 dependencies = [
