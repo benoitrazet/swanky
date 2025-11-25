@@ -144,11 +144,7 @@ impl<P: Party> AndTripleGenerator<P> {
             .generate(nleaky, &mut leaky_ands, channel, rng)?;
         // Run a coin-tossing protocol to determine a seed for permuting the
         // generated leaky AND triples.
-        let seed = rng.r#gen::<U8x16>();
-        let random = match P::WHICH {
-            swanky_party::WhichParty::Prover(_) => swanky_cointoss::send(channel, &[seed])?[0],
-            swanky_party::WhichParty::Verifier(_) => swanky_cointoss::receive(channel, &[seed])?[0],
-        };
+        let random = swanky_f_rand::random_seed::<P, _>(channel, rng)?;
         // Do the permutation.
         let mut shuffle_rng = AesRng::from_seed(random);
         leaky_ands.shuffle(&mut shuffle_rng);

@@ -2519,6 +2519,7 @@ dependencies = [
  "swanky-channel",
  "swanky-cointoss",
  "swanky-f-eq",
+ "swanky-f-rand",
  "swanky-field",
  "swanky-field-binary",
  "swanky-ot-alsz-kos",
