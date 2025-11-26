@@ -34,9 +34,11 @@
 //! To accomplish this in Rust, we use a trait, as this allows us to
 //! simultaneously express type-level constraints _and_ provide
 //! value-level manipulation via methods and associated items.
-//! We restrict any misuse of the trait in downstream code (i.e.
-//! implementing it in ways that are unsound with respect to Rust's
-//! type system) by 'sealing' the trait.
+//! We 'seal' the trait [according to the Rust internal API
+//! guidelines](https://rust-lang.github.io/api-guidelines/future-proofing.html#sealed-traits-protect-against-downstream-implementations-c-sealed),
+//! so that code using this module cannot introduce unsoundness or
+//! inconsistency to the logic of type equalities the trait
+//! encapsulates.
 //!
 //! The trait `EqualityProposition<T0, T1>` represents the logical
 //! statement `T0 == T1`, which may be true or false.
