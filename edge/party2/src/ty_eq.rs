@@ -126,24 +126,29 @@
 //! Each of these types implements `EqualityProposition`, but
 //! naturally only `TrueEqualityProposition` can be `Witness`ed.
 //!
-//! ## `Witness`ing truth / not-necessarily-truth of `EqualityProposition`s
+//! ## `Witness`es
 //!
 //! So, finally, what is a `Witness<P>`?
 //!
-//! Simply put, for a generic `P: EqualityProposition<T0, T1>`, it is
-//! a value-level 'lowering' of the `EqualityProposition` itself,
-//! whose existence implies that the proposition holds.
-//! This implication holds under the Curry-Howard isomorphism: Types
-//! are propositions, and values of types are witnesses to those
-//! corresponding propositions' truth.
+//! Summarizing what we have so far: If `P: EqualityProposition<T0,
+//! T1>`, then `P` is a type-level encoding of the logical statement
+//! `T0 == T1`.
+//! Then, by the Curry-Howard isomorphism, values of type `P` are
+//! _proof_ of the `EqualityProposition` described by `P`.
 //!
-//! Where `EqualityProposition` provided associated types (that acted
-//! essentially as type-level functions to transform the proposition),
-//! `Witness` provides a set of _methods_ acting on the corresponding
-//! witness to a proposition, allowing it to be turned into a witness
-//! for the symmetric equality proposition, a witness to a transitive
-//! equality (given a witness to the intermediate equality), and so
-//! on.
+//! Rust does not currently allow us to specify that trait methods are
+//! `const`, and computations with the proofs of equality propositions
+//! ought to be able to be simplified / computed with at compile-time.
+//! For this reason, the wrapper type `Witness<P>` is introduced to
+//! provide conveniences and the value-level equivalent of the
+//! type-level interface defined by `EqualityProposition`, rather than
+//! defining these methods on the `EqualityProposition` trait itself.
+//!
+//! For every associated type / "type-level function" in
+//! `EqualityProposition`, there is a method (or methods)
+//! corresponding to it defined for `Witness`.
+//! (Disjunctions require _two_ methods: One to become the left
+//! disjunct, and one to become the right.)
 //!
 //! Everything is tied together through the key property of
 //! `EqualityProposition`: That `SUMMON` is `Some(w)` (where `w:
