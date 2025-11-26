@@ -43,7 +43,7 @@
 //! The trait `EqualityProposition<T0, T1>` represents the logical
 //! statement `T0 == T1`, which may be true or false.
 //!
-//! More complex equality propositions can be derived from this basic
+//! Other equality propositions can be derived from this basic
 //! starting point:
 //!
 //! - `T1 == T0` (equality is symmetric)
