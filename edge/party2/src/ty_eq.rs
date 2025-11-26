@@ -13,38 +13,45 @@
 //! types that are _actually equal_ to the 'thing' on the inside for
 //! the given party.
 //! This 'convincing' cannot be completely hidden; we need to, in
-//! part, reflect type-level facts at the value level such that Rust
-//! _can_ infer what we want and generate the most efficient code
-//! possible.
-//! The particular facts that must be reflected in this way to
-//! accomplish the stated performance goals within Rust's limitations
-//! are _type equalities_.
+//! some cases, use an explicit encoding of the logic of type equality
+//! (that is sound, consistent, and built on type equalities that Rust
+//! can typically understand automatically).
 //!
-//! This module defines this reflection, ultimately providing a
-//! library capable of reasoning about equalities between complex
-//! generic types (with a respectable starting point of commonly-used
-//! standard library data structures like `Option` and `HashMap`).
+//! This module defines this logic, ultimately providing a library
+//! capable of reasoning about equalities between complex generic
+//! types (with a respectable starting point of commonly-used standard
+//! library data structures like `Option` and `HashMap`) and defining
+//! APIs with complex type equality type bounds.
 //!
 //! ## Type equality propositions
 //!
 //! As alluded to above, we occasionally need to reason about type
-//! equality at the value level and type level simultaneously so that
-//! our abstractions incur no unnecessary runtime or memory costs.
+//! equalities explicitly so that our abstractions incur no
+//! unnecessary runtime or memory costs (when Rust is unable to figure
+//! out that equal types are equal without some help).
 //!
-//! To accomplish this in Rust, we use a trait, as this allows us to
-//! simultaneously express type-level constraints _and_ provide
-//! value-level manipulation via methods and associated items.
+//! To accomplish this, we use a trait, as this allows us to encode
+//! the logic of type equality such that a type implementing the trait
+//! encodes a concrete type equality proposition (that is either true
+//! or false), _and_ we can safely `SUMMON` the evidence that a true
+//! type equality is true for safe value-level manipulation of
+//! propositions.
 //! We 'seal' the trait [according to the Rust internal API
 //! guidelines](https://rust-lang.github.io/api-guidelines/future-proofing.html#sealed-traits-protect-against-downstream-implementations-c-sealed),
 //! so that code using this module cannot introduce unsoundness or
-//! inconsistency to the logic of type equalities the trait
+//! inconsistency to the logic of type equalities that the trait
 //! encapsulates.
 //!
-//! The trait `EqualityProposition<T0, T1>` represents the logical
-//! statement `T0 == T1`, which may be true or false.
+//! The trait `EqualityProposition<T0, T1>` encodes the logic of
+//! statements of the form `T0 == T1`, which may be true or false.
+//! A type `P: EqualityProposition<T0, T1>` is therefore a type-level
+//! encoding of a _particular_ such statement -- furthermore, a
+//! concrete value of such a type `P` is then _proof_ of the statement
+//! encoded by `P`, by the Curry-Howard isomorphism.
 //!
-//! Other equality propositions can be derived from this basic
-//! starting point:
+//! The logic of type equality is captured (and augmented with some
+//! useful-for-our-purposes reasoning capabilities) by the
+//! following statements:
 //!
 //! - `T1 == T0` (equality is symmetric)
 //! - If (in addition to `T0 == T1`) `T1 == T2`, then `T0 == T2`
@@ -52,15 +59,21 @@
 //! - `G<T0> == G<T1>` (type constructors are well-defined)
 //! - Disjunctions with other `EqualityProposition`s of the same type
 //!
-//! These implied propositions are provided as associated types of the
-//! `EqualityProposition` trait, as they are all themselves
-//! `EqualityProposition`s (or "type-level functions" that return
-//! `EqualityProposition`s).
+//! The first two are required for type equality to be an equivalence
+//! relation; reflexivity doesn't need to be explicitly encoded, as it
+//! is indeed the case Rust can automatically handle in all cases (and
+//! that we simply want to inherit from the type system to have its
+//! soundness/consistency properties).
+//! The latter two enhance the potential reasoning capability,
+//! allowing for equality to be properly handled for any [`Generic`]
+//! type (at least, any type implementing `Generic`; see [`generics`]
+//! for a starting point for many common cases), and disjunctions
+//! (which is particularly useful when using `EqualityProposition`s
+//! and `Witness`es in enumerated types.
 //!
-//! Generics and disjunctions are somewhat more involved due to
-//! limitations of the type system, so their introduction is left to
-//! the documentation of those respective types (see [`Generic`] and
-//! [`JoinedTypeEqualityWitness`]).
+//! Generics and disjunctions are somewhat more involved, so their
+//! introduction is left to the documentation of those respective
+//! types (see [`Generic`] and [`JoinedTypeEqualityWitness`]).
 //!
 //! But how do we know if an `EqualityProposition` is true or not?
 //! And, knowing this, what can we _do_ with an `EqualityProposition`
@@ -70,8 +83,8 @@
 //! associated `const SUMMON: Option<Witness<Self>>` that is `Some(w)`
 //! if and only if the `EqualityProposition` is actually true.
 //! We will say more about `Witness<P>` shortly; for now, it suffices
-//! to say that having a value of this type is how we _know_ that `P`
-//! is a true equality proposition.
+//! to say that having a value of this type is how we _know_ that `P:
+//! EqualityProposition` is true.
 //!
 //! For the second, the answer is simple: Casting!
 //! A true type equality means that the types are truly and safely
