@@ -16,6 +16,9 @@
 //! part, reflect type-level facts at the value level such that Rust
 //! _can_ infer what we want and generate the most efficient code
 //! possible.
+//! The particular facts that must be reflected in this way to
+//! accomplish the stated performance goals within Rust's limitations
+//! are _type equalities_.
 //!
 //! This module defines this reflection, ultimately providing a
 //! library capable of reasoning about equalities between complex
