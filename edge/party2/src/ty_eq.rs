@@ -99,8 +99,12 @@
 //!   affect anything.
 //!
 //! A `TrueEqualityProposition`, as expected, is _always_ able to
-//! `SUMMON` a witness; under the hood, it's just a unit-like
-//! structure type.
+//! `SUMMON` a witness; namely, the single value of type
+//! `TrueEqualityProposition` (a `()`-like structure type).
+//! (Note that we _actually_ summon a
+//! `Witness<TrueEqualityProposition>` value, allowing for convenient
+//! composition / reasoning with other `Witness`es at the value-level.
+//! See below for more on `Witness`.)
 //!
 //! On the other hand, `NotNecessarilyTrueEqualityProposition` can
 //! _never_ produce a witness, as it is an enumeration type with no
