@@ -1,4 +1,89 @@
 //! Support for types indexed by a _party_.
+//!
+//! This crate enables code de-duplication in the context of
+//! multi-party protocols.
+//!
+//! Using the [`party_system`] macro, a [`PartySystem`] can be defined
+//! that uses names appropriate to the protocol context.
+//! A `PartySystem` is a set of two participants in a multi-party
+//! protocol operating opposite one another, such as `Alice` and `Bob`
+//! as defined below:
+//!
+//! ```
+//! use swanky_party2::{party_system};
+//! party_system! {
+//!     mod ps {
+//!         Alice,
+//!         Bob,
+//!     }
+//! }
+//! ```
+//!
+//! With this short invocation, a significant amount of expressive
+//! power is achieved:
+//!
+//! - `ps::Party` can be used to implement functions and types that
+//!   are generic over the system's participants.
+//! - [`either`] defines `PartyEither` and `PartyEitherCopy`.
+//!   In short, these types are `repr(transparent)` to one type or
+//!   another, dependent on context (i.e. which participant is running
+//!   protocol code), meaning they cost nothing after specialization.
+//!   For complex cases, [`either::raw`] (the backing of
+//!   `PartyEither`) is available for use.
+//! - [`party_map`] allows party systems to be 'mapped' to one
+//!   another; this is useful when implementing sub-protocols, where
+//!   participants in the super-protocol must be correctly
+//!   associated with participants in the sub-protocol.
+//! - [`private`] exposes types that provide zero-cost representations
+//!   of data that is private to a protocol participant.
+//! - [`ty_eq`] implements reasoning over type equality, value-level
+//!   evidence of which is used to write code that (for instance) can
+//!   only be run by a specific participant in a `PartySystem`.
+//!   Most importantly, it provides the [`Witness`] type, which is a
+//!   value-level piece of evidence that some [`EqualityProposition`]
+//!   is true.
+//!   This is used to safely invoke functions that are
+//!   participant-specific, for instance.
+//!
+//! Here is a very contrived example using most of these ideas and
+//! building on the code above:
+//!
+//! ```
+//! # use swanky_party2::{party_system, either::*, ty_eq::*};
+//! # party_system! {
+//! #     mod ps {
+//! #         Alice,
+//! #         Bob,
+//! #     }
+//! # }
+//! # use ps::*;
+//! struct AliceOnlyData;
+//! struct BobOnlyData;
+//!
+//! struct Info<P: Party> {
+//!     // ... other fields common to both parties ...
+//!
+//!     // A field that is `AliceOnlyData` when `P == Alice` and
+//!     // `BobOnlyData` when `P == Bob`
+//!     participant_specific_data: PartyEither<P, AliceOnlyData, BobOnlyData>,
+//! }
+//!
+//! fn do_something<P: Party>(info: Info<P>) {
+//!     /* ... Operations common to both participants ... */
+//!     match P::WHICH {
+//!         // e is a `Witness` to the fact that `P` is the
+//!         // participant in question; participant-specific
+//!         // operations can use this evidence to guarantee the right
+//!         // participant is working
+//!         WhichParty::Alice(e) => { /* ... Alice-specific operations ... */ }
+//!         WhichParty::Bob(e) => { /* ... Bob-specific operations ...  */ }
+//!     }
+//! }
+//!
+//! fn do_something_alice<P: Party>(info: Info<P>, ev: Witness<impl EqualityProposition<P, Alice>>) {
+//!     /* ... Things only Alice can do ... */
+//! }
+//! ```
 #![warn(missing_docs)]
 
 #[macro_use]
