@@ -14,6 +14,5 @@ workspace = true
 fancy-garbling.workspace = true
 swanky-authenticated-bits.workspace = true
 swanky-f-rand.workspace = true
-rand.workspace = true
-itertools.workspace = true
-swanky-aes-rng.workspace = true
+
+eyre.workspace = true

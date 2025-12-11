@@ -2531,6 +2531,12 @@ dependencies = [
 [[package]]
 name = "swanky-authenticated-garbling"
 version = "0.6.0"
+dependencies = [
+ "eyre",
+ "fancy-garbling",
+ "swanky-authenticated-bits",
+ "swanky-f-rand",
+]
 
 [[package]]
 name = "swanky-bit-matrix-transpose"
