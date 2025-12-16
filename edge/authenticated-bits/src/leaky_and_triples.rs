@@ -138,8 +138,8 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
         // The protocol works as follows.
         //
         // The parties begin by generating random shares, and viewing them as an
-        // "invalid" triple `(⟨x₁|x₂⟩, ⟨y₁|y₂⟩, ⟨z₁|r⟩)`. The goal then is to
-        // turn the share `⟨r⟩` into a "valid" share `⟨z₂⟩`.
+        // "uncorrelated" AND triple `(⟨x₁|x₂⟩, ⟨y₁|y₂⟩, ⟨z₁|r⟩)`. The goal then
+        // is to turn the share `⟨r⟩` into a "correlated" share `⟨z₂⟩`.
         //
         // To do this, we want to find the (public) `d` such that
         // ```
@@ -337,6 +337,8 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
         triples: &[LeakyAndTriple<P>],
         channel: &mut Channel,
     ) -> eyre::Result<()> {
+        // Flatten triples into a vector of shares so we can call
+        // `AuthShareGenerator::open` on the shares.
         let shares: Vec<AuthShare<_>> = triples
             .iter()
             .flat_map(|triple| vec![triple.x, triple.y, triple.z])
@@ -353,14 +355,16 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
         Ok(())
     }
 
-    /// Combines a vector of [`LeakyAndTriple`]s into [`AndTriple`]s.
+    /// Combines a vector of $`B \cdot N`$ randomly permuted [`LeakyAndTriple`]s
+    /// into $`N`$ [`AndTriple`]s, where $`B`$ denotes the bucket size and $`N`$
+    /// denotes the number of AND triples produced.
     ///
     /// This implements the $`\Pi_{\mathsf{aAND}}`$ protocol (Figure 9) from
     /// Wang et al. [^1].
     ///
     /// # Security
-    /// This assumes that the bucket is of the correct size. The bucket size
-    /// depends on the number of (non-leaky) AND triples to be created:
+    /// This assumes that the bucket size $`B`$ is correct for the given number
+    /// $`N`$ of (non-leaky) AND triples produced:
     ///
     /// | ≥ # Triples | Bucket Size |
     /// | :---------: | :---------: |
@@ -368,11 +372,11 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
     /// |       3,100 |           4 |
     /// |     280,000 |           3 |
     ///
-    /// That is, if you want to create `N` triples, you need to generate `B · N`
-    /// leaky-AND triples---where `B` is the bucket size---randomly permute the
-    /// triples, and then call `combine` with bucket size `B`. See Table 4 from
-    /// Wang et al. [^1] (the number of triples above is for a statistical
-    /// security parameter of 40 bits).
+    /// That is, if you want to create $`N`$ triples, you need to generate $`B
+    /// \cdot N`$ leaky-AND triples, randomly permute the triples, and then call
+    /// `combine` with bucket size $`B`$. See Table 4 from Wang et al. [^1] (the
+    /// number of triples above is for a statistical security parameter of 40
+    /// bits).
     ///
     /// This implies that _there is no security guarantee_ when generating fewer
     /// than 320 triples!
@@ -391,6 +395,26 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
         bucket_size: usize,
         channel: &mut Channel,
     ) -> eyre::Result<()> {
+        // This protocol works by combining `B` leaky AND triples into one
+        // non-leaky AND triple in an iterative way. Two leaky AND triples
+        // `(⟨x₁|x₂⟩, ⟨y₁|y₂⟩, ⟨z₁|z₂⟩)` and `(⟨x'₁|x'₂⟩, ⟨y'₁|y'₂⟩, ⟨z'₁|z'₂⟩)`
+        // are combined as follows:
+        //
+        // 1. Each party computes `dᵢ = yᵢ ⊕ y'ᵢ` and reveals `dᵢ` to the other
+        //    party, who checks its validity.
+        // 2. Each party computes `d = d₁ ⊕ d₂`.
+        // 3. The parties output a new AND triple as:
+        //    `(⟨x₁ ⊕ x'₁         |         x₂ ⊕ x'₂⟩,
+        //      ⟨y₁               |               y₂⟩,
+        //      ⟨z₁ ⊕ z'₁ ⊕ d x'₁ | z₂ ⊕ z'₂ ⊕ d x'₂⟩)`
+        //
+        // The protocol then proceeds to combine the newly produced AND triple
+        // with the next one in the bucket, resulting in one final (non-leaky)
+        // AND triple that combines all `B` leaky AND triples.
+        //
+        // The implementation below optimizes the above protocol as follows.
+        // Instead of revealing the `d`s one at a time, it instead computes all
+        // the `d`s up front and opens them all in one fell swoop.
         assert!(bucket_size == 3 || bucket_size == 4 || bucket_size == 5);
         assert_eq!(leaky_ands.len() % bucket_size, 0);
         assert!(!leaky_ands.is_empty());
@@ -400,11 +424,16 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
         let mut ds_opened = Vec::with_capacity((bucket_size - 1) * nbuckets);
 
         for bucket in leaky_ands.chunks_exact(bucket_size) {
-            // Compute `⟨d⟩ := ⟨y⟩ ⊕ ⟨y'⟩`.
             bucket.iter().skip(1).map(|triple| triple.y()).fold(
                 bucket.first().unwrap().y(),
                 |y, y_| {
+                    // Compute `⟨d⟩ := ⟨y⟩ ⊕ ⟨y'⟩` and save it for opening later.
                     ds.push(y ^ y_);
+                    // The combined AND triple uses only `⟨y⟩` and not ⟨y'⟩, so
+                    // return it as part of our fold. This means that the `i`th
+                    // `⟨d⟩` value is an XOR of the `⟨y⟩` value from the first
+                    // bucket entry with the `⟨y⟩` value from the `i+1`th bucket
+                    // entry.
                     y
                 },
             );

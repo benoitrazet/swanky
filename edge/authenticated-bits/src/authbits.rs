@@ -194,6 +194,13 @@ impl<P: Party> core::ops::BitXorAssign for AuthBit<P> {
 /// verification will fail (with overwhelming probability), but when verifying
 /// zero bits, verification will not (because the $`\Delta`$ value is never used
 /// in the verification of a zero bit)!
+///
+/// # Implementation Note
+/// Internally, [`AuthBitGenerator`] uses oblivious transfer (OT). In this
+/// implementation, the KOS OT protocol is currently hardcoded. There may come a
+/// point in the future where we'll want to make the OT protocol adjustable, in
+/// which case the the type definition may have to change (in order to include
+/// any necessarily OT trait).
 pub struct AuthBitGenerator<P: Party> {
     /// The verifier's global $`\Delta`$.
     delta: VerifierPrivateCopy<P, U8x16>,
