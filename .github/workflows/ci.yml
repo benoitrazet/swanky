@@ -27,6 +27,9 @@ jobs:
   deploy-docs:
     name: "Deploy Swanky documentation"
     needs: [build-docs]
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
