@@ -341,7 +341,7 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
         // `AuthShareGenerator::open` on the shares.
         let shares: Vec<AuthShare<_>> = triples
             .iter()
-            .flat_map(|triple| vec![triple.x, triple.y, triple.z])
+            .flat_map(|triple| [triple.x, triple.y, triple.z])
             .collect();
         let mut out = Vec::with_capacity(3 * triples.len());
         self.auth_share_generator.open(&shares, &mut out, channel)?;
