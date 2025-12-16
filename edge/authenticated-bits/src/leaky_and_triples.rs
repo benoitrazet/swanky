@@ -452,7 +452,7 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
             //   ⟨x''⟩ := ⟨x⟩ ⊕ ⟨x'⟩
             //   ⟨y''⟩ := ⟨y⟩
             //   ⟨z''⟩ := ⟨z⟩ ⊕ ⟨z'⟩ ⊕ d ⟨x'⟩
-            let result = bucket.iter().skip(1).zip(ds_opened).fold(
+            let triple = bucket.iter().skip(1).zip(ds_opened).fold(
                 *bucket.first().unwrap(),
                 |acc, (triple, d)| LeakyAndTriple {
                     x: acc.x ^ triple.x,
@@ -464,7 +464,7 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
                     },
                 },
             );
-            out.push(result.into());
+            out.push(triple.into());
         }
         Ok(())
     }
