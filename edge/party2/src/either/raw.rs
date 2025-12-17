@@ -147,11 +147,11 @@ use std::marker::PhantomData;
 ///     match P::WHICH {
 ///         WhichParty::P0(ev) => format!(
 ///             "Hex Number! 0x{:X}",
-///             is_t0::<bounds::Any, _, _, _>(ev).sym().cast(x),
+///             is_t0::<bounds::Any, P, _, _>(ev).sym().cast(x),
 ///         ),
 ///         WhichParty::P1(ev) => format!(
 ///             "Lower-case string! {}",
-///             is_t1::<bounds::Any, _, _, _>(ev).sym().cast(x).to_lowercase(),
+///             is_t1::<bounds::Any, P, _, _>(ev).sym().cast(x).to_lowercase(),
 ///         ),
 ///     }
 /// }
