@@ -84,7 +84,7 @@
 //!     /* ... Things only Alice can do ... */
 //! }
 //! ```
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 
 #[macro_use]
 mod macros;
