@@ -1,3 +1,23 @@
+//! Party-based type selection.
+//!
+//! This module implements the [`PartyEither`] (and
+//! [`PartyEitherCopy`]) types, which provide an efficient way to
+//! wrap data whose type is dependent on which participant in a
+//! protocol is running the code.
+//!
+//! The type `PartyEither<P: GenericParty, T0, T1>` is
+//! `repr(transparent)` to `T0` if `P` is the system's `Party0`, and
+//! `repr(transparent)` to `T1` if `P` is the system's `Party1`.
+//! In practice, this means that `PartyEither` acts as a newtype
+//! wrapper for `T0` _or_ `T1`, depending on which protocol
+//! participant is executing.
+//!
+//! See the [`crate`] documentation for basic usage examples in
+//! context.
+//!
+//! These types are based on [`RawEither`], which is _actually equal_
+//! to the underlying type; see [`raw`] for additional detail on this
+//! type, which is not needed in typical cases.
 use crate::ty_eq::{EqualityProposition as EqProp, Witness, generics};
 use crate::{GenericParty, GenericWhichParty};
 use bytemuck::TransparentWrapper;
