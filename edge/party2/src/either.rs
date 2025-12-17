@@ -245,6 +245,12 @@ macro_rules! either {
                     T1,
                 >() }.cast(&self.0))
             }
+            /// Convert from `&mut PartyEither<P, A, B>` into
+            /// `PartyEither<P, &mut A, &mut B>`
+            ///
+            /// This serves the same purpose as [`Option::as_mut`]
+            ///
+            /// Otherwise functions much like [`PartyEither::as_ref`]
             #[inline(always)]
             pub fn as_mut<'a>(&'a mut self) -> PartyEither<P, &'a mut T0, &'a mut T1> {
                 PartyEither(const { either_type_substitution::<
@@ -256,6 +262,41 @@ macro_rules! either {
                     T1,
                 >() }.cast(&mut self.0))
             }
+            /// Combine `self` with another `PartyEither` by zipping them
+            ///
+            /// Compare to [`Option::zip`]
+            ///
+            /// # Example
+            /// ```
+            /// # use swanky_party2::{*, either::*, ty_eq::Witness};
+            /// party_system! {
+            ///     mod ps {
+            ///         Alice,
+            ///         Bob,
+            ///     }
+            /// }
+            /// use ps::*;
+            /// fn combine<P: Party>(
+            ///     a: PartyEither<P, String, u16>,
+            ///     b: PartyEither<P, std::net::Ipv4Addr, u128>
+            /// ) -> PartyEither<P, (String, std::net::Ipv4Addr), (u16, u128)> {
+            ///     a.zip(b)
+            /// }
+            /// assert_eq!(
+            ///     combine::<Alice>(
+            ///         PartyEither::new(Witness::EQUAL_TYPES, "Alice".to_string()),
+            ///         PartyEither::new(Witness::EQUAL_TYPES, std::net::Ipv4Addr::LOCALHOST),
+            ///     ).into_inner(Witness::EQUAL_TYPES),
+            ///     ("Alice".to_string(), std::net::Ipv4Addr::LOCALHOST),
+            /// );
+            /// assert_eq!(
+            ///     combine::<Bob>(
+            ///         PartyEither::new(Witness::EQUAL_TYPES, 1),
+            ///         PartyEither::new(Witness::EQUAL_TYPES, 2),
+            ///     ).into_inner(Witness::EQUAL_TYPES),
+            ///     (1, 2),
+            /// );
+            /// ```
             #[inline(always)]
             pub fn zip<
                 T0x$(: $Copy)?,
