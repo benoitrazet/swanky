@@ -21,7 +21,7 @@ pub mod raw {
     //! Internals of [`PartyPrivate`]s
     //!
     //! For advanced uses, just like you might need to use [`RawEither`] instead of
-    //! [`PartyEither`](crate::either::PartyEither), you might need to access the
+    //! [`PartyEither`], you might need to access the
     //! [`PartyPrivateRaw`] internals of a [`PartyPrivate`].
     //!
     //! [`PartyPrivate`] is a [`TransparentWrapper`] over [`PartyPrivateRaw`].
