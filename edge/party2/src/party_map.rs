@@ -164,6 +164,11 @@ use crate::{
 /// ```
 pub type PartyMap<P, P0, P1> = raw::RawEither<bounds::GenericParty, P, P0, P1>;
 
+/// Convert evidence that `P == Party0<P>` into evidence that
+/// `PartyMap<P, P0, P1> == P0`
+///
+/// Useful when reasoning about sub-protocols given knowledge about
+/// which super-protocol participant is running.
 #[inline(always)]
 pub const fn map_evidence_party0<
     // P can have a different PartySystem than P0/P1
@@ -176,6 +181,11 @@ pub const fn map_evidence_party0<
     is_t0::<bounds::GenericParty, _, _, _>(w).sym()
 }
 
+/// Convert evidence that `P == Party1<P>` into evidence that
+/// `PartyMap<P, P0, P1> == P1`
+///
+/// Useful when reasoning about sub-protocols given knowledge about
+/// which super-protocol participant is running.
 #[inline(always)]
 pub const fn map_evidence_party1<
     // P can have a different PartySystem than P0/P1
