@@ -247,6 +247,25 @@ macro_rules! private {
                     PrivateWhich::Empty(e) => Self::empty(e),
                 }
             }
+            /// Construct a new `PartyPrivate`. If `P == PrivateTo`
+            /// it'll contain `constructor()`, otherwise it'll be empty.
+            ///
+            /// # Example
+            /// ```
+            /// # use swanky_party2::{*, private::*};
+            /// party_system! {
+            ///     mod ps {
+            ///         Alice,
+            ///         Bob,
+            ///     }
+            /// }
+            /// use ps::*;
+            /// // Values that are private only to Alice.
+            /// type AlicePrivate<P, T> = PartyPrivate<Alice, P, T>;
+            /// let p1: AlicePrivate<Alice, i32> = PartyPrivate::new_with(|| 12);
+            /// // p2 is empty because this value is private to Alice, but the current party is Bob
+            /// let p2: AlicePrivate<Bob, i32> = PartyPrivate::new_with(|| 13);
+            /// ```
             #[inline(always)]
             pub fn new_with(constructor: impl FnOnce() -> T) -> Self {
                 match const { private_which::<PrivateTo, P>() } {
@@ -295,6 +314,11 @@ macro_rules! private {
             pub fn into_inner(self, e: Witness<impl EqProp<PrivateTo, P>>) -> T {
                 private_full::<$bound, _, _, _>(e).sym().cast(self.0)
             }
+            /// Convert from `&PartyPrivate<PrivateTo, P, T>` into `PartyPrivate<PrivateTo, P, &T>`
+            ///
+            /// This serves the same purpose as [`Option::as_ref`]
+            ///
+            /// This is frequently useful to _borrow_ the contents of a `PartyPrivate`.
             #[inline(always)]
             pub fn as_ref(&self) -> $PartyPrivate<PrivateTo, P, &T> {
                 match const { private_which::<PrivateTo, P>() } {
@@ -307,6 +331,11 @@ macro_rules! private {
                     PrivateWhich::Empty(e) => $PartyPrivate::empty(e),
                 }
             }
+            /// Convert from `&mut PartyPrivate<PrivateTo, P, T>` into `PartyPrivate<PrivateTo, P, &mut T>`
+            ///
+            /// This serves the same purpose as [`Option::as_mut`]
+            ///
+            /// This is frequently useful to _borrow_ the contents of a `PartyPrivate`.
             #[inline(always)]
             pub fn as_mut(&mut self) -> PartyPrivate<PrivateTo, P, &mut T> {
                 match const { private_which::<PrivateTo, P>() } {
@@ -319,6 +348,8 @@ macro_rules! private {
                     PrivateWhich::Empty(e) => PartyPrivate::empty(e),
                 }
             }
+            /// Create a new `PartyPrivate` by running `f` on the
+            /// contents if `P == PrivateTo`.
             #[inline(always)]
             pub fn map<U$(: $Copy)?>(self, f: impl FnOnce(T) -> U) -> $PartyPrivate<PrivateTo, P, U> {
                 match const { private_which::<PrivateTo, P>() } {
@@ -326,6 +357,10 @@ macro_rules! private {
                     PrivateWhich::Empty(ev) => $PartyPrivate::empty(ev),
                 }
             }
+
+            /// Combine `self` with another `PartyPrivate` by zipping them.
+            ///
+            /// Compare to [`Option::zip`].
             #[inline(always)]
             pub fn zip<U$(: $Copy)?>(
                 self,
@@ -338,6 +373,10 @@ macro_rules! private {
                     PrivateWhich::Empty(ev) => $PartyPrivate::empty(ev),
                 }
             }
+            /// Combine `self` with another `PartyPrivate` by zipping
+            /// them with `mapper`.
+            ///
+            /// Compare to [`Option::zip_with`].
             #[inline(always)]
             pub fn zip_with<Tx$(: $Copy)?, U$(: $Copy)?>(
                 self,
