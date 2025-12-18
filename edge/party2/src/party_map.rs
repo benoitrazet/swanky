@@ -112,6 +112,61 @@
 //!
 //! Now we've got everything sorted at the type-level, but we still need to be able to _use_ the
 //! `PartyMap`ped values.
+//!
+//! For this, we have `map_evidence_party0` and `map_evidence_party1`:
+//!
+//! ```
+//! # use swanky_party2::{*, private::*, either::*, party_map::*};
+//! # // We define parties for oblivious transfer.
+//! # party_system! {
+//! #     mod ot {
+//! #         Sender,
+//! #         Receiver,
+//! #     }
+//! # }
+//! # // And now we define parties for garbled circuits.
+//! # party_system! {
+//! #     mod gc {
+//! #         Garbler,
+//! #         Evaluator,
+//! #     }
+//! # }
+//! # // This isn't the real OT trait; it also doesn't use network communication. It just serves as
+//! # // an example.
+//! # pub trait OT<P: ot::Party>: Sized {
+//! #     fn init() -> Self;
+//! #     fn random_ot(
+//! #         self,
+//! #         choices: &[PartyPrivate<ot::Receiver, P, bool>],
+//! #     ) -> (
+//! #         Self,
+//! #         Vec<PartyEither<P, [u128; 2], u128>>,
+//! #     );
+//! # }
+//! # // For our example, we'll say that the garbler plays the role of OT sender, and the evaluator
+//! # // plays the role of OT receiver.
+//! # struct MyGarbledCircuit<P: gc::Party, OtProtocol: OT<PartyMap<P, ot::Sender, ot::Receiver>>> {
+//! #     ot: OtProtocol,
+//! #     phantom: std::marker::PhantomData<P>,
+//! # }
+//! impl<P: gc::Party, OtProtocol: OT<PartyMap<P, ot::Sender, ot::Receiver>>> MyGarbledCircuit<P, OtProtocol> {
+//!     pub fn do_ot_things(&self) {
+//!         /* ... Garbled circuit operations ... */
+//!
+//!         /* Need to call e.g. random_ot; only allowed for evaluator */
+//!         match P::WHICH {
+//!             gc::WhichParty::Garbler(e) => { /* ... Garbler things ... */ },
+//!             gc::WhichParty::Evaluator(e) => {
+//!                 /* Use map_evidence_party1 to convert e into evidence that PartyMap<P, ot::Sender, ot::Receiver> == ot::Receiver */
+//!                 let ev_ot = map_evidence_party1::<P, ot::Sender, ot::Receiver>(e);
+//!
+//!                 /* ... Use ev_ot to run receiver-only code ... */
+//!             }
+//!         }
+//!     }
+//! }
+//! ```
+
 use crate::{
     GenericParty, Party0, Party1,
     either::raw::{self, bounds, is_t0, is_t1},
