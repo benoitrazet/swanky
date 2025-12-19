@@ -370,7 +370,7 @@ impl<'inner> Channel<'inner> {
     /// (The `2` in `communicate2` refers to `swanky_party2`, since `communicate()` refers to
     /// `swanky_party`)
     ///
-    /// If `P` can see its value, then send it over the wire and return it. Otherwise, read the
+    /// If `p` is private to `P`, then send it over the wire and return it. Otherwise, read the
     /// peer's value from over the wire and return that.
     ///
     /// # Example
