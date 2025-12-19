@@ -637,7 +637,7 @@ impl<T> IsSameType<T> for T {
 
 /// An [`EqualityProposition`] which might not be true (but in practice isn't).
 ///
-/// This [`EqualityProposition`] is an uninhabitied type, and it's impossible to get a witness for
+/// This [`EqualityProposition`] is an uninhabited type, and it's impossible to get a witness for
 /// this proposition. Thus, we can use it in situations where an equality does not hold.
 ///
 /// ```
@@ -650,7 +650,7 @@ impl<T> IsSameType<T> for T {
 /// [`Witness<NotNeccessarilyTrueEqualityProposition>`](Witness).
 ///
 /// `NotNeccessarilyTrueEqualityProposition` is so-named because we cannot prevent you from
-/// provding a `NotNeccessarilyTrueEqualityProposition` for equal types.
+/// providing a `NotNeccessarilyTrueEqualityProposition` for equal types.
 ///
 /// ```
 /// # use swanky_party2::ty_eq::*;

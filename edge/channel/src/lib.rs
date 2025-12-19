@@ -389,7 +389,7 @@ impl<'inner> Channel<'inner> {
     /// fn do_work<P: Party>(c: &mut Channel) -> eyre::Result<i32> {
     ///     // Only the sender knows x. We're party P. If P == Sender, then _we_ know x.
     ///     let x: PartyPrivateCopy<Sender, P, i32> = PartyPrivateCopy::new(4586);
-    ///     // If we're the sender, send x to the receiver. If P == Receiver, then recieve x.
+    ///     // If we're the sender, send x to the receiver. If P == Receiver, then receive x.
     ///     let x: i32 = c.communicate2(x)?;
     ///     // Now both parties know x.
     ///     Ok(x)

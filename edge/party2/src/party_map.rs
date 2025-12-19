@@ -187,7 +187,7 @@ use crate::{
 ///         Receiver,
 ///     }
 /// }
-/// // And now we definie parties for garbled circuits.
+/// // And now we define parties for garbled circuits.
 /// party_system! {
 ///     mod gc {
 ///         Garbler,
