@@ -16,15 +16,16 @@
 //! Garbling for Faster Secure Two-Party Computation".
 //! <https://eprint.iacr.org/2018/578.pdf>
 
-use crate::authshares::{AuthShare, AuthShareGenerator};
+use crate::{
+    and_triples::AndTriple,
+    authshares::{AuthShare, AuthShareGenerator},
+};
 use itertools::Itertools;
 use rand::{CryptoRng, Rng};
-use swanky_adversary::Malicious;
 use swanky_channel::Channel;
 use swanky_f_eq::EqualityFunctionality;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
-use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
 use swanky_party::{Party, WhichParty};
 use swanky_serialization::{CanonicalSerialize, SequenceDeserializer, SequenceSerializer};
 use vectoreyes::{SimdBase, U8x16};
@@ -62,17 +63,11 @@ impl<P: Party> LeakyAndTriple<P> {
 }
 
 /// A type for generating [`LeakyAndTriple`]s.
-pub(crate) struct LeakyAndTripleGenerator<P: Party, OTS: CorrelatedSender, OTR: CorrelatedReceiver>
-{
-    pub(crate) auth_share_generator: AuthShareGenerator<P, OTS, OTR>,
+pub(crate) struct LeakyAndTripleGenerator<P: Party> {
+    pub(crate) auth_share_generator: AuthShareGenerator<P>,
 }
 
-impl<
-    P: Party,
-    OTS: CorrelatedSender<Msg = U8x16> + Malicious,
-    OTR: CorrelatedReceiver<Msg = U8x16> + Malicious,
-> LeakyAndTripleGenerator<P, OTS, OTR>
-{
+impl<P: Party> LeakyAndTripleGenerator<P> {
     /// Create a new [`LeakyAndTripleGenerator`].
     pub(crate) fn new<RNG: CryptoRng + Rng>(
         channel: &mut Channel,
@@ -140,79 +135,155 @@ impl<
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> eyre::Result<()> {
+        // The protocol works as follows.
+        //
+        // The parties begin by generating random shares, and viewing them as an
+        // "uncorrelated" AND triple `(⟨x₁|x₂⟩, ⟨y₁|y₂⟩, ⟨z₁|r⟩)`. The goal then
+        // is to turn the share `⟨r⟩` into a "correlated" share `⟨z₂⟩`.
+        //
+        // To do this, we want to find the (public) `d` such that
+        // ```
+        // ([x₁] ⊕ [x₂])([y₁] ⊕ [y₂]) ⊕ [z₁] ⊕ [r] ⊕ d = 0
+        // ```
+        // Then, we can compute `[z₂] = [r] ⊕ d`, and we're done.
+        //
+        // Now, consider computing the following:
+        // ```
+        // S = ((x₁ ⊕ x₂)(y₁ ⊕ y₂) ⊕ z₁ ⊕ r)(Δ₁ ⊕ Δ₂)
+        // ```
+        // And recall that we enforce at initialization time that
+        // ```
+        // lsb(Δ₁ ⊕ Δ₂) = 1
+        // ```
+        // Thus, if `((x₁ ⊕ x₂)(y₁ ⊕ y₂) ⊕ z₁ ⊕ r) = 0` (⇒ `d = 0`) then `S =
+        // 0`, and if `((x₁ ⊕ x₂)(y₁ ⊕ y₂) ⊕ z₁ ⊕ r) = 1` (⇒ `d = 1`) then `S =
+        // Δ₁ ⊕ Δ₂`, and hence `lsb(S) = d`. So the goal then is to compute `S`.
+        //
+        // Consider the `x₂(y₁ ⊕ y₂)(Δ₁ ⊕ Δ₂)` portion of `S`. The `(y₁ ⊕ y₂)(Δ₁
+        // ⊕ Δ₂)` portion can be computed as `C₁ ⊕ C₂` where
+        // ```
+        // C₁ = y₁ Δ₁ ⊕ K[y₂] ⊕ M[y₁]
+        // C₂ = y₂ Δ₂ ⊕ K[y₁] ⊕ M[y₂]
+        // ```
+        // These computations are entirely local to each party.
+        //
+        // Now, we can compute `S` as:
+        // ```
+        // S = x₁(C₁ ⊕ C₂) ⊕ x₂(C₁ ⊕ C₂) ⊕ (z₁ ⊕ r)(Δ₁ ⊕ Δ₂)
+        // ```
+        // Each `xₚ(C₁ ⊕ C₂)` can be computed using Half-Gates, since the `xₚ`
+        // is known to one of the parties. (The details of Half-Gates won't be
+        // described here, but that is where the `G` and `E` variables come from
+        // in the implementation.)
+        //
+        // Likewise, `(z₁ ⊕ r)(Δ₁ ⊕ Δ₂)` can be computed as `Z = Z₁ ⊕ Z₂` where:
+        // ```
+        // Z₁ = z₁ Δ₁ ⊕ K[r] ⊕ M[z₁]
+        // Z₂ = r  Δ₂ ⊕ K[z₁] ⊕ M[r]
+        // ```
+        // Again, this is entirely local to each party.
+        //
+        // Thus, we can compute `S = S₁ ⊕ S₂` and thus compute (public) bit `d`
+        // as `lsb(S₁) ⊕ lsb(S₂)`.
+        //
+        // Lastly, to enforce no party cheated in revealing their share of `d`,
+        // we check equality, since it should be the case that `S₁ ⊕ dΔ₁ = S₂ ⊕
+        // dΔ₂` (since by construction, `S₁ ⊕ S₂ =  = d(Δ₁ ⊕ Δ₂)`).
+
         let nshares = 3 * ntriples;
         let delta = F128b::from(self.auth_share_generator.delta());
         let mut shares = Vec::with_capacity(nshares);
 
-        // Step 1.
-        // A and B obtain random authenticated shares (⟨x₁ | x₂⟩, ⟨y₁ | y₂⟩, ⟨z₁ | r⟩).
+        // A and B obtain random authenticated shares `(⟨x₁|x₂⟩, ⟨y₁|y₂⟩,
+        // ⟨z₁|r⟩)`.
         self.auth_share_generator
             .generate(nshares, &mut shares, channel, rng)?;
+
+        // We need to compute `H(K[x])` twice below, so we cache the result to
+        // save on hashing the same value twice.
+        let hashed_x_keys: Vec<_> = shares
+            .iter()
+            .tuples()
+            .map(|(x, _, _)| hash(F128b::from(x.key())))
+            .collect();
+
+        // A and B locally compute `Cₚ = y Δ + K[y] + M[y]` for all `y`.
+        // These values correspond to shares of some `C = C₁ ⊕ C₂` such that
+        // ```
+        // C = (y₁ ⊕ y₂)(Δ₁ ⊕ Δ₂)
+        // ```
         let cs: Vec<F128b> = shares
             .iter()
             .tuples()
-            .map(|(_, y, _)|
-            // A and B locally compute `y Δ + K[y] + M[y]`.
-            y.bit() * delta + F128b::from(y.key()) + F128b::from(y.mac()))
+            .map(|(_, y, _)| y.bit() * delta + F128b::from(y.key()) + F128b::from(y.mac()))
             .collect();
 
-        // Step 2.
-        let mut es = Vec::with_capacity(ntriples);
-        // Send `G := H(K[x] + Δ) + H(K[x]) + C`.
-        let send_g = |x: &AuthShare<P>, c: &F128b, channel: &mut Channel| -> eyre::Result<()> {
-            let g = hash(F128b::from(x.key()) + delta) + hash(F128b::from(x.key())) + c;
+        let mut ss = Vec::with_capacity(ntriples);
+
+        // A and B compute the Half-Gates computations of `x₁(C₁ ⊕ C₂)` and
+        // `x₂(C₁ ⊕ C₂)`.
+
+        // Function for sending `G := H(K[x] + Δ) + H(K[x]) + C`.
+        let send_g = |x: &AuthShare<P>,
+                      c: F128b,
+                      hashed_x_key: F128b,
+                      channel: &mut Channel|
+         -> eyre::Result<()> {
+            let g = hash(F128b::from(x.key()) + delta) + hashed_x_key + c;
             channel.write(&g)?;
             Ok(())
         };
-        // Receive `G` and compute `E := x G + H(M[x]) + x C`.
-        let mut receive_g_and_compute_e =
-            |x: &AuthShare<P>, c: &F128b, channel: &mut Channel| -> eyre::Result<()> {
-                let g = channel.read::<F128b>()?;
-                let e = x.bit() * g + hash(F128b::from(x.mac())) + x.bit() * *c;
-                es.push(e);
-                Ok(())
-            };
-        for ((x, _, _), c) in shares.iter().tuples().zip(cs.iter()) {
-            match P::WHICH {
-                WhichParty::Prover(_) => {
-                    // A sends `G₁ := H(K[x] + Δ) + H(K[x]) + C` to B.
-                    send_g(x, c, channel)?;
-                }
-                WhichParty::Verifier(_) => {
-                    // B computes `E₁ := x G₁ + H(M[x]) + x C`.
-                    receive_g_and_compute_e(x, c, channel)?;
-                }
-            }
-        }
-        // Step 3.
-        for ((x, _, _), c) in shares.iter().tuples().zip(cs.iter()) {
-            match P::WHICH {
-                WhichParty::Verifier(_) => {
-                    // B sends `G₂ := H(K[x] + Δ) + H(K[x]) + C` to A.
-                    send_g(x, c, channel)?;
-                }
-                WhichParty::Prover(_) => {
-                    // A computes `E₂ := x G₂ + H(M[x]) + x C`.
-                    receive_g_and_compute_e(x, c, channel)?;
-                }
-            }
-        }
+        // Function for receiving `G` and computing `E := x G + H(M[x]) + x C`
+        // and `S := H(K[x]) + E + (z Δ + K[z] + M[z])`.
+        let mut receive_g_and_compute_s = |x: &AuthShare<P>,
+                                           z: &AuthShare<P>,
+                                           c: F128b,
+                                           hashed_x_key: F128b,
+                                           channel: &mut Channel|
+         -> eyre::Result<()> {
+            let g = channel.read::<F128b>()?;
+            let e = x.bit() * g + hash(x.mac().into()) + x.bit() * c;
+            let s =
+                hashed_x_key + e + z.bit() * delta + F128b::from(z.key()) + F128b::from(z.mac());
+            ss.push(s);
+            Ok(())
+        };
 
-        // Step 4.
-        let ss: Vec<F128b> = shares
+        // Compute shares of `S` using the above functions.
+        for (((x, _, z), c), hashed_x_key) in shares
             .iter()
             .tuples()
-            .zip(es)
-            .map(|((x, _, z), e)| {
-                // Compute `S := H(K[x]) + E + (z Δ + K[z] + M[z])`.
-                hash(F128b::from(x.key()))
-                    + e
-                    + (z.bit() * delta + F128b::from(z.key()) + F128b::from(z.mac()))
-            })
-            .collect();
+            .zip(cs.iter())
+            .zip(hashed_x_keys.iter())
+        {
+            match P::WHICH {
+                WhichParty::Prover(_) => {
+                    send_g(x, *c, *hashed_x_key, channel)?;
+                }
+                WhichParty::Verifier(_) => {
+                    receive_g_and_compute_s(x, z, *c, *hashed_x_key, channel)?;
+                }
+            }
+        }
+        for (((x, _, z), c), hashed_x_key) in shares
+            .iter()
+            .tuples()
+            .zip(cs.iter())
+            .zip(hashed_x_keys.iter())
+        {
+            match P::WHICH {
+                WhichParty::Prover(_) => {
+                    receive_g_and_compute_s(x, z, *c, *hashed_x_key, channel)?;
+                }
+                WhichParty::Verifier(_) => {
+                    send_g(x, *c, *hashed_x_key, channel)?;
+                }
+            }
+        }
 
-        let mut ds = Vec::with_capacity(ntriples);
-        // Sends the LSBs of `ss` to the other party.
+        let mut feq = EqualityFunctionality::<P>::new(rng);
+
+        // Function for sending the LSB `d` of each party's share of `S`.
         let send_lsb = |channel: &mut Channel| -> eyre::Result<()> {
             let mut serializer: F2BitSerializer =
                 SequenceSerializer::new(&mut channel.as_std_io())?;
@@ -223,43 +294,38 @@ impl<
             serializer.finish(channel.as_std_io())?;
             Ok(())
         };
-        // Receives the LSBs of `ss` from the other party.
-        let mut receive_lsb = |channel: &mut Channel| -> eyre::Result<()> {
+        // Function for receiving the LSB of each party's share of `S`, sending
+        // `L := S + dΔ` to `Feq`, and output the updated triple.
+        let receive_lsb = |channel: &mut Channel| -> eyre::Result<()> {
             let mut deserializer: F2BitDeserializer =
                 SequenceDeserializer::new(&mut channel.as_std_io())?;
-            for s in ss.iter() {
+            for ((x, y, z), s) in shares.into_iter().tuples().zip(ss.iter()) {
                 let lsb_s_mine = lsb(*s);
                 let lsb_s_other = deserializer.read(channel.as_std_io())?;
                 let d = lsb_s_mine + lsb_s_other;
-                ds.push(d);
+                // Send `L := S + dΔ` to `Feq`.
+                feq.input(U8x16::from(s + d * delta));
+                // Compute `⟨z'⟩ := ⟨z⟩ ⊕ d`.
+                let z_new = self.auth_share_generator.xor_with_const(z, d);
+                let triple = LeakyAndTriple { x, y, z: z_new };
+                out.push(triple);
             }
             Ok(())
         };
+
+        // Compute the correction bit `d` and output the updating triples using
+        // the above functions.
         match P::WHICH {
             WhichParty::Prover(_) => {
-                // A sends `lsb(S₁)` to B.
                 send_lsb(channel)?;
-                // A receives `lsb(S₂)` from B and computes `d := lsb(S₁) +
-                // lsb(S₂)`.
                 receive_lsb(channel)?;
             }
             WhichParty::Verifier(_) => {
-                // B receives `lsb(S₁)` from A.
                 receive_lsb(channel)?;
-                // B sends `lsb(S₂)` to A and computes `d := lsb(S₁) + lsb(S₂)`.
                 send_lsb(channel)?;
             }
         }
-        let mut feq = EqualityFunctionality::<P>::new(rng);
-        for (((x, y, z), s), d) in shares.into_iter().tuples().zip(ss).zip(ds) {
-            // A and B send `L := S + dΔ` to `Feq`.
-            feq.input(U8x16::from(s + d * delta));
-            // Compute `⟨z'⟩ := ⟨z⟩ ⊕ d`.
-            let z_new = self.auth_share_generator.xor_with_const(z, d);
-            let triple = LeakyAndTriple { x, y, z: z_new };
-            out.push(triple)
-        }
-        // Check the equality on all the `L` values.
+        // Check the equality on all the `L` values to enforce proper behavior.
         feq.finalize(channel)
     }
 
@@ -271,43 +337,34 @@ impl<
         triples: &[LeakyAndTriple<P>],
         channel: &mut Channel,
     ) -> eyre::Result<()> {
-        let (xs, ys, zs): (Vec<_>, Vec<_>, Vec<_>) = triples
+        // Flatten triples into a vector of shares so we can call
+        // `AuthShareGenerator::open` on the shares.
+        let shares: Vec<AuthShare<_>> = triples
             .iter()
-            .map(|triple| (triple.x, triple.y, triple.z))
-            .multiunzip();
-        let mut output_x = Vec::with_capacity(triples.len());
-        self.auth_share_generator
-            .open(&xs, &mut output_x, channel)?;
-        let mut output_y = Vec::with_capacity(triples.len());
-        self.auth_share_generator
-            .open(&ys, &mut output_y, channel)?;
-        let mut output_z = Vec::with_capacity(triples.len());
-        self.auth_share_generator
-            .open(&zs, &mut output_z, channel)?;
+            .flat_map(|triple| [triple.x, triple.y, triple.z])
+            .collect();
+        let mut out = Vec::with_capacity(3 * triples.len());
+        self.auth_share_generator.open(&shares, &mut out, channel)?;
         // Confirm when testing that all the triples are indeed valid.
         #[cfg(test)]
         {
-            for (i, ((x, y), z)) in output_x
-                .iter()
-                .zip(output_y.iter())
-                .zip(output_z.iter())
-                .enumerate()
-            {
-                assert_eq!(x * y, *z, "Iteration {i} failed");
+            for (i, triple) in out.chunks_exact(3).enumerate() {
+                assert_eq!(triple[0] * triple[1], triple[2], "Iteration {i} failed");
             }
         }
         Ok(())
     }
 
-    /// Combine a "bucket" of [`LeakyAndTriple`]s to produce a single
-    /// [`AndTriple`].
+    /// Combines a vector of $`B \cdot N`$ randomly permuted [`LeakyAndTriple`]s
+    /// into $`N`$ [`AndTriple`]s, where $`B`$ denotes the bucket size and $`N`$
+    /// denotes the number of AND triples produced.
     ///
     /// This implements the $`\Pi_{\mathsf{aAND}}`$ protocol (Figure 9) from
     /// Wang et al. [^1].
     ///
     /// # Security
-    /// This assumes that the bucket is of the correct size. The bucket size
-    /// depends on the number of (non-leaky) AND triples to be created:
+    /// This assumes that the bucket size $`B`$ is correct for the given number
+    /// $`N`$ of (non-leaky) AND triples produced:
     ///
     /// | ≥ # Triples | Bucket Size |
     /// | :---------: | :---------: |
@@ -315,50 +372,101 @@ impl<
     /// |       3,100 |           4 |
     /// |     280,000 |           3 |
     ///
-    /// That is, if you want to create `N` triples, you need to generate `B · N`
-    /// leaky-AND triples---where `B` is the bucket size---randomly permute the
-    /// triples, and then call `combine` on buckets of size `B`. See Table 4
-    /// from Wang et al. [^1] (the number of triples above is for a statistical
-    /// security parameter of 40 bits).
+    /// That is, if you want to create $`N`$ triples, you need to generate $`B
+    /// \cdot N`$ leaky-AND triples, randomly permute the triples, and then call
+    /// `combine` with bucket size $`B`$. See Table 4 from Wang et al. [^1] (the
+    /// number of triples above is for a statistical security parameter of 40
+    /// bits).
     ///
     /// This implies that _there is no security guarantee_ when generating fewer
     /// than 320 triples!
     ///
     /// # Panics
-    /// This panics if `bucket` is empty.
+    /// This panics if `bucket_size ∉ {3, 4, 5}`, if `bucket_size` does not
+    /// divide `leaky_ands.len()`, or if `leaky_ands` is empty.
     ///
     /// [^1]: X. Wang, S. Ranellucci, J. Katz. "Authenticated Garbling and
     /// Efficient Maliciously Secure Two-Party Computation".
     /// <https://eprint.iacr.org/2017/030.pdf>
     pub(crate) fn combine(
-        &mut self,
-        bucket: &[LeakyAndTriple<P>],
+        &self,
+        leaky_ands: &[LeakyAndTriple<P>],
+        out: &mut Vec<AndTriple<P>>,
+        bucket_size: usize,
         channel: &mut Channel,
-    ) -> eyre::Result<LeakyAndTriple<P>> {
-        assert!(!bucket.is_empty());
-        bucket
-            .iter()
-            .skip(1)
-            .try_fold(*bucket.first().unwrap(), |acc, triple| {
-                // Compute `⟨d⟩ := ⟨y⟩ ⊕ ⟨y'⟩` and open `⟨d⟩`.
-                let d = acc.y ^ triple.y;
-                let mut d_vector = Vec::with_capacity(1);
-                self.auth_share_generator
-                    .open(&[d], &mut d_vector, channel)?;
-                // Compute the resulting triple as:
-                //   ⟨x''⟩ := ⟨x⟩ ⊕ ⟨x'⟩
-                //   ⟨y''⟩ := ⟨y⟩
-                //   ⟨z''⟩ := ⟨z⟩ ⊕ ⟨z'⟩ ⊕ d ⟨x'⟩
-                Ok(LeakyAndTriple {
+    ) -> eyre::Result<()> {
+        // This protocol works by combining `B` leaky AND triples into one
+        // non-leaky AND triple in an iterative way. Two leaky AND triples
+        // `(⟨x₁|x₂⟩, ⟨y₁|y₂⟩, ⟨z₁|z₂⟩)` and `(⟨x'₁|x'₂⟩, ⟨y'₁|y'₂⟩, ⟨z'₁|z'₂⟩)`
+        // are combined as follows:
+        //
+        // 1. Each party computes `dᵢ = yᵢ ⊕ y'ᵢ` and reveals `dᵢ` to the other
+        //    party, who checks its validity.
+        // 2. Each party computes `d = d₁ ⊕ d₂`.
+        // 3. The parties output a new AND triple as:
+        //    `(⟨x₁ ⊕ x'₁         |         x₂ ⊕ x'₂⟩,
+        //      ⟨y₁               |               y₂⟩,
+        //      ⟨z₁ ⊕ z'₁ ⊕ d x'₁ | z₂ ⊕ z'₂ ⊕ d x'₂⟩)`
+        //
+        // The protocol then proceeds to combine the newly produced AND triple
+        // with the next one in the bucket, resulting in one final (non-leaky)
+        // AND triple that combines all `B` leaky AND triples.
+        //
+        // The implementation below optimizes the above protocol as follows.
+        // Instead of revealing the `d`s one at a time, it instead computes all
+        // the `d`s up front and opens them all in one fell swoop.
+        assert!(bucket_size == 3 || bucket_size == 4 || bucket_size == 5);
+        assert_eq!(leaky_ands.len() % bucket_size, 0);
+        assert!(!leaky_ands.is_empty());
+
+        let nbuckets = leaky_ands.len() / bucket_size;
+        let mut ds = Vec::with_capacity((bucket_size - 1) * nbuckets);
+        let mut ds_opened = Vec::with_capacity((bucket_size - 1) * nbuckets);
+
+        for bucket in leaky_ands.chunks_exact(bucket_size) {
+            bucket.iter().skip(1).map(|triple| triple.y()).fold(
+                bucket.first().unwrap().y(),
+                |y, y_| {
+                    // Compute `⟨d⟩ := ⟨y⟩ ⊕ ⟨y'⟩` and save it for opening later.
+                    ds.push(y ^ y_);
+                    // The combined AND triple uses only `⟨y⟩` and not ⟨y'⟩, so
+                    // return it as part of our fold. This means that the `i`th
+                    // `⟨d⟩` value is an XOR of the `⟨y⟩` value from the first
+                    // bucket entry with the `⟨y⟩` value from the `i+1`th bucket
+                    // entry.
+                    y
+                },
+            );
+        }
+
+        // Open the `⟨d⟩`s in one shot. This is much more efficient than opening
+        // the `⟨d⟩`s on a per-bucket basis.
+        self.auth_share_generator
+            .open(&ds, &mut ds_opened, channel)?;
+
+        for (bucket, ds_opened) in leaky_ands
+            .chunks_exact(bucket_size)
+            .zip(ds_opened.chunks_exact(bucket_size - 1))
+        {
+            // Compute the resulting triple as:
+            //   ⟨x''⟩ := ⟨x⟩ ⊕ ⟨x'⟩
+            //   ⟨y''⟩ := ⟨y⟩
+            //   ⟨z''⟩ := ⟨z⟩ ⊕ ⟨z'⟩ ⊕ d ⟨x'⟩
+            let triple = bucket.iter().skip(1).zip(ds_opened).fold(
+                *bucket.first().unwrap(),
+                |acc, (triple, d)| LeakyAndTriple {
                     x: acc.x ^ triple.x,
                     y: acc.y,
-                    z: if d_vector[0] == F2::ONE {
+                    z: if *d == F2::ONE {
                         acc.z ^ triple.z ^ triple.x
                     } else {
                         acc.z ^ triple.z
                     },
-                })
-            })
+                },
+            );
+            out.push(triple.into());
+        }
+        Ok(())
     }
 
     /// The $`\Delta`$ value used to validate the other party's shares.
@@ -390,39 +498,29 @@ fn lsb(input: F128b) -> F2 {
 mod tests {
     use super::*;
     use crate::authshares::{PartyA, PartyB};
+    use bytemuck::TransparentWrapper;
     use proptest::prelude::*;
     use rand::SeedableRng;
     use swanky_aes_rng::AesRng;
-    use swanky_ot_alsz_kos::kos;
 
     fn generators(
         mut rng_a: &mut AesRng,
         mut rng_b: &mut AesRng,
     ) -> (
-        LeakyAndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
-        LeakyAndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
+        LeakyAndTripleGenerator<PartyA>,
+        LeakyAndTripleGenerator<PartyB>,
     ) {
         swanky_channel::local::local_channel_pair(
-            |c| {
-                let generator = LeakyAndTripleGenerator::<PartyA, kos::Sender, kos::Receiver>::new(
-                    c, &mut rng_a,
-                )?;
-                Ok(generator)
-            },
-            |c| {
-                let generator = LeakyAndTripleGenerator::<PartyB, kos::Sender, kos::Receiver>::new(
-                    c, &mut rng_b,
-                )?;
-                Ok(generator)
-            },
+            |c| LeakyAndTripleGenerator::<PartyA>::new(c, &mut rng_a),
+            |c| LeakyAndTripleGenerator::<PartyB>::new(c, &mut rng_b),
         )
         .unwrap()
     }
 
     fn generate_triples(
         ntriples: usize,
-        generator_a: &mut LeakyAndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
-        generator_b: &mut LeakyAndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
+        generator_a: &mut LeakyAndTripleGenerator<PartyA>,
+        generator_b: &mut LeakyAndTripleGenerator<PartyB>,
         mut rng_a: &mut AesRng,
         mut rng_b: &mut AesRng,
     ) -> (Vec<LeakyAndTriple<PartyA>>, Vec<LeakyAndTriple<PartyB>>) {
@@ -442,8 +540,8 @@ mod tests {
     }
 
     fn validate(
-        generator_a: &LeakyAndTripleGenerator<PartyA, kos::Sender, kos::Receiver>,
-        generator_b: &LeakyAndTripleGenerator<PartyB, kos::Sender, kos::Receiver>,
+        generator_a: &LeakyAndTripleGenerator<PartyA>,
+        generator_b: &LeakyAndTripleGenerator<PartyB>,
         output_a: Vec<LeakyAndTriple<PartyA>>,
         output_b: Vec<LeakyAndTriple<PartyB>>,
     ) -> (bool, bool) {
@@ -491,19 +589,17 @@ mod tests {
             let (triples_a, triples_b) = generate_triples(nleaky, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
             swanky_channel::local::local_channel_pair(
                 |channel| {
-                    for bucket in triples_a.chunks_exact(bucket_size) {
-                        let triple = generator_a.combine(bucket, channel).unwrap();
-                        let result = generator_a.open(&[triple], channel);
-                        assert!(result.is_ok());
-                    }
+                    let mut out = vec![];
+                    generator_a.combine(&triples_a, &mut out, bucket_size, channel).unwrap();
+                    let result = generator_a.open(AndTriple::peel_slice(&out), channel);
+                    assert!(result.is_ok());
                     Ok(())
                 },
                 |channel| {
-                    for bucket in triples_b.chunks_exact(bucket_size) {
-                        let triple = generator_b.combine(bucket, channel).unwrap();
-                        let result = generator_b.open(&[triple], channel);
-                        assert!(result.is_ok());
-                    }
+                    let mut out = vec![];
+                    generator_b.combine(&triples_b, &mut out, bucket_size, channel).unwrap();
+                    let result = generator_b.open(AndTriple::peel_slice(&out), channel);
+                    assert!(result.is_ok());
                     Ok(())
                 },
             )
