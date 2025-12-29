@@ -2,7 +2,7 @@
 use eyre::{ErrReport, eyre};
 use fancy_garbling::{Fancy, FancyBinary, FancyInput, FancyReveal, HasModulus, errors::FancyError};
 #[derive(Clone, Debug)]
-/// An Analyzer Item
+/// "An instantiation of [FancyInput::Item] used by [Analyzer]."
 ///
 /// A dummy FancyItem which is returned when profiling a [`fancy_garbling::Fancy`] circuit.
 /// The [`AnalyzerItem`] only contains the wire modulus. This is because
@@ -11,16 +11,16 @@ pub struct AnalyzerItem {
     modulus: u16,
 }
 impl HasModulus for AnalyzerItem {
-    /// Returns the modulus of the current wire.
-    /// Since [`Analyzer`] is only defined for binary
-    /// circuits, for now, the modulus should always be 2.
+    // Returns the modulus of the current wire.
+    // Since [`Analyzer`] is only defined for binary
+    // circuits, for now, the modulus should always be 2.
     fn modulus(&self) -> u16 {
         self.modulus
     }
 }
 
 #[derive(Debug)]
-/// Errors from the [`Analyzer`] fancy object
+/// Error from the [`Analyzer`] fancy object
 ///
 /// This error wraps any underlying error thrown by
 /// [`fancy_garbling::Fancy`] with eyre.
@@ -43,7 +43,7 @@ impl std::fmt::Display for AnalyzerError {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-/// A [`fancy_garbling::Fancy`] Object which counts gates in a binary circuit.
+/// A [`fancy_garbling::Fancy`] object which counts gates in a binary circuit.
 ///
 /// Specifically, [`Analyzer`] stores the number of inputs,
 /// ands, xors, negations and constants in the circuits. This
@@ -74,7 +74,7 @@ impl std::fmt::Display for Analyzer {
 }
 
 impl Analyzer {
-    /// Create a new fresh [`Analyzer`] and sets all the gate
+    /// Create a new [`Analyzer`] and sets all the gate
     /// counts to 0.
     pub fn new() -> Analyzer {
         Analyzer {
@@ -235,7 +235,7 @@ mod tests {
     use super::*;
     use fancy_garbling::BinaryGadgets;
     #[test]
-    fn test_single_and() {
+    fn single_and_gate_count_is_correct() {
         let nbits = 64;
         let x = 0;
         let y = 0;
@@ -255,7 +255,7 @@ mod tests {
         assert_eq!(analyzer_test, analyzer_correct);
     }
     #[test]
-    fn test_binady_addition() {
+    fn binary_addition_counts_are_correct() {
         let nbits = 64;
         let x = 0;
         let y = 0;
@@ -279,7 +279,7 @@ mod tests {
         assert_eq!(analyzer_test, analyzer_correct);
     }
     #[test]
-    fn test_binary_multiplication() {
+    fn binary_multiplication_counts_are_correct() {
         let nbits = 64;
         let x = 0;
         let y = 0;
@@ -306,7 +306,7 @@ mod tests {
         assert_eq!(analyzer_test, analyzer_correct);
     }
     #[test]
-    fn test_binady_twos_complement() {
+    fn binady_twos_complement_counts_are_correct() {
         let nbits = 64;
         let x = 0;
         let mut analyzer_test: Analyzer = Analyzer::new();
