@@ -1,6 +1,7 @@
 //! Fancy object to compute the number of gates in a binary circuit.
 use eyre::{ErrReport, eyre};
 use fancy_garbling::{Fancy, FancyBinary, FancyInput, FancyReveal, HasModulus, errors::FancyError};
+use std::error::Error;
 #[derive(Clone, Debug)]
 /// "An instantiation of [FancyInput::Item] used by [Analyzer]."
 ///
@@ -41,6 +42,8 @@ impl std::fmt::Display for AnalyzerError {
         }
     }
 }
+
+impl Error for AnalyzerError {}
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 /// A [`fancy_garbling::Fancy`] object which counts gates in a binary circuit.
