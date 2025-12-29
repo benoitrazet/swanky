@@ -61,16 +61,13 @@ use vectoreyes::U8x16;
 pub fn f_preprocessing<
     P: Party,
     RNG: CryptoRng + Rng,
-    OTS: CorrelatedSender<Msg = U8x16> + Malicious,
-    OTR: CorrelatedReceiver<Msg = U8x16> + Malicious,
 >(
     circuit: impl Fn(
         &mut Analyzer,
         BinaryBundle<AnalyzerItem>,
         BinaryBundle<AnalyzerItem>,
     ) -> Result<BinaryBundle<AnalyzerItem>, AnalyzerError>,
-    and_generator: &mut AndTripleGenerator<P, OTS, OTR>,
-    auth_generator: &mut AuthShareGenerator<P, OTS, OTR>,
+    and_generator: &mut AndTripleGenerator<P>,
     input_size: usize,
     channel: &mut Channel,
     rng: &mut RNG,
@@ -87,7 +84,7 @@ pub fn f_preprocessing<
 
     let ninputs = analyzer.ninputs();
     let mut auth_shares = Vec::with_capacity(ninputs);
-    auth_generator.generate(nands + ninputs, &mut auth_shares, channel, rng)?;
+    and_generator.auth_share_generator_mut().generate(nands + ninputs, &mut auth_shares, channel, rng)?;
 
     Ok((and_shares, auth_shares))
 }
@@ -127,14 +124,11 @@ mod tests {
         let (_shares_gb, _shares_ev) = swanky_channel::local::local_channel_pair(
             |c| {
                 let mut rng = AesRng::new();
-                let mut generator_auth_share =
-                    AuthShareGenerator::<Garbler, kos::Sender, kos::Receiver>::new(c, &mut rng)?;
                 let mut generator_and_triples =
-                    AndTripleGenerator::<Garbler, kos::Sender, kos::Receiver>::new(c, &mut rng)?;
+                    AndTripleGenerator::<Garbler>::new(c, &mut rng)?;
                 Ok(f_preprocessing(
                     fancy_sum,
                     &mut generator_and_triples,
-                    &mut generator_auth_share,
                     input_size,
                     c,
                     &mut rng,
@@ -142,14 +136,11 @@ mod tests {
             },
             |c| {
                 let mut rng = AesRng::new();
-                let mut generator_auth_share =
-                    AuthShareGenerator::<Evaluator, kos::Sender, kos::Receiver>::new(c, &mut rng)?;
                 let mut generator_and_triples =
-                    AndTripleGenerator::<Evaluator, kos::Sender, kos::Receiver>::new(c, &mut rng)?;
+                    AndTripleGenerator::<Evaluator>::new(c, &mut rng)?;
                 Ok(f_preprocessing(
                     fancy_sum,
                     &mut generator_and_triples,
-                    &mut generator_auth_share,
                     input_size,
                     c,
                     &mut rng,
