@@ -28,15 +28,12 @@ use crate::analyzer::{Analyzer, AnalyzerError, AnalyzerItem};
 use eyre::Ok;
 use fancy_garbling::{BinaryBundle, FancyInput};
 use rand::{CryptoRng, Rng};
-use swanky_adversary::Malicious;
 use swanky_authenticated_bits::{
     and_triples::{AndTriple, AndTripleGenerator},
-    authshares::{AuthShare, AuthShareGenerator},
+    authshares::{AuthShare},
 };
 use swanky_channel::Channel;
-use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
 use swanky_party::Party;
-use vectoreyes::U8x16;
 
 /// Pre-process a circuit for authenticated garbling.
 ///
@@ -95,7 +92,6 @@ mod tests {
     use fancy_garbling::{BinaryGadgets, Fancy, FancyBinary, FancyReveal};
     use swanky_aes_rng::AesRng;
     use swanky_authenticated_bits::authshares::{PartyA, PartyB};
-    use swanky_ot_alsz_kos::kos;
 
     /// Garbler
     ///
