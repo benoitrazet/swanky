@@ -1,9 +1,9 @@
-//! Authenticated Garbling's Pre-processing functionality.
+//! Authenticated Garbling's pre-processing functionality.
 //!
 //! The first step in authenticated garbling consists in pre-processing a fixed
 //! circuit in order to give each party shares of wire labels. This pre-processing
-//! step is one of the main reasons why [^1] achieves an *online* communication complexity
-//! that is "close to" its semi-honest counterpart.
+//! step is one of the main reasons why authenticated garbling achieves
+//! an *online* communication complexity that is "close to" its semi-honest counterpart. See Figure 2 in [^1] for more details.
 //!
 //! The idea behind pre-processing is to generate random authenticated shares "per wire"[^0] that
 //! are input independent and circuit dependent. These shares will later be used for both
@@ -12,13 +12,11 @@
 //! shares:
 //! (1) The regular authenticated shares
 //! (2) Correlated authenticated shares that we call AND triples
-//! These two pairs of AND shares are combined in the online phase to properly garble and evaluate
-//! AND gates.
+//! these two pairs of AND shares are combined in the online phase to properly garble and evaluate
+//! AND gates. See Figure 2 in [^1] for more details.
 //!
-//! For more details, please checkout Figure 2 in [^1].
-//!
-//! Note on [^0]: In practice, we only generate these shares for input wires and the output wires
-//! of AND gates. The reason is that the construction in [^1] preserves certain classic Garbled Circuits
+//! [^0]: In practice, we only generate these shares for input wires and the output wires
+//! of AND gates. The reason is that the construction in [1] preserves certain classic Garbled Circuits
 //! optimizations and namely free-XORs. Recall that in free-XOR: $L_0 \oplus L_1 = \Delta$.
 //!
 //! References:
@@ -39,6 +37,15 @@ use swanky_channel::Channel;
 use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender};
 use swanky_party::Party;
 use vectoreyes::U8x16;
+
+/// Pre-process a circuit for authenticated garbling.
+///
+/// Authenticated garbling utilizes pre-computed [`AndTriple`]s and [`AuthShare`]s in its "online" portion. 
+/// This function generates the correct number of such triples and shares for a given circuit of interest. 
+/// The circuit is provided as a closure which takes in a fancy object (in this case an [`Analyzer`]) and circuit inputs
+/// written as [`BinaryBundle`] over fancy items ( in this case [`AnalyzerItem`]), and triples and shares are 
+/// generated using the provided [`AndTripleGenerator`].
+
 /// The pre-processing function
 ///
 /// This function takes in
@@ -46,9 +53,6 @@ use vectoreyes::U8x16;
 /// - and_generator: An And Triple Generator that has been pre-initialized.
 /// - auth_generator: An Authenticated Share Generator that has been pre-initialized.
 /// - input_size: The size in bits of the parties inputs to the circuit.
-/// - channel: The swanky channel that the parties can communicate over.
-/// - rng: A random number generator
-///
 /// This function returns:
 /// - A vector of AndTriples that are party dependent. This protocol generates as many
 /// AndTriples as there are AND gates.
@@ -75,15 +79,15 @@ pub fn f_preprocessing<
     let dummy_wires_self: BinaryBundle<AnalyzerItem> = analyzer.bin_encode(0, input_size).unwrap();
     let dummy_wires_other: BinaryBundle<AnalyzerItem> = analyzer.bin_receive(input_size).unwrap();
 
-    let _ = circuit(&mut analyzer, dummy_wires_self, dummy_wires_other);
+    circuit(&mut analyzer, dummy_wires_self, dummy_wires_other)?;
 
     let nands = analyzer.nands();
-    let mut and_shares = Vec::new();
-    let _ = and_generator.generate(nands, &mut and_shares, channel, rng)?;
+    let mut and_shares = Vec::with_capacity(nands);
+    and_generator.generate(nands, &mut and_shares, channel, rng)?;
 
     let ninputs = analyzer.ninputs();
-    let mut auth_shares = Vec::new();
-    let _ = auth_generator.generate(nands + ninputs, &mut auth_shares, channel, rng)?;
+    let mut auth_shares = Vec::with_capacity(ninputs);
+    auth_generator.generate(nands + ninputs, &mut auth_shares, channel, rng)?;
 
     Ok((and_shares, auth_shares))
 }
