@@ -338,6 +338,10 @@ impl<F: Default + Clone + Copy> CircuitMemory<F> {
         &self.cont
     }
 
+    /// Create a new circuit memory.
+    ///
+    /// Provided the maximum wire id, it will prepare a memory ready to received contents for
+    /// wires up to this maximum wire id.
     pub(crate) fn new(max_wire_id: WireId) -> Self {
         let size = max_wire_id as usize + 1;
         return CircuitMemory {
