@@ -4,6 +4,7 @@ use merlin::Transcript;
 use rand::thread_rng;
 use schmivitz::{
     circuit::load_circuit_from_strings_prover,
+    circuit_validator::validate_circuit,
     vole::functionality::{VoleProver, VoleVerifier},
     Proof,
 };
@@ -26,6 +27,7 @@ fn benchmark_aes256(c: &mut Criterion) {
 
     let circuit =
         load_circuit_from_strings_prover(mini_circuit_bytes, private_input_bytes).unwrap();
+    validate_circuit(&circuit).unwrap();
 
     c.bench_function("aes256_prove", |b| {
         b.iter(|| {
@@ -63,6 +65,7 @@ fn benchmark_sha256(c: &mut Criterion) {
 
     let circuit =
         load_circuit_from_strings_prover(mini_circuit_bytes, private_input_bytes).unwrap();
+    validate_circuit(&circuit).unwrap();
 
     c.bench_function("sha256_prove", |b| {
         b.iter(|| {
