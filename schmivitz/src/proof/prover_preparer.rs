@@ -50,12 +50,7 @@ impl ProverPreparer {
     fn save_wire(&mut self, wid: WireId, value: F2) -> eyre::Result<()> {
         // Assumption: Every wire ID will be assigned to exactly once, so if there's already a
         // value associated with a wire ID, the circuit is malformed.
-        if self.wire_values.insert(wid, value).is_some() {
-            bail!(
-                "Invalid input: assigned to a wire ID {} more than once",
-                wid
-            );
-        }
+        self.wire_values.insert(wid, value);
         Ok(())
     }
 
@@ -76,8 +71,7 @@ impl ProverPreparer {
                     assert_eq!(ty, 0);
 
                     let sum = match (self.wire_values.get(&left), self.wire_values.get(&right)) {
-                        (Some(l_val), Some(r_val)) => l_val + r_val,
-                        _ => bail!("Malformed circuit: used a wire that has not yet been defined"),
+                        (l_val, r_val) => l_val + r_val,
                     };
 
                     self.save_wire(dst, sum)?;
@@ -90,8 +84,7 @@ impl ProverPreparer {
 
                     let product = match (self.wire_values.get(&left), self.wire_values.get(&right))
                     {
-                        (Some(l_val), Some(r_val)) => l_val * r_val,
-                        _ => bail!("Malformed circuit: used a wire that has not yet been defined"),
+                        (l_val, r_val) => l_val * r_val,
                     };
 
                     // Save product to the witness and associate it with its wire ID
@@ -103,8 +96,7 @@ impl ProverPreparer {
                     assert_eq!(ty, 0);
 
                     let sum = match self.wire_values.get(&left) {
-                        Some(l_val) => l_val + F2::from_number(&right)?,
-                        _ => bail!("Malformed circuit: used a wire that has not yet been defined"),
+                        l_val => l_val + F2::from_number(&right)?,
                     };
 
                     self.save_wire(dst, sum)?;
@@ -296,8 +288,8 @@ mod tests {
         // This evaluates on a random input; over time we'll check them all
         let counter = prepare_circuit(one_add)?;
         assert_eq!(
-            counter.wire_values.get(&0).unwrap() + counter.wire_values.get(&1).unwrap(),
-            *counter.wire_values.get(&2).unwrap()
+            counter.wire_values.get(&0) + counter.wire_values.get(&1),
+            *counter.wire_values.get(&2)
         );
 
         Ok(())
@@ -317,8 +309,8 @@ mod tests {
         // This evaluates on a random input; over time we'll check them all
         let counter = prepare_circuit(one_mul)?;
         assert_eq!(
-            counter.wire_values.get(&0).unwrap() * counter.wire_values.get(&1).unwrap(),
-            *counter.wire_values.get(&2).unwrap()
+            counter.wire_values.get(&0) * counter.wire_values.get(&1),
+            *counter.wire_values.get(&2)
         );
 
         Ok(())

@@ -333,6 +333,7 @@ pub(crate) struct CircuitMemory<F> {
 
 impl<F: Default + Clone + Copy> CircuitMemory<F> {
     // NOTE: This accessor for the internal memory is only used in unit tests.
+    #[allow(dead_code)]
     pub(crate) fn get_memory(&self) -> &[F] {
         &self.cont
     }
@@ -344,15 +345,23 @@ impl<F: Default + Clone + Copy> CircuitMemory<F> {
         };
     }
 
-    pub(crate) fn insert(&mut self, wid: WireId, e: F) -> Option<F> {
+    /// Insert in the memory at wire id `wid` and value `e`.
+    ///
+    /// This function assumes that it is called on a memory associated with a well-formed circuit,
+    /// more specifically that the wire id has not been previously set, so that it does not have to
+    /// return the stored old value.
+    pub(crate) fn insert(&mut self, wid: WireId, e: F) -> () {
         let idx: usize = wid as usize;
         self.cont[idx] = e;
-        None
     }
 
-    pub(crate) fn get(&self, wid: &WireId) -> Option<&F> {
+    /// Get from the memory the value stored at the memory indexed by wire id `wid`.
+    ///
+    /// This function assumes that it is called on a memory associated with a well-formed circuit,
+    /// more specifically that the wire id has been previously set.
+    pub(crate) fn get(&self, wid: &WireId) -> &F {
         let idx: usize = *wid as usize;
-        Some(&self.cont[idx])
+        &self.cont[idx]
     }
 
     pub(crate) fn len(&self) -> usize {

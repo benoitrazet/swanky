@@ -1,5 +1,5 @@
 use diet_mac_and_cheese::fields::SieveIrDeserialize;
-use eyre::{bail, eyre, Result};
+use eyre::{bail, Result};
 use mac_n_cheese_sieve_parser::WireId;
 use std::borrow::Borrow;
 use swanky_field::FiniteRing;
@@ -79,15 +79,11 @@ impl VerifierTraverser {
     /// correct witness for an addition gate is the sum of the witnesses of the two input wires.
     /// This method does not validate the correctness of the provided witness.
     ///
-    /// Fails if the wire ID was already associated with a witness.
+    /// This function assumes that the circuit is well-formed and that wire ID can be assigned in memory
+    /// and that is was not already assigned.
     fn save_computed_masked_witness(&mut self, wid: WireId, masked_witness: F128b) -> Result<()> {
-        match self.assigned_masked_witnesses.insert(wid, masked_witness) {
-            Some(_) => bail!(
-                "Something went wrong assigning a masked witness to {}; it was already assigned!",
-                wid
-            ),
-            None => Ok(()),
-        }
+        self.assigned_masked_witnesses.insert(wid, masked_witness);
+        Ok(())
     }
 
     /// Assign a wire ID to the next unused masked witness and get the corresponding challenge.
@@ -138,15 +134,7 @@ impl VerifierTraverser {
     /// by computing the appropriate witness for a linear gate and assigning it via
     /// [`Self::save_computed_masked_witness()`].
     fn masked_witness(&self, wid: WireId) -> Result<F128b> {
-        self.assigned_masked_witnesses
-            .get(&wid)
-            .ok_or_else(|| {
-                eyre!(
-                    "Internal invariant failed: expected a masked witness value for wire ID {}",
-                    wid
-                )
-            })
-            .copied()
+        Ok(*self.assigned_masked_witnesses.get(&wid))
     }
 
     /// Decomposes into the aggregate component (a partial construction of `c~`) that was built

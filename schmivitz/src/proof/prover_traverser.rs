@@ -1,4 +1,4 @@
-use eyre::{bail, eyre, Result};
+use eyre::{bail, Result};
 use mac_n_cheese_sieve_parser::WireId;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F128b, F2};
@@ -87,34 +87,18 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
 
     /// Retrieve the wire value associated with the [`WireId`].
     ///
-    /// Fails if the wire value map provided by the caller does not contain the given ID.
+    /// It assumes the circuit is well-formed and the wire requested has been previously assigned.
     fn wire_value(&self, wid: WireId) -> Result<F2> {
-        self.wire_values
-            .get(&wid)
-            .ok_or_else(|| {
-                eyre!(
-                    "Internal invariant failed: expected a witness value for wire ID {}",
-                    wid
-                )
-            })
-            .copied()
+        Ok(*self.wire_values.get(&wid))
     }
 
     /// Retrieve the VOLE value associated with the [`WireId`].
     ///
-    /// Fails if the [`WireId`] has not been associated with a VOLE, either by assigning
+    /// It assumes the [`WireId`] has not been associated with a VOLE, either by assigning
     /// a new VOLE to a non-linear gate with [`Self::assign_vole()`] or computing the appropriate
     /// VOLE for a linear gate and assigning it via [`Self::save_computed_vole()`].
     fn vole(&self, wid: WireId) -> Result<F128b> {
-        self.assigned_voles
-            .get(&wid)
-            .ok_or_else(|| {
-                eyre!(
-                    "Internal invariant failed: expected a VOLE correlated to wire ID {}",
-                    wid
-                )
-            })
-            .copied()
+        Ok(*self.assigned_voles.get(&wid))
     }
 
     /// Associates the given VOLE with the [`WireId`].
@@ -124,15 +108,11 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
     /// VOLE for an addition gate is the sum of the VOLEs of the two input wires. This method
     /// does not validate the correctness of the VOLE.
     ///
-    /// Fails if the wire ID was already associated with a VOLE.
+    /// This function assumes that the circuit is well-formed and that wire ID can be assigned in memory
+    /// and that is was not already assigned.
     fn save_computed_vole(&mut self, wid: WireId, vole: F128b) -> Result<()> {
-        match self.assigned_voles.insert(wid, vole) {
-            Some(_) => bail!(
-                "Something went wrong assigning a VOLE to {}; it was already assigned!",
-                wid
-            ),
-            None => Ok(()),
-        }
+        self.assigned_voles.insert(wid, vole);
+        Ok(())
     }
 
     /// Assigns an unused VOLE to the wire ID.
@@ -362,7 +342,7 @@ mod tests {
             traverser.save_computed_vole(wid, vole)?;
 
             // The value stored is extremely unlikely to be zero
-            assert!(*traverser.assigned_voles.get(&wid).unwrap() != F128b::ZERO);
+            assert!(*traverser.assigned_voles.get(&wid) != F128b::ZERO);
         }
 
         for id in (2..linear_gates.len()).into_iter() {
@@ -374,7 +354,7 @@ mod tests {
             traverser.assign_vole(wid)?;
 
             // The value stored is extremely unlikely to be zero
-            assert!(*traverser.assigned_voles.get(&wid).unwrap() != F128b::ZERO);
+            assert!(*traverser.assigned_voles.get(&wid) != F128b::ZERO);
         }
 
         Ok(())
