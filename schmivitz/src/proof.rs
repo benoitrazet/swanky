@@ -100,12 +100,13 @@ where
             .collect();
         log::info!("3: witness_commitment: {:?}", t.elapsed());
 
+        let t = std::time::Instant::now();
         // TODO:
-        // Add u~ to the transcript
-        // Add hV to the transcript
+        // The hashing of u~ and hV is done in the Vole generation. In order to do it here we have to change the interface of VoleP to expose these fields.
+        // Add u~ from the proof into the transcript here instead of in the vole part.
+        // Add hV (from VOLE) to the transcript here instead of in the vole part.
 
         // Add witness commitment to the transcript and generate a challenge for each polynomial
-        let t = std::time::Instant::now();
         transcript.append_witness_commitment(witness_commitment.as_slice());
         let witness_challenges = transcript.extract_witness_challenges(polynomial_count);
 
@@ -175,16 +176,18 @@ where {
         self.validate_proof(&reconstructed_voles)?;
         log::info!("1: VoleV::reconstruct: {:?}", t.elapsed());
 
-        // TODO:
-        // Add u~ from the proof into the transcript
-        // Add hV (from VOLE) to the transcript
-
         // Add `d` to transcript and generate challenges for each polynomial
         let t = std::time::Instant::now();
         transcript.append_witness_commitment(self.witness_commitment.as_slice());
         log::info!("2: append_witness_commitment {:?}", t.elapsed());
-        // TODO: Should we be doing something with these challenges?
+
         let t = std::time::Instant::now();
+        // TODO:
+        // The hashing of u~ and hV is done in the Vole generation. In order to do it here we have to change the interface of VoleP to expose these fields.
+        // Add u~ from the proof into the transcript here instead of in the vole part.
+        // Add hV (from VOLE) to the transcript here instead of in the vole part.
+
+        // TODO: Should we be doing something with these challenges?
         let witness_challenges = transcript.extract_witness_challenges(self.polynomial_count);
         log::info!("3: extract_witness_challenges {:?}", t.elapsed());
 
