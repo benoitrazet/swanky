@@ -3,7 +3,8 @@
 //! The first step in authenticated garbling consists in pre-processing a fixed
 //! circuit in order to give each party shares of wire labels. This pre-processing
 //! step is one of the main reasons why authenticated garbling achieves
-//! an *online* communication complexity that is "close to" its semi-honest counterpart. See Figure 2 in [^1] for more details.
+//! an *online* communication complexity that is "close to" its semi-honest counterpart.
+//! See Figure 2 from Katz et al.[^1] for more details.
 //!
 //! The idea behind pre-processing is to generate random authenticated shares "per wire"[^0] that
 //! are input independent and circuit dependent. These shares will later be used for both
@@ -13,11 +14,11 @@
 //! (1) The regular authenticated shares
 //! (2) Correlated authenticated shares that we call AND triples
 //! these two pairs of AND shares are combined in the online phase to properly garble and evaluate
-//! AND gates. See Figure 2 in [^1] for more details.
+//! AND gates. See Figure 2 from Katz et al.[^1] for more details.
 //!
 //! [^0]: In practice, we only generate these shares for input wires and the output wires
-//! of AND gates. The reason is that the construction in [1] preserves certain classic Garbled Circuits
-//! optimizations and namely free-XORs. Recall that in free-XOR: $L_0 \oplus L_1 = \Delta$.
+//! of AND gates. The reason is that the construction preserves certain classic Garbled Circuits
+//! optimizations and namely free-XORs [^1]. Recall that in free-XOR: $`L_0 \oplus L_1 = \Delta`$.
 //!
 //! References:
 //! [^1]: J. Katz, S. Ranellucci, M. Rosulek, X. Wang. "Optimizing Authenticated
@@ -30,35 +31,23 @@ use fancy_garbling::{BinaryBundle, FancyInput};
 use rand::{CryptoRng, Rng};
 use swanky_authenticated_bits::{
     and_triples::{AndTriple, AndTripleGenerator},
-    authshares::{AuthShare},
+    authshares::AuthShare,
 };
 use swanky_channel::Channel;
 use swanky_party::Party;
 
 /// Pre-process a circuit for authenticated garbling.
 ///
-/// Authenticated garbling utilizes pre-computed [`AndTriple`]s and [`AuthShare`]s in its "online" portion. 
-/// This function generates the correct number of such triples and shares for a given circuit of interest. 
+/// Authenticated garbling utilizes pre-computed [`AndTriple`]s and [`AuthShare`]s in its "online" portion.
+/// This function generates the correct number of such triples and shares for a given circuit of interest.
 /// The circuit is provided as a closure which takes in a fancy object (in this case an [`Analyzer`]) and circuit inputs
-/// written as [`BinaryBundle`] over fancy items ( in this case [`AnalyzerItem`]), and triples and shares are 
+/// written as [`BinaryBundle`] over fancy items (in this case [`AnalyzerItem`]), and triples and shares are
 /// generated using the provided [`AndTripleGenerator`].
-
-/// The pre-processing function
-///
-/// This function takes in
-/// - circuit: a fancy circuit written as a closure.
-/// - and_generator: An And Triple Generator that has been pre-initialized.
-/// - auth_generator: An Authenticated Share Generator that has been pre-initialized.
-/// - input_size: The size in bits of the parties inputs to the circuit.
-/// This function returns:
-/// - A vector of AndTriples that are party dependent. This protocol generates as many
-/// AndTriples as there are AND gates.
-/// - A vector of AuthShare that are party dependent. This protocol generates as many
-/// AuthShare as there are AND gates and input wires.
-pub fn f_preprocessing<
-    P: Party,
-    RNG: CryptoRng + Rng,
->(
+/// 
+/// Note that the fancy circuit passed to this function is generic in the size of the input,
+/// this is why we need to pass the input size separately. This fancy circuit is the same one that will
+/// be later used for garbling.
+pub fn f_preprocessing<P: Party, RNG: CryptoRng + Rng>(
     circuit: impl Fn(
         &mut Analyzer,
         BinaryBundle<AnalyzerItem>,
@@ -81,7 +70,12 @@ pub fn f_preprocessing<
 
     let ninputs = analyzer.ninputs();
     let mut auth_shares = Vec::with_capacity(ninputs);
-    and_generator.auth_share_generator_mut().generate(nands + ninputs, &mut auth_shares, channel, rng)?;
+    and_generator.auth_share_generator_mut().generate(
+        nands + ninputs,
+        &mut auth_shares,
+        channel,
+        rng,
+    )?;
 
     Ok((and_shares, auth_shares))
 }
@@ -120,8 +114,7 @@ mod tests {
         let (_shares_gb, _shares_ev) = swanky_channel::local::local_channel_pair(
             |c| {
                 let mut rng = AesRng::new();
-                let mut generator_and_triples =
-                    AndTripleGenerator::<Garbler>::new(c, &mut rng)?;
+                let mut generator_and_triples = AndTripleGenerator::<Garbler>::new(c, &mut rng)?;
                 Ok(f_preprocessing(
                     fancy_sum,
                     &mut generator_and_triples,
@@ -132,8 +125,7 @@ mod tests {
             },
             |c| {
                 let mut rng = AesRng::new();
-                let mut generator_and_triples =
-                    AndTripleGenerator::<Evaluator>::new(c, &mut rng)?;
+                let mut generator_and_triples = AndTripleGenerator::<Evaluator>::new(c, &mut rng)?;
                 Ok(f_preprocessing(
                     fancy_sum,
                     &mut generator_and_triples,

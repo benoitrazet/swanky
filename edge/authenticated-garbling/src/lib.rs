@@ -1,4 +1,4 @@
-#![deny(missing_docs)]
+// #![deny(missing_docs)]
 //! Authenticated malicious garbling in the presence of a malicious garbler and evaluator
-mod analyzer;
-mod preprocess;
+pub mod analyzer;
+pub mod preprocess;

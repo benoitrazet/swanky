@@ -2,12 +2,13 @@
 use eyre::{ErrReport, eyre};
 use fancy_garbling::{Fancy, FancyBinary, FancyInput, FancyReveal, HasModulus, errors::FancyError};
 use std::error::Error;
-#[derive(Clone, Debug)]
-/// "An instantiation of [FancyInput::Item] used by [Analyzer]."
+
+/// An instantiation of [`FancyInput::Item`] used by [`Analyzer`].
 ///
 /// A dummy FancyItem which is returned when profiling a [`fancy_garbling::Fancy`] circuit.
 /// The [`AnalyzerItem`] only contains the wire modulus. This is because
-/// [`fancy_garbling::Fancy::Item`] need to implement [`HasModulus`].
+/// [`fancy_garbling::Fancy::Item`] needs to implement [`HasModulus`].
+#[derive(Clone, Debug)]
 pub struct AnalyzerItem {
     modulus: u16,
 }
@@ -20,11 +21,11 @@ impl HasModulus for AnalyzerItem {
     }
 }
 
-#[derive(Debug)]
 /// Error from the [`Analyzer`] fancy object
 ///
 /// This error wraps any underlying error thrown by
 /// [`fancy_garbling::Fancy`] with eyre.
+#[derive(Debug)]
 pub enum AnalyzerError {
     Underlying(ErrReport),
 }
@@ -45,13 +46,13 @@ impl std::fmt::Display for AnalyzerError {
 
 impl Error for AnalyzerError {}
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 /// A [`fancy_garbling::Fancy`] object which counts gates in a binary circuit.
 ///
 /// Specifically, [`Analyzer`] stores the number of inputs,
 /// ands, xors, negations and constants in the circuits. This
 /// information is especially useful for pre-processing authenticated
 /// garbling circuits.
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Analyzer {
     ninputs: usize,
     nands: usize,
@@ -63,15 +64,11 @@ pub struct Analyzer {
 impl std::fmt::Display for Analyzer {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f, "computation info:")?;
-        writeln!(f, "  number of inputs:             {:16}", self.ninputs)?;
-        writeln!(f, "  number of ands:             {:16}", self.nands)?;
-        writeln!(f, "  number of xors:             {:16}", self.nxors)?;
-        writeln!(f, "  number of negations:             {:16}", self.nnegs)?;
-        writeln!(
-            f,
-            "  number of constants:             {:16}",
-            self.nconstants
-        )?;
+        writeln!(f, "   number of inputs: {:16}", self.ninputs)?;
+        writeln!(f, "   number of ands: {:16}", self.nands)?;
+        writeln!(f, "   number of xors: {:16}", self.nxors)?;
+        writeln!(f, "   number of negations: {:16}", self.nnegs)?;
+        writeln!(f, "   number of constants: {:16}", self.nconstants)?;
         Ok(())
     }
 }
@@ -80,13 +77,7 @@ impl Analyzer {
     /// Create a new [`Analyzer`] and sets all the gate
     /// counts to 0.
     pub fn new() -> Analyzer {
-        Analyzer {
-            ninputs: 0,
-            nands: 0,
-            nxors: 0,
-            nnegs: 0,
-            nconstants: 0,
-        }
+        Default::default()
     }
     /// Return the number of AND gates in the circuit
     pub fn nands(&self) -> usize {
