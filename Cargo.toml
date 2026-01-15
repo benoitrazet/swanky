@@ -139,31 +139,31 @@ ff_codegen = { git = "https://github.com/GaloisInc/ff", rev = "c29da06f50c67fe9e
 # External Dependencies
 aes = "0.8.4"
 aes-gcm = "0.10.3"
-anyhow = "1.0.98"
-arc-swap = "1.7.1"
+anyhow = "1.0.100"
+arc-swap = "1.8.0"
 arrayvec = "0.7.6"
-bincode = "1"
-bitpacking = "0.9.2"
+bincode = "^1"
+bitpacking = "0.9.3"
 bitvec = { version = "1.0.1", features = ["alloc"] }
 # We disable avx512 since we typically run on skylake.
-blake3 = { version = "1.8.2", features = ["no_avx512"] }
+blake3 = { version = "1.8.3", features = ["no_avx512"] }
 bufstream = "0.1.4"
-bumpalo = "3.19.0"
+bumpalo = "3.19.1"
 bumpalo-herd = "0.1.2"
-bytemuck = { version = "1.23.1", features = [
+bytemuck = { version = "1.24.0", features = [
   "derive",
   "min_const_generics",
   "extern_crate_alloc",
   "aarch64_simd",
 ] }
-bytes = "1.10.1"
-cc = "1.2.31"
+bytes = "1.11.0"
+cc = "1.2.52"
 ciborium = "0.2.2"
-clap = { version = "4.5.43", features = ["derive"] }
+clap = { version = "4.5.54", features = ["derive"] }
 color-eyre = "0.6.5"
 console_error_panic_hook = "0.1.7"
 console_log = { version = "1.0", features = ["color"] }
-criterion = "0.7.0"
+criterion = "0.8.1"
 crossbeam = "0.8.4"
 crossbeam-queue = "0.3.12"
 crypto-bigint = { version = "0.6.1", features = ["hybrid-array"] }
@@ -172,22 +172,22 @@ dhat = "0.3.3"
 digest = "0.10.7"
 env_logger = "0.11.8"
 eyre = "0.6.12"
-flatbuffers = "25.2.10" # Keep this version in sync with edge/flatbuffer-build/src/flatc-ver.txt
-flume = "0.11.1"
-generic-array = { version = "1.2.0", features = ["serde"] }
+flatbuffers = "25.12.19" # Keep this version in sync with edge/flatbuffer-build/src/flatc-ver.txt
+flume = "0.12.0"
+generic-array = { version = "1.3.5", features = ["serde"] }
 hex = "0.4.3"
-io-uring = "0.7.9"
+io-uring = "0.7.11"
 itertools = "0.14.0"
 jemallocator = "0.5.4"
-libc = "0.2.174"
-log = "0.4.27"
+libc = "0.2.180"
+log = "0.4.29"
 lz4 = "1.28.1"
-memchr = "2.7.5"
-memmap2 = "0.9.7"
+memchr = "2.7.6"
+memmap2 = "0.9.9"
 merkle-cbt = "0.3.2"
 merlin = "3.0.0"
-mimalloc = { version = "0.1.47", default-features = false }
-moka = { version = "0.12.10", features = ["sync"] }
+mimalloc = { version = "0.1.48", default-features = false }
+moka = { version = "0.12.12", features = ["sync"] }
 ndarray = "=0.15.6" # See issue #123
 # Rather than enabling nix features on a per-crate basis (which could lead to issues where
 # compiling the whole workspace might succeed, but compiling an individual crate might fail),
@@ -196,35 +196,35 @@ nix = { version = "0.30.1", features = ["sched"] }
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
 num_cpus = "1.17.0"
-parking_lot = "0.12.4"
+parking_lot = "0.12.5"
 pretty_env_logger = "0.5"
-prettyplease = "0.2.36"
-proc-macro2 = "1.0.95"
-rand = "0.8.5"
-rand_chacha = "0.3.1"
-rand_core = "0.6.4"
-proptest = "1.7.0"
-quick-xml = "0.38.1"
-quote = "1.0.40"
-rayon = "1.10.0"
-regex = "1.11.1"
+prettyplease = "0.2.37"
+proc-macro2 = "1.0.105"
+rand = "^0.8.5"
+rand_chacha = "^0.3.1"
+rand_core = "^0.6.4"
+proptest = "1.9.0"
+quick-xml = "0.39.0"
+quote = "1.0.43"
+rayon = "1.11.0"
+regex = "1.12.2"
 ring = "0.17.14"
 rpmalloc = "0.2.2"
 rustc-hash = "2.1.1"
-rustls = { version = "0.23.31", default-features = false, features = [
+rustls = { version = "0.23.36", default-features = false, features = [
   "std",
   "ring",
 ] }
 rustls-pemfile = "2.2.0"
-serde = "1.0.219"
-serde_json = "1.0.142"
+serde = "1.0.228"
+serde_json = "1.0.149"
 sha2 = "0.10.9"
 smallvec = { version = "1.15.1", features = [
   "const_generics",
   "union",
   "const_new",
 ] }
-snafu = "0.8.6"
+snafu = "0.8.9"
 snmalloc-rs = { version = "0.3.8", default-features = false, features = [
   "build_cc",
   "usecxx17",
@@ -234,13 +234,13 @@ subtle = { version = "2.6.1", features = [
   "core_hint_black_box",
   "const-generics",
 ] }
-syn = { version = "2.0.104", features = ["full"] }
-tempfile = "3.20.0"
-thiserror = "2.0.12"
-toml = "0.9.5"
-tungstenite = { version = "0.27.0", features = ["rustls"] }
-twox-hash = "2.1.1"
-wasm-bindgen = "0.2.100"
+syn = { version = "2.0.114", features = ["full"] }
+tempfile = "3.24.0"
+thiserror = "2.0.17"
+toml = "0.9.11"
+tungstenite = { version = "0.28.0", features = ["rustls"] }
+twox-hash = "2.1.2"
+wasm-bindgen = "0.2.108"
 zstd = "0.13.3"
 
 [profile.release]
