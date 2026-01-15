@@ -70,9 +70,7 @@ impl ProverPreparer {
                     // Assumption: There is exactly one type ID for these circuits and it is F2.
                     assert_eq!(ty, 0);
 
-                    let sum = match (self.wire_values.get(&left), self.wire_values.get(&right)) {
-                        (l_val, r_val) => l_val + r_val,
-                    };
+                    let sum = self.wire_values.get(&left) + self.wire_values.get(&right);
 
                     self.save_wire(dst, sum)?;
                 }
@@ -82,10 +80,7 @@ impl ProverPreparer {
 
                     self.challenge_count += 1;
 
-                    let product = match (self.wire_values.get(&left), self.wire_values.get(&right))
-                    {
-                        (l_val, r_val) => l_val * r_val,
-                    };
+                    let product = self.wire_values.get(&left) * self.wire_values.get(&right);
 
                     // Save product to the witness and associate it with its wire ID
                     self.witness.push(product);

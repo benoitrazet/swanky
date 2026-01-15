@@ -333,7 +333,7 @@ pub(crate) struct CircuitMemory<F> {
 
 impl<F: Default + Clone + Copy> CircuitMemory<F> {
     // NOTE: This accessor for the internal memory is only used in unit tests.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn get_memory(&self) -> &[F] {
         &self.cont
     }
