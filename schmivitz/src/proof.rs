@@ -115,6 +115,7 @@ where
         // the challenges.
         let mut circuit_traverser = ProverTraverser::new(wire_values, witness_challenges, voles)?;
         circuit_traverser.execute(&circuit)?;
+        // TODO: consider not returning the `voles` with `into_parts()`. This interface does not communicate that `voles` are only read but not modified by the circuit traverser
         let (degree_0_aggregation, degree_1_aggregation, voles) = circuit_traverser.into_parts()?;
 
         log::info!("4: circuit_traverser.into_parts: {:?}", t.elapsed());
