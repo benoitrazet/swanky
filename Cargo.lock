@@ -2121,6 +2121,7 @@ version = "0.6.0"
 dependencies = [
  "aes",
  "blake3",
+ "criterion",
  "diet-mac-and-cheese",
  "eyre",
  "generic-array 1.1.0",

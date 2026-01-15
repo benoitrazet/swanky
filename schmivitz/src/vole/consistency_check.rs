@@ -258,8 +258,6 @@ pub(crate) struct VoleHasher {
     r3: F128b,
     s0: F128b,
     s1: F128b,
-    s0_powers: Vec<F128b>,
-    s1_powers: Vec<F128b>,
     ell: usize,
     ell_prime: usize,
 }
@@ -287,25 +285,6 @@ impl VoleHasher {
         // Line 6.
         let ell_prime = SECURITY_PARAM * (ell + SECURITY_PARAM).div_ceil(SECURITY_PARAM);
 
-        // Precomputation: This is part of Line 10.
-        // This differs from the FAEST spec where the powers are in reverse order; this is also valid!
-        let mut s0_powers = Vec::with_capacity(ell_prime / SECURITY_PARAM - 1);
-        s0_powers.push(s0);
-        // The bounds written in the spec are _inclusive_, hence the `+1` at the end.
-        for i in 1..(ell_prime / SECURITY_PARAM - 1) + 1 {
-            s0_powers.push(s0_powers[i - 1] * s0);
-        }
-
-        // Precomputation: This is part of Line 11.
-        // This differs from the FAEST spec where the powers are in reverse order; this is also valid!
-        // This differs from the FAEST spec because it uses a different field.
-        let mut s1_powers = Vec::with_capacity((ell_prime / 64) - 1);
-        s1_powers.push(s1);
-        // The bounds written in the spec are _inclusive_, hence the `+1` at the end.
-        for i in 1..(ell_prime / 64 - 1) + 1 {
-            s1_powers.push(s1_powers[i - 1] * s1);
-        }
-
         Self {
             r0,
             r1,
@@ -314,9 +293,6 @@ impl VoleHasher {
 
             s0,
             s1,
-
-            s0_powers,
-            s1_powers,
 
             ell,
             ell_prime,
@@ -330,16 +306,18 @@ impl VoleHasher {
         // Line 7. This pads and converts to a field -- it is called `y_hat` in the spec.
         let x0_vec = self.to_field_128(x0);
 
-        // Line 10.
+        // Line 10 and 11.
+        // This differs from the FAEST spec where the powers are in reverse order; this is also valid!
+        // This differs from the FAEST spec because it uses a different field for `s1`.
         let mut h0 = F128b::ZERO;
-        for (x0_i, s0_i) in izip!(&x0_vec, &self.s0_powers) {
-            h0 += s0_i * x0_i;
-        }
-
-        // Line 11.
         let mut h1 = F128b::ZERO;
-        for (x0_i, s1_i) in izip!(x0_vec, &self.s1_powers) {
-            h1 += s1_i * x0_i;
+        let mut s0_powers = self.s0;
+        let mut s1_powers = self.s1;
+        for x0_i in x0_vec.iter() {
+            h0 += s0_powers * x0_i;
+            h1 += s1_powers * x0_i;
+            s0_powers *= self.s0;
+            s1_powers *= self.s1;
         }
 
         // Line 13.

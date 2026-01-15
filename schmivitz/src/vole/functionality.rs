@@ -11,6 +11,7 @@ use crate::vole::commit_reconstruct::{compute_secret_key, recompose_d, B};
 use crate::vole::consistency_check::{HashConsistency, VoleHasher};
 use crate::vole::crypto_primitives::{h2_chall1, Chall1, Chall3, Com, Seed, H1, H3, IV};
 use crate::vole::AsSecretBytes;
+use crate::vole::DecommitmentSerde;
 use generic_array::typenum::U16;
 use generic_array::GenericArray;
 use rayon::prelude::*;
@@ -182,6 +183,21 @@ pub struct PartialDecommitment {
     u_tilda: HashConsistency,
     /// Size of extended witness. `ell` in the paper.
     l: usize,
+}
+
+impl DecommitmentSerde for PartialDecommitment {
+    fn proof_size_estimate(&self) -> usize {
+        let size_com = (SECURITY_PARAM * 2) / 8;
+        let size_key = SECURITY_PARAM / 8;
+        let pdecom_bytes = REPETITION_PARAM * (self.pdecom[2].0.len() * size_key + size_com);
+
+        let corrections_bytes = (self.corrections.length() / 8) * (REPETITION_PARAM - 1);
+
+        let iv_bytes = 16;
+        let u_tilda_bytes = SECURITY_PARAM + B / 8;
+
+        return pdecom_bytes + corrections_bytes + iv_bytes + u_tilda_bytes;
+    }
 }
 
 /// Implements get for the functionality on the prover side
@@ -436,8 +452,8 @@ mod test {
                 Ok(val) => println!("loglvl: {}", val),
                 Err(_) => env::set_var("RUST_LOG", "info"),
             };
-
             pretty_env_logger::init_timed();
+
             let t = std::time::Instant::now();
             test_vole_prover_and_verifier(10_000_000);
             log::info!("VOLE-it-Head completed in: {:?}", t.elapsed());

@@ -24,6 +24,7 @@ impl RandomVoleP for VoleProver {
         secret: &Secret,
         _rng: &mut (impl CryptoRng + RngCore),
     ) -> (Self, Self::VoleChallenge) {
+        log::info!("NB VOLES {:?}", extended_witness_length);
         let mut statement_sig = [0u8; SECURITY_PARAM];
         transcript.challenge_bytes(b"statement signature", &mut statement_sig);
 
