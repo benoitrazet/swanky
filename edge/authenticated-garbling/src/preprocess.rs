@@ -25,9 +25,11 @@
 //! Garbling for Faster Secure Two-Party Computation".
 //! <https://eprint.iacr.org/2018/578.pdf>
 //!
-use crate::analyzer::{Analyzer, AnalyzerError, AnalyzerItem};
 use eyre::Ok;
-use fancy_garbling::{BinaryBundle, FancyInput};
+use fancy_garbling::{
+    BinaryBundle, FancyInput,
+    circuit_analyzer::{AnalyzerError, AnalyzerItem, CircuitAnalyzer},
+};
 use rand::{CryptoRng, Rng};
 use swanky_authenticated_bits::{
     and_triples::{AndTriple, AndTripleGenerator},
@@ -43,13 +45,13 @@ use swanky_party::Party;
 /// The circuit is provided as a closure which takes in a fancy object (in this case an [`Analyzer`]) and circuit inputs
 /// written as [`BinaryBundle`] over fancy items (in this case [`AnalyzerItem`]), and triples and shares are
 /// generated using the provided [`AndTripleGenerator`].
-/// 
+///
 /// Note that the fancy circuit passed to this function is generic in the size of the input,
 /// this is why we need to pass the input size separately. This fancy circuit is the same one that will
 /// be later used for garbling.
 pub fn f_preprocessing<P: Party, RNG: CryptoRng + Rng>(
     circuit: impl Fn(
-        &mut Analyzer,
+        &mut CircuitAnalyzer,
         BinaryBundle<AnalyzerItem>,
         BinaryBundle<AnalyzerItem>,
     ) -> Result<BinaryBundle<AnalyzerItem>, AnalyzerError>,
@@ -58,7 +60,7 @@ pub fn f_preprocessing<P: Party, RNG: CryptoRng + Rng>(
     channel: &mut Channel,
     rng: &mut RNG,
 ) -> eyre::Result<(Vec<AndTriple<P>>, Vec<AuthShare<P>>)> {
-    let mut analyzer = Analyzer::new();
+    let mut analyzer = CircuitAnalyzer::new();
     let dummy_wires_self: BinaryBundle<AnalyzerItem> = analyzer.bin_encode(0, input_size).unwrap();
     let dummy_wires_other: BinaryBundle<AnalyzerItem> = analyzer.bin_receive(input_size).unwrap();
 
