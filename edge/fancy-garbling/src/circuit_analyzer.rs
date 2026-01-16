@@ -147,18 +147,150 @@ impl FancyInput for CircuitAnalyzer {
 
 impl FancyBinary for CircuitAnalyzer {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        FancyArithmetic::add(self, x, y)
+        self.nxors += 1;
+        // Fancy's XOR gate calls the underlying arithmetic addition
+        self.nadds += 1;
+        Ok(AnalyzerItem {
+            modulus: x.modulus,
+            // Same depth as an ADD
+            depth: max(x.depth, y.depth),
+        })
     }
 
     fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        FancyArithmetic::mul(self, x, y)
+        self.nands += 1;
+        // Fancy's AND gate calls the underlying arithmetic multiplication
+        self.nmuls += 1;
+        Ok(AnalyzerItem {
+            modulus: x.modulus,
+            // Same depth as a MUL
+            depth: max(x.depth, y.depth) + 1,
+        })
     }
-
+    fn or(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        self.nands += 1;
+        self.nnegs += 3;
+        // Fancy binary's AND gate calls the underlying arithmetic multiplication
+        self.nmuls += 1;
+        Ok(AnalyzerItem {
+            modulus: x.modulus,
+            // This is because OR in swanky invokes an AND gate
+            depth: max(x.depth, y.depth) + 1,
+        })
+    }
     fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+        self.nnegs += 1;
+
+        // Fancy implements negation with one constant gate and one XOR
+        self.nconstants += 1;
+        self.nxors += 1;
+
+        // Fancy's XOR gate calls the underlying arithmetic addition
+        self.nadds += 1;
+        Ok(AnalyzerItem {
+            modulus: x.modulus,
+            // Same depth as a XOR, except that negation is a unary gate
+            depth: x.depth,
+        })
+    }
+    fn adder(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        carry_in: Option<&Self::Item>,
+    ) -> Result<(Self::Item, Self::Item), Self::Error> {
+        // Fancy implements adders with 5 XORs and 2 ANDs
+        self.nands += 2;
+        self.nxors += 5;
+        // Fancy's AND gate calls the underlying arithmetic multiplication
+        self.nmuls += 2;
+        // Fancy's XOR gate calls the underlying arithmetic addition
+        self.nadds += 5;
+        // We need to take the carry_in's depth into account as it may come from elsewhere in the circuit
+        let carry_depth = { if let Some(v) = carry_in { v.depth } else { 0 } };
+        Ok((
+            AnalyzerItem {
+                modulus: x.modulus,
+                // An adder is comprised of two ANDS, which increase the multiplication depth
+                // by 2. We first however need to check which of the inputs has highest depths.
+                depth: max(max(x.depth, y.depth), carry_depth) + 2,
+            },
+            AnalyzerItem {
+                modulus: x.modulus,
+                depth: max(max(x.depth, y.depth), carry_depth) + 2,
+            },
+        ))
+    }
+    fn and_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
+        self.nands += args.len();
+        // Fancy's AND gate calls the underlying arithmetic multiplication
+        self.nmuls += args.len();
+        Ok(AnalyzerItem {
+            modulus: args[0].modulus,
+            // The gates comprising this function are all sequential
+            depth: args.iter().fold(args[0].depth, |acc, x| max(acc, x.depth)) + args.len(),
+        })
+    }
+    fn or_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
+        // Fancy implements OR with 3 NEGs and 1 AND.
+        self.nands += args.len();
+        self.nnegs += 3 * args.len();
+        // Recall that a negation is made of 1 constant input and 1 XOR
+        self.nconstants += args.len();
+        self.nxors += args.len();
+        // Fancy's AND gate calls the underlying arithmetic multiplication
+        self.nmuls += args.len();
+        // Fancy's XOR gate calls the underlying arithmetic addition
+        self.nadds += args.len();
+        Ok(AnalyzerItem {
+            modulus: args[0].modulus,
+            depth: args.iter().fold(args[0].depth, |acc, x| max(acc, x.depth)) + args.len(),
+        })
+    }
+    fn xor_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
+        self.nxors += args.len();
+        // Fancy's XOR gate calls the underlying arithmetic addition
+        self.nadds += args.len();
+        Ok(AnalyzerItem {
+            modulus: args[0].modulus,
+            depth: args.iter().fold(args[0].depth, |acc, x| max(acc, x.depth)),
+        })
+    }
+    fn mux_constant_bits(
+        &mut self,
+        x: &Self::Item,
+        _b1: bool,
+        _b2: bool,
+    ) -> Result<Self::Item, Self::Error> {
+        self.nnegs += 1;
+        self.nconstants += 2;
+
+        // Fancy implements negation with one constant gate and one XOR
+        self.nconstants += 1;
+        self.nxors += 1;
+
+        // Fancy's XOR gate calls the underlying arithmetic addition
         self.nadds += 1;
         Ok(AnalyzerItem {
             modulus: x.modulus,
             depth: x.depth,
+        })
+    }
+    fn mux(
+        &mut self,
+        b: &Self::Item,
+        x: &Self::Item,
+        y: &Self::Item,
+    ) -> Result<Self::Item, Self::Error> {
+        self.nands += 1;
+        self.nxors += 2;
+        // Fancy's AND gate calls the underlying arithmetic multiplication
+        self.nmuls += 2;
+        // Fancy's XOR gate calls the underlying arithmetic addition
+        self.nadds += 2;
+        Ok(AnalyzerItem {
+            modulus: x.modulus,
+            depth: max(max(x.depth, y.depth), b.depth) + 1,
         })
     }
 }
