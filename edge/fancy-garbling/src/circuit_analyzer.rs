@@ -361,3 +361,87 @@ impl FancyReveal for CircuitAnalyzer {
         Ok(0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::BinaryGadgets;
+    #[test]
+    fn single_and_gate_count_is_correct() {
+        let nbits = 64;
+        let x = 0;
+        let y = 0;
+        let mut analyzer_test: CircuitAnalyzer = CircuitAnalyzer::new();
+        {
+            let x = analyzer_test.bin_encode(x, nbits).unwrap();
+            let y = analyzer_test.bin_encode(y, nbits).unwrap();
+            let _c = analyzer_test.bin_and(&x, &y);
+        }
+
+        assert_eq!(analyzer_test.ninputs, 128);
+        assert_eq!(analyzer_test.nands, 64);
+        assert_eq!(analyzer_test.nxors, 0);
+        assert_eq!(analyzer_test.nconstants, 0);
+        assert_eq!(analyzer_test.nnegs, 0);
+    }
+    #[test]
+    fn binary_addition_counts_are_correct() {
+        let nbits = 64;
+        let x = 0;
+        let y = 0;
+        let mut analyzer_test: CircuitAnalyzer = CircuitAnalyzer::new();
+        {
+            let x = analyzer_test.bin_encode(x, nbits).unwrap();
+            let y = analyzer_test.bin_encode(y, nbits).unwrap();
+            // bin_addition is equivalent to an "adder" per wire
+            let _c = analyzer_test.bin_addition(&x, &y);
+        }
+
+        assert_eq!(analyzer_test.ninputs, 128);
+        assert_eq!(analyzer_test.nands, 64 * 2);
+        assert_eq!(analyzer_test.nxors, 64 * 5);
+        assert_eq!(analyzer_test.nconstants, 0);
+        assert_eq!(analyzer_test.nnegs, 0);
+    }
+    #[test]
+    fn binary_multiplication_counts_are_correct() {
+        let nbits = 64;
+        let x = 0;
+        let y = 0;
+        let mut analyzer_test: CircuitAnalyzer = CircuitAnalyzer::new();
+        {
+            let x = analyzer_test.bin_encode(x, nbits).unwrap();
+            let y = analyzer_test.bin_encode(y, nbits).unwrap();
+            // bin_addition is equivalent to an "adder" per wire
+            let _c = analyzer_test.bin_mul(&x, &y);
+        }
+
+        // In binary multiplication there are :
+        // - 64 * 64 explicit ANDs, i.e. pairwise ANDS between parties input wires.
+        // - Sum(65 to 128) binary additions. Recall that in multiplication the input
+        //   size grows by 1 bit each round until each 2 times the size of the initial
+        //   input (i.e. 64 * 2)
+        assert_eq!(analyzer_test.ninputs, 128);
+        assert_eq!(analyzer_test.nands, (65..128).sum::<usize>() * 2 + 64 * 64);
+        assert_eq!(analyzer_test.nxors, (65..128).sum::<usize>() * 5);
+        assert_eq!(analyzer_test.nconstants, 64);
+        assert_eq!(analyzer_test.nnegs, 0);
+    }
+    #[test]
+    fn binary_twos_complement_counts_are_correct() {
+        let nbits = 64;
+        let x = 0;
+        let mut analyzer_test: CircuitAnalyzer = CircuitAnalyzer::new();
+        {
+            let x = analyzer_test.bin_encode(x, nbits).unwrap();
+            // bin_addition is equivalent to an "adder" per wire
+            let _c = analyzer_test.bin_twos_complement(&x);
+        }
+
+        assert_eq!(analyzer_test.ninputs, 64);
+        assert_eq!(analyzer_test.nands, 63 * 2);
+        assert_eq!(analyzer_test.nxors, 63 * 5 + 3 + 64);
+        assert_eq!(analyzer_test.nconstants, 64 + 64);
+        assert_eq!(analyzer_test.nnegs, 64);
+    }
+}
