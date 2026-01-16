@@ -5,9 +5,15 @@ use crate::{
     errors::FancyError,
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
 };
+use eyre::{ErrReport, eyre};
 use std::cmp::max;
+use std::error::Error;
 
-/// Carries the depth of the computation.
+/// An instantiation of [`FancyInput::Item`] used by [`CircuitAnalyzer`].
+///
+/// A dummy FancyItem which is returned when profiling a [`Fancy`] circuit.
+/// The [`AnalyzerItem`] contains the wire modulus and the depth of the computation.
+/// This is because [`Fancy::Item`] needs to implement [`HasModulus`].
 #[derive(Clone, Debug)]
 pub struct AnalyzerItem {
     modulus: u16,
@@ -20,18 +26,22 @@ impl HasModulus for AnalyzerItem {
     }
 }
 
-/// Errors thrown by the Fancy computation.
+/// Error from the [`CircuitAnalyzer`] fancy object
+///
+/// This error either wraps any underlying error thrown by
+/// [`Fancy`] with eyre or returns an error when trying to run
+/// the [`CircuitAnalyzer`] on projection gates.
 #[derive(Debug)]
 pub enum AnalyzerError {
     /// Projection is unsupported by the depth informer
     ProjUnsupported,
     /// Error from Fancy library.
-    Underlying(FancyError),
+    Underlying(ErrReport),
 }
 
 impl From<FancyError> for AnalyzerError {
     fn from(e: FancyError) -> Self {
-        AnalyzerError::Underlying(e)
+        AnalyzerError::Underlying(eyre!(e))
     }
 }
 
@@ -43,12 +53,24 @@ impl std::fmt::Display for AnalyzerError {
         }
     }
 }
+impl Error for AnalyzerError {}
 
 /// Fancy Object which computes information about the circuit of interest to FHE.
-#[derive(Clone, Debug)]
+///
+/// A [`Fancy`] object which counts gates in a binary circuit.
+///
+/// Specifically, [`CircuitAnalyzer`] stores the number of inputs,
+/// ands, xors, negations, constants, multiplication, addition, subtraction,
+/// constant operations and multiplication depth of the circuits. This
+/// information is especially useful for pre-processing authenticated
+/// garbling circuits.
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CircuitAnalyzer {
     ninputs: usize,
     nconstants: usize,
+    nands: usize,
+    nxors: usize,
+    nnegs: usize,
     nadds: usize,
     nsubs: usize,
     ncmuls: usize,
@@ -59,34 +81,43 @@ pub struct CircuitAnalyzer {
 impl std::fmt::Display for CircuitAnalyzer {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f, "computation info:")?;
-        writeln!(f, "  inputs:             {:16}", self.ninputs)?;
-        writeln!(f, "  constants:          {:16}", self.nconstants)?;
-        writeln!(f, "  additions:          {:16}", self.nadds)?;
-        writeln!(f, "  subtractions:       {:16}", self.nsubs)?;
-        writeln!(f, "  cmuls:              {:16}", self.ncmuls)?;
-        writeln!(f, "  muls:               {:16}", self.nmuls)?;
+        writeln!(f, "   number of inputs: {:16}", self.ninputs)?;
+        writeln!(f, "   number of constants: {:16}", self.nconstants)?;
+        writeln!(f, "   number of additions: {:16}", self.nadds)?;
+        writeln!(f, "   number of subtractions: {:16}", self.nsubs)?;
+        writeln!(f, "   number of cmuls: {:16}", self.ncmuls)?;
+        writeln!(f, "   number of muls: {:16}", self.nmuls)?;
+        writeln!(f, "   number of ands: {:16}", self.nands)?;
+        writeln!(f, "   number of xors: {:16}", self.nxors)?;
+        writeln!(f, "   number of negations: {:16}", self.nnegs)?;
         writeln!(
             f,
-            "  total gates:        {:16}",
+            "   total number of arithmetic gates(ADD, SUB, MUL, CMUL): {:16}",
             self.nadds + self.nsubs + self.ncmuls + self.nmuls
         )?;
-        writeln!(f, "  mul depth:          {:16}", self.mul_depth)?;
+        writeln!(
+            f,
+            "   total number of boolean gates (AND, XOR): {:16}",
+            self.nands + self.nxors
+        )?;
+        writeln!(f, "   multiplicative depth: {:16}", self.mul_depth)?;
         Ok(())
     }
 }
 
 impl CircuitAnalyzer {
-    /// Create a new CircuitAnalyzer
+    /// Create a new [`CircuitAnalyzer`] and sets all the gate
+    /// counts to 0.
     pub fn new() -> CircuitAnalyzer {
-        CircuitAnalyzer {
-            ninputs: 0,
-            nconstants: 0,
-            nadds: 0,
-            nsubs: 0,
-            ncmuls: 0,
-            nmuls: 0,
-            mul_depth: 0,
-        }
+        Default::default()
+    }
+    /// Return the number of AND gates in the circuit
+    pub fn nands(&self) -> usize {
+        self.nands
+    }
+    /// Return the number of input wires of the circuit
+    pub fn ninputs(&self) -> usize {
+        self.ninputs
     }
 }
 
