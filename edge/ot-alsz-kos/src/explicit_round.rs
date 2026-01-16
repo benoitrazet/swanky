@@ -69,7 +69,11 @@ impl AlszSender {
         Ok(AlszSender { s, rngs })
     }
     const fn send_setup_input_bytes(m: usize) -> usize {
-        let ncols = if m % 8 != 0 { m + (8 - m % 8) } else { m };
+        let ncols = if !m.is_multiple_of(8) {
+            m + (8 - m % 8)
+        } else {
+            m
+        };
         let u_len = ncols / 8;
         u_len * 128
     }
@@ -81,7 +85,11 @@ impl AlszSender {
         mut incoming_bytes: &[u8],
     ) -> Result<BorrowedAllocation<'a, u8>, Error> {
         const NROWS: usize = 128;
-        let ncols = if m % 8 != 0 { m + (8 - m % 8) } else { m };
+        let ncols = if !m.is_multiple_of(8) {
+            m + (8 - m % 8)
+        } else {
+            m
+        };
         let mut qs = arena.alloc_slice_fill_with(NROWS * ncols / 8, |_| 0);
         let u_len = ncols / 8;
         for (j, aes) in self.rngs.iter().enumerate() {
@@ -158,7 +166,11 @@ impl AlszReceiver {
         mut outgoing_bytes: &mut [u8],
         selector: u64,
     ) -> Result<BorrowedAllocation<'a, u8>, Error> {
-        let ncols = if m % 8 != 0 { m + (8 - m % 8) } else { m };
+        let ncols = if !m.is_multiple_of(8) {
+            m + (8 - m % 8)
+        } else {
+            m
+        };
         let mut ts = arena.alloc_slice_fill_with(NROWS * ncols / 8, |_| 0);
         let g_len = ncols / 8;
         for (j, (rng0, rng1)) in self.rngs.iter().enumerate() {
@@ -211,7 +223,7 @@ impl KosSender {
 
     /// How many incoming bytes is this stage expecting, for the given `num_inputs`
     pub const fn send_incoming_bytes(num_inputs: usize) -> usize {
-        let m = if num_inputs % 8 != 0 {
+        let m = if !num_inputs.is_multiple_of(8) {
             num_inputs + (8 - num_inputs % 8)
         } else {
             num_inputs
@@ -246,7 +258,7 @@ impl KosSender {
     ) -> Result<KosSenderStage2, Error> {
         let aes_hash = AesHash::fixed_key();
         let num_inputs = inputs.len();
-        let m = if num_inputs % 8 != 0 {
+        let m = if !num_inputs.is_multiple_of(8) {
             num_inputs + (8 - num_inputs % 8)
         } else {
             num_inputs
@@ -390,11 +402,21 @@ impl KosReceiver {
             )));
         }
         let m = choices.len();
-        let m = if m % 8 != 0 { m + (8 - m % 8) } else { m };
+        let m = if !m.is_multiple_of(8) {
+            m + (8 - m % 8)
+        } else {
+            m
+        };
         let m_ = m + 128 + SSP;
         //let mut r = crate::utils::boolvec_to_u8vec(&choices);
         let mut r = arena.alloc_slice_fill_with(
-            (choices.len() / 8) + (if choices.len() % 8 == 0 { 0 } else { 1 }) + ((m_ - m) / 8),
+            (choices.len() / 8)
+                + (if choices.len().is_multiple_of(8) {
+                    0
+                } else {
+                    1
+                })
+                + ((m_ - m) / 8),
             |_| 0,
         );
         for (i, b) in choices.iter().enumerate() {

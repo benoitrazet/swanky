@@ -62,7 +62,11 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
         m: usize,
     ) -> Result<Vec<u8>, Error> {
         const nrows: usize = 128;
-        let ncols = if m % 8 != 0 { m + (8 - m % 8) } else { m };
+        let ncols = if !m.is_multiple_of(8) {
+            m + (8 - m % 8)
+        } else {
+            m
+        };
         let mut qs = vec![0u8; nrows * ncols / 8];
         let mut u = vec![0u8; ncols / 8];
         let zero = vec![0u8; ncols / 8];
@@ -174,7 +178,11 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> Receiver<OT> {
         m: usize,
     ) -> Result<Vec<u8>, Error> {
         const nrows: usize = 128;
-        let ncols = if m % 8 != 0 { m + (8 - m % 8) } else { m };
+        let ncols = if !m.is_multiple_of(8) {
+            m + (8 - m % 8)
+        } else {
+            m
+        };
         let mut ts = vec![0u8; nrows * ncols / 8];
         let mut g = vec![0u8; ncols / 8];
         for j in 0..self.rngs.len() {

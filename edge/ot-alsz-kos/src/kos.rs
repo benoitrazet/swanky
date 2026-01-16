@@ -35,7 +35,11 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
         m: usize,
         rng: &mut RNG,
     ) -> Result<Vec<u8>, Error> {
-        let m = if m % 8 != 0 { m + (8 - m % 8) } else { m };
+        let m = if !m.is_multiple_of(8) {
+            m + (8 - m % 8)
+        } else {
+            m
+        };
         let ncols = m + 128 + SSP;
         let qs = self.ot.send_setup(channel, ncols)?;
         // Check correlation
@@ -176,7 +180,11 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
         rng: &mut RNG,
     ) -> Result<Vec<u8>, Error> {
         let m = inputs.len();
-        let m = if m % 8 != 0 { m + (8 - m % 8) } else { m };
+        let m = if !m.is_multiple_of(8) {
+            m + (8 - m % 8)
+        } else {
+            m
+        };
         let m_ = m + 128 + SSP;
         let mut r = swanky_deprecated_bitwise_utils::boolvec_to_u8vec(inputs);
         r.extend((0..(m_ - m) / 8).map(|_| rand::random::<u8>()));

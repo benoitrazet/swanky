@@ -55,7 +55,7 @@ fn generate_for_count(out: &mut TokenStream, count: usize) {
         }
     });
     out.append_all(pair_adjacent_maybe_odd(count));
-    if count % 2 == 0 {
+    if count.is_multiple_of(2) {
         out.append_all(pair_adjacent(count));
     }
 }
@@ -195,7 +195,7 @@ fn pair_adjacent_maybe_odd(count: usize) -> TokenStream {
         let second = &elems[i * 2 + 1];
         body.append_all(quote! { (#first, #second),});
     }
-    if count % 2 != 0 {
+    if !count.is_multiple_of(2) {
         let last = elems.last().expect("0 % 2 == 0, so elems.len() > 0");
         body.append_all(quote! {(#last, fallback),})
     }

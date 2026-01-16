@@ -67,8 +67,9 @@ publish = false
 version = "0.6.0"
 
 [workspace.lints.clippy]
-type_complexity = "allow"
+assertions_on_constants = "allow"
 derived_hash_with_manual_eq = "allow"
+type_complexity = "allow"
 
 [workspace.dependencies]
 # Don't remove, or modify, the below "# BEGIN OUR CRATES" line. It's used by ./swanky new-crate
