@@ -9,12 +9,12 @@ use std::cmp::max;
 
 /// Carries the depth of the computation.
 #[derive(Clone, Debug)]
-pub struct DepthItem {
+pub struct AnalyzerItem {
     modulus: u16,
     depth: usize,
 }
 
-impl HasModulus for DepthItem {
+impl HasModulus for AnalyzerItem {
     fn modulus(&self) -> u16 {
         self.modulus
     }
@@ -22,20 +22,20 @@ impl HasModulus for DepthItem {
 
 /// Errors thrown by the Fancy computation.
 #[derive(Debug)]
-pub enum DepthError {
+pub enum AnalyzerError {
     /// Projection is unsupported by the depth informer
     ProjUnsupported,
     /// Error from Fancy library.
     Underlying(FancyError),
 }
 
-impl From<FancyError> for DepthError {
+impl From<FancyError> for AnalyzerError {
     fn from(e: FancyError) -> Self {
-        DepthError::Underlying(e)
+        AnalyzerError::Underlying(e)
     }
 }
 
-impl std::fmt::Display for DepthError {
+impl std::fmt::Display for AnalyzerError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::ProjUnsupported => writeln!(f, "Projection unsupported"),
@@ -46,7 +46,7 @@ impl std::fmt::Display for DepthError {
 
 /// Fancy Object which computes information about the circuit of interest to FHE.
 #[derive(Clone, Debug)]
-pub struct DepthInformer {
+pub struct CircuitAnalyzer {
     ninputs: usize,
     nconstants: usize,
     nadds: usize,
@@ -56,7 +56,7 @@ pub struct DepthInformer {
     mul_depth: usize,
 }
 
-impl std::fmt::Display for DepthInformer {
+impl std::fmt::Display for CircuitAnalyzer {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f, "computation info:")?;
         writeln!(f, "  inputs:             {:16}", self.ninputs)?;
@@ -75,10 +75,10 @@ impl std::fmt::Display for DepthInformer {
     }
 }
 
-impl DepthInformer {
-    /// Create a new DepthInformer
-    pub fn new() -> DepthInformer {
-        DepthInformer {
+impl CircuitAnalyzer {
+    /// Create a new CircuitAnalyzer
+    pub fn new() -> CircuitAnalyzer {
+        CircuitAnalyzer {
             ninputs: 0,
             nconstants: 0,
             nadds: 0,
@@ -90,15 +90,15 @@ impl DepthInformer {
     }
 }
 
-impl FancyInput for DepthInformer {
-    type Item = DepthItem;
-    type Error = DepthError;
+impl FancyInput for CircuitAnalyzer {
+    type Item = AnalyzerItem;
+    type Error = AnalyzerError;
 
     fn receive_many(&mut self, moduli: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
         self.ninputs += moduli.len();
         Ok(moduli
             .iter()
-            .map(|q| DepthItem {
+            .map(|q| AnalyzerItem {
                 modulus: *q,
                 depth: 0,
             })
@@ -114,7 +114,7 @@ impl FancyInput for DepthInformer {
     }
 }
 
-impl FancyBinary for DepthInformer {
+impl FancyBinary for CircuitAnalyzer {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
         FancyArithmetic::add(self, x, y)
     }
@@ -125,17 +125,17 @@ impl FancyBinary for DepthInformer {
 
     fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
         self.nadds += 1;
-        Ok(DepthItem {
+        Ok(AnalyzerItem {
             modulus: x.modulus,
             depth: x.depth,
         })
     }
 }
 
-impl FancyArithmetic for DepthInformer {
+impl FancyArithmetic for CircuitAnalyzer {
     fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
         self.nadds += 1;
-        Ok(DepthItem {
+        Ok(AnalyzerItem {
             modulus: x.modulus,
             depth: max(x.depth, y.depth),
         })
@@ -143,7 +143,7 @@ impl FancyArithmetic for DepthInformer {
 
     fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
         self.nsubs += 1;
-        Ok(DepthItem {
+        Ok(AnalyzerItem {
             modulus: x.modulus,
             depth: max(x.depth, y.depth),
         })
@@ -151,7 +151,7 @@ impl FancyArithmetic for DepthInformer {
 
     fn cmul(&mut self, x: &Self::Item, _y: u16) -> Result<Self::Item, Self::Error> {
         self.ncmuls += 1;
-        Ok(DepthItem {
+        Ok(AnalyzerItem {
             modulus: x.modulus,
             depth: x.depth + 1,
         })
@@ -159,7 +159,7 @@ impl FancyArithmetic for DepthInformer {
 
     fn mul(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
         self.nmuls += 1;
-        Ok(DepthItem {
+        Ok(AnalyzerItem {
             modulus: x.modulus,
             depth: max(x.depth, y.depth) + 1,
         })
@@ -171,17 +171,17 @@ impl FancyArithmetic for DepthInformer {
         _q: u16,
         _tt: Option<Vec<u16>>,
     ) -> Result<Self::Item, Self::Error> {
-        Err(DepthError::ProjUnsupported)
+        Err(AnalyzerError::ProjUnsupported)
     }
 }
 
-impl Fancy for DepthInformer {
-    type Item = DepthItem;
-    type Error = DepthError;
+impl Fancy for CircuitAnalyzer {
+    type Item = AnalyzerItem;
+    type Error = AnalyzerError;
 
     fn constant(&mut self, _val: u16, q: u16) -> Result<Self::Item, Self::Error> {
         self.nconstants += 1;
-        Ok(DepthItem {
+        Ok(AnalyzerItem {
             modulus: q,
             depth: 0,
         })
@@ -193,7 +193,7 @@ impl Fancy for DepthInformer {
     }
 }
 
-impl FancyReveal for DepthInformer {
+impl FancyReveal for CircuitAnalyzer {
     fn reveal(&mut self, _x: &Self::Item) -> Result<u16, Self::Error> {
         Ok(0)
     }
