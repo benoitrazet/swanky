@@ -196,7 +196,7 @@ pub struct F2BitSerializer {
 }
 impl SequenceSerializer<F2> for F2BitSerializer {
     fn serialized_size(n: usize) -> usize {
-        (n / 64 + (if n % 64 == 0 { 0 } else { 1 })) * 8
+        (n / 64 + (if n.is_multiple_of(64) { 0 } else { 1 })) * 8
     }
 
     fn new<W: std::io::Write>(_dst: &mut W) -> std::io::Result<Self> {
