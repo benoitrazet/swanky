@@ -215,7 +215,7 @@ impl FancyArithmetic for CircuitAnalyzer {
         self.ncmuls += 1;
         Ok(AnalyzerItem {
             modulus: x.modulus,
-            depth: x.depth + 1,
+            depth: x.depth,
         })
     }
 
