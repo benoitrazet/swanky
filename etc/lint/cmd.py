@@ -3,6 +3,7 @@ from typing import Any, Callable, List
 import click
 import rich
 
+from core.vectoreyes.cmd import generate as vectoreyes_generate
 from etc.fmt import fmt
 from etc.lint import LintResult
 from etc.lint import flatbuffers as lint_flatbuffers
@@ -10,7 +11,6 @@ from etc.lint import gitlab as lint_gitlab
 from etc.lint import rust as lint_rust
 from etc.lint.mypy import mypy as lint_mypy
 from etc.readme import gen_crate_list as readme_gen_crate_list
-from vectoreyes.cmd import generate as vectoreyes_generate
 
 
 def existing_command_as_lint(
@@ -52,7 +52,10 @@ LINTS: List[Callable[[click.Context], LintResult]] = [
     lint_rust.validate_crate_manifests,
     lint_rust.crates_enumerated_in_workspace,
     lint_rust.workspace_members_are_defined_in_workspace,
+    lint_rust.crates_in_manifest_are_sorted,
+    lint_rust.check_crate_paths,
     lint_rust.cargo_deny,
+    lint_rust.check_core_dependencies,
 ]
 
 

@@ -1,6 +1,8 @@
 import ctypes
+import difflib
 import functools
 import itertools
+import json
 import os
 import subprocess
 import threading
@@ -18,6 +20,7 @@ import tree_sitter
 
 from etc import ROOT
 from etc.lint import LintResult
+from etc.rust import CrateDir, crate_path
 
 
 def list_cargo_toml_files() -> List[Path]:
@@ -48,9 +51,44 @@ def check_cargo_lock(ctx: click.Context) -> LintResult:
         )
         != 0
     ):
-        rich.print("Cargo.lock isn't up to date. Run `cargo update` to fix this.")
+        rich.print("Cargo.lock isn't up to date. Run `cargo check` to fix this.")
         return LintResult.FAILURE
     return LintResult.SUCCESS
+
+
+def check_core_dependencies(ctx: click.Context) -> LintResult:
+    """Check that core crates don't depend on edge crates"""
+    try:
+        metadata = json.loads(
+            subprocess.check_output(
+                ["cargo", "metadata", "--format-version=1", "--locked"],
+                cwd=ROOT,
+            )
+        )
+    except subprocess.SubprocessError:
+        rich.print("`cargo metadata` failed. Is Cargo.lock up-to-date?")
+        return LintResult.FAILURE
+    edge_crates = set()
+    core_crates = set()
+    for member in metadata["workspace_members"]:
+        is_edge = "/edge/" in member
+        is_core = "/core/" in member
+        assert is_core ^ is_edge
+        if is_edge:
+            edge_crates.add(member)
+        else:
+            core_crates.add(member)
+    result = LintResult.SUCCESS
+    for node in metadata["resolve"]["nodes"]:
+        if node["id"] in core_crates:
+            edge_deps = [dep for dep in node["dependencies"] if dep in edge_crates]
+            if len(edge_deps) > 0:
+                result = LintResult.FAILURE
+                rich.print(
+                    f"Core crate {repr(node['id'])} has edge dependencies: "
+                    + repr(edge_deps)
+                )
+    return result
 
 
 def root_cargo_toml() -> Any:
@@ -63,6 +101,23 @@ def crates_in_manifest() -> List[Path]:
             ROOT.glob(member) for member in root_cargo_toml()["workspace"]["members"]
         )
     )
+
+
+def crates_in_manifest_are_sorted(ctx: click.Context) -> LintResult:
+    """Check that all workspace members are sorted."""
+    members = root_cargo_toml()["workspace"]["members"]
+    sorted_members = sorted(members)
+    if sorted_members != members:
+        rich.print("workspace members in /Cargo.toml aren't sorted!")
+        rich.get_console().print(
+            rich.syntax.Syntax(
+                "\n".join(difflib.unified_diff(members, sorted_members, lineterm="")),
+                "diff",
+            )
+        )
+        return LintResult.FAILURE
+    else:
+        return LintResult.SUCCESS
 
 
 def crates_enumerated_in_workspace(ctx: click.Context) -> LintResult:
@@ -100,6 +155,70 @@ def workspace_members_are_defined_in_workspace(ctx: click.Context) -> LintResult
         return LintResult.FAILURE
     else:
         return LintResult.SUCCESS
+
+
+MISNAMED_CRATES = {
+    "bristol-fashion",
+    "diet-mac-and-cheese",
+    "humidor",
+    "inferno",
+    "keyed_arena",
+    "fancy-garbling",
+    "mac-n-cheese-compiler",
+    "mac-n-cheese-event-log",
+    "mac-n-cheese-inspector",
+    "mac-n-cheese-ir",
+    "mac-n-cheese-runner",
+    "mac-n-cheese-sieve-parser",
+    "mac-n-cheese-vole",
+    "mac-n-cheese-wire-map",
+    "popsicle",
+    "schmivitz",
+    "simple-arith-circuit",
+    "vectoreyes",
+    "web-mac-n-cheese-wasm",
+    "web-mac-n-cheese-websocket",
+    "zkv",
+}
+
+
+def check_crate_paths(ctx: click.Context) -> LintResult:
+    """
+    Check that crate names match their paths
+
+    For example:
+    swanky-cool-crate: ./edge/cool-crate, ./edge/cool/crate (both valid)
+
+    If ./edge/cool exists (and isn't a crate), then we _require_ that cool-crate live under
+    that directory.
+    """
+    result = LintResult.SUCCESS
+    for cargo_toml in list_cargo_toml_files():
+        name = toml.loads(cargo_toml.read_text())["package"]["name"]
+        if name in MISNAMED_CRATES:
+            continue
+
+        def report_error(err: str) -> None:
+            nonlocal result
+            result = LintResult.FAILURE
+            rich.print(f"[bold][underline]{name}[/underline][/bold] is misnamed: {err}")
+
+        if not name.startswith("swanky-"):
+            report_error("does not start with 'swanky-'")
+            continue
+        expected_paths = [
+            crate_path(name, CrateDir.CORE),
+            crate_path(name, CrateDir.EDGE),
+        ]
+        if cargo_toml.parent not in expected_paths:
+            expected_paths_str = ", ".join(
+                str(p.relative_to(ROOT)) for p in expected_paths
+            )
+            report_error(
+                f"Expected at one of {expected_paths_str}, "
+                + f"not {cargo_toml.parent.relative_to(ROOT)}"
+            )
+    return result
 
 
 def validate_crate_manifests(ctx: click.Context) -> LintResult:
@@ -194,17 +313,16 @@ def cargo_deny(ctx: click.Context) -> LintResult:
 
 # As of this writing, these libraries don't require documentation.
 LIBS_NOT_YET_DOCUMENTED = {
-    "bristol-fashion/src/lib.rs",
-    "crates/field-fft/src/lib.rs",
-    "diet-mac-and-cheese/web-mac-and-cheese/wasm/src/lib.rs",
-    "diet-mac-and-cheese/web-mac-and-cheese/websocket/src/lib.rs",
-    "fancy-garbling/base_conversion/src/lib.rs",
-    "keyed_arena/src/lib.rs",
-    "mac-n-cheese/event-log/src/lib.rs",
-    "mac-n-cheese/ir/src/lib.rs",
-    "mac-n-cheese/sieve-parser/src/lib.rs",
-    "mac-n-cheese/vole/src/lib.rs",
-    "mac-n-cheese/wire-map/src/lib.rs",
+    "edge/bristol-fashion/src/lib.rs",
+    "edge/field-fft/src/lib.rs",
+    "edge/diet-mac-and-cheese/web-mac-and-cheese/wasm/src/lib.rs",
+    "edge/diet-mac-and-cheese/web-mac-and-cheese/websocket/src/lib.rs",
+    "edge/keyed_arena/src/lib.rs",
+    "edge/mac-n-cheese/event-log/src/lib.rs",
+    "edge/mac-n-cheese/ir/src/lib.rs",
+    "edge/mac-n-cheese/sieve-parser/src/lib.rs",
+    "edge/mac-n-cheese/vole/src/lib.rs",
+    "edge/mac-n-cheese/wire-map/src/lib.rs",
 }
 
 
@@ -234,7 +352,7 @@ def _tree_sitter_rust_language() -> tree_sitter.Language:
     lib = ctypes.cdll.LoadLibrary(os.path.join(so_paths[0], "parser"))
     getter_function = lib.tree_sitter_rust
     getter_function.restype = ctypes.c_void_p
-    return tree_sitter.Language(getter_function(), "rust")
+    return tree_sitter.Language(getter_function())
 
 
 _MISSING_DOCS_QUERY_OBJ: Optional["tree_sitter.Query"] = None
@@ -249,8 +367,7 @@ def _contains_deny_missing_docs(code: bytes) -> bool:
     with _MISSING_DOCS_QUERY_LOCK:
         if _MISSING_DOCS_QUERY_OBJ is None:
             lang = _tree_sitter_rust_language()
-            _MISSING_DOCS_PARSER = tree_sitter.Parser()
-            _MISSING_DOCS_PARSER.set_language(lang)
+            _MISSING_DOCS_PARSER = tree_sitter.Parser(lang)
             _MISSING_DOCS_QUERY_OBJ = lang.query(_MISSING_DOCS_QUERY)
         assert _MISSING_DOCS_PARSER is not None
         return (

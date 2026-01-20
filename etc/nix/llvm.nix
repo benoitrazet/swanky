@@ -1,2 +1,2 @@
 with import ./pkgs.nix { };
-llvmPackages_18
+llvmPackages_20

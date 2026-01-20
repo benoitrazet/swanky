@@ -1,15 +1,18 @@
+import json
 from pathlib import Path
 from string import Template
 from typing import Sequence
 
 import click
 
-from etc import ROOT
+from etc import ROOT, readme
+from etc.rust import CrateDir, crate_path
 
 _TOML_TEMPLATE = Template(
     """
 [package]
 name = "$crate"
+description = $escaped_description
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -25,46 +28,76 @@ workspace = true
     + "\n"
 )
 
+_LIB_RS_TEMPLATE = Template(
+    """
+#![deny(missing_docs)]
+//! $description
+    """.strip()
+    + "\n"
+)
+
 
 @click.command()
-@click.argument("names", nargs=-1)
-def new_crate(names: Sequence[str]) -> None:
+@click.option(
+    "--name",
+    help="What should the new crate be called? (It must start with 'swanky-')"
+    + " If absent, you'll be prompted for the name.",
+    prompt="Crate Name",
+)
+@click.option(
+    "--description",
+    help="What's the description of the new crate? If absent, you'll be prompted for it.",
+    prompt="Crate Description",
+)
+@click.option(
+    "--core/--edge",
+    default=False,
+    help="Is the crate an edge crate or a core crate?",
+)
+@click.pass_context
+def new_crate(ctx: click.Context, name: str, description: str, core: bool) -> None:
     """
-    Create new crates in Swanky
+    Create a new crate in Swanky
 
-    NAMES are names of crates to create. They must start with 'swanky-'.
-
-    A crate template will be instantiated in the crates/ directory
-
-    For example: ./swanky new-crate swanky-cool-protocol1 swanky-cool-protocol2
+    A crate template will be instantiated in the edge/ directory
     """
-    bad_names = [name for name in names if not name.startswith("swanky-")]
-    if len(bad_names) > 0:
+    if not name.startswith("swanky-"):
         raise click.UsageError(
-            f"Crate names must start with 'swanky-'. But {repr(bad_names)} were submitted."
+            f"Crate names must start with 'swanky-'. But {repr(name)} were submitted."
         )
-    for crate in names:
-        dst = ROOT / "crates" / crate.replace("swanky-", "", 1)
-        if dst.exists():
-            print(f"{dst} already exists. Skipping.")
-        dst.mkdir()
-        (dst / "Cargo.toml").write_text(_TOML_TEMPLATE.safe_substitute(crate=crate))
-        (dst / "src").mkdir()
-        (dst / "src" / "lib.rs").write_text("")
-        cargo_toml_path = ROOT / "Cargo.toml"
-        cargo_toml = cargo_toml_path.read_text()
-        lines = cargo_toml.split("\n")
-        assert "# BEGIN OUR CRATES" in lines
-        assert "# END OUR CRATES" in lines
-        begin_idx = lines.index("# BEGIN OUR CRATES")
-        end_idx = lines.index("# END OUR CRATES")
-        path = dst.relative_to(ROOT)
-        lines = (
-            lines[0 : begin_idx + 1]
-            + sorted(
-                lines[begin_idx + 1 : end_idx] + [f'{crate} = {{ path = "{path}" }}']
-            )
-            + lines[end_idx:]
+    dst = crate_path(name, CrateDir.CORE if core else CrateDir.EDGE)
+    if dst.exists():
+        raise click.ClickException(f"Crate {repr(name)} already exists.")
+    dst.mkdir()
+    (dst / "Cargo.toml").write_text(
+        _TOML_TEMPLATE.safe_substitute(
+            crate=name, escaped_description=json.dumps(description)
         )
-        cargo_toml = "\n".join(lines)
-        cargo_toml_path.write_text(cargo_toml)
+    )
+    (dst / "src").mkdir()
+    (dst / "src" / "lib.rs").write_text(
+        _LIB_RS_TEMPLATE.safe_substitute(description=description)
+    )
+    cargo_toml_path = ROOT / "Cargo.toml"
+    cargo_toml = cargo_toml_path.read_text()
+    lines = cargo_toml.split("\n")
+    assert "# BEGIN OUR CRATES" in lines
+    assert "# END OUR CRATES" in lines
+    begin_idx = lines.index("# BEGIN OUR CRATES")
+    end_idx = lines.index("# END OUR CRATES")
+    path = dst.relative_to(ROOT)
+    lines = (
+        lines[0 : begin_idx + 1]
+        + sorted(lines[begin_idx + 1 : end_idx] + [f'{name} = {{ path = "{path}" }}'])
+        + lines[end_idx:]
+    )
+    begin_idx = lines.index("members = [")
+    end_idx = lines.index("]", begin_idx)
+    lines = (
+        lines[0 : begin_idx + 1]
+        + sorted(lines[begin_idx + 1 : end_idx] + [f'  "{path}",'])
+        + lines[end_idx:]
+    )
+    cargo_toml = "\n".join(lines)
+    cargo_toml_path.write_text(cargo_toml)
+    ctx.invoke(readme.gen_crate_list, check=False)

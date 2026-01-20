@@ -4,6 +4,7 @@ import json
 import os
 import platform
 import shlex
+import shutil
 import subprocess
 from base64 import urlsafe_b64encode
 from dataclasses import dataclass
@@ -201,6 +202,7 @@ class _CrossCompile:
             ]
             + rustc_flags
         )
+        env["RUSTDOCFLAGS"] = env["RUSTFLAGS"]
         # Check that the expected vectoreyes backend matches what's actualy in use
         vectoreyes_backend = (
             subprocess.check_output(
@@ -256,6 +258,15 @@ def _host_triple() -> str:
     )
 
 
+def _host_build_rustflags() -> list[str]:
+    """What are the standard CI rustflags"""
+    return [
+        "-Clinker-flavor=gcc",
+        "-Clinker=clang",
+        f"-Clink-arg=-fuse-ld={_linker(_host_triple())}",
+    ]
+
+
 def test_rust(
     ctx: click.Context,
     cargo_args: list[str],
@@ -263,6 +274,7 @@ def test_rust(
     cargo_nextest: bool = True,
     cross_compile: _CrossCompile | None = None,
     code_coverage: Path | None = None,
+    cargo_incremental: bool = False,
 ) -> None:
     """
     Test rust code
@@ -274,6 +286,7 @@ def test_rust(
     cross_compile: if set, cross-compile and run on the specified target. Otherwise target the host
     code_coverage: if set, write LLVM code coverage data to this folder. This is incompatible with
                    test caching.
+    cargo_incremental: if set, then enable incremental rust builds
     """
     rich.get_console().rule("Test Rust")
     rich.pretty.pprint(
@@ -289,6 +302,7 @@ def test_rust(
     assert not (code_coverage and cache_test_output)
 
     env = dict(os.environ)
+    env["CARGO_INCREMENTAL"] = str(int(cargo_incremental))
 
     # First, set up the environment for cross-compilation and test caching.
     if cache_test_output:
@@ -320,14 +334,7 @@ def test_rust(
         # flags that we've set in .cargo/config.toml
         cargo_args += [
             "--config=build.rustflags = "
-            + json.dumps(
-                [
-                    "-Clinker-flavor=gcc",
-                    "-Clinker=clang",
-                    f"-Clink-arg=-fuse-ld={_linker(_host_triple())}",
-                ]
-                + instrument_coverage_flags
-            )
+            + json.dumps(_host_build_rustflags() + instrument_coverage_flags)
         ]
     if code_coverage:
         code_coverage.mkdir(parents=True, exist_ok=True)
@@ -399,7 +406,6 @@ def ci() -> None:
     os.environ.update(
         {
             "RUST_BACKTRACE": "1",
-            "PROPTEST_CASES": "256",
             "SWANKY_FLATBUFFER_DO_NOT_GENERATE": "1",
             "RUSTC_WRAPPER": str(ROOT / "etc/ci/wrappers/rustc.py"),
             "CARGO_INCREMENTAL": "0",
@@ -434,6 +440,16 @@ def nightly(ctx: click.Context) -> None:
         cache_test_output=False,
         code_coverage=code_coverage,
     )
+    rich.get_console().rule("Benchmarking")
+    # Run cargo bench. We don't collect the outputs (since they won't be stable on a VM), but to
+    # make sure they build properly.
+    subprocess.check_call(
+        ["cargo", "bench", "--verbose"],
+        cwd=ROOT,
+        # Timeout after 30 minutes
+        env=os.environ
+        | {_cargo_target_runner_env_var(_host_triple()): "timeout 1800s"},
+    )
     # Post-process code coverage data.
     # What's the path to rust's llvm-tools?
     llvm_bin = (
@@ -453,6 +469,16 @@ def nightly(ctx: click.Context) -> None:
     # Merge the profile data for each executable into a single lcov file.
     for cov_for_exe in code_coverage.iterdir():
         exe = (cov_for_exe / "exe").resolve()
+        if "rustdoctest" in str(exe):
+            # doctests binaries are written to /tmp and then deleted once they're run. By the time
+            # we reach this loop, the binaries are gone. We also don't care about code coverage on
+            # doctest code, so it's fine to skip it.
+            continue
+        if b"__llvm_covmap" not in subprocess.check_output(
+            [llvm_bin / "llvm-objdump", "--section-headers", exe]
+        ):
+            print(f"{exe} does not have LLVM coverage data. Skipping...")
+            continue
         merged = cov_for_exe / "merged.profraw"
         input_file = cov_for_exe / "inputs.txt"
         input_file.write_text("\n".join(map(str, cov_for_exe.glob("*.profraw"))))
@@ -511,16 +537,12 @@ def nightly(ctx: click.Context) -> None:
     split_cobertura(coverage_out / "cobertura.xml", coverage_out / "coverage-split")
 
 
-@ci.command()
-@click.option(
-    "--cache-dir",
-    help="[Usually for CI use] path to cache Swanky artifacts",
-    type=click.Path(path_type=Path),
-    required=True,
-)
-@click.pass_context
-def quick(ctx: click.Context, cache_dir: Path) -> None:
-    """Run the quick (non-nightly) CI tests"""
+def _setup_cache_dir(ctx: click.Context, cache_dir: Path) -> Path:
+    """
+    Update the environment for CI caching and unpack a cache
+
+    **Returns:** The cache-key-prefixed cache_dir path
+    """
     cache_dir = (
         cache_dir
         / urlsafe_b64encode(
@@ -540,8 +562,22 @@ def quick(ctx: click.Context, cache_dir: Path) -> None:
             "SWANKY_CACHE_DIR": str(cache_dir),
         }
     )
+    unpack_target_dir(cache_dir)
+    return cache_dir
+
+
+@ci.command()
+@click.option(
+    "--cache-dir",
+    help="[Usually for CI use] path to cache Swanky artifacts",
+    type=click.Path(path_type=Path, resolve_path=True),
+    required=True,
+)
+@click.pass_context
+def quick(ctx: click.Context, cache_dir: Path) -> None:
+    """Run the quick (non-nightly) CI tests"""
+    cache_dir = _setup_cache_dir(ctx, cache_dir)
     try:
-        unpack_target_dir(cache_dir)
         non_rust_tests(ctx)
         test_rust(
             ctx,
@@ -550,11 +586,57 @@ def quick(ctx: click.Context, cache_dir: Path) -> None:
             cross_compile=_NEON,
             # These tests are fast enough, that the overhead of cargo-nextest isn't a win.
             cargo_nextest=False,
+            cargo_incremental=True,
         )
         test_rust(
             ctx,
             cargo_args=["--features=serde"],
             cache_test_output=True,
+            cargo_incremental=True,
         )
     finally:
         pack_target_dir(cache_dir)
+
+
+@ci.command()
+@click.option(
+    "--cache-dir",
+    help="[Usually for CI use] path to cache Swanky artifacts",
+    type=click.Path(path_type=Path, resolve_path=True),
+    required=True,
+)
+@click.option(
+    "--docs-dir",
+    help="[Usually for CI use] path to write the swanky docs",
+    type=click.Path(path_type=Path, resolve_path=True),
+    required=True,
+)
+@click.option(
+    "--branch",
+    help="[Usually for CI use] what shortname should these docs be labelled as",
+    required=True,
+)
+@click.pass_context
+def push_docs(ctx: click.Context, cache_dir: Path, docs_dir: Path, branch: str) -> None:
+    """Publish the swanky docs"""
+    rev = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip()
+    dst = docs_dir / f"rev-{rev}"
+    if not dst.exists():
+        _setup_cache_dir(ctx, cache_dir)
+        # NOTE: the docs might already be in the cache
+        subprocess.check_call(
+            [
+                "cargo",
+                "doc",
+                "--no-deps",
+                "--verbose",
+                "--config=build.rustflags = " + json.dumps(_host_build_rustflags()),
+            ]
+        )
+        tmp = docs_dir / f".tmp-{uuid4()}"
+        shutil.copytree(os.path.join(os.environ["CARGO_TARGET_DIR"], "doc"), tmp)
+        tmp.rename(dst)
+    final_dst = docs_dir / branch
+    if final_dst.exists():
+        final_dst.unlink()
+    final_dst.symlink_to(dst)
