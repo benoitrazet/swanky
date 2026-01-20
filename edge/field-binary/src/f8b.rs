@@ -135,7 +135,6 @@ impl From<F2> for F8b {
         Self(value.0)
     }
 }
-
 // Prime subfield
 impl Mul<F8b> for F2 {
     type Output = F8b;
