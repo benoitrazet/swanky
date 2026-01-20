@@ -1,36 +1,48 @@
-use eyre::Result;
-use merlin::Transcript;
-use rand::thread_rng;
-use schmivitz::{
-    circuit::load_circuit_from_strings_prover,
-    circuit::Circuit,
-    vole::functionality::{VoleProver, VoleVerifier},
-    Proof,
-};
+mod test {
+    use eyre::Result;
+    use merlin::Transcript;
+    use rand::thread_rng;
+    use schmivitz::{
+        Proof,
+        circuit::Circuit,
+        circuit::load_circuit_from_strings_prover,
+        vole::functionality::{VoleProver, VoleVerifier},
+    };
+    use std::sync::Once;
 
-// Get a fresh transcript
-fn transcript() -> Transcript {
-    Transcript::new(b"basic happy test transcript")
-}
+    static INIT: Once = Once::new();
 
-// Create a proof for the given circuit and input.
-fn create_proof(
-    circuit_bytes: &'static str,
-    private_input_bytes: &'static str,
-) -> (Result<Proof<VoleProver, VoleVerifier>>, Circuit) {
-    let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
+    fn init_logger() {
+        INIT.call_once(|| {
+            let _ =
+                env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+                    .try_init();
+        });
+    }
 
-    let rng = &mut thread_rng();
+    // Get a fresh transcript
+    fn transcript() -> Transcript {
+        Transcript::new(b"basic happy test transcript")
+    }
 
-    let t = std::time::Instant::now();
-    let t1 = Proof::prove::<_>(&circuit, &mut transcript(), rng);
-    log::info!("proof time: {:?}", t.elapsed());
-    (t1, circuit)
-}
+    // Create a proof for the given circuit and input.
+    fn create_proof(
+        circuit_bytes: &'static str,
+        private_input_bytes: &'static str,
+    ) -> (Result<Proof<VoleProver, VoleVerifier>>, Circuit) {
+        let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
 
-#[test]
-fn prove_doesnt_explode() -> Result<()> {
-    let mini_circuit_bytes = "version 2.0.0;
+        let rng = &mut thread_rng();
+
+        let t = std::time::Instant::now();
+        let t1 = Proof::prove::<_>(&circuit, &mut transcript(), rng);
+        log::info!("proof time: {:?}", t.elapsed());
+        (t1, circuit)
+    }
+
+    #[test]
+    fn prove_doesnt_explode() -> Result<()> {
+        let mini_circuit_bytes = "version 2.0.0;
         circuit;
         @type field 2;
         @begin
@@ -38,23 +50,23 @@ fn prove_doesnt_explode() -> Result<()> {
           $1 <- @mul(0: $0, $0);
           $2 <- @add(0: $0, $0);
         @end ";
-    let private_input_bytes = "version 2.0.0;
+        let private_input_bytes = "version 2.0.0;
         private_input;
         @type field 2;
         @begin
             < 1 >;
         @end";
 
-    let (proof, mut mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
-    let verif = proof?.verify(&mut mini_circuit, &mut transcript());
-    assert!(verif.is_ok());
+        let (proof, mut mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
+        let verif = proof?.verify(&mut mini_circuit, &mut transcript());
+        assert!(verif.is_ok());
 
-    Ok(())
-}
+        Ok(())
+    }
 
-#[test]
-fn prove_addc_doesnt_explode() -> Result<()> {
-    let mini_circuit_bytes = "version 2.0.0;
+    #[test]
+    fn prove_addc_doesnt_explode() -> Result<()> {
+        let mini_circuit_bytes = "version 2.0.0;
         circuit;
         @type field 2;
         @begin
@@ -66,7 +78,7 @@ fn prove_addc_doesnt_explode() -> Result<()> {
           $5 <- @mul(0: $3, $4);
           $6 <- @addc(0: $5, < 1 >);
         @end ";
-    let private_input_bytes = "version 2.0.0;
+        let private_input_bytes = "version 2.0.0;
         private_input;
         @type field 2;
         @begin
@@ -74,14 +86,14 @@ fn prove_addc_doesnt_explode() -> Result<()> {
             < 1 >;
         @end ";
 
-    let (proof, mut mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
-    let verif = proof?.verify(&mut mini_circuit, &mut transcript());
-    assert!(verif.is_ok());
+        let (proof, mut mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
+        let verif = proof?.verify(&mut mini_circuit, &mut transcript());
+        assert!(verif.is_ok());
 
-    Ok(())
-}
+        Ok(())
+    }
 
-const SMALL_CIRCUIT: &str = "version 2.0.0;
+    const SMALL_CIRCUIT: &str = "version 2.0.0;
     circuit;
     @type field 2;
     @begin
@@ -98,9 +110,9 @@ const SMALL_CIRCUIT: &str = "version 2.0.0;
       $14 <- @mul(0: $0, $9);
     @end ";
 
-#[test]
-fn prove_works_on_slightly_larger_circuit() -> Result<()> {
-    let private_input_bytes = "version 2.0.0;
+    #[test]
+    fn prove_works_on_slightly_larger_circuit() -> Result<()> {
+        let private_input_bytes = "version 2.0.0;
         private_input;
         @type field 2;
         @begin
@@ -111,78 +123,68 @@ fn prove_works_on_slightly_larger_circuit() -> Result<()> {
             < 0 >;
         @end ";
 
-    let (proof, mut small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes);
-    assert!(proof?.verify(&mut small_circuit, &mut transcript()).is_ok());
+        let (proof, mut small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes);
+        assert!(proof?.verify(&mut small_circuit, &mut transcript()).is_ok());
 
-    Ok(())
-}
+        Ok(())
+    }
 
-#[test]
-fn prove_aes256() -> Result<()> {
-    use std::env;
-    // if log-level `RUST_LOG` not already set, then set to info
-    match env::var("RUST_LOG") {
-        Ok(val) => println!("loglvl: {}", val),
-        Err(_) => env::set_var("RUST_LOG", "info"),
-    };
-    let _ = pretty_env_logger::try_init_timed();
+    #[test]
+    fn prove_aes256() -> Result<()> {
+        init_logger();
 
-    let circuit_bytes = include_str!("../circuits/aes_256_conv.sieve");
-    let private_input_bytes = include_str!("../circuits/aes_256_conv_private.sieve");
+        let circuit_bytes = include_str!("../circuits/aes_256_conv.sieve");
+        let private_input_bytes = include_str!("../circuits/aes_256_conv_private.sieve");
 
-    let t = std::time::Instant::now();
-    let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
-    log::info!("parsing: {:?}", t.elapsed());
+        let t = std::time::Instant::now();
+        let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
+        log::info!("parsing: {:?}", t.elapsed());
 
-    let t = std::time::Instant::now();
-    let rng = &mut thread_rng();
-    let proof = Proof::<VoleProver, VoleVerifier>::prove::<_>(&circuit, &mut transcript(), rng);
-    log::info!("Elapsed prover   aes256: {:?}", t.elapsed());
+        let t = std::time::Instant::now();
+        let rng = &mut thread_rng();
+        let proof = Proof::<VoleProver, VoleVerifier>::prove::<_>(&circuit, &mut transcript(), rng);
+        log::info!("Elapsed prover   aes256: {:?}", t.elapsed());
 
-    log::info!(
-        "proof size estimate: {:?}",
-        (proof.as_ref()).unwrap().proof_size_estimate()
-    );
+        log::info!(
+            "proof size estimate: {:?}",
+            (proof.as_ref()).unwrap().proof_size_estimate()
+        );
 
-    let t = std::time::Instant::now();
-    let verif = proof?.verify(&circuit, &mut transcript());
-    assert!(verif.is_ok());
-    log::info!("Elapsed verifier aes256: {:?}", t.elapsed());
+        let t = std::time::Instant::now();
+        let verif = proof?.verify(&circuit, &mut transcript());
+        assert!(verif.is_ok());
+        log::info!("Elapsed verifier aes256: {:?}", t.elapsed());
 
-    Ok(())
-}
+        Ok(())
+    }
 
-#[test]
-fn prove_sha256() -> Result<()> {
-    use std::env;
-    // if log-level `RUST_LOG` not already set, then set to info
-    match env::var("RUST_LOG") {
-        Ok(val) => println!("loglvl: {}", val),
-        Err(_) => env::set_var("RUST_LOG", "info"),
-    };
-    let _ = pretty_env_logger::try_init_timed();
+    #[test]
+    fn prove_sha256() -> Result<()> {
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
 
-    let circuit_bytes = include_str!("../circuits/sha256_conv.sieve");
-    let private_input_bytes = include_str!("../circuits/sha256_conv_private.sieve");
+        let circuit_bytes = include_str!("../circuits/sha256_conv.sieve");
+        let private_input_bytes = include_str!("../circuits/sha256_conv_private.sieve");
 
-    let t = std::time::Instant::now();
-    let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
-    log::info!("parsing: {:?}", t.elapsed());
+        let t = std::time::Instant::now();
+        let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
+        log::info!("parsing: {:?}", t.elapsed());
 
-    let t = std::time::Instant::now();
-    let rng = &mut thread_rng();
-    let proof = Proof::<VoleProver, VoleVerifier>::prove::<_>(&circuit, &mut transcript(), rng);
-    log::info!("Elapsed prover   sha256: {:?}", t.elapsed());
+        let t = std::time::Instant::now();
+        let rng = &mut thread_rng();
+        let proof = Proof::<VoleProver, VoleVerifier>::prove::<_>(&circuit, &mut transcript(), rng);
+        log::info!("Elapsed prover   sha256: {:?}", t.elapsed());
 
-    log::info!(
-        "proof size estimate: {:?}",
-        (proof.as_ref()).unwrap().proof_size_estimate()
-    );
+        log::info!(
+            "proof size estimate: {:?}",
+            (proof.as_ref()).unwrap().proof_size_estimate()
+        );
 
-    let t = std::time::Instant::now();
-    let verif = proof?.verify(&circuit, &mut transcript());
-    assert!(verif.is_ok());
-    log::info!("Elapsed verifier sha256: {:?}", t.elapsed());
+        let t = std::time::Instant::now();
+        let verif = proof?.verify(&circuit, &mut transcript());
+        assert!(verif.is_ok());
+        log::info!("Elapsed verifier sha256: {:?}", t.elapsed());
 
-    Ok(())
+        Ok(())
+    }
 }

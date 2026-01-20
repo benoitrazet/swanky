@@ -49,7 +49,7 @@ fn hash_commitments(com: &[Com]) -> Com {
     assert_eq!(com.len(), REPETITION_PARAM);
     let mut com_bytes = Vec::with_capacity(H1_LENGTH * REPETITION_PARAM);
     for i in 0..REPETITION_PARAM {
-        com_bytes.extend(com[i].as_ref());
+        com_bytes.extend::<&[u8]>(com[i].as_ref());
     }
     H1::from_bytes(&com_bytes).into_com()
 }

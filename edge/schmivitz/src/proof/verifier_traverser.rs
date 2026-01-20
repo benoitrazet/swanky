@@ -1,10 +1,10 @@
 use diet_mac_and_cheese::fields::SieveIrDeserialize;
-use eyre::{bail, Result};
+use eyre::{Result, bail};
 use mac_n_cheese_sieve_parser::WireId;
 use std::borrow::Borrow;
 use swanky_field::FiniteRing;
-use swanky_field_binary::F128b;
 use swanky_field_binary::F2;
+use swanky_field_binary::F128b;
 
 use crate::circuit::{Circuit, CircuitMemory, GateM};
 
@@ -289,7 +289,7 @@ mod tests {
         let mut traverser = dummy_traverser(len);
 
         // Form a random set of unique wire ids (might be smaller than 25 due to repeats)
-        let wire_ids: HashSet<_> = repeat_with(|| (rng.gen::<u8>() as u64) % len_u64)
+        let wire_ids: HashSet<_> = repeat_with(|| (rng.r#gen::<u8>() as u64) % len_u64)
             .take(len)
             .collect();
 

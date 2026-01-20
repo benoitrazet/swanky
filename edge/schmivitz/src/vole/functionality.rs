@@ -330,6 +330,7 @@ pub(crate) fn verify(chall3: &Chall3, chall2: Chall2, a_tilda: F128b, b_tilda: F
 #[cfg(test)]
 mod test {
     use std::iter::repeat_with;
+    use std::sync::Once;
 
     use super::{Chall1, Chall2, H1, HashConsistency};
     use super::{create_vole_prover, create_vole_verifier, decommit, verify};
@@ -344,6 +345,16 @@ mod test {
     use swanky_field_binary::F2;
     use swanky_field_binary::{F8b, F128b};
     use swanky_serialization::CanonicalSerialize;
+
+    static INIT: Once = Once::new();
+
+    fn init_logger() {
+        INIT.call_once(|| {
+            let _ =
+                env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+                    .try_init();
+        });
+    }
 
     /// Compute second challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
     pub(crate) fn compute_chall_2(
@@ -440,19 +451,14 @@ mod test {
 
     #[test]
     fn test_vole_prover_verifier() {
-        let perf = false; // toggle to true for using this test for performance testing the generation of VOLEs
+        let perf = true; // toggle to true for using this test for performance testing the generation of VOLEs
         if !perf {
             test_vole_prover_and_verifier(100);
         } else {
             // Same test but more voles drawn and printing the logs to monitor the timing of the different components
-            use std::env;
 
             // if log-level `RUST_LOG` not already set, then set to info
-            match env::var("RUST_LOG") {
-                Ok(val) => println!("loglvl: {}", val),
-                Err(_) => env::set_var("RUST_LOG", "info"),
-            };
-            pretty_env_logger::init_timed();
+            init_logger();
 
             let t = std::time::Instant::now();
             test_vole_prover_and_verifier(10_000_000);

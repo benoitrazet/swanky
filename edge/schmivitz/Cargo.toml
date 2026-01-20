@@ -23,6 +23,7 @@ version.workspace = true
 aes.workspace = true
 blake3.workspace = true
 diet-mac-and-cheese.workspace = true
+env_logger.workspace = true
 eyre.workspace = true
 generic-array.workspace = true
 itertools.workspace = true

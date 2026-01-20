@@ -121,48 +121,12 @@ mod tests {
     use rand::thread_rng;
     use std::io::Cursor;
 
-    use mac_n_cheese_sieve_parser::{Number, ValueStreamReader, text_parser::RelationReader};
+    use mac_n_cheese_sieve_parser::text_parser::RelationReader;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
 
     use crate::circuit::CircuitIngestor;
     use crate::proof::prover_preparer::ProverPreparer;
-
-    /// Stream reader that produces an arbitrary-length stream of random inputs in F_2.
-    struct RandomStreamReader {
-        modulus: Number,
-    }
-    impl ValueStreamReader for RandomStreamReader {
-        fn open(
-            _kind: mac_n_cheese_sieve_parser::ValueStreamKind,
-            _path: &std::path::Path,
-        ) -> eyre::Result<Self> {
-            Ok(Self {
-                modulus: Number::from(2u8),
-            })
-        }
-
-        fn modulus(&self) -> &mac_n_cheese_sieve_parser::Number {
-            &self.modulus
-        }
-
-        fn next(&mut self) -> eyre::Result<Option<Number>> {
-            let random_bit = if rand::random() {
-                Number::ONE
-            } else {
-                Number::ZERO
-            };
-            Ok(Some(random_bit))
-        }
-    }
-
-    impl Default for RandomStreamReader {
-        fn default() -> Self {
-            Self {
-                modulus: Number::from(2u8),
-            }
-        }
-    }
 
     /// Take a string description of a circuit and parse it with the circuit preparer.
     fn prepare_circuit(circuit: &str) -> eyre::Result<ProverPreparer> {

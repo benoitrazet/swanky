@@ -333,7 +333,7 @@ impl VoleHasher {
 
         // Line 14 (XOR with x1). This unwrap is safe because the two inputs must be the expected length.
         let out: [F2; SECURITY_PARAM + B] = izip!(all_bits, x1)
-            .map(|(b1, b2)| (F2::from(b1) + b2))
+            .map(|(b1, b2)| F2::from(b1) + b2)
             .collect::<Vec<_>>()
             .try_into()
             .unwrap();
