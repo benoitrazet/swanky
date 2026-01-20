@@ -32,15 +32,20 @@ merlin.workspace = true
 pretty_env_logger.workspace = true
 proptest.workspace = true
 rand.workspace = true
+rayon.workspace = true
 sha3.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true
 swanky-serialization.workspace = true
-rayon.workspace = true
+tempfile.workspace = true
 
 [dev-dependencies]
+criterion.workspace = true
 rand.workspace = true
-tempfile.workspace = true
 
 [lints]
 workspace = true
+
+[[bench]]
+name = "benchmark"
+harness = false

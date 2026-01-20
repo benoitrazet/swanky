@@ -13,7 +13,7 @@ use rand::{CryptoRng, RngCore};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F8b, F2};
 
-use super::{AsSecretBytes, Chall3, RandomVoleP, RandomVoleV};
+use super::{AsSecretBytes, Chall3, DecommitmentSerde, RandomVoleP, RandomVoleV};
 
 #[derive(Clone)]
 pub(crate) struct InsecureVole {
@@ -205,6 +205,12 @@ impl InsecureCommitments {
         }
 
         Ok(())
+    }
+}
+
+impl DecommitmentSerde for InsecureCommitments {
+    fn proof_size_estimate(&self) -> usize {
+        unimplemented!()
     }
 }
 
