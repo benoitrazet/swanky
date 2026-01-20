@@ -10,6 +10,7 @@ mod test {
     };
     use std::sync::Once;
 
+    static DO_LOGGING: bool = false;
     static INIT: Once = Once::new();
 
     fn init_logger() {
@@ -131,7 +132,9 @@ mod test {
 
     #[test]
     fn prove_aes256() -> Result<()> {
-        init_logger();
+        if DO_LOGGING {
+            init_logger();
+        }
 
         let circuit_bytes = include_str!("../circuits/aes_256_conv.sieve");
         let private_input_bytes = include_str!("../circuits/aes_256_conv_private.sieve");
@@ -161,8 +164,9 @@ mod test {
     #[test]
     fn prove_sha256() -> Result<()> {
         // if log-level `RUST_LOG` not already set, then set to info
-        init_logger();
-
+        if DO_LOGGING {
+            init_logger();
+        }
         let circuit_bytes = include_str!("../circuits/sha256_conv.sieve");
         let private_input_bytes = include_str!("../circuits/sha256_conv_private.sieve");
 
