@@ -15,6 +15,7 @@ use swanky_field_binary::{F2, F8b, F128b};
 
 use super::{AsSecretBytes, Chall3, DecommitmentSerde, RandomVoleP, RandomVoleV};
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub(crate) struct InsecureVole {
     /// Number of VOLEs requested.
