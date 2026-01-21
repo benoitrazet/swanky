@@ -143,6 +143,13 @@ macro_rules! swanky_error {
     };
 }
 
+mod sealed {
+    pub trait Sealed {}
+    impl<T, E> Sealed for std::result::Result<T, E> {}
+    impl<T> Sealed for Option<T> {}
+}
+use sealed::Sealed;
+
 #[test]
 fn test_error_sizes() {
     assert_eq!(
