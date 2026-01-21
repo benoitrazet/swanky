@@ -187,6 +187,18 @@ impl Display for Error {
     }
 }
 
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        // Need to temporarily unwrap the `Option` for successful
+        // deref coercion.
+        if let Some(ref e) = self.inner.source {
+            Some(&**e)
+        } else {
+            None
+        }
+    }
+}
+
 /// `Result<T, Error>`
 ///
 /// This can be used anywhere Swanky produces an error.
