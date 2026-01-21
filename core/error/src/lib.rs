@@ -58,8 +58,50 @@ struct ErrorInner {
 }
 
 /// The error type for Swanky operations.
+///
+/// Errors can be constructed from scratch using [`Error::new`];
+/// additional context can be provided to an error at any time with
+/// [`context`][Error::context].
+/// Use [`kind`][Error::kind] to inspect the [`ErrorKind`] of the
+/// `Error`.
 pub struct Error {
     inner: Box<ErrorInner>,
+}
+
+impl Error {
+    /// Construct a new `Error` given an [`ErrorKind`], a message, and
+    /// (optionally) a source error.
+    #[track_caller]
+    pub fn new(
+        kind: ErrorKind,
+        message: String,
+        source: Option<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    ) -> Self {
+        Error {
+            inner: Box::new(ErrorInner {
+                kind,
+                backtrace: Backtrace::capture(),
+                message,
+                context: Vec::new(),
+                source,
+            }),
+        }
+    }
+
+    /// Provide additional context to an `Error`.
+    pub fn context(mut self, context_message: String) -> Self {
+        self.inner.context.push(context_message);
+        self
+    }
+
+    /// Returns the corresponding [`ErrorKind`] for this error.
+    ///
+    /// It is recommended that you only `match` against the
+    /// relevant `ErrorKind`s, and match against all others with `_`
+    /// (as `ErrorKind` may be extended in the future).
+    pub fn kind(&self) -> ErrorKind {
+        self.inner.kind
+    }
 }
 
 /// `Result<T, Error>`
