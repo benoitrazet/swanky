@@ -1,5 +1,16 @@
 #![deny(missing_docs)]
 //! A common error type for Swanky.
+//!
+//! - [`Error`] is modeled after [`std::io::Error`]
+//! - There is an `eyre`-like [`Result<T>`] type alias and set of
+//!   corresponding macros (e.g. [`ensure`])
+//! - Extension trait [`ResultExt`] allows ad-hoc contextual
+//!   information to be added to errors in [`Result<T>`]
+//! - Extension trait [`WrapErr`] allows a [`Result<T, E:
+//!   std::error::Error>`][std::result::Result] to be converted to a
+//!   [`Result<T>`]
+//! - Extension trait [`OptionExt`] allows any [`Option<T>`] to be
+//!   converted to a [`Result<T>`]
 
 use std::{
     backtrace::Backtrace,
@@ -220,6 +231,28 @@ impl<T, E: std::error::Error + Send + Sync + 'static> WrapErr for std::result::R
     #[inline]
     fn wrap_err_with(self, kind: ErrorKind, msg: impl FnOnce() -> String) -> Result<Self::Output> {
         self.map_err(|e| Error::new(kind, msg(), Some(Box::new(e))))
+    }
+}
+
+/// Provides the [`ok_or_swanky_error`][OptionExt::ok_or_swanky_error]
+/// method for [`Option<T>`].
+///
+/// This trait is sealed and cannot be implemented for types outside
+/// of `swanky_error`.
+pub trait OptionExt<T>: Sealed {
+    /// Transform the [`Option<T>`] into a [`Result<T>`], mapping
+    /// `Some(v)` to `Ok(v)` and `None` to a new [`Error`].
+    fn ok_or_swanky_error(self, kind: ErrorKind, message: &str) -> Result<T>;
+}
+
+impl<T> OptionExt<T> for Option<T> {
+    #[inline]
+    #[track_caller]
+    fn ok_or_swanky_error(self, kind: ErrorKind, message: &str) -> Result<T> {
+        match self {
+            Some(ok) => Ok(ok),
+            None => bail!(kind, "{}", message.to_string()),
+        }
     }
 }
 
