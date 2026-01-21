@@ -109,6 +109,40 @@ impl Error {
 /// This can be used anywhere Swanky produces an error.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Return early with an error if a condition is not satisfied.
+///
+/// This is equivalent to `if !$cond { bail!(<other args>); }`.
+///
+/// This is analogous to `assert!`, but returns a [`Result`] rather
+/// than panicking if the condition fails.
+#[macro_export]
+macro_rules! ensure {
+    ($condition:expr, $kind:expr, $($msg:tt)*) => {
+        if !$condition {
+            $crate::bail!($kind, $($msg)*)
+        }
+    };
+}
+
+/// Return early with an error.
+///
+/// This is equivalent to `return Err(swanky_err!(<args>))`.
+#[macro_export]
+macro_rules! bail {
+    ($kind:expr, $($msg:tt)*) => {
+        return Err(swanky_error!($kind, $($msg)*))
+    };
+}
+
+/// Construct an ad-hoc error from an [`ErrorKind`] and string/format
+/// string with arguments; this evaluates to an [`Error`].
+#[macro_export]
+macro_rules! swanky_error {
+    ($kind:expr, $($msg:tt)*) => {
+        $crate::Error::new($kind, std::format!($($msg)*), None)
+    };
+}
+
 #[test]
 fn test_error_sizes() {
     assert_eq!(
