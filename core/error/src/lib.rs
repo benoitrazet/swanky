@@ -64,6 +64,11 @@ struct ErrorInner {
 /// [`context`][Error::context].
 /// Use [`kind`][Error::kind] to inspect the [`ErrorKind`] of the
 /// `Error`.
+///
+/// See [`Result`], [`swanky_error`], [`bail`], and [`ensure`] for an
+/// `anyhow-`/`eyre`-like API for using this type, and see [`WrapErr`]
+/// to integrate standard errors into code using this error type /
+/// [`Result`].
 pub struct Error {
     inner: Box<ErrorInner>,
 }
@@ -71,6 +76,12 @@ pub struct Error {
 impl Error {
     /// Construct a new `Error` given an [`ErrorKind`], a message, and
     /// (optionally) a source error.
+    ///
+    /// It is atypical to use this method directly; see
+    /// [`swanky_error`] for construction of ad-hoc errors (e.g. with
+    /// no `source`), and [`WrapErr`] which provides methods to
+    /// convert `Result<T, E: std::error::Error>` to `Result<T,
+    /// Error>`.
     #[track_caller]
     pub fn new(
         kind: ErrorKind,
@@ -176,6 +187,39 @@ impl<T> ResultExt<T> for Result<T> {
     #[inline]
     fn with_context(self, msg: impl FnOnce() -> String) -> Result<T> {
         self.map_err(|e| e.context(msg()))
+    }
+}
+
+/// Provides the [`wrap_err`][WrapErr::wrap_err] method for [`Result<T,
+/// E: std::error::Error>`][std::result::Result].
+///
+/// This trait is sealed and cannot be implemented for types outside
+/// of `swanky_error`.
+pub trait WrapErr: Sealed {
+    /// The type of a successful computation, (i.e. the type of `x`
+    /// when  `self` is `Ok(x)`).
+    type Output;
+
+    /// Wrap the error value with a new [`Error`], using this error as
+    /// its `source`.
+    fn wrap_err(self, kind: ErrorKind, msg: String) -> Result<Self::Output>;
+
+    /// Lazily wrap the error value with a new [`Error`], constructing
+    /// the message only once an error does occur.
+    fn wrap_err_with(self, kind: ErrorKind, msg: impl FnOnce() -> String) -> Result<Self::Output>;
+}
+
+impl<T, E: std::error::Error + Send + Sync + 'static> WrapErr for std::result::Result<T, E> {
+    type Output = T;
+
+    #[inline]
+    fn wrap_err(self, kind: ErrorKind, msg: String) -> Result<Self::Output> {
+        self.map_err(|e| Error::new(kind, msg, Some(Box::new(e))))
+    }
+
+    #[inline]
+    fn wrap_err_with(self, kind: ErrorKind, msg: impl FnOnce() -> String) -> Result<Self::Output> {
+        self.map_err(|e| Error::new(kind, msg(), Some(Box::new(e))))
     }
 }
 
