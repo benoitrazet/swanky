@@ -68,6 +68,45 @@ struct ErrorInner {
     source: Option<Box<dyn std::error::Error + Send + Sync + 'static>>,
 }
 
+fn pretty_context(context: &[String]) -> String {
+    let mut out = String::new();
+
+    for (i, s) in context.iter().enumerate() {
+        out.push_str(&format!("\t{}: {}\n", i, s));
+    }
+
+    out
+}
+
+impl Debug for ErrorInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Kind: {:?}", self.kind)?;
+        write!(f, "\n\nMessage:\n\t{}", self.message)?;
+
+        if !self.context.is_empty() {
+            write!(f, "\n\nContext:\n{}", pretty_context(&self.context))?;
+        }
+
+        if let Some(ref cause) = self.source {
+            write!(f, "\n\nCaused by:\n\t{}", cause)?;
+        }
+
+        if let std::backtrace::BacktraceStatus::Captured = self.backtrace.status() {
+            let mut backtrace = self.backtrace.to_string();
+            write!(f, "\n\n")?;
+            if backtrace.starts_with("stack backtrace:") {
+                backtrace.replace_range(0..1, "S");
+            } else {
+                writeln!(f, "Stack backtrace:")?;
+            }
+            backtrace.truncate(backtrace.trim_end().len());
+            write!(f, "{}", backtrace)?;
+        }
+
+        Ok(())
+    }
+}
+
 /// The error type for Swanky operations.
 ///
 /// Errors can be constructed from scratch using [`Error::new`];
@@ -127,6 +166,12 @@ impl Error {
     /// (as `ErrorKind` may be extended in the future).
     pub fn kind(&self) -> ErrorKind {
         self.inner.kind
+    }
+}
+
+impl Debug for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.inner)
     }
 }
 
