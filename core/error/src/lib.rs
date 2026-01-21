@@ -107,6 +107,12 @@ impl Debug for ErrorInner {
     }
 }
 
+impl Display for ErrorInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "K: {:?}\nM: {}", self.kind, self.message)
+    }
+}
+
 /// The error type for Swanky operations.
 ///
 /// Errors can be constructed from scratch using [`Error::new`];
@@ -172,6 +178,12 @@ impl Error {
 impl Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.inner)
+    }
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.inner)
     }
 }
 
