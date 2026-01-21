@@ -89,6 +89,10 @@ impl Error {
     }
 
     /// Provide additional context to an `Error`.
+    ///
+    /// It is atypical to use this method directly; see
+    /// [`ResultExt`] which adds this functionality to [`Result<T>`]
+    /// values.
     pub fn context(mut self, context_message: String) -> Self {
         self.inner.context.push(context_message);
         self
@@ -149,6 +153,31 @@ mod sealed {
     impl<T> Sealed for Option<T> {}
 }
 use sealed::Sealed;
+
+/// Provides the [`context`][ResultExt::context] method for
+/// [`Result<T>`].
+///
+/// This trait is sealed and cannot be implemented for types outside
+/// of `swanky_error`.
+pub trait ResultExt<T>: Sealed {
+    /// Provide additional context to the error value.
+    fn context(self, msg: String) -> Result<T>;
+
+    /// Provide additional context to the error value, evaluating the
+    /// context lazily only once an error does occur.
+    fn with_context(self, msg: impl FnOnce() -> String) -> Result<T>;
+}
+
+impl<T> ResultExt<T> for Result<T> {
+    #[inline]
+    fn context(self, msg: String) -> Result<T> {
+        self.map_err(|e| e.context(msg))
+    }
+    #[inline]
+    fn with_context(self, msg: impl FnOnce() -> String) -> Result<T> {
+        self.map_err(|e| e.context(msg()))
+    }
+}
 
 #[test]
 fn test_error_sizes() {
