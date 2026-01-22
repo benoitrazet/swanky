@@ -27,7 +27,11 @@ macro_rules! error_kind {
         /// This list is intended to grow over time and it is not
         /// recommended to exhaustively match against it.
         ///
-        /// It is used with the [`Error`] type.
+        /// It is used with the [`Error`] type; note that `core`
+        /// Swanky crates should **not** use `ErrorKind::Other`; this
+        /// variant is for `edge` crates and downstream consumers of
+        /// Swanky to integrate seamlessly with `swanky_error` when
+        /// the other variants are insufficient.
         #[non_exhaustive]
         #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
         pub enum ErrorKind {
