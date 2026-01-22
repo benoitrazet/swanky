@@ -105,7 +105,7 @@ impl Debug for ErrorInner {
 
 impl Display for ErrorInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "K: {:?}\nM: {}", self.kind, self.message)
+        write!(f, "Kind: {:?}\nMessage: {}", self.kind, self.message)
     }
 }
 
