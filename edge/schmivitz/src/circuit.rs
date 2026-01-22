@@ -7,9 +7,9 @@
 use crate::parameters::FIELD_SIZE;
 use eyre::{bail, eyre};
 use mac_n_cheese_sieve_parser::{
-    text_parser::RelationReader, text_parser::ValueStreamReader, ConversionSemantics,
-    FunctionBodyVisitor, Identifier, Number, RelationVisitor, Type, TypeId, TypedWireRange,
-    ValueStreamKind, ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
+    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, RelationVisitor, Type, TypeId,
+    TypedWireRange, ValueStreamKind, ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
+    text_parser::RelationReader, text_parser::ValueStreamReader,
 };
 use std::{
     cmp::max,
@@ -181,7 +181,10 @@ impl FunctionBodyVisitor for CircuitIngestor {
         if self.is_prover {
             let how_many_wires = dst.end - dst.start + 1;
             if self.private_input_count + how_many_wires > (self.priv_inputs.len() as u64) {
-                bail!("Not enough private inputs for this circuit. The circuit requires more than {} private inputs", self.private_input_count + 1);
+                bail!(
+                    "Not enough private inputs for this circuit. The circuit requires more than {} private inputs",
+                    self.private_input_count + 1
+                );
             }
             self.private_input_count += how_many_wires;
         }

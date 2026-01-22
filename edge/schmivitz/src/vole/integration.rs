@@ -1,15 +1,15 @@
 use super::crypto_primitives::CHALL1_LENGTH;
-use super::functionality::{decommit, VoleVerifier};
+use super::functionality::{VoleVerifier, decommit};
 use super::{AsSecretBytes, Chall3, RandomVoleP, RandomVoleV};
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
 use crate::vole::functionality::{
-    create_vole_prover, create_vole_verifier, PartialDecommitment, VoleProver,
+    PartialDecommitment, VoleProver, create_vole_prover, create_vole_verifier,
 };
-use eyre::{bail, Result};
+use eyre::{Result, bail};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
 use swanky_field::IsSubFieldOf;
-use swanky_field_binary::{F128b, F8b, F2};
+use swanky_field_binary::{F2, F8b, F128b};
 
 // This is a first attempt to connect the VOLE part to the circuit traverser.
 

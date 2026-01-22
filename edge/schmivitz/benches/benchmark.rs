@@ -1,12 +1,12 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 use merlin::Transcript;
 use rand::thread_rng;
 use schmivitz::{
+    Proof,
     circuit::load_circuit_from_strings_prover,
     circuit_validator::validate_circuit,
     vole::functionality::{VoleProver, VoleVerifier},
-    Proof,
 };
 
 // Get a fresh transcript
@@ -21,7 +21,7 @@ fn benchmark_aes256(c: &mut Criterion) {
     c.bench_function("aes256_parse", |b| {
         b.iter(|| {
             let circuit = load_circuit_from_strings_prover(mini_circuit_bytes, private_input_bytes);
-            black_box(circuit.is_ok());
+            std::hint::black_box(circuit.is_ok());
         })
     });
 
@@ -35,7 +35,7 @@ fn benchmark_aes256(c: &mut Criterion) {
             let proof =
                 Proof::<VoleProver, VoleVerifier>::prove::<_>(&circuit, &mut transcript(), rng)
                     .unwrap();
-            black_box(proof)
+            std::hint::black_box(proof)
         })
     });
 
@@ -47,7 +47,7 @@ fn benchmark_aes256(c: &mut Criterion) {
         b.iter(|| {
             let verif = proof.verify(&circuit, &mut transcript());
             assert!(verif.is_ok());
-            black_box(verif.is_ok())
+            std::hint::black_box(verif.is_ok())
         })
     });
 }
@@ -59,7 +59,7 @@ fn benchmark_sha256(c: &mut Criterion) {
     c.bench_function("sha256_parse", |b| {
         b.iter(|| {
             let circuit = load_circuit_from_strings_prover(mini_circuit_bytes, private_input_bytes);
-            black_box(circuit.is_ok());
+            std::hint::black_box(circuit.is_ok());
         })
     });
 
@@ -73,7 +73,7 @@ fn benchmark_sha256(c: &mut Criterion) {
             let proof =
                 Proof::<VoleProver, VoleVerifier>::prove::<_>(&circuit, &mut transcript(), rng)
                     .unwrap();
-            black_box(proof)
+            std::hint::black_box(proof)
         })
     });
 
@@ -85,7 +85,7 @@ fn benchmark_sha256(c: &mut Criterion) {
         b.iter(|| {
             let verif = proof.verify(&circuit, &mut transcript());
             assert!(verif.is_ok());
-            black_box(verif.is_ok())
+            std::hint::black_box(verif.is_ok())
         })
     });
 }
