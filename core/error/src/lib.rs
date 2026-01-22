@@ -325,6 +325,12 @@ impl<T> OptionExt<T> for Option<T> {
     }
 }
 
+// This test guarantees that `Error` (and `Result`s over `Error`) are
+// the same size as a raw pointer (e.g. as small as reasonably
+// possible).
+//
+// This is important to minimizing the impact of Swanky errors on
+// program performance, particularly memory usage.
 #[test]
 fn test_error_sizes() {
     assert_eq!(
