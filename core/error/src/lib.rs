@@ -195,7 +195,7 @@ impl std::error::Error for Error {
     }
 }
 
-/// `Result<T, Error>`
+/// An alias for `Result<T, Error>`.
 ///
 /// This can be used anywhere Swanky produces an error.
 pub type Result<T> = std::result::Result<T, Error>;
