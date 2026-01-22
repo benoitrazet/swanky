@@ -225,7 +225,7 @@ macro_rules! ensure {
 #[macro_export]
 macro_rules! bail {
     ($kind:expr, $($msg:tt)*) => {
-        return Err(swanky_error!($kind, $($msg)*))
+        return Err($crate::swanky_error!($kind, $($msg)*))
     };
 }
 
