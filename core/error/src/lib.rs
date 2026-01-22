@@ -94,11 +94,7 @@ impl Debug for ErrorInner {
         if let std::backtrace::BacktraceStatus::Captured = self.backtrace.status() {
             let mut backtrace = self.backtrace.to_string();
             write!(f, "\n\n")?;
-            if backtrace.starts_with("stack backtrace:") {
-                backtrace.replace_range(0..1, "S");
-            } else {
-                writeln!(f, "Stack backtrace:")?;
-            }
+            writeln!(f, "Stack backtrace:")?;
             backtrace.truncate(backtrace.trim_end().len());
             write!(f, "{}", backtrace)?;
         }
