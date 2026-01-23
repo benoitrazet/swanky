@@ -160,7 +160,7 @@ bytemuck = { version = "1.24.0", features = [
   "aarch64_simd",
 ] }
 bytes = "1.11.0"
-cc = "1.2.52"
+cc = "1.2.53"
 ciborium = "0.2.2"
 clap = { version = "4.5.54", features = ["derive"] }
 color-eyre = "0.6.5"
@@ -195,14 +195,14 @@ ndarray = "=0.15.6" # See issue #123
 # Rather than enabling nix features on a per-crate basis (which could lead to issues where
 # compiling the whole workspace might succeed, but compiling an individual crate might fail),
 # we just enable all the features we need at the workspace root.
-nix = { version = "0.30.1", features = ["sched"] }
+nix = { version = "0.31.1", features = ["sched"] }
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
 num_cpus = "1.17.0"
 parking_lot = "0.12.5"
 pretty_env_logger = "0.5"
 prettyplease = "0.2.37"
-proc-macro2 = "1.0.105"
+proc-macro2 = "1.0.106"
 rand = "=0.8.5" # See issue #345
 rand_chacha = "=0.3.1" # See issue #345
 rand_core = "=0.6.4" # See issue #345
@@ -239,7 +239,7 @@ subtle = { version = "2.6.1", features = [
 ] }
 syn = { version = "2.0.114", features = ["full"] }
 tempfile = "3.24.0"
-thiserror = "2.0.17"
+thiserror = "2.0.18"
 toml = "0.9.11"
 tungstenite = { version = "0.28.0", features = ["rustls"] }
 twox-hash = "2.1.2"
