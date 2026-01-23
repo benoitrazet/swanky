@@ -3,10 +3,11 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     AllWire, FancyArithmetic,
     circuit::{ArithmeticCircuit as Circuit, CircuitBuilder, CircuitType},
-    classic::garble,
+    classic::{GarbledChannel, garble},
     util::RngExt,
 };
 use std::time::Duration;
+use swanky_channel::Channel;
 
 fn bench_garble<F: 'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
 where
@@ -34,29 +35,38 @@ where
             .collect::<Vec<u16>>();
         let xs = en.encode_garbler_inputs(&inps);
         bench.iter(|| {
-            let ys = ev.eval(&c, &xs, &[]).unwrap();
+            let ys = Channel::with(GarbledChannel::from(&ev), |channel| {
+                Ok(ev.eval(&c, &xs, &[], channel).unwrap())
+            })
+            .unwrap();
             std::hint::black_box(ys);
         });
     });
 }
 
 fn proj(q: u16) -> Circuit {
-    let tt = (0..q).map(|i| (i + 1) % q).collect::<Vec<u16>>();
-    let mut b = CircuitBuilder::new();
-    let x = b.garbler_input(q);
-    for _ in 0..1000 {
-        let _ = b.proj(&x, q, Some(tt.clone())).unwrap();
-    }
-    b.finish()
+    Channel::with(std::io::empty(), |channel| {
+        let tt = (0..q).map(|i| (i + 1) % q).collect::<Vec<u16>>();
+        let mut b = CircuitBuilder::new();
+        let x = b.garbler_input(q);
+        for _ in 0..1000 {
+            let _ = b.proj(&x, q, Some(tt.clone()), channel).unwrap();
+        }
+        Ok(b.finish())
+    })
+    .unwrap()
 }
 
 fn mul(q: u16) -> Circuit {
-    let mut b = CircuitBuilder::new();
-    let x = b.garbler_input(q);
-    for _ in 0..1000 {
-        let _ = b.mul(&x, &x).unwrap();
-    }
-    b.finish()
+    Channel::with(std::io::empty(), |channel| {
+        let mut b = CircuitBuilder::new();
+        let x = b.garbler_input(q);
+        for _ in 0..1000 {
+            let _ = b.mul(&x, &x, channel).unwrap();
+        }
+        Ok(b.finish())
+    })
+    .unwrap()
 }
 
 fn proj_gb(c: &mut Criterion) {

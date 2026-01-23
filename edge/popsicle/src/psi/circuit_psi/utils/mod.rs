@@ -4,13 +4,9 @@ use fancy_garbling::{FancyInput, WireMod2, util};
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use swanky_block::{Block, Block512};
-use swanky_channel_legacy::Channel;
+use swanky_channel::Channel;
 
-use std::{
-    fmt::Debug,
-    io::{BufReader, BufWriter},
-    os::unix::net::UnixStream,
-};
+use std::fmt::Debug;
 
 /// Turn a vector of bits represented as u16 into a decimal
 /// value represented as a u128.
@@ -173,6 +169,7 @@ pub fn bin_encode_many_block512<F, E>(
     gc_party: &mut F,
     values: &[Block512],
     size: usize,
+    channel: &mut Channel,
 ) -> Result<Vec<F::Item>, E>
 where
     F: FancyInput<Item = WireMod2, Error = E>,
@@ -182,12 +179,16 @@ where
     let bits = encode_binary(values, size);
     // Then specify the moduli of the wires
     let moduli = vec![2; bits.len()];
-    gc_party.encode_many(&bits, &moduli)
+    gc_party.encode_many(&bits, &moduli, channel)
 }
 
 /// A wrapper function that encodes `Block512` as garbled
 /// circuit inputs
-pub fn bin_receive_many_block512<F, E>(gc_party: &mut F, size: usize) -> Result<Vec<F::Item>, E>
+pub fn bin_receive_many_block512<F, E>(
+    gc_party: &mut F,
+    size: usize,
+    channel: &mut Channel,
+) -> Result<Vec<F::Item>, E>
 where
     F: FancyInput<Item = WireMod2, Error = E>,
     E: Debug,
@@ -195,13 +196,5 @@ where
 {
     // Specify the moduli of the wires
     let moduli = vec![2; size];
-    gc_party.receive_many(&moduli)
-}
-
-/// Turns a Unixstream into a scuttlebutt channel
-pub fn setup_channel(stream: UnixStream) -> Channel<BufReader<UnixStream>, BufWriter<UnixStream>> {
-    let reader = BufReader::new(stream.try_clone().unwrap());
-    let writer = BufWriter::new(stream);
-    let channel = Channel::new(reader, writer);
-    channel
+    gc_party.receive_many(&moduli, channel)
 }

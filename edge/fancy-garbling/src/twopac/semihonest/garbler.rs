@@ -5,47 +5,41 @@ use crate::{
 use rand::{CryptoRng, Rng, SeedableRng};
 use swanky_adversary::SemiHonest;
 use swanky_block::Block;
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_ot_traits::Sender as OtSender;
 
 /// Semi-honest garbler.
-pub struct Garbler<C, RNG, OT, Wire> {
-    garbler: Gb<C, RNG, Wire>,
+pub struct Garbler<RNG, OT, Wire> {
+    garbler: Gb<RNG, Wire>,
     ot: OT,
     rng: RNG,
 }
 
-impl<C, OT, RNG, Wire> std::ops::Deref for Garbler<C, RNG, OT, Wire> {
-    type Target = Gb<C, RNG, Wire>;
+impl<OT, RNG, Wire> std::ops::Deref for Garbler<RNG, OT, Wire> {
+    type Target = Gb<RNG, Wire>;
     fn deref(&self) -> &Self::Target {
         &self.garbler
     }
 }
 
-impl<C, OT, RNG, Wire> std::ops::DerefMut for Garbler<C, RNG, OT, Wire> {
-    fn deref_mut(&mut self) -> &mut Gb<C, RNG, Wire> {
+impl<OT, RNG, Wire> std::ops::DerefMut for Garbler<RNG, OT, Wire> {
+    fn deref_mut(&mut self) -> &mut Gb<RNG, Wire> {
         &mut self.garbler
     }
 }
 
 impl<
-    C: AbstractChannel,
     RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
     Wire: WireLabel,
-> Garbler<C, RNG, OT, Wire>
+> Garbler<RNG, OT, Wire>
 {
     /// Make a new `Garbler`.
-    pub fn new(mut channel: C, mut rng: RNG) -> Result<Self, TwopacError> {
-        let ot = OT::init(&mut channel, &mut rng)?;
+    pub fn new(channel: &mut Channel, mut rng: RNG) -> Result<Self, TwopacError> {
+        let ot = OT::init(channel, &mut rng)?;
 
-        let garbler = Gb::new(channel, RNG::from_seed(rng.r#gen()));
+        let garbler = Gb::new(RNG::from_seed(rng.r#gen()));
         Ok(Garbler { garbler, ot, rng })
-    }
-
-    /// Get a reference to the internal channel.
-    pub fn get_channel(&mut self) -> &mut C {
-        &mut self.garbler.channel
     }
 
     fn _evaluator_input(&mut self, delta: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
@@ -64,38 +58,48 @@ impl<
 }
 
 impl<
-    C: AbstractChannel,
     RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
     Wire: WireLabel,
-> FancyInput for Garbler<C, RNG, OT, Wire>
+> FancyInput for Garbler<RNG, OT, Wire>
 {
     type Item = Wire;
     type Error = TwopacError;
 
-    fn encode(&mut self, val: u16, modulus: u16) -> Result<Wire, TwopacError> {
+    fn encode(
+        &mut self,
+        val: u16,
+        modulus: u16,
+        channel: &mut Channel,
+    ) -> Result<Wire, TwopacError> {
         let (mine, theirs) = self.garbler.encode_wire(val, modulus);
-        self.garbler.send_wire(&theirs)?;
-        self.channel.flush()?;
+        self.garbler.send_wire(&theirs, channel)?;
         Ok(mine)
     }
 
-    fn encode_many(&mut self, vals: &[u16], moduli: &[u16]) -> Result<Vec<Wire>, TwopacError> {
+    fn encode_many(
+        &mut self,
+        vals: &[u16],
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> Result<Vec<Wire>, TwopacError> {
         let ws = vals
             .iter()
             .zip(moduli.iter())
             .map(|(x, q)| {
                 let (mine, theirs) = self.garbler.encode_wire(*x, *q);
-                self.garbler.send_wire(&theirs)?;
+                self.garbler.send_wire(&theirs, channel)?;
                 Ok(mine)
             })
             .collect();
-        self.channel.flush()?;
         ws
     }
 
-    fn receive_many(&mut self, qs: &[u16]) -> Result<Vec<Wire>, TwopacError> {
-        self.channel.flush()?;
+    fn receive_many(
+        &mut self,
+        qs: &[u16],
+        channel: &mut Channel,
+    ) -> Result<Vec<Wire>, TwopacError> {
         let n = qs.len();
         let lens = qs.iter().map(|q| f32::from(*q).log(2.0).ceil() as usize);
         let mut wires = Vec::with_capacity(n);
@@ -109,42 +113,51 @@ impl<
                 inputs.push(i);
             }
         }
-        self.ot
-            .send(&mut self.garbler.channel, &inputs, &mut self.rng)?;
+        self.ot.send(channel, &inputs, &mut self.rng)?;
         Ok(wires)
     }
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> FancyBinary for Garbler<C, RNG, OT, WireMod2> {
-    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
-        self.garbler.negate(x).map_err(Self::Error::from)
+impl<RNG: CryptoRng + Rng, OT> FancyBinary for Garbler<RNG, OT, WireMod2> {
+    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Self::Item, Self::Error> {
+        self.garbler.negate(x, channel).map_err(Self::Error::from)
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
         self.garbler.xor(x, y).map_err(Self::Error::from)
     }
 
-    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        self.garbler.and(x, y).map_err(Self::Error::from)
+    fn and(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
+        self.garbler.and(x, y, channel).map_err(Self::Error::from)
     }
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> FancyBinary for Garbler<C, RNG, OT, AllWire> {
-    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
-        self.garbler.negate(x).map_err(Self::Error::from)
+impl<RNG: CryptoRng + Rng, OT> FancyBinary for Garbler<RNG, OT, AllWire> {
+    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Self::Item, Self::Error> {
+        self.garbler.negate(x, channel).map_err(Self::Error::from)
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
         self.garbler.xor(x, y).map_err(Self::Error::from)
     }
 
-    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        self.garbler.and(x, y).map_err(Self::Error::from)
+    fn and(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
+        self.garbler.and(x, y, channel).map_err(Self::Error::from)
     }
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic
-    for Garbler<C, RNG, OT, Wire>
+impl<RNG: CryptoRng + Rng, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic
+    for Garbler<RNG, OT, Wire>
 {
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.garbler.add(x, y).map_err(Self::Error::from)
@@ -158,36 +171,56 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT, Wire: WireLabel + ArithmeticW
         self.garbler.cmul(x, c).map_err(Self::Error::from)
     }
 
-    fn mul(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
-        self.garbler.mul(x, y).map_err(Self::Error::from)
+    fn mul(
+        &mut self,
+        x: &Wire,
+        y: &Wire,
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
+        self.garbler.mul(x, y, channel).map_err(Self::Error::from)
     }
 
-    fn proj(&mut self, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Result<Self::Item, Self::Error> {
-        self.garbler.proj(x, q, tt).map_err(Self::Error::from)
+    fn proj(
+        &mut self,
+        x: &Wire,
+        q: u16,
+        tt: Option<Vec<u16>>,
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
+        self.garbler
+            .proj(x, q, tt, channel)
+            .map_err(Self::Error::from)
     }
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT, Wire: WireLabel> Fancy
-    for Garbler<C, RNG, OT, Wire>
-{
+impl<RNG: CryptoRng + Rng, OT, Wire: WireLabel> Fancy for Garbler<RNG, OT, Wire> {
     type Item = Wire;
     type Error = TwopacError;
 
-    fn constant(&mut self, x: u16, q: u16) -> Result<Self::Item, Self::Error> {
-        self.garbler.constant(x, q).map_err(Self::Error::from)
+    fn constant(
+        &mut self,
+        x: u16,
+        q: u16,
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
+        self.garbler
+            .constant(x, q, channel)
+            .map_err(Self::Error::from)
     }
 
-    fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error> {
-        self.garbler.output(x).map_err(Self::Error::from)
+    fn output(
+        &mut self,
+        x: &Self::Item,
+        channel: &mut Channel,
+    ) -> Result<Option<u16>, Self::Error> {
+        self.garbler.output(x, channel).map_err(Self::Error::from)
     }
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT, Wire: WireLabel> FancyReveal
-    for Garbler<C, RNG, OT, Wire>
-{
-    fn reveal(&mut self, x: &Self::Item) -> Result<u16, Self::Error> {
-        self.garbler.reveal(x).map_err(Self::Error::from)
+impl<RNG: CryptoRng + Rng, OT, Wire: WireLabel> FancyReveal for Garbler<RNG, OT, Wire> {
+    fn reveal(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<u16, Self::Error> {
+        self.garbler.reveal(x, channel).map_err(Self::Error::from)
     }
 }
 
-impl<C, RNG, OT, Wire> SemiHonest for Garbler<C, RNG, OT, Wire> {}
+impl<RNG, OT, Wire> SemiHonest for Garbler<RNG, OT, Wire> {}

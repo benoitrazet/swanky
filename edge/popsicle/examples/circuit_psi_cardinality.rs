@@ -4,47 +4,49 @@ use popsicle::circuit_psi::{
 
 use fancy_garbling::Fancy;
 use rand::Rng;
-use std::{os::unix::net::UnixStream, thread};
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 const SET_SIZE: usize = 1 << 8;
 
 pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {
-    let (sender, receiver) = UnixStream::pair().unwrap();
-    thread::scope(|s| {
-        let _ = s.spawn(|| {
+    let (_, result) = swanky_channel::local::local_channel_pair(
+        |channel| {
             let mut rng = AesRng::new();
-            let mut channel = setup_channel(sender);
             let mut gb_psi =
-                OpprfPsiGarbler::<_, AesRng>::new(&mut channel, Block::from(rng.r#gen::<u128>()))
-                    .unwrap();
+                OpprfPsiGarbler::<AesRng>::new(channel, Block::from(rng.r#gen::<u128>())).unwrap();
 
-            let intersection_results = gb_psi.intersect(set_a).unwrap();
+            let intersection_results = gb_psi.intersect(set_a, channel).unwrap();
             let res = fancy_cardinality(
                 &mut gb_psi.gb,
                 &intersection_results.intersection.existence_bit_vector,
+                channel,
             )
             .unwrap();
-            gb_psi.gb.outputs(res.wires()).unwrap();
-        });
-        let mut rng = AesRng::new();
-        let mut channel = setup_channel(receiver);
-        let mut ev_psi =
-            OpprfPsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(rng.r#gen::<u128>()))
-                .unwrap();
-        let intersection_results = ev_psi.intersect(set_b).unwrap();
-        let res = fancy_cardinality(
-            &mut ev_psi.ev,
-            &intersection_results.intersection.existence_bit_vector,
-        )
-        .unwrap();
-        let res_out = ev_psi
-            .ev
-            .outputs(res.wires())
-            .unwrap()
-            .expect("evaluator should produce outputs");
-        binary_to_u128(res_out)
-    })
+            gb_psi.gb.outputs(res.wires(), channel).unwrap();
+            Ok(())
+        },
+        |channel| {
+            let mut rng = AesRng::new();
+            let mut ev_psi =
+                OpprfPsiEvaluator::<AesRng>::new(channel, Block::from(rng.r#gen::<u128>()))
+                    .unwrap();
+            let intersection_results = ev_psi.intersect(set_b, channel).unwrap();
+            let res = fancy_cardinality(
+                &mut ev_psi.ev,
+                &intersection_results.intersection.existence_bit_vector,
+                channel,
+            )
+            .unwrap();
+            let res_out = ev_psi
+                .ev
+                .outputs(res.wires(), channel)
+                .unwrap()
+                .expect("evaluator should produce outputs");
+            Ok(binary_to_u128(res_out))
+        },
+    )
+    .unwrap();
+    result
 }
 pub fn main() {
     let set_a: Vec<Vec<u8>> = (0..SET_SIZE).map(|el| el.to_le_bytes().to_vec()).collect();

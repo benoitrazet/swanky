@@ -30,17 +30,31 @@ pub trait FancyBinary: Fancy {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
 
     /// Binary And
-    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
+    fn and(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error>;
 
     /// Binary Not
-    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error>;
+    // TODO: `negate` _should_ be free (i.e., not require `Channel`), but its
+    // not because we need to define a constant (namely, the constant `1`),
+    // which requires `Channel`. We should fix this! This can be done by having
+    // `Fancy` require a one element.
+    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Self::Item, Self::Error>;
 
     /// Uses Demorgan's Rule implemented with an and gate and negation.
-    fn or(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        let notx = self.negate(x)?;
-        let noty = self.negate(y)?;
-        let z = self.and(&notx, &noty)?;
-        self.negate(&z)
+    fn or(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
+        let notx = self.negate(x, channel)?;
+        let noty = self.negate(y, channel)?;
+        let z = self.and(&notx, &noty, channel)?;
+        self.negate(&z, channel)
     }
 
     /// Binary adder. Returns the result and the carry.
@@ -49,22 +63,27 @@ pub trait FancyBinary: Fancy {
         x: &Self::Item,
         y: &Self::Item,
         carry_in: Option<&Self::Item>,
+        channel: &mut Channel,
     ) -> Result<(Self::Item, Self::Item), Self::Error> {
         if let Some(c) = carry_in {
             let z1 = self.xor(x, y)?;
             let z2 = self.xor(&z1, c)?;
             let z3 = self.xor(x, c)?;
-            let z4 = self.and(&z1, &z3)?;
+            let z4 = self.and(&z1, &z3, channel)?;
             let carry = self.xor(&z4, x)?;
             Ok((z2, carry))
         } else {
             let z = self.xor(x, y)?;
-            let carry = self.and(x, y)?;
+            let carry = self.and(x, y, channel)?;
             Ok((z, carry))
         }
     }
     /// Returns 1 if all wires equal 1.
-    fn and_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
+    fn and_many(
+        &mut self,
+        args: &[Self::Item],
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
         if args.is_empty() {
             return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: args.len(),
@@ -73,11 +92,15 @@ pub trait FancyBinary: Fancy {
         }
         args.iter()
             .skip(1)
-            .fold(Ok(args[0].clone()), |acc, x| self.and(&(acc?), x))
+            .fold(Ok(args[0].clone()), |acc, x| self.and(&(acc?), x, channel))
     }
 
     /// Returns 1 if any wire equals 1.
-    fn or_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
+    fn or_many(
+        &mut self,
+        args: &[Self::Item],
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
         if args.is_empty() {
             return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: args.len(),
@@ -86,7 +109,7 @@ pub trait FancyBinary: Fancy {
         }
         args.iter()
             .skip(1)
-            .fold(Ok(args[0].clone()), |acc, x| self.or(&(acc?), x))
+            .fold(Ok(args[0].clone()), |acc, x| self.or(&(acc?), x, channel))
     }
 
     /// XOR many wires together
@@ -108,12 +131,13 @@ pub trait FancyBinary: Fancy {
         x: &Self::Item,
         b1: bool,
         b2: bool,
+        channel: &mut Channel,
     ) -> Result<Self::Item, Self::Error> {
         match (b1, b2) {
             (false, true) => Ok(x.clone()),
-            (true, false) => self.negate(x),
-            (false, false) => self.constant(0, 2),
-            (true, true) => self.constant(1, 2),
+            (true, false) => self.negate(x, channel),
+            (false, false) => self.constant(0, 2, channel),
+            (true, true) => self.constant(1, 2, channel),
         }
     }
 
@@ -123,9 +147,10 @@ pub trait FancyBinary: Fancy {
         b: &Self::Item,
         x: &Self::Item,
         y: &Self::Item,
+        channel: &mut Channel,
     ) -> Result<Self::Item, Self::Error> {
         let xor = self.xor(x, y)?;
-        let and = self.and(b, &xor)?;
+        let and = self.and(b, &xor, channel)?;
         self.xor(&and, x)
     }
 }
@@ -142,17 +167,27 @@ pub trait Fancy {
     type Error: std::fmt::Debug + std::fmt::Display + std::convert::From<FancyError>;
 
     /// Create a constant `x` with modulus `q`.
-    fn constant(&mut self, x: u16, q: u16) -> Result<Self::Item, Self::Error>;
+    fn constant(
+        &mut self,
+        x: u16,
+        q: u16,
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error>;
 
     /// Process this wire as output. Some `Fancy` implementers don't actually *return*
     /// output, but they need to be involved in the process, so they can return `None`.
-    fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error>;
+    fn output(&mut self, x: &Self::Item, channel: &mut Channel)
+    -> Result<Option<u16>, Self::Error>;
 
     /// Output a slice of wires.
-    fn outputs(&mut self, xs: &[Self::Item]) -> Result<Option<Vec<u16>>, Self::Error> {
+    fn outputs(
+        &mut self,
+        xs: &[Self::Item],
+        channel: &mut Channel,
+    ) -> Result<Option<Vec<u16>>, Self::Error> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
-            zs.push(self.output(x)?);
+            zs.push(self.output(x, channel)?);
         }
         Ok(zs.into_iter().collect())
     }
@@ -170,7 +205,12 @@ pub trait FancyArithmetic: Fancy {
     fn cmul(&mut self, x: &Self::Item, c: u16) -> Result<Self::Item, Self::Error>;
 
     /// Multiply `x` and `y`.
-    fn mul(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
+    fn mul(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error>;
 
     /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
     ///
@@ -180,6 +220,7 @@ pub trait FancyArithmetic: Fancy {
         x: &Self::Item,
         q: u16,
         tt: Option<Vec<u16>>,
+        channel: &mut Channel,
     ) -> Result<Self::Item, Self::Error>;
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -200,13 +241,18 @@ pub trait FancyArithmetic: Fancy {
         Ok(z)
     }
     /// Change the modulus of `x` to `to_modulus` using a projection gate.
-    fn mod_change(&mut self, x: &Self::Item, to_modulus: u16) -> Result<Self::Item, Self::Error> {
+    fn mod_change(
+        &mut self,
+        x: &Self::Item,
+        to_modulus: u16,
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
         let from_modulus = x.modulus();
         if from_modulus == to_modulus {
             return Ok(x.clone());
         }
         let tab = (0..from_modulus).map(|x| x % to_modulus).collect_vec();
-        self.proj(x, to_modulus, Some(tab))
+        self.proj(x, to_modulus, Some(tab), channel)
     }
 }
 
@@ -242,17 +288,20 @@ macro_rules! derive_binary {
                 self.add(x, y)
             }
 
-            fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+            fn and(&mut self, x: &Self::Item, y: &Self::Item, channel: &mut Channel) -> Result<Self::Item, Self::Error> {
                 check_binary!(x);
                 check_binary!(y);
 
-                self.mul(x, y)
+                self.mul(x, y, channel)
             }
 
-            fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+            fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Self::Item, Self::Error> {
                 check_binary!(x);
-
-                let c = self.constant(1, 2)?;
+                // TODO: negate _should_ be free, but it's not because we define
+                // a constant here, and this is defined on _every_ negate call.
+                // We should change this! Possibly by having the constant 1 be
+                // required as an entry in the `Fancy` trait.
+                let c = self.constant(1, 2, channel)?;
                 self.xor(x, &c)
             }
         }
@@ -260,3 +309,4 @@ macro_rules! derive_binary {
 }
 pub(crate) use check_binary;
 pub(crate) use derive_binary;
+use swanky_channel::Channel;

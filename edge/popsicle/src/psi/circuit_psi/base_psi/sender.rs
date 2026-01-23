@@ -51,15 +51,16 @@ impl BasePsi for OpprfSender {
     ///
     /// If the payloads are not needed for the computation, `payload_existence`
     /// should be set to false.
-    fn init<C, RNG>(channel: &mut C, rng: &mut RNG, has_payload: bool) -> Result<Self, Error>
+    fn init<RNG>(channel: &mut Channel, rng: &mut RNG, has_payload: bool) -> Result<Self, Error>
     where
-        C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng,
     {
         // The key used during hashing is known to both
         // parties and allows them to hash the same inputs
         // to the same outputs.
-        let key = channel.read_block()?;
+        let key = channel
+            .read()
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
         let opprf_primary_keys = KmprtSender::init(channel, rng)?;
         let mut opprf_payload = None;
         if has_payload {
@@ -75,24 +76,27 @@ impl BasePsi for OpprfSender {
         })
     }
     /// Hash the data using simple hashing
-    fn hash_data<C, RNG>(
+    fn hash_data<RNG>(
         &mut self,
         primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<(), Error>
     where
-        C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng,
     {
         // refresh key if cuckoo hash is full
-        self.key = channel.read_block()?;
+        self.key = channel
+            .read::<Block>()
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
 
         // Receive cuckoo hash info from sender
         // The receiver determines the number of bins
         // to be used by the sender.
-        let nbins = channel.read_usize()?;
+        let nbins = channel
+            .read::<usize>()
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
 
         self.nbins = Some(nbins);
 
@@ -144,9 +148,8 @@ impl BasePsi for OpprfSender {
         Ok(())
     }
 
-    fn opprf_exchange<C, RNG>(&mut self, channel: &mut C, rng: &mut RNG) -> Result<(), Error>
+    fn opprf_exchange<RNG>(&mut self, channel: &mut Channel, rng: &mut RNG) -> Result<(), Error>
     where
-        C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng,
     {
         // The Opprf in swanky expects the programmed input and outputs
@@ -175,6 +178,7 @@ impl BasePsi for OpprfSender {
     fn encode_circuit_inputs<F, E>(
         &mut self,
         gc_party: &mut F,
+        channel: &mut Channel,
     ) -> Result<CircuitInputs<F::Item>, Error>
     where
         F: FancyInput<Item = WireMod2, Error = E>,
@@ -185,9 +189,11 @@ impl BasePsi for OpprfSender {
             gc_party,
             &self.state.opprf_primary_keys_out,
             PRIMARY_KEY_SIZE,
+            channel,
         )?;
 
-        let receiver_primary_keys = bin_receive_many_block512(gc_party, sender_primary_keys.len())?;
+        let receiver_primary_keys =
+            bin_receive_many_block512(gc_party, sender_primary_keys.len(), channel)?;
 
         let mut result = CircuitInputs {
             sender_primary_keys,
@@ -199,13 +205,17 @@ impl BasePsi for OpprfSender {
 
         // If payloads exist, then encode them
         if !&self.state.opprf_payloads_out.is_empty() {
-            let sender_payloads_masked: Vec<F::Item> =
-                bin_encode_many_block512(gc_party, &self.state.opprf_payloads_out, PAYLOAD_SIZE)?;
+            let sender_payloads_masked: Vec<F::Item> = bin_encode_many_block512(
+                gc_party,
+                &self.state.opprf_payloads_out,
+                PAYLOAD_SIZE,
+                channel,
+            )?;
             let receiver_payloads: Vec<F::Item> =
-                bin_receive_many_block512(gc_party, sender_payloads_masked.len())?;
+                bin_receive_many_block512(gc_party, sender_payloads_masked.len(), channel)?;
 
             let masks: Vec<F::Item> =
-                bin_receive_many_block512(gc_party, sender_payloads_masked.len())?;
+                bin_receive_many_block512(gc_party, sender_payloads_masked.len(), channel)?;
 
             result.sender_payloads_masked = sender_payloads_masked;
             result.receiver_payloads = receiver_payloads;

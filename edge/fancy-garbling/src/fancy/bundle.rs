@@ -5,6 +5,7 @@ use crate::{
 };
 use itertools::Itertools;
 use std::ops::Index;
+use swanky_channel::Channel;
 
 /// A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`.
 #[derive(Clone)]
@@ -154,11 +155,12 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
         &mut self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
+        channel: &mut Channel
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         x.wires()
             .iter()
             .zip(y.wires().iter())
-            .map(|(x, y)| self.mul(x, y))
+            .map(|(x, y)| self.mul(x, y, channel))
             .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle::new)
     }
@@ -167,6 +169,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
     fn mixed_radix_addition(
         &mut self,
         xs: &[Bundle<Self::Item>],
+        channel: &mut Channel
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         let nargs = xs.len();
         if nargs < 1 {
@@ -205,7 +208,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
 
                 let modded_ds = ds
                     .iter()
-                    .map(|d| self.mod_change(d, max_val + 1))
+                    .map(|d| self.mod_change(d, max_val + 1, channel))
                     .collect::<Result<Vec<Self::Item>, Self::Error>>()?;
 
                 let carry_sum = self.add_many(&modded_ds)?;
@@ -217,17 +220,17 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
                 // the correct moduli for the next iteration
                 let next_mod = xs[0].wires()[i + 1].modulus();
                 let tt = (0..=max_val).map(|i| (i / q) % next_mod).collect_vec();
-                digit_carry = Some(self.proj(&carry, next_mod, Some(tt))?);
+                digit_carry = Some(self.proj(&carry, next_mod, Some(tt), channel)?);
 
                 let next_max_val = nargs as u16 * (next_mod - 1) + max_carry;
 
                 if i < n - 2 {
                     if max_carry < next_mod {
                         carry_carry =
-                            Some(self.mod_change(digit_carry.as_ref().unwrap(), next_max_val + 1)?);
+                            Some(self.mod_change(digit_carry.as_ref().unwrap(), next_max_val + 1, channel)?);
                     } else {
                         let tt = (0..=max_val).map(|i| i / q).collect_vec();
-                        carry_carry = Some(self.proj(&carry, next_max_val + 1, Some(tt))?);
+                        carry_carry = Some(self.proj(&carry, next_max_val + 1, Some(tt), channel)?);
                     }
                 } else {
                     // next digit is MSB so we dont need carry_carry
@@ -246,6 +249,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
     fn mixed_radix_addition_msb_only(
         &mut self,
         xs: &[Bundle<Self::Item>],
+        channel: &mut Channel
     ) -> Result<Self::Item, Self::Error> {
         let nargs = xs.len();
         if nargs < 1 {
@@ -277,7 +281,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
             // previous iteration
             let modded_ds = ds
                 .iter()
-                .map(|d| self.mod_change(d, max_val + 1))
+                .map(|d| self.mod_change(d, max_val + 1, channel))
                 .collect::<Result<Vec<Self::Item>, Self::Error>>()?;
             // add them up
             let sum = self.add_many(&modded_ds)?;
@@ -297,7 +301,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
             };
 
             let tt = (0..=max_val).map(|i| (i / q) % next_mod).collect_vec();
-            opt_carry = Some(self.proj(&sum_with_carry, next_mod, Some(tt))?);
+            opt_carry = Some(self.proj(&sum_with_carry, next_mod, Some(tt), channel)?);
         }
 
         // compute the msb
@@ -313,10 +317,11 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
         &mut self,
         b: &Self::Item,
         x: &Bundle<Self::Item>,
+        channel: &mut Channel
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         x.wires()
             .iter()
-            .map(|xwire| self.mul(xwire, b))
+            .map(|xwire| self.mul(xwire, b, channel))
             .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }
@@ -326,6 +331,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
         &mut self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
+        channel: &mut Channel
     ) -> Result<Self::Item, Self::Error> {
         if x.moduli() != y.moduli() {
             return Err(Self::Error::from(FancyError::UnequalModuli));
@@ -340,7 +346,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
                 let z = self.sub(x, y)?;
                 let mut eq_zero_tab = vec![0; x.modulus() as usize];
                 eq_zero_tab[0] = 1;
-                self.proj(&z, wlen + 1, Some(eq_zero_tab))
+                self.proj(&z, wlen + 1, Some(eq_zero_tab), channel)
             })
             .collect::<Result<Vec<Self::Item>, Self::Error>>()?;
         // add up the results, and output whether they equal zero or not, mod 2
@@ -348,7 +354,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
         let b = zs.len();
         let mut tab = vec![0; b + 1];
         tab[b] = 1;
-        self.proj(&z, 2, Some(tab))
+        self.proj(&z, 2, Some(tab), channel)
     }
 }
 
@@ -361,11 +367,12 @@ pub trait BinaryBundleGadgets: FancyBinary {
         b: &Self::Item,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
+        channel: &mut Channel
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         x.wires()
             .iter()
             .zip(y.wires().iter())
-            .map(|(xwire, ywire)| self.mux(b, xwire, ywire))
+            .map(|(xwire, ywire)| self.mux(b, xwire, ywire, channel))
             .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }
@@ -379,20 +386,21 @@ pub trait BundleGadgets: Fancy {
         &mut self,
         xs: &[u16],
         ps: &[u16],
+        channel: &mut Channel
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         xs.iter()
             .zip(ps.iter())
-            .map(|(&x, &p)| self.constant(x, p))
+            .map(|(&x, &p)| self.constant(x, p, channel))
             .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
     }
 
     /// Output the wires that make up a bundle.
-    fn output_bundle(&mut self, x: &Bundle<Self::Item>) -> Result<Option<Vec<u16>>, Self::Error> {
+    fn output_bundle(&mut self, x: &Bundle<Self::Item>, channel: &mut Channel) -> Result<Option<Vec<u16>>, Self::Error> {
         let ws = x.wires();
         let mut outputs = Vec::with_capacity(ws.len());
         for w in ws.iter() {
-            outputs.push(self.output(w)?);
+            outputs.push(self.output(w, channel)?);
         }
         Ok(outputs.into_iter().collect())
     }
@@ -401,10 +409,11 @@ pub trait BundleGadgets: Fancy {
     fn output_bundles(
         &mut self,
         xs: &[Bundle<Self::Item>],
+        channel: &mut Channel
     ) -> Result<Option<Vec<Vec<u16>>>, Self::Error> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
-            let z = self.output_bundle(x)?;
+            let z = self.output_bundle(x, channel)?;
             zs.push(z);
         }
         Ok(zs.into_iter().collect())
@@ -419,9 +428,10 @@ pub trait BundleGadgets: Fancy {
         &mut self,
         x: &Bundle<Self::Item>,
         n: usize,
+        channel: &mut Channel
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         let mut ws = x.wires().to_vec();
-        let zero = self.constant(0, ws.last().unwrap().modulus())?;
+        let zero = self.constant(0, ws.last().unwrap().modulus(), channel)?;
         for _ in 0..n {
             ws.pop();
             ws.insert(0, zero.clone());
@@ -435,9 +445,10 @@ pub trait BundleGadgets: Fancy {
         &mut self,
         x: &Bundle<Self::Item>,
         n: usize,
+        channel: &mut Channel
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         let mut ws = x.wires().to_vec();
-        let zero = self.constant(0, ws.last().unwrap().modulus())?;
+        let zero = self.constant(0, ws.last().unwrap().modulus(), channel)?;
         for _ in 0..n {
             ws.insert(0, zero.clone());
         }

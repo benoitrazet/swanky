@@ -1,5 +1,7 @@
 //! Fancy object to compute the multiplicative depth of a computation.
 
+use swanky_channel::Channel;
+
 use crate::{
     FancyArithmetic, FancyBinary,
     errors::FancyError,
@@ -94,7 +96,11 @@ impl FancyInput for DepthInformer {
     type Item = DepthItem;
     type Error = DepthError;
 
-    fn receive_many(&mut self, moduli: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
+    fn receive_many(
+        &mut self,
+        moduli: &[u16],
+        _: &mut Channel,
+    ) -> Result<Vec<Self::Item>, Self::Error> {
         self.ninputs += moduli.len();
         Ok(moduli
             .iter()
@@ -109,8 +115,9 @@ impl FancyInput for DepthInformer {
         &mut self,
         _values: &[u16],
         moduli: &[u16],
+        channel: &mut Channel,
     ) -> Result<Vec<Self::Item>, Self::Error> {
-        self.receive_many(moduli)
+        self.receive_many(moduli, channel)
     }
 }
 
@@ -119,11 +126,16 @@ impl FancyBinary for DepthInformer {
         FancyArithmetic::add(self, x, y)
     }
 
-    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        FancyArithmetic::mul(self, x, y)
+    fn and(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
+        FancyArithmetic::mul(self, x, y, channel)
     }
 
-    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Self::Item, Self::Error> {
         self.nadds += 1;
         Ok(DepthItem {
             modulus: x.modulus,
@@ -157,7 +169,12 @@ impl FancyArithmetic for DepthInformer {
         })
     }
 
-    fn mul(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn mul(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        _: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
         self.nmuls += 1;
         Ok(DepthItem {
             modulus: x.modulus,
@@ -170,6 +187,7 @@ impl FancyArithmetic for DepthInformer {
         _x: &Self::Item,
         _q: u16,
         _tt: Option<Vec<u16>>,
+        _channel: &mut Channel,
     ) -> Result<Self::Item, Self::Error> {
         Err(DepthError::ProjUnsupported)
     }
@@ -179,7 +197,7 @@ impl Fancy for DepthInformer {
     type Item = DepthItem;
     type Error = DepthError;
 
-    fn constant(&mut self, _val: u16, q: u16) -> Result<Self::Item, Self::Error> {
+    fn constant(&mut self, _val: u16, q: u16, _: &mut Channel) -> Result<Self::Item, Self::Error> {
         self.nconstants += 1;
         Ok(DepthItem {
             modulus: q,
@@ -187,14 +205,14 @@ impl Fancy for DepthInformer {
         })
     }
 
-    fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error> {
+    fn output(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Option<u16>, Self::Error> {
         self.mul_depth = max(self.mul_depth, x.depth);
         Ok(None)
     }
 }
 
 impl FancyReveal for DepthInformer {
-    fn reveal(&mut self, _x: &Self::Item) -> Result<u16, Self::Error> {
+    fn reveal(&mut self, _x: &Self::Item, _: &mut Channel) -> Result<u16, Self::Error> {
         Ok(0)
     }
 }

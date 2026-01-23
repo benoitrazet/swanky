@@ -161,10 +161,12 @@ impl BinaryCircuit {
 
 #[cfg(test)]
 mod tests {
+    use swanky_channel::Channel;
+
     use crate::{
         WireMod2,
         circuit::{BinaryCircuit as Circuit, eval_plain},
-        classic::garble,
+        classic::{GarbledChannel, garble},
     };
 
     #[test]
@@ -216,6 +218,9 @@ mod tests {
         let (en, gc) = garble::<WireMod2, _>(&circ).unwrap();
         let gb = en.encode_garbler_inputs(&vec![0u16; 128]);
         let ev = en.encode_evaluator_inputs(&vec![0u16; 128]);
-        gc.eval(&circ, &gb, &ev).unwrap();
+        Channel::with(GarbledChannel::from(&gc), |channel| {
+            Ok(gc.eval(&circ, &gb, &ev, channel).unwrap())
+        })
+        .unwrap();
     }
 }

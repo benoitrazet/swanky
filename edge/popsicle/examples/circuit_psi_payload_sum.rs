@@ -5,7 +5,6 @@ use popsicle::circuit_psi::{
 
 use fancy_garbling::Fancy;
 use rand::Rng;
-use std::{os::unix::net::UnixStream, thread};
 use swanky_aes_rng::AesRng;
 use swanky_block::{Block, Block512};
 const SET_SIZE: usize = 1 << 8;
@@ -16,50 +15,53 @@ pub fn psty_payload_sum(
     payload_a: &[Block512],
     payload_b: &[Block512],
 ) -> u128 {
-    let (sender, receiver) = UnixStream::pair().unwrap();
-    thread::scope(|s| {
-        let _ = s.spawn(|| {
+    let (_, result) = swanky_channel::local::local_channel_pair(
+        |channel| {
             let mut rng = AesRng::new();
-            let mut channel = setup_channel(sender);
             let mut gb_psi =
-                OpprfPsiGarbler::<_, AesRng>::new(&mut channel, Block::from(rng.r#gen::<u128>()))
-                    .unwrap();
+                OpprfPsiGarbler::<AesRng>::new(channel, Block::from(rng.r#gen::<u128>())).unwrap();
 
             let intersection_results = gb_psi
-                .intersect_with_payloads(set_a, Some(payload_a))
+                .intersect_with_payloads(set_a, Some(payload_a), channel)
                 .unwrap();
             let res = fancy_payload_sum(
                 &mut gb_psi.gb,
                 &intersection_results.intersection.existence_bit_vector,
                 &intersection_results.payloads.sender_payloads,
                 &intersection_results.payloads.receiver_payloads,
+                channel,
             )
             .unwrap();
-            gb_psi.gb.outputs(res.wires()).unwrap();
-        });
-        let mut rng = AesRng::new();
-        let mut channel = setup_channel(receiver);
+            gb_psi.gb.outputs(res.wires(), channel).unwrap();
+            Ok(())
+        },
+        |channel| {
+            let mut rng = AesRng::new();
 
-        let mut ev_psi =
-            OpprfPsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(rng.r#gen::<u128>()))
+            let mut ev_psi =
+                OpprfPsiEvaluator::<AesRng>::new(channel, Block::from(rng.r#gen::<u128>()))
+                    .unwrap();
+            let intersection_results = ev_psi
+                .intersect_with_payloads(set_b, Some(payload_b), channel)
                 .unwrap();
-        let intersection_results = ev_psi
-            .intersect_with_payloads(set_b, Some(payload_b))
+            let res = fancy_payload_sum(
+                &mut ev_psi.ev,
+                &intersection_results.intersection.existence_bit_vector,
+                &intersection_results.payloads.sender_payloads,
+                &intersection_results.payloads.receiver_payloads,
+                channel,
+            )
             .unwrap();
-        let res = fancy_payload_sum(
-            &mut ev_psi.ev,
-            &intersection_results.intersection.existence_bit_vector,
-            &intersection_results.payloads.sender_payloads,
-            &intersection_results.payloads.receiver_payloads,
-        )
-        .unwrap();
-        let res_out = ev_psi
-            .ev
-            .outputs(res.wires())
-            .unwrap()
-            .expect("evaluator should produce outputs");
-        binary_to_u128(res_out)
-    })
+            let res_out = ev_psi
+                .ev
+                .outputs(res.wires(), channel)
+                .unwrap()
+                .expect("evaluator should produce outputs");
+            Ok(binary_to_u128(res_out))
+        },
+    )
+    .unwrap();
+    result
 }
 
 pub fn main() {
