@@ -76,16 +76,12 @@ fn ingest_private_inputs_from_path(path: &Path) -> eyre::Result<Vec<F2>> {
     let mut private_inputs_text = ValueStreamReader::open(ValueStreamKind::Private, path)?;
 
     let mut private_inputs = vec![];
-    loop {
-        if let Some(value) = private_inputs_text.next()? {
-            let maybe_f2: Option<F2> = F2::try_from_int(value).into();
-            let f2 = maybe_f2.ok_or_else(|| eyre!("Invalid input: Private input was not in F2"))?;
+    while let Some(value) = private_inputs_text.next()? {
+        let maybe_f2: Option<F2> = F2::try_from_int(value).into();
+        let f2 = maybe_f2.ok_or_else(|| eyre!("Invalid input: Private input was not in F2"))?;
 
-            // Save private input
-            private_inputs.push(f2);
-        } else {
-            break;
-        }
+        // Save private input
+        private_inputs.push(f2);
     }
 
     Ok(private_inputs)
@@ -124,7 +120,7 @@ impl CircuitIngestor {
         self.max_wire_id = max(self.max_wire_id, wid);
     }
 
-    pub(crate) fn to_circuit(self) -> Circuit {
+    pub(crate) fn into_circuit(self) -> Circuit {
         Circuit {
             gates: self.gates,
             private_inputs: self.priv_inputs,
@@ -291,7 +287,7 @@ pub fn load_circuit_prover<T: Read + Seek + Clone>(
     let private_inputs = ingest_private_inputs_from_path(private_input_path)?;
     let mut circ = CircuitIngestor::new_prover(private_inputs)?;
     reader.read(&mut circ)?;
-    let circ_loaded: Circuit = circ.to_circuit();
+    let circ_loaded: Circuit = circ.into_circuit();
 
     Ok(circ_loaded)
 }
@@ -305,7 +301,7 @@ pub fn load_circuit_verifier<T: Read + Seek + Clone>(
 
     let mut circ = CircuitIngestor::new_verifier()?;
     reader.read(&mut circ)?;
-    let circ_loaded: Circuit = circ.to_circuit();
+    let circ_loaded: Circuit = circ.into_circuit();
 
     Ok(circ_loaded)
 }
@@ -347,9 +343,9 @@ impl<F: Default + Clone + Copy> CircuitMemory<F> {
     /// wires up to this maximum wire id.
     pub(crate) fn new(max_wire_id: WireId) -> Self {
         let size = max_wire_id as usize + 1;
-        return CircuitMemory {
+        CircuitMemory {
             cont: vec![F::default(); size],
-        };
+        }
     }
 
     /// Insert in the memory at wire id `wid` and value `e`.
@@ -357,7 +353,7 @@ impl<F: Default + Clone + Copy> CircuitMemory<F> {
     /// This function assumes that it is called on a memory associated with a well-formed circuit,
     /// more specifically that the wire id has not been previously set, so that it does not have to
     /// return the stored old value.
-    pub(crate) fn insert(&mut self, wid: WireId, e: F) -> () {
+    pub(crate) fn insert(&mut self, wid: WireId, e: F) {
         let idx: usize = wid as usize;
         self.cont[idx] = e;
     }

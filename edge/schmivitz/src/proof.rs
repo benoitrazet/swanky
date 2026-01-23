@@ -61,10 +61,10 @@ where
 
         let partial_decommitment_size = self.partial_decommitment.proof_size_estimate();
 
-        return witness_commitment_bytes
+        witness_commitment_bytes
             + degree_1_commitment_bytes
             + decommitment_challenge_bytes
-            + partial_decommitment_size;
+            + partial_decommitment_size
     }
 
     /// Create a proof of knowledge of a witness that satisfies the given circuit.
@@ -79,7 +79,7 @@ where
         // Evaluate the circuit in the clear to get the full witness and all wire values
         let t = std::time::Instant::now();
         let mut circuit_preparer = ProverPreparer::new(circuit.max_wire_id)?;
-        circuit_preparer.execute(&circuit)?;
+        circuit_preparer.execute(circuit)?;
 
         let (witness, wire_values, polynomial_count) = circuit_preparer.into_parts();
         log::info!("1: circuit preparer: {:?}", t.elapsed());
@@ -114,7 +114,7 @@ where
         // gate / polynomial (`A_i0` and `A_i1` in the paper) and start to aggregate these with
         // the challenges.
         let mut circuit_traverser = ProverTraverser::new(wire_values, witness_challenges, voles)?;
-        circuit_traverser.execute(&circuit)?;
+        circuit_traverser.execute(circuit)?;
         // TODO: consider not returning the `voles` with `into_parts()`. This interface does not communicate that `voles` are only read but not modified by the circuit traverser
         let (degree_0_aggregation, degree_1_aggregation, voles) = circuit_traverser.into_parts()?;
 
@@ -233,7 +233,7 @@ where {
             masked_witnesses,
             circuit.max_wire_id,
         )?;
-        verifier_traverser.execute(&circuit)?;
+        verifier_traverser.execute(circuit)?;
         let validation_aggregate = verifier_traverser.into_parts()?;
         log::info!("5: circuit traverser {:?}", t.elapsed());
 
@@ -342,8 +342,8 @@ mod tests {
                 < 1 >;
             @end";
 
-        let (proof, mut mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes)?;
-        assert!(proof?.verify(&mut mini_circuit, &mut transcript()).is_ok());
+        let (proof, mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes)?;
+        assert!(proof?.verify(&mini_circuit, &mut transcript()).is_ok());
 
         Ok(())
     }
@@ -378,8 +378,8 @@ mod tests {
                 < 0 >;
             @end ";
 
-        let (proof, mut small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes)?;
-        assert!(proof?.verify(&mut small_circuit, &mut transcript()).is_ok());
+        let (proof, small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes)?;
+        assert!(proof?.verify(&small_circuit, &mut transcript()).is_ok());
 
         Ok(())
     }
@@ -398,13 +398,13 @@ mod tests {
         @end ";
 
         // This uses the output of `transcript()` as-is to prove. This should work
-        let (proof, mut small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes)?;
+        let (proof, small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes)?;
         assert!(proof.is_ok());
 
         // If we use a different transcript to verify, it'll fail
         let transcript = &mut transcript();
         transcript.append_message(b"I am but a simple verifier", b"trying to be secure");
-        assert!(proof?.verify(&mut small_circuit, transcript).is_err());
+        assert!(proof?.verify(&small_circuit, transcript).is_err());
 
         Ok(())
     }
@@ -456,17 +456,17 @@ mod tests {
 
         // Adding an extra challenge should fail
         let mut too_many_challenges = proof.clone();
-        too_many_challenges.polynomial_count = too_many_challenges.polynomial_count + 1;
+        too_many_challenges.polynomial_count += 1;
 
         assert!(
             too_many_challenges
-                .verify(&mut small_circuit.clone(), &mut transcript())
+                .verify(&small_circuit, &mut transcript())
                 .is_err()
         );
 
         // Not having enough challenges should fail
         let mut too_few_challenges = proof.clone();
-        too_few_challenges.polynomial_count = too_few_challenges.polynomial_count + 1;
+        too_few_challenges.polynomial_count += 1;
         assert!(
             too_few_challenges
                 .verify(&small_circuit, &mut transcript())

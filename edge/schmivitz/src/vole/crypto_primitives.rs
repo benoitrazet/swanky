@@ -215,8 +215,7 @@ impl PRG_Stream {
             self.pos_in_block = 0;
             self.block_number += 1;
         };
-        let r = u64::from_le_bytes(t);
-        return r;
+        u64::from_le_bytes(t)
     }
 
     #[inline(always)]

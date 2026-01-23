@@ -90,9 +90,8 @@ impl ProverPreparer {
                     // Assumption: There is exactly one type ID for these circuits and it is F2.
                     assert_eq!(ty, 0);
 
-                    let sum = match self.wire_values.get(&left) {
-                        l_val => l_val + F2::from_number(&right)?,
-                    };
+                    let l_val = self.wire_values.get(&left);
+                    let sum = l_val + F2::from_number(&right)?;
 
                     self.save_wire(dst, sum)?;
                 }
@@ -132,15 +131,14 @@ mod tests {
     fn prepare_circuit(circuit: &str) -> eyre::Result<ProverPreparer> {
         let rng = &mut thread_rng();
         // Generate a private input vector with 100 random inputs
-        let random_private_inputs: Vec<F2> =
-            (0..100).into_iter().map(|_| F2::random(rng)).collect();
+        let random_private_inputs: Vec<F2> = (0..100).map(|_| F2::random(rng)).collect();
 
         let cursor = &mut Cursor::new(circuit.as_bytes());
         let reader = RelationReader::new(cursor)?;
         let mut circ = CircuitIngestor::new_prover(random_private_inputs)?;
         reader.read(&mut circ)?;
 
-        let circuit_loaded = circ.to_circuit();
+        let circuit_loaded = circ.into_circuit();
 
         let mut counter: ProverPreparer = ProverPreparer::new(circuit_loaded.max_wire_id)?;
         counter.execute(&circuit_loaded)?;

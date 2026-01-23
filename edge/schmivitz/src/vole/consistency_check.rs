@@ -3,7 +3,7 @@ Implementation of algorithms related to consistency checks.
  *
 */
 #![allow(clippy::needless_range_loop)]
-use std::iter::repeat;
+use std::iter::repeat_n;
 
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::commit_reconstruct::B;
@@ -195,7 +195,7 @@ impl<'a> Iterator for ColumnEnumState<'a> {
             }
         }
 
-        return Some(out);
+        Some(out)
     }
 }
 
@@ -343,9 +343,8 @@ impl VoleHasher {
 
     // Padding plus ToField (Fig 3.1) from FAEST, where `k` is fixed to the security parameter (128).
     fn to_field_128(&self, x: &[F2]) -> Vec<F128b> {
-        let padding = repeat(F2::ZERO)
-            .take(self.ell_prime - (self.ell + SECURITY_PARAM))
-            .collect::<Vec<_>>();
+        let padding =
+            repeat_n(F2::ZERO, self.ell_prime - (self.ell + SECURITY_PARAM)).collect::<Vec<_>>();
 
         let x_padded = [x, &padding].concat();
 
@@ -456,7 +455,7 @@ impl VoleHasher {
         use std::sync::mpsc::{SyncSender, sync_channel}; // SyncChannel uses fixed size buffers, which is useful to control memory.
         use std::{sync::mpsc::channel, thread};
 
-        let x0_vec = ColumnEnumState::new(&x0);
+        let x0_vec = ColumnEnumState::new(x0);
 
         const N: usize = 2; // number of threads
         let mut senders: Vec<SyncSender<[F128b; SECURITY_PARAM / N]>> = Vec::with_capacity(N);
@@ -469,11 +468,9 @@ impl VoleHasher {
         }
         let mut handles = Vec::new();
 
-        let mut num = 0;
-
         let s0 = self.s0;
         let s1 = self.s1;
-        for recv in receivs {
+        for (num, recv) in receivs.into_iter().enumerate() {
             let send_i = result_sender.clone();
             let handle = thread::spawn(move || {
                 let i = num;
@@ -493,12 +490,10 @@ impl VoleHasher {
                 send_i.send((i, h0, h1)).unwrap();
             });
             handles.push(handle);
-            num += 1;
         }
 
         for arr in x0_vec {
-            let mut i = 0;
-            for _ in 0..N {
+            for (i, _) in (0..N).enumerate() {
                 senders[i]
                     .send(
                         arr[i * (SECURITY_PARAM / N)..(i + 1) * (SECURITY_PARAM / N)]
@@ -506,7 +501,6 @@ impl VoleHasher {
                             .unwrap(),
                     )
                     .unwrap();
-                i += 1;
             }
         }
         drop(senders);

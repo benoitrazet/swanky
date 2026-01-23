@@ -28,14 +28,14 @@ impl ValidatorMemory {
     }
 
     pub(crate) fn check_free(&self, wid: &WireId) -> eyre::Result<()> {
-        if self.mem.contains_key(&wid) {
+        if self.mem.contains_key(wid) {
             bail!("wire {wid} is not free")
         }
         Ok(())
     }
 
     pub(crate) fn check_assigned(&self, wid: &WireId) -> eyre::Result<()> {
-        if !self.mem.contains_key(&wid) {
+        if !self.mem.contains_key(wid) {
             bail!("wire {wid} not assigned")
         }
         Ok(())

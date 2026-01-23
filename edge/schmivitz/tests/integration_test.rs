@@ -58,8 +58,8 @@ mod test {
             < 1 >;
         @end";
 
-        let (proof, mut mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
-        let verif = proof?.verify(&mut mini_circuit, &mut transcript());
+        let (proof, mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
+        let verif = proof?.verify(&mini_circuit, &mut transcript());
         assert!(verif.is_ok());
 
         Ok(())
@@ -87,8 +87,8 @@ mod test {
             < 1 >;
         @end ";
 
-        let (proof, mut mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
-        let verif = proof?.verify(&mut mini_circuit, &mut transcript());
+        let (proof, mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
+        let verif = proof?.verify(&mini_circuit, &mut transcript());
         assert!(verif.is_ok());
 
         Ok(())
@@ -124,8 +124,8 @@ mod test {
             < 0 >;
         @end ";
 
-        let (proof, mut small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes);
-        assert!(proof?.verify(&mut small_circuit, &mut transcript()).is_ok());
+        let (proof, small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes);
+        assert!(proof?.verify(&small_circuit, &mut transcript()).is_ok());
 
         Ok(())
     }

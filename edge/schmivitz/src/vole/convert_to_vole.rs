@@ -71,9 +71,8 @@ pub(crate) fn convert_to_vole(
             }
 
             // swap the top-level to the lower level
-            for i in 0..i_bound {
-                r0[i] = r1[i];
-            }
+            r0[0..i_bound].copy_from_slice(&r1[0..i_bound]);
+
             i_bound /= 2;
         }
 

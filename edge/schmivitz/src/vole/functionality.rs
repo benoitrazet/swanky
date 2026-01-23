@@ -196,7 +196,7 @@ impl DecommitmentSerde for PartialDecommitment {
         let iv_bytes = 16;
         let u_tilda_bytes = SECURITY_PARAM + B / 8;
 
-        return pdecom_bytes + corrections_bytes + iv_bytes + u_tilda_bytes;
+        pdecom_bytes + corrections_bytes + iv_bytes + u_tilda_bytes
     }
 }
 
