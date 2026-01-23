@@ -796,6 +796,7 @@ version = "0.6.0"
 dependencies = [
  "clap",
  "criterion",
+ "eyre",
  "itertools 0.14.0",
  "rand 0.8.5",
  "regex",
@@ -2482,6 +2483,26 @@ dependencies = [
  "swanky-ot-traits",
  "swanky-party",
  "swanky-serialization",
+ "vectoreyes",
+]
+
+[[package]]
+name = "swanky-authenticated-garbling"
+version = "0.6.0"
+dependencies = [
+ "eyre",
+ "fancy-garbling",
+ "itertools 0.14.0",
+ "proptest",
+ "rand 0.8.5",
+ "swanky-adversary",
+ "swanky-aes-rng",
+ "swanky-authenticated-bits",
+ "swanky-channel",
+ "swanky-f-rand",
+ "swanky-ot-alsz-kos",
+ "swanky-ot-traits",
+ "swanky-party",
  "vectoreyes",
 ]
 
