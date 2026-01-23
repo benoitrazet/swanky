@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+  "core/error",
   "core/vectoreyes",
   "edge/adversary",
   "edge/aes-hash",
@@ -102,6 +103,7 @@ swanky-channel = { path = "edge/channel" }
 swanky-channel-legacy = { path = "edge/channel-legacy" }
 swanky-cointoss = { path = "edge/cointoss" }
 swanky-deprecated-bitwise-utils = { path = "edge/deprecated-bitwise-utils" }
+swanky-error = { path = "core/error" }
 swanky-f-eq = { path = "edge/f-eq" }
 swanky-f-rand = { path = "edge/f-rand" }
 swanky-field = { path = "edge/field" }

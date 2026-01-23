@@ -2557,6 +2557,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-error"
+version = "0.6.0"
+
+[[package]]
 name = "swanky-f-eq"
 version = "0.6.0"
 dependencies = [

@@ -1,0 +1,13 @@
+[package]
+name = "swanky-error"
+description = "A common error type for Swanky."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
