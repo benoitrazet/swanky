@@ -42,7 +42,7 @@ use swanky_party::Party;
 ///
 /// Authenticated garbling utilizes pre-computed [`AndTriple`]s and [`AuthShare`]s in its "online" portion.
 /// This function generates the correct number of such triples and shares for a given circuit of interest.
-/// The circuit is provided as a closure which takes in a fancy object (in this case an [`Analyzer`]) and circuit inputs
+/// The circuit is provided as a closure which takes in a fancy object (in this case an [`CircuitAnalyzer`]) and circuit inputs
 /// written as [`BinaryBundle`] over fancy items (in this case [`AnalyzerItem`]), and triples and shares are
 /// generated using the provided [`AndTripleGenerator`].
 ///
@@ -111,7 +111,6 @@ mod tests {
     }
     #[test]
     fn test_preprocessing_fancy_sum() {
-        let mut rng = AesRng::new();
         let input_size = 400;
         let (_shares_gb, _shares_ev) = swanky_channel::local::local_channel_pair(
             |c| {
