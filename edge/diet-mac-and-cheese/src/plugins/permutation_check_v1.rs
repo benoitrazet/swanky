@@ -149,7 +149,7 @@ impl Plugin for PermutationCheckV1 {
         );
         let nwires = input_counts[0].1;
         ensure!(
-            nwires % tuple_size == 0,
+            nwires.is_multiple_of(tuple_size),
             "{}: Number of wires must be divisible by `t`",
             Self::NAME
         );

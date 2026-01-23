@@ -72,7 +72,11 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
         RNG: CryptoRng + Rng,
     {
         // Round up if necessary so that `m mod 16 ≡ 0`.
-        let nrows = if m % 16 != 0 { m + (16 - m % 16) } else { m };
+        let nrows = if !m.is_multiple_of(16) {
+            m + (16 - m % 16)
+        } else {
+            m
+        };
         const ncols: usize = 512;
         let mut t0 = vec![0u8; nrows / 8];
         let mut t1 = vec![0u8; nrows / 8];

@@ -2,7 +2,9 @@
 //! Abstractions for communication in Swanky.
 //!
 //! **WARNING:** This is considered legacy code, and will be removed in a future
-//! version of Swanky. Use the [`swanky-channel`] crate instead for new code!
+//! version of Swanky. Use the
+//! [`swanky-channel`](../swanky_channel/index.html) crate instead for
+//! new code!
 
 mod hash_channel;
 pub use hash_channel::HashChannel;
