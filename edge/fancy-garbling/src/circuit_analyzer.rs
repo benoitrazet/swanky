@@ -1,6 +1,5 @@
 //! Fancy object to profile a fancy circuit and compute stats such as the multiplicative depth
 //! or the number of boolean and arithmetic gates in a circuit.
-
 use crate::{
     FancyArithmetic, FancyBinary,
     errors::FancyError,
