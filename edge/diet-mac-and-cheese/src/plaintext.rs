@@ -158,8 +158,8 @@ impl BackendLiftT for DietMacAndCheesePlaintext<F2, F40b> {
     type LiftedBackend = DietMacAndCheesePlaintext<F40b, F40b>;
 
     fn lift(&mut self) -> &mut Self::LiftedBackend {
-        if self.extfield_backend.is_some() {
-            self.extfield_backend.as_mut().unwrap()
+        if let Some(backend) = &mut self.extfield_backend {
+            backend
         } else {
             unimplemented!()
         }
