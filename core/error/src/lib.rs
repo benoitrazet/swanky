@@ -210,6 +210,20 @@ pub type Result<T> = std::result::Result<T, Error>;
 ///
 /// This is analogous to `assert!`, but returns a [`Result`] rather
 /// than panicking if the condition fails.
+///
+/// ## Example
+///
+/// ```
+/// fn ensure_demo() -> swanky_error::Result<()> {
+///     swanky_error::ensure!(
+///         2 + 2 == 4,
+///         swanky_error::ErrorKind::OtherError,
+///         "Uh oh! Expected {}",
+///         4,
+///     );
+///     Ok(())
+/// }
+/// ```
 #[macro_export]
 macro_rules! ensure {
     ($condition:expr, $kind:expr, $($msg:tt)*) => {
@@ -222,6 +236,17 @@ macro_rules! ensure {
 /// Return early with an error.
 ///
 /// This is equivalent to `return Err(swanky_err!(<args>))`.
+///
+/// ## Example
+///
+/// ```
+/// fn bail_demo() -> swanky_error::Result<()> {
+///     swanky_error::bail!(
+///         swanky_error::ErrorKind::OtherError,
+///         "Something went wrong; bailing!",
+///     );
+/// }
+/// ```
 #[macro_export]
 macro_rules! bail {
     ($kind:expr, $($msg:tt)*) => {
@@ -231,6 +256,18 @@ macro_rules! bail {
 
 /// Construct an ad-hoc error from an [`ErrorKind`] and string/format
 /// string with arguments; this evaluates to an [`Error`].
+///
+/// ## Example
+///
+/// ```
+/// fn swanky_error_demo() -> swanky_error::Result<()> {
+///     let e = swanky_error::swanky_error!(swanky_error::ErrorKind::OtherError, "Oops!");
+///     // ... Other things ...
+///
+///     // ... If you need to return the error in a `Result` ...
+///     Err(e)
+/// }
+/// ```
 #[macro_export]
 macro_rules! swanky_error {
     ($kind:expr, $($msg:tt)*) => {
@@ -341,4 +378,40 @@ fn test_error_sizes() {
         std::mem::size_of::<Result<()>>(),
         std::mem::size_of::<*const ()>()
     );
+}
+
+#[test]
+fn test_swanky_error() {
+    let mut e = swanky_error!(ErrorKind::OtherError, "Message");
+    e = e.context("Context".to_string());
+
+    assert_eq!(e.inner.kind, ErrorKind::OtherError);
+    assert_eq!(e.inner.message, "Message");
+    assert_eq!(e.inner.context, vec!["Context"]);
+}
+
+#[test]
+fn test_bail() {
+    fn bails() -> Result<()> {
+        bail!(ErrorKind::OtherError, "Get me out of here!")
+    }
+
+    assert!(bails().is_err());
+}
+
+#[test]
+fn test_ensure() {
+    fn ensure_true() -> Result<()> {
+        ensure!(true, ErrorKind::OtherError, "A happy universe.");
+        Ok(())
+    }
+
+    assert!(ensure_true().is_ok());
+
+    fn ensure_false() -> Result<()> {
+        ensure!(false, ErrorKind::OtherError, "A sad universe.");
+        Ok(())
+    }
+
+    assert!(ensure_false().is_err());
 }
