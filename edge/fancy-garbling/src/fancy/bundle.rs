@@ -155,7 +155,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
         &mut self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
-        channel: &mut Channel
+        channel: &mut Channel,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         x.wires()
             .iter()
@@ -169,7 +169,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
     fn mixed_radix_addition(
         &mut self,
         xs: &[Bundle<Self::Item>],
-        channel: &mut Channel
+        channel: &mut Channel,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         let nargs = xs.len();
         if nargs < 1 {
@@ -226,11 +226,15 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
 
                 if i < n - 2 {
                     if max_carry < next_mod {
-                        carry_carry =
-                            Some(self.mod_change(digit_carry.as_ref().unwrap(), next_max_val + 1, channel)?);
+                        carry_carry = Some(self.mod_change(
+                            digit_carry.as_ref().unwrap(),
+                            next_max_val + 1,
+                            channel,
+                        )?);
                     } else {
                         let tt = (0..=max_val).map(|i| i / q).collect_vec();
-                        carry_carry = Some(self.proj(&carry, next_max_val + 1, Some(tt), channel)?);
+                        carry_carry =
+                            Some(self.proj(&carry, next_max_val + 1, Some(tt), channel)?);
                     }
                 } else {
                     // next digit is MSB so we dont need carry_carry
@@ -249,7 +253,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
     fn mixed_radix_addition_msb_only(
         &mut self,
         xs: &[Bundle<Self::Item>],
-        channel: &mut Channel
+        channel: &mut Channel,
     ) -> Result<Self::Item, Self::Error> {
         let nargs = xs.len();
         if nargs < 1 {
@@ -317,7 +321,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
         &mut self,
         b: &Self::Item,
         x: &Bundle<Self::Item>,
-        channel: &mut Channel
+        channel: &mut Channel,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         x.wires()
             .iter()
@@ -331,7 +335,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
         &mut self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
-        channel: &mut Channel
+        channel: &mut Channel,
     ) -> Result<Self::Item, Self::Error> {
         if x.moduli() != y.moduli() {
             return Err(Self::Error::from(FancyError::UnequalModuli));
@@ -367,7 +371,7 @@ pub trait BinaryBundleGadgets: FancyBinary {
         b: &Self::Item,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
-        channel: &mut Channel
+        channel: &mut Channel,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         x.wires()
             .iter()
@@ -386,7 +390,7 @@ pub trait BundleGadgets: Fancy {
         &mut self,
         xs: &[u16],
         ps: &[u16],
-        channel: &mut Channel
+        channel: &mut Channel,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         xs.iter()
             .zip(ps.iter())
@@ -396,7 +400,11 @@ pub trait BundleGadgets: Fancy {
     }
 
     /// Output the wires that make up a bundle.
-    fn output_bundle(&mut self, x: &Bundle<Self::Item>, channel: &mut Channel) -> Result<Option<Vec<u16>>, Self::Error> {
+    fn output_bundle(
+        &mut self,
+        x: &Bundle<Self::Item>,
+        channel: &mut Channel,
+    ) -> Result<Option<Vec<u16>>, Self::Error> {
         let ws = x.wires();
         let mut outputs = Vec::with_capacity(ws.len());
         for w in ws.iter() {
@@ -409,7 +417,7 @@ pub trait BundleGadgets: Fancy {
     fn output_bundles(
         &mut self,
         xs: &[Bundle<Self::Item>],
-        channel: &mut Channel
+        channel: &mut Channel,
     ) -> Result<Option<Vec<Vec<u16>>>, Self::Error> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
@@ -428,7 +436,7 @@ pub trait BundleGadgets: Fancy {
         &mut self,
         x: &Bundle<Self::Item>,
         n: usize,
-        channel: &mut Channel
+        channel: &mut Channel,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         let mut ws = x.wires().to_vec();
         let zero = self.constant(0, ws.last().unwrap().modulus(), channel)?;
@@ -445,7 +453,7 @@ pub trait BundleGadgets: Fancy {
         &mut self,
         x: &Bundle<Self::Item>,
         n: usize,
-        channel: &mut Channel
+        channel: &mut Channel,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         let mut ws = x.wires().to_vec();
         let zero = self.constant(0, ws.last().unwrap().modulus(), channel)?;
