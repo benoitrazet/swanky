@@ -6,7 +6,6 @@ use fancy_garbling::{
 };
 use std::{fs::File, io::BufReader, time::SystemTime};
 use swanky_aes_rng::AesRng;
-use swanky_channel_legacy::{UnixChannel, unix_channel_pair};
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 
 fn circuit(fname: &str) -> Circuit {
@@ -16,54 +15,63 @@ fn circuit(fname: &str) -> Circuit {
 
 fn run_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
     let circ_ = circ.clone();
-    let (sender, receiver) = unix_channel_pair();
     let n_gb_inputs = gb_inputs.len();
     let n_ev_inputs = ev_inputs.len();
+
     let total = SystemTime::now();
-    let handle = std::thread::spawn(move || {
-        let rng = AesRng::new();
-        let start = SystemTime::now();
-        let mut gb = Garbler::<UnixChannel, AesRng, OtSender, WireMod2>::new(sender, rng).unwrap();
-        println!(
-            "Garbler :: Initialization: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
-        let start = SystemTime::now();
-        let xs = gb.encode_many(&gb_inputs, &vec![2; n_gb_inputs]).unwrap();
-        let ys = gb.receive_many(&vec![2; n_ev_inputs]).unwrap();
-        println!(
-            "Garbler :: Encoding inputs: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
-        let start = SystemTime::now();
-        circ_.eval(&mut gb, &xs, &ys).unwrap();
-        println!(
-            "Garbler :: Circuit garbling: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
-    });
-    let rng = AesRng::new();
-    let start = SystemTime::now();
-    let mut ev =
-        Evaluator::<UnixChannel, AesRng, OtReceiver, WireMod2>::new(receiver, rng).unwrap();
-    println!(
-        "Evaluator :: Initialization: {} ms",
-        start.elapsed().unwrap().as_millis()
-    );
-    let start = SystemTime::now();
-    let xs = ev.receive_many(&vec![2; n_gb_inputs]).unwrap();
-    let ys = ev.encode_many(&ev_inputs, &vec![2; n_ev_inputs]).unwrap();
-    println!(
-        "Evaluator :: Encoding inputs: {} ms",
-        start.elapsed().unwrap().as_millis()
-    );
-    let start = SystemTime::now();
-    circ.eval(&mut ev, &xs, &ys).unwrap();
-    println!(
-        "Evaluator :: Circuit evaluation: {} ms",
-        start.elapsed().unwrap().as_millis()
-    );
-    handle.join().unwrap();
+    swanky_channel::local::local_channel_pair(
+        |channel| {
+            let rng = AesRng::new();
+            let start = SystemTime::now();
+            let mut gb = Garbler::<AesRng, OtSender, WireMod2>::new(channel, rng).unwrap();
+            println!(
+                "Garbler :: Initialization: {} ms",
+                start.elapsed().unwrap().as_millis()
+            );
+            let start = SystemTime::now();
+            let xs = gb
+                .encode_many(&gb_inputs, &vec![2; n_gb_inputs], channel)
+                .unwrap();
+            let ys = gb.receive_many(&vec![2; n_ev_inputs], channel).unwrap();
+            println!(
+                "Garbler :: Encoding inputs: {} ms",
+                start.elapsed().unwrap().as_millis()
+            );
+            let start = SystemTime::now();
+            circ_.eval(&mut gb, &xs, &ys, channel).unwrap();
+            println!(
+                "Garbler :: Circuit garbling: {} ms",
+                start.elapsed().unwrap().as_millis()
+            );
+            Ok(())
+        },
+        |channel| {
+            let rng = AesRng::new();
+            let start = SystemTime::now();
+            let mut ev = Evaluator::<AesRng, OtReceiver, WireMod2>::new(channel, rng).unwrap();
+            println!(
+                "Evaluator :: Initialization: {} ms",
+                start.elapsed().unwrap().as_millis()
+            );
+            let start = SystemTime::now();
+            let xs = ev.receive_many(&vec![2; n_gb_inputs], channel).unwrap();
+            let ys = ev
+                .encode_many(&ev_inputs, &vec![2; n_ev_inputs], channel)
+                .unwrap();
+            println!(
+                "Evaluator :: Encoding inputs: {} ms",
+                start.elapsed().unwrap().as_millis()
+            );
+            let start = SystemTime::now();
+            circ.eval(&mut ev, &xs, &ys, channel).unwrap();
+            println!(
+                "Evaluator :: Circuit evaluation: {} ms",
+                start.elapsed().unwrap().as_millis()
+            );
+            Ok(())
+        },
+    )
+    .unwrap();
     println!("Total: {} ms", total.elapsed().unwrap().as_millis());
 }
 

@@ -3,6 +3,7 @@ use crate::{circuit_psi::*, errors::Error};
 use fancy_garbling::{BinaryBundle, BinaryGadgets, Fancy, FancyBinary, FancyReveal};
 use itertools::Itertools;
 use std::fmt::Debug;
+use swanky_channel::Channel;
 
 // How many bytes of the hash to use for the equality tests. This affects
 // correctness, with a lower value increasing the likelihood of a false
@@ -19,6 +20,7 @@ pub fn fancy_intersection_bit_vector<F>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
+    channel: &mut Channel,
 ) -> Result<Vec<F::Item>, F::Error>
 where
     F: FancyReveal + Fancy + FancyBinary,
@@ -30,6 +32,7 @@ where
             f.bin_eq_bundles(
                 &BinaryBundle::new(xs.to_vec()),
                 &BinaryBundle::new(ys.to_vec()),
+                channel,
             )
         })
         .collect()
@@ -67,18 +70,19 @@ where
 pub fn fancy_cardinality<F, E>(
     f: &mut F,
     intersect_bitvec: &[<F as Fancy>::Item],
+    channel: &mut Channel,
 ) -> Result<BinaryBundle<<F as Fancy>::Item>, Error>
 where
     F: FancyBinary + Fancy<Item = WireMod2, Error = E>,
     E: Debug,
     Error: From<E>,
 {
-    let mut acc = f.bin_constant_bundle(0, PRIMARY_KEY_SIZE * 8)?;
-    let one = f.bin_constant_bundle(1, PRIMARY_KEY_SIZE * 8)?;
-    let zero = f.bin_constant_bundle(0, PRIMARY_KEY_SIZE * 8)?;
+    let mut acc = f.bin_constant_bundle(0, PRIMARY_KEY_SIZE * 8, channel)?;
+    let one = f.bin_constant_bundle(1, PRIMARY_KEY_SIZE * 8, channel)?;
+    let zero = f.bin_constant_bundle(0, PRIMARY_KEY_SIZE * 8, channel)?;
     for bit in intersect_bitvec {
-        let mux = f.bin_multiplex(bit, &zero, &one)?;
-        acc = f.bin_addition_no_carry(&acc, &mux)?;
+        let mux = f.bin_multiplex(bit, &zero, &one, channel)?;
+        acc = f.bin_addition_no_carry(&acc, &mux, channel)?;
     }
     Ok(acc)
 }
@@ -91,20 +95,21 @@ pub fn fancy_payload_sum<F, E>(
     intersect_bitvec: &[<F as Fancy>::Item],
     payload_a: &[BinaryBundle<<F as Fancy>::Item>],
     payload_b: &[BinaryBundle<<F as Fancy>::Item>],
+    channel: &mut Channel,
 ) -> Result<BinaryBundle<<F as Fancy>::Item>, Error>
 where
     F: FancyBinary + Fancy<Item = WireMod2, Error = E>,
     E: Debug,
     Error: From<E>,
 {
-    let mut acc = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8)?; // multiplication extends the representation of the number
-    let zero = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8)?;
+    let mut acc = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8, channel)?; // multiplication extends the representation of the number
+    let zero = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8, channel)?;
 
     for (i, bit) in intersect_bitvec.into_iter().enumerate() {
-        let mux_a = f.bin_multiplex(bit, &zero, &payload_a[i])?;
-        let mux_b = f.bin_multiplex(bit, &zero, &payload_b[i])?;
-        let mul = f.bin_addition_no_carry(&mux_a, &mux_b)?;
-        acc = f.bin_addition_no_carry(&acc, &mul)?;
+        let mux_a = f.bin_multiplex(bit, &zero, &payload_a[i], channel)?;
+        let mux_b = f.bin_multiplex(bit, &zero, &payload_b[i], channel)?;
+        let mul = f.bin_addition_no_carry(&mux_a, &mux_b, channel)?;
+        acc = f.bin_addition_no_carry(&acc, &mul, channel)?;
     }
     Ok(acc)
 }

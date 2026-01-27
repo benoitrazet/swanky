@@ -5,6 +5,7 @@ use crate::{
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
 };
 use std::collections::{HashMap, HashSet};
+use swanky_channel::Channel;
 
 /// Implements `Fancy`. Used to learn information about a `Fancy` computation in
 /// a lightweight way.
@@ -222,22 +223,27 @@ impl<F: Fancy + FancyInput<Item = <F as Fancy>::Item, Error = <F as Fancy>::Erro
     type Item = <F as Fancy>::Item;
     type Error = <F as Fancy>::Error;
 
-    fn receive_many(&mut self, moduli: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
+    fn receive_many(
+        &mut self,
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> Result<Vec<Self::Item>, Self::Error> {
         self.stats
             .garbler_input_moduli
             .extend(moduli.iter().cloned());
-        self.underlying.receive_many(moduli)
+        self.underlying.receive_many(moduli, channel)
     }
 
     fn encode_many(
         &mut self,
         values: &[u16],
         moduli: &[u16],
+        channel: &mut Channel,
     ) -> Result<Vec<Self::Item>, Self::Error> {
         self.stats
             .garbler_input_moduli
             .extend(moduli.iter().cloned());
-        self.underlying.encode_many(values, moduli)
+        self.underlying.encode_many(values, moduli, channel)
     }
 }
 
@@ -249,16 +255,21 @@ impl<F: FancyBinary> FancyBinary for Informer<F> {
         Ok(result)
     }
 
-    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        let result = self.underlying.and(x, y)?;
+    fn and(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
+        let result = self.underlying.and(x, y, channel)?;
         self.stats.nmuls += 1;
         self.stats.nciphertexts += 2;
         self.update_moduli(x.modulus());
         Ok(result)
     }
 
-    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
-        let result = self.underlying.negate(x)?;
+    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Self::Item, Self::Error> {
+        let result = self.underlying.negate(x, channel)?;
 
         // Technically only the garbler adds: noop for the evaluator
         self.stats.nadds += 1;
@@ -293,11 +304,16 @@ impl<F: FancyArithmetic> FancyArithmetic for Informer<F> {
         Ok(result)
     }
 
-    fn mul(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn mul(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
         if x.modulus() < y.modulus() {
-            return self.mul(y, x);
+            return self.mul(y, x, channel);
         }
-        let result = self.underlying.mul(x, y)?;
+        let result = self.underlying.mul(x, y, channel)?;
         self.stats.nmuls += 1;
         self.stats.nciphertexts += x.modulus() as usize + y.modulus() as usize - 2;
         if x.modulus() != y.modulus() {
@@ -313,8 +329,9 @@ impl<F: FancyArithmetic> FancyArithmetic for Informer<F> {
         x: &Self::Item,
         q: u16,
         tt: Option<Vec<u16>>,
+        channel: &mut Channel,
     ) -> Result<Self::Item, Self::Error> {
-        let result = self.underlying.proj(x, q, tt)?;
+        let result = self.underlying.proj(x, q, tt, channel)?;
         self.stats.nprojs += 1;
         self.stats.nciphertexts += x.modulus() as usize - 1;
         self.update_moduli(q);
@@ -326,21 +343,30 @@ impl<F: Fancy> Fancy for Informer<F> {
     type Item = F::Item;
     type Error = F::Error;
 
-    fn constant(&mut self, val: u16, q: u16) -> Result<Self::Item, Self::Error> {
+    fn constant(
+        &mut self,
+        val: u16,
+        q: u16,
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
         self.stats.constants.insert((val, q));
         self.update_moduli(q);
-        self.underlying.constant(val, q)
+        self.underlying.constant(val, q, channel)
     }
 
-    fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error> {
-        let result = self.underlying.output(x)?;
+    fn output(
+        &mut self,
+        x: &Self::Item,
+        channel: &mut Channel,
+    ) -> Result<Option<u16>, Self::Error> {
+        let result = self.underlying.output(x, channel)?;
         self.stats.outputs.push(x.modulus());
         Ok(result)
     }
 }
 
 impl<F: Fancy + FancyReveal> FancyReveal for Informer<F> {
-    fn reveal(&mut self, x: &Self::Item) -> Result<u16, Self::Error> {
-        self.underlying.reveal(x)
+    fn reveal(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<u16, Self::Error> {
+        self.underlying.reveal(x, channel)
     }
 }
