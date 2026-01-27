@@ -2444,7 +2444,6 @@ dependencies = [
  "criterion",
  "proptest",
  "rand 0.8.5",
- "swanky-block",
  "vectoreyes",
 ]
 
