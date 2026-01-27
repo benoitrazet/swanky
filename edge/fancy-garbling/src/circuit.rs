@@ -10,6 +10,7 @@ use crate::{
 };
 use itertools::Itertools;
 use std::{collections::HashMap, fmt::Display};
+use swanky_channel::Channel;
 
 /// The index and modulus of a gate in a circuit.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -253,18 +254,31 @@ impl<C: EvaluableCircuit<Informer<Dummy>>> CircuitInfo for C {
         let mut informer = crate::informer::Informer::new(Dummy::new());
 
         // encode inputs as InformerVals
-        let gb = self
-            .get_garbler_input_refs()
-            .iter()
-            .map(|r| informer.encode(0, r.modulus()))
-            .collect::<Result<Vec<DummyVal>, DummyError>>()?;
-        let ev = self
-            .get_evaluator_input_refs()
-            .iter()
-            .map(|r| informer.encode(0, r.modulus()))
-            .collect::<Result<Vec<DummyVal>, DummyError>>()?;
+        let gb = Channel::with(std::io::empty(), |channel| {
+            Ok(self
+                .get_garbler_input_refs()
+                .iter()
+                .map(|r| informer.encode(0, r.modulus(), channel))
+                .collect::<Result<Vec<DummyVal>, DummyError>>()
+                .map_err(|e| eyre::eyre!(e))?)
+        })
+        .map_err(|_| DummyError::EncodingError)?;
+        let ev = Channel::with(std::io::empty(), |channel| {
+            Ok(self
+                .get_evaluator_input_refs()
+                .iter()
+                .map(|r| informer.encode(0, r.modulus(), channel))
+                .collect::<Result<Vec<DummyVal>, DummyError>>()
+                .map_err(|e| eyre::eyre!(e))?)
+        })
+        .map_err(|_| DummyError::EncodingError)?;
 
-        let _outputs = self.eval(&mut informer, &gb, &ev)?;
+        Channel::with(std::io::empty(), |c| {
+            Ok(self
+                .eval(&mut informer, &gb, &ev, c)
+                .map_err(|e| eyre::eyre!(e))?)
+        })
+        .map_err(|_| DummyError::EncodingError)?;
         println!("{}", informer.stats());
         Ok(())
     }
@@ -280,6 +294,7 @@ pub trait EvaluableCircuit<F: Fancy>: CircuitType {
         f: &mut F,
         garbler_inputs: &[F::Item],
         evaluator_inputs: &[F::Item],
+        channel: &mut Channel,
     ) -> Result<Option<Vec<u16>>, F::Error>;
 }
 
@@ -289,6 +304,7 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
         f: &mut F,
         garbler_inputs: &[F::Item],
         evaluator_inputs: &[F::Item],
+        channel: &mut Channel,
     ) -> Result<Option<Vec<u16>>, F::Error> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
@@ -304,7 +320,7 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
                     );
                     (None, evaluator_inputs[id].clone())
                 }
-                ArithmeticGate::Constant { val } => (None, f.constant(val, q)?),
+                ArithmeticGate::Constant { val } => (None, f.constant(val, q, channel)?),
                 ArithmeticGate::Add { xref, yref, out } => (
                     out,
                     f.add(
@@ -346,6 +362,7 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
                             .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
                         q,
                         Some(tt.to_vec()),
+                        channel,
                     )?,
                 ),
                 ArithmeticGate::Mul {
@@ -359,6 +376,7 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
                         cache[yref.ix]
                             .as_ref()
                             .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
+                        channel,
                     )?,
                 ),
             };
@@ -369,7 +387,7 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
             let r = cache[r.ix]
                 .as_ref()
                 .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?;
-            let out = f.output(r)?;
+            let out = f.output(r, channel)?;
             outputs.push(out);
         }
         Ok(outputs.into_iter().collect())
@@ -382,6 +400,7 @@ impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
         f: &mut F,
         garbler_inputs: &[F::Item],
         evaluator_inputs: &[F::Item],
+        channel: &mut Channel,
     ) -> Result<Option<Vec<u16>>, F::Error> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
@@ -397,13 +416,14 @@ impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
                     );
                     (None, evaluator_inputs[id].clone())
                 }
-                BinaryGate::Constant { val } => (None, f.constant(val, q)?),
+                BinaryGate::Constant { val } => (None, f.constant(val, q, channel)?),
                 BinaryGate::Inv { xref, out } => (
                     out,
                     f.negate(
                         cache[xref.ix]
                             .as_ref()
                             .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
+                        channel,
                     )?,
                 ),
                 BinaryGate::Xor { xref, yref, out } => (
@@ -428,6 +448,7 @@ impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
                         cache[yref.ix]
                             .as_ref()
                             .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
+                        channel,
                     )?,
                 ),
             };
@@ -438,7 +459,7 @@ impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
             let r = cache[r.ix]
                 .as_ref()
                 .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?;
-            let out = f.output(r)?;
+            let out = f.output(r, channel)?;
             outputs.push(out);
         }
         Ok(outputs.into_iter().collect())
@@ -579,7 +600,12 @@ pub fn eval_plain<C: EvaluableCircuit<Dummy>>(
         .map(|(x, r)| DummyVal::new(*x, r.modulus()))
         .collect_vec();
 
-    let outputs = circuit.eval(&mut dummy, &gb, &ev)?;
+    // XXX `unwrap` is used!
+    let outputs = Channel::with(std::io::empty(), |c| {
+        // XXX `unwrap` is used!
+        Ok(circuit.eval(&mut dummy, &gb, &ev, c).unwrap())
+    })
+    .unwrap();
     Ok(outputs.expect("dummy will always return Some(u16) output"))
 }
 
@@ -750,7 +776,7 @@ impl FancyBinary for CircuitBuilder<BinaryCircuit> {
         Ok(self.gate(gate, xref.modulus()))
     }
 
-    fn negate(&mut self, xref: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn negate(&mut self, xref: &Self::Item, _: &mut Channel) -> Result<Self::Item, Self::Error> {
         let gate = BinaryGate::Inv {
             xref: *xref,
             out: None,
@@ -758,7 +784,12 @@ impl FancyBinary for CircuitBuilder<BinaryCircuit> {
         Ok(self.gate(gate, xref.modulus()))
     }
 
-    fn and(&mut self, xref: &Self::Item, yref: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn and(
+        &mut self,
+        xref: &Self::Item,
+        yref: &Self::Item,
+        _: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
         let gate = BinaryGate::And {
             xref: *xref,
             yref: *yref,
@@ -814,6 +845,7 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
         xref: &CircuitRef,
         output_modulus: u16,
         tt: Option<Vec<u16>>,
+        _: &mut Channel,
     ) -> Result<CircuitRef, Self::Error> {
         let tt = tt.ok_or_else(|| Self::Error::from(FancyError::NoTruthTable))?;
         if tt.len() < xref.modulus() as usize || !tt.iter().all(|&x| x < output_modulus) {
@@ -828,9 +860,14 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
         Ok(self.gate(gate, output_modulus))
     }
 
-    fn mul(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
+    fn mul(
+        &mut self,
+        xref: &CircuitRef,
+        yref: &CircuitRef,
+        channel: &mut Channel,
+    ) -> Result<CircuitRef, Self::Error> {
         if xref.modulus() < yref.modulus() {
-            return self.mul(yref, xref);
+            return self.mul(yref, xref, channel);
         }
 
         let gate = ArithmeticGate::Mul {
@@ -848,7 +885,12 @@ impl<Circuit: CircuitType> Fancy for CircuitBuilder<Circuit> {
     type Item = CircuitRef;
     type Error = CircuitBuilderError;
 
-    fn constant(&mut self, val: u16, modulus: u16) -> Result<CircuitRef, Self::Error> {
+    fn constant(
+        &mut self,
+        val: u16,
+        modulus: u16,
+        _: &mut Channel,
+    ) -> Result<CircuitRef, Self::Error> {
         match self.const_map.get(&(val, modulus)) {
             Some(&r) => Ok(r),
             None => {
@@ -861,8 +903,7 @@ impl<Circuit: CircuitType> Fancy for CircuitBuilder<Circuit> {
         }
     }
 
-    fn output(&mut self, xref: &CircuitRef) -> Result<Option<u16>, Self::Error> {
-        println!("output called");
+    fn output(&mut self, xref: &CircuitRef, _: &mut Channel) -> Result<Option<u16>, Self::Error> {
         self.circ.push_output_ref(*xref);
         Ok(None)
     }
@@ -973,13 +1014,17 @@ mod plaintext {
     #[test] // {{{ and_gate_fan_n
     fn and_gate_fan_n() {
         let mut rng = thread_rng();
-
-        let mut b = CircuitBuilder::<BinaryCircuit>::new();
         let n = 2 + (rng.gen_usize() % 200);
-        let inps = b.evaluator_inputs(&vec![2; n]);
-        let z = b.and_many(&inps).unwrap();
-        b.output(&z).unwrap();
-        let c = b.finish();
+
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::<BinaryCircuit>::new();
+            let inps = b.evaluator_inputs(&vec![2; n]);
+            let z = b.and_many(&inps, channel).unwrap();
+            b.output(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         for _ in 0..16 {
             let mut inps: Vec<u16> = Vec::new();
@@ -998,12 +1043,16 @@ mod plaintext {
     #[test] // {{{ or_gate_fan_n
     fn or_gate_fan_n() {
         let mut rng = thread_rng();
-        let mut b: CircuitBuilder<BinaryCircuit> = CircuitBuilder::new();
         let n = 2 + (rng.gen_usize() % 200);
-        let inps = b.evaluator_inputs(&vec![2; n]);
-        let z = b.or_many(&inps).unwrap();
-        b.output(&z).unwrap();
-        let c = b.finish();
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b: CircuitBuilder<BinaryCircuit> = CircuitBuilder::new();
+            let inps = b.evaluator_inputs(&vec![2; n]);
+            let z = b.or_many(&inps, channel).unwrap();
+            b.output(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         for _ in 0..16 {
             let mut inps: Vec<u16> = Vec::new();
@@ -1022,12 +1071,17 @@ mod plaintext {
     #[test] // {{{ or_gate_fan_n_arithmetic
     fn or_gate_fan_n_arithmetic() {
         let mut rng = thread_rng();
-        let mut b: CircuitBuilder<ArithmeticCircuit> = CircuitBuilder::new();
         let n = 2 + (rng.gen_usize() % 200);
-        let inps = b.evaluator_inputs(&vec![2; n]);
-        let z = b.or_many(&inps).unwrap();
-        b.output(&z).unwrap();
-        let c = b.finish();
+
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b: CircuitBuilder<ArithmeticCircuit> = CircuitBuilder::new();
+            let inps = b.evaluator_inputs(&vec![2; n]);
+            let z = b.or_many(&inps, channel).unwrap();
+            b.output(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         for _ in 0..16 {
             let mut inps: Vec<u16> = Vec::new();
@@ -1046,13 +1100,18 @@ mod plaintext {
     #[test] // {{{ half_gate
     fn binary_half_gate() {
         let mut rng = thread_rng();
-        let mut b = CircuitBuilder::<BinaryCircuit>::new();
         let q = 2;
-        let x = b.garbler_input(q);
-        let y = b.evaluator_input(q);
-        let z = b.and(&x, &y).unwrap();
-        b.output(&z).unwrap();
-        let c = b.finish();
+
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::<BinaryCircuit>::new();
+            let x = b.garbler_input(q);
+            let y = b.evaluator_input(q);
+            let z = b.and(&x, &y, channel).unwrap();
+            b.output(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
         for _ in 0..16 {
             let x = rng.gen_u16() % q;
             let y = rng.gen_u16() % q;
@@ -1063,13 +1122,18 @@ mod plaintext {
     #[test] // {{{ half_gate
     fn arithmetic_half_gate() {
         let mut rng = thread_rng();
-        let mut b = CircuitBuilder::new();
         let q = rng.gen_prime();
-        let x = b.garbler_input(q);
-        let y = b.evaluator_input(q);
-        let z = b.mul(&x, &y).unwrap();
-        b.output(&z).unwrap();
-        let c = b.finish();
+
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
+            let x = b.garbler_input(q);
+            let y = b.evaluator_input(q);
+            let z = b.mul(&x, &y, channel).unwrap();
+            b.output(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
         for _ in 0..16 {
             let x = rng.gen_u16() % q;
             let y = rng.gen_u16() % q;
@@ -1081,14 +1145,19 @@ mod plaintext {
     #[test] // mod_change {{{
     fn mod_change() {
         let mut rng = thread_rng();
-        let mut b = CircuitBuilder::new();
         let p = rng.gen_prime();
         let q = rng.gen_prime();
-        let x = b.garbler_input(p);
-        let y = b.mod_change(&x, q).unwrap();
-        let z = b.mod_change(&y, p).unwrap();
-        b.output(&z).unwrap();
-        let c = b.finish();
+
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
+            let x = b.garbler_input(p);
+            let y = b.mod_change(&x, q, channel).unwrap();
+            let z = b.mod_change(&y, p, channel).unwrap();
+            b.output(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
         for _ in 0..16 {
             let x = rng.gen_u16() % p;
             let out = eval_plain(&c, &[x], &[]).unwrap();
@@ -1098,16 +1167,20 @@ mod plaintext {
     //}}}
     #[test] // add_many_mod_change {{{
     fn add_many_mod_change() {
-        let mut b = CircuitBuilder::new();
-        let n = 113;
-        let args = b.garbler_inputs(&vec![2; n]);
-        let wires = args
-            .iter()
-            .map(|x| b.mod_change(x, n as u16 + 1).unwrap())
-            .collect_vec();
-        let s = b.add_many(&wires).unwrap();
-        b.output(&s).unwrap();
-        let c = b.finish();
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
+            let n = 113;
+            let args = b.garbler_inputs(&vec![2; n]);
+            let wires = args
+                .iter()
+                .map(|x| b.mod_change(x, n as u16 + 1, channel).unwrap())
+                .collect_vec();
+            let s = b.add_many(&wires).unwrap();
+            b.output(&s, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         let mut rng = thread_rng();
         for _ in 0..64 {
@@ -1123,18 +1196,22 @@ mod plaintext {
     // }}}
     #[test] // constants {{{
     fn constants() {
-        let mut b = CircuitBuilder::new();
         let mut rng = thread_rng();
-
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;
 
-        let x = b.evaluator_input(q);
-        let y = b.constant(c, q).unwrap();
-        let z = b.add(&x, &y).unwrap();
-        b.output(&z).unwrap();
+        let circ = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
 
-        let circ = b.finish();
+            let x = b.evaluator_input(q);
+            let y = b.constant(c, q, channel).unwrap();
+            let z = b.add(&x, &y).unwrap();
+            b.output(&z, channel).unwrap();
+
+            let circ = b.finish();
+            Ok(circ)
+        })
+        .unwrap();
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
@@ -1160,12 +1237,15 @@ mod bundle {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
-        let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input(q);
-        println!("{:?} wires", x.wires().len());
-        b.output_bundle(&x).unwrap();
-
-        let c: ArithmeticCircuit = b.finish();
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
+            let x = b.crt_garbler_input(q);
+            println!("{:?} wires", x.wires().len());
+            b.output_bundle(&x, channel).unwrap();
+            let c: ArithmeticCircuit = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         println!("{:?}", c.output_refs);
 
@@ -1184,12 +1264,16 @@ mod bundle {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
-        let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input(q);
-        let y = b.crt_evaluator_input(q);
-        let z = b.crt_add(&x, &y).unwrap();
-        b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
+            let x = b.crt_garbler_input(q);
+            let y = b.crt_evaluator_input(q);
+            let z = b.crt_add(&x, &y).unwrap();
+            b.output_bundle(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
@@ -1205,12 +1289,16 @@ mod bundle {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
-        let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input(q);
-        let y = b.crt_evaluator_input(q);
-        let z = b.sub_bundles(&x, &y).unwrap();
-        b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
+            let x = b.crt_garbler_input(q);
+            let y = b.crt_evaluator_input(q);
+            let z = b.sub_bundles(&x, &y).unwrap();
+            b.output_bundle(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
@@ -1225,13 +1313,17 @@ mod bundle {
     fn test_cmul() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(16);
-
-        let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input(q);
         let y = rng.gen_u128() % q;
-        let z = b.crt_cmul(&x, y).unwrap();
-        b.output_bundle(&z).unwrap();
-        let c = b.finish();
+
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
+            let x = b.crt_garbler_input(q);
+            let z = b.crt_cmul(&x, y).unwrap();
+            b.output_bundle(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
@@ -1246,12 +1338,16 @@ mod bundle {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
-        let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input(q);
-        let y = b.crt_evaluator_input(q);
-        let z = b.mul_bundles(&x, &y).unwrap();
-        b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
+            let x = b.crt_garbler_input(q);
+            let y = b.crt_evaluator_input(q);
+            let z = b.mul_bundles(&x, &y, channel).unwrap();
+            b.output_bundle(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         for _ in 0..16 {
             let x = rng.gen_u64() as u128 % q;
@@ -1268,11 +1364,15 @@ mod bundle {
         let q = util::modulus_with_width(10);
         let y = rng.gen_u16() % 10;
 
-        let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input(q);
-        let z = b.crt_cexp(&x, y).unwrap();
-        b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
+            let x = b.crt_garbler_input(q);
+            let z = b.crt_cexp(&x, y, channel).unwrap();
+            b.output_bundle(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         for _ in 0..64 {
             let x = rng.gen_u16() as u128 % q;
@@ -1290,11 +1390,15 @@ mod bundle {
         let q = ps.iter().fold(1, |acc, &x| (x as u128) * acc);
         let p = ps[rng.gen_u16() as usize % ps.len()];
 
-        let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input(q);
-        let z = b.crt_rem(&x, p).unwrap();
-        b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
+            let x = b.crt_garbler_input(q);
+            let z = b.crt_rem(&x, p, channel).unwrap();
+            b.output_bundle(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         for _ in 0..64 {
             let x = rng.gen_u128() % q;
@@ -1310,12 +1414,16 @@ mod bundle {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
 
-        let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input(q);
-        let y = b.crt_evaluator_input(q);
-        let z = b.eq_bundles(&x, &y).unwrap();
-        b.output(&z).unwrap();
-        let c = b.finish();
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
+            let x = b.crt_garbler_input(q);
+            let y = b.crt_evaluator_input(q);
+            let z = b.eq_bundles(&x, &y, channel).unwrap();
+            b.output(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         // lets have at least one test where they are surely equal
         let x = rng.gen_u128() % q;
@@ -1337,13 +1445,17 @@ mod bundle {
         let nargs = 2 + rng.gen_usize() % 100;
         let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
 
-        let mut b = CircuitBuilder::new();
-        let xs = (0..nargs)
-            .map(|_| crate::fancy::Bundle::new(b.evaluator_inputs(&mods)))
-            .collect_vec();
-        let z = b.mixed_radix_addition(&xs).unwrap();
-        b.output_bundle(&z).unwrap();
-        let circ = b.finish();
+        let circ = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
+            let xs = (0..nargs)
+                .map(|_| crate::fancy::Bundle::new(b.evaluator_inputs(&mods)))
+                .collect_vec();
+            let z = b.mixed_radix_addition(&xs, channel).unwrap();
+            b.output_bundle(&z, channel).unwrap();
+            let circ = b.finish();
+            Ok(circ)
+        })
+        .unwrap();
 
         let Q: u128 = mods.iter().map(|&q| q as u128).product();
 
@@ -1378,11 +1490,15 @@ mod bundle {
         let q = util::modulus_with_width(10);
         println!("q={}", q);
 
-        let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input(q);
-        let z = b.crt_relu(&x, "100%", None).unwrap();
-        b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
+            let x = b.crt_garbler_input(q);
+            let z = b.crt_relu(&x, "100%", None, channel).unwrap();
+            b.output_bundle(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         for _ in 0..128 {
             let pt = rng.gen_u128() % q;
@@ -1399,11 +1515,15 @@ mod bundle {
         let q = util::modulus_with_width(10);
         println!("q={}", q);
 
-        let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input(q);
-        let z = b.crt_sgn(&x, "100%", None).unwrap();
-        b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
+            let x = b.crt_garbler_input(q);
+            let z = b.crt_sgn(&x, "100%", None, channel).unwrap();
+            b.output_bundle(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         for _ in 0..128 {
             let pt = rng.gen_u128() % q;
@@ -1419,12 +1539,16 @@ mod bundle {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
 
-        let mut b = CircuitBuilder::new();
-        let x = b.crt_garbler_input(q);
-        let y = b.crt_evaluator_input(q);
-        let z = b.crt_lt(&x, &y, "100%").unwrap();
-        b.output(&z).unwrap();
-        let c = b.finish();
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
+            let x = b.crt_garbler_input(q);
+            let y = b.crt_evaluator_input(q);
+            let z = b.crt_lt(&x, &y, "100%", channel).unwrap();
+            b.output(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         // lets have at least one test where they are surely equal
         let x = rng.gen_u128() % q / 2;
@@ -1446,11 +1570,15 @@ mod bundle {
         let n = 10;
         println!("n={} q={}", n, q);
 
-        let mut b = CircuitBuilder::new();
-        let xs = (0..n).map(|_| b.crt_garbler_input(q)).collect_vec();
-        let z = b.crt_max(&xs, "100%").unwrap();
-        b.output_bundle(&z).unwrap();
-        let c = b.finish();
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::new();
+            let xs = (0..n).map(|_| b.crt_garbler_input(q)).collect_vec();
+            let z = b.crt_max(&xs, "100%", channel).unwrap();
+            b.output_bundle(&z, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         for _ in 0..16 {
             let inps = (0..n).map(|_| rng.gen_u128() % (q / 2)).collect_vec();
@@ -1475,13 +1603,17 @@ mod bundle {
         let Q = util::product(&vec![q; n]);
         println!("n={} q={} Q={}", n, q, Q);
 
-        let mut b = CircuitBuilder::<BinaryCircuit>::new();
-        let x = b.bin_garbler_input(n);
-        let y = b.bin_evaluator_input(n);
-        let (zs, carry) = b.bin_addition(&x, &y).unwrap();
-        b.output(&carry).unwrap();
-        b.output_bundle(&zs).unwrap();
-        let c = b.finish();
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::<BinaryCircuit>::new();
+            let x = b.bin_garbler_input(n);
+            let y = b.bin_evaluator_input(n);
+            let (zs, carry) = b.bin_addition(&x, &y, channel).unwrap();
+            b.output(&carry, channel).unwrap();
+            b.output_bundle(&zs, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         for _ in 0..16 {
             let x = rng.gen_u128() % Q;
@@ -1501,11 +1633,15 @@ mod bundle {
         let nbits = 1 + (rng.gen_usize() % 7);
         let Q = 1 << nbits as u128;
 
-        let mut b = CircuitBuilder::<BinaryCircuit>::new();
-        let x = b.bin_garbler_input(nbits);
-        let d = b.bin_demux(&x).unwrap();
-        b.outputs(&d).unwrap();
-        let c = b.finish();
+        let c = Channel::with(std::io::empty(), |channel| {
+            let mut b = CircuitBuilder::<BinaryCircuit>::new();
+            let x = b.bin_garbler_input(nbits);
+            let d = b.bin_demux(&x, channel).unwrap();
+            b.outputs(&d, channel).unwrap();
+            let c = b.finish();
+            Ok(c)
+        })
+        .unwrap();
 
         for _ in 0..16 {
             let x = rng.gen_u128() % Q;

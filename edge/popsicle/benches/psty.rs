@@ -3,13 +3,8 @@
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use popsicle::psty::{Receiver, Sender};
-use std::{
-    io::{BufReader, BufWriter},
-    os::unix::net::UnixStream,
-    time::Duration,
-};
+use std::time::Duration;
 use swanky_aes_rng::AesRng;
-use swanky_channel_legacy::Channel;
 
 const SIZE: usize = 15;
 
@@ -22,43 +17,37 @@ fn rand_vec_vec(size: usize) -> Vec<Vec<u8>> {
 }
 
 fn bench_psty_init() {
-    let (sender, receiver) = UnixStream::pair().unwrap();
-
-    let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let _ = Sender::init(&mut channel, &mut rng).unwrap();
-    });
-
-    let mut rng = AesRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let _ = Receiver::init(&mut channel, &mut rng).unwrap();
-
-    handle.join().unwrap();
+    swanky_channel::local::local_channel_pair(
+        |channel| {
+            let mut rng = AesRng::new();
+            let _ = Sender::init(channel, &mut rng).unwrap();
+            Ok(())
+        },
+        |channel| {
+            let mut rng = AesRng::new();
+            let _ = Receiver::init(channel, &mut rng).unwrap();
+            Ok(())
+        },
+    )
+    .unwrap();
 }
 
 fn bench_psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> () {
-    let (sender, receiver) = UnixStream::pair().unwrap();
-
-    std::thread::spawn(move || {
-        let mut rng = AesRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let mut p1 = Sender::init(&mut channel, &mut rng).unwrap();
-        p1.send(&inputs1, &mut channel, &mut rng).unwrap()
-    });
-
-    let mut rng = AesRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let mut p2 = Receiver::init(&mut channel, &mut rng).unwrap();
-    p2.receive(&inputs2, &mut channel, &mut rng).unwrap();
+    swanky_channel::local::local_channel_pair(
+        |channel| {
+            let mut rng = AesRng::new();
+            let mut p1 = Sender::init(channel, &mut rng).unwrap();
+            p1.send(&inputs1, channel, &mut rng).unwrap();
+            Ok(())
+        },
+        |channel| {
+            let mut rng = AesRng::new();
+            let mut p2 = Receiver::init(channel, &mut rng).unwrap();
+            p2.receive(&inputs2, channel, &mut rng).unwrap();
+            Ok(())
+        },
+    )
+    .unwrap();
 }
 
 fn bench_psi(c: &mut Criterion) {

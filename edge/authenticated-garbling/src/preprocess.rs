@@ -54,6 +54,7 @@ pub fn f_preprocessing<P: Party, RNG: CryptoRng + Rng>(
         &mut CircuitAnalyzer,
         BinaryBundle<AnalyzerItem>,
         BinaryBundle<AnalyzerItem>,
+        &mut Channel,
     ) -> Result<BinaryBundle<AnalyzerItem>, AnalyzerError>,
     and_generator: &mut AndTripleGenerator<P>,
     input_size: usize,
@@ -61,10 +62,12 @@ pub fn f_preprocessing<P: Party, RNG: CryptoRng + Rng>(
     rng: &mut RNG,
 ) -> eyre::Result<(Vec<AndTriple<P>>, Vec<AuthShare<P>>)> {
     let mut analyzer = CircuitAnalyzer::new();
-    let dummy_wires_self: BinaryBundle<AnalyzerItem> = analyzer.bin_encode(0, input_size).unwrap();
-    let dummy_wires_other: BinaryBundle<AnalyzerItem> = analyzer.bin_receive(input_size).unwrap();
+    let dummy_wires_self: BinaryBundle<AnalyzerItem> =
+        analyzer.bin_encode(0, input_size, channel).unwrap();
+    let dummy_wires_other: BinaryBundle<AnalyzerItem> =
+        analyzer.bin_receive(input_size, channel).unwrap();
 
-    circuit(&mut analyzer, dummy_wires_self, dummy_wires_other)?;
+    circuit(&mut analyzer, dummy_wires_self, dummy_wires_other, channel)?;
 
     let nands = analyzer.nands();
     let mut and_shares = Vec::with_capacity(nands);
@@ -103,11 +106,12 @@ mod tests {
         f: &mut F,
         garbler_wires: BinaryBundle<F::Item>,
         evaluator_wires: BinaryBundle<F::Item>,
+        channel: &mut Channel,
     ) -> Result<BinaryBundle<F::Item>, F::Error>
     where
         F: FancyReveal + Fancy + BinaryGadgets + FancyBinary,
     {
-        f.bin_addition_no_carry(&garbler_wires, &evaluator_wires)
+        f.bin_addition_no_carry(&garbler_wires, &evaluator_wires, channel)
     }
     #[test]
     fn test_preprocessing_fancy_sum() {

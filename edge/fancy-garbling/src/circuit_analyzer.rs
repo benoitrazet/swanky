@@ -8,6 +8,7 @@ use crate::{
 use eyre::{ErrReport, eyre};
 use std::cmp::max;
 use std::error::Error;
+use swanky_channel::Channel;
 
 /// An instantiation of [`FancyInput::Item`] used by [`CircuitAnalyzer`].
 ///
@@ -123,7 +124,11 @@ impl FancyInput for CircuitAnalyzer {
     type Item = AnalyzerItem;
     type Error = AnalyzerError;
 
-    fn receive_many(&mut self, moduli: &[u16]) -> Result<Vec<Self::Item>, Self::Error> {
+    fn receive_many(
+        &mut self,
+        moduli: &[u16],
+        _: &mut Channel,
+    ) -> Result<Vec<Self::Item>, Self::Error> {
         self.ninputs += moduli.len();
         Ok(moduli
             .iter()
@@ -138,8 +143,9 @@ impl FancyInput for CircuitAnalyzer {
         &mut self,
         _values: &[u16],
         moduli: &[u16],
+        channel: &mut Channel,
     ) -> Result<Vec<Self::Item>, Self::Error> {
-        self.receive_many(moduli)
+        self.receive_many(moduli, channel)
     }
 }
 
@@ -155,7 +161,12 @@ impl FancyBinary for CircuitAnalyzer {
         })
     }
 
-    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn and(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        _: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
         self.nands += 1;
         // Fancy's AND gate calls the underlying arithmetic multiplication
         self.nmuls += 1;
@@ -165,7 +176,12 @@ impl FancyBinary for CircuitAnalyzer {
             depth: max(x.depth, y.depth) + 1,
         })
     }
-    fn or(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn or(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        _: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
         self.nands += 1;
         self.nnegs += 3;
         // Fancy binary's AND gate calls the underlying arithmetic multiplication
@@ -176,7 +192,7 @@ impl FancyBinary for CircuitAnalyzer {
             depth: max(x.depth, y.depth) + 1,
         })
     }
-    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Self::Item, Self::Error> {
         self.nnegs += 1;
 
         // Fancy implements negation with one constant gate and one XOR
@@ -218,7 +234,12 @@ impl FancyArithmetic for CircuitAnalyzer {
         })
     }
 
-    fn mul(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn mul(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        _: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
         self.nmuls += 1;
         Ok(AnalyzerItem {
             modulus: x.modulus,
@@ -231,6 +252,7 @@ impl FancyArithmetic for CircuitAnalyzer {
         _x: &Self::Item,
         _q: u16,
         _tt: Option<Vec<u16>>,
+        _: &mut Channel,
     ) -> Result<Self::Item, Self::Error> {
         Err(AnalyzerError::ProjUnsupported)
     }
@@ -240,7 +262,7 @@ impl Fancy for CircuitAnalyzer {
     type Item = AnalyzerItem;
     type Error = AnalyzerError;
 
-    fn constant(&mut self, _val: u16, q: u16) -> Result<Self::Item, Self::Error> {
+    fn constant(&mut self, _val: u16, q: u16, _: &mut Channel) -> Result<Self::Item, Self::Error> {
         self.nconstants += 1;
         Ok(AnalyzerItem {
             modulus: q,
@@ -248,14 +270,14 @@ impl Fancy for CircuitAnalyzer {
         })
     }
 
-    fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error> {
+    fn output(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Option<u16>, Self::Error> {
         self.mul_depth = max(self.mul_depth, x.depth);
         Ok(None)
     }
 }
 
 impl FancyReveal for CircuitAnalyzer {
-    fn reveal(&mut self, _x: &Self::Item) -> Result<u16, Self::Error> {
+    fn reveal(&mut self, _x: &Self::Item, _: &mut Channel) -> Result<u16, Self::Error> {
         Ok(0)
     }
 }
@@ -269,84 +291,92 @@ mod tests {
         let nbits = 64;
         let x = 0;
         let y = 0;
-        let mut analyzer_test: CircuitAnalyzer = CircuitAnalyzer::new();
-        {
-            let x = analyzer_test.bin_encode(x, nbits).unwrap();
-            let y = analyzer_test.bin_encode(y, nbits).unwrap();
-            let _c = analyzer_test.bin_and(&x, &y);
-        }
+        Channel::with(std::io::empty(), |channel| {
+            let mut analyzer_test: CircuitAnalyzer = CircuitAnalyzer::new();
+            let x = analyzer_test.bin_encode(x, nbits, channel).unwrap();
+            let y = analyzer_test.bin_encode(y, nbits, channel).unwrap();
+            let _c = analyzer_test.bin_and(&x, &y, channel);
 
-        assert_eq!(analyzer_test.ninputs, 128);
-        assert_eq!(analyzer_test.nands, 64);
-        assert_eq!(analyzer_test.nxors, 0);
-        assert_eq!(analyzer_test.nconstants, 0);
-        assert_eq!(analyzer_test.nnegs, 0);
+            assert_eq!(analyzer_test.ninputs, 128);
+            assert_eq!(analyzer_test.nands, 64);
+            assert_eq!(analyzer_test.nxors, 0);
+            assert_eq!(analyzer_test.nconstants, 0);
+            assert_eq!(analyzer_test.nnegs, 0);
+            Ok(())
+        })
+        .unwrap();
     }
     #[test]
     fn binary_addition_counts_are_correct() {
         let nbits = 64;
         let x = 0;
         let y = 0;
-        let mut analyzer_test: CircuitAnalyzer = CircuitAnalyzer::new();
-        {
-            let x = analyzer_test.bin_encode(x, nbits).unwrap();
-            let y = analyzer_test.bin_encode(y, nbits).unwrap();
+        Channel::with(std::io::empty(), |channel| {
+            let mut analyzer_test: CircuitAnalyzer = CircuitAnalyzer::new();
+            let x = analyzer_test.bin_encode(x, nbits, channel).unwrap();
+            let y = analyzer_test.bin_encode(y, nbits, channel).unwrap();
             // bin_addition is equivalent to an "adder" per wire
-            let _c = analyzer_test.bin_addition(&x, &y);
-        }
+            let _c = analyzer_test.bin_addition(&x, &y, channel);
 
-        assert_eq!(analyzer_test.ninputs, 128);
-        assert_eq!(analyzer_test.nands, 64);
-        // There are (nbits -1) adders invoked with a carry
-        // and the very first one without. The adders with
-        // carry have 3 extra XORs, check fancy_garbling::adder
-        // and fancy_garbling::binary_addition for more info
-        assert_eq!(analyzer_test.nxors, 64 * 4 - 3);
-        assert_eq!(analyzer_test.nconstants, 0);
-        assert_eq!(analyzer_test.nnegs, 0);
+            assert_eq!(analyzer_test.ninputs, 128);
+            assert_eq!(analyzer_test.nands, 64);
+            // There are (nbits -1) adders invoked with a carry
+            // and the very first one without. The adders with
+            // carry have 3 extra XORs, check fancy_garbling::adder
+            // and fancy_garbling::binary_addition for more info
+            assert_eq!(analyzer_test.nxors, 64 * 4 - 3);
+            assert_eq!(analyzer_test.nconstants, 0);
+            assert_eq!(analyzer_test.nnegs, 0);
+            Ok(())
+        })
+        .unwrap();
     }
     #[test]
     fn binary_multiplication_counts_are_correct() {
         let nbits = 64;
         let x = 0;
         let y = 0;
-        let mut analyzer_test: CircuitAnalyzer = CircuitAnalyzer::new();
-        {
-            let x = analyzer_test.bin_encode(x, nbits).unwrap();
-            let y = analyzer_test.bin_encode(y, nbits).unwrap();
+        Channel::with(std::io::empty(), |channel| {
+            let mut analyzer_test: CircuitAnalyzer = CircuitAnalyzer::new();
+            let x = analyzer_test.bin_encode(x, nbits, channel).unwrap();
+            let y = analyzer_test.bin_encode(y, nbits, channel).unwrap();
             // bin_addition is equivalent to an "adder" per wire
-            let _c = analyzer_test.bin_mul(&x, &y);
-        }
+            let _c = analyzer_test.bin_mul(&x, &y, channel);
 
-        // In binary multiplication there are :
-        // - 64 * 64 explicit ANDs, i.e. pairwise ANDS between parties input wires.
-        // - Sum(65 to 128) binary additions. Recall that in multiplication the input
-        //   size grows by 1 bit each round until each 2 times the size of the initial
-        //   input (i.e. 64 * 2)
-        assert_eq!(analyzer_test.ninputs, 128);
-        assert_eq!(analyzer_test.nands, (65..128).sum::<usize>() + 64 * 64);
-        assert_eq!(
-            analyzer_test.nxors,
-            (65..128).sum::<usize>() * 4 - (3 * (128 - 65))
-        );
-        assert_eq!(analyzer_test.nconstants, 64);
-        assert_eq!(analyzer_test.nnegs, 0);
+            // In binary multiplication there are :
+            // - 64 * 64 explicit ANDs, i.e. pairwise ANDS between parties input wires.
+            // - Sum(65 to 128) binary additions. Recall that in multiplication the input
+            //   size grows by 1 bit each round until each 2 times the size of the initial
+            //   input (i.e. 64 * 2)
+            assert_eq!(analyzer_test.ninputs, 128);
+            assert_eq!(analyzer_test.nands, (65..128).sum::<usize>() + 64 * 64);
+            assert_eq!(
+                analyzer_test.nxors,
+                (65..128).sum::<usize>() * 4 - (3 * (128 - 65))
+            );
+            assert_eq!(analyzer_test.nconstants, 64);
+            assert_eq!(analyzer_test.nnegs, 0);
+            Ok(())
+        })
+        .unwrap();
     }
     #[test]
     fn binary_twos_complement_counts_are_correct() {
         let nbits = 64;
         let x = 0;
-        let mut analyzer_test: CircuitAnalyzer = CircuitAnalyzer::new();
-        {
-            let x = analyzer_test.bin_encode(x, nbits).unwrap();
+        Channel::with(std::io::empty(), |channel| {
+            let mut analyzer_test: CircuitAnalyzer = CircuitAnalyzer::new();
+            let x = analyzer_test.bin_encode(x, nbits, channel).unwrap();
             // bin_addition is equivalent to an "adder" per wire
-            let _c = analyzer_test.bin_twos_complement(&x);
-        }
+            let _c = analyzer_test.bin_twos_complement(&x, channel);
 
-        assert_eq!(analyzer_test.ninputs, 64);
-        assert_eq!(analyzer_test.nands, 63);
-        assert_eq!(analyzer_test.nxors, 63 * 4 - 3 + 64 + 2);
-        assert_eq!(analyzer_test.nconstants, 64 + 64);
-        assert_eq!(analyzer_test.nnegs, 64);
+            assert_eq!(analyzer_test.ninputs, 64);
+            assert_eq!(analyzer_test.nands, 63);
+            assert_eq!(analyzer_test.nxors, 63 * 4 - 3 + 64 + 2);
+            assert_eq!(analyzer_test.nconstants, 64 + 64);
+            assert_eq!(analyzer_test.nnegs, 64);
+            Ok(())
+        })
+        .unwrap();
     }
 }

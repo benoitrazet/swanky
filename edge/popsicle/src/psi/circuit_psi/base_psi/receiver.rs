@@ -50,25 +50,23 @@ impl BasePsi for OpprfReceiver {
     ///
     /// If the payloads are not needed for the computation, `payload_existence`
     /// should be set to false.
-    fn init<C, RNG>(channel: &mut C, rng: &mut RNG, has_payload: bool) -> Result<Self, Error>
+    fn init<RNG>(channel: &mut Channel, rng: &mut RNG, has_payload: bool) -> Result<Self, Error>
     where
-        C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng,
     {
         // The key used during hashing is known to both
         // parties and allows them to hash the same inputs
         // to the same outputs.
         let key = rng.r#gen();
-        channel.write_block(&key)?;
-        channel.flush()?;
+        channel
+            .write(&key)
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
 
         let opprf_primary_keys = KmprtReceiver::init(channel, rng)?;
-        channel.flush()?;
 
         let mut opprf_payload = None;
         if has_payload {
             opprf_payload = Some(KmprtReceiver::init(channel, rng)?);
-            channel.flush()?;
         }
 
         Ok(Self {
@@ -79,15 +77,14 @@ impl BasePsi for OpprfReceiver {
         })
     }
     /// Hash the data using cuckoo hashing
-    fn hash_data<C, RNG>(
+    fn hash_data<RNG>(
         &mut self,
         primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<(), Error>
     where
-        C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng,
     {
         let mut hashed_inputs = compress_and_hash_inputs(primary_keys, self.key);
@@ -103,9 +100,12 @@ impl BasePsi for OpprfReceiver {
             }
         };
 
-        channel.write_block(&self.key)?;
-        channel.write_usize(cuckoo.nbins)?; // The number of bins is sent out to the sender
-        channel.flush()?;
+        channel
+            .write(&self.key)
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
+        channel
+            .write(&cuckoo.nbins)
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?; // The number of bins is sent out to the sender
 
         let opprf_primary_keys_in = cuckoo_place_ids(&cuckoo.items, rng);
 
@@ -122,9 +122,8 @@ impl BasePsi for OpprfReceiver {
         Ok(())
     }
 
-    fn opprf_exchange<C, RNG>(&mut self, channel: &mut C, rng: &mut RNG) -> Result<(), Error>
+    fn opprf_exchange<RNG>(&mut self, channel: &mut Channel, rng: &mut RNG) -> Result<(), Error>
     where
-        C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng,
     {
         // The receiver queries the opprf with their inputs if the receiver
@@ -145,6 +144,7 @@ impl BasePsi for OpprfReceiver {
     fn encode_circuit_inputs<F, E>(
         &mut self,
         gc_party: &mut F,
+        channel: &mut Channel,
     ) -> Result<CircuitInputs<F::Item>, Error>
     where
         F: FancyInput<Item = WireMod2, Error = E>,
@@ -160,13 +160,14 @@ impl BasePsi for OpprfReceiver {
 
         // First receive encoded inputs from the `OpprfSender`
         let sender_primary_keys: Vec<F::Item> =
-            bin_receive_many_block512(gc_party, primary_keys_binary_len)?;
+            bin_receive_many_block512(gc_party, primary_keys_binary_len, channel)?;
 
         // Then send encoded inputs
         let receiver_primary_keys: Vec<F::Item> = bin_encode_many_block512(
             gc_party,
             &self.state.opprf_primary_keys_out,
             PRIMARY_KEY_SIZE,
+            channel,
         )?;
 
         let mut result = CircuitInputs {
@@ -186,11 +187,19 @@ impl BasePsi for OpprfReceiver {
             let payloads_binary_len = PAYLOAD_SIZE * 8 * self.state.opprf_payloads_in.len();
 
             let sender_payloads: Vec<F::Item> =
-                bin_receive_many_block512(gc_party, payloads_binary_len)?;
-            let receiver_payloads: Vec<F::Item> =
-                bin_encode_many_block512(gc_party, &self.state.opprf_payloads_in, PAYLOAD_SIZE)?;
-            let masks: Vec<F::Item> =
-                bin_encode_many_block512(gc_party, &self.state.opprf_payloads_out, PAYLOAD_SIZE)?;
+                bin_receive_many_block512(gc_party, payloads_binary_len, channel)?;
+            let receiver_payloads: Vec<F::Item> = bin_encode_many_block512(
+                gc_party,
+                &self.state.opprf_payloads_in,
+                PAYLOAD_SIZE,
+                channel,
+            )?;
+            let masks: Vec<F::Item> = bin_encode_many_block512(
+                gc_party,
+                &self.state.opprf_payloads_out,
+                PAYLOAD_SIZE,
+                channel,
+            )?;
 
             result.sender_payloads_masked = sender_payloads;
             result.receiver_payloads = receiver_payloads;

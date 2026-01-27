@@ -5,24 +5,25 @@ mod tests {
     use crate::psi::circuit_psi::{
         base_psi::{BasePsi, receiver::OpprfReceiver, sender::OpprfSender},
         tests::*,
-        utils::*,
     };
-    use std::os::unix::net::UnixStream;
     use swanky_aes_rng::AesRng;
 
     #[test]
     fn test_psty_init_receiver_succeeded() {
         for _ in 0..TEST_TRIALS {
-            let (sender, receiver) = UnixStream::pair().unwrap();
-
-            std::thread::spawn(move || {
-                let mut rng = AesRng::new();
-                let mut channel = setup_channel(sender);
-                let _ = OpprfSender::init(&mut channel, &mut rng, true);
-            });
-            let mut rng = AesRng::new();
-            let mut channel = setup_channel(receiver);
-            let receiver = OpprfReceiver::init(&mut channel, &mut rng, true);
+            let (_, receiver) = swanky_channel::local::local_channel_pair(
+                |channel| {
+                    let mut rng = AesRng::new();
+                    let _ = OpprfSender::init(channel, &mut rng, true);
+                    Ok(())
+                },
+                |channel| {
+                    let mut rng = AesRng::new();
+                    let receiver = OpprfReceiver::init(channel, &mut rng, true);
+                    Ok(receiver)
+                },
+            )
+            .unwrap();
 
             assert!(
                 !receiver.is_err(),
@@ -33,20 +34,21 @@ mod tests {
     #[test]
     fn test_psty_init_sender_succeeded() {
         for _ in 0..TEST_TRIALS {
-            let (sender, receiver) = UnixStream::pair().unwrap();
-
-            let sender = std::thread::spawn(move || {
-                let mut rng = AesRng::new();
-                let mut channel = setup_channel(sender);
-
-                OpprfSender::init(&mut channel, &mut rng, true)
-            });
-            let mut rng = AesRng::new();
-            let mut channel = setup_channel(receiver);
-            let _ = OpprfReceiver::init(&mut channel, &mut rng, true);
+            let (sender, _) = swanky_channel::local::local_channel_pair(
+                |channel| {
+                    let mut rng = AesRng::new();
+                    Ok(OpprfSender::init(channel, &mut rng, true))
+                },
+                |channel| {
+                    let mut rng = AesRng::new();
+                    let _ = OpprfReceiver::init(channel, &mut rng, true);
+                    Ok(())
+                },
+            )
+            .unwrap();
 
             assert!(
-                !sender.join().unwrap().is_err(),
+                !sender.is_err(),
                 "PSTY Initialization failed on the sender side"
             );
         }

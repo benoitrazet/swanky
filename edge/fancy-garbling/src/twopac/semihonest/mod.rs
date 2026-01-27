@@ -18,41 +18,45 @@ mod tests {
     };
     use itertools::Itertools;
     use swanky_aes_rng::AesRng;
-    use swanky_channel_legacy::{UnixChannel, unix_channel_pair};
+    use swanky_channel::Channel;
     use swanky_ot_chou_orlandi::{Receiver as ChouOrlandiReceiver, Sender as ChouOrlandiSender};
 
     fn addition<F: FancyArithmetic>(
         f: &mut F,
         a: &F::Item,
         b: &F::Item,
+        channel: &mut Channel,
     ) -> Result<Option<u16>, F::Error> {
         let c = f.add(a, b)?;
-        f.output(&c)
+        f.output(&c, channel)
     }
 
     #[test]
     fn test_addition_circuit() {
         for a in 0..2 {
             for b in 0..2 {
-                let (sender, receiver) = unix_channel_pair();
-                std::thread::spawn(move || {
-                    let rng = AesRng::new();
-                    let mut gb = Garbler::<UnixChannel, AesRng, ChouOrlandiSender, AllWire>::new(
-                        sender, rng,
-                    )
-                    .unwrap();
-                    let x = gb.encode(a, 3).unwrap();
-                    let ys = gb.receive_many(&[3]).unwrap();
-                    addition(&mut gb, &x, &ys[0]).unwrap();
-                });
-                let rng = AesRng::new();
-                let mut ev = Evaluator::<UnixChannel, AesRng, ChouOrlandiReceiver, AllWire>::new(
-                    receiver, rng,
+                let (_, output) = swanky_channel::local::local_channel_pair(
+                    |channel| {
+                        let rng = AesRng::new();
+                        let mut gb =
+                            Garbler::<AesRng, ChouOrlandiSender, AllWire>::new(channel, rng)
+                                .unwrap();
+                        let x = gb.encode(a, 3, channel).unwrap();
+                        let ys = gb.receive_many(&[3], channel).unwrap();
+                        addition(&mut gb, &x, &ys[0], channel).unwrap();
+                        Ok(())
+                    },
+                    |channel| {
+                        let rng = AesRng::new();
+                        let mut ev =
+                            Evaluator::<AesRng, ChouOrlandiReceiver, AllWire>::new(channel, rng)
+                                .unwrap();
+                        let x = ev.receive(3, channel).unwrap();
+                        let ys = ev.encode_many(&[b], &[3], channel).unwrap();
+                        Ok(addition(&mut ev, &x, &ys[0], channel).unwrap().unwrap())
+                    },
                 )
                 .unwrap();
-                let x = ev.receive(3).unwrap();
-                let ys = ev.encode_many(&[b], &[3]).unwrap();
-                let output = addition(&mut ev, &x, &ys[0]).unwrap().unwrap();
                 assert_eq!((a + b) % 3, output);
             }
         }
@@ -61,14 +65,15 @@ mod tests {
     fn relu<F: FancyArithmetic + FancyBinary>(
         b: &mut F,
         xs: &[CrtBundle<F::Item>],
+        channel: &mut Channel,
     ) -> Option<Vec<u128>> {
         let mut outputs = Vec::new();
         for x in xs.iter() {
             let q = x.composite_modulus();
-            let c = b.crt_constant_bundle(1, q).unwrap();
-            let y = b.crt_mul(x, &c).unwrap();
-            let z = b.crt_relu(&y, "100%", None).unwrap();
-            outputs.push(b.crt_output(&z).unwrap());
+            let c = b.crt_constant_bundle(1, q, channel).unwrap();
+            let y = b.crt_mul(x, &c, channel).unwrap();
+            let z = b.crt_relu(&y, "100%", None, channel).unwrap();
+            outputs.push(b.crt_output(&z, channel).unwrap());
         }
         outputs.into_iter().collect()
     }
@@ -82,35 +87,40 @@ mod tests {
         let input = (0..n).map(|_| rng.gen_u128() % q).collect::<Vec<u128>>();
 
         // Run dummy version.
-        let mut dummy = Dummy::new();
-        let dummy_input = input
-            .iter()
-            .map(|x| dummy.crt_encode(*x, q).unwrap())
-            .collect_vec();
-        let target = relu(&mut dummy, &dummy_input).unwrap();
+        let target = Channel::with(std::io::empty(), |channel| {
+            let mut dummy = Dummy::new();
+            let dummy_input = input
+                .iter()
+                .map(|x| dummy.crt_encode(*x, q, channel).unwrap())
+                .collect_vec();
+            Ok(relu(&mut dummy, &dummy_input, channel).unwrap())
+        })
+        .unwrap();
 
         // Run 2PC version.
-        let (sender, receiver) = unix_channel_pair();
-        std::thread::spawn(move || {
-            let rng = AesRng::new();
-            let mut gb =
-                Garbler::<UnixChannel, AesRng, ChouOrlandiSender, AllWire>::new(sender, rng)
-                    .unwrap();
-            let xs = gb.crt_encode_many(&input, q).unwrap();
-            relu(&mut gb, &xs);
-        });
-
-        let rng = AesRng::new();
-        let mut ev =
-            Evaluator::<UnixChannel, AesRng, ChouOrlandiReceiver, AllWire>::new(receiver, rng)
-                .unwrap();
-        let xs = ev.crt_receive_many(n, q).unwrap();
-        let result = relu(&mut ev, &xs).unwrap();
+        let (_, result) = swanky_channel::local::local_channel_pair(
+            |channel| {
+                let rng = AesRng::new();
+                let mut gb =
+                    Garbler::<AesRng, ChouOrlandiSender, AllWire>::new(channel, rng).unwrap();
+                let xs = gb.crt_encode_many(&input, q, channel).unwrap();
+                relu(&mut gb, &xs, channel);
+                Ok(())
+            },
+            |channel| {
+                let rng = AesRng::new();
+                let mut ev =
+                    Evaluator::<AesRng, ChouOrlandiReceiver, AllWire>::new(channel, rng).unwrap();
+                let xs = ev.crt_receive_many(n, q, channel).unwrap();
+                Ok(relu(&mut ev, &xs, channel).unwrap())
+            },
+        )
+        .unwrap();
         assert_eq!(target, result);
     }
 
-    type GB<Wire> = Garbler<UnixChannel, AesRng, ChouOrlandiSender, Wire>;
-    type EV<Wire> = Evaluator<UnixChannel, AesRng, ChouOrlandiReceiver, Wire>;
+    type GB<Wire> = Garbler<AesRng, ChouOrlandiSender, Wire>;
+    type EV<Wire> = Evaluator<AesRng, ChouOrlandiReceiver, Wire>;
 
     fn test_circuit<CIRC, Wire: WireLabel>(circ: CIRC)
     where
@@ -119,28 +129,36 @@ mod tests {
             + EvaluableCircuit<EV<Wire>>
             + CircuitInfo
             + Send
+            + Sync
             + 'static,
     {
         circ.print_info().unwrap();
-
         let circ_ = circ.clone();
-        let (sender, receiver) = unix_channel_pair();
-        let handle = std::thread::spawn(move || {
-            let rng = AesRng::new();
-            let mut gb =
-                Garbler::<UnixChannel, AesRng, ChouOrlandiSender, Wire>::new(sender, rng).unwrap();
-            let xs = gb.encode_many(&vec![0_u16; 128], &vec![2; 128]).unwrap();
-            let ys = gb.receive_many(&vec![2; 128]).unwrap();
-            circ_.eval(&mut gb, &xs, &ys).unwrap();
-        });
-        let rng = AesRng::new();
-        let mut ev =
-            Evaluator::<UnixChannel, AesRng, ChouOrlandiReceiver, Wire>::new(receiver, rng)
-                .unwrap();
-        let xs = ev.receive_many(&vec![2; 128]).unwrap();
-        let ys = ev.encode_many(&vec![0_u16; 128], &vec![2; 128]).unwrap();
-        let out = circ.eval(&mut ev, &xs, &ys).unwrap().unwrap();
-        handle.join().unwrap();
+
+        let (_, out) = swanky_channel::local::local_channel_pair(
+            |channel| {
+                let rng = AesRng::new();
+                let mut gb = Garbler::<AesRng, ChouOrlandiSender, Wire>::new(channel, rng).unwrap();
+                let xs = gb
+                    .encode_many(&vec![0_u16; 128], &vec![2; 128], channel)
+                    .unwrap();
+                let ys = gb.receive_many(&vec![2; 128], channel).unwrap();
+                circ_.eval(&mut gb, &xs, &ys, channel).unwrap();
+                Ok(())
+            },
+            |channel| {
+                let rng = AesRng::new();
+                let mut ev =
+                    Evaluator::<AesRng, ChouOrlandiReceiver, Wire>::new(channel, rng).unwrap();
+                let xs = ev.receive_many(&vec![2; 128], channel).unwrap();
+                let ys = ev
+                    .encode_many(&vec![0_u16; 128], &vec![2; 128], channel)
+                    .unwrap();
+                let out = circ_.eval(&mut ev, &xs, &ys, channel).unwrap().unwrap();
+                Ok(out)
+            },
+        )
+        .unwrap();
 
         let target = eval_plain(&circ, &vec![0_u16; 128], &vec![0_u16; 128]).unwrap();
         assert_eq!(out, target);

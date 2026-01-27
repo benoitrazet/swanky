@@ -12,13 +12,12 @@ use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use subtle::ConditionallySelectable;
 use swanky_block::Block;
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 
 use super::security_warning::warn_proj;
 
 /// Streams garbled circuit ciphertexts through a callback.
-pub struct Garbler<C, RNG, Wire> {
-    pub(crate) channel: C,
+pub struct Garbler<RNG, Wire> {
     deltas: HashMap<u16, Wire>, // map from modulus to associated delta wire-label.
     current_output: usize,
     current_gate: usize,
@@ -26,9 +25,7 @@ pub struct Garbler<C, RNG, Wire> {
 }
 
 #[cfg(feature = "serde")]
-impl<C: AbstractChannel, RNG: CryptoRng + RngCore, Wire: WireLabel + DeserializeOwned>
-    Garbler<C, RNG, Wire>
-{
+impl<RNG: CryptoRng + RngCore, Wire: WireLabel + DeserializeOwned> Garbler<RNG, Wire> {
     /// Load pre-chosen deltas from a file
     pub fn load_deltas(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
         let f = std::fs::File::open(filename)?;
@@ -39,11 +36,10 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore, Wire: WireLabel + Deserialize
     }
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<C, RNG, Wire> {
+impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
     /// Create a new garbler.
-    pub fn new(channel: C, rng: RNG) -> Self {
+    pub fn new(rng: RNG) -> Self {
         Garbler {
-            channel,
             deltas: HashMap::new(),
             current_gate: 0,
             current_output: 0,
@@ -84,8 +80,10 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<C, R
     }
 
     /// Send a wire over the established channel.
-    pub fn send_wire(&mut self, wire: &Wire) -> Result<(), GarblerError> {
-        self.channel.write_block(&wire.as_block())?;
+    pub fn send_wire(&mut self, wire: &Wire, channel: &mut Channel) -> Result<(), GarblerError> {
+        channel
+            .write(&wire.as_block())
+            .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
         Ok(())
     }
 
@@ -193,25 +191,33 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<C, R
     }
 }
 
-impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel> FancyReveal
-    for Garbler<C, RNG, Wire>
-{
-    fn reveal(&mut self, x: &Wire) -> Result<u16, GarblerError> {
+impl<RNG: RngCore + CryptoRng, Wire: WireLabel> FancyReveal for Garbler<RNG, Wire> {
+    fn reveal(&mut self, x: &Wire, channel: &mut Channel) -> Result<u16, GarblerError> {
         // The evaluator needs our cooperation in order to see the output.
         // Hence, we call output() ourselves.
-        self.output(x)?;
-        self.channel.flush()?;
-        let val = self.channel.read_u16()?;
+        self.output(x, channel)?;
+        let val = channel
+            .read::<u16>()
+            .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
         Ok(val)
     }
 }
 
-impl<C: AbstractChannel, RNG: RngCore + CryptoRng> FancyBinary for Garbler<C, RNG, WireMod2> {
-    fn and(&mut self, A: &Self::Item, B: &Self::Item) -> Result<Self::Item, Self::Error> {
+impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, WireMod2> {
+    fn and(
+        &mut self,
+        A: &Self::Item,
+        B: &Self::Item,
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
         let delta = self.delta(2);
         let (gate0, gate1, C) = self.garble_and_gate(A, B, &delta);
-        self.channel.write_block(&gate0)?;
-        self.channel.write_block(&gate1)?;
+        channel
+            .write(&gate0)
+            .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
+        channel
+            .write(&gate1)
+            .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
         Ok(C)
     }
 
@@ -223,18 +229,18 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> FancyBinary for Garbler<C, RN
     ///
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
-    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Self::Item, Self::Error> {
         let delta = self.delta(2);
         self.xor(&delta, x)
     }
 }
 
-impl<C: AbstractChannel, RNG: RngCore + CryptoRng> FancyBinary for Garbler<C, RNG, AllWire> {
+impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
     /// We can negate by having garbler xor wire with Delta
     ///
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
-    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Self::Item, Self::Error> {
         check_binary!(x);
 
         let delta = self.delta(2);
@@ -250,13 +256,22 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> FancyBinary for Garbler<C, RN
     }
 
     /// Use binary and_gate
-    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn and(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        channel: &mut Channel,
+    ) -> Result<Self::Item, Self::Error> {
         if let (AllWire::Mod2(A), AllWire::Mod2(B), AllWire::Mod2(ref delta)) =
             (x, y, self.delta(2))
         {
             let (gate0, gate1, C) = self.garble_and_gate(A, B, delta);
-            self.channel.write_block(&gate0)?;
-            self.channel.write_block(&gate1)?;
+            channel
+                .write(&gate0)
+                .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
+            channel
+                .write(&gate1)
+                .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
             return Ok(AllWire::Mod2(C));
         }
         // If we got here, one of the wires isn't binary
@@ -268,8 +283,8 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> FancyBinary for Garbler<C, RN
     }
 }
 
-impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
-    for Garbler<C, RNG, Wire>
+impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
+    for Garbler<RNG, Wire>
 {
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
         if x.modulus() != y.modulus() {
@@ -289,9 +304,9 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticW
         Ok(x.cmul(c))
     }
 
-    fn mul(&mut self, A: &Wire, B: &Wire) -> Result<Wire, GarblerError> {
+    fn mul(&mut self, A: &Wire, B: &Wire, channel: &mut Channel) -> Result<Wire, GarblerError> {
         if A.modulus() < B.modulus() {
-            return self.mul(B, A);
+            return self.mul(B, A, channel);
         }
 
         let q = A.modulus();
@@ -400,12 +415,20 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticW
         }
 
         for block in gate.iter() {
-            self.channel.write_block(block)?;
+            channel
+                .write(block)
+                .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
         }
         Ok(X.plus_mov(&Y))
     }
 
-    fn proj(&mut self, A: &Wire, q_out: u16, tt: Option<Vec<u16>>) -> Result<Wire, GarblerError> {
+    fn proj(
+        &mut self,
+        A: &Wire,
+        q_out: u16,
+        tt: Option<Vec<u16>>,
+        channel: &mut Channel,
+    ) -> Result<Wire, GarblerError> {
         warn_proj();
         let tt = tt.ok_or(GarblerError::TruthTableRequired)?;
 
@@ -454,32 +477,34 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticW
         }
 
         for block in gate.iter() {
-            self.channel.write_block(block)?;
+            channel
+                .write(block)
+                .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
         }
         Ok(C)
     }
 }
 
-impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy
-    for Garbler<C, RNG, Wire>
-{
+impl<RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
     type Item = Wire;
     type Error = GarblerError;
 
-    fn constant(&mut self, x: u16, q: u16) -> Result<Wire, GarblerError> {
+    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> Result<Wire, GarblerError> {
         let zero = Wire::rand(&mut self.rng, q);
         let wire = zero.plus(self.delta(q).cmul_eq(x));
-        self.send_wire(&wire)?;
+        self.send_wire(&wire, channel)?;
         Ok(zero)
     }
 
-    fn output(&mut self, X: &Wire) -> Result<Option<u16>, GarblerError> {
+    fn output(&mut self, X: &Wire, channel: &mut Channel) -> Result<Option<u16>, GarblerError> {
         let q = X.modulus();
         let i = self.current_output();
         let D = self.delta(q);
         for k in 0..q {
             let block = X.plus(&D.cmul(k)).hash(output_tweak(i, k));
-            self.channel.write_block(&block)?;
+            channel
+                .write(&block)
+                .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
         }
         Ok(None)
     }

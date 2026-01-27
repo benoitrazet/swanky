@@ -9,8 +9,7 @@ mod tests {
         *,
     };
 
-    use std::thread;
-    use std::{collections::HashSet, os::unix::net::UnixStream};
+    use std::collections::HashSet;
     use swanky_aes_rng::AesRng;
     use swanky_block::Block512;
 
@@ -26,27 +25,27 @@ mod tests {
         Result<(), Error>,
         Result<(), Error>,
     ) {
-        let (sender, receiver) = UnixStream::pair().unwrap();
+        let ((sender, result_opprf_sender), (receiver, result_opprf_receiver)) =
+            swanky_channel::local::local_channel_pair(
+                |channel| {
+                    let mut rng = AesRng::seed_from_u64(seed_sx);
+                    let mut sender = OpprfSender::init(channel, &mut rng, true).unwrap();
+                    let _ = sender.hash_data(set, Some(payloads), channel, &mut rng);
+                    let result_opprf_sender = sender.opprf_exchange(channel, &mut rng);
 
-        thread::scope(|s| {
-            let result_sender = s.spawn(|| {
-                let mut rng = AesRng::seed_from_u64(seed_sx);
-                let mut channel = setup_channel(sender);
-                let mut sender = OpprfSender::init(&mut channel, &mut rng, true).unwrap();
-                let _ = sender.hash_data(set, Some(payloads), &mut channel, &mut rng);
-                let result_opprf_sender = sender.opprf_exchange(&mut channel, &mut rng);
+                    Ok((sender, result_opprf_sender))
+                },
+                |channel| {
+                    let mut rng = AesRng::seed_from_u64(seed_rx);
+                    let mut receiver = OpprfReceiver::init(channel, &mut rng, true).unwrap();
+                    let _ = receiver.hash_data(set, Some(payloads), channel, &mut rng);
+                    let result_opprf_receiver = receiver.opprf_exchange(channel, &mut rng);
+                    Ok((receiver, result_opprf_receiver))
+                },
+            )
+            .unwrap();
 
-                (sender, result_opprf_sender)
-            });
-            let mut rng = AesRng::seed_from_u64(seed_rx);
-            let mut channel = setup_channel(receiver);
-            let mut receiver = OpprfReceiver::init(&mut channel, &mut rng, true).unwrap();
-            let _ = receiver.hash_data(set, Some(payloads), &mut channel, &mut rng);
-            let result_opprf_receiver = receiver.opprf_exchange(&mut channel, &mut rng);
-
-            let (sender, result_opprf_sender) = result_sender.join().unwrap();
-            (sender, receiver, result_opprf_sender, result_opprf_receiver)
-        })
+        (sender, receiver, result_opprf_sender, result_opprf_receiver)
     }
     // Check that the opprf preserves the original set by intersecting the party's opprf outputs
     // with the original set. The idea is that if the intersection cardinality in both cases is

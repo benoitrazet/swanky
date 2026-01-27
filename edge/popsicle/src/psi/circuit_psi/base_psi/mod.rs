@@ -4,7 +4,7 @@ use crate::{circuit_psi::*, errors::Error};
 use fancy_garbling::{FancyInput, WireMod2};
 use rand::{CryptoRng, RngCore, SeedableRng};
 use std::fmt::Debug;
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 
 // The number of hash functions that will be used to attempt to
 // place any item in a cuckoo bin
@@ -29,23 +29,21 @@ pub mod sender;
 /// performed in the garbled circuit with no a-priori pre-processing computation).
 pub trait BasePsi {
     /// Initializes the BasePsi party
-    fn init<C, RNG>(channel: &mut C, rng: &mut RNG, has_payload: bool) -> Result<Self, Error>
+    fn init<RNG>(channel: &mut Channel, rng: &mut RNG, has_payload: bool) -> Result<Self, Error>
     where
         Self: Sized,
-        C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng;
     /// Parties locally hash their inputs
     ///
     /// This allows them to agree on an ordering of their inputs.
-    fn hash_data<C, RNG>(
+    fn hash_data<RNG>(
         &mut self,
         primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<(), Error>
     where
-        C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng;
     /// Parties call an OPPRF on their inputs
     ///
@@ -54,14 +52,14 @@ pub trait BasePsi {
     /// in a garbled circuit. This additionally allows them to mask
     /// their payloads so that only payloads associated with intersection
     /// are kept in the garbled circuit.
-    fn opprf_exchange<C, RNG>(&mut self, channel: &mut C, rng: &mut RNG) -> Result<(), Error>
+    fn opprf_exchange<RNG>(&mut self, channel: &mut Channel, rng: &mut RNG) -> Result<(), Error>
     where
-        C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng;
     /// Parties turn their inputs into garbled wires
     fn encode_circuit_inputs<F, E>(
         &mut self,
         gc_party: &mut F,
+        channel: &mut Channel,
     ) -> Result<CircuitInputs<F::Item>, Error>
     where
         F: FancyInput<Item = WireMod2, Error = E>,
@@ -69,11 +67,11 @@ pub trait BasePsi {
         Error: From<E>;
     /// A wrapper that calls the different pieces of the BasePsi in order
     /// to the necessary hidden inputs that the CircuitPsi can operate on.
-    fn base_psi<F, E, C, RNG>(
+    fn base_psi<F, E, RNG>(
         gc_party: &mut F,
         primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<CircuitInputs<F::Item>, Error>
     where
@@ -81,7 +79,6 @@ pub trait BasePsi {
         F: FancyInput<Item = WireMod2, Error = E>,
         E: Debug,
         Error: From<E>,
-        C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng,
     {
         let has_payloads = payloads.is_some();
@@ -89,10 +86,8 @@ pub trait BasePsi {
         let mut party = Self::init(channel, rng, has_payloads)?;
         party.hash_data(primary_keys, payloads, channel, rng)?;
 
-        channel.flush()?;
         party.opprf_exchange(channel, rng)?;
-        channel.flush()?;
 
-        party.encode_circuit_inputs(gc_party)
+        party.encode_circuit_inputs(gc_party, channel)
     }
 }
