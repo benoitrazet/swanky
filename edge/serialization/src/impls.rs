@@ -60,7 +60,8 @@ pod_impl!(
     vectoreyes::U64x4,
 );
 
-/// An integer could fit in a u64, but not in a usize
+/// A 64-bit integer could fit in a `u64`, but not necessarily in a `usize`,
+/// which is architecture dependent.
 #[derive(Debug, Clone, Copy)]
 pub struct ValueTooBigForUsize;
 impl std::fmt::Display for ValueTooBigForUsize {
@@ -90,7 +91,8 @@ impl CanonicalSerialize for usize {
     }
 }
 
-/// An integer could fit in a i64, but not in a isize
+/// A 64-bit integer could fit in a `i64`, but not necessarily in a `isize`,
+/// which is architecture dependent.
 #[derive(Debug, Clone, Copy)]
 pub struct ValueTooBigForIsize;
 impl std::fmt::Display for ValueTooBigForIsize {
