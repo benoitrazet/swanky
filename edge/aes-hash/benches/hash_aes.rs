@@ -2,12 +2,11 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use std::hint::black_box;
 use swanky_aes_hash::{CorrelationRobustHash, TweakableCircularCorrelationRobustHash};
-use swanky_block::Block;
 
 fn bench_cr_hash(c: &mut Criterion) {
     c.bench_function("CorrelationRobustHash", |b| {
-        let hash = CorrelationRobustHash::new(rand::random::<Block>());
-        let x = rand::random::<Block>();
+        let hash = CorrelationRobustHash::new(rand::random());
+        let x = rand::random();
         b.iter(|| {
             let z = hash.hash(black_box(x));
             black_box(z)
@@ -17,8 +16,8 @@ fn bench_cr_hash(c: &mut Criterion) {
 
 fn bench_tccr_hash(c: &mut Criterion) {
     c.bench_function("TweakableCircularCorrelationRobustHash", |b| {
-        let hash = TweakableCircularCorrelationRobustHash::new(rand::random::<Block>());
-        let x = rand::random::<Block>();
+        let hash = TweakableCircularCorrelationRobustHash::new(rand::random());
+        let x = rand::random();
         let i = rand::random::<u128>();
         b.iter(|| {
             let z = hash.hash(black_box(x), black_box(i));
