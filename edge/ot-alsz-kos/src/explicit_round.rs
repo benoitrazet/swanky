@@ -291,9 +291,9 @@ impl KosSender {
         for (j, (input, q)) in inputs.iter().zip(qs.chunks_exact(16)).enumerate() {
             let q: [u8; 16] = q.try_into().unwrap();
             let q = Block::from(q);
-            let y0 = aes_hash.hash(Block::from(j as u128), q.into()) ^ input.0;
+            let y0 = aes_hash.hash(q, j as u128) ^ input.0;
             let q = q ^ Block::from(self.alsz.s);
-            let y1 = aes_hash.hash(Block::from(j as u128), q.into()) ^ input.1;
+            let y1 = aes_hash.hash(q, j as u128) ^ input.1;
             outgoing_bytes[0..16].copy_from_slice(bytemuck::bytes_of(&y0));
             outgoing_bytes[16..32].copy_from_slice(bytemuck::bytes_of(&y1));
             outgoing_bytes = &mut outgoing_bytes[32..];
@@ -502,7 +502,7 @@ impl KosReceiverStage2 {
             // TODO: constant-time
             let y = if b { y1 } else { y0 };
 
-            y ^ aes_hash.hash(Block::from(j as u128), Block::from(t).into())
+            y ^ aes_hash.hash(Block::from(t), j as u128)
         });
         debug_assert!(incoming.is_empty());
         let mut x = Block::default();

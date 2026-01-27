@@ -108,13 +108,11 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
             let q = Block::from(q);
-            let y0 = TweakableCircularCorrelationRobustHash::fixed_key()
-                .hash(Block::from(j as u128), q.into())
-                ^ input.0;
+            let y0 =
+                TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128) ^ input.0;
             let q = q ^ self.ot.s_;
-            let y1 = TweakableCircularCorrelationRobustHash::fixed_key()
-                .hash(Block::from(j as u128), q.into())
-                ^ input.1;
+            let y1 =
+                TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128) ^ input.1;
             channel.write_block(&y0)?;
             channel.write_block(&y1)?;
         }
@@ -137,13 +135,10 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
             let q = Block::from(q);
-            let x0 = TweakableCircularCorrelationRobustHash::fixed_key()
-                .hash(Block::from(j as u128), q.into());
+            let x0 = TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128);
             let x1 = x0 ^ delta;
             let q = q ^ self.ot.s_;
-            let y = TweakableCircularCorrelationRobustHash::fixed_key()
-                .hash(Block::from(j as u128), q.into())
-                ^ x1;
+            let y = TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128) ^ x1;
             channel.write_block(&y)?;
             out.push(x0);
         }
@@ -165,11 +160,9 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> RandomSender for Sender<OT> {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
             let q = Block::from(q);
-            let x0 = TweakableCircularCorrelationRobustHash::fixed_key()
-                .hash(Block::from(j as u128), q.into());
+            let x0 = TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128);
             let q = q ^ self.ot.s_;
-            let x1 = TweakableCircularCorrelationRobustHash::fixed_key()
-                .hash(Block::from(j as u128), q.into());
+            let x1 = TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128);
             out.push((x0, x1));
         }
         Ok(out)
@@ -252,7 +245,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
             let y1 = channel.read_block()?;
             let y = if *b { y1 } else { y0 };
             let y = y ^ TweakableCircularCorrelationRobustHash::fixed_key()
-                .hash(Block::from(j as u128), Block::from(t).into());
+                .hash(Block::from(t), j as u128);
             out.push(y);
         }
         Ok(out)
@@ -273,8 +266,8 @@ impl<OT: OtSender<Msg = Block> + Malicious> CorrelatedReceiver for Receiver<OT> 
             let t: [u8; 16] = t.try_into().unwrap();
             let y = channel.read_block()?;
             let y = if *b { y } else { Block::default() };
-            let h = TweakableCircularCorrelationRobustHash::fixed_key()
-                .hash(Block::from(j as u128), Block::from(t).into());
+            let h =
+                TweakableCircularCorrelationRobustHash::fixed_key().hash(Block::from(t), j as u128);
             out.push(y ^ h);
         }
         Ok(out)
@@ -293,8 +286,8 @@ impl<OT: OtSender<Msg = Block> + Malicious> RandomReceiver for Receiver<OT> {
         for j in 0..inputs.len() {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
-            let h = TweakableCircularCorrelationRobustHash::fixed_key()
-                .hash(Block::from(j as u128), Block::from(t).into());
+            let h =
+                TweakableCircularCorrelationRobustHash::fixed_key().hash(Block::from(t), j as u128);
             out.push(h);
         }
         Ok(out)
