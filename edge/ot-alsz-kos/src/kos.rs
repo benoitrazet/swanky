@@ -5,6 +5,7 @@ use crate::alsz::{Receiver as AlszReceiver, Sender as AlszSender};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::io::ErrorKind;
 use swanky_adversary::{Malicious, SemiHonest};
+use swanky_aes_hash::TweakableCircularCorrelationRobustHash;
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
@@ -107,9 +108,13 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
             let q = Block::from(q);
-            let y0 = self.ot.hash.tccr_hash(Block::from(j as u128), q) ^ input.0;
+            let y0 = TweakableCircularCorrelationRobustHash::fixed_key()
+                .hash(Block::from(j as u128), q.into())
+                ^ input.0;
             let q = q ^ self.ot.s_;
-            let y1 = self.ot.hash.tccr_hash(Block::from(j as u128), q) ^ input.1;
+            let y1 = TweakableCircularCorrelationRobustHash::fixed_key()
+                .hash(Block::from(j as u128), q.into())
+                ^ input.1;
             channel.write_block(&y0)?;
             channel.write_block(&y1)?;
         }
@@ -132,10 +137,13 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
             let q = Block::from(q);
-            let x0 = self.ot.hash.tccr_hash(Block::from(j as u128), q);
+            let x0 = TweakableCircularCorrelationRobustHash::fixed_key()
+                .hash(Block::from(j as u128), q.into());
             let x1 = x0 ^ delta;
             let q = q ^ self.ot.s_;
-            let y = self.ot.hash.tccr_hash(Block::from(j as u128), q) ^ x1;
+            let y = TweakableCircularCorrelationRobustHash::fixed_key()
+                .hash(Block::from(j as u128), q.into())
+                ^ x1;
             channel.write_block(&y)?;
             out.push(x0);
         }
@@ -157,9 +165,11 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> RandomSender for Sender<OT> {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
             let q = Block::from(q);
-            let x0 = self.ot.hash.tccr_hash(Block::from(j as u128), q);
+            let x0 = TweakableCircularCorrelationRobustHash::fixed_key()
+                .hash(Block::from(j as u128), q.into());
             let q = q ^ self.ot.s_;
-            let x1 = self.ot.hash.tccr_hash(Block::from(j as u128), q);
+            let x1 = TweakableCircularCorrelationRobustHash::fixed_key()
+                .hash(Block::from(j as u128), q.into());
             out.push((x0, x1));
         }
         Ok(out)
@@ -241,10 +251,8 @@ impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
             let y0 = channel.read_block()?;
             let y1 = channel.read_block()?;
             let y = if *b { y1 } else { y0 };
-            let y = y ^ self
-                .ot
-                .hash
-                .tccr_hash(Block::from(j as u128), Block::from(t));
+            let y = y ^ TweakableCircularCorrelationRobustHash::fixed_key()
+                .hash(Block::from(j as u128), Block::from(t).into());
             out.push(y);
         }
         Ok(out)
@@ -265,10 +273,8 @@ impl<OT: OtSender<Msg = Block> + Malicious> CorrelatedReceiver for Receiver<OT> 
             let t: [u8; 16] = t.try_into().unwrap();
             let y = channel.read_block()?;
             let y = if *b { y } else { Block::default() };
-            let h = self
-                .ot
-                .hash
-                .tccr_hash(Block::from(j as u128), Block::from(t));
+            let h = TweakableCircularCorrelationRobustHash::fixed_key()
+                .hash(Block::from(j as u128), Block::from(t).into());
             out.push(y ^ h);
         }
         Ok(out)
@@ -287,10 +293,8 @@ impl<OT: OtSender<Msg = Block> + Malicious> RandomReceiver for Receiver<OT> {
         for j in 0..inputs.len() {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
-            let h = self
-                .ot
-                .hash
-                .tccr_hash(Block::from(j as u128), Block::from(t));
+            let h = TweakableCircularCorrelationRobustHash::fixed_key()
+                .hash(Block::from(j as u128), Block::from(t).into());
             out.push(h);
         }
         Ok(out)

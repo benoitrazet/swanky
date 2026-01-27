@@ -3,7 +3,7 @@
 use crate::{fancy::HasModulus, util};
 use rand::{CryptoRng, Rng, RngCore};
 use subtle::ConditionallySelectable;
-use swanky_aes_hash::AesHash;
+use swanky_aes_hash::TweakableCircularCorrelationRobustHash;
 use swanky_block::Block;
 use vectoreyes::{
     SimdBase,
@@ -30,12 +30,12 @@ pub enum AllWire {
 }
 
 /// Batch hashing of wires
-pub fn hash_wires<const Q: usize, W: WireLabel>(wires: [&W; Q], tweak: Block) -> [Block; Q]
+pub fn hash_wires<const Q: usize, W: WireLabel>(wires: [&W; Q], tweak: u128) -> [Block; Q]
 where
     ArrayUnrolledOps: UnrollableArraySize<Q>,
 {
     let batch = wires.array_map(|x| x.as_block());
-    AesHash::fixed_key().tccr_hash_many(tweak, batch)
+    TweakableCircularCorrelationRobustHash::fixed_key().hash_many(batch, tweak)
 }
 
 /// Marker trait indicating an arithmetic wire
@@ -82,7 +82,7 @@ pub trait WireLabel: Clone + HasModulus {
     /// Compute the hash of this wire, converting the result back to a wire.
     ///
     /// Uses fixed-key AES.
-    fn hashback(&self, tweak: Block, q: u16) -> Self {
+    fn hashback(&self, tweak: u128, q: u16) -> Self {
         let hash = self.hash(tweak);
         Self::hash_to_mod(hash, q)
     }
@@ -141,8 +141,8 @@ pub trait WireLabel: Clone + HasModulus {
     ///
     /// Uses fixed-key AES.
     #[inline(never)]
-    fn hash(&self, tweak: Block) -> Block {
-        AesHash::fixed_key().tccr_hash(tweak, self.as_block())
+    fn hash(&self, tweak: u128) -> Block {
+        TweakableCircularCorrelationRobustHash::fixed_key().hash(self.as_block(), tweak)
     }
 }
 
@@ -828,7 +828,7 @@ mod tests {
         for _ in 0..100 {
             let q = 2 + (rng.gen_u16() % 110);
             let x = AllWire::rand(&mut rng, q);
-            let y = x.hashback(Block::from(1u128), q);
+            let y = x.hashback(1u128, q);
             assert!(x != y);
             match y {
                 AllWire::Mod2(WireMod2 { val }) => assert!(u128::from(val) > 0),
@@ -938,12 +938,12 @@ mod tests {
         let mut handles = Vec::new();
         for w in ws.iter() {
             let w_ = w.clone();
-            let h = std::thread::spawn(move || w_.hash(Block::default()));
+            let h = std::thread::spawn(move || w_.hash(0u128));
             handles.push(h);
         }
         let hashes = handles.into_iter().map(|h| h.join().unwrap()).collect_vec();
 
-        let should_be = ws.iter().map(|w| w.hash(Block::default())).collect_vec();
+        let should_be = ws.iter().map(|w| w.hash(0u128)).collect_vec();
 
         assert_eq!(hashes, should_be);
     }

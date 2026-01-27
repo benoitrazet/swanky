@@ -5,7 +5,6 @@
 use itertools::Itertools;
 use std::collections::HashMap;
 use swanky_block::Block;
-use vectoreyes::{SimdBase, U8x16, U64x2};
 
 use crate::WireLabel;
 
@@ -13,19 +12,19 @@ use crate::WireLabel;
 // tweak functions for garbling
 
 /// Tweak function for a single item.
-pub fn tweak(i: usize) -> Block {
-    Block::from(U8x16::from(U64x2::set_lo(i as u64)))
+pub fn tweak(i: usize) -> u128 {
+    i as u128
 }
 
 /// Tweak function for two items.
-pub fn tweak2(i: u64, j: u64) -> Block {
-    Block::from(U8x16::from(U64x2::from([j, i])))
+pub fn tweak2(i: u64, j: u64) -> u128 {
+    (i as u128) << 64 | (j as u128)
 }
 
 /// Compute the output tweak for a garbled gate where i is the gate id and k is the value.
-pub fn output_tweak(i: usize, k: u16) -> Block {
+pub fn output_tweak(i: usize, k: u16) -> u128 {
     let (left, _) = (i as u128).overflowing_shl(64);
-    Block::from(left + k as u128)
+    left + k as u128
 }
 
 ////////////////////////////////////////////////////////////////////////////////
