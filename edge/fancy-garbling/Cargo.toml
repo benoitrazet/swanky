@@ -24,6 +24,7 @@ serde = ["dep:serde", "dep:serde_json"]
 swanky-ot-traits.workspace = true
 swanky-ocelot-error.workspace = true
 
+eyre.workspace = true
 vectoreyes.workspace = true
 itertools.workspace = true
 clap.workspace = true
@@ -37,8 +38,6 @@ swanky-aes-hash.workspace = true
 swanky-aes-rng.workspace = true
 swanky-block.workspace = true
 swanky-channel.workspace = true
-
-eyre.workspace = true
 
 [dev-dependencies]
 swanky-ot-alsz-kos.workspace = true
