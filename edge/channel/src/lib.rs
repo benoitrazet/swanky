@@ -20,13 +20,13 @@ pub mod local;
 trait ReadWrite: Read + Write {}
 impl<T: Read + Write + ?Sized> ReadWrite for T {}
 
-/// The sizes of the read and write buffers be for a [`Channel`]
+/// The sizes of the read and write buffers for a [`Channel`].
 ///
-/// The struct is only intended to be used as an argument to [`Channel::with_sizes`]
+/// The struct is only intended to be used as an argument to [`Channel::with_sizes`].
 pub struct BufferSizes {
-    /// Size (in bytes) of the read buffer
+    /// Size (in bytes) of the read buffer.
     pub read: usize,
-    /// Size (in bytes) of the write buffer
+    /// Size (in bytes) of the write buffer.
     pub write: usize,
 }
 impl Default for BufferSizes {
@@ -58,17 +58,17 @@ impl Default for BufferSizes {
 /// This wrapper provides buffering and automatic flushing of the channel.
 ///
 /// # Flushing
-/// `Channel` will automatically flush the write buffer before performing a read. As a result,
-/// users of the `Channel` API should almost never need to manually flush.
+/// [`Channel`] will automatically flush the write buffer before performing a read. As a result,
+/// users of the [`Channel`] API should almost never need to manually flush.
 ///
-/// A manual flush should only be _required_ when interleaving `Channel` operations with
-/// non-`Channel` operations. For example, it would be advisable to `manual_flush()` before reading
-/// user input from standard in. `Channel` can't flush for you, because it doesn't know that you're
+/// A manual flush should only be _required_ when interleaving [`Channel`] operations with
+/// non-[`Channel`] operations. For example, it would be advisable to [`Channel::force_flush`] before reading
+/// user input from standard in. [`Channel`] can't flush for you, because it doesn't know that you're
 /// about to read from standard in!
 ///
 /// # Error Handling
-/// On error, `Channel` is left in an unknown state. For example, if a `Channel` wraps a
-/// `TcpStream`, and a `write_bytes` fails with an
+/// On error, [`Channel`] is left in an unknown state. For example, if a [`Channel`] wraps a
+/// `TcpStream`, and a [`Channel::write_bytes`] fails with an
 /// [`ETIMEDOUT`](https://man7.org/linux/man-pages/man7/tcp.7.html#ERRORS) error, due to the
 /// [Two Generals' Problem](https://en.wikipedia.org/wiki/Two_Generals%27_Problem), it's not
 /// possible to know whether or not the peer received the sent data.
@@ -84,7 +84,7 @@ pub struct Channel<'inner> {
 }
 
 impl<'inner> Channel<'inner> {
-    /// Construct a new `[Channel]` wrapping the full-duplex connection, `inner`.
+    /// Construct a new [`Channel`] by wrapping the full-duplex connection, `inner`.
     ///
     /// This function is equivalent to calling [`Channel::with_sizes`] with the default
     /// [`BufferSizes`]. See that function for more information.
@@ -96,7 +96,7 @@ impl<'inner> Channel<'inner> {
         Self::with_sizes(inner, BufferSizes::default(), thunk)
     }
 
-    /// Construct a new `[Channel]` wrapping the full-duplex connection, `inner`.
+    /// Construct a new [`Channel`] by wrapping the full-duplex connection, `inner`.
     ///
     /// The fresh channel gets passed to `thunk`, and (barring any errors) the result of `thunk`
     /// gets returned by `with_sizes()`.
@@ -150,7 +150,7 @@ impl<'inner> Channel<'inner> {
         Ok(())
     }
 
-    /// Flush the channel
+    /// Flush the channel.
     ///
     /// Write buffers and [`Write::flush()`] the underlying channel.
     ///
@@ -368,7 +368,7 @@ impl<'inner> Channel<'inner> {
     /// Turn a `swanky_party2::PartyPrivate<P, T>` into a `T` by communicating it.
     ///
     /// (The `2` in `communicate2` refers to `swanky_party2`, since `communicate()` refers to
-    /// `swanky_party`)
+    /// `swanky_party`.)
     ///
     /// If `p` is private to `P`, then send it over the wire and return it. Otherwise, read the
     /// peer's value from over the wire and return that.
