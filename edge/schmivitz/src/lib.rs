@@ -16,9 +16,10 @@
 
 #![deny(missing_docs)]
 
-mod all_but_one_vc;
+pub mod circuit;
+pub mod circuit_validator;
 pub mod parameters;
-mod proof;
-mod vole;
+pub mod proof;
+pub mod vole;
 
 pub use proof::Proof;

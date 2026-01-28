@@ -6,15 +6,16 @@
 
 use std::iter::{repeat_with, zip};
 
-use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
+use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
 use eyre::{Result, bail};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b, F128b};
 
-use super::RandomVole;
+use super::{AsSecretBytes, Chall3, DecommitmentSerde, RandomVoleP, RandomVoleV};
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub(crate) struct InsecureVole {
     /// Number of VOLEs requested.
@@ -35,33 +36,36 @@ pub(crate) struct InsecureVole {
     /// [`VOLE_SIZE_PARAM`] and $`\tau`$ is the [`REPETITION_PARAM`].
     masks: Vec<[F8b; REPETITION_PARAM]>,
 }
-impl RandomVole for InsecureVole {
+
+/// Updates transcript with public material available at VOLE creation and VOLE reconstruction
+/// and extracts a challenge.
+fn update_transcript(transcript: &mut Transcript, extended_witness_length: usize) -> [u8; 16] {
+    transcript.append_message(
+        b"VOLE type",
+        format!(
+            "Creating {} totally local & insecure VOLEs!!",
+            extended_witness_length
+        )
+        .as_bytes(),
+    );
+    let mut challenge = [0; 16];
+    transcript.challenge_bytes(b"insecure VOLE creation challenge", &mut challenge);
+    challenge
+}
+
+impl RandomVoleP for InsecureVole {
     type Decommitment = InsecureCommitments;
     type VoleChallenge = [u8; 16];
-    type VoleDecommitmentChallenge = [u8; 16];
 
-    fn extract_vole_challenge(
-        transcript: &mut Transcript,
-        extended_witness_length: usize,
-    ) -> Self::VoleChallenge {
-        transcript.append_message(
-            b"VOLE type",
-            format!("Creating {extended_witness_length} totally local & insecure VOLEs!!")
-                .as_bytes(),
-        );
-        let mut challenge = [0; 16];
-        transcript.challenge_bytes(b"insecure VOLE creation challenge", &mut challenge);
-        challenge
-    }
-
-    fn create(
+    fn create<Secret: AsSecretBytes>(
         extended_witness_length: usize,
         transcript: &mut merlin::Transcript,
+        _secret: &Secret,
         rng: &mut (impl CryptoRng + RngCore),
     ) -> (Self, Self::VoleChallenge) {
         // In a secure version of VOLE, we would populate the transcript with more useful
         // or relevant context about the VOLE instantiation.
-        let challenge = Self::extract_vole_challenge(transcript, extended_witness_length);
+        let challenge = update_transcript(transcript, extended_witness_length);
 
         let total_vole_count = extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM;
 
@@ -143,23 +147,7 @@ impl RandomVole for InsecureVole {
         Ok(F8b::form_superfield(&self.masks[i].into()))
     }
 
-    fn extract_decommitment_challenge(
-        transcript: &mut Transcript,
-    ) -> Self::VoleDecommitmentChallenge {
-        let mut challenge = [0; 16];
-        transcript.challenge_bytes(b"insecure VOLE decommitment challenge", &mut challenge);
-        challenge
-    }
-
-    fn decommit(
-        self,
-        transcript: &mut merlin::Transcript,
-    ) -> (Self::Decommitment, Self::VoleDecommitmentChallenge) {
-        // NB: in a real protocol, we would decommit based on a challenge pulled from the
-        // transcript. In the insecure version, we don't actually use this challenge to
-        // determine anything about the decommitment, but we still generate it for fun.
-        let challenge = Self::extract_decommitment_challenge(transcript);
-
+    fn decommit(self, _challenge: &[u8; SECURITY_PARAM / 8]) -> Self::Decommitment {
         // Compute uΔ^T (where Δ^T is the transpose of the verifier key)
         let u_delta = self
             .values
@@ -179,14 +167,11 @@ impl RandomVole for InsecureVole {
             })
             .collect::<Vec<_>>();
 
-        (
-            Self::Decommitment {
-                extended_witness_length: self.extended_witness_length,
-                verifier_key: self.verifier_key,
-                verifier_commitments,
-            },
-            challenge,
-        )
+        Self::Decommitment {
+            extended_witness_length: self.extended_witness_length,
+            verifier_key: self.verifier_key,
+            verifier_commitments,
+        }
     }
 }
 
@@ -205,9 +190,10 @@ pub(crate) struct InsecureCommitments {
     verifier_commitments: Vec<[F8b; REPETITION_PARAM]>,
 }
 
-#[allow(unused)]
 impl InsecureCommitments {
     /// Validate that the partial decommitment is correctly formed with respect to itself.
+    /// TODO: put this inline somewhere -- maybe in `reconstruct`.
+    #[allow(unused)]
     pub(crate) fn validate_commitments(&self) -> Result<()> {
         let expected_num_commitments =
             self.extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM;
@@ -221,32 +207,53 @@ impl InsecureCommitments {
 
         Ok(())
     }
+}
+
+impl DecommitmentSerde for InsecureCommitments {
+    fn proof_size_estimate(&self) -> usize {
+        unimplemented!()
+    }
+}
+
+impl RandomVoleV for InsecureCommitments {
+    type Decommitment = InsecureCommitments;
+
+    fn reconstruct(
+        decom: &Self::Decommitment,
+        _chall3: &Chall3,
+        transcript: &mut Transcript,
+    ) -> Self {
+        // The output of this function is ignored since, in this insecure implementation,
+        // it is not used for anything.
+        update_transcript(transcript, decom.extended_witness_length);
+        decom.clone()
+    }
 
     /// Get the length of the extended witness (e.g. the number of VOLEs requested).
-    pub(crate) fn extended_witness_length(&self) -> usize {
+    fn extended_witness_length(&self) -> usize {
         self.extended_witness_length
     }
 
     /// Get verifier key ($`\bf\Delta`$ in the paper).
-    pub(crate) fn verifier_key_array(&self) -> &[F8b; REPETITION_PARAM] {
+    fn verifier_key_array(&self) -> &[F8b; REPETITION_PARAM] {
         &self.verifier_key
     }
 
     /// Get the lifted verifier key ($`\Delta`$ in the paper).
-    pub(crate) fn verifier_key(&self) -> F128b {
+    fn verifier_key(&self) -> F128b {
         F8b::form_superfield(&self.verifier_key.into())
     }
 
     /// Get the VOLEs corresponding to the witness ($`\bf Q_{[1..\ell]}`$ in the paper).
     ///
     /// The output is guaranteed to be [`Self::extended_witness_length()`].
-    pub(crate) fn witness_voles(&self) -> &[[F8b; REPETITION_PARAM]] {
+    fn witness_voles(&self) -> &[[F8b; REPETITION_PARAM]] {
         &self.verifier_commitments[0..self.extended_witness_length]
     }
 
     /// Get the lifted VOLEs corresponding to the mask for the aggregate commitment
     /// ($`q_{\ell+1}, \dots, q_{\ell + r\tau}`$ in the paper).
-    pub(crate) fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+    fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
         // Lift the commitments -- we only want the last $`r\tau`$ of them, so we skip the first ones.
         // This will panic if we constructed the type with the wrong length.
         self.verifier_commitments
@@ -263,19 +270,21 @@ impl InsecureCommitments {
 mod tests {
     use merlin::Transcript;
     use rand::thread_rng;
+    use swanky_field_binary::F2;
 
     use crate::{
-        parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM},
-        vole::{RandomVole, insecure::InsecureVole},
+        parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM},
+        vole::{RandomVoleP, RandomVoleV, insecure::InsecureVole},
     };
 
     #[test]
     fn everything_is_the_expected_size() {
         let rng = &mut thread_rng();
         let transcript = &mut Transcript::new(b"testing");
+        let secret: Vec<F2> = Vec::new();
 
         let witness = 100;
-        let (voles, _challenge) = InsecureVole::create(witness, transcript, rng);
+        let (voles, _challenge) = InsecureVole::create(witness, transcript, &secret, rng);
 
         assert_eq!(voles.count(), witness + REPETITION_PARAM * VOLE_SIZE_PARAM);
         assert_eq!(voles.witness_mask().len(), witness);
@@ -291,7 +300,8 @@ mod tests {
             }
         }
 
-        let (decom, _challenge) = voles.decommit(transcript);
+        // Note: the challenge passed here is invalid because it's not drawn from transcript.
+        let decom = voles.decommit(&[0; SECURITY_PARAM / 8]);
 
         assert_eq!(decom.extended_witness_length(), witness);
         assert_eq!(decom.witness_voles().len(), witness);

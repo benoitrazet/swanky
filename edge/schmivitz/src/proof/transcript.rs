@@ -1,5 +1,3 @@
-use std::iter::repeat_with;
-
 use mac_n_cheese_sieve_parser::WireId;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
@@ -64,17 +62,22 @@ impl Transcript<'_> {
 
     /// Extracts a challenge for each polynomial from the transcript.
     ///
-    /// TODO #259: Consider simplifying this into a single seed drawn from the transcript and fed
-    /// into a PRG.
+    /// Use the transcript to extract a seed challenge and use exponentiation to
+    /// derive a vector of random values.
     pub(crate) fn extract_witness_challenges(&mut self, polynomial_count: usize) -> Vec<F128b> {
-        repeat_with(|| {
-            let mut bytes = [0u8; 16];
-            self.0
-                .challenge_bytes(b"chi_i: witness challenge", &mut bytes);
-            F128b::from_uniform_bytes(&bytes)
-        })
-        .take(polynomial_count)
-        .collect()
+        let mut bytes = [0u8; 16];
+        self.0
+            .challenge_bytes(b"chi_i: witness challenge", &mut bytes);
+        let seed = F128b::from_uniform_bytes(&bytes);
+
+        let mut v = seed;
+        let mut out = Vec::with_capacity(polynomial_count);
+        for _ in 0..polynomial_count {
+            out.push(v);
+            v *= seed;
+        }
+
+        out
     }
 
     /// Adds the commitment to the aggregated polynomial coefficients to the transcript.
@@ -87,5 +90,12 @@ impl Transcript<'_> {
             .append_message(b"b~: degree 0 commitment", &degree_0_commitment.to_bytes());
         self.0
             .append_message(b"a~: degree 1 commitment", &degree_1_commitment.to_bytes());
+    }
+
+    pub(crate) fn extract_decommitment_challenge(&mut self) -> [u8; SECURITY_PARAM / 8] {
+        let mut challenge = [0u8; SECURITY_PARAM / 8];
+        self.0
+            .challenge_bytes(b"decommitment challenge", &mut challenge);
+        challenge
     }
 }
