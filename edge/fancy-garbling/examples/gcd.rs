@@ -9,15 +9,11 @@ use fancy_garbling::{
 };
 
 use swanky_aes_rng::AesRng;
-use swanky_channel_legacy::{AbstractChannel, Channel};
+use swanky_channel::Channel;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 
 use std::cmp::{Ordering, max};
 use std::fmt::Debug;
-use std::{
-    io::{BufReader, BufWriter},
-    os::unix::net::UnixStream,
-};
 
 /// A structure that contains both the garbler and the evaluators
 /// wires. This structure simplifies the API of the garbled circuit.
@@ -36,24 +32,24 @@ struct GCDInputs<F> {
 /// (2) The garbler then exchanges their wires obliviously with the evaluator.
 /// (3) The garbler and the evaluator then run the garbled circuit.
 /// (4) The garbler and the evaluator open the result of the computation.
-fn gb_gcd<C>(rng: &mut AesRng, channel: &mut C, input: u128, upper_bound: u128)
-where
-    C: AbstractChannel + std::clone::Clone,
-{
+fn gb_gcd(rng: &mut AesRng, channel: &mut Channel, input: u128, upper_bound: u128) {
     // (1)
-    let mut gb =
-        Garbler::<C, AesRng, OtSender, AllWire>::new(channel.clone(), rng.clone()).unwrap();
+    let mut gb = Garbler::<AesRng, OtSender, AllWire>::new(channel, rng.clone()).unwrap();
     // (2)
-    let circuit_wires = gb_set_fancy_inputs(&mut gb, input);
+    let circuit_wires = gb_set_fancy_inputs(&mut gb, input, channel);
     // (3)
-    let gcd =
-        fancy_gcd::<Garbler<C, AesRng, OtSender, AllWire>>(&mut gb, circuit_wires, upper_bound)
-            .unwrap();
+    let gcd = fancy_gcd::<Garbler<AesRng, OtSender, AllWire>>(
+        &mut gb,
+        circuit_wires,
+        upper_bound,
+        channel,
+    )
+    .unwrap();
     // (4)
-    gb.outputs(gcd.wires()).unwrap();
+    gb.outputs(gcd.wires(), channel).unwrap();
 }
 /// The garbler's wire exchange method
-fn gb_set_fancy_inputs<F, E>(gb: &mut F, input: u128) -> GCDInputs<F::Item>
+fn gb_set_fancy_inputs<F, E>(gb: &mut F, input: u128, channel: &mut Channel) -> GCDInputs<F::Item>
 where
     F: FancyInput<Item = AllWire, Error = E>,
     E: Debug,
@@ -61,9 +57,9 @@ where
     // The number of bits needed to represent a single input, in this case a u128
     let nbits = 128;
     // The garbler encodes their input into binary wires
-    let garbler_wires: BinaryBundle<F::Item> = gb.bin_encode(input, nbits).unwrap();
+    let garbler_wires: BinaryBundle<F::Item> = gb.bin_encode(input, nbits, channel).unwrap();
     // The evaluator receives their input labels using Oblivious Transfer (OT)
-    let evaluator_wires: BinaryBundle<F::Item> = gb.bin_receive(nbits).unwrap();
+    let evaluator_wires: BinaryBundle<F::Item> = gb.bin_receive(nbits, channel).unwrap();
 
     GCDInputs {
         garbler_wires,
@@ -83,29 +79,29 @@ where
 /// (4) The evaluator and the garbler open the result of the computation.
 /// (5) The evaluator translates the binary output of the circuit into its decimal
 ///     representation.
-fn ev_gcd<C>(rng: &mut AesRng, channel: &mut C, input: u128, upper_bound: u128) -> u128
-where
-    C: AbstractChannel + std::clone::Clone,
-{
+fn ev_gcd(rng: &mut AesRng, channel: &mut Channel, input: u128, upper_bound: u128) -> u128 {
     // (1)
-    let mut ev =
-        Evaluator::<C, AesRng, OtReceiver, AllWire>::new(channel.clone(), rng.clone()).unwrap();
+    let mut ev = Evaluator::<AesRng, OtReceiver, AllWire>::new(channel, rng.clone()).unwrap();
     // (2)
-    let circuit_wires = ev_set_fancy_inputs(&mut ev, input);
+    let circuit_wires = ev_set_fancy_inputs(&mut ev, input, channel);
     // (3)
-    let gcd =
-        fancy_gcd::<Evaluator<C, AesRng, OtReceiver, AllWire>>(&mut ev, circuit_wires, upper_bound)
-            .unwrap();
+    let gcd = fancy_gcd::<Evaluator<AesRng, OtReceiver, AllWire>>(
+        &mut ev,
+        circuit_wires,
+        upper_bound,
+        channel,
+    )
+    .unwrap();
     // (4)
     let gcd_binary = ev
-        .outputs(gcd.wires())
+        .outputs(gcd.wires(), channel)
         .unwrap()
         .expect("evaluator should produce outputs");
 
     // (5)
     util::u128_from_bits(&gcd_binary)
 }
-fn ev_set_fancy_inputs<F, E>(ev: &mut F, input: u128) -> GCDInputs<F::Item>
+fn ev_set_fancy_inputs<F, E>(ev: &mut F, input: u128, channel: &mut Channel) -> GCDInputs<F::Item>
 where
     F: FancyInput<Item = AllWire, Error = E>,
     E: Debug,
@@ -113,9 +109,9 @@ where
     // The number of bits needed to represent a single input, in this case a u128
     let nbits = 128;
     // The evaluator receives the garblers input labels.
-    let garbler_wires: BinaryBundle<F::Item> = ev.bin_receive(nbits).unwrap();
+    let garbler_wires: BinaryBundle<F::Item> = ev.bin_receive(nbits, channel).unwrap();
     // The evaluator receives their input labels using Oblivious Transfer (OT).
-    let evaluator_wires: BinaryBundle<F::Item> = ev.bin_encode(input, nbits).unwrap();
+    let evaluator_wires: BinaryBundle<F::Item> = ev.bin_encode(input, nbits, channel).unwrap();
 
     GCDInputs {
         garbler_wires,
@@ -128,6 +124,7 @@ fn fancy_gcd<F>(
     f: &mut F,
     wire_inputs: GCDInputs<F::Item>,
     upper_bound: u128,
+    channel: &mut Channel,
 ) -> Result<BinaryBundle<F::Item>, F::Error>
 where
     F: FancyReveal + Fancy + BinaryGadgets + FancyBinary + FancyArithmetic,
@@ -152,27 +149,27 @@ where
         // updating our variables and find the result of the computation gcd(a,b).
         //
         // We compute a := a - b and check for an underflow that will help determine if "a > b";
-        let (r_1, mut underflow_r_1) = f.bin_subtraction(&a, &b)?;
+        let (r_1, mut underflow_r_1) = f.bin_subtraction(&a, &b, channel)?;
         // And compute b := b - a and check for an underflow that will help determine if "b > a";
-        let (r_2, mut underflow_r_2) = f.bin_subtraction(&b, &a)?;
+        let (r_2, mut underflow_r_2) = f.bin_subtraction(&b, &a, channel)?;
 
         // We compute "a == b"
-        let check_equality = f.bin_eq_bundles(&a, &b)?;
-        let zero = f.constant(0, 2)?;
+        let check_equality = f.bin_eq_bundles(&a, &b, channel)?;
+        let zero = f.constant(0, 2, channel)?;
 
         // The `underflow` bits act as dual purpose multiplexing bits:
         // (1) If a > b then underflow_r_1 = 1 and underflow_r_2 = 0
         // (2) If b > a then underflow_r_1 = 0 and underflow_r_2 = 1
         // (3) If a == b then underflow_r_1 = underflow_r_2 = 0
-        underflow_r_1 = f.mux(&check_equality, &underflow_r_1, &zero)?;
-        underflow_r_2 = f.mux(&check_equality, &underflow_r_2, &zero)?;
+        underflow_r_1 = f.mux(&check_equality, &underflow_r_1, &zero, channel)?;
+        underflow_r_2 = f.mux(&check_equality, &underflow_r_2, &zero, channel)?;
 
         // Using the `underflow` bits we multiplex in the following way:
         // (1) If a > b, a := a - b and b := b
         // (2) If b > a, a := a  and b := b - a
         // (3) If a == b, a := a and b := b
-        a = f.bin_multiplex(&underflow_r_1, &a, &r_1)?;
-        b = f.bin_multiplex(&underflow_r_2, &b, &r_2)?;
+        a = f.bin_multiplex(&underflow_r_1, &a, &r_1, channel)?;
+        b = f.bin_multiplex(&underflow_r_2, &b, &r_2, channel)?;
     }
 
     Ok(a)
@@ -214,22 +211,20 @@ fn main() {
 
     let upper_bound: u128 = max(gb_value, ev_value);
 
-    let (sender, receiver) = UnixStream::pair().unwrap();
+    let (_, result) = swanky_channel::local::local_channel_pair(
+        |channel| {
+            let rng_gb = AesRng::new();
+            gb_gcd(&mut rng_gb.clone(), channel, gb_value, upper_bound);
+            Ok(())
+        },
+        |channel| {
+            let rng_ev = AesRng::new();
+            let result = ev_gcd(&mut rng_ev.clone(), channel, ev_value, upper_bound);
+            Ok(result)
+        },
+    )
+    .unwrap();
 
-    std::thread::spawn(move || {
-        let rng_gb = AesRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        gb_gcd(&mut rng_gb.clone(), &mut channel, gb_value, upper_bound);
-    });
-
-    let rng_ev = AesRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-
-    let result = ev_gcd(&mut rng_ev.clone(), &mut channel, ev_value, upper_bound);
     let resut_in_clear = gcd_in_clear(gb_value, ev_value, upper_bound);
     println!("Garbled Circuit result is : GCD({gb_value}, {ev_value}) = {result}");
     assert!(

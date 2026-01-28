@@ -6,7 +6,7 @@
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
-use swanky_aes_hash::AesHash;
+use swanky_aes_hash::CorrelationRobustHash;
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_bytearray_utils as scutils;
@@ -20,7 +20,6 @@ use swanky_ot_traits::{
 /// Oblivious transfer sender.
 pub struct Sender<OT: OtReceiver<Msg = Block> + SemiHonest = swanky_ot_chou_orlandi::Receiver> {
     _ot: PhantomData<OT>,
-    pub(super) hash: AesHash,
     s: Vec<bool>,
     pub(super) s_: Block,
     rngs: Vec<AesRng>,
@@ -28,7 +27,6 @@ pub struct Sender<OT: OtReceiver<Msg = Block> + SemiHonest = swanky_ot_chou_orla
 /// Oblivious transfer receiver.
 pub struct Receiver<OT: OtSender<Msg = Block> + SemiHonest = swanky_ot_chou_orlandi::Sender> {
     _ot: PhantomData<OT>,
-    pub(super) hash: AesHash,
     rngs: Vec<(AesRng, AesRng)>,
 }
 
@@ -47,7 +45,6 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> FixedKeyInitializer for Sender<OT
             .collect::<Vec<AesRng>>();
         Ok(Self {
             _ot: PhantomData::<OT>,
-            hash: AesHash::fixed_key().clone(),
             s,
             s_: Block::from(s_),
             rngs,
@@ -105,9 +102,9 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OtSender for Sender<OT> {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
             let q = Block::from(q);
-            let y0 = self.hash.cr_hash(Block::from(j as u128), q) ^ input.0;
+            let y0 = CorrelationRobustHash::fixed_key().hash(q) ^ input.0;
             let q = q ^ self.s_;
-            let y1 = self.hash.cr_hash(Block::from(j as u128), q) ^ input.1;
+            let y1 = CorrelationRobustHash::fixed_key().hash(q) ^ input.1;
             channel.write_block(&y0)?;
             channel.write_block(&y1)?;
         }
@@ -136,10 +133,10 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> CorrelatedSender for Sender<OT> {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
             let q = Block::from(q);
-            let x0 = self.hash.cr_hash(Block::from(j as u128), q);
+            let x0 = CorrelationRobustHash::fixed_key().hash(q);
             let x1 = x0 ^ delta;
             let q = q ^ self.s_;
-            let y = self.hash.cr_hash(Block::from(j as u128), q) ^ x1;
+            let y = CorrelationRobustHash::fixed_key().hash(q) ^ x1;
             channel.write_block(&y)?;
             out.push(x0);
         }
@@ -161,9 +158,9 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> RandomSender for Sender<OT> {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
             let q = Block::from(q);
-            let x0 = self.hash.cr_hash(Block::from(j as u128), q);
+            let x0 = CorrelationRobustHash::fixed_key().hash(q);
             let q = q ^ self.s_;
-            let x1 = self.hash.cr_hash(Block::from(j as u128), q);
+            let x1 = CorrelationRobustHash::fixed_key().hash(q);
             out.push((x0, x1));
         }
         Ok(out)
@@ -222,7 +219,6 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
             .collect::<Vec<(AesRng, AesRng)>>();
         Ok(Self {
             _ot: PhantomData::<OT>,
-            hash: AesHash::fixed_key().clone(),
             rngs,
         })
     }
@@ -242,7 +238,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
             let y0 = channel.read_block()?;
             let y1 = channel.read_block()?;
             let y = if *b { y1 } else { y0 };
-            let y = y ^ self.hash.cr_hash(Block::from(j as u128), Block::from(t));
+            let y = y ^ CorrelationRobustHash::fixed_key().hash(Block::from(t));
             out.push(y);
         }
         Ok(out)
@@ -264,7 +260,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> CorrelatedReceiver for Receiver<OT>
             let t: [u8; 16] = t.try_into().unwrap();
             let y = channel.read_block()?;
             let y = if *b { y } else { Block::default() };
-            let h = self.hash.cr_hash(Block::from(j as u128), Block::from(t));
+            let h = CorrelationRobustHash::fixed_key().hash(Block::from(t));
             out.push(y ^ h);
         }
         Ok(out)
@@ -284,7 +280,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> RandomReceiver for Receiver<OT> {
         for j in 0..inputs.len() {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
-            let h = self.hash.cr_hash(Block::from(j as u128), Block::from(t));
+            let h = CorrelationRobustHash::fixed_key().hash(Block::from(t));
             out.push(h);
         }
         Ok(out)

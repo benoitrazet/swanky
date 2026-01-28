@@ -15,14 +15,7 @@ mod tests {
 
     use swanky_aes_rng::AesRng;
     use swanky_block::Block512;
-    use swanky_channel_legacy::Channel;
     use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
-
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-        thread,
-    };
 
     // Run Base Psi
     fn psty_base_psi(
@@ -34,45 +27,33 @@ mod tests {
         Result<CircuitInputs<WireMod2>, Error>,
         Result<CircuitInputs<WireMod2>, Error>,
     ) {
-        let (sender, receiver) = UnixStream::pair().unwrap();
-
-        thread::scope(|s| {
-            let result_sender = s.spawn(|| {
+        swanky_channel::local::local_channel_pair(
+            |channel| {
                 let mut rng = AesRng::seed_from_u64(seed_sx);
-                let mut channel = setup_channel(sender);
-                let mut gb = Garbler::<
-                    Channel<BufReader<UnixStream>, BufWriter<UnixStream>>,
-                    AesRng,
-                    OtSender,
-                    WireMod2,
-                >::new(channel.clone(), rng.clone())
-                .unwrap();
-                OpprfSender::base_psi(
+                let mut gb =
+                    Garbler::<AesRng, OtSender, WireMod2>::new(channel, rng.clone()).unwrap();
+                Ok(OpprfSender::base_psi(
                     &mut gb,
                     &primary_keys,
                     Some(&payloads),
-                    &mut channel,
+                    channel,
                     &mut rng,
-                )
-            });
-            let mut rng = AesRng::seed_from_u64(seed_rx);
-            let mut channel = setup_channel(receiver);
-            let mut ev = Evaluator::<
-                Channel<BufReader<UnixStream>, BufWriter<UnixStream>>,
-                AesRng,
-                OtReceiver,
-                WireMod2,
-            >::new(channel.clone(), rng.clone())
-            .unwrap();
-            let result_receiver = OpprfReceiver::base_psi(
-                &mut ev,
-                &primary_keys,
-                Some(&payloads),
-                &mut channel,
-                &mut rng,
-            );
-            (result_sender.join().unwrap(), result_receiver)
-        })
+                ))
+            },
+            |channel| {
+                let mut rng = AesRng::seed_from_u64(seed_rx);
+                let mut ev =
+                    Evaluator::<AesRng, OtReceiver, WireMod2>::new(channel, rng.clone()).unwrap();
+                Ok(OpprfReceiver::base_psi(
+                    &mut ev,
+                    &primary_keys,
+                    Some(&payloads),
+                    channel,
+                    &mut rng,
+                ))
+            },
+        )
+        .unwrap()
     }
 
     #[test]

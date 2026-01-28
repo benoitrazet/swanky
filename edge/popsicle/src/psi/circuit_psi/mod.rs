@@ -8,6 +8,7 @@ use fancy_garbling::{BinaryBundle, Fancy, FancyBinary, FancyReveal, WireMod2};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::fmt::Debug;
 use swanky_block::Block512;
+use swanky_channel::Channel;
 
 pub mod base_psi;
 pub mod circuits;
@@ -162,7 +163,12 @@ pub trait CircuitPsi {
         &mut self,
         primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
+        channel: &mut Channel,
     ) -> Result<Intersection, Error>;
     /// Computes the Circuit PSI on the parties' inputs with no payloads.
-    fn intersect(&mut self, keys: &[PrimaryKey]) -> Result<Intersection, Error>;
+    fn intersect(
+        &mut self,
+        keys: &[PrimaryKey],
+        channel: &mut Channel,
+    ) -> Result<Intersection, Error>;
 }

@@ -7,50 +7,45 @@ use fancy_garbling::{WireMod2, twopac::semihonest::Garbler};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
 use swanky_block::Block;
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_ot_alsz_kos::alsz::Sender as OtSender;
 
 use self::sender::OpprfSender;
 
 /// A Garbling party for Circuit PSI that uses OPPRF Base PSI
-pub type OpprfPsiGarbler<C, RNG> = PsiGarbler<C, RNG, OpprfSender>;
+pub type OpprfPsiGarbler<RNG> = PsiGarbler<RNG, OpprfSender>;
 
 /// A struct defining the Garbling party in Circuit Psi
-pub struct PsiGarbler<C, RNG, B> {
+pub struct PsiGarbler<RNG, B> {
     /// The actual garbler being called during the garbled circuit
-    pub gb: Garbler<C, RNG, OtSender, WireMod2>,
-    /// The garbler's dedicated channel
-    pub channel: C,
+    pub gb: Garbler<RNG, OtSender, WireMod2>,
     /// The garbler's dedicated rng
     pub rng: RNG,
     /// A witness for the Base PSI protocol
     _base_psi: PhantomData<B>,
 }
 
-impl<C, RNG, B> PsiGarbler<C, RNG, B>
+impl<RNG, B> PsiGarbler<RNG, B>
 where
-    C: AbstractChannel + Clone,
     RNG: RngCore + CryptoRng + Rng + SeedableRng<Seed = Block>,
 {
     /// Creates a PsiGarbler from a dedicated channel and rng
-    pub fn new(channel: &mut C, seed: RNG::Seed) -> Result<Self, Error>
+    pub fn new(channel: &mut Channel, seed: RNG::Seed) -> Result<Self, Error>
     where
         Self: Sized,
     {
         Ok(PsiGarbler {
-            gb: Garbler::<C, RNG, OtSender, WireMod2>::new(channel.clone(), RNG::from_seed(seed))?,
-            channel: channel.clone(),
+            gb: Garbler::<RNG, OtSender, WireMod2>::new(channel, RNG::from_seed(seed))?,
             rng: RNG::from_seed(seed),
             _base_psi: PhantomData,
         })
     }
 }
 
-impl<C, RNG, B> SemiHonest for PsiGarbler<C, RNG, B> {}
+impl<RNG, B> SemiHonest for PsiGarbler<RNG, B> {}
 
-impl<C, RNG, B> CircuitPsi for PsiGarbler<C, RNG, B>
+impl<RNG, B> CircuitPsi for PsiGarbler<RNG, B>
 where
-    C: AbstractChannel + Clone,
     RNG: RngCore + CryptoRng + Rng + SeedableRng<Seed = Block>,
     B: BasePsi,
 {
@@ -70,6 +65,7 @@ where
         &mut self,
         primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
+        channel: &mut Channel,
     ) -> Result<Intersection, Error> {
         // (0)
         if payloads.is_some() && primary_keys.len() != payloads.unwrap().len() {
@@ -79,16 +75,11 @@ where
             });
         }
         // (1)
-        let circuit_inputs = B::base_psi(
-            &mut self.gb,
-            primary_keys,
-            payloads,
-            &mut self.channel,
-            &mut self.rng,
-        )?;
+        let circuit_inputs =
+            B::base_psi(&mut self.gb, primary_keys, payloads, channel, &mut self.rng)?;
         // (2)
         let primary_keys =
-            bundle_primary_keys::<Garbler<C, RNG, OtSender, WireMod2>, _>(&circuit_inputs)?;
+            bundle_primary_keys::<Garbler<RNG, OtSender, WireMod2>, _>(&circuit_inputs)?;
         let (sender_payloads, receiver_payloads) = bundle_payloads(&mut self.gb, &circuit_inputs)?;
 
         // (3)
@@ -96,6 +87,7 @@ where
             &mut self.gb,
             &circuit_inputs.sender_primary_keys,
             &circuit_inputs.receiver_primary_keys,
+            channel,
         )?;
         let intersection_results = Intersection {
             intersection: PrivateIntersection {
@@ -109,7 +101,11 @@ where
         };
         Ok(intersection_results)
     }
-    fn intersect(&mut self, primary_keys: &[PrimaryKey]) -> Result<Intersection, Error> {
-        self.intersect_with_payloads(primary_keys, None)
+    fn intersect(
+        &mut self,
+        primary_keys: &[PrimaryKey],
+        channel: &mut Channel,
+    ) -> Result<Intersection, Error> {
+        self.intersect_with_payloads(primary_keys, None, channel)
     }
 }

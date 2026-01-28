@@ -8,10 +8,10 @@ use crate::{
     garble::{Evaluator, Garbler},
 };
 use itertools::Itertools;
-use std::{collections::HashMap, marker::PhantomData, rc::Rc};
+use std::{collections::HashMap, marker::PhantomData};
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
-use swanky_channel_legacy::Channel;
+use swanky_channel::Channel;
 
 /// Static evaluator for a circuit, created by the `garble` function.
 ///
@@ -40,8 +40,8 @@ impl<W, C> GarbledCircuit<W, C> {
     }
 }
 
-type Ev<Wire> = Evaluator<Channel<GarbledReader, GarbledWriter>, Wire>;
-type Gb<Wire> = Garbler<Channel<GarbledReader, GarbledWriter>, AesRng, Wire>;
+type Ev<Wire> = Evaluator<Wire>;
+type Gb<Wire> = Garbler<AesRng, Wire>;
 
 impl<Wire: WireLabel, Circuit: EvaluableCircuit<Ev<Wire>>> GarbledCircuit<Wire, Circuit> {
     /// Evaluate the garbled circuit.
@@ -50,10 +50,10 @@ impl<Wire: WireLabel, Circuit: EvaluableCircuit<Ev<Wire>>> GarbledCircuit<Wire, 
         c: &Circuit,
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
+        channel: &mut Channel,
     ) -> Result<Vec<u16>, EvaluatorError> {
-        let channel = Channel::new(GarbledReader::new(&self.blocks), GarbledWriter::new(None));
-        let mut evaluator = Evaluator::new(channel);
-        let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs)?;
+        let mut evaluator = Evaluator::new();
+        let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs, channel)?;
         Ok(outputs.expect("evaluator outputs always are Some(u16)"))
     }
 }
@@ -62,14 +62,8 @@ impl<Wire: WireLabel, Circuit: EvaluableCircuit<Ev<Wire>>> GarbledCircuit<Wire, 
 pub fn garble<Wire: WireLabel, Circuit: EvaluableCircuit<Gb<Wire>>>(
     c: &Circuit,
 ) -> Result<(Encoder<Wire>, GarbledCircuit<Wire, Circuit>), GarblerError> {
-    let channel = Channel::new(
-        GarbledReader::new(&[]),
-        GarbledWriter::new(Some(c.get_num_nonfree_gates())),
-    );
-    let channel_ = channel.clone();
-
     let rng = AesRng::new();
-    let mut garbler = Garbler::new(channel_, rng);
+    let mut garbler = Garbler::new(rng);
 
     // get input wires, ignoring encoded values
     let gb_inps = (0..c.num_garbler_inputs())
@@ -88,16 +82,16 @@ pub fn garble<Wire: WireLabel, Circuit: EvaluableCircuit<Gb<Wire>>>(
         })
         .collect_vec();
 
-    c.eval(&mut garbler, &gb_inps, &ev_inps)?;
+    let mut channel = GarbledChannel::new_writer(None);
+    Channel::with(&mut channel, |channel| {
+        c.eval(&mut garbler, &gb_inps, &ev_inps, channel).unwrap();
+        Ok(())
+    })
+    .unwrap();
 
     let en = Encoder::new(gb_inps, ev_inps, garbler.get_deltas());
 
-    let gc = GarbledCircuit::new(
-        Rc::try_unwrap(channel.writer())
-            .unwrap()
-            .into_inner()
-            .blocks,
-    );
+    let gc = GarbledCircuit::new(channel.writer().blocks.clone());
 
     Ok((en, gc))
 }
@@ -173,7 +167,64 @@ impl<Wire: WireLabel> Encoder<Wire> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Reader and Writer impls for simple local structures to collect and release blocks
+// Reader and Writer impls for simple local structures to collect and release
+// blocks
+
+/// A [`Channel`] type for writing and reading a garbled circuit from memory.
+pub struct GarbledChannel {
+    reader: Option<GarbledReader>,
+    writer: Option<GarbledWriter>,
+}
+
+impl GarbledChannel {
+    /// Construct a new [`GarbledChannel`] for writing a garbled circuit.
+    pub fn new_writer(ngates: Option<usize>) -> Self {
+        Self {
+            reader: None,
+            writer: Some(GarbledWriter::new(ngates)),
+        }
+    }
+
+    /// Construct a new [`GarbledChannel`] for reading a garbled circuit.
+    pub fn new_reader(blocks: &[Block]) -> Self {
+        Self {
+            reader: Some(GarbledReader::new(blocks)),
+            writer: None,
+        }
+    }
+
+    fn writer(&self) -> &GarbledWriter {
+        self.writer.as_ref().unwrap()
+    }
+}
+
+impl std::io::Read for GarbledChannel {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let reader = self.reader.as_mut().unwrap();
+        reader.read(buf)
+    }
+}
+
+impl std::io::Write for GarbledChannel {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let writer = self.writer.as_mut().unwrap();
+        writer.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        let writer = self.writer.as_mut().unwrap();
+        writer.flush()
+    }
+}
+
+impl<W, C> From<&GarbledCircuit<W, C>> for GarbledChannel {
+    fn from(value: &GarbledCircuit<W, C>) -> Self {
+        Self {
+            reader: Some(GarbledReader::new(&value.blocks)),
+            writer: None,
+        }
+    }
+}
 
 /// Implementation of the `Read` trait for use by the `Evaluator`.
 #[derive(Debug)]
@@ -194,12 +245,19 @@ impl GarbledReader {
 impl std::io::Read for GarbledReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         assert_eq!(buf.len() % 16, 0);
+        let start = self.index;
         for data in buf.chunks_mut(16) {
             let block: [u8; 16] = self.blocks[self.index].into();
             for (a, b) in data.iter_mut().zip(block.iter()) {
                 *a = *b;
             }
             self.index += 1;
+            if self.index == self.blocks.len() {
+                // We've read all that we can from the vector of `Block`s, so
+                // return the length of bytes that we've read to satisfy the
+                // `read` API.
+                return Ok(16 * (self.index - start));
+            }
         }
         Ok(buf.len())
     }

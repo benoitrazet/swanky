@@ -39,6 +39,7 @@ use fancy_garbling::{
 };
 
 use itertools::Itertools;
+use swanky_channel::Channel;
 use swanky_oprf_kmprt::{Receiver as KmprtReceiver, Sender as KmprtSender};
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 
@@ -46,7 +47,6 @@ use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::time::SystemTime;
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
-use swanky_channel_legacy::AbstractChannel;
 
 use std::{
     fs::File,
@@ -104,11 +104,13 @@ pub struct ReceiverState {
 
 impl Sender {
     /// Initialize the PSI sender.
-    pub fn init<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
-        channel: &mut C,
+    pub fn init<RNG: RngCore + CryptoRng + SeedableRng>(
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let key = channel.read_block()?;
+        let key = channel
+            .read::<Block>()
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
         let opprf = KmprtSender::init(channel, rng)?;
         let opprf_payload = KmprtSender::init(channel, rng)?;
         Ok(Self {
@@ -120,31 +122,25 @@ impl Sender {
 
     /// PSI with associated payloads for small to moderately sized sets without any
     /// parallelization features.
-    pub fn full_protocol<
-        C: AbstractChannel + Clone,
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
-    >(
+    pub fn full_protocol<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         table: &[Msg],
         payloads: &[Block512],
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let mut gb =
-            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.r#gen()))
-                .unwrap();
+            Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen())).unwrap();
 
         let (mut state, nbins, _, _) = self.bucketize_data(table, payloads, channel, rng)?;
 
-        channel.flush()?;
         self.send_data(&mut state, nbins, channel, rng)?;
-        channel.flush()?;
 
-        let (aggregate, sum_weights) = state.build_and_compute_circuit(&mut gb).unwrap();
-        let weighted_mean = gb.crt_div(&aggregate, &sum_weights).unwrap();
+        let (aggregate, sum_weights) = state.build_and_compute_circuit(&mut gb, channel).unwrap();
+        let weighted_mean = gb.crt_div(&aggregate, &sum_weights, channel).unwrap();
 
-        gb.outputs(&weighted_mean.wires().to_vec()).unwrap();
-        channel.flush()?;
+        gb.outputs(&weighted_mean.wires().to_vec(), channel)
+            .unwrap();
 
         Ok(())
     }
@@ -153,20 +149,16 @@ impl Sender {
     /// on a Megabin instead of the entirety of the hashed data. The number of Megabin is pre-agreed
     /// on during the bucketization. Users have to specify the GC deltas. If the computation is run
     /// in parallel, the deltas must be synced accross threads.
-    pub fn full_protocol_large<
-        C: AbstractChannel + Clone,
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
-    >(
+    pub fn full_protocol_large<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         table: &[Msg],
         payloads: &[Block512],
         path_deltas: &str,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let mut gb =
-            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.r#gen()))
-                .unwrap();
+            Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen())).unwrap();
         let _ = gb.load_deltas(path_deltas);
 
         let (state, _nbins, _nmegabins, megasize) =
@@ -198,9 +190,10 @@ impl Sender {
                 rng,
             )
             .unwrap();
-        let weighted_mean = gb.crt_div(&aggregate, &sum_weights).unwrap();
+        let weighted_mean = gb.crt_div(&aggregate, &sum_weights, channel).unwrap();
         println!("Done");
-        gb.outputs(&weighted_mean.wires().to_vec()).unwrap();
+        gb.outputs(&weighted_mean.wires().to_vec(), channel)
+            .unwrap();
         Ok(())
     }
 
@@ -209,29 +202,25 @@ impl Sender {
     /// were precomputed.
     /// Returns a garbled output over given megabins that the user can open or join with other
     /// threads results using compute_aggregate.
-    pub fn compute_payload<
-        C: AbstractChannel + Clone,
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
-    >(
+    pub fn compute_payload<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         ts_id: Vec<Vec<Block512>>,
         ts_payload: Vec<Vec<Block512>>,
         table: Vec<Vec<Vec<Block>>>,
         payload: Vec<Vec<Vec<Block512>>>,
         path_deltas: &str,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error> {
         let mut gb =
-            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.r#gen()))
-                .unwrap();
+            Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen())).unwrap();
         let _ = gb.load_deltas(path_deltas);
 
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
         let q = fancy_garbling::util::product(&qs);
 
-        let mut acc = gb.crt_constant_bundle(0, q).unwrap();
-        let mut sum_weights = gb.crt_constant_bundle(0, q).unwrap();
+        let mut acc = gb.crt_constant_bundle(0, q, channel).unwrap();
+        let mut sum_weights = gb.crt_constant_bundle(0, q, channel).unwrap();
 
         let nmegabins = ts_id.len();
         for i in 0..nmegabins {
@@ -246,7 +235,8 @@ impl Sender {
             };
 
             self.send_data(&mut state, nbins, channel, rng)?;
-            let (partial, partial_sum_weights) = state.build_and_compute_circuit(&mut gb).unwrap();
+            let (partial, partial_sum_weights) =
+                state.build_and_compute_circuit(&mut gb, channel).unwrap();
 
             acc = gb.crt_add(&acc, &partial).unwrap();
             sum_weights = gb.crt_add(&sum_weights, &partial_sum_weights).unwrap();
@@ -255,28 +245,22 @@ impl Sender {
                 "Sender :: Computation time: {} ms",
                 start.elapsed().unwrap().as_millis()
             );
-
-            channel.flush()?;
         }
         Ok((acc, sum_weights))
     }
 
     /// Aggregates partial grabled outputs encoded as CRTs. Uses the same deltas used by partial
     /// circuits.
-    pub fn compute_aggregates<
-        C: AbstractChannel + Clone,
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
-    >(
+    pub fn compute_aggregates<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         aggregates: Vec<Vec<AllWire>>,
         sum_of_weights: Vec<Vec<AllWire>>,
         path_deltas: &str,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let mut gb =
-            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.r#gen()))
-                .unwrap();
+            Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen())).unwrap();
         let _ = gb.load_deltas(path_deltas);
 
         let mut acc = CrtBundle::new(aggregates[0].clone());
@@ -290,23 +274,30 @@ impl Sender {
             sum_weights = gb.crt_add(&sum_weights, &partial_sum_weight).unwrap();
         }
 
-        let weighted_mean = gb.crt_div(&acc, &sum_weights).unwrap();
-        gb.outputs(&weighted_mean.wires().to_vec()).unwrap();
+        let weighted_mean = gb.crt_div(&acc, &sum_weights, channel).unwrap();
+        gb.outputs(&weighted_mean.wires().to_vec(), channel)
+            .unwrap();
         Ok(())
     }
 
     /// Bucketizes data according to the number of bins specified by the Receiver
-    pub fn bucketize_data<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn bucketize_data<RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
         payloads: &[Block512],
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<(SenderState, usize, usize, usize), Error> {
         // receive cuckoo hash info from sender
-        let megasize = channel.read_usize()?;
-        let nmegabins = channel.read_usize()?;
-        let nbins = channel.read_usize()?;
+        let megasize = channel
+            .read::<usize>()
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
+        let nmegabins = channel
+            .read::<usize>()
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
+        let nbins = channel
+            .read::<usize>()
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
         let hashes = utils::compress_and_hash_inputs(inputs, self.key);
 
         let mut table = vec![Vec::new(); nbins];
@@ -349,11 +340,11 @@ impl Sender {
     }
 
     /// Perform OPPRF on ID's & associated payloads
-    pub fn send_data<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn send_data<RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         state: &mut SenderState,
         nbins: usize,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let points_id = state
@@ -383,9 +374,10 @@ impl Sender {
 //
 impl SenderState {
     /// Encodes circuit inputs before passing them to GC
-    pub fn encode_circuit_inputs<C, RNG>(
+    pub fn encode_circuit_inputs<RNG>(
         &mut self,
-        gb: &mut Garbler<C, RNG, OtSender, AllWire>,
+        gb: &mut Garbler<RNG, OtSender, AllWire>,
+        channel: &mut Channel,
     ) -> Result<
         (
             Vec<AllWire>,
@@ -397,15 +389,14 @@ impl SenderState {
         Error,
     >
     where
-        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let my_input_bits = encode_inputs(&self.opprf_ids);
         let my_payload_bits = encode_payloads(&self.opprf_payloads);
 
         let mods_bits = vec![2; my_input_bits.len()];
-        let sender_inputs = gb.encode_many(&my_input_bits, &mods_bits).unwrap();
-        let receiver_inputs = gb.receive_many(&mods_bits).unwrap();
+        let sender_inputs = gb.encode_many(&my_input_bits, &mods_bits, channel).unwrap();
+        let receiver_inputs = gb.receive_many(&mods_bits, channel).unwrap();
 
         // Build appropriate modulus in order to encode as CRT.
         // CRT representation assumes that inputs and outputs of the
@@ -420,9 +411,11 @@ impl SenderState {
             mods_crt.append(&mut qs.clone());
         }
 
-        let sender_payloads = gb.encode_many(&my_payload_bits, &mods_crt).unwrap();
-        let receiver_payloads = gb.receive_many(&mods_crt).unwrap();
-        let receiver_masks = gb.receive_many(&mods_crt).unwrap();
+        let sender_payloads = gb
+            .encode_many(&my_payload_bits, &mods_crt, channel)
+            .unwrap();
+        let receiver_payloads = gb.receive_many(&mods_crt, channel).unwrap();
+        let receiver_masks = gb.receive_many(&mods_crt, channel).unwrap();
         Ok((
             sender_inputs,
             receiver_inputs,
@@ -433,30 +426,32 @@ impl SenderState {
     }
 
     /// Encode inputs & compute weighted aggregates circuit
-    pub fn build_and_compute_circuit<C, RNG>(
+    pub fn build_and_compute_circuit<RNG>(
         &mut self,
-        gb: &mut Garbler<C, RNG, OtSender, AllWire>,
+        gb: &mut Garbler<RNG, OtSender, AllWire>,
+        channel: &mut Channel,
     ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error>
     where
-        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let (x, y, x_payload, y_payload, masks) = self.encode_circuit_inputs(gb).unwrap();
+        let (x, y, x_payload, y_payload, masks) = self.encode_circuit_inputs(gb, channel).unwrap();
         let (outs, sum_weights) =
-            fancy_compute_payload_aggregate(gb, &x, &y, &x_payload, &y_payload, &masks).unwrap();
+            fancy_compute_payload_aggregate(gb, &x, &y, &x_payload, &y_payload, &masks, channel)
+                .unwrap();
         Ok((outs, sum_weights))
     }
 }
 
 impl Receiver {
     /// Initialize the PSI receiver.
-    pub fn init<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
-        channel: &mut C,
+    pub fn init<RNG: RngCore + CryptoRng + SeedableRng>(
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let key = rng.r#gen();
-        channel.write_block(&key)?;
-        channel.flush()?;
+        channel
+            .write(&key)
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
 
         let opprf = KmprtReceiver::init(channel, rng)?;
         let opprf_payload = KmprtReceiver::init(channel, rng)?;
@@ -469,21 +464,16 @@ impl Receiver {
 
     /// PSI with associated payloads for small to moderately sized sets without any
     /// parallelization features.
-    pub fn full_protocol<
-        C: AbstractChannel + Clone,
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
-    >(
+    pub fn full_protocol<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         table: &[Msg],
         payloads: &[Block512],
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<u128, Error> {
-        let mut ev = Evaluator::<C, RNG, OtReceiver, AllWire>::new(
-            channel.clone(),
-            RNG::from_seed(rng.r#gen()),
-        )
-        .unwrap();
+        let mut ev =
+            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
+                .unwrap();
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
 
         let (table, payload) = self.bucketize_data(table, payloads, channel, rng)?;
@@ -497,15 +487,14 @@ impl Receiver {
 
         self.receive_data(&mut state, channel, rng)?;
         let (aggregate, sum_weights) = state.build_and_compute_circuit(&mut ev, channel).unwrap();
-        let weighted_mean = ev.crt_div(&aggregate, &sum_weights).unwrap();
+        let weighted_mean = ev.crt_div(&aggregate, &sum_weights, channel).unwrap();
 
         let weighted_mean_outs = ev
-            .outputs(&weighted_mean.wires().to_vec())
+            .outputs(&weighted_mean.wires().to_vec(), channel)
             .unwrap()
             .expect("evaluator should produce outputs");
 
         let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, &qs);
-        channel.flush()?;
 
         Ok(weighted_mean)
     }
@@ -514,22 +503,17 @@ impl Receiver {
     /// on a Megabin instead of the entirety of the hashed data. The number of Megabin is pre-agreed
     /// on during the bucketization. Users have to specify the GC deltas. If the computation is run
     /// in parallel, the deltas must be synced accross threads.
-    pub fn full_protocol_large<
-        C: AbstractChannel + Clone,
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
-    >(
+    pub fn full_protocol_large<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         table: &[Msg],
         payloads: &[Block512],
         megasize: usize,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<u128, Error> {
-        let mut ev = Evaluator::<C, RNG, OtReceiver, AllWire>::new(
-            channel.clone(),
-            RNG::from_seed(rng.r#gen()),
-        )
-        .unwrap();
+        let mut ev =
+            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
+                .unwrap();
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
 
         let (table, payload, _) =
@@ -537,14 +521,12 @@ impl Receiver {
 
         let (aggregate, sum_weights) = self.compute_payload(table, payload, channel, rng).unwrap();
 
-        let weighted_mean = ev.crt_div(&aggregate, &sum_weights).unwrap();
+        let weighted_mean = ev.crt_div(&aggregate, &sum_weights, channel).unwrap();
         let weighted_mean_outs = ev
-            .outputs(&weighted_mean.wires().to_vec())
+            .outputs(&weighted_mean.wires().to_vec(), channel)
             .unwrap()
             .expect("evaluator should produce outputs");
         let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, &qs);
-
-        channel.flush()?;
 
         Ok(weighted_mean)
     }
@@ -554,26 +536,21 @@ impl Receiver {
     /// were precomputed.
     /// Returns a garbled output over given megabins that the user can open or join with other
     /// threads results using compute_aggregate.
-    pub fn compute_payload<
-        C: AbstractChannel + Clone,
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
-    >(
+    pub fn compute_payload<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         table: Vec<Vec<Block>>,
         payload: Vec<Vec<Block512>>,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error> {
-        let mut ev = Evaluator::<C, RNG, OtReceiver, AllWire>::new(
-            channel.clone(),
-            RNG::from_seed(rng.r#gen()),
-        )
-        .unwrap();
+        let mut ev =
+            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
+                .unwrap();
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
         let q = fancy_garbling::util::product(&qs);
 
-        let mut acc = ev.crt_constant_bundle(0, q).unwrap();
-        let mut sum_weights = ev.crt_constant_bundle(0, q).unwrap();
+        let mut acc = ev.crt_constant_bundle(0, q, channel).unwrap();
+        let mut sum_weights = ev.crt_constant_bundle(0, q, channel).unwrap();
 
         let nmegabins = table.len();
         println!("nmegabins: {:?}", nmegabins);
@@ -593,7 +570,6 @@ impl Receiver {
             acc = ev.crt_add(&acc, &partial).unwrap();
             sum_weights = ev.crt_add(&sum_weights, &partial_sum_weights).unwrap();
 
-            channel.flush()?;
             println!(
                 "Receiver :: Computation time: {} ms",
                 start.elapsed().unwrap().as_millis()
@@ -604,21 +580,16 @@ impl Receiver {
 
     /// Aggregates partial grabled outputs encoded as CRTs. Uses the same deltas used by partial
     /// circuits.
-    pub fn compute_aggregates<
-        C: AbstractChannel + Clone,
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
-    >(
+    pub fn compute_aggregates<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         aggregates: Vec<Vec<AllWire>>,
         sum_of_weights: Vec<Vec<AllWire>>,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<u128, Error> {
-        let mut ev = Evaluator::<C, RNG, OtReceiver, AllWire>::new(
-            channel.clone(),
-            RNG::from_seed(rng.r#gen()),
-        )
-        .unwrap();
+        let mut ev =
+            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
+                .unwrap();
 
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
         let _q = fancy_garbling::util::product(&qs);
@@ -634,10 +605,10 @@ impl Receiver {
             sum_weights = ev.crt_add(&sum_weights, &partial_sum_weights).unwrap();
         }
 
-        let weighted_mean = ev.crt_div(&acc, &sum_weights).unwrap();
+        let weighted_mean = ev.crt_div(&acc, &sum_weights, channel).unwrap();
 
         let weighted_mean_outs = ev
-            .outputs(&weighted_mean.wires().to_vec())
+            .outputs(&weighted_mean.wires().to_vec(), channel)
             .unwrap()
             .expect("evaluator should produce outputs");
         let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, &qs);
@@ -648,20 +619,25 @@ impl Receiver {
     }
 
     /// For small to moderate sized sets, bucketizes using Cuckoo Hashing
-    pub fn bucketize_data<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn bucketize_data<RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
         payloads: &[Block512],
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<(Vec<Block>, Vec<Block512>), Error> {
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
 
-        channel.write_usize(0)?;
-        channel.write_usize(0)?;
-        channel.write_usize(cuckoo.nbins)?; // The number of bins is sent out to the sender
-        channel.flush()?;
+        channel
+            .write(&0usize)
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
+        channel
+            .write(&0usize)
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
+        channel
+            .write(&cuckoo.nbins)
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?; // The number of bins is sent out to the sender
         let table = cuckoo
             .items
             .iter()
@@ -690,12 +666,12 @@ impl Receiver {
     ///            megabin_id =  ch_id / megabin_size;
     /// A megabin is a collection of bins, typically specified by the total number of elements that
     /// can be handled at a time (megabin_size).
-    pub fn bucketize_data_large<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn bucketize_data_large<RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
         payloads: &[Block512],
         megasize: usize,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<(Vec<Vec<Block>>, Vec<Vec<Block512>>, usize), Error> {
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
@@ -704,10 +680,15 @@ impl Receiver {
         let cuckoo_large: Vec<&[Option<CuckooItem>]> = cuckoo.items.chunks(megasize).collect();
         let nmegabins = cuckoo_large.len();
 
-        channel.write_usize(megasize)?; // The megabin size is sent out to the sender
-        channel.write_usize(nmegabins)?; // The number of megabins is sent out to the sender
-        channel.write_usize(cuckoo.nbins)?; // The number of bins is sent out to the sender
-        channel.flush()?;
+        channel
+            .write(&megasize)
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?; // The megabin size is sent out to the sender
+        channel
+            .write(&nmegabins)
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?; // The number of megabins is sent out to the sender
+        channel
+            .write(&cuckoo.nbins)
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?; // The number of bins is sent out to the sender
 
         let table = cuckoo_large
             .iter()
@@ -739,10 +720,10 @@ impl Receiver {
     }
 
     /// Receive outputs of the OPPRF
-    pub fn receive_data<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn receive_data<RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         state: &mut ReceiverState,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<(), Error> {
         state.opprf_ids = self.opprf.receive(channel, &state.table, rng)?;
@@ -753,9 +734,10 @@ impl Receiver {
 
 impl ReceiverState {
     /// Encodes circuit inputs before passing them to GC
-    pub fn encode_circuit_inputs<C, RNG>(
+    pub fn encode_circuit_inputs<RNG>(
         &mut self,
-        ev: &mut Evaluator<C, RNG, OtReceiver, AllWire>,
+        ev: &mut Evaluator<RNG, OtReceiver, AllWire>,
+        channel: &mut Channel,
     ) -> Result<
         (
             Vec<AllWire>,
@@ -767,7 +749,6 @@ impl ReceiverState {
         Error,
     >
     where
-        C: AbstractChannel + Clone,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
     {
         let my_input_bits = encode_inputs(&self.opprf_ids);
@@ -775,8 +756,8 @@ impl ReceiverState {
         let my_payload_bits = encode_payloads(&self.payload);
 
         let mods_bits = vec![2; my_input_bits.len()];
-        let sender_inputs = ev.receive_many(&mods_bits).unwrap();
-        let receiver_inputs = ev.encode_many(&my_input_bits, &mods_bits).unwrap();
+        let sender_inputs = ev.receive_many(&mods_bits, channel).unwrap();
+        let receiver_inputs = ev.encode_many(&my_input_bits, &mods_bits, channel).unwrap();
 
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED].to_vec();
 
@@ -785,10 +766,14 @@ impl ReceiverState {
             mods_crt.append(&mut qs.clone());
         }
 
-        let sender_payloads = ev.receive_many(&mods_crt).unwrap();
+        let sender_payloads = ev.receive_many(&mods_crt, channel).unwrap();
 
-        let receiver_payloads = ev.encode_many(&my_payload_bits, &mods_crt).unwrap();
-        let receiver_masks = ev.encode_many(&my_opprf_output, &mods_crt).unwrap();
+        let receiver_payloads = ev
+            .encode_many(&my_payload_bits, &mods_crt, channel)
+            .unwrap();
+        let receiver_masks = ev
+            .encode_many(&my_opprf_output, &mods_crt, channel)
+            .unwrap();
         Ok((
             sender_inputs,
             receiver_inputs,
@@ -799,20 +784,19 @@ impl ReceiverState {
     }
 
     /// Encode inputs & compute weighted aggregates circuit
-    pub fn build_and_compute_circuit<C, RNG>(
+    pub fn build_and_compute_circuit<RNG>(
         &mut self,
-        ev: &mut Evaluator<C, RNG, OtReceiver, AllWire>,
-        channel: &mut C,
+        ev: &mut Evaluator<RNG, OtReceiver, AllWire>,
+        channel: &mut Channel,
     ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error>
     where
-        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        channel.flush()?;
-        let (x, y, x_payload, y_payload, masks) = self.encode_circuit_inputs(ev)?;
+        let (x, y, x_payload, y_payload, masks) = self.encode_circuit_inputs(ev, channel)?;
 
         let (outs, sum_weights) =
-            fancy_compute_payload_aggregate(ev, &x, &y, &x_payload, &y_payload, &masks).unwrap();
+            fancy_compute_payload_aggregate(ev, &x, &y, &x_payload, &y_payload, &masks, channel)
+                .unwrap();
         Ok((outs, sum_weights))
     }
 }
@@ -884,6 +868,7 @@ fn fancy_compute_payload_aggregate<
     sender_payloads: &[F::Item],
     receiver_payloads: &[F::Item],
     receiver_masks: &[F::Item],
+    channel: &mut Channel,
 ) -> Result<(CrtBundle<F::Item>, CrtBundle<F::Item>), F::Error> {
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
     assert_eq!(sender_payloads.len(), receiver_payloads.len());
@@ -899,6 +884,7 @@ fn fancy_compute_payload_aggregate<
             f.eq_bundles(
                 &BinaryBundle::new(xs.to_vec()),
                 &BinaryBundle::new(ys.to_vec()),
+                channel,
             )
         })
         .collect::<Result<Vec<F::Item>, F::Error>>()?;
@@ -920,25 +906,25 @@ fn fancy_compute_payload_aggregate<
         .zip_eq(receiver_payloads.chunks(PAYLOAD_PRIME_SIZE_EXPANDED))
     {
         let (ps, pr) = it;
-        let weighted = f.crt_mul(&ps, &CrtBundle::new(pr.to_vec()))?;
+        let weighted = f.crt_mul(&ps, &CrtBundle::new(pr.to_vec()), channel)?;
         weighted_payloads.push(weighted);
     }
 
     assert_eq!(eqs.len(), weighted_payloads.len());
 
-    let mut acc = f.crt_constant_bundle(0, q)?;
-    let mut sum_weights = f.crt_constant_bundle(0, q)?;
-    let one = f.crt_constant_bundle(1, q)?;
+    let mut acc = f.crt_constant_bundle(0, q, channel)?;
+    let mut sum_weights = f.crt_constant_bundle(0, q, channel)?;
+    let one = f.crt_constant_bundle(1, q, channel)?;
 
     for (i, b) in eqs.iter().enumerate() {
         let b_ws = one
             .iter()
-            .map(|w| f.mul(w, &b))
+            .map(|w| f.mul(w, &b, channel))
             .collect::<Result<Vec<F::Item>, F::Error>>()?;
         let b_crt = CrtBundle::new(b_ws);
 
-        let mux = f.crt_mul(&b_crt, &weighted_payloads[i])?;
-        let mux_sum_weights = f.crt_mul(&b_crt, &reconstructed_payload[i])?;
+        let mux = f.crt_mul(&b_crt, &weighted_payloads[i], channel)?;
+        let mux_sum_weights = f.crt_mul(&b_crt, &reconstructed_payload[i], channel)?;
         acc = f.crt_add(&acc, &mux)?;
         sum_weights = f.crt_add(&sum_weights, &mux_sum_weights)?;
     }
@@ -1035,14 +1021,9 @@ mod tests {
     use super::*;
     use crate::utils::rand_u64_vec;
     use rand::{prelude::SliceRandom, thread_rng};
-    use std::{
-        collections::HashMap,
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
+    use std::collections::HashMap;
     use swanky_aes_rng::AesRng;
     use swanky_block::Block512;
-    use swanky_channel_legacy::Channel;
 
     const ITEM_SIZE: usize = 8;
 
@@ -1103,8 +1084,6 @@ mod tests {
 
         let mut rng = AesRng::new();
 
-        let (sender, receiver) = UnixStream::pair().unwrap();
-
         let sender_inputs = enum_ids_shuffled(set_size_sx, ITEM_SIZE);
         let receiver_inputs = enum_ids_shuffled(set_size_rx, ITEM_SIZE);
         let weights = int_vec_block512(rand_u64_vec(set_size_sx, weight_max, &mut rng));
@@ -1117,31 +1096,27 @@ mod tests {
             &weights.clone(),
         );
 
-        std::thread::spawn(move || {
-            let mut rng = AesRng::new();
-
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-
-            let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-
-            // For small to medium sized sets where batching can occur accross all bins
-            let _ = psi
-                .full_protocol(&sender_inputs, &weights, &mut channel, &mut rng)
-                .unwrap();
-        });
-
-        let mut rng = AesRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-
-        let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-        // For small to medium sized sets where batching can occur accross all bins
-        let weighted_mean = psi
-            .full_protocol(&receiver_inputs, &payloads, &mut channel, &mut rng)
-            .unwrap();
+        let (_, weighted_mean) = swanky_channel::local::local_channel_pair(
+            |channel| {
+                let mut rng = AesRng::new();
+                let mut psi = Sender::init(channel, &mut rng).unwrap();
+                // For small to medium sized sets where batching can occur accross all bins
+                let _ = psi
+                    .full_protocol(&sender_inputs, &weights, channel, &mut rng)
+                    .unwrap();
+                Ok(())
+            },
+            |channel| {
+                let mut rng = AesRng::new();
+                let mut psi = Receiver::init(channel, &mut rng).unwrap();
+                // For small to medium sized sets where batching can occur accross all bins
+                let weighted_mean = psi
+                    .full_protocol(&receiver_inputs, &payloads, channel, &mut rng)
+                    .unwrap();
+                Ok(weighted_mean)
+            },
+        )
+        .unwrap();
 
         assert_eq!(result_in_clear, weighted_mean);
     }

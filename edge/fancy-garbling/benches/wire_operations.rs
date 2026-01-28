@@ -138,7 +138,7 @@ fn bench_negate_eq(c: &mut Criterion, p: u16) {
 fn bench_hash(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::hash ({})", p), move |b| {
         let rng = &mut rand::thread_rng();
-        let tweak = rand::random::<Block>();
+        let tweak = rand::random::<u128>();
         let x = AllWire::rand(rng, p);
         b.iter(|| {
             let z = x.hash(tweak);
@@ -150,7 +150,7 @@ fn bench_hash(c: &mut Criterion, p: u16) {
 fn bench_hashback(c: &mut Criterion, q: u16) {
     c.bench_function(&format!("wire::hashback ({})", q), move |b| {
         let rng = &mut rand::thread_rng();
-        let tweak = rand::random::<Block>();
+        let tweak = rand::random::<u128>();
         let wire = AllWire::rand(rng, q);
         b.iter(|| {
             let z = wire.hashback(tweak, q);

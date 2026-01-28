@@ -15,7 +15,7 @@ use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_oprf_kmprt::{Receiver as KmprtReceiver, Sender as KmprtSender};
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 
@@ -65,8 +65,8 @@ pub struct ReceiverState {
 
 impl Sender {
     /// Initialize the PSI sender.
-    pub fn init<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
-        channel: &mut C,
+    pub fn init<RNG: RngCore + CryptoRng + SeedableRng>(
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let opprf = KmprtSender::init(channel, rng)?;
@@ -74,18 +74,22 @@ impl Sender {
     }
 
     /// Run the PSI protocol over `inputs`.
-    pub fn send<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn send<RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<SenderState, Error> {
         // receive cuckoo hash info from sender
-        let key = channel.read_block()?;
+        let key = channel
+            .read::<Block>()
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
         let hashes = utils::compress_and_hash_inputs(inputs, key);
 
         // map inputs to table using all hash functions
-        let nbins = channel.read_usize()?;
+        let nbins = channel
+            .read::<usize>()
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
         let mut table = vec![Vec::new(); nbins];
 
         for &x in &hashes {
@@ -122,70 +126,64 @@ impl Sender {
 
 impl SenderState {
     /// Run the setup phase, producing a garbler for the next stage.
-    pub fn compute_setup<C, RNG>(
+    pub fn compute_setup<RNG>(
         &self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<
-        (
-            Garbler<C, RNG, OtSender, AllWire>,
-            Vec<AllWire>,
-            Vec<AllWire>,
-        ),
-        Error,
-    >
+    ) -> Result<(Garbler<RNG, OtSender, AllWire>, Vec<AllWire>, Vec<AllWire>), Error>
     where
-        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let mut gb = Garbler::<C, RNG, OtSender, AllWire>::new(
-            channel.clone(),
-            RNG::from_seed(rng.r#gen()),
-        )?;
+        let mut gb = Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))?;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
         let mods = vec![2; my_input_bits.len()]; // all binary moduli
-        let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
-        let receiver_inputs = gb.receive_many(&mods)?;
+        let sender_inputs = gb.encode_many(&my_input_bits, &mods, channel)?;
+        let receiver_inputs = gb.receive_many(&mods, channel)?;
         Ok((gb, sender_inputs, receiver_inputs))
     }
 
     /// Compute the intersection.
-    pub fn compute_intersection<C, RNG>(&self, channel: &mut C, rng: &mut RNG) -> Result<(), Error>
+    pub fn compute_intersection<RNG>(
+        &self,
+        channel: &mut Channel,
+        rng: &mut RNG,
+    ) -> Result<(), Error>
     where
-        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut gb, x, y) = self.compute_setup(channel, rng)?;
-        let outs = fancy_compute_intersection(&mut gb, &x, &y)?;
-        gb.outputs(&outs)?;
+        let outs = fancy_compute_intersection(&mut gb, &x, &y, channel)?;
+        gb.outputs(&outs, channel)?;
         Ok(())
     }
 
     /// Compute the cardinality of the intersection.
-    pub fn compute_cardinality<C, RNG>(&self, channel: &mut C, rng: &mut RNG) -> Result<(), Error>
+    pub fn compute_cardinality<RNG>(
+        &self,
+        channel: &mut Channel,
+        rng: &mut RNG,
+    ) -> Result<(), Error>
     where
-        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut gb, x, y) = self.compute_setup(channel, rng)?;
-        let result = fancy_compute_cardinality(&mut gb, &x, &y)?;
-        gb.outputs(result.wires())?;
+        let result = fancy_compute_cardinality(&mut gb, &x, &y, channel)?;
+        gb.outputs(result.wires(), channel)?;
         Ok(())
     }
 
     /// Receive encrypted payloads from the Sender.
-    pub fn receive_payloads<C>(
+    pub fn receive_payloads(
         &self,
         payload_len: usize,
-        channel: &mut C,
-    ) -> Result<Vec<Vec<u8>>, Error>
-    where
-        C: AbstractChannel + Clone,
-    {
+        channel: &mut Channel,
+    ) -> Result<Vec<Vec<u8>>, Error> {
         let mut payloads = Vec::new();
         for opprf_output in self.opprf_outputs.iter() {
-            let nonce_bytes = channel.read_vec(NONCE_SIZE)?;
-            let ciphertext = channel.read_vec(payload_len + PAD_LEN + TAG_SIZE)?;
+            let mut nonce_bytes = vec![0u8; NONCE_SIZE];
+            let mut ciphertext = vec![0u8; payload_len + PAD_LEN + TAG_SIZE];
+            channel.read_bytes(&mut nonce_bytes)?;
+            channel.read_bytes(&mut ciphertext)?;
 
             let key = opprf_output.prefix(KEY_SIZE);
             let key: &Key<Aes256Gcm> = key.into();
@@ -206,8 +204,8 @@ impl SenderState {
 
 impl Receiver {
     /// Initialize the PSI receiver.
-    pub fn init<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
-        channel: &mut C,
+    pub fn init<RNG: RngCore + CryptoRng + SeedableRng>(
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let opprf = KmprtReceiver::init(channel, rng)?;
@@ -215,10 +213,10 @@ impl Receiver {
     }
 
     /// Run the PSI protocol over `inputs`.
-    pub fn receive<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn receive<RNG: RngCore + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<ReceiverState, Error> {
         let key = rng.r#gen();
@@ -226,9 +224,12 @@ impl Receiver {
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
 
         // Send cuckoo hash info to receiver.
-        channel.write_block(&key)?;
-        channel.write_usize(cuckoo.nbins)?;
-        channel.flush()?;
+        channel
+            .write(&key)
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
+        channel
+            .write(&cuckoo.nbins)
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
 
         // Build `table` to include a cuckoo hash entry xored with its hash
         // index, if such a entry exists, or a random value.
@@ -253,50 +254,46 @@ impl Receiver {
 
 impl ReceiverState {
     /// Run the setup phase, producing an evaluator for the next stage.
-    pub fn compute_setup<C, RNG>(
+    pub fn compute_setup<RNG>(
         &self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<
         (
-            Evaluator<C, RNG, OtReceiver, AllWire>,
+            Evaluator<RNG, OtReceiver, AllWire>,
             Vec<AllWire>,
             Vec<AllWire>,
         ),
         Error,
     >
     where
-        C: AbstractChannel + Clone,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
     {
         let nbins = self.cuckoo.nbins;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
 
-        let mut ev = Evaluator::<C, RNG, OtReceiver, AllWire>::new(
-            channel.clone(),
-            RNG::from_seed(rng.r#gen()),
-        )?;
+        let mut ev =
+            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))?;
 
         let mods = vec![2; nbins * HASH_SIZE * 8];
-        let sender_inputs = ev.receive_many(&mods)?;
-        let receiver_inputs = ev.encode_many(&my_input_bits, &mods)?;
+        let sender_inputs = ev.receive_many(&mods, channel)?;
+        let receiver_inputs = ev.encode_many(&my_input_bits, &mods, channel)?;
         Ok((ev, sender_inputs, receiver_inputs))
     }
 
     /// Compute the intersection.
-    pub fn compute_intersection<C, RNG>(
+    pub fn compute_intersection<RNG>(
         &self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<Vec<Msg>, Error>
     where
-        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut ev, x, y) = self.compute_setup(channel, rng)?;
-        let outs = fancy_compute_intersection(&mut ev, &x, &y)?;
+        let outs = fancy_compute_intersection(&mut ev, &x, &y, channel)?;
         let mpc_outs = ev
-            .outputs(&outs)?
+            .outputs(&outs, channel)?
             .expect("evaluator should produce outputs");
 
         let mut intersection = Vec::new();
@@ -311,19 +308,18 @@ impl ReceiverState {
     }
 
     /// Compute the cardinality of the intersection.
-    pub fn compute_cardinality<C, RNG>(
+    pub fn compute_cardinality<RNG>(
         &self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<usize, Error>
     where
-        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut ev, x, y) = self.compute_setup(channel, rng)?;
-        let result = fancy_compute_cardinality(&mut ev, &x, &y)?;
+        let result = fancy_compute_cardinality(&mut ev, &x, &y, channel)?;
         let cardinality_outs = ev
-            .outputs(&result.wires())?
+            .outputs(&result.wires(), channel)?
             .expect("evaluator should produce outputs");
 
         let mut cardinality = 0;
@@ -335,14 +331,13 @@ impl ReceiverState {
 
     /// Send encrypted payloads to the Receiver, who can only decrypt a payload if they
     /// share the associated element in the intersection.
-    pub fn send_payloads<C, RNG>(
+    pub fn send_payloads<RNG>(
         &self,
         payloads: &[Vec<u8>],
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<(), Error>
     where
-        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let payload_len = payloads[0].len();
@@ -374,7 +369,6 @@ impl ReceiverState {
             channel.write_bytes(&nonce)?;
             channel.write_bytes(&ciphertext)?;
         }
-        channel.flush()?;
         Ok(())
     }
 }
@@ -395,6 +389,7 @@ fn fancy_compute_intersection<F: Fancy + BinaryBundleGadgets>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
+    channel: &mut Channel,
 ) -> Result<Vec<F::Item>, F::Error> {
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
     sender_inputs
@@ -404,6 +399,7 @@ fn fancy_compute_intersection<F: Fancy + BinaryBundleGadgets>(
             f.bin_eq_bundles(
                 &BinaryBundle::new(xs.to_vec()),
                 &BinaryBundle::new(ys.to_vec()),
+                channel,
             )
         })
         .collect()
@@ -414,6 +410,7 @@ fn fancy_compute_cardinality<F: Fancy + BinaryBundleGadgets + FancyBinary>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
+    channel: &mut Channel,
 ) -> Result<BinaryBundle<F::Item>, F::Error> {
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
 
@@ -424,21 +421,22 @@ fn fancy_compute_cardinality<F: Fancy + BinaryBundleGadgets + FancyBinary>(
             f.bin_eq_bundles(
                 &BinaryBundle::new(xs.to_vec()),
                 &BinaryBundle::new(ys.to_vec()),
+                channel,
             )
         })
         .collect::<Result<Vec<F::Item>, F::Error>>()?;
 
-    let mut acc = f.bin_constant_bundle(0, HASH_SIZE * 8)?;
+    let mut acc = f.bin_constant_bundle(0, HASH_SIZE * 8, channel)?;
 
     for b in eqs.into_iter() {
-        let one = f.bin_constant_bundle(1, HASH_SIZE * 8)?;
+        let one = f.bin_constant_bundle(1, HASH_SIZE * 8, channel)?;
         let b_ws = one
             .iter()
-            .map(|w| f.and(w, &b))
+            .map(|w| f.and(w, &b, channel))
             .collect::<Result<Vec<_>, _>>()?;
         let b_binary = BinaryBundle::new(b_ws);
 
-        acc = f.bin_addition_no_carry(&acc, &b_binary)?;
+        acc = f.bin_addition_no_carry(&acc, &b_binary, channel)?;
     }
 
     Ok(acc)
@@ -451,40 +449,32 @@ impl SemiHonest for Receiver {}
 mod tests {
     use super::*;
     use crate::utils::rand_vec_vec;
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
     use swanky_aes_rng::AesRng;
-    use swanky_channel_legacy::Channel;
 
     const ITEM_SIZE: usize = 8;
     const SET_SIZE: usize = 1 << 6;
     const NUM_DIFF: usize = 10;
 
     fn psty_cardinality(sender_inputs: Vec<Vec<u8>>, receiver_inputs: Vec<Vec<u8>>) -> usize {
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        std::thread::spawn(move || {
-            let mut rng = AesRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
+        let (_, output) = swanky_channel::local::local_channel_pair(
+            |channel| {
+                let mut rng = AesRng::new();
+                let mut psi = Sender::init(channel, &mut rng).unwrap();
 
-            let state = psi.send(&sender_inputs, &mut channel, &mut rng).unwrap();
-            state.compute_cardinality(&mut channel, &mut rng).unwrap();
-        });
+                let state = psi.send(&sender_inputs, channel, &mut rng).unwrap();
+                state.compute_cardinality(channel, &mut rng).unwrap();
+                Ok(())
+            },
+            |channel| {
+                let mut rng = AesRng::new();
+                let mut psi = Receiver::init(channel, &mut rng).unwrap();
 
-        let mut rng = AesRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-
-        let state = psi
-            .receive(&receiver_inputs, &mut channel, &mut rng)
-            .unwrap();
-        state.compute_cardinality(&mut channel, &mut rng).unwrap()
+                let state = psi.receive(&receiver_inputs, channel, &mut rng).unwrap();
+                Ok(state.compute_cardinality(channel, &mut rng).unwrap())
+            },
+        )
+        .unwrap();
+        output
     }
 
     #[test]
@@ -578,37 +568,28 @@ mod tests {
     #[test]
     fn payloads() {
         let payload_size = 16;
-
         let mut rng = AesRng::new();
-        let (sender, receiver) = UnixStream::pair().unwrap();
         let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
         let receiver_inputs = sender_inputs.clone();
         let payloads = rand_vec_vec(SET_SIZE, payload_size, &mut rng);
 
-        let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-            let state = psi.send(&sender_inputs, &mut channel, &mut rng).unwrap();
-            state.receive_payloads(payload_size, &mut channel).unwrap()
-        });
+        let (received_payloads, _) = swanky_channel::local::local_channel_pair(
+            |channel| {
+                let mut rng = AesRng::new();
+                let mut psi = Sender::init(channel, &mut rng).unwrap();
+                let state = psi.send(&sender_inputs, channel, &mut rng).unwrap();
+                Ok(state.receive_payloads(payload_size, channel).unwrap())
+            },
+            |channel| {
+                let mut rng = AesRng::new();
+                let mut psi = Receiver::init(channel, &mut rng).unwrap();
 
-        let mut rng = AesRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-
-        let state = psi
-            .receive(&receiver_inputs, &mut channel, &mut rng)
-            .unwrap();
-        state
-            .send_payloads(&payloads, &mut channel, &mut rng)
-            .unwrap();
-
-        let received_payloads = handle.join().unwrap();
+                let state = psi.receive(&receiver_inputs, channel, &mut rng).unwrap();
+                state.send_payloads(&payloads, channel, &mut rng).unwrap();
+                Ok(())
+            },
+        )
+        .unwrap();
 
         for payload in payloads.iter() {
             assert!(received_payloads.contains(payload));

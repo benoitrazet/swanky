@@ -8,7 +8,7 @@ mod tests {
         utils::*,
         *,
     };
-    use std::{collections::HashSet, os::unix::net::UnixStream, thread};
+    use std::collections::HashSet;
     use swanky_aes_rng::AesRng;
     use swanky_block::Block512;
 
@@ -24,26 +24,25 @@ mod tests {
         Result<(), Error>,
         Result<(), Error>,
     ) {
-        let (sender, receiver) = UnixStream::pair().unwrap();
-
-        thread::scope(|s| {
-            let result_sender = s.spawn(|| {
-                let mut rng = AesRng::seed_from_u64(seed_sx);
-                let mut channel = setup_channel(sender);
-                let mut sender = OpprfSender::init(&mut channel, &mut rng, true).unwrap();
-                let result_hash_sender =
-                    sender.hash_data(set, Some(payloads), &mut channel, &mut rng);
-                (sender, result_hash_sender)
-            });
-            let mut rng = AesRng::seed_from_u64(seed_rx);
-            let mut channel = setup_channel(receiver);
-
-            let mut receiver = OpprfReceiver::init(&mut channel, &mut rng, true).unwrap();
-            let result_hash_receiver =
-                receiver.hash_data(set, Some(payloads), &mut channel, &mut rng);
-            let (sender, result_hash_sender) = result_sender.join().unwrap();
-            (sender, receiver, result_hash_sender, result_hash_receiver)
-        })
+        let ((sender, result_hash_sender), (receiver, result_hash_receiver)) =
+            swanky_channel::local::local_channel_pair(
+                |channel| {
+                    let mut rng = AesRng::seed_from_u64(seed_sx);
+                    let mut sender = OpprfSender::init(channel, &mut rng, true).unwrap();
+                    let result_hash_sender =
+                        sender.hash_data(set, Some(payloads), channel, &mut rng);
+                    Ok((sender, result_hash_sender))
+                },
+                |channel| {
+                    let mut rng = AesRng::seed_from_u64(seed_rx);
+                    let mut receiver = OpprfReceiver::init(channel, &mut rng, true).unwrap();
+                    let result_hash_receiver =
+                        receiver.hash_data(set, Some(payloads), channel, &mut rng);
+                    Ok((receiver, result_hash_receiver))
+                },
+            )
+            .unwrap();
+        (sender, receiver, result_hash_sender, result_hash_receiver)
     }
 
     // Check that hashing preserves the original payloads by intersecting the party's hash outputs

@@ -9,7 +9,7 @@ mod tests {
         utils::*,
         *,
     };
-    use std::{collections::HashSet, os::unix::net::UnixStream, thread};
+    use std::collections::HashSet;
     use swanky_aes_rng::AesRng;
     use swanky_block::Block;
 
@@ -49,37 +49,41 @@ mod tests {
         seed_sx: u128,
         seed_rx: u128,
     ) -> Result<u128, Error> {
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        thread::scope(|s| {
-            let _ = s.spawn(|| {
-                let mut channel = setup_channel(sender);
+        let (_, result) = swanky_channel::local::local_channel_pair(
+            |channel| {
                 let mut gb_psi: _ =
-                    OpprfPsiGarbler::<_, AesRng>::new(&mut channel, Block::from(seed_sx)).unwrap();
+                    OpprfPsiGarbler::<AesRng>::new(channel, Block::from(seed_sx)).unwrap();
 
-                let intersection_results = gb_psi.intersect(set_a).unwrap();
+                let intersection_results = gb_psi.intersect(set_a, channel).unwrap();
                 let res = fancy_cardinality(
                     &mut gb_psi.gb,
                     &intersection_results.intersection.existence_bit_vector,
+                    channel,
                 )
                 .unwrap();
-                gb_psi.gb.outputs(res.wires()).unwrap();
-            });
-            let mut channel = setup_channel(receiver);
-
-            let mut ev_psi =
-                OpprfPsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(seed_rx)).unwrap();
-            let intersection_results = ev_psi.intersect(set_b).unwrap();
-            let res = fancy_cardinality(
-                &mut ev_psi.ev,
-                &intersection_results.intersection.existence_bit_vector,
-            )?;
-            let res_out = ev_psi
-                .ev
-                .outputs(&res.wires().to_vec())
-                .unwrap()
-                .expect("evaluator should produce outputs");
-            Ok(utils::binary_to_u128(res_out))
-        })
+                gb_psi.gb.outputs(res.wires(), channel).unwrap();
+                Ok(())
+            },
+            |channel| {
+                let mut ev_psi =
+                    OpprfPsiEvaluator::<AesRng>::new(channel, Block::from(seed_rx)).unwrap();
+                let intersection_results = ev_psi.intersect(set_b, channel).unwrap();
+                let res = fancy_cardinality(
+                    &mut ev_psi.ev,
+                    &intersection_results.intersection.existence_bit_vector,
+                    channel,
+                )
+                .unwrap();
+                let res_out = ev_psi
+                    .ev
+                    .outputs(&res.wires().to_vec(), channel)
+                    .unwrap()
+                    .expect("evaluator should produce outputs");
+                Ok(utils::binary_to_u128(res_out))
+            },
+        )
+        .unwrap();
+        Ok(result)
     }
     #[cfg(test)]
     pub fn psty_payload_sum(
@@ -90,46 +94,49 @@ mod tests {
         seed_sx: u128,
         seed_rx: u128,
     ) -> Result<u128, Error> {
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        thread::scope(|s| {
-            let _ = s.spawn(|| {
-                let mut channel = setup_channel(sender);
+        let (_, result) = swanky_channel::local::local_channel_pair(
+            |channel| {
                 let mut gb_psi: _ =
-                    OpprfPsiGarbler::<_, AesRng>::new(&mut channel, Block::from(seed_sx)).unwrap();
+                    OpprfPsiGarbler::<AesRng>::new(channel, Block::from(seed_sx)).unwrap();
 
                 let intersection_results = gb_psi
-                    .intersect_with_payloads(primary_keys_a, Some(payload_a))
+                    .intersect_with_payloads(primary_keys_a, Some(payload_a), channel)
                     .unwrap();
                 let res = fancy_payload_sum(
                     &mut gb_psi.gb,
                     &intersection_results.intersection.existence_bit_vector,
                     &intersection_results.payloads.sender_payloads,
                     &intersection_results.payloads.receiver_payloads,
+                    channel,
                 )
                 .unwrap();
-                gb_psi.gb.outputs(res.wires()).unwrap();
-            });
-            let mut channel = setup_channel(receiver);
-
-            let mut ev_psi =
-                OpprfPsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(seed_rx)).unwrap();
-            let intersection_results = ev_psi
-                .intersect_with_payloads(primary_keys_b, Some(payload_b))
+                gb_psi.gb.outputs(res.wires(), channel).unwrap();
+                Ok(())
+            },
+            |channel| {
+                let mut ev_psi =
+                    OpprfPsiEvaluator::<AesRng>::new(channel, Block::from(seed_rx)).unwrap();
+                let intersection_results = ev_psi
+                    .intersect_with_payloads(primary_keys_b, Some(payload_b), channel)
+                    .unwrap();
+                let res = fancy_payload_sum(
+                    &mut ev_psi.ev,
+                    &intersection_results.intersection.existence_bit_vector,
+                    &intersection_results.payloads.sender_payloads,
+                    &intersection_results.payloads.receiver_payloads,
+                    channel,
+                )
                 .unwrap();
-            let res = fancy_payload_sum(
-                &mut ev_psi.ev,
-                &intersection_results.intersection.existence_bit_vector,
-                &intersection_results.payloads.sender_payloads,
-                &intersection_results.payloads.receiver_payloads,
-            )
-            .unwrap();
-            let res_out = ev_psi
-                .ev
-                .outputs(&res.wires().to_vec())
-                .unwrap()
-                .expect("evaluator should produce outputs");
-            Ok(utils::binary_to_u128(res_out))
-        })
+                let res_out = ev_psi
+                    .ev
+                    .outputs(&res.wires().to_vec(), channel)
+                    .unwrap()
+                    .expect("evaluator should produce outputs");
+                Ok(utils::binary_to_u128(res_out))
+            },
+        )
+        .unwrap();
+        Ok(result)
     }
     #[test]
     // Test the fancy cardinality of the intersection circuit
