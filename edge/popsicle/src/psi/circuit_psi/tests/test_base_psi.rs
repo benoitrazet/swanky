@@ -8,10 +8,8 @@ mod tests {
         utils::*,
         *,
     };
-    use fancy_garbling::{
-        WireMod2,
-        twopac::semihonest::{Evaluator, Garbler},
-    };
+    use fancy_garbling::WireMod2;
+    use swanky_twopac::semihonest::{Evaluator, Garbler};
 
     use swanky_aes_rng::AesRng;
     use swanky_block::Block512;

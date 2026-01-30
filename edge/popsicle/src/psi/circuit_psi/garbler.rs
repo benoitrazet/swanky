@@ -3,12 +3,13 @@ use crate::{
     errors::Error,
     psi::circuit_psi::{circuits::*, *},
 };
-use fancy_garbling::{WireMod2, twopac::semihonest::Garbler};
+use fancy_garbling::WireMod2;
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
 use swanky_block::Block;
 use swanky_channel::Channel;
 use swanky_ot_alsz_kos::alsz::Sender as OtSender;
+use swanky_twopac::semihonest::Garbler;
 
 use self::sender::OpprfSender;
 

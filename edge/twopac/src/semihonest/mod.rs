@@ -9,7 +9,7 @@ pub use garbler::Garbler;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
+    use fancy_garbling::{
         AllWire, CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary, FancyInput, WireLabel,
         WireMod2,
         circuit::{BinaryCircuit, CircuitInfo, EvaluableCircuit, eval_plain},
@@ -82,8 +82,8 @@ mod tests {
     fn test_relu() {
         let mut rng = rand::thread_rng();
         let n = 10;
-        let ps = crate::util::primes_with_width(10);
-        let q = crate::util::product(&ps);
+        let ps = fancy_garbling::util::primes_with_width(10);
+        let q = fancy_garbling::util::product(&ps);
         let input = (0..n).map(|_| rng.gen_u128() % q).collect::<Vec<u128>>();
 
         // Run dummy version.
@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn test_aes_arithmetic() {
         let circ = BinaryCircuit::parse(std::io::Cursor::<&'static [u8]>::new(include_bytes!(
-            "../../../circuits/AES-non-expanded.txt"
+            "../../../fancy-garbling/circuits/AES-non-expanded.txt"
         )))
         .unwrap();
         test_circuit::<_, AllWire>(circ);
@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn test_aes_binary() {
         let circ = BinaryCircuit::parse(std::io::Cursor::<&'static [u8]>::new(include_bytes!(
-            "../../../circuits/AES-non-expanded.txt"
+            "../../../fancy-garbling/circuits/AES-non-expanded.txt"
         )))
         .unwrap();
         test_circuit::<_, WireMod2>(circ);

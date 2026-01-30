@@ -26,7 +26,7 @@ pub enum Error {
     /// AES GCM Error
     AESGCMError(aes_gcm::Error),
     /// An error occurred in the underlying 2PC protocol.
-    TwopacError(fancy_garbling::errors::TwopacError),
+    TwopacError(swanky_twopac::errors::Error),
     /// The set of payloads is not equal to the set of keys.
     PayloadSetNotComplete {
         /// length of the set of payloads
@@ -64,9 +64,9 @@ impl From<swanky_cointoss::Error> for Error {
     }
 }
 
-impl From<fancy_garbling::errors::TwopacError> for Error {
+impl From<swanky_twopac::errors::Error> for Error {
     #[inline]
-    fn from(e: fancy_garbling::errors::TwopacError) -> Error {
+    fn from(e: swanky_twopac::errors::Error) -> Error {
         Error::TwopacError(e)
     }
 }

@@ -9,7 +9,6 @@ use aes_gcm::{
 
 use fancy_garbling::{
     AllWire, BinaryBundle, BinaryBundleGadgets, BinaryGadgets, Fancy, FancyBinary, FancyInput,
-    twopac::semihonest::{Evaluator, Garbler},
 };
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
@@ -18,6 +17,7 @@ use swanky_block::{Block, Block512};
 use swanky_channel::Channel;
 use swanky_oprf_kmprt::{Receiver as KmprtReceiver, Sender as KmprtSender};
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 const NHASHES: usize = 3;
 // How many bytes of the hash to use for the equality tests. This affects

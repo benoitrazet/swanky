@@ -1,6 +1,7 @@
-use crate::{
+use crate::errors::Error;
+use fancy_garbling::{
     AllWire, ArithmeticWire, Evaluator as Ev, Fancy, FancyArithmetic, FancyBinary, FancyInput,
-    FancyReveal, WireMod2, errors::TwopacError, wire::WireLabel,
+    FancyReveal, WireLabel, WireMod2,
 };
 use rand::{CryptoRng, Rng};
 use swanky_adversary::SemiHonest;
@@ -21,20 +22,16 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
     Evaluator<RNG, OT, Wire>
 {
     /// Make a new `Evaluator`.
-    pub fn new(channel: &mut Channel, mut rng: RNG) -> Result<Self, TwopacError> {
+    pub fn new(channel: &mut Channel, mut rng: RNG) -> Result<Self, Error> {
         let ot = OT::init(channel, &mut rng)?;
         let evaluator = Ev::new();
         Ok(Self { evaluator, ot, rng })
     }
 
-    fn run_ot(
-        &mut self,
-        inputs: &[bool],
-        channel: &mut Channel,
-    ) -> Result<Vec<Block>, TwopacError> {
+    fn run_ot(&mut self, inputs: &[bool], channel: &mut Channel) -> Result<Vec<Block>, Error> {
         self.ot
             .receive(channel, inputs, &mut self.rng)
-            .map_err(TwopacError::from)
+            .map_err(Error::from)
     }
 }
 
@@ -42,20 +39,16 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
     for Evaluator<RNG, OT, Wire>
 {
     type Item = Wire;
-    type Error = TwopacError;
+    type Error = Error;
 
     /// Receive a garbler input wire.
-    fn receive(&mut self, modulus: u16, channel: &mut Channel) -> Result<Wire, TwopacError> {
+    fn receive(&mut self, modulus: u16, channel: &mut Channel) -> Result<Wire, Error> {
         let w = self.evaluator.read_wire(modulus, channel)?;
         Ok(w)
     }
 
     /// Receive garbler input wires.
-    fn receive_many(
-        &mut self,
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> Result<Vec<Wire>, TwopacError> {
+    fn receive_many(&mut self, moduli: &[u16], channel: &mut Channel) -> Result<Vec<Wire>, Error> {
         moduli.iter().map(|q| self.receive(*q, channel)).collect()
     }
 
@@ -65,7 +58,7 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
         inputs: &[u16],
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> Result<Vec<Wire>, TwopacError> {
+    ) -> Result<Vec<Wire>, Error> {
         let mut lens = Vec::new();
         let mut bs = Vec::new();
         for (x, q) in inputs.iter().zip(moduli.iter()) {
@@ -172,7 +165,7 @@ impl<RNG, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<RN
 
 impl<RNG, OT, Wire: WireLabel> Fancy for Evaluator<RNG, OT, Wire> {
     type Item = Wire;
-    type Error = TwopacError;
+    type Error = Error;
 
     fn constant(
         &mut self,

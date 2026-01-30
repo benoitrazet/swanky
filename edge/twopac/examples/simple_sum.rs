@@ -2,10 +2,9 @@
 //! using fancy-garbling.
 use fancy_garbling::{
     AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyInput,
-    FancyReveal,
-    twopac::semihonest::{Evaluator, Garbler},
-    util,
+    FancyReveal, util,
 };
+use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
