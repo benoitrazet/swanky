@@ -3,11 +3,12 @@ use crate::{
     errors::Error,
     psi::circuit_psi::{circuits::*, *},
 };
-use fancy_garbling::{WireMod2, twopac::semihonest::Evaluator};
+use fancy_garbling::WireMod2;
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
 use swanky_block::Block;
 use swanky_ot_alsz_kos::alsz::Receiver as OtReceiver;
+use swanky_twopac::semihonest::Evaluator;
 
 use self::receiver::OpprfReceiver;
 

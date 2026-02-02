@@ -1,6 +1,7 @@
-use crate::{
+use crate::errors::Error;
+use fancy_garbling::{
     AllWire, ArithmeticWire, Fancy, FancyArithmetic, FancyBinary, FancyInput, FancyReveal,
-    Garbler as Gb, WireMod2, errors::TwopacError, wire::WireLabel,
+    Garbler as Gb, WireLabel, WireMod2,
 };
 use rand::{CryptoRng, Rng, SeedableRng};
 use swanky_adversary::SemiHonest;
@@ -35,7 +36,7 @@ impl<
 > Garbler<RNG, OT, Wire>
 {
     /// Make a new `Garbler`.
-    pub fn new(channel: &mut Channel, mut rng: RNG) -> Result<Self, TwopacError> {
+    pub fn new(channel: &mut Channel, mut rng: RNG) -> Result<Self, Error> {
         let ot = OT::init(channel, &mut rng)?;
 
         let garbler = Gb::new(RNG::from_seed(rng.r#gen()));
@@ -64,14 +65,9 @@ impl<
 > FancyInput for Garbler<RNG, OT, Wire>
 {
     type Item = Wire;
-    type Error = TwopacError;
+    type Error = Error;
 
-    fn encode(
-        &mut self,
-        val: u16,
-        modulus: u16,
-        channel: &mut Channel,
-    ) -> Result<Wire, TwopacError> {
+    fn encode(&mut self, val: u16, modulus: u16, channel: &mut Channel) -> Result<Wire, Error> {
         let (mine, theirs) = self.garbler.encode_wire(val, modulus);
         self.garbler.send_wire(&theirs, channel)?;
         Ok(mine)
@@ -82,24 +78,18 @@ impl<
         vals: &[u16],
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> Result<Vec<Wire>, TwopacError> {
-        let ws = vals
-            .iter()
+    ) -> Result<Vec<Wire>, Error> {
+        vals.iter()
             .zip(moduli.iter())
             .map(|(x, q)| {
                 let (mine, theirs) = self.garbler.encode_wire(*x, *q);
                 self.garbler.send_wire(&theirs, channel)?;
                 Ok(mine)
             })
-            .collect();
-        ws
+            .collect()
     }
 
-    fn receive_many(
-        &mut self,
-        qs: &[u16],
-        channel: &mut Channel,
-    ) -> Result<Vec<Wire>, TwopacError> {
+    fn receive_many(&mut self, qs: &[u16], channel: &mut Channel) -> Result<Vec<Wire>, Error> {
         let n = qs.len();
         let lens = qs.iter().map(|q| f32::from(*q).log(2.0).ceil() as usize);
         let mut wires = Vec::with_capacity(n);
@@ -195,7 +185,7 @@ impl<RNG: CryptoRng + Rng, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic
 
 impl<RNG: CryptoRng + Rng, OT, Wire: WireLabel> Fancy for Garbler<RNG, OT, Wire> {
     type Item = Wire;
-    type Error = TwopacError;
+    type Error = Error;
 
     fn constant(
         &mut self,

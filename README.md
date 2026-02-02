@@ -71,6 +71,7 @@ have a lesser stability guarantee.
 - **`swanky-polynomial`**: Support for various representations of polynomials over finite fields
 - **`swanky-serialization`**: Traits and utilities for compact serialization into a canonical byte representation
 - **`swanky-svole-wykw`**: An implementation of the WYKW svole protocol
+- **`swanky-twopac`**: Two-party secure computation using garbled circuits.
 - **`web-mac-n-cheese-wasm`**: Web Mac'n'Cheese, the wasm part
 - **`web-mac-n-cheese-websocket`**: Web Mac'n'Cheese, the websocket part
 - **`zkv`**: Zero knowledge proofs for verilog files generated using saw / abc

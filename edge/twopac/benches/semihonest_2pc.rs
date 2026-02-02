@@ -5,11 +5,11 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     FancyInput, WireMod2,
     circuit::{BinaryCircuit as Circuit, EvaluableCircuit},
-    twopac::semihonest::{Evaluator, Garbler},
 };
 use std::{fs::File, io::BufReader, time::Duration};
 use swanky_aes_rng::AesRng;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 fn circuit(fname: &str) -> Circuit {
     Circuit::parse(BufReader::new(File::open(fname).unwrap())).unwrap()
@@ -45,21 +45,21 @@ fn _bench_circuit(circ: &Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
 }
 
 fn bench_aes_binary(c: &mut Criterion) {
-    let circ = circuit("circuits/AES-non-expanded.txt");
+    let circ = circuit("../fancy-garbling/circuits/AES-non-expanded.txt");
     c.bench_function("twopac::semi-honest (AES-binary)", move |bench| {
         bench.iter(|| _bench_circuit(&circ, vec![0u16; 128], vec![0u16; 128]))
     });
 }
 
 fn bench_sha_1_binary(c: &mut Criterion) {
-    let circ = circuit("circuits/sha-1.txt");
+    let circ = circuit("../fancy-garbling/circuits/sha-1.txt");
     c.bench_function("twopac::semi-honest (SHA-1-binary)", move |bench| {
         bench.iter(|| _bench_circuit(&circ, vec![0u16; 512], vec![]))
     });
 }
 
 fn bench_sha_256_binary(c: &mut Criterion) {
-    let circ = circuit("circuits/sha-256.txt");
+    let circ = circuit("../fancy-garbling/circuits/sha-256.txt");
     c.bench_function("twopac::semi-honest (SHA-256-binary)", move |bench| {
         bench.iter(|| _bench_circuit(&circ, vec![0u16; 512], vec![]))
     });

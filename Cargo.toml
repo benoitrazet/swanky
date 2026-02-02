@@ -58,6 +58,7 @@ members = [
   "edge/serialization",
   "edge/simple-arith-circuit",
   "edge/svole-wykw",
+  "edge/twopac",
   "edge/zkv",
 ]
 
@@ -130,6 +131,7 @@ swanky-party2 = { path = "edge/party2" }
 swanky-polynomial = { path = "edge/polynomial" }
 swanky-serialization = { path = "edge/serialization" }
 swanky-svole-wykw = { path = "edge/svole-wykw" }
+swanky-twopac = { path = "edge/twopac" }
 vectoreyes = { path = "core/vectoreyes" }
 web-mac-n-cheese-wasm = { path = "edge/diet-mac-and-cheese/web-mac-and-cheese/wasm" }
 web-mac-n-cheese-websocket = { path = "edge/diet-mac-and-cheese/web-mac-and-cheese/websocket" }

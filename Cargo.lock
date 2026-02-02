@@ -794,7 +794,6 @@ dependencies = [
 name = "fancy-garbling"
 version = "0.6.0"
 dependencies = [
- "clap",
  "criterion",
  "eyre",
  "itertools 0.14.0",
@@ -808,10 +807,6 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-block",
  "swanky-channel",
- "swanky-ocelot-error",
- "swanky-ot-alsz-kos",
- "swanky-ot-chou-orlandi",
- "swanky-ot-traits",
  "vectoreyes",
 ]
 
@@ -1826,6 +1821,7 @@ dependencies = [
  "swanky-oprf-kmprt",
  "swanky-oprf-traits",
  "swanky-ot-alsz-kos",
+ "swanky-twopac",
  "vectoreyes",
 ]
 
@@ -2929,6 +2925,25 @@ dependencies = [
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",
  "vectoreyes",
+]
+
+[[package]]
+name = "swanky-twopac"
+version = "0.6.0"
+dependencies = [
+ "clap",
+ "criterion",
+ "fancy-garbling",
+ "itertools 0.14.0",
+ "rand 0.8.5",
+ "swanky-adversary",
+ "swanky-aes-rng",
+ "swanky-block",
+ "swanky-channel",
+ "swanky-ocelot-error",
+ "swanky-ot-alsz-kos",
+ "swanky-ot-chou-orlandi",
+ "swanky-ot-traits",
 ]
 
 [[package]]

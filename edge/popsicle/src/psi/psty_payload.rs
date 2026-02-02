@@ -35,8 +35,8 @@ use crate::{
 use fancy_garbling::{
     AllWire, ArithmeticBundleGadgets, BinaryBundle, Bundle, CrtBundle, CrtGadgets, Fancy,
     FancyBinary, FancyInput,
-    twopac::semihonest::{Evaluator, Garbler},
 };
+use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 use itertools::Itertools;
 use swanky_channel::Channel;

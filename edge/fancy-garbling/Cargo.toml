@@ -21,13 +21,9 @@ doctest = false
 serde = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
-swanky-ot-traits.workspace = true
-swanky-ocelot-error.workspace = true
-
 eyre.workspace = true
 vectoreyes.workspace = true
 itertools.workspace = true
-clap.workspace = true
 rand.workspace = true
 regex.workspace = true
 subtle.workspace = true
@@ -40,8 +36,6 @@ swanky-block.workspace = true
 swanky-channel.workspace = true
 
 [dev-dependencies]
-swanky-ot-alsz-kos.workspace = true
-swanky-ot-chou-orlandi.workspace = true
 criterion.workspace = true
 
 [[bin]]
@@ -62,8 +56,4 @@ harness = false
 
 [[bench]]
 name = "util"
-harness = false
-
-[[bench]]
-name = "semihonest_2pc"
 harness = false
