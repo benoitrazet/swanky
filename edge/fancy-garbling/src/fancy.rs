@@ -209,6 +209,10 @@ pub trait FancyArithmetic: Fancy {
     /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
     ///
     /// Optional `tt` is useful for hiding the gate from the evaluator.
+    ///
+    /// # Panics
+    /// This may panic in certain implementations if `tt` is `None` when it
+    /// should be `Some`.
     fn proj(
         &mut self,
         x: &Self::Item,

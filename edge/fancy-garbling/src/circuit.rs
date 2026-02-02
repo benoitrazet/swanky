@@ -847,7 +847,8 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
         tt: Option<Vec<u16>>,
         _: &mut Channel,
     ) -> Result<CircuitRef, Self::Error> {
-        let tt = tt.ok_or_else(|| Self::Error::from(FancyError::NoTruthTable))?;
+        assert!(tt.is_some(), "`tt` must not be `None`");
+        let tt = tt.unwrap();
         if tt.len() < xref.modulus() as usize || !tt.iter().all(|&x| x < output_modulus) {
             return Err(Self::Error::from(FancyError::InvalidTruthTable));
         }

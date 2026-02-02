@@ -136,7 +136,8 @@ impl FancyArithmetic for Dummy {
         tt: Option<Vec<u16>>,
         _: &mut Channel,
     ) -> Result<DummyVal, Self::Error> {
-        let tt = tt.ok_or_else(|| Self::Error::from(FancyError::NoTruthTable))?;
+        assert!(tt.is_some(), "`tt` must not be `None`");
+        let tt = tt.unwrap();
         if tt.len() < x.modulus() as usize || !tt.iter().all(|&x| x < modulus) {
             return Err(Self::Error::from(FancyError::InvalidTruthTable));
         }

@@ -18,8 +18,6 @@ pub enum FancyError {
         /// Expected modulus.
         needed: u16,
     },
-    /// Truth table expected but none given.
-    NoTruthTable,
     /// Projection truth table is invalid.
     InvalidTruthTable,
     /// Uninitialized value encountered.
@@ -171,7 +169,6 @@ impl Display for FancyError {
                 "invalid modulus: got mod {} but require mod {}",
                 got, needed
             ),
-            FancyError::NoTruthTable => "truth table required".fmt(f),
             FancyError::InvalidTruthTable => "invalid truth table".fmt(f),
             FancyError::UninitializedValue => {
                 "uninitialized value in circuit. is the circuit topologically sorted?".fmt(f)
