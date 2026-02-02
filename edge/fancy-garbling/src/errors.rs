@@ -18,8 +18,6 @@ pub enum FancyError {
         /// Expected modulus.
         needed: u16,
     },
-    /// Expected binary argument.
-    ArgNotBinary,
     /// Truth table expected but none given.
     NoTruthTable,
     /// Projection truth table is invalid.
@@ -173,7 +171,6 @@ impl Display for FancyError {
                 "invalid modulus: got mod {} but require mod {}",
                 got, needed
             ),
-            FancyError::ArgNotBinary => "argument bundle must be boolean".fmt(f),
             FancyError::NoTruthTable => "truth table required".fmt(f),
             FancyError::InvalidTruthTable => "invalid truth table".fmt(f),
             FancyError::UninitializedValue => {
