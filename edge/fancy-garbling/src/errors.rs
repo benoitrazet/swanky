@@ -11,13 +11,6 @@ pub enum FancyError {
     UnequalModuli,
     /// Invalid argument.
     InvalidArg(String),
-    /// Invalid number of arguments.
-    InvalidArgNum {
-        /// Received number of arguments.
-        got: usize,
-        /// Expected number of arguments.
-        needed: usize,
-    },
     /// Invalid argument modulus.
     InvalidArgMod {
         /// Received modulus.
@@ -175,11 +168,6 @@ impl Display for FancyError {
         match self {
             FancyError::UnequalModuli => "unequal moduli".fmt(f),
             FancyError::InvalidArg(s) => write!(f, "invalid argument: {}", s),
-            FancyError::InvalidArgNum { got, needed } => write!(
-                f,
-                "invalid number of arguments: needed {} but got {}",
-                got, needed
-            ),
             FancyError::InvalidArgMod { got, needed } => write!(
                 f,
                 "invalid modulus: got mod {} but require mod {}",

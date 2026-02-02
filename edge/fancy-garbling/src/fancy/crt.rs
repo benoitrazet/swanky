@@ -312,18 +312,16 @@ pub trait CrtGadgets:
     }
 
     /// Compute the maximum bundle in `xs`.
+    ///
+    /// # Panics
+    /// Panics if `xs` is empty.
     fn crt_max(
         &mut self,
         xs: &[CrtBundle<Self::Item>],
         accuracy: &str,
         channel: &mut Channel,
     ) -> Result<CrtBundle<Self::Item>, Self::Error> {
-        if xs.is_empty() {
-            return Err(Self::Error::from(FancyError::InvalidArgNum {
-                got: xs.len(),
-                needed: 1,
-            }));
-        }
+        assert!(!xs.is_empty(), "`xs` cannot be empty");
         xs.iter().skip(1).fold(Ok(xs[0].clone()), |x, y| {
             x.map(|x| {
                 let pos = self.crt_lt(&x, y, accuracy, channel)?;

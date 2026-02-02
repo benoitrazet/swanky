@@ -107,17 +107,19 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
     /// Add two wire bundles pairwise, zipping addition.
     ///
     /// In CRT this is plain addition. In binary this is xor.
+    ///
+    /// # Panics
+    /// Panics if `x` and `y` are not of the same length.
     fn add_bundles(
         &mut self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
-        if x.wires().len() != y.wires().len() {
-            return Err(Self::Error::from(FancyError::InvalidArgNum {
-                got: y.wires().len(),
-                needed: x.wires().len(),
-            }));
-        }
+        assert_eq!(
+            x.wires().len(),
+            y.wires().len(),
+            "`x` and `y` must be the same length"
+        );
         x.wires()
             .iter()
             .zip(y.wires().iter())
@@ -129,17 +131,19 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
     /// Subtract two wire bundles, residue by residue.
     ///
     /// In CRT this is plain subtraction. In binary this is `xor`.
+    ///
+    /// # Panics
+    /// Panics if `x` and `y` are not of the same length.
     fn sub_bundles(
         &mut self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
-        if x.wires().len() != y.wires().len() {
-            return Err(Self::Error::from(FancyError::InvalidArgNum {
-                got: y.wires().len(),
-                needed: x.wires().len(),
-            }));
-        }
+        assert_eq!(
+            x.wires().len(),
+            y.wires().len(),
+            "`x` and `y` must be the same length"
+        );
         x.wires()
             .iter()
             .zip(y.wires().iter())
@@ -166,18 +170,16 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
     }
 
     /// Mixed radix addition.
+    ///
+    /// # Panics
+    /// Panics if `xs` is empty.
     fn mixed_radix_addition(
         &mut self,
         xs: &[Bundle<Self::Item>],
         channel: &mut Channel,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
+        assert!(!xs.is_empty(), "`xs` cannot be empty");
         let nargs = xs.len();
-        if nargs < 1 {
-            return Err(Self::Error::from(FancyError::InvalidArgNum {
-                got: nargs,
-                needed: 1,
-            }));
-        }
 
         let n = xs[0].wires().len();
         if !xs.iter().all(|x| x.moduli() == xs[0].moduli()) {
@@ -250,18 +252,16 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
     }
 
     /// Mixed radix addition only returning the MSB.
+    ///
+    /// # Panics
+    /// Panics if `xs` is empty.
     fn mixed_radix_addition_msb_only(
         &mut self,
         xs: &[Bundle<Self::Item>],
         channel: &mut Channel,
     ) -> Result<Self::Item, Self::Error> {
+        assert!(!xs.is_empty(), "`xs` cannot be empty");
         let nargs = xs.len();
-        if nargs < 1 {
-            return Err(Self::Error::from(FancyError::InvalidArgNum {
-                got: nargs,
-                needed: 1,
-            }));
-        }
 
         let n = xs[0].wires().len();
         if !xs.iter().all(|x| x.moduli() == xs[0].moduli()) {

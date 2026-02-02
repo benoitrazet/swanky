@@ -79,47 +79,41 @@ pub trait FancyBinary: Fancy {
         }
     }
     /// Returns 1 if all wires equal 1.
+    ///
+    /// # Panics
+    /// Panics if `args` is empty.
     fn and_many(
         &mut self,
         args: &[Self::Item],
         channel: &mut Channel,
     ) -> Result<Self::Item, Self::Error> {
-        if args.is_empty() {
-            return Err(Self::Error::from(FancyError::InvalidArgNum {
-                got: args.len(),
-                needed: 1,
-            }));
-        }
+        assert!(!args.is_empty(), "`args` cannot be empty");
         args.iter()
             .skip(1)
             .fold(Ok(args[0].clone()), |acc, x| self.and(&(acc?), x, channel))
     }
 
     /// Returns 1 if any wire equals 1.
+    ///
+    /// # Panics
+    /// Panics if `args` is empty.
     fn or_many(
         &mut self,
         args: &[Self::Item],
         channel: &mut Channel,
     ) -> Result<Self::Item, Self::Error> {
-        if args.is_empty() {
-            return Err(Self::Error::from(FancyError::InvalidArgNum {
-                got: args.len(),
-                needed: 1,
-            }));
-        }
+        assert!(!args.is_empty(), "`args` cannot be empty");
         args.iter()
             .skip(1)
             .fold(Ok(args[0].clone()), |acc, x| self.or(&(acc?), x, channel))
     }
 
-    /// XOR many wires together
+    /// XOR many wires together.
+    ///
+    /// # Panics
+    /// Panics if `args.len() < 2`.
     fn xor_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
-        if args.len() < 2 {
-            return Err(Self::Error::from(FancyError::InvalidArgNum {
-                got: args.len(),
-                needed: 2,
-            }));
-        }
+        assert!(args.len() >= 2, "`args.len()` must be two or more");
         args.iter()
             .skip(1)
             .fold(Ok(args[0].clone()), |acc, x| self.xor(&(acc?), x))
@@ -227,13 +221,11 @@ pub trait FancyArithmetic: Fancy {
     // Functions built on top of arithmetic fancy operations.
 
     /// Sum up a slice of wires.
+    ///
+    /// # Panics
+    /// Panics if `args.len() < 2`.
     fn add_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
-        if args.len() < 2 {
-            return Err(Self::Error::from(FancyError::InvalidArgNum {
-                got: args.len(),
-                needed: 2,
-            }));
-        }
+        assert!(args.len() >= 2, "`args.len()` must be two or more");
         let mut z = args[0].clone();
         for x in args.iter().skip(1) {
             z = self.add(&z, x)?;
