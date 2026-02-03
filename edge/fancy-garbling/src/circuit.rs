@@ -315,7 +315,17 @@ pub trait EvaluableCircuit<F: Fancy>: CircuitType {
         f: &mut F,
         output_wirelabels: &[Option<F::Item>],
         channel: &mut Channel,
-    ) -> Result<Option<Vec<u16>>, F::Error>;
+    ) -> Result<Option<Vec<u16>>, F::Error> {
+        let mut outputs = Vec::with_capacity(self.noutputs());
+        for r in self.get_output_refs().iter() {
+            let r = output_wirelabels[r.ix]
+                .as_ref()
+                .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?;
+            let out = f.output(r, channel)?;
+            outputs.push(out);
+        }
+        Ok(outputs.into_iter().collect())
+    }
 }
 
 impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
@@ -404,23 +414,6 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
         }
         Ok(cache)
     }
-
-    fn map_wirelabels_to_outputs(
-        &self,
-        f: &mut F,
-        output_wirelabels: &[Option<F::Item>],
-        channel: &mut Channel,
-    ) -> Result<Option<Vec<u16>>, F::Error> {
-        let mut outputs = Vec::with_capacity(self.noutputs());
-        for r in self.get_output_refs().iter() {
-            let r = output_wirelabels[r.ix]
-                .as_ref()
-                .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?;
-            let out = f.output(r, channel)?;
-            outputs.push(out);
-        }
-        Ok(outputs.into_iter().collect())
-    }
 }
 
 impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
@@ -484,23 +477,6 @@ impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
             cache[zref_.unwrap_or(i)] = Some(val);
         }
         Ok(cache)
-    }
-
-    fn map_wirelabels_to_outputs(
-        &self,
-        f: &mut F,
-        output_wirelabels: &[Option<F::Item>],
-        channel: &mut Channel,
-    ) -> Result<Option<Vec<u16>>, F::Error> {
-        let mut outputs = Vec::with_capacity(self.noutputs());
-        for r in self.get_output_refs().iter() {
-            let r = output_wirelabels[r.ix]
-                .as_ref()
-                .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?;
-            let out = f.output(r, channel)?;
-            outputs.push(out);
-        }
-        Ok(outputs.into_iter().collect())
     }
 }
 
