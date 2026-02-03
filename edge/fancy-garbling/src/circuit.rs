@@ -296,6 +296,23 @@ pub trait EvaluableCircuit<F: Fancy>: CircuitType {
         evaluator_inputs: &[F::Item],
         channel: &mut Channel,
     ) -> Result<Option<Vec<u16>>, F::Error>;
+
+    /// Function to output wire labels prior to evaulating
+    fn eval_to_wirelabels(
+        &self,
+        f: &mut F,
+        garbler_inputs: &[F::Item],
+        evaluator_inputs: &[F::Item],
+        channel: &mut Channel,
+    ) -> Result<Vec<Option<F::Item>>, F::Error>;
+
+    /// Function to output wire labels prior to evaulating
+    fn map_wirelabels_to_outputs(
+        &self,
+        f: &mut F,
+        output_wirelabels: &[Option<F::Item>],
+        channel: &mut Channel,
+    ) -> Result<Option<Vec<u16>>, F::Error>;
 }
 
 impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
@@ -306,6 +323,17 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
         evaluator_inputs: &[F::Item],
         channel: &mut Channel,
     ) -> Result<Option<Vec<u16>>, F::Error> {
+        let wirelabels = self.eval_to_wirelabels(f, garbler_inputs, evaluator_inputs, channel)?;
+        self.map_wirelabels_to_outputs(f, &wirelabels, channel)
+    }
+
+    fn eval_to_wirelabels(
+        &self,
+        f: &mut F,
+        garbler_inputs: &[F::Item],
+        evaluator_inputs: &[F::Item],
+        channel: &mut Channel,
+    ) -> Result<Vec<Option<F::Item>>, F::Error> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
             let q = self.modulus(i);
@@ -382,9 +410,18 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
             };
             cache[zref_.unwrap_or(i)] = Some(val);
         }
+        Ok(cache)
+    }
+
+    fn map_wirelabels_to_outputs(
+        &self,
+        f: &mut F,
+        output_wirelabels: &[Option<F::Item>],
+        channel: &mut Channel,
+    ) -> Result<Option<Vec<u16>>, F::Error> {
         let mut outputs = Vec::with_capacity(self.noutputs());
         for r in self.get_output_refs().iter() {
-            let r = cache[r.ix]
+            let r = output_wirelabels[r.ix]
                 .as_ref()
                 .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?;
             let out = f.output(r, channel)?;
@@ -402,6 +439,17 @@ impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
         evaluator_inputs: &[F::Item],
         channel: &mut Channel,
     ) -> Result<Option<Vec<u16>>, F::Error> {
+        let wirelabels = self.eval_to_wirelabels(f, garbler_inputs, evaluator_inputs, channel)?;
+        self.map_wirelabels_to_outputs(f, &wirelabels, channel)
+    }
+
+    fn eval_to_wirelabels(
+        &self,
+        f: &mut F,
+        garbler_inputs: &[F::Item],
+        evaluator_inputs: &[F::Item],
+        channel: &mut Channel,
+    ) -> Result<Vec<Option<F::Item>>, F::Error> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
             let q = 2;
@@ -454,9 +502,18 @@ impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
             };
             cache[zref_.unwrap_or(i)] = Some(val);
         }
+        Ok(cache)
+    }
+
+    fn map_wirelabels_to_outputs(
+        &self,
+        f: &mut F,
+        output_wirelabels: &[Option<F::Item>],
+        channel: &mut Channel,
+    ) -> Result<Option<Vec<u16>>, F::Error> {
         let mut outputs = Vec::with_capacity(self.noutputs());
         for r in self.get_output_refs().iter() {
-            let r = cache[r.ix]
+            let r = output_wirelabels[r.ix]
                 .as_ref()
                 .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?;
             let out = f.output(r, channel)?;
