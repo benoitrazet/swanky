@@ -295,7 +295,10 @@ pub trait EvaluableCircuit<F: Fancy>: CircuitType {
         garbler_inputs: &[F::Item],
         evaluator_inputs: &[F::Item],
         channel: &mut Channel,
-    ) -> Result<Option<Vec<u16>>, F::Error>;
+    ) -> Result<Option<Vec<u16>>, F::Error> {
+        let wirelabels = self.eval_to_wirelabels(f, garbler_inputs, evaluator_inputs, channel)?;
+        self.map_wirelabels_to_outputs(f, &wirelabels, channel)
+    }
 
     /// Function to output wire labels prior to evaulating
     fn eval_to_wirelabels(
@@ -316,17 +319,6 @@ pub trait EvaluableCircuit<F: Fancy>: CircuitType {
 }
 
 impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
-    fn eval(
-        &self,
-        f: &mut F,
-        garbler_inputs: &[F::Item],
-        evaluator_inputs: &[F::Item],
-        channel: &mut Channel,
-    ) -> Result<Option<Vec<u16>>, F::Error> {
-        let wirelabels = self.eval_to_wirelabels(f, garbler_inputs, evaluator_inputs, channel)?;
-        self.map_wirelabels_to_outputs(f, &wirelabels, channel)
-    }
-
     fn eval_to_wirelabels(
         &self,
         f: &mut F,
@@ -432,17 +424,6 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
 }
 
 impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
-    fn eval(
-        &self,
-        f: &mut F,
-        garbler_inputs: &[F::Item],
-        evaluator_inputs: &[F::Item],
-        channel: &mut Channel,
-    ) -> Result<Option<Vec<u16>>, F::Error> {
-        let wirelabels = self.eval_to_wirelabels(f, garbler_inputs, evaluator_inputs, channel)?;
-        self.map_wirelabels_to_outputs(f, &wirelabels, channel)
-    }
-
     fn eval_to_wirelabels(
         &self,
         f: &mut F,
