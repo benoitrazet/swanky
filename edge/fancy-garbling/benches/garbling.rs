@@ -3,7 +3,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     AllWire, FancyArithmetic,
     circuit::{ArithmeticCircuit as Circuit, CircuitBuilder, CircuitType},
-    classic::{GarbledChannel, garble},
+    classic::{GarbledChannel, eval, garble},
     util::RngExt,
 };
 use std::time::Duration;
@@ -36,7 +36,7 @@ where
         let xs = en.encode_garbler_inputs(&inps);
         bench.iter(|| {
             let ys = Channel::with(GarbledChannel::from(&ev), |channel| {
-                Ok(ev.eval(&c, &xs, &[], channel).unwrap())
+                Ok(eval(&c, &xs, &[], channel).unwrap())
             })
             .unwrap();
             std::hint::black_box(ys);

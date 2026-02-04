@@ -166,7 +166,7 @@ mod tests {
     use crate::{
         WireMod2,
         circuit::{BinaryCircuit as Circuit, eval_plain},
-        classic::{GarbledChannel, garble},
+        classic::{GarbledChannel, eval, garble},
     };
 
     #[test]
@@ -219,7 +219,7 @@ mod tests {
         let gb = en.encode_garbler_inputs(&vec![0u16; 128]);
         let ev = en.encode_evaluator_inputs(&vec![0u16; 128]);
         Channel::with(GarbledChannel::from(&gc), |channel| {
-            Ok(gc.eval(&circ, &gb, &ev, channel).unwrap())
+            Ok(eval(&circ, &gb, &ev, channel).unwrap())
         })
         .unwrap();
     }

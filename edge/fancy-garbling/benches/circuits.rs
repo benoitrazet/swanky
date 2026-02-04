@@ -5,7 +5,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     AllWire, WireMod2,
     circuit::BinaryCircuit,
-    classic::{GarbledChannel, garble},
+    classic::{GarbledChannel, eval, garble},
 };
 use std::{fs::File, io::BufReader, time::Duration};
 use swanky_channel::Channel;
@@ -30,7 +30,7 @@ fn bench_eval_aes_binary(c: &mut Criterion) {
     c.bench_function("eval::aes-binary", move |bench| {
         bench.iter(|| {
             Channel::with(GarbledChannel::from(&gc), |channel| {
-                Ok(gc.eval(&circ, &gb, &ev, channel))
+                Ok(eval(&circ, &gb, &ev, channel))
             })
         })
     });
@@ -51,7 +51,7 @@ fn bench_eval_sha_1_binary(c: &mut Criterion) {
     c.bench_function("eval::sha-1-binary", move |bench| {
         bench.iter(|| {
             Channel::with(GarbledChannel::from(&gc), |channel| {
-                Ok(gc.eval(&circ, &gb, &ev, channel))
+                Ok(eval(&circ, &gb, &ev, channel))
             })
         })
     });
@@ -72,7 +72,7 @@ fn bench_eval_sha_256_binary(c: &mut Criterion) {
     c.bench_function("eval::sha-256-binary", move |bench| {
         bench.iter(|| {
             Channel::with(GarbledChannel::from(&gc), |channel| {
-                Ok(gc.eval(&circ, &gb, &ev, channel))
+                Ok(eval(&circ, &gb, &ev, channel))
             })
         })
     });
@@ -93,7 +93,7 @@ fn bench_eval_aes_arithmetic(c: &mut Criterion) {
     c.bench_function("eval::aes-arithmetic", move |bench| {
         bench.iter(|| {
             Channel::with(GarbledChannel::from(&gc), |channel| {
-                Ok(gc.eval(&circ, &gb, &ev, channel))
+                Ok(eval(&circ, &gb, &ev, channel))
             })
         })
     });
@@ -114,7 +114,7 @@ fn bench_eval_sha_1_arithmetic(c: &mut Criterion) {
     c.bench_function("eval::sha-1-arithmetic", move |bench| {
         bench.iter(|| {
             Channel::with(GarbledChannel::from(&gc), |channel| {
-                Ok(gc.eval(&circ, &gb, &ev, channel))
+                Ok(eval(&circ, &gb, &ev, channel))
             })
         })
     });
@@ -135,7 +135,7 @@ fn bench_eval_sha_256_arithmetic(c: &mut Criterion) {
     c.bench_function("eval::sha-256-arithmetic", move |bench| {
         bench.iter(|| {
             Channel::with(GarbledChannel::from(&gc), |channel| {
-                Ok(gc.eval(&circ, &gb, &ev, channel))
+                Ok(eval(&circ, &gb, &ev, channel))
             })
         })
     });
