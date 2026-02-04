@@ -2,12 +2,9 @@
 //! or the number of boolean and arithmetic gates in a circuit.
 use crate::{
     FancyArithmetic, FancyBinary,
-    errors::FancyError,
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
 };
-use eyre::{ErrReport, eyre};
 use std::cmp::max;
-use std::error::Error;
 use swanky_channel::Channel;
 
 /// An instantiation of [`FancyInput::Item`] used by [`CircuitAnalyzer`].
@@ -26,35 +23,6 @@ impl HasModulus for AnalyzerItem {
         self.modulus
     }
 }
-
-/// Error from the [`CircuitAnalyzer`] fancy object
-///
-/// This error either wraps any underlying error thrown by
-/// [`Fancy`] with eyre or returns an error when trying to run
-/// the [`CircuitAnalyzer`] on projection gates.
-#[derive(Debug)]
-pub enum AnalyzerError {
-    /// Projection is unsupported by the depth informer
-    ProjUnsupported,
-    /// Error from Fancy library.
-    Underlying(ErrReport),
-}
-
-impl From<FancyError> for AnalyzerError {
-    fn from(e: FancyError) -> Self {
-        AnalyzerError::Underlying(eyre!(e))
-    }
-}
-
-impl std::fmt::Display for AnalyzerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::ProjUnsupported => writeln!(f, "Projection unsupported"),
-            Self::Underlying(e) => writeln!(f, "Fancy error: {}", e),
-        }
-    }
-}
-impl Error for AnalyzerError {}
 
 /// A [`Fancy`] object which counts gates in a binary circuit.
 ///

@@ -16,4 +16,4 @@ mod parser;
 pub mod util;
 mod wire;
 
-pub use crate::{errors::FancyError, fancy::*, garble::*, wire::*};
+pub use crate::{fancy::*, garble::*, wire::*};
