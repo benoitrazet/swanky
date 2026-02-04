@@ -288,7 +288,10 @@ impl<C: EvaluableCircuit<Informer<Dummy>>> CircuitInfo for C {
 ///
 /// Supertrait ensures that circuit can be built by `CircuitBuilder`
 pub trait EvaluableCircuit<F: Fancy>: CircuitType {
-    /// Function to evaluate the circuit
+    /// Function to evaluate the circuit.
+    ///
+    /// # Panics
+    /// This may panic if the circuit is malformed.
     fn eval(
         &self,
         f: &mut F,
