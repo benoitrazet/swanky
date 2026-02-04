@@ -42,13 +42,13 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
     type Error = Error;
 
     /// Receive a garbler input wire.
-    fn receive(&mut self, modulus: u16, channel: &mut Channel) -> Result<Wire, Error> {
+    fn receive(&mut self, modulus: u16, channel: &mut Channel) -> eyre::Result<Wire> {
         let w = self.evaluator.read_wire(modulus, channel)?;
         Ok(w)
     }
 
     /// Receive garbler input wires.
-    fn receive_many(&mut self, moduli: &[u16], channel: &mut Channel) -> Result<Vec<Wire>, Error> {
+    fn receive_many(&mut self, moduli: &[u16], channel: &mut Channel) -> eyre::Result<Vec<Wire>> {
         moduli.iter().map(|q| self.receive(*q, channel)).collect()
     }
 
@@ -58,7 +58,7 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
         inputs: &[u16],
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> Result<Vec<Wire>, Error> {
+    ) -> eyre::Result<Vec<Wire>> {
         let mut lens = Vec::new();
         let mut bs = Vec::new();
         for (x, q) in inputs.iter().zip(moduli.iter()) {
@@ -96,16 +96,16 @@ impl<RNG, OT> FancyBinary for Evaluator<RNG, OT, WireMod2> {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
-        self.evaluator.and(x, y, channel).map_err(Self::Error::from)
+    ) -> eyre::Result<Self::Item> {
+        self.evaluator.and(x, y, channel)
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         self.evaluator.xor(x, y)
     }
 
-    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Self::Item, Self::Error> {
-        self.evaluator.negate(x, channel).map_err(Self::Error::from)
+    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<Self::Item> {
+        self.evaluator.negate(x, channel)
     }
 }
 
@@ -115,16 +115,16 @@ impl<RNG, OT> FancyBinary for Evaluator<RNG, OT, AllWire> {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
-        self.evaluator.and(x, y, channel).map_err(Self::Error::from)
+    ) -> eyre::Result<Self::Item> {
+        self.evaluator.and(x, y, channel)
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         self.evaluator.xor(x, y)
     }
 
-    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Self::Item, Self::Error> {
-        self.evaluator.negate(x, channel).map_err(Self::Error::from)
+    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<Self::Item> {
+        self.evaluator.negate(x, channel)
     }
 }
 
@@ -141,13 +141,8 @@ impl<RNG, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<RN
         self.evaluator.cmul(x, c)
     }
 
-    fn mul(
-        &mut self,
-        x: &Wire,
-        y: &Wire,
-        channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
-        self.evaluator.mul(x, y, channel).map_err(Self::Error::from)
+    fn mul(&mut self, x: &Wire, y: &Wire, channel: &mut Channel) -> eyre::Result<Self::Item> {
+        self.evaluator.mul(x, y, channel)
     }
 
     fn proj(
@@ -156,10 +151,8 @@ impl<RNG, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<RN
         q: u16,
         tt: Option<Vec<u16>>,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
-        self.evaluator
-            .proj(x, q, tt, channel)
-            .map_err(Self::Error::from)
+    ) -> eyre::Result<Self::Item> {
+        self.evaluator.proj(x, q, tt, channel)
     }
 }
 
@@ -167,25 +160,18 @@ impl<RNG, OT, Wire: WireLabel> Fancy for Evaluator<RNG, OT, Wire> {
     type Item = Wire;
     type Error = Error;
 
-    fn constant(
-        &mut self,
-        x: u16,
-        q: u16,
-        channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
-        self.evaluator
-            .constant(x, q, channel)
-            .map_err(Self::Error::from)
+    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> eyre::Result<Self::Item> {
+        self.evaluator.constant(x, q, channel)
     }
 
-    fn output(&mut self, x: &Wire, channel: &mut Channel) -> Result<Option<u16>, Self::Error> {
-        self.evaluator.output(x, channel).map_err(Self::Error::from)
+    fn output(&mut self, x: &Wire, channel: &mut Channel) -> eyre::Result<Option<u16>> {
+        self.evaluator.output(x, channel)
     }
 }
 
 impl<RNG: CryptoRng + Rng, OT, Wire: WireLabel> FancyReveal for Evaluator<RNG, OT, Wire> {
-    fn reveal(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<u16, Self::Error> {
-        self.evaluator.reveal(x, channel).map_err(Self::Error::from)
+    fn reveal(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<u16> {
+        self.evaluator.reveal(x, channel)
     }
 }
 

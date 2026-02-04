@@ -170,7 +170,7 @@ pub fn bin_encode_many_block512<F, E>(
     values: &[Block512],
     size: usize,
     channel: &mut Channel,
-) -> Result<Vec<F::Item>, E>
+) -> eyre::Result<Vec<F::Item>>
 where
     F: FancyInput<Item = WireMod2, Error = E>,
     E: Debug,
@@ -188,7 +188,7 @@ pub fn bin_receive_many_block512<F, E>(
     gc_party: &mut F,
     size: usize,
     channel: &mut Channel,
-) -> Result<Vec<F::Item>, E>
+) -> eyre::Result<Vec<F::Item>>
 where
     F: FancyInput<Item = WireMod2, Error = E>,
     E: Debug,

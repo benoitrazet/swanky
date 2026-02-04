@@ -8,14 +8,10 @@ use swanky_channel::Channel;
 /// Evaluator only.
 pub trait FancyReveal: Fancy {
     /// Reveal the contents of `x` to all parties.
-    fn reveal(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<u16, Self::Error>;
+    fn reveal(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<u16>;
 
     /// Reveal a slice of items to all parties.
-    fn reveal_many(
-        &mut self,
-        xs: &[Self::Item],
-        channel: &mut Channel,
-    ) -> Result<Vec<u16>, Self::Error> {
+    fn reveal_many(&mut self, xs: &[Self::Item], channel: &mut Channel) -> eyre::Result<Vec<u16>> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             zs.push(self.reveal(x, channel)?);
@@ -28,7 +24,7 @@ pub trait FancyReveal: Fancy {
         &mut self,
         x: &Bundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<Vec<u16>, Self::Error> {
+    ) -> eyre::Result<Vec<u16>> {
         self.reveal_many(x.wires(), channel)
     }
 
@@ -37,7 +33,7 @@ pub trait FancyReveal: Fancy {
         &mut self,
         xs: &[Bundle<Self::Item>],
         channel: &mut Channel,
-    ) -> Result<Vec<Vec<u16>>, Self::Error> {
+    ) -> eyre::Result<Vec<Vec<u16>>> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             zs.push(self.reveal_bundle(x, channel)?);
@@ -50,7 +46,7 @@ pub trait FancyReveal: Fancy {
         &mut self,
         x: &CrtBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<u128, Self::Error> {
+    ) -> eyre::Result<u128> {
         let q = x.composite_modulus();
         let xs = self.reveal_many(x.wires(), channel)?;
         Ok(util::crt_inv_factor(&xs, q))
@@ -61,7 +57,7 @@ pub trait FancyReveal: Fancy {
         &mut self,
         xs: &[CrtBundle<Self::Item>],
         channel: &mut Channel,
-    ) -> Result<Vec<u128>, Self::Error> {
+    ) -> eyre::Result<Vec<u128>> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             zs.push(self.crt_reveal(x, channel)?);
@@ -74,7 +70,7 @@ pub trait FancyReveal: Fancy {
         &mut self,
         x: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<u128, Self::Error> {
+    ) -> eyre::Result<u128> {
         let bits = self.reveal_many(x.wires(), channel)?;
         Ok(util::u128_from_bits(&bits))
     }
@@ -84,7 +80,7 @@ pub trait FancyReveal: Fancy {
         &mut self,
         xs: &[BinaryBundle<Self::Item>],
         channel: &mut Channel,
-    ) -> Result<Vec<u128>, Self::Error> {
+    ) -> eyre::Result<Vec<u128>> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             zs.push(self.bin_reveal(x, channel)?);

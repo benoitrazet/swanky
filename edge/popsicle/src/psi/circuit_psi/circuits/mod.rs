@@ -21,7 +21,7 @@ pub fn fancy_intersection_bit_vector<F>(
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
     channel: &mut Channel,
-) -> Result<Vec<F::Item>, F::Error>
+) -> eyre::Result<Vec<F::Item>>
 where
     F: FancyReveal + Fancy + FancyBinary,
 {

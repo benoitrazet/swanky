@@ -2934,6 +2934,7 @@ version = "0.6.0"
 dependencies = [
  "clap",
  "criterion",
+ "eyre",
  "fancy-garbling",
  "itertools 0.14.0",
  "rand 0.8.5",

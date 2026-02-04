@@ -104,7 +104,7 @@ fn fancy_sum<F>(
     f: &mut F,
     wire_inputs: SUMInputs<F::Item>,
     channel: &mut Channel,
-) -> Result<BinaryBundle<F::Item>, F::Error>
+) -> eyre::Result<BinaryBundle<F::Item>>
 where
     F: FancyReveal + Fancy + BinaryGadgets + FancyBinary + FancyArithmetic,
 {

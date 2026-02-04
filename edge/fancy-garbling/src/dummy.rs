@@ -51,12 +51,7 @@ impl FancyInput for Dummy {
     type Error = DummyError;
 
     /// Encode a single dummy value.
-    fn encode(
-        &mut self,
-        value: u16,
-        modulus: u16,
-        _: &mut Channel,
-    ) -> Result<DummyVal, DummyError> {
+    fn encode(&mut self, value: u16, modulus: u16, _: &mut Channel) -> eyre::Result<DummyVal> {
         Ok(DummyVal::new(value, modulus))
     }
 
@@ -66,10 +61,8 @@ impl FancyInput for Dummy {
         xs: &[u16],
         moduli: &[u16],
         _: &mut Channel,
-    ) -> Result<Vec<DummyVal>, DummyError> {
-        if xs.len() != moduli.len() {
-            return Err(DummyError::EncodingError);
-        }
+    ) -> eyre::Result<Vec<DummyVal>> {
+        assert_eq!(xs.len(), moduli.len());
         Ok(xs
             .iter()
             .zip(moduli.iter())
@@ -77,13 +70,9 @@ impl FancyInput for Dummy {
             .collect())
     }
 
-    fn receive_many(
-        &mut self,
-        _moduli: &[u16],
-        _: &mut Channel,
-    ) -> Result<Vec<DummyVal>, DummyError> {
+    fn receive_many(&mut self, _moduli: &[u16], _: &mut Channel) -> eyre::Result<Vec<DummyVal>> {
         // Receive is undefined for Dummy which is a single party "protocol"
-        Err(DummyError::EncodingError)
+        eyre::bail!("`receive_many` is undefined for `Dummy`");
     }
 }
 
@@ -113,12 +102,7 @@ impl FancyArithmetic for Dummy {
         }
     }
 
-    fn mul(
-        &mut self,
-        x: &DummyVal,
-        y: &DummyVal,
-        _: &mut Channel,
-    ) -> Result<DummyVal, Self::Error> {
+    fn mul(&mut self, x: &DummyVal, y: &DummyVal, _: &mut Channel) -> eyre::Result<DummyVal> {
         Ok(DummyVal {
             val: x.val * y.val % x.modulus,
             modulus: x.modulus,
@@ -131,7 +115,7 @@ impl FancyArithmetic for Dummy {
         modulus: u16,
         tt: Option<Vec<u16>>,
         _: &mut Channel,
-    ) -> Result<DummyVal, Self::Error> {
+    ) -> eyre::Result<DummyVal> {
         assert!(tt.is_some(), "`tt` must not be `None`");
         let tt = tt.unwrap();
         assert!(
@@ -151,22 +135,17 @@ impl Fancy for Dummy {
     type Item = DummyVal;
     type Error = DummyError;
 
-    fn constant(
-        &mut self,
-        val: u16,
-        modulus: u16,
-        _: &mut Channel,
-    ) -> Result<DummyVal, Self::Error> {
+    fn constant(&mut self, val: u16, modulus: u16, _: &mut Channel) -> eyre::Result<DummyVal> {
         Ok(DummyVal { val, modulus })
     }
 
-    fn output(&mut self, x: &DummyVal, _: &mut Channel) -> Result<Option<u16>, Self::Error> {
+    fn output(&mut self, x: &DummyVal, _: &mut Channel) -> eyre::Result<Option<u16>> {
         Ok(Some(x.val))
     }
 }
 
 impl FancyReveal for Dummy {
-    fn reveal(&mut self, x: &DummyVal, _: &mut Channel) -> Result<u16, DummyError> {
+    fn reveal(&mut self, x: &DummyVal, _: &mut Channel) -> eyre::Result<u16> {
         Ok(x.val)
     }
 }

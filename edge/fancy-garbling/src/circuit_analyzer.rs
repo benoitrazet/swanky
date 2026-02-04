@@ -124,11 +124,7 @@ impl FancyInput for CircuitAnalyzer {
     type Item = AnalyzerItem;
     type Error = AnalyzerError;
 
-    fn receive_many(
-        &mut self,
-        moduli: &[u16],
-        _: &mut Channel,
-    ) -> Result<Vec<Self::Item>, Self::Error> {
+    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> eyre::Result<Vec<Self::Item>> {
         self.ninputs += moduli.len();
         Ok(moduli
             .iter()
@@ -144,7 +140,7 @@ impl FancyInput for CircuitAnalyzer {
         _values: &[u16],
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> Result<Vec<Self::Item>, Self::Error> {
+    ) -> eyre::Result<Vec<Self::Item>> {
         self.receive_many(moduli, channel)
     }
 }
@@ -161,12 +157,7 @@ impl FancyBinary for CircuitAnalyzer {
         }
     }
 
-    fn and(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        _: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    fn and(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
         self.nands += 1;
         // Fancy's AND gate calls the underlying arithmetic multiplication
         self.nmuls += 1;
@@ -176,12 +167,7 @@ impl FancyBinary for CircuitAnalyzer {
             depth: max(x.depth, y.depth) + 1,
         })
     }
-    fn or(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        _: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    fn or(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
         self.nands += 1;
         self.nnegs += 3;
         // Fancy binary's AND gate calls the underlying arithmetic multiplication
@@ -192,7 +178,7 @@ impl FancyBinary for CircuitAnalyzer {
             depth: max(x.depth, y.depth) + 1,
         })
     }
-    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Self::Item, Self::Error> {
+    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
         self.nnegs += 1;
 
         // Fancy implements negation with one constant gate and one XOR
@@ -234,12 +220,7 @@ impl FancyArithmetic for CircuitAnalyzer {
         }
     }
 
-    fn mul(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        _: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    fn mul(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
         self.nmuls += 1;
         Ok(AnalyzerItem {
             modulus: x.modulus,
@@ -253,8 +234,8 @@ impl FancyArithmetic for CircuitAnalyzer {
         _q: u16,
         _tt: Option<Vec<u16>>,
         _: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
-        Err(AnalyzerError::ProjUnsupported)
+    ) -> eyre::Result<Self::Item> {
+        eyre::bail!("Projection gates are unsupported")
     }
 }
 
@@ -262,7 +243,7 @@ impl Fancy for CircuitAnalyzer {
     type Item = AnalyzerItem;
     type Error = AnalyzerError;
 
-    fn constant(&mut self, _val: u16, q: u16, _: &mut Channel) -> Result<Self::Item, Self::Error> {
+    fn constant(&mut self, _val: u16, q: u16, _: &mut Channel) -> eyre::Result<Self::Item> {
         self.nconstants += 1;
         Ok(AnalyzerItem {
             modulus: q,
@@ -270,14 +251,14 @@ impl Fancy for CircuitAnalyzer {
         })
     }
 
-    fn output(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Option<u16>, Self::Error> {
+    fn output(&mut self, x: &Self::Item, _: &mut Channel) -> eyre::Result<Option<u16>> {
         self.mul_depth = max(self.mul_depth, x.depth);
         Ok(None)
     }
 }
 
 impl FancyReveal for CircuitAnalyzer {
-    fn reveal(&mut self, _x: &Self::Item, _: &mut Channel) -> Result<u16, Self::Error> {
+    fn reveal(&mut self, _x: &Self::Item, _: &mut Channel) -> eyre::Result<u16> {
         Ok(0)
     }
 }

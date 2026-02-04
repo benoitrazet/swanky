@@ -35,14 +35,14 @@ pub trait FancyBinary: Fancy {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error>;
+    ) -> eyre::Result<Self::Item>;
 
     /// Binary Not
     // TODO: `negate` _should_ be free (i.e., not require `Channel`), but its
     // not because we need to define a constant (namely, the constant `1`),
     // which requires `Channel`. We should fix this! This can be done by having
     // `Fancy` require a one element.
-    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Self::Item, Self::Error>;
+    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<Self::Item>;
 
     /// Uses Demorgan's Rule implemented with an and gate and negation.
     fn or(
@@ -50,7 +50,7 @@ pub trait FancyBinary: Fancy {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         let notx = self.negate(x, channel)?;
         let noty = self.negate(y, channel)?;
         let z = self.and(&notx, &noty, channel)?;
@@ -64,7 +64,7 @@ pub trait FancyBinary: Fancy {
         y: &Self::Item,
         carry_in: Option<&Self::Item>,
         channel: &mut Channel,
-    ) -> Result<(Self::Item, Self::Item), Self::Error> {
+    ) -> eyre::Result<(Self::Item, Self::Item)> {
         if let Some(c) = carry_in {
             let z1 = self.xor(x, y);
             let z2 = self.xor(&z1, c);
@@ -82,11 +82,7 @@ pub trait FancyBinary: Fancy {
     ///
     /// # Panics
     /// Panics if `args` is empty.
-    fn and_many(
-        &mut self,
-        args: &[Self::Item],
-        channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    fn and_many(&mut self, args: &[Self::Item], channel: &mut Channel) -> eyre::Result<Self::Item> {
         assert!(!args.is_empty(), "`args` cannot be empty");
         args.iter()
             .skip(1)
@@ -97,11 +93,7 @@ pub trait FancyBinary: Fancy {
     ///
     /// # Panics
     /// Panics if `args` is empty.
-    fn or_many(
-        &mut self,
-        args: &[Self::Item],
-        channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    fn or_many(&mut self, args: &[Self::Item], channel: &mut Channel) -> eyre::Result<Self::Item> {
         assert!(!args.is_empty(), "`args` cannot be empty");
         args.iter()
             .skip(1)
@@ -126,7 +118,7 @@ pub trait FancyBinary: Fancy {
         b1: bool,
         b2: bool,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         match (b1, b2) {
             (false, true) => Ok(x.clone()),
             (true, false) => self.negate(x, channel),
@@ -142,7 +134,7 @@ pub trait FancyBinary: Fancy {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         let xor = self.xor(x, y);
         let and = self.and(b, &xor, channel)?;
         Ok(self.xor(&and, x))
@@ -161,24 +153,18 @@ pub trait Fancy {
     type Error: std::fmt::Debug + std::fmt::Display + std::convert::From<FancyError>;
 
     /// Create a constant `x` with modulus `q`.
-    fn constant(
-        &mut self,
-        x: u16,
-        q: u16,
-        channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error>;
+    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> eyre::Result<Self::Item>;
 
     /// Process this wire as output. Some `Fancy` implementers don't actually *return*
     /// output, but they need to be involved in the process, so they can return `None`.
-    fn output(&mut self, x: &Self::Item, channel: &mut Channel)
-    -> Result<Option<u16>, Self::Error>;
+    fn output(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<Option<u16>>;
 
     /// Output a slice of wires.
     fn outputs(
         &mut self,
         xs: &[Self::Item],
         channel: &mut Channel,
-    ) -> Result<Option<Vec<u16>>, Self::Error> {
+    ) -> eyre::Result<Option<Vec<u16>>> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             zs.push(self.output(x, channel)?);
@@ -210,7 +196,7 @@ pub trait FancyArithmetic: Fancy {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error>;
+    ) -> eyre::Result<Self::Item>;
 
     /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
     ///
@@ -227,7 +213,7 @@ pub trait FancyArithmetic: Fancy {
         q: u16,
         tt: Option<Vec<u16>>,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error>;
+    ) -> eyre::Result<Self::Item>;
 
     ////////////////////////////////////////////////////////////////////////////////
     // Functions built on top of arithmetic fancy operations.
@@ -250,7 +236,7 @@ pub trait FancyArithmetic: Fancy {
         x: &Self::Item,
         to_modulus: u16,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         let from_modulus = x.modulus();
         if from_modulus == to_modulus {
             return Ok(x.clone());
@@ -287,14 +273,14 @@ macro_rules! derive_binary {
                 self.add(x, y)
             }
 
-            fn and(&mut self, x: &Self::Item, y: &Self::Item, channel: &mut Channel) -> Result<Self::Item, Self::Error> {
+            fn and(&mut self, x: &Self::Item, y: &Self::Item, channel: &mut Channel) -> eyre::Result<Self::Item> {
                 check_binary!(x);
                 check_binary!(y);
 
                 self.mul(x, y, channel)
             }
 
-            fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Self::Item, Self::Error> {
+            fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<Self::Item> {
                 check_binary!(x);
                 // TODO: negate _should_ be free, but it's not because we define
                 // a constant here, and this is defined on _every_ negate call.

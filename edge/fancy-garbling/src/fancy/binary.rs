@@ -57,7 +57,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         val: u128,
         nbits: usize,
         channel: &mut Channel,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<BinaryBundle<Self::Item>> {
         self.constant_bundle(&util::u128_to_bits(val, nbits), &vec![2; nbits], channel)
             .map(BinaryBundle)
     }
@@ -67,7 +67,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         &mut self,
         x: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<Option<u128>, Self::Error> {
+    ) -> eyre::Result<Option<u128>> {
         Ok(self
             .output_bundle(x, channel)?
             .map(|bs| util::u128_from_bits(&bs)))
@@ -78,7 +78,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         &mut self,
         xs: &[BinaryBundle<Self::Item>],
         channel: &mut Channel,
-    ) -> Result<Option<Vec<u128>>, Self::Error> {
+    ) -> eyre::Result<Option<Vec<u128>>> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             let z = self.bin_output(x, channel)?;
@@ -108,12 +108,12 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<BinaryBundle<Self::Item>> {
         x.wires()
             .iter()
             .zip(y.wires().iter())
             .map(|(x, y)| self.and(x, y, channel))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .collect::<eyre::Result<Vec<Self::Item>>>()
             .map(BinaryBundle::new)
     }
 
@@ -123,12 +123,12 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<BinaryBundle<Self::Item>> {
         x.wires()
             .iter()
             .zip(y.wires().iter())
             .map(|(x, y)| self.or(x, y, channel))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .collect::<eyre::Result<Vec<Self::Item>>>()
             .map(BinaryBundle::new)
     }
 
@@ -141,7 +141,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         xs: &BinaryBundle<Self::Item>,
         ys: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<(BinaryBundle<Self::Item>, Self::Item), Self::Error> {
+    ) -> eyre::Result<(BinaryBundle<Self::Item>, Self::Item)> {
         assert_eq!(xs.moduli(), ys.moduli());
         let xwires = xs.wires();
         let ywires = ys.wires();
@@ -165,7 +165,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         xs: &BinaryBundle<Self::Item>,
         ys: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<BinaryBundle<Self::Item>> {
         assert_eq!(xs.moduli(), ys.moduli());
         let xwires = xs.wires();
         let ywires = ys.wires();
@@ -199,7 +199,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         xs: &BinaryBundle<Self::Item>,
         ys: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<BinaryBundle<Self::Item>> {
         assert_eq!(xs.moduli(), ys.moduli());
 
         let xwires = xs.wires();
@@ -208,14 +208,14 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         let mut sum = xwires
             .iter()
             .map(|x| self.and(x, &ywires[0], channel))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .collect::<eyre::Result<Vec<Self::Item>>>()
             .map(BinaryBundle::new)?;
 
         for i in 1..xwires.len() {
             let mul = xwires
                 .iter()
                 .map(|x| self.and(x, &ywires[i], channel))
-                .collect::<Result<Vec<Self::Item>, Self::Error>>()
+                .collect::<eyre::Result<Vec<Self::Item>>>()
                 .map(BinaryBundle::new)?;
             let shifted = self.shift(&mul, i, channel).map(BinaryBundle)?;
             sum = self.bin_addition_no_carry(&sum, &shifted, channel)?;
@@ -233,7 +233,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         xs: &BinaryBundle<Self::Item>,
         ys: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<BinaryBundle<Self::Item>> {
         assert_eq!(xs.moduli(), ys.moduli());
 
         let xwires = xs.wires();
@@ -274,7 +274,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         xs: &BinaryBundle<Self::Item>,
         ys: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<BinaryBundle<Self::Item>> {
         assert_eq!(xs.moduli(), ys.moduli());
         let ys_neg = self.bin_twos_complement(ys, channel)?;
         let mut acc = self.bin_constant_bundle(0, xs.size(), channel)?;
@@ -295,12 +295,12 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         &mut self,
         xs: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<BinaryBundle<Self::Item>> {
         let not_xs = xs
             .wires()
             .iter()
             .map(|x| self.negate(x, channel))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .collect::<eyre::Result<Vec<Self::Item>>>()
             .map(BinaryBundle::new)?;
         let one = self.bin_constant_bundle(1, xs.size(), channel)?;
         self.bin_addition_no_carry(&not_xs, &one, channel)
@@ -314,7 +314,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         xs: &BinaryBundle<Self::Item>,
         ys: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<(BinaryBundle<Self::Item>, Self::Item), Self::Error> {
+    ) -> eyre::Result<(BinaryBundle<Self::Item>, Self::Item)> {
         let neg_ys = self.bin_twos_complement(ys, channel)?;
         self.bin_addition(xs, &neg_ys, channel)
     }
@@ -327,7 +327,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         c2: u128,
         nbits: usize,
         channel: &mut Channel,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<BinaryBundle<Self::Item>> {
         let c1_bs = util::u128_to_bits(c1, nbits)
             .into_iter()
             .map(|x: u16| x > 0)
@@ -340,7 +340,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
             .into_iter()
             .zip(c2_bs.into_iter())
             .map(|(b1, b2)| self.mux_constant_bits(x, b1, b2, channel))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .collect::<eyre::Result<Vec<Self::Item>>>()
             .map(BinaryBundle::new)
     }
 
@@ -351,12 +351,12 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<BinaryBundle<Self::Item>> {
         x.wires()
             .iter()
             .zip(y.wires().iter())
             .map(|(xwire, ywire)| self.mux(b, xwire, ywire, channel))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .collect::<eyre::Result<Vec<Self::Item>>>()
             .map(BinaryBundle::new)
     }
 
@@ -367,7 +367,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         c: u128,
         nbits: usize,
         channel: &mut Channel,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<BinaryBundle<Self::Item>> {
         let zero = self.bin_constant_bundle(0, nbits, channel)?;
         util::u128_to_bits(c, nbits)
             .into_iter()
@@ -384,7 +384,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         &mut self,
         x: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<BinaryBundle<Self::Item>> {
         let sign = x.wires().last().unwrap();
         let negated = self.bin_twos_complement(x, channel)?;
         self.bin_multiplex(sign, x, &negated, channel)
@@ -396,7 +396,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         // determine whether x and y are positive or negative
         let x_neg = &x.wires().last().unwrap();
         let y_neg = &y.wires().last().unwrap();
@@ -424,7 +424,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         // underflow indicates y != 0 && x >= y
         // requiring special care to remove the y != 0, which is what follows.
         let (_, lhs) = self.bin_subtraction(x, y, channel)?;
@@ -458,7 +458,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         let z = self.bin_lt(x, y, channel)?;
         self.negate(&z, channel)
     }
@@ -471,7 +471,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         &mut self,
         xs: &[BinaryBundle<Self::Item>],
         channel: &mut Channel,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<BinaryBundle<Self::Item>> {
         assert!(!xs.is_empty(), "`xs` cannot be empty");
         xs.iter().skip(1).fold(Ok(xs[0].clone()), |x, y| {
             x.map(|x| {
@@ -486,7 +486,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
                             let yp = self.and(y, &pos, channel)?;
                             Ok(self.xor(&xp, &yp))
                         })
-                        .collect::<Result<Vec<Self::Item>, Self::Error>>()?,
+                        .collect::<eyre::Result<Vec<Self::Item>>>()?,
                 ))
             })?
         })
@@ -500,7 +500,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         &mut self,
         x: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<Vec<Self::Item>, Self::Error> {
+    ) -> eyre::Result<Vec<Self::Item>> {
         let wires = x.wires();
         let nbits = wires.len();
         assert!(nbits <= 8, "wire bitlength is too large");
@@ -537,7 +537,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         c: usize,
         channel: &mut Channel,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<BinaryBundle<Self::Item>> {
         let zero = self.constant(0, 2, channel)?;
         Ok(self.bin_shr(x, c, &zero))
     }
@@ -568,7 +568,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         // compute (x^y == 0) for each residue
         let zs = x
             .wires()
@@ -578,7 +578,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
                 let xy = self.xor(x, y);
                 self.negate(&xy, channel)
             })
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()?;
+            .collect::<eyre::Result<Vec<Self::Item>>>()?;
         // and_many will return 1 only if all outputs of xnor are 1
         // indicating equality
         self.and_many(&zs, channel)

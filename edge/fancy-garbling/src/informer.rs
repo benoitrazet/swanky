@@ -227,7 +227,7 @@ impl<F: Fancy + FancyInput<Item = <F as Fancy>::Item, Error = <F as Fancy>::Erro
         &mut self,
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> Result<Vec<Self::Item>, Self::Error> {
+    ) -> eyre::Result<Vec<Self::Item>> {
         self.stats
             .garbler_input_moduli
             .extend(moduli.iter().cloned());
@@ -239,7 +239,7 @@ impl<F: Fancy + FancyInput<Item = <F as Fancy>::Item, Error = <F as Fancy>::Erro
         values: &[u16],
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> Result<Vec<Self::Item>, Self::Error> {
+    ) -> eyre::Result<Vec<Self::Item>> {
         self.stats
             .garbler_input_moduli
             .extend(moduli.iter().cloned());
@@ -260,7 +260,7 @@ impl<F: FancyBinary> FancyBinary for Informer<F> {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         let result = self.underlying.and(x, y, channel)?;
         self.stats.nmuls += 1;
         self.stats.nciphertexts += 2;
@@ -268,7 +268,7 @@ impl<F: FancyBinary> FancyBinary for Informer<F> {
         Ok(result)
     }
 
-    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Self::Item, Self::Error> {
+    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<Self::Item> {
         let result = self.underlying.negate(x, channel)?;
 
         // Technically only the garbler adds: noop for the evaluator
@@ -309,7 +309,7 @@ impl<F: FancyArithmetic> FancyArithmetic for Informer<F> {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         if x.modulus() < y.modulus() {
             return self.mul(y, x, channel);
         }
@@ -330,7 +330,7 @@ impl<F: FancyArithmetic> FancyArithmetic for Informer<F> {
         q: u16,
         tt: Option<Vec<u16>>,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         let result = self.underlying.proj(x, q, tt, channel)?;
         self.stats.nprojs += 1;
         self.stats.nciphertexts += x.modulus() as usize - 1;
@@ -343,22 +343,13 @@ impl<F: Fancy> Fancy for Informer<F> {
     type Item = F::Item;
     type Error = F::Error;
 
-    fn constant(
-        &mut self,
-        val: u16,
-        q: u16,
-        channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    fn constant(&mut self, val: u16, q: u16, channel: &mut Channel) -> eyre::Result<Self::Item> {
         self.stats.constants.insert((val, q));
         self.update_moduli(q);
         self.underlying.constant(val, q, channel)
     }
 
-    fn output(
-        &mut self,
-        x: &Self::Item,
-        channel: &mut Channel,
-    ) -> Result<Option<u16>, Self::Error> {
+    fn output(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<Option<u16>> {
         let result = self.underlying.output(x, channel)?;
         self.stats.outputs.push(x.modulus());
         Ok(result)
@@ -366,7 +357,7 @@ impl<F: Fancy> Fancy for Informer<F> {
 }
 
 impl<F: Fancy + FancyReveal> FancyReveal for Informer<F> {
-    fn reveal(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<u16, Self::Error> {
+    fn reveal(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<u16> {
         self.underlying.reveal(x, channel)
     }
 }

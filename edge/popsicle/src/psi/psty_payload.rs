@@ -869,7 +869,7 @@ fn fancy_compute_payload_aggregate<
     receiver_payloads: &[F::Item],
     receiver_masks: &[F::Item],
     channel: &mut Channel,
-) -> Result<(CrtBundle<F::Item>, CrtBundle<F::Item>), F::Error> {
+) -> eyre::Result<(CrtBundle<F::Item>, CrtBundle<F::Item>)> {
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
     assert_eq!(sender_payloads.len(), receiver_payloads.len());
     assert_eq!(receiver_payloads.len(), receiver_masks.len());
@@ -887,7 +887,7 @@ fn fancy_compute_payload_aggregate<
                 channel,
             )
         })
-        .collect::<Result<Vec<F::Item>, F::Error>>()?;
+        .collect::<eyre::Result<Vec<F::Item>>>()?;
 
     let reconstructed_payload = sender_payloads
         .chunks(PAYLOAD_PRIME_SIZE_EXPANDED)
@@ -920,7 +920,7 @@ fn fancy_compute_payload_aggregate<
         let b_ws = one
             .iter()
             .map(|w| f.mul(w, &b, channel))
-            .collect::<Result<Vec<F::Item>, F::Error>>()?;
+            .collect::<eyre::Result<Vec<F::Item>>>()?;
         let b_crt = CrtBundle::new(b_ws);
 
         let mux = f.crt_mul(&b_crt, &weighted_payloads[i], channel)?;

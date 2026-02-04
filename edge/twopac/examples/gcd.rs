@@ -124,7 +124,7 @@ fn fancy_gcd<F>(
     wire_inputs: GCDInputs<F::Item>,
     upper_bound: u128,
     channel: &mut Channel,
-) -> Result<BinaryBundle<F::Item>, F::Error>
+) -> eyre::Result<BinaryBundle<F::Item>>
 where
     F: FancyReveal + Fancy + BinaryGadgets + FancyBinary + FancyArithmetic,
 {

@@ -4,7 +4,7 @@
 use crate::{
     WireLabel,
     circuit::EvaluableCircuit,
-    errors::{EvaluatorError, GarblerError},
+    errors::GarblerError,
     garble::{Evaluator, Garbler},
 };
 use itertools::Itertools;
@@ -51,7 +51,7 @@ impl<Wire: WireLabel, Circuit: EvaluableCircuit<Ev<Wire>>> GarbledCircuit<Wire, 
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
         channel: &mut Channel,
-    ) -> Result<Vec<u16>, EvaluatorError> {
+    ) -> eyre::Result<Vec<u16>> {
         let mut evaluator = Evaluator::new();
         let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs, channel)?;
         Ok(outputs.expect("evaluator outputs always are Some(u16)"))

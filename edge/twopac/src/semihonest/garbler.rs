@@ -67,7 +67,7 @@ impl<
     type Item = Wire;
     type Error = Error;
 
-    fn encode(&mut self, val: u16, modulus: u16, channel: &mut Channel) -> Result<Wire, Error> {
+    fn encode(&mut self, val: u16, modulus: u16, channel: &mut Channel) -> eyre::Result<Wire> {
         let (mine, theirs) = self.garbler.encode_wire(val, modulus);
         self.garbler.send_wire(&theirs, channel)?;
         Ok(mine)
@@ -78,7 +78,7 @@ impl<
         vals: &[u16],
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> Result<Vec<Wire>, Error> {
+    ) -> eyre::Result<Vec<Wire>> {
         vals.iter()
             .zip(moduli.iter())
             .map(|(x, q)| {
@@ -89,7 +89,7 @@ impl<
             .collect()
     }
 
-    fn receive_many(&mut self, qs: &[u16], channel: &mut Channel) -> Result<Vec<Wire>, Error> {
+    fn receive_many(&mut self, qs: &[u16], channel: &mut Channel) -> eyre::Result<Vec<Wire>> {
         let n = qs.len();
         let lens = qs.iter().map(|q| f32::from(*q).log(2.0).ceil() as usize);
         let mut wires = Vec::with_capacity(n);
@@ -109,8 +109,8 @@ impl<
 }
 
 impl<RNG: CryptoRng + Rng, OT> FancyBinary for Garbler<RNG, OT, WireMod2> {
-    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Self::Item, Self::Error> {
-        self.garbler.negate(x, channel).map_err(Self::Error::from)
+    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<Self::Item> {
+        self.garbler.negate(x, channel)
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
@@ -122,14 +122,14 @@ impl<RNG: CryptoRng + Rng, OT> FancyBinary for Garbler<RNG, OT, WireMod2> {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
-        self.garbler.and(x, y, channel).map_err(Self::Error::from)
+    ) -> eyre::Result<Self::Item> {
+        self.garbler.and(x, y, channel)
     }
 }
 
 impl<RNG: CryptoRng + Rng, OT> FancyBinary for Garbler<RNG, OT, AllWire> {
-    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Self::Item, Self::Error> {
-        self.garbler.negate(x, channel).map_err(Self::Error::from)
+    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<Self::Item> {
+        self.garbler.negate(x, channel)
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
@@ -141,8 +141,8 @@ impl<RNG: CryptoRng + Rng, OT> FancyBinary for Garbler<RNG, OT, AllWire> {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
-        self.garbler.and(x, y, channel).map_err(Self::Error::from)
+    ) -> eyre::Result<Self::Item> {
+        self.garbler.and(x, y, channel)
     }
 }
 
@@ -161,13 +161,8 @@ impl<RNG: CryptoRng + Rng, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         self.garbler.cmul(x, c)
     }
 
-    fn mul(
-        &mut self,
-        x: &Wire,
-        y: &Wire,
-        channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
-        self.garbler.mul(x, y, channel).map_err(Self::Error::from)
+    fn mul(&mut self, x: &Wire, y: &Wire, channel: &mut Channel) -> eyre::Result<Self::Item> {
+        self.garbler.mul(x, y, channel)
     }
 
     fn proj(
@@ -176,10 +171,8 @@ impl<RNG: CryptoRng + Rng, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         q: u16,
         tt: Option<Vec<u16>>,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
-        self.garbler
-            .proj(x, q, tt, channel)
-            .map_err(Self::Error::from)
+    ) -> eyre::Result<Self::Item> {
+        self.garbler.proj(x, q, tt, channel)
     }
 }
 
@@ -187,29 +180,18 @@ impl<RNG: CryptoRng + Rng, OT, Wire: WireLabel> Fancy for Garbler<RNG, OT, Wire>
     type Item = Wire;
     type Error = Error;
 
-    fn constant(
-        &mut self,
-        x: u16,
-        q: u16,
-        channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
-        self.garbler
-            .constant(x, q, channel)
-            .map_err(Self::Error::from)
+    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> eyre::Result<Self::Item> {
+        self.garbler.constant(x, q, channel)
     }
 
-    fn output(
-        &mut self,
-        x: &Self::Item,
-        channel: &mut Channel,
-    ) -> Result<Option<u16>, Self::Error> {
-        self.garbler.output(x, channel).map_err(Self::Error::from)
+    fn output(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<Option<u16>> {
+        self.garbler.output(x, channel)
     }
 }
 
 impl<RNG: CryptoRng + Rng, OT, Wire: WireLabel> FancyReveal for Garbler<RNG, OT, Wire> {
-    fn reveal(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<u16, Self::Error> {
-        self.garbler.reveal(x, channel).map_err(Self::Error::from)
+    fn reveal(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<u16> {
+        self.garbler.reveal(x, channel)
     }
 }
 

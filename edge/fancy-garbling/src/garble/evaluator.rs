@@ -49,14 +49,8 @@ impl<Wire: WireLabel> Evaluator<Wire> {
     }
 
     /// Read a Wire from the reader.
-    pub fn read_wire(
-        &mut self,
-        modulus: u16,
-        channel: &mut Channel,
-    ) -> Result<Wire, EvaluatorError> {
-        let block = channel
-            .read()
-            .map_err(|e| EvaluatorError::CommunicationError(e.to_string()))?;
+    pub fn read_wire(&mut self, modulus: u16, channel: &mut Channel) -> eyre::Result<Wire> {
+        let block = channel.read()?;
         Ok(Wire::from_block(block, modulus))
     }
 
@@ -95,7 +89,7 @@ impl<Wire: WireLabel> Evaluator<Wire> {
 
 impl FancyBinary for Evaluator<WireMod2> {
     /// Negate is a noop for the evaluator
-    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Self::Item, Self::Error> {
+    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
         Ok(*x)
     }
 
@@ -108,32 +102,26 @@ impl FancyBinary for Evaluator<WireMod2> {
         A: &Self::Item,
         B: &Self::Item,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
-        let gate0 = channel
-            .read()
-            .map_err(|e| EvaluatorError::CommunicationError(e.to_string()))?;
-        let gate1 = channel
-            .read()
-            .map_err(|e| EvaluatorError::CommunicationError(e.to_string()))?;
+    ) -> eyre::Result<Self::Item> {
+        let gate0 = channel.read()?;
+        let gate1 = channel.read()?;
         Ok(self.evaluate_and_gate(A, B, &gate0, &gate1))
     }
 }
 
 impl<Wire: WireLabel> FancyReveal for Evaluator<Wire> {
-    fn reveal(&mut self, x: &Wire, channel: &mut Channel) -> Result<u16, EvaluatorError> {
+    fn reveal(&mut self, x: &Wire, channel: &mut Channel) -> eyre::Result<u16> {
         let val = self
             .output(x, channel)?
             .expect("Evaluator always outputs Some(u16)");
-        channel
-            .write(&val)
-            .map_err(|e| EvaluatorError::CommunicationError(e.to_string()))?;
+        channel.write(&val)?;
         Ok(val)
     }
 }
 
 impl FancyBinary for Evaluator<AllWire> {
     /// Overriding `negate` to be a noop: entirely handled on garbler's end
-    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Self::Item, Self::Error> {
+    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
         check_binary!(x);
 
         Ok(x.clone())
@@ -151,14 +139,10 @@ impl FancyBinary for Evaluator<AllWire> {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         if let (AllWire::Mod2(A), AllWire::Mod2(B)) = (x, y) {
-            let gate0 = channel
-                .read()
-                .map_err(|e| EvaluatorError::CommunicationError(e.to_string()))?;
-            let gate1 = channel
-                .read()
-                .map_err(|e| EvaluatorError::CommunicationError(e.to_string()))?;
+            let gate0 = channel.read()?;
+            let gate1 = channel.read()?;
             return Ok(AllWire::Mod2(self.evaluate_and_gate(A, B, &gate0, &gate1)));
         }
 
@@ -186,7 +170,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
         x.cmul(c)
     }
 
-    fn mul(&mut self, A: &Wire, B: &Wire, channel: &mut Channel) -> Result<Wire, EvaluatorError> {
+    fn mul(&mut self, A: &Wire, B: &Wire, channel: &mut Channel) -> eyre::Result<Wire> {
         if A.modulus() < B.modulus() {
             return self.mul(B, A, channel);
         }
@@ -197,9 +181,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
         let mut gate = Vec::with_capacity(ngates);
         {
             for _ in 0..ngates {
-                let block = channel
-                    .read::<Block>()
-                    .map_err(|e| EvaluatorError::CommunicationError(e.to_string()))?;
+                let block = channel.read::<Block>()?;
                 gate.push(block);
             }
         }
@@ -245,14 +227,12 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
         q: u16,
         _: Option<Vec<u16>>,
         channel: &mut Channel,
-    ) -> Result<Wire, EvaluatorError> {
+    ) -> eyre::Result<Wire> {
         warn_proj();
         let ngates = (x.modulus() - 1) as usize;
         let mut gate = Vec::with_capacity(ngates);
         for _ in 0..ngates {
-            let block = channel
-                .read::<Block>()
-                .map_err(|e| EvaluatorError::CommunicationError(e.to_string()))?;
+            let block = channel.read::<Block>()?;
             gate.push(block);
         }
         let t = tweak(self.current_gate());
@@ -269,20 +249,18 @@ impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
     type Item = Wire;
     type Error = EvaluatorError;
 
-    fn constant(&mut self, _: u16, q: u16, channel: &mut Channel) -> Result<Wire, EvaluatorError> {
+    fn constant(&mut self, _: u16, q: u16, channel: &mut Channel) -> eyre::Result<Wire> {
         self.read_wire(q, channel)
     }
 
-    fn output(&mut self, x: &Wire, channel: &mut Channel) -> Result<Option<u16>, EvaluatorError> {
+    fn output(&mut self, x: &Wire, channel: &mut Channel) -> eyre::Result<Option<u16>> {
         let q = x.modulus();
         let i = self.current_output();
 
         // Receive the output ciphertext from the garbler
         let mut ct = Vec::with_capacity(q as usize);
         for _ in 0..q {
-            let block = channel
-                .read()
-                .map_err(|e| EvaluatorError::CommunicationError(e.to_string()))?;
+            let block = channel.read()?;
             ct.push(block);
         }
 
@@ -299,7 +277,7 @@ impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
         if let Some(output) = decoded {
             Ok(Some(output))
         } else {
-            Err(EvaluatorError::DecodingFailed)
+            eyre::bail!("Decoding failed");
         }
     }
 }
