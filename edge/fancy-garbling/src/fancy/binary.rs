@@ -1,6 +1,5 @@
 use crate::{
     FancyBinary,
-    errors::FancyError,
     fancy::{
         HasModulus,
         bundle::{Bundle, BundleGadgets},
@@ -492,6 +491,9 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
     }
 
     /// Demux a binary bundle into a unary vector.
+    ///
+    /// # Panics
+    /// Panics if the length of `x` is greater than eight.
     fn bin_demux(
         &mut self,
         x: &BinaryBundle<Self::Item>,
@@ -499,11 +501,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
     ) -> Result<Vec<Self::Item>, Self::Error> {
         let wires = x.wires();
         let nbits = wires.len();
-        if nbits > 8 {
-            return Err(Self::Error::from(FancyError::InvalidArg(
-                "wire bitlength too large".to_string(),
-            )));
-        }
+        assert!(nbits <= 8, "wire bitlength is too large");
 
         let mut outs = Vec::with_capacity(1 << nbits);
 

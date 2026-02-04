@@ -3,7 +3,6 @@
 use super::{HasModulus, bundle::ArithmeticBundleGadgets};
 use crate::{
     FancyArithmetic, FancyBinary,
-    errors::FancyError,
     fancy::bundle::{Bundle, BundleGadgets},
     util,
 };
@@ -158,17 +157,18 @@ pub trait CrtGadgets:
     }
 
     /// Compute the remainder with respect to modulus `p`.
+    ///
+    /// # Panics
+    /// Panics if `p` is not a modulus contained in `x`.
     fn crt_rem(
         &mut self,
         x: &CrtBundle<Self::Item>,
         p: u16,
         channel: &mut Channel,
     ) -> Result<CrtBundle<Self::Item>, Self::Error> {
-        let i = x.moduli().iter().position(|&q| p == q).ok_or_else(|| {
-            Self::Error::from(FancyError::InvalidArg(
-                "p is not a modulus in this bundle!".to_string(),
-            ))
-        })?;
+        let i = x.moduli().iter().position(|&q| p == q);
+        assert!(i.is_some(), "`p` is not a modulus in the `x` bundle");
+        let i = i.unwrap();
         let w = &x.wires()[i];
         x.moduli()
             .iter()

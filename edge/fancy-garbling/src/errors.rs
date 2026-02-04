@@ -7,8 +7,6 @@ use swanky_block::Block;
 /// API-usage errors, such as trying to add two `Items` with different moduli.
 #[derive(Debug)]
 pub enum FancyError {
-    /// Invalid argument.
-    InvalidArg(String),
     /// Invalid argument modulus.
     InvalidArgMod {
         /// Received modulus.
@@ -160,7 +158,6 @@ impl Display for ModQDeserializationError {
 impl Display for FancyError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            FancyError::InvalidArg(s) => write!(f, "invalid argument: {}", s),
             FancyError::InvalidArgMod { got, needed } => write!(
                 f,
                 "invalid modulus: got mod {} but require mod {}",

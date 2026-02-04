@@ -74,6 +74,9 @@ pub trait FancyInput {
     }
 
     /// Encode many input bundles.
+    ///
+    /// # Panics,
+    /// Panics if `values` and `moduli` are of unequal length.
     fn encode_bundles(
         &mut self,
         values: &[Vec<u16>],
@@ -82,11 +85,7 @@ pub trait FancyInput {
     ) -> Result<Vec<Bundle<Self::Item>>, Self::Error> {
         let qs = moduli.iter().flatten().cloned().collect_vec();
         let xs = values.iter().flatten().cloned().collect_vec();
-        if xs.len() != qs.len() {
-            return Err(
-                FancyError::InvalidArg("unequal number of values and moduli".to_string()).into(),
-            );
-        }
+        assert_eq!(xs.len(), qs.len(), "unequal number of values and moduli");
         let mut wires = self.encode_many(&xs, &qs, channel)?;
         let buns = moduli
             .iter()
