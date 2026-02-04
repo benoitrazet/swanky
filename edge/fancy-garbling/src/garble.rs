@@ -72,7 +72,7 @@ mod nonstreaming {
         garble_test_helper(|q, channel| {
             let mut b = CircuitBuilder::new();
             let xs = b.evaluator_inputs(&[q; 16]);
-            let z = b.add_many(&xs).unwrap();
+            let z = b.add_many(&xs);
             b.output(&z, channel).unwrap();
             b.finish()
         });

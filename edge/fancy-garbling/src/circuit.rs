@@ -1141,7 +1141,7 @@ mod plaintext {
                 .iter()
                 .map(|x| b.mod_change(x, n as u16 + 1, channel).unwrap())
                 .collect_vec();
-            let s = b.add_many(&wires).unwrap();
+            let s = b.add_many(&wires);
             b.output(&s, channel).unwrap();
             let c = b.finish();
             Ok(c)

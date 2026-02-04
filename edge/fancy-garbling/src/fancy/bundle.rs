@@ -196,7 +196,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
             let ds = xs.iter().map(|x| x.wires()[i].clone()).collect_vec();
 
             // compute the digit -- easy
-            let digit_sum = self.add_many(&ds)?;
+            let digit_sum = self.add_many(&ds);
             let digit = digit_carry.map_or(digit_sum.clone(), |d| self.add(&digit_sum, &d));
 
             if i < n - 1 {
@@ -212,7 +212,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
                     .map(|d| self.mod_change(d, max_val + 1, channel))
                     .collect::<Result<Vec<Self::Item>, Self::Error>>()?;
 
-                let carry_sum = self.add_many(&modded_ds)?;
+                let carry_sum = self.add_many(&modded_ds);
                 // add in the carry from the previous iteration
                 let carry = carry_carry.map_or(carry_sum.clone(), |c| self.add(&carry_sum, &c));
 
@@ -284,7 +284,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
                 .map(|d| self.mod_change(d, max_val + 1, channel))
                 .collect::<Result<Vec<Self::Item>, Self::Error>>()?;
             // add them up
-            let sum = self.add_many(&modded_ds)?;
+            let sum = self.add_many(&modded_ds);
             // add in the carry
             let sum_with_carry = opt_carry
                 .as_ref()
@@ -306,7 +306,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
 
         // compute the msb
         let ds = xs.iter().map(|x| x.wires()[n - 1].clone()).collect_vec();
-        let digit_sum = self.add_many(&ds)?;
+        let digit_sum = self.add_many(&ds);
         Ok(opt_carry
             .as_ref()
             .map_or(digit_sum.clone(), |d| self.add(&digit_sum, d)))
@@ -352,7 +352,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
             })
             .collect::<Result<Vec<Self::Item>, Self::Error>>()?;
         // add up the results, and output whether they equal zero or not, mod 2
-        let z = self.add_many(&zs)?;
+        let z = self.add_many(&zs);
         let b = zs.len();
         let mut tab = vec![0; b + 1];
         tab[b] = 1;

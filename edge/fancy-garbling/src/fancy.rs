@@ -236,13 +236,13 @@ pub trait FancyArithmetic: Fancy {
     ///
     /// # Panics
     /// Panics if `args.len() < 2`.
-    fn add_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
+    fn add_many(&mut self, args: &[Self::Item]) -> Self::Item {
         assert!(args.len() >= 2, "`args.len()` must be two or more");
         let mut z = args[0].clone();
         for x in args.iter().skip(1) {
             z = self.add(&z, x);
         }
-        Ok(z)
+        z
     }
     /// Change the modulus of `x` to `to_modulus` using a projection gate.
     fn mod_change(
