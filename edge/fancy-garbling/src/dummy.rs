@@ -7,7 +7,6 @@ use swanky_channel::Channel;
 
 use crate::{
     FancyArithmetic, FancyBinary, check_binary, derive_binary,
-    errors::DummyError,
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
 };
 
@@ -48,7 +47,6 @@ impl Dummy {
 
 impl FancyInput for Dummy {
     type Item = DummyVal;
-    type Error = DummyError;
 
     /// Encode a single dummy value.
     fn encode(&mut self, value: u16, modulus: u16, _: &mut Channel) -> eyre::Result<DummyVal> {
@@ -133,7 +131,6 @@ impl FancyArithmetic for Dummy {
 
 impl Fancy for Dummy {
     type Item = DummyVal;
-    type Error = DummyError;
 
     fn constant(&mut self, val: u16, modulus: u16, _: &mut Channel) -> eyre::Result<DummyVal> {
         Ok(DummyVal { val, modulus })

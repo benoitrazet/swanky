@@ -4,7 +4,7 @@
 use crate::{
     FancyArithmetic, FancyBinary, check_binary, derive_binary,
     dummy::{Dummy, DummyVal},
-    errors::{CircuitBuilderError, DummyError},
+    errors::DummyError,
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyInput, HasModulus},
     informer::Informer,
 };
@@ -843,7 +843,6 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
 
 impl<Circuit: CircuitType> Fancy for CircuitBuilder<Circuit> {
     type Item = CircuitRef;
-    type Error = CircuitBuilderError;
 
     fn constant(&mut self, val: u16, modulus: u16, _: &mut Channel) -> eyre::Result<CircuitRef> {
         match self.const_map.get(&(val, modulus)) {

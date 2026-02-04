@@ -3,7 +3,6 @@
 //! An implementer must be able to create inputs, constants, do modular arithmetic, and
 //! create projections.
 
-use crate::errors::FancyError;
 use itertools::Itertools;
 
 mod binary;
@@ -148,9 +147,6 @@ pub trait FancyBinary: Fancy {
 pub trait Fancy {
     /// The underlying wire datatype created by an object implementing `Fancy`.
     type Item: Clone + HasModulus;
-
-    /// Errors which may be thrown by the users of Fancy.
-    type Error: std::fmt::Debug + std::fmt::Display + std::convert::From<FancyError>;
 
     /// Create a constant `x` with modulus `q`.
     fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> eyre::Result<Self::Item>;

@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 
 use crate::{
     AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireMod2, check_binary,
-    errors::EvaluatorError,
     fancy::{Fancy, FancyReveal},
     hash_wires,
     util::{output_tweak, tweak, tweak2},
@@ -247,7 +246,6 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
 
 impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
     type Item = Wire;
-    type Error = EvaluatorError;
 
     fn constant(&mut self, _: u16, q: u16, channel: &mut Channel) -> eyre::Result<Wire> {
         self.read_wire(q, channel)

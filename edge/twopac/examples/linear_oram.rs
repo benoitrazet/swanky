@@ -10,8 +10,6 @@ use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 
-use std::fmt::Debug;
-
 /// A structure that contains both the garbler and the evaluators
 /// wires. This structure simplifies the API of the garbled circuit.
 struct ORAMInputs<F> {
@@ -40,14 +38,9 @@ fn gb_linear_oram(rng: &mut AesRng, channel: &mut Channel, inputs: &[u128]) {
 }
 
 /// The garbler's wire exchange method
-fn gb_set_fancy_inputs<F, E>(
-    gb: &mut F,
-    inputs: &[u128],
-    channel: &mut Channel,
-) -> ORAMInputs<F::Item>
+fn gb_set_fancy_inputs<F>(gb: &mut F, inputs: &[u128], channel: &mut Channel) -> ORAMInputs<F::Item>
 where
-    F: FancyInput<Item = AllWire, Error = E>,
-    E: Debug,
+    F: FancyInput<Item = AllWire>,
 {
     // The number of bits needed to represent a single input value
     let nbits = 128;
@@ -88,15 +81,14 @@ fn ev_linear_oram(rng: &mut AesRng, channel: &mut Channel, input: u128) -> u128 
     // (5)
     util::u128_from_bits(&query_binary)
 }
-fn ev_set_fancy_inputs<F, E>(
+fn ev_set_fancy_inputs<F>(
     ev: &mut F,
     input: u128,
     ram_size: usize,
     channel: &mut Channel,
 ) -> ORAMInputs<F::Item>
 where
-    F: FancyInput<Item = AllWire, Error = E>,
-    E: Debug,
+    F: FancyInput<Item = AllWire>,
 {
     // The number of bits needed to represent a single input value
     let nbits = 128;

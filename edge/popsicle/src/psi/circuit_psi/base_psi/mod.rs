@@ -3,7 +3,6 @@
 use crate::{circuit_psi::*, errors::Error};
 use fancy_garbling::{FancyInput, WireMod2};
 use rand::{CryptoRng, RngCore, SeedableRng};
-use std::fmt::Debug;
 use swanky_channel::Channel;
 
 // The number of hash functions that will be used to attempt to
@@ -56,18 +55,16 @@ pub trait BasePsi {
     where
         RNG: RngCore + CryptoRng + SeedableRng;
     /// Parties turn their inputs into garbled wires
-    fn encode_circuit_inputs<F, E>(
+    fn encode_circuit_inputs<F>(
         &mut self,
         gc_party: &mut F,
         channel: &mut Channel,
     ) -> Result<CircuitInputs<F::Item>, Error>
     where
-        F: FancyInput<Item = WireMod2, Error = E>,
-        E: Debug,
-        Error: From<E>;
+        F: FancyInput<Item = WireMod2>;
     /// A wrapper that calls the different pieces of the BasePsi in order
     /// to the necessary hidden inputs that the CircuitPsi can operate on.
-    fn base_psi<F, E, RNG>(
+    fn base_psi<F, RNG>(
         gc_party: &mut F,
         primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
@@ -76,9 +73,7 @@ pub trait BasePsi {
     ) -> Result<CircuitInputs<F::Item>, Error>
     where
         Self: Sized,
-        F: FancyInput<Item = WireMod2, Error = E>,
-        E: Debug,
-        Error: From<E>,
+        F: FancyInput<Item = WireMod2>,
         RNG: RngCore + CryptoRng + SeedableRng,
     {
         let has_payloads = payloads.is_some();

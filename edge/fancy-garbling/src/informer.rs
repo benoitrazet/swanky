@@ -217,11 +217,8 @@ impl<F: Fancy> Informer<F> {
     }
 }
 
-impl<F: Fancy + FancyInput<Item = <F as Fancy>::Item, Error = <F as Fancy>::Error>> FancyInput
-    for Informer<F>
-{
+impl<F: Fancy + FancyInput<Item = <F as Fancy>::Item>> FancyInput for Informer<F> {
     type Item = <F as Fancy>::Item;
-    type Error = <F as Fancy>::Error;
 
     fn receive_many(
         &mut self,
@@ -341,7 +338,6 @@ impl<F: FancyArithmetic> FancyArithmetic for Informer<F> {
 
 impl<F: Fancy> Fancy for Informer<F> {
     type Item = F::Item;
-    type Error = F::Error;
 
     fn constant(&mut self, val: u16, q: u16, channel: &mut Channel) -> eyre::Result<Self::Item> {
         self.stats.constants.insert((val, q));

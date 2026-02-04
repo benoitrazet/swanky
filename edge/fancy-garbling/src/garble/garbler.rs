@@ -470,7 +470,6 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
 
 impl<RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
     type Item = Wire;
-    type Error = GarblerError;
 
     fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> eyre::Result<Wire> {
         let zero = Wire::rand(&mut self.rng, q);

@@ -39,7 +39,6 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
     for Evaluator<RNG, OT, Wire>
 {
     type Item = Wire;
-    type Error = Error;
 
     /// Receive a garbler input wire.
     fn receive(&mut self, modulus: u16, channel: &mut Channel) -> eyre::Result<Wire> {
@@ -158,7 +157,6 @@ impl<RNG, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<RN
 
 impl<RNG, OT, Wire: WireLabel> Fancy for Evaluator<RNG, OT, Wire> {
     type Item = Wire;
-    type Error = Error;
 
     fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> eyre::Result<Self::Item> {
         self.evaluator.constant(x, q, channel)

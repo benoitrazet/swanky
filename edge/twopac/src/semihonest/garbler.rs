@@ -65,7 +65,6 @@ impl<
 > FancyInput for Garbler<RNG, OT, Wire>
 {
     type Item = Wire;
-    type Error = Error;
 
     fn encode(&mut self, val: u16, modulus: u16, channel: &mut Channel) -> eyre::Result<Wire> {
         let (mine, theirs) = self.garbler.encode_wire(val, modulus);
@@ -178,7 +177,6 @@ impl<RNG: CryptoRng + Rng, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic
 
 impl<RNG: CryptoRng + Rng, OT, Wire: WireLabel> Fancy for Garbler<RNG, OT, Wire> {
     type Item = Wire;
-    type Error = Error;
 
     fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> eyre::Result<Self::Item> {
         self.garbler.constant(x, q, channel)

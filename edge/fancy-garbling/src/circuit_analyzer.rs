@@ -122,7 +122,6 @@ impl CircuitAnalyzer {
 
 impl FancyInput for CircuitAnalyzer {
     type Item = AnalyzerItem;
-    type Error = AnalyzerError;
 
     fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> eyre::Result<Vec<Self::Item>> {
         self.ninputs += moduli.len();
@@ -241,7 +240,6 @@ impl FancyArithmetic for CircuitAnalyzer {
 
 impl Fancy for CircuitAnalyzer {
     type Item = AnalyzerItem;
-    type Error = AnalyzerError;
 
     fn constant(&mut self, _val: u16, q: u16, _: &mut Channel) -> eyre::Result<Self::Item> {
         self.nconstants += 1;

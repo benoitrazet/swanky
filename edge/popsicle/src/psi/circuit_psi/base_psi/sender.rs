@@ -175,15 +175,13 @@ impl BasePsi for OpprfSender {
         }
         Ok(())
     }
-    fn encode_circuit_inputs<F, E>(
+    fn encode_circuit_inputs<F>(
         &mut self,
         gc_party: &mut F,
         channel: &mut Channel,
     ) -> Result<CircuitInputs<F::Item>, Error>
     where
-        F: FancyInput<Item = WireMod2, Error = E>,
-        E: Debug,
-        Error: From<E>,
+        F: FancyInput<Item = WireMod2>,
     {
         let sender_primary_keys = bin_encode_many_block512(
             gc_party,
