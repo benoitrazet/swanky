@@ -4,7 +4,6 @@
 use crate::{
     FancyArithmetic, FancyBinary, check_binary, derive_binary,
     dummy::{Dummy, DummyVal},
-    errors::DummyError,
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyInput, HasModulus},
     informer::Informer,
 };
@@ -246,11 +245,11 @@ impl std::fmt::Display for BinaryGate {
 /// that can be evaluated with an `Informer`
 pub trait CircuitInfo {
     /// Print circuit info
-    fn print_info(&self) -> Result<(), DummyError>;
+    fn print_info(&self) -> eyre::Result<()>;
 }
 
 impl<C: EvaluableCircuit<Informer<Dummy>>> CircuitInfo for C {
-    fn print_info(&self) -> Result<(), DummyError> {
+    fn print_info(&self) -> eyre::Result<()> {
         let mut informer = crate::informer::Informer::new(Dummy::new());
 
         // encode inputs as InformerVals
@@ -259,20 +258,17 @@ impl<C: EvaluableCircuit<Informer<Dummy>>> CircuitInfo for C {
                 .iter()
                 .map(|r| informer.encode(0, r.modulus(), channel))
                 .collect::<eyre::Result<Vec<DummyVal>>>()
-        })
-        .map_err(|_| DummyError::EncodingError)?;
+        })?;
         let ev = Channel::with(std::io::empty(), |channel| {
             self.get_evaluator_input_refs()
                 .iter()
                 .map(|r| informer.encode(0, r.modulus(), channel))
                 .collect::<eyre::Result<Vec<DummyVal>>>()
-        })
-        .map_err(|_| DummyError::EncodingError)?;
+        })?;
 
         Channel::with(std::io::empty(), |c| {
             Ok(self.eval(&mut informer, &gb, &ev, c)?)
-        })
-        .map_err(|_| DummyError::EncodingError)?;
+        })?;
         println!("{}", informer.stats());
         Ok(())
     }
@@ -540,7 +536,7 @@ pub fn eval_plain<C: EvaluableCircuit<Dummy>>(
     circuit: &C,
     garbler_inputs: &[u16],
     evaluator_inputs: &[u16],
-) -> Result<Vec<u16>, DummyError> {
+) -> eyre::Result<Vec<u16>> {
     assert_eq!(garbler_inputs.len(), circuit.num_garbler_inputs());
     assert_eq!(evaluator_inputs.len(), circuit.num_evaluator_inputs());
 

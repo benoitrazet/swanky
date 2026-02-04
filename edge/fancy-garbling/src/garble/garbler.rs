@@ -101,7 +101,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
         &mut self,
         vals: &[u16],
         moduli: &[u16],
-    ) -> Result<(Vec<Wire>, Vec<Wire>), GarblerError> {
+    ) -> eyre::Result<(Vec<Wire>, Vec<Wire>)> {
         assert_eq!(vals.len(), moduli.len());
 
         let mut gbs = Vec::with_capacity(vals.len());
@@ -119,7 +119,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
         &mut self,
         val: u128,
         modulus: u128,
-    ) -> Result<(CrtBundle<Wire>, CrtBundle<Wire>), GarblerError> {
+    ) -> eyre::Result<(CrtBundle<Wire>, CrtBundle<Wire>)> {
         let ms = crate::util::factor(modulus);
         let xs = crate::util::crt(val, &ms);
         let (gbs, evs) = self.encode_many_wires(&xs, &ms)?;
@@ -131,7 +131,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
         &mut self,
         val: u128,
         nbits: usize,
-    ) -> Result<(BinaryBundle<Wire>, BinaryBundle<Wire>), GarblerError> {
+    ) -> eyre::Result<(BinaryBundle<Wire>, BinaryBundle<Wire>)> {
         let xs = crate::util::u128_to_bits(val, nbits);
         let ms = vec![2; nbits];
         let (gbs, evs) = self.encode_many_wires(&xs, &ms)?;

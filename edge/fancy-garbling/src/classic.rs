@@ -4,7 +4,6 @@
 use crate::{
     WireLabel,
     circuit::EvaluableCircuit,
-    errors::GarblerError,
     garble::{Evaluator, Garbler},
 };
 use itertools::Itertools;
@@ -61,7 +60,7 @@ impl<Wire: WireLabel, Circuit: EvaluableCircuit<Ev<Wire>>> GarbledCircuit<Wire, 
 /// Garble a circuit without streaming.
 pub fn garble<Wire: WireLabel, Circuit: EvaluableCircuit<Gb<Wire>>>(
     c: &Circuit,
-) -> Result<(Encoder<Wire>, GarbledCircuit<Wire, Circuit>), GarblerError> {
+) -> eyre::Result<(Encoder<Wire>, GarbledCircuit<Wire, Circuit>)> {
     let rng = AesRng::new();
     let mut garbler = Garbler::new(rng);
 
