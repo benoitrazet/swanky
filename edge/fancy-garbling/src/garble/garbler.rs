@@ -96,15 +96,16 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
     }
 
     /// Encode many wires, producing zero wires as well as encoded values.
+    ///
+    /// # Panics
+    /// Panics if the length of `vals` and `moduli` are not equal.
     pub fn encode_many_wires(
         &mut self,
         vals: &[u16],
         moduli: &[u16],
     ) -> Result<(Vec<Wire>, Vec<Wire>), GarblerError> {
-        if vals.len() != moduli.len() {
-            return Err(GarblerError::EncodingError);
-        }
-        assert!(vals.len() == moduli.len());
+        assert_eq!(vals.len(), moduli.len());
+
         let mut gbs = Vec::with_capacity(vals.len());
         let mut evs = Vec::with_capacity(vals.len());
         for (x, q) in vals.iter().zip(moduli.iter()) {
@@ -318,9 +319,10 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         // hack for unequal moduli
         if q != qb {
             // would need to pack minitable into more than one u128 to support qb > 8
-            if qb > 8 {
-                return Err(GarblerError::AsymmetricHalfGateModuliMax8(qb));
-            }
+            assert!(
+                qb <= 8,
+                "`B.modulus()` with asymmetric moduli is capped at 8"
+            );
 
             r = self.rng.gen_u16() % q;
             let t = tweak2(gate_num as u64, 1);
@@ -426,7 +428,8 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         channel: &mut Channel,
     ) -> Result<Wire, GarblerError> {
         warn_proj();
-        let tt = tt.ok_or(GarblerError::TruthTableRequired)?;
+        assert!(tt.is_some(), "`tt` must not be `None`");
+        let tt = tt.unwrap();
 
         let q_in = A.modulus();
         let mut gate = vec![Block::default(); q_in as usize - 1];

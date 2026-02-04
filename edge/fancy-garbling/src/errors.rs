@@ -33,12 +33,6 @@ pub enum EvaluatorError {
 pub enum GarblerError {
     /// An error occurred while processing a message.
     CommunicationError(String),
-    /// Asymmetric moduli error.
-    AsymmetricHalfGateModuliMax8(u16),
-    /// A truth table was missing.
-    TruthTableRequired,
-    /// Encoding error.
-    EncodingError,
     /// A fancy error has occurred.
     FancyError(FancyError),
 }
@@ -193,17 +187,6 @@ impl Display for GarblerError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             GarblerError::CommunicationError(s) => write!(f, "{}", s),
-            GarblerError::AsymmetricHalfGateModuliMax8(q) => write!(
-                f,
-                "the small modulus in a half gate with asymmetric moduli is capped at 8, got {}",
-                q
-            ),
-            GarblerError::TruthTableRequired => {
-                "truth table required for garbler projection gates".fmt(f)
-            }
-            GarblerError::EncodingError => {
-                "encoding failed: unequal length input values and moduli".fmt(f)
-            }
             GarblerError::FancyError(e) => write!(f, "{}", e),
         }
     }
