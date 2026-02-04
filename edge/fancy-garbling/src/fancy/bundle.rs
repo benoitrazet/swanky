@@ -1,6 +1,5 @@
 use crate::{
     FancyArithmetic, FancyBinary,
-    errors::FancyError,
     fancy::{Fancy, HasModulus},
 };
 use itertools::Itertools;
@@ -172,19 +171,17 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
     /// Mixed radix addition.
     ///
     /// # Panics
-    /// Panics if `xs` is empty.
+    /// Panics if `xs` is empty, or the moduli in `xs` are not all equal.
     fn mixed_radix_addition(
         &mut self,
         xs: &[Bundle<Self::Item>],
         channel: &mut Channel,
     ) -> Result<Bundle<Self::Item>, Self::Error> {
         assert!(!xs.is_empty(), "`xs` cannot be empty");
-        let nargs = xs.len();
+        assert!(xs.iter().all(|x| x.moduli() == xs[0].moduli()));
 
+        let nargs = xs.len();
         let n = xs[0].wires().len();
-        if !xs.iter().all(|x| x.moduli() == xs[0].moduli()) {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
 
         let mut digit_carry = None;
         let mut carry_carry = None;
@@ -254,19 +251,17 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
     /// Mixed radix addition only returning the MSB.
     ///
     /// # Panics
-    /// Panics if `xs` is empty.
+    /// Panics if `xs` is empty, or the moduli in `xs` are not all equal.
     fn mixed_radix_addition_msb_only(
         &mut self,
         xs: &[Bundle<Self::Item>],
         channel: &mut Channel,
     ) -> Result<Self::Item, Self::Error> {
         assert!(!xs.is_empty(), "`xs` cannot be empty");
-        let nargs = xs.len();
+        assert!(xs.iter().all(|x| x.moduli() == xs[0].moduli()));
 
+        let nargs = xs.len();
         let n = xs[0].wires().len();
-        if !xs.iter().all(|x| x.moduli() == xs[0].moduli()) {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
 
         let mut opt_carry = None;
         let mut max_carry = 0;
@@ -331,15 +326,17 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
     }
 
     /// Compute `x == y`. Returns a wire encoding the result mod 2.
+    ///
+    /// # Panics
+    /// Panics if `x` and `y` do not have equal moduli.
     fn eq_bundles(
         &mut self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
         channel: &mut Channel,
     ) -> Result<Self::Item, Self::Error> {
-        if x.moduli() != y.moduli() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
+        assert_eq!(x.moduli(), y.moduli());
+
         let wlen = x.wires().len() as u16;
         let zs = x
             .wires()

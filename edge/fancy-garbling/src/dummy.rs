@@ -91,9 +91,7 @@ derive_binary!(Dummy);
 
 impl FancyArithmetic for Dummy {
     fn add(&mut self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, Self::Error> {
-        if x.modulus() != y.modulus() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
+        assert_eq!(x.modulus(), y.modulus());
         Ok(DummyVal {
             val: (x.val + y.val) % x.modulus,
             modulus: x.modulus,
@@ -101,9 +99,7 @@ impl FancyArithmetic for Dummy {
     }
 
     fn sub(&mut self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, Self::Error> {
-        if x.modulus() != y.modulus() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
+        assert_eq!(x.modulus(), y.modulus());
         Ok(DummyVal {
             val: (x.modulus + x.val - y.val) % x.modulus,
             modulus: x.modulus,

@@ -438,15 +438,16 @@ pub trait CrtGadgets:
 
     /// Generic, and expensive, CRT-based addition for two ciphertexts. Uses PMR
     /// comparison repeatedly. Requires an extra unused prime in both inputs.
+    ///
+    /// # Panics
+    /// Panics if `x` and `y` do not have equal moduli.
     fn crt_div(
         &mut self,
         x: &CrtBundle<Self::Item>,
         y: &CrtBundle<Self::Item>,
         channel: &mut Channel,
     ) -> Result<CrtBundle<Self::Item>, Self::Error> {
-        if x.moduli() != y.moduli() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
+        assert_eq!(x.moduli(), y.moduli());
 
         let q = x.composite_modulus();
 

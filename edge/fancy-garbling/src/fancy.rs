@@ -190,9 +190,15 @@ pub trait Fancy {
 /// DSL for arithmetic computation.
 pub trait FancyArithmetic: Fancy {
     /// Add `x` and `y`.
+    ///
+    /// # Panics
+    /// This panics if `x` and `y` do not have equal moduli.
     fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
 
     /// Subtract `x` and `y`.
+    ///
+    /// # Panics
+    /// This panics if `x` and `y` do not have equal moduli.
     fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
 
     /// Multiply `x` times the constant `c`.

@@ -806,9 +806,7 @@ derive_binary!(CircuitBuilder<ArithmeticCircuit>);
 
 impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
     fn add(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
-        if xref.modulus() != yref.modulus() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
+        assert_eq!(xref.modulus(), yref.modulus());
         let gate = ArithmeticGate::Add {
             xref: *xref,
             yref: *yref,
@@ -818,9 +816,7 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
     }
 
     fn sub(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
-        if xref.modulus() != yref.modulus() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
+        assert_eq!(xref.modulus(), yref.modulus());
         let gate = ArithmeticGate::Sub {
             xref: *xref,
             yref: *yref,

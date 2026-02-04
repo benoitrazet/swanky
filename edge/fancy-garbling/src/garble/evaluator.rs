@@ -173,16 +173,12 @@ impl FancyBinary for Evaluator<AllWire> {
 
 impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
-        if x.modulus() != y.modulus() {
-            return Err(EvaluatorError::FancyError(FancyError::UnequalModuli));
-        }
+        assert_eq!(x.modulus(), y.modulus());
         Ok(x.plus(y))
     }
 
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
-        if x.modulus() != y.modulus() {
-            return Err(EvaluatorError::FancyError(FancyError::UnequalModuli));
-        }
+        assert_eq!(x.modulus(), y.modulus());
         Ok(x.minus(y))
     }
 

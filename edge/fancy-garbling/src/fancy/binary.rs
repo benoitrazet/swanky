@@ -133,15 +133,16 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
     }
 
     /// Binary addition. Returns the result and the carry.
+    ///
+    /// # Panics
+    /// This panics if `xs` and `ys` do not have equal moduli.
     fn bin_addition(
         &mut self,
         xs: &BinaryBundle<Self::Item>,
         ys: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
     ) -> Result<(BinaryBundle<Self::Item>, Self::Item), Self::Error> {
-        if xs.moduli() != ys.moduli() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
+        assert_eq!(xs.moduli(), ys.moduli());
         let xwires = xs.wires();
         let ywires = ys.wires();
         let (mut z, mut c) = self.adder(&xwires[0], &ywires[0], None, channel)?;
@@ -156,15 +157,16 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
     }
 
     /// Binary addition. Avoids creating extra gates for the final carry.
+    ///
+    /// # Panics
+    /// This panics if `xs` and `ys` do not have equal moduli.
     fn bin_addition_no_carry(
         &mut self,
         xs: &BinaryBundle<Self::Item>,
         ys: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        if xs.moduli() != ys.moduli() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
+        assert_eq!(xs.moduli(), ys.moduli());
         let xwires = xs.wires();
         let ywires = ys.wires();
         let (mut z, mut c) = self.adder(&xwires[0], &ywires[0], None, channel)?;
@@ -189,15 +191,16 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
     ///
     /// Returns the lower-order half of the output bits, ie a number with the same number
     /// of bits as the inputs.
+    ///
+    /// # Panics
+    /// This panics if `xs` and `ys` do not have equal moduli.
     fn bin_multiplication_lower_half(
         &mut self,
         xs: &BinaryBundle<Self::Item>,
         ys: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        if xs.moduli() != ys.moduli() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
+        assert_eq!(xs.moduli(), ys.moduli());
 
         let xwires = xs.wires();
         let ywires = ys.wires();
@@ -221,16 +224,17 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         Ok(sum)
     }
 
-    /// Full multiplier
+    /// Full multiplier.
+    ///
+    /// # Panics
+    /// This panics if `xs` and `ys` do not have equal moduli.
     fn bin_mul(
         &mut self,
         xs: &BinaryBundle<Self::Item>,
         ys: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        if xs.moduli() != ys.moduli() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
+        assert_eq!(xs.moduli(), ys.moduli());
 
         let xwires = xs.wires();
         let ywires = ys.wires();
@@ -261,16 +265,17 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         Ok(sum)
     }
 
-    /// Divider
+    /// Divider.
+    ///
+    /// # Panics
+    /// This panics if `xs` and `ys` do not have equal moduli.
     fn bin_div(
         &mut self,
         xs: &BinaryBundle<Self::Item>,
         ys: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        if xs.moduli() != ys.moduli() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
+        assert_eq!(xs.moduli(), ys.moduli());
         let ys_neg = self.bin_twos_complement(ys, channel)?;
         let mut acc = self.bin_constant_bundle(0, xs.size(), channel)?;
         let mut qs = BinaryBundle::new(Vec::new());

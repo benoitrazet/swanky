@@ -287,16 +287,12 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
     for Garbler<RNG, Wire>
 {
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
-        if x.modulus() != y.modulus() {
-            return Err(GarblerError::FancyError(FancyError::UnequalModuli));
-        }
+        assert_eq!(x.modulus(), y.modulus());
         Ok(x.plus(y))
     }
 
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
-        if x.modulus() != y.modulus() {
-            return Err(GarblerError::FancyError(FancyError::UnequalModuli));
-        }
+        assert_eq!(x.modulus(), y.modulus());
         Ok(x.minus(y))
     }
 
