@@ -11,10 +11,6 @@ pub enum FancyError {}
 /// Errors from the dummy fancy object.
 #[derive(Debug)]
 pub enum DummyError {
-    /// Not enough garbler inputs provided.
-    NotEnoughGarblerInputs,
-    /// Not enough evaluator inputs provided.
-    NotEnoughEvaluatorInputs,
     /// Encoding error.
     EncodingError,
     /// A fancy error has occurred.
@@ -155,8 +151,6 @@ impl Display for FancyError {
 impl Display for DummyError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            DummyError::NotEnoughGarblerInputs => "not enough garbler inputs".fmt(f),
-            DummyError::NotEnoughEvaluatorInputs => "not enough evaluator inputs".fmt(f),
             DummyError::EncodingError => "not enough inputs or moduli".fmt(f),
             DummyError::FancyError(e) => write!(f, "fancy error: {}", e),
         }

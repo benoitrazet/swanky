@@ -538,20 +538,19 @@ pub trait CircuitType: Clone {
 }
 
 /// Evaluate the circuit in plaintext.
+///
+/// # Panics
+/// Panics if either `garbler_inputs.len()` or `evaluator_inputs.len()` does not
+/// equal the circuit's expected number of inputs.
 pub fn eval_plain<C: EvaluableCircuit<Dummy>>(
     circuit: &C,
     garbler_inputs: &[u16],
     evaluator_inputs: &[u16],
 ) -> Result<Vec<u16>, DummyError> {
+    assert_eq!(garbler_inputs.len(), circuit.num_garbler_inputs());
+    assert_eq!(evaluator_inputs.len(), circuit.num_evaluator_inputs());
+
     let mut dummy = crate::dummy::Dummy::new();
-
-    if garbler_inputs.len() != circuit.num_garbler_inputs() {
-        return Err(DummyError::NotEnoughGarblerInputs);
-    }
-
-    if evaluator_inputs.len() != circuit.num_evaluator_inputs() {
-        return Err(DummyError::NotEnoughEvaluatorInputs);
-    }
 
     // encode inputs as DummyVals
     let gb = garbler_inputs
