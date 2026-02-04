@@ -9,8 +9,6 @@ use swanky_block::Block;
 pub enum FancyError {
     /// Projection truth table is invalid.
     InvalidTruthTable,
-    /// Uninitialized value encountered.
-    UninitializedValue,
 }
 
 /// Errors from the dummy fancy object.
@@ -152,9 +150,6 @@ impl Display for FancyError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             FancyError::InvalidTruthTable => "invalid truth table".fmt(f),
-            FancyError::UninitializedValue => {
-                "uninitialized value in circuit. is the circuit topologically sorted?".fmt(f)
-            }
         }
     }
 }

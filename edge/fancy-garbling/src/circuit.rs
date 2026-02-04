@@ -324,42 +324,26 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
                 ArithmeticGate::Add { xref, yref, out } => (
                     out,
                     f.add(
-                        cache[xref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                        cache[yref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
+                        cache[xref.ix].as_ref().unwrap(),
+                        cache[yref.ix].as_ref().unwrap(),
                     )?,
                 ),
                 ArithmeticGate::Sub { xref, yref, out } => (
                     out,
                     f.sub(
-                        cache[xref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                        cache[yref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
+                        cache[xref.ix].as_ref().unwrap(),
+                        cache[yref.ix].as_ref().unwrap(),
                     )?,
                 ),
-                ArithmeticGate::Cmul { xref, c, out } => (
-                    out,
-                    f.cmul(
-                        cache[xref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                        c,
-                    )?,
-                ),
+                ArithmeticGate::Cmul { xref, c, out } => {
+                    (out, f.cmul(cache[xref.ix].as_ref().unwrap(), c)?)
+                }
                 ArithmeticGate::Proj {
                     xref, ref tt, out, ..
                 } => (
                     out,
                     f.proj(
-                        cache[xref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
+                        cache[xref.ix].as_ref().unwrap(),
                         q,
                         Some(tt.to_vec()),
                         channel,
@@ -370,12 +354,8 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
                 } => (
                     out,
                     f.mul(
-                        cache[xref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                        cache[yref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
+                        cache[xref.ix].as_ref().unwrap(),
+                        cache[yref.ix].as_ref().unwrap(),
                         channel,
                     )?,
                 ),
@@ -384,9 +364,7 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
         }
         let mut outputs = Vec::with_capacity(self.noutputs());
         for r in self.get_output_refs().iter() {
-            let r = cache[r.ix]
-                .as_ref()
-                .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?;
+            let r = cache[r.ix].as_ref().unwrap();
             let out = f.output(r, channel)?;
             outputs.push(out);
         }
@@ -417,24 +395,14 @@ impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
                     (None, evaluator_inputs[id].clone())
                 }
                 BinaryGate::Constant { val } => (None, f.constant(val, q, channel)?),
-                BinaryGate::Inv { xref, out } => (
-                    out,
-                    f.negate(
-                        cache[xref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                        channel,
-                    )?,
-                ),
+                BinaryGate::Inv { xref, out } => {
+                    (out, f.negate(cache[xref.ix].as_ref().unwrap(), channel)?)
+                }
                 BinaryGate::Xor { xref, yref, out } => (
                     out,
                     f.xor(
-                        cache[xref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                        cache[yref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
+                        cache[xref.ix].as_ref().unwrap(),
+                        cache[yref.ix].as_ref().unwrap(),
                     )?,
                 ),
                 BinaryGate::And {
@@ -442,12 +410,8 @@ impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
                 } => (
                     out,
                     f.and(
-                        cache[xref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                        cache[yref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
+                        cache[xref.ix].as_ref().unwrap(),
+                        cache[yref.ix].as_ref().unwrap(),
                         channel,
                     )?,
                 ),
@@ -456,9 +420,7 @@ impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
         }
         let mut outputs = Vec::with_capacity(self.noutputs());
         for r in self.get_output_refs().iter() {
-            let r = cache[r.ix]
-                .as_ref()
-                .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?;
+            let r = cache[r.ix].as_ref().unwrap();
             let out = f.output(r, channel)?;
             outputs.push(out);
         }
