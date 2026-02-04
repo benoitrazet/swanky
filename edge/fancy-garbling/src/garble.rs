@@ -14,7 +14,7 @@ mod nonstreaming {
     use crate::{
         AllWire, FancyArithmetic, FancyBinary,
         circuit::{ArithmeticCircuit, CircuitBuilder, CircuitType, eval_plain},
-        classic::{GarbledChannel, garble},
+        classic::{GarbledChannel, eval, garble},
         fancy::{ArithmeticBundleGadgets, Bundle, BundleGadgets, Fancy},
         util::{self, RngExt},
     };
@@ -44,7 +44,7 @@ mod nonstreaming {
                 // Run the garbled circuit evaluator.
                 let xs = &en.encode_evaluator_inputs(&inps);
                 let decoded = Channel::with(GarbledChannel::from(&ev), |channel| {
-                    Ok(ev.eval(&c, &[], xs, channel).unwrap())
+                    Ok(eval(&c, &[], xs, channel).unwrap())
                 })
                 .unwrap();
 
@@ -196,7 +196,7 @@ mod nonstreaming {
                     println!("TEST x={} y={}", x, y);
                     let xs = &en.encode_evaluator_inputs(&[x, y]);
                     let decoded = Channel::with(GarbledChannel::from(&ev), |channel| {
-                        Ok(ev.eval(&c, &[], xs, channel).unwrap())
+                        Ok(eval(&c, &[], xs, channel).unwrap())
                     })
                     .unwrap();
                     let should_be = eval_plain(&c, &[], &[x, y]).unwrap();
@@ -241,7 +241,7 @@ mod nonstreaming {
             }
             let X = en.encode_evaluator_inputs(&ds);
             let outputs = Channel::with(GarbledChannel::from(&ev), |channel| {
-                Ok(ev.eval(&circ, &[], &X, channel).unwrap())
+                Ok(eval(&circ, &[], &X, channel).unwrap())
             })
             .unwrap();
             assert_eq!(util::from_mixed_radix(&outputs, &mods), should_be);
@@ -268,7 +268,7 @@ mod nonstreaming {
             let outputs = eval_plain(&circ, &[], &[]).unwrap();
             assert_eq!(outputs[0], c, "plaintext eval failed");
             let outputs = Channel::with(GarbledChannel::from(&ev), |channel| {
-                Ok(ev.eval(&circ, &[], &[], channel).unwrap())
+                Ok(eval::<AllWire, _>(&circ, &[], &[], channel).unwrap())
             })
             .unwrap();
             assert_eq!(outputs[0], c, "garbled eval failed");
@@ -301,7 +301,7 @@ mod nonstreaming {
 
             let X = en.encode_evaluator_inputs(&[x]);
             let Y = Channel::with(GarbledChannel::from(&ev), |channel| {
-                Ok(ev.eval(&circ, &[], &X, channel).unwrap())
+                Ok(eval(&circ, &[], &X, channel).unwrap())
             })
             .unwrap();
             assert_eq!(Y[0], (x + c) % q, "garbled");

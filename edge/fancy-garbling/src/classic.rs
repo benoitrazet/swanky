@@ -42,19 +42,16 @@ impl<W, C> GarbledCircuit<W, C> {
 type Ev<Wire> = Evaluator<Wire>;
 type Gb<Wire> = Garbler<AesRng, Wire>;
 
-impl<Wire: WireLabel, Circuit: EvaluableCircuit<Ev<Wire>>> GarbledCircuit<Wire, Circuit> {
-    /// Evaluate the garbled circuit.
-    pub fn eval(
-        &self,
-        c: &Circuit,
-        garbler_inputs: &[Wire],
-        evaluator_inputs: &[Wire],
-        channel: &mut Channel,
-    ) -> eyre::Result<Vec<u16>> {
-        let mut evaluator = Evaluator::new();
-        let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs, channel)?;
-        Ok(outputs.expect("evaluator outputs always are Some(u16)"))
-    }
+/// Evaluate the garbled circuit.
+pub fn eval<Wire: WireLabel, Circuit: EvaluableCircuit<Ev<Wire>>>(
+    c: &Circuit,
+    garbler_inputs: &[Wire],
+    evaluator_inputs: &[Wire],
+    channel: &mut Channel,
+) -> eyre::Result<Vec<u16>> {
+    let mut evaluator = Evaluator::new();
+    let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs, channel)?;
+    Ok(outputs.expect("evaluator outputs always are Some(u16)"))
 }
 
 /// Garble a circuit without streaming.
