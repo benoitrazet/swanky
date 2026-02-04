@@ -194,7 +194,7 @@ mod bundle {
             let out = Channel::with(std::io::empty(), |channel| {
                 let x = d.crt_encode(x, q, channel).unwrap();
                 let y = d.crt_encode(y, q, channel).unwrap();
-                let z = d.crt_add(&x, &y).unwrap();
+                let z = d.crt_add(&x, &y);
                 Ok(d.crt_output(&z, channel).unwrap().unwrap())
             })
             .unwrap();
@@ -213,7 +213,7 @@ mod bundle {
             let out = Channel::with(std::io::empty(), |channel| {
                 let x = d.crt_encode(x, q, channel).unwrap();
                 let y = d.crt_encode(y, q, channel).unwrap();
-                let z = d.crt_sub(&x, &y).unwrap();
+                let z = d.crt_sub(&x, &y);
                 Ok(d.crt_output(&z, channel).unwrap().unwrap())
             })
             .unwrap();
@@ -631,7 +631,7 @@ mod bundle {
             let mut d = Dummy::new();
             let out = Channel::with(std::io::empty(), |channel| {
                 let x = d.bin_encode(x, nbits, channel).unwrap();
-                let z = d.bin_rsa(&x, shift_size).unwrap();
+                let z = d.bin_rsa(&x, shift_size);
                 Ok(d.bin_output(&z, channel).unwrap().unwrap() as i64)
             })
             .unwrap();

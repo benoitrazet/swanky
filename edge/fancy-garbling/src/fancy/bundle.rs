@@ -113,19 +113,19 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
         &mut self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
-    ) -> Result<Bundle<Self::Item>, Self::Error> {
+    ) -> Bundle<Self::Item> {
         assert_eq!(
             x.wires().len(),
             y.wires().len(),
             "`x` and `y` must be the same length"
         );
-        Ok(Bundle::new(
+        Bundle::new(
             x.wires()
                 .iter()
                 .zip(y.wires().iter())
                 .map(|(x, y)| self.add(x, y))
                 .collect::<Vec<Self::Item>>(),
-        ))
+        )
     }
 
     /// Subtract two wire bundles, residue by residue.

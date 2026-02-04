@@ -238,8 +238,8 @@ impl Sender {
             let (partial, partial_sum_weights) =
                 state.build_and_compute_circuit(&mut gb, channel).unwrap();
 
-            acc = gb.crt_add(&acc, &partial).unwrap();
-            sum_weights = gb.crt_add(&sum_weights, &partial_sum_weights).unwrap();
+            acc = gb.crt_add(&acc, &partial);
+            sum_weights = gb.crt_add(&sum_weights, &partial_sum_weights);
 
             println!(
                 "Sender :: Computation time: {} ms",
@@ -270,8 +270,8 @@ impl Sender {
             let partial_aggregate = CrtBundle::new(aggregates[i].clone());
             let partial_sum_weight = CrtBundle::new(sum_of_weights[i].clone());
 
-            acc = gb.crt_add(&acc, &partial_aggregate).unwrap();
-            sum_weights = gb.crt_add(&sum_weights, &partial_sum_weight).unwrap();
+            acc = gb.crt_add(&acc, &partial_aggregate);
+            sum_weights = gb.crt_add(&sum_weights, &partial_sum_weight);
         }
 
         let weighted_mean = gb.crt_div(&acc, &sum_weights, channel).unwrap();
@@ -567,8 +567,8 @@ impl Receiver {
             let (partial, partial_sum_weights) =
                 state.build_and_compute_circuit(&mut ev, channel).unwrap();
 
-            acc = ev.crt_add(&acc, &partial).unwrap();
-            sum_weights = ev.crt_add(&sum_weights, &partial_sum_weights).unwrap();
+            acc = ev.crt_add(&acc, &partial);
+            sum_weights = ev.crt_add(&sum_weights, &partial_sum_weights);
 
             println!(
                 "Receiver :: Computation time: {} ms",
@@ -601,8 +601,8 @@ impl Receiver {
             let partial_aggregate = CrtBundle::new(aggregates[i].clone());
             let partial_sum_weights = CrtBundle::new(sum_of_weights[i].clone());
 
-            acc = ev.crt_add(&acc, &partial_aggregate).unwrap();
-            sum_weights = ev.crt_add(&sum_weights, &partial_sum_weights).unwrap();
+            acc = ev.crt_add(&acc, &partial_aggregate);
+            sum_weights = ev.crt_add(&sum_weights, &partial_sum_weights);
         }
 
         let weighted_mean = ev.crt_div(&acc, &sum_weights, channel).unwrap();
@@ -897,7 +897,7 @@ fn fancy_compute_payload_aggregate<
             let b_t = Bundle::new(tp.to_vec());
             f.crt_sub(&CrtBundle::from(b_t), &CrtBundle::from(b_x))
         })
-        .collect::<Result<Vec<CrtBundle<F::Item>>, F::Error>>()?;
+        .collect::<Vec<CrtBundle<F::Item>>>();
 
     let mut weighted_payloads = Vec::new();
     for it in reconstructed_payload
@@ -925,8 +925,8 @@ fn fancy_compute_payload_aggregate<
 
         let mux = f.crt_mul(&b_crt, &weighted_payloads[i], channel)?;
         let mux_sum_weights = f.crt_mul(&b_crt, &reconstructed_payload[i], channel)?;
-        acc = f.crt_add(&acc, &mux)?;
-        sum_weights = f.crt_add(&sum_weights, &mux_sum_weights)?;
+        acc = f.crt_add(&acc, &mux);
+        sum_weights = f.crt_add(&sum_weights, &mux_sum_weights);
     }
     Ok((acc, sum_weights))
 }

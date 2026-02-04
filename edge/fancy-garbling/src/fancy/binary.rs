@@ -92,14 +92,14 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         &mut self,
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        Ok(BinaryBundle::new(
+    ) -> BinaryBundle<Self::Item> {
+        BinaryBundle::new(
             x.wires()
                 .iter()
                 .zip(y.wires().iter())
                 .map(|(x, y)| self.xor(x, y))
                 .collect::<Vec<Self::Item>>(),
-        ))
+        )
     }
 
     /// And the bits of two bundles together pairwise.
@@ -527,11 +527,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
     }
 
     /// arithmetic right shift (shifts the sign of the MSB into the new spaces)
-    fn bin_rsa(
-        &mut self,
-        x: &BinaryBundle<Self::Item>,
-        c: usize,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    fn bin_rsa(&mut self, x: &BinaryBundle<Self::Item>, c: usize) -> BinaryBundle<Self::Item> {
         self.bin_shr(x, c, x.wires().last().unwrap())
     }
 
@@ -543,7 +539,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         channel: &mut Channel,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
         let zero = self.constant(0, 2, channel)?;
-        self.bin_shr(x, c, &zero)
+        Ok(self.bin_shr(x, c, &zero))
     }
 
     /// shift a value right by a constant, filling space on the right by `pad`
@@ -552,7 +548,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         c: usize,
         pad: &Self::Item,
-    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+    ) -> BinaryBundle<Self::Item> {
         let mut wires: Vec<Self::Item> = Vec::with_capacity(x.wires().len());
 
         for i in 0..x.wires().len() {
@@ -564,7 +560,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
             }
         }
 
-        Ok(BinaryBundle::new(wires))
+        BinaryBundle::new(wires)
     }
     /// Compute `x == y` for binary bundles.
     fn bin_eq_bundles(

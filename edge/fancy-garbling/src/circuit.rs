@@ -1234,7 +1234,7 @@ mod bundle {
             let mut b = CircuitBuilder::new();
             let x = b.crt_garbler_input(q);
             let y = b.crt_evaluator_input(q);
-            let z = b.crt_add(&x, &y).unwrap();
+            let z = b.crt_add(&x, &y);
             b.output_bundle(&z, channel).unwrap();
             let c = b.finish();
             Ok(c)
@@ -1284,7 +1284,7 @@ mod bundle {
         let c = Channel::with(std::io::empty(), |channel| {
             let mut b = CircuitBuilder::new();
             let x = b.crt_garbler_input(q);
-            let z = b.crt_cmul(&x, y).unwrap();
+            let z = b.crt_cmul(&x, y);
             b.output_bundle(&z, channel).unwrap();
             let c = b.finish();
             Ok(c)

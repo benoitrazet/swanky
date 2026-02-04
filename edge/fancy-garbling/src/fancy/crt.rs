@@ -98,8 +98,8 @@ pub trait CrtGadgets:
         &mut self,
         x: &CrtBundle<Self::Item>,
         y: &CrtBundle<Self::Item>,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
-        self.add_bundles(x, y).map(CrtBundle)
+    ) -> CrtBundle<Self::Item> {
+        CrtBundle(self.add_bundles(x, y))
     }
 
     /// Subtract two CRT bundles.
@@ -107,24 +107,20 @@ pub trait CrtGadgets:
         &mut self,
         x: &CrtBundle<Self::Item>,
         y: &CrtBundle<Self::Item>,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
-        Ok(CrtBundle(self.sub_bundles(x, y)))
+    ) -> CrtBundle<Self::Item> {
+        CrtBundle(self.sub_bundles(x, y))
     }
 
     /// Multiplies each wire in `x` by the corresponding residue of `c`.
-    fn crt_cmul(
-        &mut self,
-        x: &CrtBundle<Self::Item>,
-        c: u128,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
+    fn crt_cmul(&mut self, x: &CrtBundle<Self::Item>, c: u128) -> CrtBundle<Self::Item> {
         let cs = util::crt(c, &x.moduli());
-        Ok(CrtBundle::new(
+        CrtBundle::new(
             x.wires()
                 .iter()
                 .zip(cs.into_iter())
                 .map(|(x, c)| self.cmul(x, c))
                 .collect::<Vec<Self::Item>>(),
-        ))
+        )
     }
 
     /// Multiply `x` with `y`.
@@ -296,7 +292,7 @@ pub trait CrtGadgets:
         accuracy: &str,
         channel: &mut Channel,
     ) -> Result<Self::Item, Self::Error> {
-        let z = self.crt_sub(x, y)?;
+        let z = self.crt_sub(x, y);
         self.crt_sign(&z, accuracy, channel)
     }
 
@@ -415,7 +411,7 @@ pub trait CrtGadgets:
         y: &CrtBundle<Self::Item>,
         channel: &mut Channel,
     ) -> Result<Self::Item, Self::Error> {
-        let z = self.crt_sub(x, y)?;
+        let z = self.crt_sub(x, y);
         let mut pmr = self.crt_to_pmr(&z, channel)?;
         let w = pmr.pop().unwrap();
         let mut tab = vec![1; w.modulus() as usize];
@@ -470,7 +466,7 @@ pub trait CrtGadgets:
                 pb -= 1;
             }
 
-            let tmp = self.crt_cmul(y, b)?;
+            let tmp = self.crt_cmul(y, b);
             let c1 = self.pmr_geq(&a, &tmp, channel)?;
 
             let pb_crt = self.crt_constant_bundle(pb, q, channel)?;
@@ -484,11 +480,11 @@ pub trait CrtGadgets:
                 .collect::<Result<Vec<_>, _>>()?;
             let c_crt = CrtBundle::new(c_ws);
 
-            let b_if = self.crt_cmul(&c_crt, b)?;
-            quotient = self.crt_add(&quotient, &b_if)?;
+            let b_if = self.crt_cmul(&c_crt, b);
+            quotient = self.crt_add(&quotient, &b_if);
 
             let tmp_if = self.crt_mul(&c_crt, &tmp, channel)?;
-            a = self.crt_sub(&a, &tmp_if)?;
+            a = self.crt_sub(&a, &tmp_if);
         }
 
         Ok(quotient)

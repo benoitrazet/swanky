@@ -61,7 +61,7 @@ where
     let mut res = Vec::new();
 
     for i in 0..elements.len() {
-        res.push(f.bin_xor(&elements[i], &masks[i])?);
+        res.push(f.bin_xor(&elements[i], &masks[i]));
     }
     Ok(res)
 }
