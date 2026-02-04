@@ -100,8 +100,8 @@ impl<RNG, OT> FancyBinary for Evaluator<RNG, OT, WireMod2> {
         self.evaluator.and(x, y, channel).map_err(Self::Error::from)
     }
 
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        self.evaluator.xor(x, y).map_err(Self::Error::from)
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        self.evaluator.xor(x, y)
     }
 
     fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Self::Item, Self::Error> {
@@ -119,8 +119,8 @@ impl<RNG, OT> FancyBinary for Evaluator<RNG, OT, AllWire> {
         self.evaluator.and(x, y, channel).map_err(Self::Error::from)
     }
 
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        self.evaluator.xor(x, y).map_err(Self::Error::from)
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        self.evaluator.xor(x, y)
     }
 
     fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Self::Item, Self::Error> {
@@ -129,8 +129,8 @@ impl<RNG, OT> FancyBinary for Evaluator<RNG, OT, AllWire> {
 }
 
 impl<RNG, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<RNG, OT, Wire> {
-    fn add(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
-        self.evaluator.add(x, y).map_err(Self::Error::from)
+    fn add(&mut self, x: &Wire, y: &Wire) -> Self::Item {
+        self.evaluator.add(x, y)
     }
 
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {

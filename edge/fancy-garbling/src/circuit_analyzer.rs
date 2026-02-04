@@ -150,15 +150,15 @@ impl FancyInput for CircuitAnalyzer {
 }
 
 impl FancyBinary for CircuitAnalyzer {
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         self.nxors += 1;
         // Fancy's XOR gate calls the underlying arithmetic addition
         self.nadds += 1;
-        Ok(AnalyzerItem {
+        AnalyzerItem {
             modulus: x.modulus,
             // Same depth as an ADD
             depth: max(x.depth, y.depth),
-        })
+        }
     }
 
     fn and(
@@ -210,12 +210,12 @@ impl FancyBinary for CircuitAnalyzer {
 }
 
 impl FancyArithmetic for CircuitAnalyzer {
-    fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         self.nadds += 1;
-        Ok(AnalyzerItem {
+        AnalyzerItem {
             modulus: x.modulus,
             depth: max(x.depth, y.depth),
-        })
+        }
     }
 
     fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {

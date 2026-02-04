@@ -90,12 +90,12 @@ impl FancyInput for Dummy {
 derive_binary!(Dummy);
 
 impl FancyArithmetic for Dummy {
-    fn add(&mut self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, Self::Error> {
+    fn add(&mut self, x: &DummyVal, y: &DummyVal) -> DummyVal {
         assert_eq!(x.modulus(), y.modulus());
-        Ok(DummyVal {
+        DummyVal {
             val: (x.val + y.val) % x.modulus,
             modulus: x.modulus,
-        })
+        }
     }
 
     fn sub(&mut self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, Self::Error> {

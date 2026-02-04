@@ -119,12 +119,13 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
             y.wires().len(),
             "`x` and `y` must be the same length"
         );
-        x.wires()
-            .iter()
-            .zip(y.wires().iter())
-            .map(|(x, y)| self.add(x, y))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
-            .map(Bundle::new)
+        Ok(Bundle::new(
+            x.wires()
+                .iter()
+                .zip(y.wires().iter())
+                .map(|(x, y)| self.add(x, y))
+                .collect::<Vec<Self::Item>>(),
+        ))
     }
 
     /// Subtract two wire bundles, residue by residue.
@@ -195,7 +196,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
 
             // compute the digit -- easy
             let digit_sum = self.add_many(&ds)?;
-            let digit = digit_carry.map_or(Ok(digit_sum.clone()), |d| self.add(&digit_sum, &d))?;
+            let digit = digit_carry.map_or(digit_sum.clone(), |d| self.add(&digit_sum, &d));
 
             if i < n - 1 {
                 // compute the carries
@@ -212,8 +213,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
 
                 let carry_sum = self.add_many(&modded_ds)?;
                 // add in the carry from the previous iteration
-                let carry =
-                    carry_carry.map_or(Ok(carry_sum.clone()), |c| self.add(&carry_sum, &c))?;
+                let carry = carry_carry.map_or(carry_sum.clone(), |c| self.add(&carry_sum, &c));
 
                 // carry now contains the carry information, we just have to project it to
                 // the correct moduli for the next iteration
@@ -287,7 +287,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
             // add in the carry
             let sum_with_carry = opt_carry
                 .as_ref()
-                .map_or(Ok(sum.clone()), |c| self.add(&sum, c))?;
+                .map_or(sum.clone(), |c| self.add(&sum, c));
 
             // carry now contains the carry information, we just have to project it to
             // the correct moduli for the next iteration. It will either be used to
@@ -306,9 +306,9 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
         // compute the msb
         let ds = xs.iter().map(|x| x.wires()[n - 1].clone()).collect_vec();
         let digit_sum = self.add_many(&ds)?;
-        opt_carry
+        Ok(opt_carry
             .as_ref()
-            .map_or(Ok(digit_sum.clone()), |d| self.add(&digit_sum, d))
+            .map_or(digit_sum.clone(), |d| self.add(&digit_sum, d)))
     }
 
     /// If b=0 then return 0, else return x.

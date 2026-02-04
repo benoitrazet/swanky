@@ -113,8 +113,8 @@ impl<RNG: CryptoRng + Rng, OT> FancyBinary for Garbler<RNG, OT, WireMod2> {
         self.garbler.negate(x, channel).map_err(Self::Error::from)
     }
 
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        self.garbler.xor(x, y).map_err(Self::Error::from)
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        self.garbler.xor(x, y)
     }
 
     fn and(
@@ -132,8 +132,8 @@ impl<RNG: CryptoRng + Rng, OT> FancyBinary for Garbler<RNG, OT, AllWire> {
         self.garbler.negate(x, channel).map_err(Self::Error::from)
     }
 
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        self.garbler.xor(x, y).map_err(Self::Error::from)
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        self.garbler.xor(x, y)
     }
 
     fn and(
@@ -149,8 +149,8 @@ impl<RNG: CryptoRng + Rng, OT> FancyBinary for Garbler<RNG, OT, AllWire> {
 impl<RNG: CryptoRng + Rng, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic
     for Garbler<RNG, OT, Wire>
 {
-    fn add(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
-        self.garbler.add(x, y).map_err(Self::Error::from)
+    fn add(&mut self, x: &Wire, y: &Wire) -> Self::Item {
+        self.garbler.add(x, y)
     }
 
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {

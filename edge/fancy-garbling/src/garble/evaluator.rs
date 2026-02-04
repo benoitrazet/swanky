@@ -99,8 +99,8 @@ impl FancyBinary for Evaluator<WireMod2> {
         Ok(*x)
     }
 
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        Ok(x.plus(y))
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        x.plus(y)
     }
 
     fn and(
@@ -139,7 +139,7 @@ impl FancyBinary for Evaluator<AllWire> {
         Ok(x.clone())
     }
 
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         check_binary!(x);
         check_binary!(y);
 
@@ -172,9 +172,9 @@ impl FancyBinary for Evaluator<AllWire> {
 }
 
 impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
-    fn add(&mut self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
+    fn add(&mut self, x: &Wire, y: &Wire) -> Wire {
         assert_eq!(x.modulus(), y.modulus());
-        Ok(x.plus(y))
+        x.plus(y)
     }
 
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {

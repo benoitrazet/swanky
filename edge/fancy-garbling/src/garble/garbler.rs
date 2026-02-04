@@ -222,8 +222,8 @@ impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, WireMod2> {
         Ok(C)
     }
 
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        Ok(x.plus(y))
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        x.plus(y)
     }
 
     /// We can negate by having garbler xor wire with Delta
@@ -232,7 +232,7 @@ impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, WireMod2> {
     /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Self::Item, Self::Error> {
         let delta = self.delta(2);
-        self.xor(&delta, x)
+        Ok(self.xor(&delta, x))
     }
 }
 
@@ -245,11 +245,11 @@ impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
         check_binary!(x);
 
         let delta = self.delta(2);
-        self.xor(&delta, x)
+        Ok(self.xor(&delta, x))
     }
 
     /// Xor is just addition
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         check_binary!(x);
         check_binary!(y);
 
@@ -287,9 +287,9 @@ impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
 impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
     for Garbler<RNG, Wire>
 {
-    fn add(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
+    fn add(&mut self, x: &Wire, y: &Wire) -> Wire {
         assert_eq!(x.modulus(), y.modulus());
-        Ok(x.plus(y))
+        x.plus(y)
     }
 
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {

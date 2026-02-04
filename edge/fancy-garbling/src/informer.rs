@@ -248,11 +248,11 @@ impl<F: Fancy + FancyInput<Item = <F as Fancy>::Item, Error = <F as Fancy>::Erro
 }
 
 impl<F: FancyBinary> FancyBinary for Informer<F> {
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        let result = self.underlying.xor(x, y)?;
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        let result = self.underlying.xor(x, y);
         self.stats.nadds += 1;
         self.update_moduli(x.modulus());
-        Ok(result)
+        result
     }
 
     fn and(
@@ -283,11 +283,11 @@ impl<F: FancyArithmetic> FancyArithmetic for Informer<F> {
     // updating the stats. That way we can avoid checking multiple times that, e.g.
     // the moduli are equal.
 
-    fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        let result = self.underlying.add(x, y)?;
+    fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        let result = self.underlying.add(x, y);
         self.stats.nadds += 1;
         self.update_moduli(x.modulus());
-        Ok(result)
+        result
     }
 
     fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {

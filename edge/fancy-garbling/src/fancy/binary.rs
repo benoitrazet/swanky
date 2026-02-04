@@ -93,12 +93,13 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        x.wires()
-            .iter()
-            .zip(y.wires().iter())
-            .map(|(x, y)| self.xor(x, y))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
-            .map(BinaryBundle::new)
+        Ok(BinaryBundle::new(
+            x.wires()
+                .iter()
+                .zip(y.wires().iter())
+                .map(|(x, y)| self.xor(x, y))
+                .collect::<Vec<Self::Item>>(),
+        ))
     }
 
     /// And the bits of two bundles together pairwise.
@@ -181,7 +182,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
             xwires.last().unwrap().clone(),
             ywires.last().unwrap().clone(),
             c,
-        ])?;
+        ]);
         bs.push(z);
         Ok(BinaryBundle::new(bs))
     }
@@ -476,16 +477,17 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
             x.map(|x| {
                 let pos = self.bin_lt(&x, y, channel)?;
                 let neg = self.negate(&pos, channel)?;
-                x.wires()
-                    .iter()
-                    .zip(y.wires().iter())
-                    .map(|(x, y)| {
-                        let xp = self.and(x, &neg, channel)?;
-                        let yp = self.and(y, &pos, channel)?;
-                        self.xor(&xp, &yp)
-                    })
-                    .collect::<Result<Vec<Self::Item>, Self::Error>>()
-                    .map(BinaryBundle::new)
+                Ok(BinaryBundle::new(
+                    x.wires()
+                        .iter()
+                        .zip(y.wires().iter())
+                        .map(|(x, y)| {
+                            let xp = self.and(x, &neg, channel)?;
+                            let yp = self.and(y, &pos, channel)?;
+                            Ok(self.xor(&xp, &yp))
+                        })
+                        .collect::<Result<Vec<Self::Item>, Self::Error>>()?,
+                ))
             })?
         })
     }
@@ -577,7 +579,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
             .iter()
             .zip_eq(y.wires().iter())
             .map(|(x, y)| {
-                let xy = self.xor(x, y)?;
+                let xy = self.xor(x, y);
                 self.negate(&xy, channel)
             })
             .collect::<Result<Vec<Self::Item>, Self::Error>>()?;

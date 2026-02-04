@@ -329,7 +329,7 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
                     f.add(
                         cache[xref.ix].as_ref().unwrap(),
                         cache[yref.ix].as_ref().unwrap(),
-                    )?,
+                    ),
                 ),
                 ArithmeticGate::Sub { xref, yref, out } => (
                     out,
@@ -406,7 +406,7 @@ impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
                     f.xor(
                         cache[xref.ix].as_ref().unwrap(),
                         cache[yref.ix].as_ref().unwrap(),
-                    )?,
+                    ),
                 ),
                 BinaryGate::And {
                     xref, yref, out, ..
@@ -730,14 +730,14 @@ pub struct CircuitBuilder<Circuit> {
 }
 
 impl FancyBinary for CircuitBuilder<BinaryCircuit> {
-    fn xor(&mut self, xref: &Self::Item, yref: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn xor(&mut self, xref: &Self::Item, yref: &Self::Item) -> Self::Item {
         let gate = BinaryGate::Xor {
             xref: *xref,
             yref: *yref,
             out: None,
         };
 
-        Ok(self.gate(gate, xref.modulus()))
+        self.gate(gate, xref.modulus())
     }
 
     fn negate(&mut self, xref: &Self::Item, _: &mut Channel) -> Result<Self::Item, Self::Error> {
@@ -769,14 +769,14 @@ impl FancyBinary for CircuitBuilder<BinaryCircuit> {
 derive_binary!(CircuitBuilder<ArithmeticCircuit>);
 
 impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
-    fn add(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
+    fn add(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> CircuitRef {
         assert_eq!(xref.modulus(), yref.modulus());
         let gate = ArithmeticGate::Add {
             xref: *xref,
             yref: *yref,
             out: None,
         };
-        Ok(self.gate(gate, xref.modulus()))
+        self.gate(gate, xref.modulus())
     }
 
     fn sub(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
@@ -1171,7 +1171,7 @@ mod plaintext {
 
             let x = b.evaluator_input(q);
             let y = b.constant(c, q, channel).unwrap();
-            let z = b.add(&x, &y).unwrap();
+            let z = b.add(&x, &y);
             b.output(&z, channel).unwrap();
 
             let circ = b.finish();

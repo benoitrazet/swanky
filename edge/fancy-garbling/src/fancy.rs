@@ -27,7 +27,7 @@ pub trait HasModulus {
 ///
 pub trait FancyBinary: Fancy {
     /// Binary Xor
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
 
     /// Binary And
     fn and(
@@ -66,14 +66,14 @@ pub trait FancyBinary: Fancy {
         channel: &mut Channel,
     ) -> Result<(Self::Item, Self::Item), Self::Error> {
         if let Some(c) = carry_in {
-            let z1 = self.xor(x, y)?;
-            let z2 = self.xor(&z1, c)?;
-            let z3 = self.xor(x, c)?;
+            let z1 = self.xor(x, y);
+            let z2 = self.xor(&z1, c);
+            let z3 = self.xor(x, c);
             let z4 = self.and(&z1, &z3, channel)?;
-            let carry = self.xor(&z4, x)?;
+            let carry = self.xor(&z4, x);
             Ok((z2, carry))
         } else {
-            let z = self.xor(x, y)?;
+            let z = self.xor(x, y);
             let carry = self.and(x, y, channel)?;
             Ok((z, carry))
         }
@@ -112,11 +112,11 @@ pub trait FancyBinary: Fancy {
     ///
     /// # Panics
     /// Panics if `args.len() < 2`.
-    fn xor_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
+    fn xor_many(&mut self, args: &[Self::Item]) -> Self::Item {
         assert!(args.len() >= 2, "`args.len()` must be two or more");
         args.iter()
             .skip(1)
-            .fold(Ok(args[0].clone()), |acc, x| self.xor(&(acc?), x))
+            .fold(args[0].clone(), |acc, x| self.xor(&acc, x))
     }
 
     /// If `x = 0` returns the constant `b1` else return `b2`. Folds constants if possible.
@@ -143,9 +143,9 @@ pub trait FancyBinary: Fancy {
         y: &Self::Item,
         channel: &mut Channel,
     ) -> Result<Self::Item, Self::Error> {
-        let xor = self.xor(x, y)?;
+        let xor = self.xor(x, y);
         let and = self.and(b, &xor, channel)?;
-        self.xor(&and, x)
+        Ok(self.xor(&and, x))
     }
 }
 
@@ -193,7 +193,7 @@ pub trait FancyArithmetic: Fancy {
     ///
     /// # Panics
     /// This panics if `x` and `y` do not have equal moduli.
-    fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
+    fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
 
     /// Subtract `x` and `y`.
     ///
@@ -240,7 +240,7 @@ pub trait FancyArithmetic: Fancy {
         assert!(args.len() >= 2, "`args.len()` must be two or more");
         let mut z = args[0].clone();
         for x in args.iter().skip(1) {
-            z = self.add(&z, x)?;
+            z = self.add(&z, x);
         }
         Ok(z)
     }
@@ -280,7 +280,7 @@ macro_rules! check_binary {
 macro_rules! derive_binary {
     ($f:ident$(<$( $t:tt ),+>)?) => {
         impl FancyBinary for $f$(< $($t),* >)? {
-            fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+            fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
                 check_binary!(x);
                 check_binary!(y);
 
@@ -301,7 +301,7 @@ macro_rules! derive_binary {
                 // We should change this! Possibly by having the constant 1 be
                 // required as an entry in the `Fancy` trait.
                 let c = self.constant(1, 2, channel)?;
-                self.xor(x, &c)
+                Ok(self.xor(x, &c))
             }
         }
     };

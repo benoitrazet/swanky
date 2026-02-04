@@ -326,16 +326,17 @@ pub trait CrtGadgets:
             x.map(|x| {
                 let pos = self.crt_lt(&x, y, accuracy, channel)?;
                 let neg = self.negate(&pos, channel)?;
-                x.wires()
-                    .iter()
-                    .zip(y.wires().iter())
-                    .map(|(x, y)| {
-                        let xp = self.mul(x, &neg, channel)?;
-                        let yp = self.mul(y, &pos, channel)?;
-                        self.add(&xp, &yp)
-                    })
-                    .collect::<Result<Vec<Self::Item>, Self::Error>>()
-                    .map(CrtBundle::new)
+                Ok(CrtBundle::new(
+                    x.wires()
+                        .iter()
+                        .zip(y.wires().iter())
+                        .map(|(x, y)| {
+                            let xp = self.mul(x, &neg, channel)?;
+                            let yp = self.mul(y, &pos, channel)?;
+                            Ok(self.add(&xp, &yp))
+                        })
+                        .collect::<Result<Vec<Self::Item>, Self::Error>>()?,
+                ))
             })?
         })
     }
