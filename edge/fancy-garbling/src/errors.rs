@@ -20,10 +20,6 @@ pub enum DummyError {
 /// Errors from the evaluator.
 #[derive(Debug)]
 pub enum EvaluatorError {
-    /// Not enough garbler inputs provided.
-    NotEnoughGarblerInputs,
-    /// Not enough evaluator inputs provided.
-    NotEnoughEvaluatorInputs,
     /// Decoding failed.
     DecodingFailed,
     /// A communication error has occurred.
@@ -41,8 +37,6 @@ pub enum GarblerError {
     AsymmetricHalfGateModuliMax8(u16),
     /// A truth table was missing.
     TruthTableRequired,
-    /// Delta required for wire reuse.
-    DeltaRequired,
     /// Encoding error.
     EncodingError,
     /// A fancy error has occurred.
@@ -52,8 +46,6 @@ pub enum GarblerError {
 /// Errors emitted when building a circuit.
 #[derive(Debug)]
 pub enum CircuitBuilderError {
-    /// Reuse not supported.
-    ReuseUndefined,
     /// A fancy error has occurred.
     FancyError(FancyError),
 }
@@ -169,8 +161,6 @@ impl From<FancyError> for DummyError {
 impl Display for EvaluatorError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            EvaluatorError::NotEnoughGarblerInputs => "not enough garbler inputs".fmt(f),
-            EvaluatorError::NotEnoughEvaluatorInputs => "not enough evaluator inputs".fmt(f),
             EvaluatorError::DecodingFailed => write!(f, "decodiing failed"),
             EvaluatorError::CommunicationError(s) => write!(f, "communication error: {}", s),
             EvaluatorError::FancyError(e) => write!(f, "fancy error: {}", e),
@@ -211,10 +201,6 @@ impl Display for GarblerError {
             GarblerError::TruthTableRequired => {
                 "truth table required for garbler projection gates".fmt(f)
             }
-            GarblerError::DeltaRequired => {
-                "delta from previous execution of garbler must be provided with wire to reuse"
-                    .fmt(f)
-            }
             GarblerError::EncodingError => {
                 "encoding failed: unequal length input values and moduli".fmt(f)
             }
@@ -248,11 +234,6 @@ impl Display for CircuitBuilderError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             CircuitBuilderError::FancyError(e) => write!(f, "fancy error: {}", e),
-            CircuitBuilderError::ReuseUndefined => write!(
-                f,
-                "reuse is undefined for circuits. it is unclear what it means to reuse a
-                CircuitRef from a previous circuit."
-            ),
         }
     }
 }
