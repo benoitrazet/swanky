@@ -1,7 +1,7 @@
 use crate::{
     AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireLabel, WireMod2,
     check_binary,
-    errors::{FancyError, GarblerError},
+    errors::GarblerError,
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal},
     hash_wires,
     util::{RngExt, output_tweak, tweak, tweak2},

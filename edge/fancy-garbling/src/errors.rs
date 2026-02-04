@@ -7,13 +7,6 @@ use swanky_block::Block;
 /// API-usage errors, such as trying to add two `Items` with different moduli.
 #[derive(Debug)]
 pub enum FancyError {
-    /// Invalid argument modulus.
-    InvalidArgMod {
-        /// Received modulus.
-        got: u16,
-        /// Expected modulus.
-        needed: u16,
-    },
     /// Projection truth table is invalid.
     InvalidTruthTable,
     /// Uninitialized value encountered.
@@ -158,11 +151,6 @@ impl Display for ModQDeserializationError {
 impl Display for FancyError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            FancyError::InvalidArgMod { got, needed } => write!(
-                f,
-                "invalid modulus: got mod {} but require mod {}",
-                got, needed
-            ),
             FancyError::InvalidTruthTable => "invalid truth table".fmt(f),
             FancyError::UninitializedValue => {
                 "uninitialized value in circuit. is the circuit topologically sorted?".fmt(f)

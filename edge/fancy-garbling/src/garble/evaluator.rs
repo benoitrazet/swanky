@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::{
     AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireMod2, check_binary,
-    errors::{EvaluatorError, FancyError},
+    errors::EvaluatorError,
     fancy::{Fancy, FancyReveal},
     hash_wires,
     util::{output_tweak, tweak, tweak2},

@@ -260,12 +260,7 @@ pub trait FancyArithmetic: Fancy {
 
 macro_rules! check_binary {
     ($x:ident) => {
-        if $x.modulus() != 2 {
-            return Err(Self::Error::from(FancyError::InvalidArgMod {
-                got: $x.modulus(),
-                needed: 2,
-            }));
-        }
+        assert_eq!($x.modulus(), 2);
     };
 }
 
