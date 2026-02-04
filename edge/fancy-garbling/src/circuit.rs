@@ -339,7 +339,7 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
                     ),
                 ),
                 ArithmeticGate::Cmul { xref, c, out } => {
-                    (out, f.cmul(cache[xref.ix].as_ref().unwrap(), c)?)
+                    (out, f.cmul(cache[xref.ix].as_ref().unwrap(), c))
                 }
                 ArithmeticGate::Proj {
                     xref, ref tt, out, ..
@@ -789,15 +789,15 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
         self.gate(gate, xref.modulus())
     }
 
-    fn cmul(&mut self, xref: &CircuitRef, c: u16) -> Result<CircuitRef, Self::Error> {
-        Ok(self.gate(
+    fn cmul(&mut self, xref: &CircuitRef, c: u16) -> CircuitRef {
+        self.gate(
             ArithmeticGate::Cmul {
                 xref: *xref,
                 c,
                 out: None,
             },
             xref.modulus(),
-        ))
+        )
     }
 
     fn proj(

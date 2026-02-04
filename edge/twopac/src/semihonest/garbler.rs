@@ -157,8 +157,8 @@ impl<RNG: CryptoRng + Rng, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         self.garbler.sub(x, y)
     }
 
-    fn cmul(&mut self, x: &Wire, c: u16) -> Result<Self::Item, Self::Error> {
-        self.garbler.cmul(x, c).map_err(Self::Error::from)
+    fn cmul(&mut self, x: &Wire, c: u16) -> Self::Item {
+        self.garbler.cmul(x, c)
     }
 
     fn mul(

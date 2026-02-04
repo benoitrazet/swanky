@@ -106,11 +106,11 @@ impl FancyArithmetic for Dummy {
         }
     }
 
-    fn cmul(&mut self, x: &DummyVal, c: u16) -> Result<DummyVal, Self::Error> {
-        Ok(DummyVal {
+    fn cmul(&mut self, x: &DummyVal, c: u16) -> DummyVal {
+        DummyVal {
             val: (x.val * c) % x.modulus,
             modulus: x.modulus,
-        })
+        }
     }
 
     fn mul(

@@ -297,11 +297,11 @@ impl<F: FancyArithmetic> FancyArithmetic for Informer<F> {
         result
     }
 
-    fn cmul(&mut self, x: &Self::Item, y: u16) -> Result<Self::Item, Self::Error> {
-        let result = self.underlying.cmul(x, y)?;
+    fn cmul(&mut self, x: &Self::Item, y: u16) -> Self::Item {
+        let result = self.underlying.cmul(x, y);
         self.stats.ncmuls += 1;
         self.update_moduli(x.modulus());
-        Ok(result)
+        result
     }
 
     fn mul(

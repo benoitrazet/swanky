@@ -226,12 +226,12 @@ impl FancyArithmetic for CircuitAnalyzer {
         }
     }
 
-    fn cmul(&mut self, x: &Self::Item, _y: u16) -> Result<Self::Item, Self::Error> {
+    fn cmul(&mut self, x: &Self::Item, _y: u16) -> Self::Item {
         self.ncmuls += 1;
-        Ok(AnalyzerItem {
+        AnalyzerItem {
             modulus: x.modulus,
             depth: x.depth,
-        })
+        }
     }
 
     fn mul(

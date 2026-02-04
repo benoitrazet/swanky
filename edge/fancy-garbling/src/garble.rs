@@ -108,9 +108,9 @@ mod nonstreaming {
             let x = b.evaluator_input(q);
             let z;
             if q > 2 {
-                z = b.cmul(&x, 2).unwrap();
+                z = b.cmul(&x, 2);
             } else {
-                z = b.cmul(&x, 1).unwrap();
+                z = b.cmul(&x, 1);
             }
             b.output(&z, channel).unwrap();
             b.finish()
@@ -450,7 +450,7 @@ mod streaming {
             xs: &[F::Item],
             channel: &mut Channel,
         ) -> Option<u16> {
-            let z = b.cmul(&xs[0], 5).unwrap();
+            let z = b.cmul(&xs[0], 5);
             b.output(&z, channel).unwrap()
         }
 

@@ -202,7 +202,7 @@ pub trait FancyArithmetic: Fancy {
     fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
 
     /// Multiply `x` times the constant `c`.
-    fn cmul(&mut self, x: &Self::Item, c: u16) -> Result<Self::Item, Self::Error>;
+    fn cmul(&mut self, x: &Self::Item, c: u16) -> Self::Item;
 
     /// Multiply `x` and `y`.
     fn mul(

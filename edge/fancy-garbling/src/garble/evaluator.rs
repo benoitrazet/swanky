@@ -182,8 +182,8 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
         x.minus(y)
     }
 
-    fn cmul(&mut self, x: &Wire, c: u16) -> Result<Wire, EvaluatorError> {
-        Ok(x.cmul(c))
+    fn cmul(&mut self, x: &Wire, c: u16) -> Wire {
+        x.cmul(c)
     }
 
     fn mul(&mut self, A: &Wire, B: &Wire, channel: &mut Channel) -> Result<Wire, EvaluatorError> {

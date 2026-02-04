@@ -118,12 +118,13 @@ pub trait CrtGadgets:
         c: u128,
     ) -> Result<CrtBundle<Self::Item>, Self::Error> {
         let cs = util::crt(c, &x.moduli());
-        x.wires()
-            .iter()
-            .zip(cs.into_iter())
-            .map(|(x, c)| self.cmul(x, c))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
-            .map(CrtBundle::new)
+        Ok(CrtBundle::new(
+            x.wires()
+                .iter()
+                .zip(cs.into_iter())
+                .map(|(x, c)| self.cmul(x, c))
+                .collect::<Vec<Self::Item>>(),
+        ))
     }
 
     /// Multiply `x` with `y`.

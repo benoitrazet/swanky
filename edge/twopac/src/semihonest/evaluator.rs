@@ -137,8 +137,8 @@ impl<RNG, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<RN
         self.evaluator.sub(x, y)
     }
 
-    fn cmul(&mut self, x: &Wire, c: u16) -> Result<Self::Item, Self::Error> {
-        self.evaluator.cmul(x, c).map_err(Self::Error::from)
+    fn cmul(&mut self, x: &Wire, c: u16) -> Self::Item {
+        self.evaluator.cmul(x, c)
     }
 
     fn mul(
