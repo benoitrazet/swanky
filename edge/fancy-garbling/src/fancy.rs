@@ -218,7 +218,9 @@ pub trait FancyArithmetic: Fancy {
     ///
     /// # Panics
     /// This may panic in certain implementations if `tt` is `None` when it
-    /// should be `Some`.
+    /// should be `Some`. In addition, it may panic if `tt` is improperly
+    /// formed: either the length of `tt` is smaller than `x`s modulus, or the
+    /// values in `tt` are larger than `q`.
     fn proj(
         &mut self,
         x: &Self::Item,

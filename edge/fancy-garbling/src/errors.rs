@@ -6,10 +6,7 @@ use swanky_block::Block;
 /// Errors that may occur when using the `Fancy` trait. These errors are
 /// API-usage errors, such as trying to add two `Items` with different moduli.
 #[derive(Debug)]
-pub enum FancyError {
-    /// Projection truth table is invalid.
-    InvalidTruthTable,
-}
+pub enum FancyError {}
 
 /// Errors from the dummy fancy object.
 #[derive(Debug)]
@@ -148,9 +145,7 @@ impl Display for ModQDeserializationError {
 
 impl Display for FancyError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            FancyError::InvalidTruthTable => "invalid truth table".fmt(f),
-        }
+        "".fmt(f)
     }
 }
 

@@ -4,7 +4,7 @@
 use crate::{
     FancyArithmetic, FancyBinary, check_binary, derive_binary,
     dummy::{Dummy, DummyVal},
-    errors::{CircuitBuilderError, DummyError, FancyError},
+    errors::{CircuitBuilderError, DummyError},
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyInput, HasModulus},
     informer::Informer,
 };
@@ -810,9 +810,14 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
     ) -> Result<CircuitRef, Self::Error> {
         assert!(tt.is_some(), "`tt` must not be `None`");
         let tt = tt.unwrap();
-        if tt.len() < xref.modulus() as usize || !tt.iter().all(|&x| x < output_modulus) {
-            return Err(Self::Error::from(FancyError::InvalidTruthTable));
-        }
+        assert!(
+            tt.len() >= xref.modulus() as usize,
+            "`tt` not large enough for `x`s modulus"
+        );
+        assert!(
+            tt.iter().all(|&x| x < output_modulus),
+            "`tt` value larger than `q`"
+        );
         let gate = ArithmeticGate::Proj {
             xref: *xref,
             tt: tt.to_vec(),

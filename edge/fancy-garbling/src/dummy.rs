@@ -7,7 +7,7 @@ use swanky_channel::Channel;
 
 use crate::{
     FancyArithmetic, FancyBinary, check_binary, derive_binary,
-    errors::{DummyError, FancyError},
+    errors::DummyError,
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
 };
 
@@ -134,9 +134,14 @@ impl FancyArithmetic for Dummy {
     ) -> Result<DummyVal, Self::Error> {
         assert!(tt.is_some(), "`tt` must not be `None`");
         let tt = tt.unwrap();
-        if tt.len() < x.modulus() as usize || !tt.iter().all(|&x| x < modulus) {
-            return Err(Self::Error::from(FancyError::InvalidTruthTable));
-        }
+        assert!(
+            tt.len() >= x.modulus() as usize,
+            "`tt` not large enough for `x`s modulus"
+        );
+        assert!(
+            tt.iter().all(|&x| x < modulus),
+            "`tt` value larger than `q`"
+        );
         let val = tt[x.val as usize];
         Ok(DummyVal { val, modulus })
     }
