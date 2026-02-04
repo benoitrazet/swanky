@@ -290,11 +290,11 @@ impl<F: FancyArithmetic> FancyArithmetic for Informer<F> {
         result
     }
 
-    fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        let result = self.underlying.sub(x, y)?;
+    fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        let result = self.underlying.sub(x, y);
         self.stats.nsubs += 1;
         self.update_moduli(x.modulus());
-        Ok(result)
+        result
     }
 
     fn cmul(&mut self, x: &Self::Item, y: u16) -> Result<Self::Item, Self::Error> {

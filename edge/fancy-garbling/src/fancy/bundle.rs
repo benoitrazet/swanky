@@ -138,18 +138,19 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
         &mut self,
         x: &Bundle<Self::Item>,
         y: &Bundle<Self::Item>,
-    ) -> Result<Bundle<Self::Item>, Self::Error> {
+    ) -> Bundle<Self::Item> {
         assert_eq!(
             x.wires().len(),
             y.wires().len(),
             "`x` and `y` must be the same length"
         );
-        x.wires()
-            .iter()
-            .zip(y.wires().iter())
-            .map(|(x, y)| self.sub(x, y))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
-            .map(Bundle::new)
+        Bundle::new(
+            x.wires()
+                .iter()
+                .zip(y.wires().iter())
+                .map(|(x, y)| self.sub(x, y))
+                .collect::<Vec<Self::Item>>(),
+        )
     }
 
     /// Multiply each wire in `x` with each wire in `y`, pairwise.
@@ -344,7 +345,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
             .zip_eq(y.wires().iter())
             .map(|(x, y)| {
                 // compute (x-y == 0) for each residue
-                let z = self.sub(x, y)?;
+                let z = self.sub(x, y);
                 let mut eq_zero_tab = vec![0; x.modulus() as usize];
                 eq_zero_tab[0] = 1;
                 self.proj(&z, wlen + 1, Some(eq_zero_tab), channel)

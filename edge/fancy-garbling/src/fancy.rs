@@ -199,7 +199,7 @@ pub trait FancyArithmetic: Fancy {
     ///
     /// # Panics
     /// This panics if `x` and `y` do not have equal moduli.
-    fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
+    fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
 
     /// Multiply `x` times the constant `c`.
     fn cmul(&mut self, x: &Self::Item, c: u16) -> Result<Self::Item, Self::Error>;

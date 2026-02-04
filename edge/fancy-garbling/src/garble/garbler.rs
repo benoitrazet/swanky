@@ -292,9 +292,9 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         x.plus(y)
     }
 
-    fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
+    fn sub(&mut self, x: &Wire, y: &Wire) -> Wire {
         assert_eq!(x.modulus(), y.modulus());
-        Ok(x.minus(y))
+        x.minus(y)
     }
 
     fn cmul(&mut self, x: &Wire, c: u16) -> Result<Wire, GarblerError> {

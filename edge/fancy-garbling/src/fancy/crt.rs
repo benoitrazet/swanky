@@ -108,7 +108,7 @@ pub trait CrtGadgets:
         x: &CrtBundle<Self::Item>,
         y: &CrtBundle<Self::Item>,
     ) -> Result<CrtBundle<Self::Item>, Self::Error> {
-        self.sub_bundles(x, y).map(CrtBundle)
+        Ok(CrtBundle(self.sub_bundles(x, y)))
     }
 
     /// Multiplies each wire in `x` by the corresponding residue of `c`.
@@ -378,7 +378,7 @@ pub trait CrtGadgets:
             let q = y.modulus();
             let x_ = self.mod_change(x, p + q - 1, channel)?;
             let y_ = self.mod_change(y, p + q - 1, channel)?;
-            let z = self.sub(&x_, &y_)?;
+            let z = self.sub(&x_, &y_);
             self.proj(&z, q, Some(gadget_projection_tt(p, q)), channel)
         };
 

@@ -336,7 +336,7 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
                     f.sub(
                         cache[xref.ix].as_ref().unwrap(),
                         cache[yref.ix].as_ref().unwrap(),
-                    )?,
+                    ),
                 ),
                 ArithmeticGate::Cmul { xref, c, out } => {
                     (out, f.cmul(cache[xref.ix].as_ref().unwrap(), c)?)
@@ -779,14 +779,14 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
         self.gate(gate, xref.modulus())
     }
 
-    fn sub(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
+    fn sub(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> CircuitRef {
         assert_eq!(xref.modulus(), yref.modulus());
         let gate = ArithmeticGate::Sub {
             xref: *xref,
             yref: *yref,
             out: None,
         };
-        Ok(self.gate(gate, xref.modulus()))
+        self.gate(gate, xref.modulus())
     }
 
     fn cmul(&mut self, xref: &CircuitRef, c: u16) -> Result<CircuitRef, Self::Error> {
@@ -1259,7 +1259,7 @@ mod bundle {
             let mut b = CircuitBuilder::new();
             let x = b.crt_garbler_input(q);
             let y = b.crt_evaluator_input(q);
-            let z = b.sub_bundles(&x, &y).unwrap();
+            let z = b.sub_bundles(&x, &y);
             b.output_bundle(&z, channel).unwrap();
             let c = b.finish();
             Ok(c)

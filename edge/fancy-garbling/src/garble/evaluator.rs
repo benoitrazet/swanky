@@ -177,9 +177,9 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
         x.plus(y)
     }
 
-    fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
+    fn sub(&mut self, x: &Wire, y: &Wire) -> Wire {
         assert_eq!(x.modulus(), y.modulus());
-        Ok(x.minus(y))
+        x.minus(y)
     }
 
     fn cmul(&mut self, x: &Wire, c: u16) -> Result<Wire, EvaluatorError> {

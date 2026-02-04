@@ -218,12 +218,12 @@ impl FancyArithmetic for CircuitAnalyzer {
         }
     }
 
-    fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         self.nsubs += 1;
-        Ok(AnalyzerItem {
+        AnalyzerItem {
             modulus: x.modulus,
             depth: max(x.depth, y.depth),
-        })
+        }
     }
 
     fn cmul(&mut self, x: &Self::Item, _y: u16) -> Result<Self::Item, Self::Error> {

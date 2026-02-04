@@ -98,12 +98,12 @@ impl FancyArithmetic for Dummy {
         }
     }
 
-    fn sub(&mut self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, Self::Error> {
+    fn sub(&mut self, x: &DummyVal, y: &DummyVal) -> DummyVal {
         assert_eq!(x.modulus(), y.modulus());
-        Ok(DummyVal {
+        DummyVal {
             val: (x.modulus + x.val - y.val) % x.modulus,
             modulus: x.modulus,
-        })
+        }
     }
 
     fn cmul(&mut self, x: &DummyVal, c: u16) -> Result<DummyVal, Self::Error> {

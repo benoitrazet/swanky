@@ -95,7 +95,7 @@ mod nonstreaming {
             let mut b = CircuitBuilder::new();
             let x = b.evaluator_input(q);
             let y = b.evaluator_input(q);
-            let z = b.sub(&x, &y).unwrap();
+            let z = b.sub(&x, &y);
             b.output(&z, channel).unwrap();
             b.finish()
         });
@@ -404,7 +404,7 @@ mod streaming {
             xs: &[F::Item],
             channel: &mut Channel,
         ) -> Option<u16> {
-            let z = b.sub(&xs[0], &xs[1]).unwrap();
+            let z = b.sub(&xs[0], &xs[1]);
             b.output(&z, channel).unwrap()
         }
 
