@@ -2,6 +2,7 @@ use crate::{
     AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireLabel, WireMod2,
     check_binary,
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal},
+    garble::binary_and::BinaryWireLabel,
     hash_wires,
     util::{RngExt, output_tweak, tweak, tweak2},
 };
@@ -9,7 +10,6 @@ use rand::{CryptoRng, RngCore};
 #[cfg(feature = "serde")]
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
-use subtle::ConditionallySelectable;
 use swanky_block::Block;
 use swanky_channel::Channel;
 
@@ -136,57 +136,6 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
         let (gbs, evs) = self.encode_many_wires(&xs, &ms)?;
         Ok((BinaryBundle::new(gbs), BinaryBundle::new(evs)))
     }
-
-    /// Garbles an 'and' gate given two input wires and the delta.
-    ///
-    /// Outputs a tuple consisting of the two gates (that should be transfered to the evaluator)
-    /// and the next wire label for the garbler.
-    ///
-    /// Used internally as a subroutine to implement 'and' gates for `FancyBinary`.
-    fn garble_and_gate(
-        &mut self,
-        A: &WireMod2,
-        B: &WireMod2,
-        delta: &WireMod2,
-    ) -> (Block, Block, WireMod2) {
-        let q = A.modulus();
-        let D = delta;
-        let gate_num = self.current_gate();
-
-        let r = B.color(); // secret value known only to the garbler (ev knows r+b)
-
-        let g = tweak2(gate_num as u64, 0);
-
-        // X = H(A+aD) + arD such that a + A.color == 0
-        let alpha = A.color(); // alpha = -A.color
-        let X1 = A.plus(&D.cmul(alpha));
-
-        // Y = H(B + bD) + (b + r)A such that b + B.color == 0
-        let beta = (q - B.color()) % q;
-        let Y1 = B.plus(&D.cmul(beta));
-
-        let AD = A.plus(D);
-        let BD = B.plus(D);
-
-        // idx is always boolean for binary gates, so it can be represented as a `u8`
-        let a_selector = (A.color() as u8).into();
-        let b_selector = (B.color() as u8).into();
-
-        let B = WireMod2::conditional_select(&BD, B, b_selector);
-        let newA = WireMod2::conditional_select(&AD, A, a_selector);
-        let idx = u8::conditional_select(&(r as u8), &0u8, a_selector);
-
-        let [hashA, hashB, hashX, hashY] = hash_wires([&newA, &B, &X1, &Y1], g);
-
-        let X = WireMod2::hash_to_mod(hashX, q).plus_mov(&D.cmul(alpha * r % q));
-        let Y = WireMod2::hash_to_mod(hashY, q);
-
-        let gate0 =
-            hashA ^ Block::conditional_select(&X.as_block(), &X.plus(D).as_block(), idx.into());
-        let gate1 = hashB ^ Y.plus(A).as_block();
-
-        (gate0, gate1, X.plus_mov(&Y))
-    }
 }
 
 impl<RNG: RngCore + CryptoRng, Wire: WireLabel> FancyReveal for Garbler<RNG, Wire> {
@@ -199,7 +148,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel> FancyReveal for Garbler<RNG, Wir
     }
 }
 
-impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, WireMod2> {
+impl<RNG: RngCore + CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, W> {
     fn and(
         &mut self,
         A: &Self::Item,
@@ -207,7 +156,8 @@ impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, WireMod2> {
         channel: &mut Channel,
     ) -> eyre::Result<Self::Item> {
         let delta = self.delta(2);
-        let (gate0, gate1, C) = self.garble_and_gate(A, B, &delta);
+        let gate_num = self.current_gate();
+        let (gate0, gate1, C) = W::garble_and_gate(gate_num, A, B, &delta);
         channel.write(&gate0)?;
         channel.write(&gate1)?;
         Ok(C)
@@ -257,7 +207,8 @@ impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
         if let (AllWire::Mod2(A), AllWire::Mod2(B), AllWire::Mod2(ref delta)) =
             (x, y, self.delta(2))
         {
-            let (gate0, gate1, C) = self.garble_and_gate(A, B, delta);
+            let gate_num = self.current_gate();
+            let (gate0, gate1, C) = WireMod2::garble_and_gate(gate_num, A, B, delta);
             channel.write(&gate0)?;
             channel.write(&gate1)?;
             return Ok(AllWire::Mod2(C));

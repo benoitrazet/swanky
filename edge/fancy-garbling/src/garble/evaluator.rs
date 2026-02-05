@@ -3,11 +3,11 @@ use std::marker::PhantomData;
 use crate::{
     AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireMod2, check_binary,
     fancy::{Fancy, FancyReveal},
+    garble::binary_and::BinaryWireLabel,
     hash_wires,
     util::{output_tweak, tweak, tweak2},
     wire::WireLabel,
 };
-use subtle::ConditionallySelectable;
 use swanky_block::Block;
 use swanky_channel::Channel;
 
@@ -52,41 +52,9 @@ impl<Wire: WireLabel> Evaluator<Wire> {
         let block = channel.read()?;
         Ok(Wire::from_block(block, modulus))
     }
-
-    /// Evaluates an 'and' gate given two inputs wires and two half-gates from the garbler.
-    ///
-    /// Outputs C = A & B
-    ///
-    /// Used internally as a subroutine to implement 'and' gates for `FancyBinary`.
-    fn evaluate_and_gate(
-        &mut self,
-        A: &WireMod2,
-        B: &WireMod2,
-        gate0: &Block,
-        gate1: &Block,
-    ) -> WireMod2 {
-        let gate_num = self.current_gate();
-        let g = tweak2(gate_num as u64, 0);
-
-        let [hashA, hashB] = hash_wires([A, B], g);
-
-        // garbler's half gate
-        let L = WireMod2::from_block(
-            Block::conditional_select(&hashA, &(hashA ^ *gate0), (A.color() as u8).into()),
-            2,
-        );
-
-        // evaluator's half gate
-        let R = WireMod2::from_block(
-            Block::conditional_select(&hashB, &(hashB ^ *gate1), (B.color() as u8).into()),
-            2,
-        );
-
-        L.plus_mov(&R.plus_mov(&A.cmul(B.color())))
-    }
 }
 
-impl FancyBinary for Evaluator<WireMod2> {
+impl<W: BinaryWireLabel> FancyBinary for Evaluator<W> {
     /// Negate is a noop for the evaluator
     fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
         Ok(*x)
@@ -102,9 +70,10 @@ impl FancyBinary for Evaluator<WireMod2> {
         B: &Self::Item,
         channel: &mut Channel,
     ) -> eyre::Result<Self::Item> {
+        let gate_num = self.current_gate();
         let gate0 = channel.read()?;
         let gate1 = channel.read()?;
-        Ok(self.evaluate_and_gate(A, B, &gate0, &gate1))
+        Ok(W::evaluate_and_gate(gate_num, A, B, &gate0, &gate1))
     }
 }
 
@@ -140,9 +109,12 @@ impl FancyBinary for Evaluator<AllWire> {
         channel: &mut Channel,
     ) -> eyre::Result<Self::Item> {
         if let (AllWire::Mod2(A), AllWire::Mod2(B)) = (x, y) {
+            let gate_num = self.current_gate();
             let gate0 = channel.read()?;
             let gate1 = channel.read()?;
-            return Ok(AllWire::Mod2(self.evaluate_and_gate(A, B, &gate0, &gate1)));
+            return Ok(AllWire::Mod2(WireMod2::evaluate_and_gate(
+                gate_num, A, B, &gate0, &gate1,
+            )));
         }
 
         // If we got here, one of the wires isn't binary
