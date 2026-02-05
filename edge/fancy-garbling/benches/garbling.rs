@@ -3,10 +3,11 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     AllWire, FancyArithmetic,
     circuit::{ArithmeticCircuit as Circuit, CircuitBuilder, CircuitType},
-    classic::{GarbledChannel, eval, garble},
+    classic::GarbledCircuit,
     util::RngExt,
 };
 use std::time::Duration;
+use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
 
 fn bench_garble<F: 'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
@@ -16,7 +17,7 @@ where
     c.bench_function(&format!("garbling::{}_gb ({})", name, q), move |bench| {
         let c = make_circuit(q);
         bench.iter(|| {
-            let gb = garble::<AllWire, _>(&c).unwrap();
+            let gb = GarbledCircuit::garble::<AllWire, _, _>(&c, AesRng::new()).unwrap();
             std::hint::black_box(gb);
         });
     });
@@ -29,16 +30,13 @@ where
     c.bench_function(&format!("garbling::{}_ev ({})", name, q), move |bench| {
         let mut rng = rand::thread_rng();
         let c = make_circuit(q);
-        let (en, ev) = garble::<AllWire, _>(&c).unwrap();
+        let (en, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&c, AesRng::new()).unwrap();
         let inps = (0..c.num_garbler_inputs())
             .map(|i| rng.gen_u16() % c.garbler_input_mod(i))
             .collect::<Vec<u16>>();
         let xs = en.encode_garbler_inputs(&inps);
         bench.iter(|| {
-            let ys = Channel::with(GarbledChannel::from(&ev), |channel| {
-                Ok(eval(&c, &xs, &[], channel).unwrap())
-            })
-            .unwrap();
+            let ys = ev.eval(&c, &xs, &[]).unwrap();
             std::hint::black_box(ys);
         });
     });

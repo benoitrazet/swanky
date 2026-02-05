@@ -2,100 +2,131 @@
 //! circuit without streaming.
 
 use crate::{
-    WireLabel,
+    Fancy, WireLabel,
     circuit::EvaluableCircuit,
     garble::{Evaluator, Garbler},
+    util::output_tweak,
 };
 use itertools::Itertools;
-use std::{collections::HashMap, marker::PhantomData};
-use swanky_aes_rng::AesRng;
+use rand::{CryptoRng, RngCore};
+use std::collections::HashMap;
 use swanky_block::Block;
 use swanky_channel::Channel;
 
-/// Static evaluator for a circuit, created by the `garble` function.
+/// A garbled circuit.
 ///
-/// Uses `Evaluator` under the hood to actually implement the evaluation.
+/// A garbled circuit at its core is just a vector of garbled rows and constant
+/// wirelabels.
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct GarbledCircuit<W, C> {
+pub struct GarbledCircuit {
     blocks: Vec<Block>,
-    _phantom_wire: PhantomData<W>,
-    _phantom_circ: PhantomData<C>,
 }
 
-impl<W, C> GarbledCircuit<W, C> {
-    /// Create a new object from a vector of garbled gates and constant wires.
+impl GarbledCircuit {
+    /// Create a [`GarbledCircuit`] from a vector of garbled rows and constant
+    /// wirelabels.
     pub fn new(blocks: Vec<Block>) -> Self {
-        GarbledCircuit {
-            blocks,
-            _phantom_wire: PhantomData,
-            _phantom_circ: PhantomData,
-        }
+        GarbledCircuit { blocks }
     }
 
     /// The number of garbled rows and constant wires in the garbled circuit.
     pub fn size(&self) -> usize {
         self.blocks.len()
     }
-}
 
-type Ev<Wire> = Evaluator<Wire>;
-type Gb<Wire> = Garbler<AesRng, Wire>;
+    /// Garble a circuit.
+    ///
+    /// This outputs three things:
+    /// 1. An [`Encoder`] for encoding inputs to valid input wirelabels.
+    /// 2. The garbled circuit itself.
+    /// 3. An [`OutputMapping`] mapping for mapping output wirelabels to their
+    ///    associated underlying values.
+    pub fn garble<
+        Wire: WireLabel,
+        Circuit: EvaluableCircuit<Garbler<RNG, Wire>>,
+        RNG: CryptoRng + RngCore,
+    >(
+        c: &Circuit,
+        rng: RNG,
+    ) -> eyre::Result<(Encoder<Wire>, Self, OutputMapping)> {
+        let mut garbler = Garbler::new(rng);
 
-/// Evaluate the garbled circuit.
-pub fn eval<Wire: WireLabel, Circuit: EvaluableCircuit<Ev<Wire>>>(
-    c: &Circuit,
-    garbler_inputs: &[Wire],
-    evaluator_inputs: &[Wire],
-    channel: &mut Channel,
-) -> eyre::Result<Vec<u16>> {
-    let mut evaluator = Evaluator::new();
-    let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs, channel)?;
-    Ok(outputs.expect("evaluator outputs always are Some(u16)"))
-}
+        // get input wires, ignoring encoded values
+        let gb_inps = (0..c.num_garbler_inputs())
+            .map(|i| {
+                let q = c.garbler_input_mod(i);
+                let (zero, _) = garbler.encode_wire(0, q);
+                zero
+            })
+            .collect_vec();
 
-/// Garble a circuit without streaming.
-pub fn garble<Wire: WireLabel, Circuit: EvaluableCircuit<Gb<Wire>>>(
-    c: &Circuit,
-) -> eyre::Result<(Encoder<Wire>, GarbledCircuit<Wire, Circuit>)> {
-    let rng = AesRng::new();
-    let mut garbler = Garbler::new(rng);
+        let ev_inps = (0..c.num_evaluator_inputs())
+            .map(|i| {
+                let q = c.evaluator_input_mod(i);
+                let (zero, _) = garbler.encode_wire(0, q);
+                zero
+            })
+            .collect_vec();
 
-    // get input wires, ignoring encoded values
-    let gb_inps = (0..c.num_garbler_inputs())
-        .map(|i| {
-            let q = c.garbler_input_mod(i);
-            let (zero, _) = garbler.encode_wire(0, q);
-            zero
-        })
-        .collect_vec();
+        let mut channel = GarbledChannel::new_writer(None);
+        let zeros = Channel::with(&mut channel, |channel| {
+            // First, garble the circuit, outputting the zero wirelabels
+            // associated with the output.
+            let zeros = c.eval_to_wirelabels(&mut garbler, &gb_inps, &ev_inps, channel)?;
+            // Next, map the zero output wirelabels to the set of valid outputs.
+            // This is needed for evaluators that don't use the output
+            // mapping provided as ouput; in that case, we need the channel to
+            // contain that mapping, which is what the below does.
+            garbler.outputs(&zeros, channel)?;
+            Ok(zeros)
+        })?;
 
-    let ev_inps = (0..c.num_evaluator_inputs())
-        .map(|i| {
-            let q = c.evaluator_input_mod(i);
-            let (zero, _) = garbler.encode_wire(0, q);
-            zero
-        })
-        .collect_vec();
+        let deltas = garbler.get_deltas();
+        let en = Encoder::new(gb_inps, ev_inps, deltas.clone());
+        let gc = GarbledCircuit::new(channel.writer().blocks.clone());
+        let output_mapping = OutputMapping::new(&zeros, &deltas);
 
-    let mut channel = GarbledChannel::new_writer(None);
-    Channel::with(&mut channel, |channel| {
-        c.eval(&mut garbler, &gb_inps, &ev_inps, channel).unwrap();
-        Ok(())
-    })
-    .unwrap();
+        Ok((en, gc, output_mapping))
+    }
 
-    let en = Encoder::new(gb_inps, ev_inps, garbler.get_deltas());
+    /// Evaluate the garbled circuit on the provided inputs.
+    pub fn eval<Wire: WireLabel, Circuit: EvaluableCircuit<Evaluator<Wire>>>(
+        &self,
+        c: &Circuit,
+        garbler_inputs: &[Wire],
+        evaluator_inputs: &[Wire],
+    ) -> eyre::Result<Vec<u16>> {
+        let output = Channel::with(GarbledChannel::from(self), |channel| {
+            let mut evaluator = Evaluator::new();
+            let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs, channel)?;
+            Ok(outputs.expect("evaluator outputs always are Some(u16)"))
+        })?;
+        Ok(output)
+    }
 
-    let gc = GarbledCircuit::new(channel.writer().blocks.clone());
-
-    Ok((en, gc))
+    /// Evaluate the garbled circuit on the provided inputs, returning the
+    /// output wirelabels.
+    pub fn eval_to_wirelabels<Wire: WireLabel, Circuit: EvaluableCircuit<Evaluator<Wire>>>(
+        &self,
+        c: &Circuit,
+        garbler_inputs: &[Wire],
+        evaluator_inputs: &[Wire],
+    ) -> eyre::Result<Vec<Wire>> {
+        let wirelabels = Channel::with(GarbledChannel::from(self), |channel| {
+            let mut evaluator = Evaluator::new();
+            let wirelabels =
+                c.eval_to_wirelabels(&mut evaluator, garbler_inputs, evaluator_inputs, channel)?;
+            Ok(wirelabels)
+        })?;
+        Ok(wirelabels)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Encoder
 
-/// Encode inputs statically.
+/// Encoder for input wirelabels.
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Encoder<Wire> {
@@ -105,9 +136,9 @@ pub struct Encoder<Wire> {
 }
 
 impl<Wire: WireLabel> Encoder<Wire> {
-    /// Make a new `Encoder` from lists of garbler and evaluator inputs,
+    /// Make a new [`Encoder`] from lists of garbler and evaluator inputs,
     /// alongside a map of moduli-to-wire-offsets.
-    pub fn new(
+    fn new(
         garbler_inputs: Vec<Wire>,
         evaluator_inputs: Vec<Wire>,
         deltas: HashMap<u16, Wire>,
@@ -119,46 +150,87 @@ impl<Wire: WireLabel> Encoder<Wire> {
         }
     }
 
-    /// Output the number of garbler inputs.
-    pub fn num_garbler_inputs(&self) -> usize {
-        self.garbler_inputs.len()
-    }
-
-    /// Output the number of evaluator inputs.
-    pub fn num_evaluator_inputs(&self) -> usize {
-        self.evaluator_inputs.len()
-    }
-
-    /// Encode a single garbler input into its associated wire-label.
-    pub fn encode_garbler_input(&self, x: u16, id: usize) -> Wire {
-        let X = &self.garbler_inputs[id];
-        let q = X.modulus();
-        X.plus(&self.deltas[&q].cmul(x))
-    }
-
-    /// Encode a single evaluator input into its associated wire-label.
-    pub fn encode_evaluator_input(&self, x: u16, id: usize) -> Wire {
-        let X = &self.evaluator_inputs[id];
-        let q = X.modulus();
-        X.plus(&self.deltas[&q].cmul(x))
-    }
-
-    /// Encode a slice of garbler inputs into their associated wire-labels.
+    /// Encode garbler input values into their associated wirelabels.
+    ///
+    /// # Panics
+    /// This panics if `inputs.len()` does not equal the expected number of
+    /// garbler inputs.
     pub fn encode_garbler_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
-        debug_assert_eq!(inputs.len(), self.garbler_inputs.len());
-        (0..inputs.len())
+        assert_eq!(inputs.len(), self.garbler_inputs.len());
+        self.garbler_inputs
+            .iter()
             .zip(inputs)
-            .map(|(id, &x)| self.encode_garbler_input(x, id))
+            .map(|(zero, x)| {
+                let q = zero.modulus();
+                zero.plus(&self.deltas[&q].cmul(*x))
+            })
             .collect()
     }
 
-    /// Encode a slice of evaluator inputs into their associated wire-labels.
+    /// Encode evaluator input values into their associated wirelabels.
+    ///
+    /// # Panics
+    /// This panics if `inputs.len()` does not equal the expected number of
+    /// evaluator inputs.
     pub fn encode_evaluator_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
-        debug_assert_eq!(inputs.len(), self.evaluator_inputs.len());
-        (0..inputs.len())
+        assert_eq!(inputs.len(), self.evaluator_inputs.len());
+        self.evaluator_inputs
+            .iter()
             .zip(inputs)
-            .map(|(id, &x)| self.encode_evaluator_input(x, id))
+            .map(|(zero, x)| {
+                let q = zero.modulus();
+                zero.plus(&self.deltas[&q].cmul(*x))
+            })
             .collect()
+    }
+}
+
+/// A mapping of output wirelabels to their associated underlying values.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct OutputMapping(Vec<Vec<Block>>);
+
+impl OutputMapping {
+    /// Construct a new [`OutputMapping`] from a set of zero wirelabels and
+    /// their associated deltas.
+    pub fn new<Wire: WireLabel>(zeros: &[Wire], deltas: &HashMap<u16, Wire>) -> Self {
+        let mut outputs = Vec::with_capacity(zeros.len());
+        for (i, zero) in zeros.iter().enumerate() {
+            let q = zero.modulus();
+            let mut wirelabels = Vec::with_capacity(q as usize);
+            for k in 0..q {
+                let wirelabel = zero.plus(&deltas[&q].cmul(k));
+                let hashed = wirelabel.hash(output_tweak(i, k));
+                wirelabels.push(hashed);
+            }
+            outputs.push(wirelabels);
+        }
+        Self(outputs)
+    }
+
+    /// Map output wirelabels to their underlying values.
+    ///
+    /// # Errors
+    /// This returns an error if it is unable to find a valid mapping for a
+    /// given output wirelabel.
+    pub fn to_outputs<Wire: WireLabel>(&self, wirelabels: &[Wire]) -> eyre::Result<Vec<u16>> {
+        let mut outputs = Vec::new();
+        for (i, wirelabel) in wirelabels.into_iter().enumerate() {
+            let q = wirelabel.modulus();
+            let mut decoded = None;
+            for k in 0..q {
+                let hashed = wirelabel.hash(output_tweak(i, k));
+                if hashed == self.0[i][k as usize] {
+                    decoded = Some(k);
+                    break;
+                }
+            }
+            if let Some(output) = decoded {
+                outputs.push(output);
+            } else {
+                eyre::bail!("Decoding failed");
+            }
+        }
+        Ok(outputs)
     }
 }
 
@@ -167,7 +239,7 @@ impl<Wire: WireLabel> Encoder<Wire> {
 // blocks
 
 /// A [`Channel`] type for writing and reading a garbled circuit from memory.
-pub struct GarbledChannel {
+struct GarbledChannel {
     reader: Option<GarbledReader>,
     writer: Option<GarbledWriter>,
 }
@@ -178,14 +250,6 @@ impl GarbledChannel {
         Self {
             reader: None,
             writer: Some(GarbledWriter::new(ngates)),
-        }
-    }
-
-    /// Construct a new [`GarbledChannel`] for reading a garbled circuit.
-    pub fn new_reader(blocks: &[Block]) -> Self {
-        Self {
-            reader: Some(GarbledReader::new(blocks)),
-            writer: None,
         }
     }
 
@@ -213,8 +277,8 @@ impl std::io::Write for GarbledChannel {
     }
 }
 
-impl<W, C> From<&GarbledCircuit<W, C>> for GarbledChannel {
-    fn from(value: &GarbledCircuit<W, C>) -> Self {
+impl From<&GarbledCircuit> for GarbledChannel {
+    fn from(value: &GarbledCircuit) -> Self {
         Self {
             reader: Some(GarbledReader::new(&value.blocks)),
             writer: None,
@@ -224,7 +288,7 @@ impl<W, C> From<&GarbledCircuit<W, C>> for GarbledChannel {
 
 /// Implementation of the `Read` trait for use by the `Evaluator`.
 #[derive(Debug)]
-pub struct GarbledReader {
+struct GarbledReader {
     blocks: Vec<Block>,
     index: usize,
 }
@@ -261,7 +325,7 @@ impl std::io::Read for GarbledReader {
 
 /// Implementation of the `Write` trait for use by `Garbler`.
 #[derive(Debug)]
-pub struct GarbledWriter {
+struct GarbledWriter {
     blocks: Vec<Block>,
 }
 
