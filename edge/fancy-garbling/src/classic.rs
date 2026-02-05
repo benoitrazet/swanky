@@ -203,6 +203,7 @@ impl<Wire: WireLabel> Encoder<Wire> {
 }
 
 /// A mapping of output wirelabels to their associated underlying values.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OutputMapping(Vec<Vec<Block>>);
 
 impl OutputMapping {
