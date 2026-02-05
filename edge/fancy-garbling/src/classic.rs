@@ -147,9 +147,9 @@ pub struct Encoder<Wire> {
 }
 
 impl<Wire: WireLabel> Encoder<Wire> {
-    /// Make a new `Encoder` from lists of garbler and evaluator inputs,
+    /// Make a new [`Encoder`] from lists of garbler and evaluator inputs,
     /// alongside a map of moduli-to-wire-offsets.
-    pub fn new(
+    fn new(
         garbler_inputs: Vec<Wire>,
         evaluator_inputs: Vec<Wire>,
         deltas: HashMap<u16, Wire>,
@@ -161,45 +161,37 @@ impl<Wire: WireLabel> Encoder<Wire> {
         }
     }
 
-    /// Output the number of garbler inputs.
-    pub fn num_garbler_inputs(&self) -> usize {
-        self.garbler_inputs.len()
-    }
-
-    /// Output the number of evaluator inputs.
-    pub fn num_evaluator_inputs(&self) -> usize {
-        self.evaluator_inputs.len()
-    }
-
-    /// Encode a single garbler input into its associated wire-label.
-    pub fn encode_garbler_input(&self, x: u16, id: usize) -> Wire {
-        let X = &self.garbler_inputs[id];
-        let q = X.modulus();
-        X.plus(&self.deltas[&q].cmul(x))
-    }
-
-    /// Encode a single evaluator input into its associated wire-label.
-    pub fn encode_evaluator_input(&self, x: u16, id: usize) -> Wire {
-        let X = &self.evaluator_inputs[id];
-        let q = X.modulus();
-        X.plus(&self.deltas[&q].cmul(x))
-    }
-
-    /// Encode a slice of garbler inputs into their associated wire-labels.
+    /// Encode garbler input values into their associated wirelabels.
+    ///
+    /// # Panics
+    /// This panics if `inputs.len()` does not equal the expected number of
+    /// garbler inputs.
     pub fn encode_garbler_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
-        debug_assert_eq!(inputs.len(), self.garbler_inputs.len());
-        (0..inputs.len())
+        assert_eq!(inputs.len(), self.garbler_inputs.len());
+        self.garbler_inputs
+            .iter()
             .zip(inputs)
-            .map(|(id, &x)| self.encode_garbler_input(x, id))
+            .map(|(zero, x)| {
+                let q = zero.modulus();
+                zero.plus(&self.deltas[&q].cmul(*x))
+            })
             .collect()
     }
 
-    /// Encode a slice of evaluator inputs into their associated wire-labels.
+    /// Encode evaluator input values into their associated wirelabels.
+    ///
+    /// # Panics
+    /// This panics if `inputs.len()` does not equal the expected number of
+    /// evaluator inputs.
     pub fn encode_evaluator_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
-        debug_assert_eq!(inputs.len(), self.evaluator_inputs.len());
-        (0..inputs.len())
+        assert_eq!(inputs.len(), self.evaluator_inputs.len());
+        self.evaluator_inputs
+            .iter()
             .zip(inputs)
-            .map(|(id, &x)| self.encode_evaluator_input(x, id))
+            .map(|(zero, x)| {
+                let q = zero.modulus();
+                zero.plus(&self.deltas[&q].cmul(*x))
+            })
             .collect()
     }
 }
