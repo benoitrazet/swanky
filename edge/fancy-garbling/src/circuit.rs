@@ -290,9 +290,9 @@ impl<C: EvaluableCircuit<Informer<Dummy>>> CircuitInfo for C {
 pub trait EvaluableCircuit<F: Fancy>: CircuitType {
     /// Evaluate the circuit.
     ///
-    /// The argument `f` provides the `Fancy` instantiation to use during
+    /// The argument `f` provides the [`Fancy`] instantiation to use during
     /// evaluation, and the actual circuit data is accessed using `channel`. The
-    /// output is a vector of `Option<u16>`s because certain `Fancy`
+    /// output is a vector of `Option<u16>`s because certain [`Fancy`]
     /// instantiations may not output anything (for example, a garbler doesn't
     /// have an "output", so `None` would be returned here).
     fn eval(
@@ -303,11 +303,16 @@ pub trait EvaluableCircuit<F: Fancy>: CircuitType {
         channel: &mut Channel,
     ) -> Result<Option<Vec<u16>>, F::Error> {
         let wirelabels = self.eval_to_wirelabels(f, garbler_inputs, evaluator_inputs, channel)?;
-        map_wirelabels_to_outputs(f, &wirelabels, channel)
+        f.outputs(&wirelabels, channel)
     }
 
-    /// Evaluate the circuit up to producing the output `Fancy::Item`s, and output
-    /// those.
+    /// Evaluate the circuit up to producing the output [`Fancy::Item`]s, and
+    /// output those.
+    ///
+    /// The argument `f` provides the [`Fancy`] instantiation to use during
+    /// evaluation, and the actual circuit data is accessed using `channel`. The
+    /// output is a vector of [`Fancy::Item`]s that correspond to the outputs of
+    /// the circuit evaluation.
     fn eval_to_wirelabels(
         &self,
         f: &mut F,
