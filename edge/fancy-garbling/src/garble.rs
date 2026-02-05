@@ -61,7 +61,7 @@ mod nonstreaming {
             let mut b = CircuitBuilder::new();
             let x = b.evaluator_input(q);
             let y = b.evaluator_input(q);
-            let z = b.add(&x, &y).unwrap();
+            let z = b.add(&x, &y);
             b.output(&z, channel).unwrap();
             b.finish()
         });
@@ -72,7 +72,7 @@ mod nonstreaming {
         garble_test_helper(|q, channel| {
             let mut b = CircuitBuilder::new();
             let xs = b.evaluator_inputs(&[q; 16]);
-            let z = b.add_many(&xs).unwrap();
+            let z = b.add_many(&xs);
             b.output(&z, channel).unwrap();
             b.finish()
         });
@@ -95,7 +95,7 @@ mod nonstreaming {
             let mut b = CircuitBuilder::new();
             let x = b.evaluator_input(q);
             let y = b.evaluator_input(q);
-            let z = b.sub(&x, &y).unwrap();
+            let z = b.sub(&x, &y);
             b.output(&z, channel).unwrap();
             b.finish()
         });
@@ -108,9 +108,9 @@ mod nonstreaming {
             let x = b.evaluator_input(q);
             let z;
             if q > 2 {
-                z = b.cmul(&x, 2).unwrap();
+                z = b.cmul(&x, 2);
             } else {
-                z = b.cmul(&x, 1).unwrap();
+                z = b.cmul(&x, 1);
             }
             b.output(&z, channel).unwrap();
             b.finish()
@@ -286,7 +286,7 @@ mod nonstreaming {
         let circ = Channel::with(std::io::empty(), |channel| {
             let x = b.evaluator_input(q);
             let y = b.constant(c, q, channel).unwrap();
-            let z = b.add(&x, &y).unwrap();
+            let z = b.add(&x, &y);
             b.output(&z, channel).unwrap();
             Ok(b.finish())
         })
@@ -381,7 +381,7 @@ mod streaming {
             xs: &[F::Item],
             channel: &mut Channel,
         ) -> Option<u16> {
-            let z = b.add(&xs[0], &xs[1]).unwrap();
+            let z = b.add(&xs[0], &xs[1]);
             b.output(&z, channel).unwrap()
         }
 
@@ -404,7 +404,7 @@ mod streaming {
             xs: &[F::Item],
             channel: &mut Channel,
         ) -> Option<u16> {
-            let z = b.sub(&xs[0], &xs[1]).unwrap();
+            let z = b.sub(&xs[0], &xs[1]);
             b.output(&z, channel).unwrap()
         }
 
@@ -450,7 +450,7 @@ mod streaming {
             xs: &[F::Item],
             channel: &mut Channel,
         ) -> Option<u16> {
-            let z = b.cmul(&xs[0], 5).unwrap();
+            let z = b.cmul(&xs[0], 5);
             b.output(&z, channel).unwrap()
         }
 
@@ -507,7 +507,7 @@ mod complex {
         b: &mut F,
         xs: &[CrtBundle<F::Item>],
         channel: &mut Channel,
-    ) -> Result<Option<Vec<u128>>, F::Error> {
+    ) -> eyre::Result<Option<Vec<u128>>> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             let c = b.crt_constant_bundle(1, x.composite_modulus(), channel)?;

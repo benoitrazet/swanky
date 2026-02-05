@@ -12,7 +12,6 @@ use swanky_channel::Channel;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 
 use std::cmp::{Ordering, max};
-use std::fmt::Debug;
 
 /// A structure that contains both the garbler and the evaluators
 /// wires. This structure simplifies the API of the garbled circuit.
@@ -48,10 +47,9 @@ fn gb_gcd(rng: &mut AesRng, channel: &mut Channel, input: u128, upper_bound: u12
     gb.outputs(gcd.wires(), channel).unwrap();
 }
 /// The garbler's wire exchange method
-fn gb_set_fancy_inputs<F, E>(gb: &mut F, input: u128, channel: &mut Channel) -> GCDInputs<F::Item>
+fn gb_set_fancy_inputs<F>(gb: &mut F, input: u128, channel: &mut Channel) -> GCDInputs<F::Item>
 where
-    F: FancyInput<Item = AllWire, Error = E>,
-    E: Debug,
+    F: FancyInput<Item = AllWire>,
 {
     // The number of bits needed to represent a single input, in this case a u128
     let nbits = 128;
@@ -100,10 +98,9 @@ fn ev_gcd(rng: &mut AesRng, channel: &mut Channel, input: u128, upper_bound: u12
     // (5)
     util::u128_from_bits(&gcd_binary)
 }
-fn ev_set_fancy_inputs<F, E>(ev: &mut F, input: u128, channel: &mut Channel) -> GCDInputs<F::Item>
+fn ev_set_fancy_inputs<F>(ev: &mut F, input: u128, channel: &mut Channel) -> GCDInputs<F::Item>
 where
-    F: FancyInput<Item = AllWire, Error = E>,
-    E: Debug,
+    F: FancyInput<Item = AllWire>,
 {
     // The number of bits needed to represent a single input, in this case a u128
     let nbits = 128;
@@ -124,7 +121,7 @@ fn fancy_gcd<F>(
     wire_inputs: GCDInputs<F::Item>,
     upper_bound: u128,
     channel: &mut Channel,
-) -> Result<BinaryBundle<F::Item>, F::Error>
+) -> eyre::Result<BinaryBundle<F::Item>>
 where
     F: FancyReveal + Fancy + BinaryGadgets + FancyBinary + FancyArithmetic,
 {

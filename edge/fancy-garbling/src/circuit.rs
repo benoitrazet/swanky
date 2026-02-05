@@ -4,7 +4,6 @@
 use crate::{
     FancyArithmetic, FancyBinary, check_binary, derive_binary,
     dummy::{Dummy, DummyVal},
-    errors::{CircuitBuilderError, DummyError, FancyError},
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyInput, HasModulus},
     informer::Informer,
 };
@@ -246,39 +245,30 @@ impl std::fmt::Display for BinaryGate {
 /// that can be evaluated with an `Informer`
 pub trait CircuitInfo {
     /// Print circuit info
-    fn print_info(&self) -> Result<(), DummyError>;
+    fn print_info(&self) -> eyre::Result<()>;
 }
 
 impl<C: EvaluableCircuit<Informer<Dummy>>> CircuitInfo for C {
-    fn print_info(&self) -> Result<(), DummyError> {
+    fn print_info(&self) -> eyre::Result<()> {
         let mut informer = crate::informer::Informer::new(Dummy::new());
 
         // encode inputs as InformerVals
         let gb = Channel::with(std::io::empty(), |channel| {
-            Ok(self
-                .get_garbler_input_refs()
+            self.get_garbler_input_refs()
                 .iter()
                 .map(|r| informer.encode(0, r.modulus(), channel))
-                .collect::<Result<Vec<DummyVal>, DummyError>>()
-                .map_err(|e| eyre::eyre!(e))?)
-        })
-        .map_err(|_| DummyError::EncodingError)?;
+                .collect::<eyre::Result<Vec<DummyVal>>>()
+        })?;
         let ev = Channel::with(std::io::empty(), |channel| {
-            Ok(self
-                .get_evaluator_input_refs()
+            self.get_evaluator_input_refs()
                 .iter()
                 .map(|r| informer.encode(0, r.modulus(), channel))
-                .collect::<Result<Vec<DummyVal>, DummyError>>()
-                .map_err(|e| eyre::eyre!(e))?)
-        })
-        .map_err(|_| DummyError::EncodingError)?;
+                .collect::<eyre::Result<Vec<DummyVal>>>()
+        })?;
 
         Channel::with(std::io::empty(), |c| {
-            Ok(self
-                .eval(&mut informer, &gb, &ev, c)
-                .map_err(|e| eyre::eyre!(e))?)
-        })
-        .map_err(|_| DummyError::EncodingError)?;
+            Ok(self.eval(&mut informer, &gb, &ev, c)?)
+        })?;
         println!("{}", informer.stats());
         Ok(())
     }
@@ -288,14 +278,17 @@ impl<C: EvaluableCircuit<Informer<Dummy>>> CircuitInfo for C {
 ///
 /// Supertrait ensures that circuit can be built by `CircuitBuilder`
 pub trait EvaluableCircuit<F: Fancy>: CircuitType {
-    /// Function to evaluate the circuit
+    /// Function to evaluate the circuit.
+    ///
+    /// # Panics
+    /// This may panic if the circuit is malformed.
     fn eval(
         &self,
         f: &mut F,
         garbler_inputs: &[F::Item],
         evaluator_inputs: &[F::Item],
         channel: &mut Channel,
-    ) -> Result<Option<Vec<u16>>, F::Error> {
+    ) -> eyre::Result<Option<Vec<u16>>> {
         let wirelabels = self.eval_to_wirelabels(f, garbler_inputs, evaluator_inputs, channel)?;
         self.map_wirelabels_to_outputs(f, &wirelabels, channel)
     }
@@ -307,7 +300,7 @@ pub trait EvaluableCircuit<F: Fancy>: CircuitType {
         garbler_inputs: &[F::Item],
         evaluator_inputs: &[F::Item],
         channel: &mut Channel,
-    ) -> Result<Vec<Option<F::Item>>, F::Error>;
+    ) -> eyre::Result<Vec<Option<F::Item>>>;
 
     /// Function to output wire labels prior to evaulating
     fn map_wirelabels_to_outputs(
@@ -315,12 +308,12 @@ pub trait EvaluableCircuit<F: Fancy>: CircuitType {
         f: &mut F,
         output_wirelabels: &[Option<F::Item>],
         channel: &mut Channel,
-    ) -> Result<Option<Vec<u16>>, F::Error> {
+    ) -> eyre::Result<Option<Vec<u16>>> {
         let mut outputs = Vec::with_capacity(self.noutputs());
         for r in self.get_output_refs().iter() {
             let r = output_wirelabels[r.ix]
                 .as_ref()
-                .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?;
+                .ok_or_else(|| eyre::Error::msg("Uninitialized value"))?;
             let out = f.output(r, channel)?;
             outputs.push(out);
         }
@@ -335,7 +328,7 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
         garbler_inputs: &[F::Item],
         evaluator_inputs: &[F::Item],
         channel: &mut Channel,
-    ) -> Result<Vec<Option<F::Item>>, F::Error> {
+    ) -> eyre::Result<Vec<Option<F::Item>>> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
             let q = self.modulus(i);
@@ -354,42 +347,26 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
                 ArithmeticGate::Add { xref, yref, out } => (
                     out,
                     f.add(
-                        cache[xref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                        cache[yref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                    )?,
+                        cache[xref.ix].as_ref().unwrap(),
+                        cache[yref.ix].as_ref().unwrap(),
+                    ),
                 ),
                 ArithmeticGate::Sub { xref, yref, out } => (
                     out,
                     f.sub(
-                        cache[xref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                        cache[yref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                    )?,
+                        cache[xref.ix].as_ref().unwrap(),
+                        cache[yref.ix].as_ref().unwrap(),
+                    ),
                 ),
-                ArithmeticGate::Cmul { xref, c, out } => (
-                    out,
-                    f.cmul(
-                        cache[xref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                        c,
-                    )?,
-                ),
+                ArithmeticGate::Cmul { xref, c, out } => {
+                    (out, f.cmul(cache[xref.ix].as_ref().unwrap(), c))
+                }
                 ArithmeticGate::Proj {
                     xref, ref tt, out, ..
                 } => (
                     out,
                     f.proj(
-                        cache[xref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
+                        cache[xref.ix].as_ref().unwrap(),
                         q,
                         Some(tt.to_vec()),
                         channel,
@@ -400,12 +377,8 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
                 } => (
                     out,
                     f.mul(
-                        cache[xref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                        cache[yref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
+                        cache[xref.ix].as_ref().unwrap(),
+                        cache[yref.ix].as_ref().unwrap(),
                         channel,
                     )?,
                 ),
@@ -423,7 +396,7 @@ impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
         garbler_inputs: &[F::Item],
         evaluator_inputs: &[F::Item],
         channel: &mut Channel,
-    ) -> Result<Vec<Option<F::Item>>, F::Error> {
+    ) -> eyre::Result<Vec<Option<F::Item>>> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
             let q = 2;
@@ -439,37 +412,23 @@ impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
                     (None, evaluator_inputs[id].clone())
                 }
                 BinaryGate::Constant { val } => (None, f.constant(val, q, channel)?),
-                BinaryGate::Inv { xref, out } => (
-                    out,
-                    f.negate(
-                        cache[xref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                        channel,
-                    )?,
-                ),
+                BinaryGate::Inv { xref, out } => {
+                    (out, f.negate(cache[xref.ix].as_ref().unwrap(), channel)?)
+                }
                 BinaryGate::Xor { xref, yref, out } => (
                     out,
                     f.xor(
-                        cache[xref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                        cache[yref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                    )?,
+                        cache[xref.ix].as_ref().unwrap(),
+                        cache[yref.ix].as_ref().unwrap(),
+                    ),
                 ),
                 BinaryGate::And {
                     xref, yref, out, ..
                 } => (
                     out,
                     f.and(
-                        cache[xref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                        cache[yref.ix]
-                            .as_ref()
-                            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
+                        cache[xref.ix].as_ref().unwrap(),
+                        cache[yref.ix].as_ref().unwrap(),
                         channel,
                     )?,
                 ),
@@ -587,20 +546,19 @@ pub trait CircuitType: Clone {
 }
 
 /// Evaluate the circuit in plaintext.
+///
+/// # Panics
+/// Panics if either `garbler_inputs.len()` or `evaluator_inputs.len()` does not
+/// equal the circuit's expected number of inputs.
 pub fn eval_plain<C: EvaluableCircuit<Dummy>>(
     circuit: &C,
     garbler_inputs: &[u16],
     evaluator_inputs: &[u16],
-) -> Result<Vec<u16>, DummyError> {
+) -> eyre::Result<Vec<u16>> {
+    assert_eq!(garbler_inputs.len(), circuit.num_garbler_inputs());
+    assert_eq!(evaluator_inputs.len(), circuit.num_evaluator_inputs());
+
     let mut dummy = crate::dummy::Dummy::new();
-
-    if garbler_inputs.len() != circuit.num_garbler_inputs() {
-        return Err(DummyError::NotEnoughGarblerInputs);
-    }
-
-    if evaluator_inputs.len() != circuit.num_evaluator_inputs() {
-        return Err(DummyError::NotEnoughEvaluatorInputs);
-    }
 
     // encode inputs as DummyVals
     let gb = garbler_inputs
@@ -780,17 +738,17 @@ pub struct CircuitBuilder<Circuit> {
 }
 
 impl FancyBinary for CircuitBuilder<BinaryCircuit> {
-    fn xor(&mut self, xref: &Self::Item, yref: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn xor(&mut self, xref: &Self::Item, yref: &Self::Item) -> Self::Item {
         let gate = BinaryGate::Xor {
             xref: *xref,
             yref: *yref,
             out: None,
         };
 
-        Ok(self.gate(gate, xref.modulus()))
+        self.gate(gate, xref.modulus())
     }
 
-    fn negate(&mut self, xref: &Self::Item, _: &mut Channel) -> Result<Self::Item, Self::Error> {
+    fn negate(&mut self, xref: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
         let gate = BinaryGate::Inv {
             xref: *xref,
             out: None,
@@ -803,7 +761,7 @@ impl FancyBinary for CircuitBuilder<BinaryCircuit> {
         xref: &Self::Item,
         yref: &Self::Item,
         _: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         let gate = BinaryGate::And {
             xref: *xref,
             yref: *yref,
@@ -819,39 +777,35 @@ impl FancyBinary for CircuitBuilder<BinaryCircuit> {
 derive_binary!(CircuitBuilder<ArithmeticCircuit>);
 
 impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
-    fn add(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
-        if xref.modulus() != yref.modulus() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
+    fn add(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> CircuitRef {
+        assert_eq!(xref.modulus(), yref.modulus());
         let gate = ArithmeticGate::Add {
             xref: *xref,
             yref: *yref,
             out: None,
         };
-        Ok(self.gate(gate, xref.modulus()))
+        self.gate(gate, xref.modulus())
     }
 
-    fn sub(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
-        if xref.modulus() != yref.modulus() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
+    fn sub(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> CircuitRef {
+        assert_eq!(xref.modulus(), yref.modulus());
         let gate = ArithmeticGate::Sub {
             xref: *xref,
             yref: *yref,
             out: None,
         };
-        Ok(self.gate(gate, xref.modulus()))
+        self.gate(gate, xref.modulus())
     }
 
-    fn cmul(&mut self, xref: &CircuitRef, c: u16) -> Result<CircuitRef, Self::Error> {
-        Ok(self.gate(
+    fn cmul(&mut self, xref: &CircuitRef, c: u16) -> CircuitRef {
+        self.gate(
             ArithmeticGate::Cmul {
                 xref: *xref,
                 c,
                 out: None,
             },
             xref.modulus(),
-        ))
+        )
     }
 
     fn proj(
@@ -860,11 +814,17 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
         output_modulus: u16,
         tt: Option<Vec<u16>>,
         _: &mut Channel,
-    ) -> Result<CircuitRef, Self::Error> {
-        let tt = tt.ok_or_else(|| Self::Error::from(FancyError::NoTruthTable))?;
-        if tt.len() < xref.modulus() as usize || !tt.iter().all(|&x| x < output_modulus) {
-            return Err(Self::Error::from(FancyError::InvalidTruthTable));
-        }
+    ) -> eyre::Result<CircuitRef> {
+        assert!(tt.is_some(), "`tt` must not be `None`");
+        let tt = tt.unwrap();
+        assert!(
+            tt.len() >= xref.modulus() as usize,
+            "`tt` not large enough for `x`s modulus"
+        );
+        assert!(
+            tt.iter().all(|&x| x < output_modulus),
+            "`tt` value larger than `q`"
+        );
         let gate = ArithmeticGate::Proj {
             xref: *xref,
             tt: tt.to_vec(),
@@ -879,7 +839,7 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
         xref: &CircuitRef,
         yref: &CircuitRef,
         channel: &mut Channel,
-    ) -> Result<CircuitRef, Self::Error> {
+    ) -> eyre::Result<CircuitRef> {
         if xref.modulus() < yref.modulus() {
             return self.mul(yref, xref, channel);
         }
@@ -897,14 +857,8 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
 
 impl<Circuit: CircuitType> Fancy for CircuitBuilder<Circuit> {
     type Item = CircuitRef;
-    type Error = CircuitBuilderError;
 
-    fn constant(
-        &mut self,
-        val: u16,
-        modulus: u16,
-        _: &mut Channel,
-    ) -> Result<CircuitRef, Self::Error> {
+    fn constant(&mut self, val: u16, modulus: u16, _: &mut Channel) -> eyre::Result<CircuitRef> {
         match self.const_map.get(&(val, modulus)) {
             Some(&r) => Ok(r),
             None => {
@@ -917,7 +871,7 @@ impl<Circuit: CircuitType> Fancy for CircuitBuilder<Circuit> {
         }
     }
 
-    fn output(&mut self, xref: &CircuitRef, _: &mut Channel) -> Result<Option<u16>, Self::Error> {
+    fn output(&mut self, xref: &CircuitRef, _: &mut Channel) -> eyre::Result<Option<u16>> {
         self.circ.push_output_ref(*xref);
         Ok(None)
     }
@@ -1189,7 +1143,7 @@ mod plaintext {
                 .iter()
                 .map(|x| b.mod_change(x, n as u16 + 1, channel).unwrap())
                 .collect_vec();
-            let s = b.add_many(&wires).unwrap();
+            let s = b.add_many(&wires);
             b.output(&s, channel).unwrap();
             let c = b.finish();
             Ok(c)
@@ -1219,7 +1173,7 @@ mod plaintext {
 
             let x = b.evaluator_input(q);
             let y = b.constant(c, q, channel).unwrap();
-            let z = b.add(&x, &y).unwrap();
+            let z = b.add(&x, &y);
             b.output(&z, channel).unwrap();
 
             let circ = b.finish();
@@ -1282,7 +1236,7 @@ mod bundle {
             let mut b = CircuitBuilder::new();
             let x = b.crt_garbler_input(q);
             let y = b.crt_evaluator_input(q);
-            let z = b.crt_add(&x, &y).unwrap();
+            let z = b.crt_add(&x, &y);
             b.output_bundle(&z, channel).unwrap();
             let c = b.finish();
             Ok(c)
@@ -1307,7 +1261,7 @@ mod bundle {
             let mut b = CircuitBuilder::new();
             let x = b.crt_garbler_input(q);
             let y = b.crt_evaluator_input(q);
-            let z = b.sub_bundles(&x, &y).unwrap();
+            let z = b.sub_bundles(&x, &y);
             b.output_bundle(&z, channel).unwrap();
             let c = b.finish();
             Ok(c)
@@ -1332,7 +1286,7 @@ mod bundle {
         let c = Channel::with(std::io::empty(), |channel| {
             let mut b = CircuitBuilder::new();
             let x = b.crt_garbler_input(q);
-            let z = b.crt_cmul(&x, y).unwrap();
+            let z = b.crt_cmul(&x, y);
             b.output_bundle(&z, channel).unwrap();
             let c = b.finish();
             Ok(c)

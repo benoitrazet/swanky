@@ -26,8 +26,8 @@ mod tests {
         a: &F::Item,
         b: &F::Item,
         channel: &mut Channel,
-    ) -> Result<Option<u16>, F::Error> {
-        let c = f.add(a, b)?;
+    ) -> eyre::Result<Option<u16>> {
+        let c = f.add(a, b);
         f.output(&c, channel)
     }
 

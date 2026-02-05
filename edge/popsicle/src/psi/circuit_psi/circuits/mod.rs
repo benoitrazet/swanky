@@ -2,7 +2,6 @@
 use crate::{circuit_psi::*, errors::Error};
 use fancy_garbling::{BinaryBundle, BinaryGadgets, Fancy, FancyBinary, FancyReveal};
 use itertools::Itertools;
-use std::fmt::Debug;
 use swanky_channel::Channel;
 
 // How many bytes of the hash to use for the equality tests. This affects
@@ -21,7 +20,7 @@ pub fn fancy_intersection_bit_vector<F>(
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
     channel: &mut Channel,
-) -> Result<Vec<F::Item>, F::Error>
+) -> eyre::Result<Vec<F::Item>>
 where
     F: FancyReveal + Fancy + FancyBinary,
 {
@@ -54,28 +53,26 @@ pub fn fancy_unmask<F>(
     f: &mut F,
     elements: &[BinaryBundle<F::Item>],
     masks: &[BinaryBundle<F::Item>],
-) -> Result<Vec<BinaryBundle<F::Item>>, F::Error>
+) -> eyre::Result<Vec<BinaryBundle<F::Item>>>
 where
     F: FancyReveal + Fancy + FancyBinary,
 {
     let mut res = Vec::new();
 
     for i in 0..elements.len() {
-        res.push(f.bin_xor(&elements[i], &masks[i])?);
+        res.push(f.bin_xor(&elements[i], &masks[i]));
     }
     Ok(res)
 }
 
 /// Fancy function which computes the cardinality of the intersection
-pub fn fancy_cardinality<F, E>(
+pub fn fancy_cardinality<F>(
     f: &mut F,
     intersect_bitvec: &[<F as Fancy>::Item],
     channel: &mut Channel,
 ) -> Result<BinaryBundle<<F as Fancy>::Item>, Error>
 where
-    F: FancyBinary + Fancy<Item = WireMod2, Error = E>,
-    E: Debug,
-    Error: From<E>,
+    F: FancyBinary + Fancy<Item = WireMod2>,
 {
     let mut acc = f.bin_constant_bundle(0, PRIMARY_KEY_SIZE * 8, channel)?;
     let one = f.bin_constant_bundle(1, PRIMARY_KEY_SIZE * 8, channel)?;
@@ -90,7 +87,7 @@ where
 /// Fancy function which computes the payload sum of the intersection
 /// where associated payloads with elements of the intersection are summed
 /// together and returned
-pub fn fancy_payload_sum<F, E>(
+pub fn fancy_payload_sum<F>(
     f: &mut F,
     intersect_bitvec: &[<F as Fancy>::Item],
     payload_a: &[BinaryBundle<<F as Fancy>::Item>],
@@ -98,9 +95,7 @@ pub fn fancy_payload_sum<F, E>(
     channel: &mut Channel,
 ) -> Result<BinaryBundle<<F as Fancy>::Item>, Error>
 where
-    F: FancyBinary + Fancy<Item = WireMod2, Error = E>,
-    E: Debug,
-    Error: From<E>,
+    F: FancyBinary + Fancy<Item = WireMod2>,
 {
     let mut acc = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8, channel)?; // multiplication extends the representation of the number
     let zero = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8, channel)?;

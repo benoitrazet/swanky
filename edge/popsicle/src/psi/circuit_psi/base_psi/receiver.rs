@@ -141,15 +141,13 @@ impl BasePsi for OpprfReceiver {
         }
         Ok(())
     }
-    fn encode_circuit_inputs<F, E>(
+    fn encode_circuit_inputs<F>(
         &mut self,
         gc_party: &mut F,
         channel: &mut Channel,
     ) -> Result<CircuitInputs<F::Item>, Error>
     where
-        F: FancyInput<Item = WireMod2, Error = E>,
-        E: Debug,
-        Error: From<E>,
+        F: FancyInput<Item = WireMod2>,
     {
         // We compute the number of wires that the receivers should
         // expect from the sender by taking the size of an element in

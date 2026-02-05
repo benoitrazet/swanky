@@ -80,7 +80,7 @@ where
             B::base_psi(&mut self.gb, primary_keys, payloads, channel, &mut self.rng)?;
         // (2)
         let primary_keys =
-            bundle_primary_keys::<Garbler<RNG, OtSender, WireMod2>, _>(&circuit_inputs)?;
+            bundle_primary_keys::<Garbler<RNG, OtSender, WireMod2>>(&circuit_inputs)?;
         let (sender_payloads, receiver_payloads) = bundle_payloads(&mut self.gb, &circuit_inputs)?;
 
         // (3)

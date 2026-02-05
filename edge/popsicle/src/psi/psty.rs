@@ -390,7 +390,7 @@ fn fancy_compute_intersection<F: Fancy + BinaryBundleGadgets>(
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
     channel: &mut Channel,
-) -> Result<Vec<F::Item>, F::Error> {
+) -> eyre::Result<Vec<F::Item>> {
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
     sender_inputs
         .chunks(HASH_SIZE * 8)
@@ -411,7 +411,7 @@ fn fancy_compute_cardinality<F: Fancy + BinaryBundleGadgets + FancyBinary>(
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
     channel: &mut Channel,
-) -> Result<BinaryBundle<F::Item>, F::Error> {
+) -> eyre::Result<BinaryBundle<F::Item>> {
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
 
     let eqs = sender_inputs
@@ -424,7 +424,7 @@ fn fancy_compute_cardinality<F: Fancy + BinaryBundleGadgets + FancyBinary>(
                 channel,
             )
         })
-        .collect::<Result<Vec<F::Item>, F::Error>>()?;
+        .collect::<eyre::Result<Vec<F::Item>>>()?;
 
     let mut acc = f.bin_constant_bundle(0, HASH_SIZE * 8, channel)?;
 

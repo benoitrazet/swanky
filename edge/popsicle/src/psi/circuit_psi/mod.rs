@@ -6,7 +6,6 @@ use crate::{
 };
 use fancy_garbling::{BinaryBundle, Fancy, FancyBinary, FancyReveal, WireMod2};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use std::fmt::Debug;
 use swanky_block::Block512;
 use swanky_channel::Channel;
 
@@ -95,7 +94,7 @@ pub struct Intersection {
 /// For instance, `sender_payloads`'s wires are grouped according to the set primary key size.
 /// This function allows us to reason about circuit inputs not in terms of individual wires, but
 /// rather in terms of the values that they represent.
-fn bundle_payloads<F, E>(
+fn bundle_payloads<F>(
     f: &mut F,
     circuit_inputs: &CircuitInputs<F::Item>,
 ) -> Result<
@@ -106,9 +105,7 @@ fn bundle_payloads<F, E>(
     Error,
 >
 where
-    F: FancyBinary + FancyReveal + Fancy<Item = WireMod2, Error = E>,
-    E: Debug,
-    Error: From<E>,
+    F: FancyBinary + FancyReveal + Fancy<Item = WireMod2>,
 {
     let sender_payloads = fancy_unmask(
         f,
@@ -121,13 +118,11 @@ where
     Ok((sender_payloads, receiver_payloads))
 }
 
-fn bundle_primary_keys<F, E>(
+fn bundle_primary_keys<F>(
     circuit_inputs: &CircuitInputs<F::Item>,
 ) -> Result<Vec<BinaryBundle<<F as Fancy>::Item>>, Error>
 where
-    F: FancyBinary + FancyReveal + Fancy<Item = WireMod2, Error = E>,
-    E: Debug,
-    Error: From<E>,
+    F: FancyBinary + FancyReveal + Fancy<Item = WireMod2>,
 {
     Ok(wires_to_bundle::<F>(
         &circuit_inputs.sender_primary_keys,

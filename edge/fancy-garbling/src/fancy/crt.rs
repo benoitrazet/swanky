@@ -3,7 +3,6 @@
 use super::{HasModulus, bundle::ArithmeticBundleGadgets};
 use crate::{
     FancyArithmetic, FancyBinary,
-    errors::FancyError,
     fancy::bundle::{Bundle, BundleGadgets},
     util,
 };
@@ -59,7 +58,7 @@ pub trait CrtGadgets:
         x: u128,
         q: u128,
         channel: &mut Channel,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<CrtBundle<Self::Item>> {
         let ps = util::factor(q);
         let xs = ps.iter().map(|&p| (x % p as u128) as u16).collect_vec();
         self.constant_bundle(&xs, &ps, channel).map(CrtBundle)
@@ -70,7 +69,7 @@ pub trait CrtGadgets:
         &mut self,
         x: &CrtBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<Option<u128>, Self::Error> {
+    ) -> eyre::Result<Option<u128>> {
         let q = x.composite_modulus();
         Ok(self
             .output_bundle(x, channel)?
@@ -82,7 +81,7 @@ pub trait CrtGadgets:
         &mut self,
         xs: &[CrtBundle<Self::Item>],
         channel: &mut Channel,
-    ) -> Result<Option<Vec<u128>>, Self::Error> {
+    ) -> eyre::Result<Option<Vec<u128>>> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             let z = self.crt_output(x, channel)?;
@@ -99,8 +98,8 @@ pub trait CrtGadgets:
         &mut self,
         x: &CrtBundle<Self::Item>,
         y: &CrtBundle<Self::Item>,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
-        self.add_bundles(x, y).map(CrtBundle)
+    ) -> CrtBundle<Self::Item> {
+        CrtBundle(self.add_bundles(x, y))
     }
 
     /// Subtract two CRT bundles.
@@ -108,23 +107,20 @@ pub trait CrtGadgets:
         &mut self,
         x: &CrtBundle<Self::Item>,
         y: &CrtBundle<Self::Item>,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
-        self.sub_bundles(x, y).map(CrtBundle)
+    ) -> CrtBundle<Self::Item> {
+        CrtBundle(self.sub_bundles(x, y))
     }
 
     /// Multiplies each wire in `x` by the corresponding residue of `c`.
-    fn crt_cmul(
-        &mut self,
-        x: &CrtBundle<Self::Item>,
-        c: u128,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
+    fn crt_cmul(&mut self, x: &CrtBundle<Self::Item>, c: u128) -> CrtBundle<Self::Item> {
         let cs = util::crt(c, &x.moduli());
-        x.wires()
-            .iter()
-            .zip(cs.into_iter())
-            .map(|(x, c)| self.cmul(x, c))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
-            .map(CrtBundle::new)
+        CrtBundle::new(
+            x.wires()
+                .iter()
+                .zip(cs.into_iter())
+                .map(|(x, c)| self.cmul(x, c))
+                .collect::<Vec<Self::Item>>(),
+        )
     }
 
     /// Multiply `x` with `y`.
@@ -133,7 +129,7 @@ pub trait CrtGadgets:
         x: &CrtBundle<Self::Item>,
         y: &CrtBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<CrtBundle<Self::Item>> {
         self.mul_bundles(x, y, channel).map(CrtBundle)
     }
 
@@ -143,7 +139,7 @@ pub trait CrtGadgets:
         x: &CrtBundle<Self::Item>,
         c: u16,
         channel: &mut Channel,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<CrtBundle<Self::Item>> {
         x.wires()
             .iter()
             .map(|x| {
@@ -153,27 +149,28 @@ pub trait CrtGadgets:
                     .collect_vec();
                 self.proj(x, p, Some(tab), channel)
             })
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .collect::<eyre::Result<_>>()
             .map(CrtBundle::new)
     }
 
     /// Compute the remainder with respect to modulus `p`.
+    ///
+    /// # Panics
+    /// Panics if `p` is not a modulus contained in `x`.
     fn crt_rem(
         &mut self,
         x: &CrtBundle<Self::Item>,
         p: u16,
         channel: &mut Channel,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
-        let i = x.moduli().iter().position(|&q| p == q).ok_or_else(|| {
-            Self::Error::from(FancyError::InvalidArg(
-                "p is not a modulus in this bundle!".to_string(),
-            ))
-        })?;
+    ) -> eyre::Result<CrtBundle<Self::Item>> {
+        let i = x.moduli().iter().position(|&q| p == q);
+        assert!(i.is_some(), "`p` is not a modulus in the `x` bundle");
+        let i = i.unwrap();
         let w = &x.wires()[i];
         x.moduli()
             .iter()
             .map(|&q| self.mod_change(w, q, channel))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .collect::<eyre::Result<_>>()
             .map(CrtBundle::new)
     }
 
@@ -187,7 +184,7 @@ pub trait CrtGadgets:
         bun: &CrtBundle<Self::Item>,
         ms: &[u16],
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         let ndigits = ms.len();
 
         let q = util::product(&bun.moduli());
@@ -213,7 +210,7 @@ pub trait CrtGadgets:
                 .into_iter()
                 .enumerate()
                 .map(|(i, tt)| self.proj(wire, ms[i], Some(tt), channel))
-                .collect::<Result<Vec<Self::Item>, Self::Error>>()?;
+                .collect::<eyre::Result<Vec<Self::Item>>>()?;
 
             ds.push(Bundle::new(new_ds));
         }
@@ -230,7 +227,7 @@ pub trait CrtGadgets:
         accuracy: &str,
         output_moduli: Option<&[u16]>,
         channel: &mut Channel,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<CrtBundle<Self::Item>> {
         let factors_of_m = &get_ms(x, accuracy);
         let res = self.crt_fractional_mixed_radix(x, factors_of_m, channel)?;
 
@@ -247,7 +244,7 @@ pub trait CrtGadgets:
             .wires()
             .iter()
             .map(|x| self.mul(x, &mask, channel))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .collect::<eyre::Result<_>>()
             .map(CrtBundle::new)
     }
 
@@ -257,7 +254,7 @@ pub trait CrtGadgets:
         x: &CrtBundle<Self::Item>,
         accuracy: &str,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         let factors_of_m = &get_ms(x, accuracy);
         let res = self.crt_fractional_mixed_radix(x, factors_of_m, channel)?;
         let p = *factors_of_m.last().unwrap();
@@ -274,7 +271,7 @@ pub trait CrtGadgets:
         accuracy: &str,
         output_moduli: Option<&[u16]>,
         channel: &mut Channel,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<CrtBundle<Self::Item>> {
         let sign = self.crt_sign(x, accuracy, channel)?;
         output_moduli
             .unwrap_or(&x.moduli())
@@ -283,7 +280,7 @@ pub trait CrtGadgets:
                 let tt = vec![1, p - 1];
                 self.proj(&sign, p, Some(tt), channel)
             })
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .collect::<eyre::Result<_>>()
             .map(CrtBundle::new)
     }
 
@@ -294,8 +291,8 @@ pub trait CrtGadgets:
         y: &CrtBundle<Self::Item>,
         accuracy: &str,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
-        let z = self.crt_sub(x, y)?;
+    ) -> eyre::Result<Self::Item> {
+        let z = self.crt_sub(x, y);
         self.crt_sign(&z, accuracy, channel)
     }
 
@@ -306,38 +303,37 @@ pub trait CrtGadgets:
         y: &CrtBundle<Self::Item>,
         accuracy: &str,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         let z = self.crt_lt(x, y, accuracy, channel)?;
         self.negate(&z, channel)
     }
 
     /// Compute the maximum bundle in `xs`.
+    ///
+    /// # Panics
+    /// Panics if `xs` is empty.
     fn crt_max(
         &mut self,
         xs: &[CrtBundle<Self::Item>],
         accuracy: &str,
         channel: &mut Channel,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
-        if xs.is_empty() {
-            return Err(Self::Error::from(FancyError::InvalidArgNum {
-                got: xs.len(),
-                needed: 1,
-            }));
-        }
+    ) -> eyre::Result<CrtBundle<Self::Item>> {
+        assert!(!xs.is_empty(), "`xs` cannot be empty");
         xs.iter().skip(1).fold(Ok(xs[0].clone()), |x, y| {
             x.map(|x| {
                 let pos = self.crt_lt(&x, y, accuracy, channel)?;
                 let neg = self.negate(&pos, channel)?;
-                x.wires()
-                    .iter()
-                    .zip(y.wires().iter())
-                    .map(|(x, y)| {
-                        let xp = self.mul(x, &neg, channel)?;
-                        let yp = self.mul(y, &pos, channel)?;
-                        self.add(&xp, &yp)
-                    })
-                    .collect::<Result<Vec<Self::Item>, Self::Error>>()
-                    .map(CrtBundle::new)
+                Ok(CrtBundle::new(
+                    x.wires()
+                        .iter()
+                        .zip(y.wires().iter())
+                        .map(|(x, y)| {
+                            let xp = self.mul(x, &neg, channel)?;
+                            let yp = self.mul(y, &pos, channel)?;
+                            Ok(self.add(&xp, &yp))
+                        })
+                        .collect::<eyre::Result<Vec<Self::Item>>>()?,
+                ))
             })?
         })
     }
@@ -347,7 +343,7 @@ pub trait CrtGadgets:
         &mut self,
         xs: &CrtBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<Bundle<Self::Item>, Self::Error> {
+    ) -> eyre::Result<Bundle<Self::Item>> {
         let gadget_projection_tt = |p: u16, q: u16| -> Vec<u16> {
             let pq = p as u32 + q as u32 - 1;
             let mut tab = Vec::with_capacity(pq as usize);
@@ -374,12 +370,12 @@ pub trait CrtGadgets:
             tab
         };
 
-        let mut gadget = |x: &Self::Item, y: &Self::Item| -> Result<Self::Item, Self::Error> {
+        let mut gadget = |x: &Self::Item, y: &Self::Item| -> eyre::Result<Self::Item> {
             let p = x.modulus();
             let q = y.modulus();
             let x_ = self.mod_change(x, p + q - 1, channel)?;
             let y_ = self.mod_change(y, p + q - 1, channel)?;
-            let z = self.sub(&x_, &y_)?;
+            let z = self.sub(&x_, &y_);
             self.proj(&z, q, Some(gadget_projection_tt(p, q)), channel)
         };
 
@@ -414,8 +410,8 @@ pub trait CrtGadgets:
         x: &CrtBundle<Self::Item>,
         y: &CrtBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
-        let z = self.crt_sub(x, y)?;
+    ) -> eyre::Result<Self::Item> {
+        let z = self.crt_sub(x, y);
         let mut pmr = self.crt_to_pmr(&z, channel)?;
         let w = pmr.pop().unwrap();
         let mut tab = vec![1; w.modulus() as usize];
@@ -433,22 +429,23 @@ pub trait CrtGadgets:
         x: &CrtBundle<Self::Item>,
         y: &CrtBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         let z = self.pmr_lt(x, y, channel)?;
         self.negate(&z, channel)
     }
 
     /// Generic, and expensive, CRT-based addition for two ciphertexts. Uses PMR
     /// comparison repeatedly. Requires an extra unused prime in both inputs.
+    ///
+    /// # Panics
+    /// Panics if `x` and `y` do not have equal moduli.
     fn crt_div(
         &mut self,
         x: &CrtBundle<Self::Item>,
         y: &CrtBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> Result<CrtBundle<Self::Item>, Self::Error> {
-        if x.moduli() != y.moduli() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
+    ) -> eyre::Result<CrtBundle<Self::Item>> {
+        assert_eq!(x.moduli(), y.moduli());
 
         let q = x.composite_modulus();
 
@@ -469,7 +466,7 @@ pub trait CrtGadgets:
                 pb -= 1;
             }
 
-            let tmp = self.crt_cmul(y, b)?;
+            let tmp = self.crt_cmul(y, b);
             let c1 = self.pmr_geq(&a, &tmp, channel)?;
 
             let pb_crt = self.crt_constant_bundle(pb, q, channel)?;
@@ -483,11 +480,11 @@ pub trait CrtGadgets:
                 .collect::<Result<Vec<_>, _>>()?;
             let c_crt = CrtBundle::new(c_ws);
 
-            let b_if = self.crt_cmul(&c_crt, b)?;
-            quotient = self.crt_add(&quotient, &b_if)?;
+            let b_if = self.crt_cmul(&c_crt, b);
+            quotient = self.crt_add(&quotient, &b_if);
 
             let tmp_if = self.crt_mul(&c_crt, &tmp, channel)?;
-            a = self.crt_sub(&a, &tmp_if)?;
+            a = self.crt_sub(&a, &tmp_if);
         }
 
         Ok(quotient)

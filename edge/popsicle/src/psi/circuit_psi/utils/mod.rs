@@ -1,12 +1,10 @@
 //! Various utils for PSTY
-use crate::{cuckoo::CuckooItem, errors::Error};
+use crate::cuckoo::CuckooItem;
 use fancy_garbling::{FancyInput, WireMod2, util};
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use swanky_block::{Block, Block512};
 use swanky_channel::Channel;
-
-use std::fmt::Debug;
 
 /// Turn a vector of bits represented as u16 into a decimal
 /// value represented as a u128.
@@ -165,16 +163,14 @@ pub fn flatten_bins_payloads(
 
 /// A wrapper function that encodes `Block512` as garbled
 /// circuit inputs
-pub fn bin_encode_many_block512<F, E>(
+pub fn bin_encode_many_block512<F>(
     gc_party: &mut F,
     values: &[Block512],
     size: usize,
     channel: &mut Channel,
-) -> Result<Vec<F::Item>, E>
+) -> eyre::Result<Vec<F::Item>>
 where
-    F: FancyInput<Item = WireMod2, Error = E>,
-    E: Debug,
-    Error: From<E>,
+    F: FancyInput<Item = WireMod2>,
 {
     let bits = encode_binary(values, size);
     // Then specify the moduli of the wires
@@ -184,15 +180,13 @@ where
 
 /// A wrapper function that encodes `Block512` as garbled
 /// circuit inputs
-pub fn bin_receive_many_block512<F, E>(
+pub fn bin_receive_many_block512<F>(
     gc_party: &mut F,
     size: usize,
     channel: &mut Channel,
-) -> Result<Vec<F::Item>, E>
+) -> eyre::Result<Vec<F::Item>>
 where
-    F: FancyInput<Item = WireMod2, Error = E>,
-    E: Debug,
-    Error: From<E>,
+    F: FancyInput<Item = WireMod2>,
 {
     // Specify the moduli of the wires
     let moduli = vec![2; size];
