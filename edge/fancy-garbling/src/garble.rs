@@ -14,7 +14,7 @@ mod nonstreaming {
     use crate::{
         AllWire, FancyArithmetic, FancyBinary,
         circuit::{ArithmeticCircuit, CircuitBuilder, CircuitType, eval_plain},
-        classic::{GarbledChannel, eval, garble},
+        classic::{GarbledChannel, GarbledCircuit, eval},
         fancy::{ArithmeticBundleGadgets, Bundle, BundleGadgets, Fancy},
         util::{self, RngExt},
     };
@@ -33,7 +33,7 @@ mod nonstreaming {
         for _ in 0..16 {
             let q = rng.gen_prime();
             let c = Channel::with(std::io::empty(), |channel| Ok(f(q, channel))).unwrap();
-            let (en, ev) = garble::<AllWire, _>(&c).unwrap();
+            let (en, ev) = GarbledCircuit::garble::<AllWire, _, _>(&c, AesRng::new()).unwrap();
             for _ in 0..16 {
                 let mut inps = Vec::new();
                 for i in 0..c.num_evaluator_inputs() {
@@ -189,7 +189,7 @@ mod nonstreaming {
             })
             .unwrap();
 
-            let (en, ev) = garble::<AllWire, _>(&c).unwrap();
+            let (en, ev) = GarbledCircuit::garble::<AllWire, _, _>(&c, AesRng::new()).unwrap();
 
             for x in 0..q {
                 for y in 0..ymod {
@@ -225,7 +225,7 @@ mod nonstreaming {
         })
         .unwrap();
 
-        let (en, ev) = garble::<AllWire, _>(&circ).unwrap();
+        let (en, ev) = GarbledCircuit::garble::<AllWire, _, _>(&circ, AesRng::new()).unwrap();
         println!("mods={:?} nargs={} size={}", mods, nargs, ev.size());
 
         let Q: u128 = mods.iter().map(|&q| q as u128).product();
@@ -262,7 +262,7 @@ mod nonstreaming {
             Ok(b.finish())
         })
         .unwrap();
-        let (_, ev) = garble::<AllWire, _>(&circ).unwrap();
+        let (_, ev) = GarbledCircuit::garble::<AllWire, _, _>(&circ, AesRng::new()).unwrap();
 
         for _ in 0..64 {
             let outputs = eval_plain(&circ, &[], &[]).unwrap();
@@ -292,7 +292,7 @@ mod nonstreaming {
         })
         .unwrap();
 
-        let (en, ev) = garble::<AllWire, _>(&circ).unwrap();
+        let (en, ev) = GarbledCircuit::garble::<AllWire, _, _>(&circ, AesRng::new()).unwrap();
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;

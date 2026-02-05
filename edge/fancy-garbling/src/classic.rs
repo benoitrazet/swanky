@@ -8,8 +8,8 @@ use crate::{
     garble::{Evaluator, Garbler},
 };
 use itertools::Itertools;
+use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel::Channel;
 
@@ -34,10 +34,50 @@ impl GarbledCircuit {
     pub fn size(&self) -> usize {
         self.blocks.len()
     }
+
+    /// Garble a circuit.
+    pub fn garble<
+        Wire: WireLabel,
+        Circuit: EvaluableCircuit<Garbler<RNG, Wire>>,
+        RNG: CryptoRng + RngCore,
+    >(
+        c: &Circuit,
+        rng: RNG,
+    ) -> Result<(Encoder<Wire>, Self), GarblerError> {
+        let mut garbler = Garbler::new(rng);
+
+        // get input wires, ignoring encoded values
+        let gb_inps = (0..c.num_garbler_inputs())
+            .map(|i| {
+                let q = c.garbler_input_mod(i);
+                let (zero, _) = garbler.encode_wire(0, q);
+                zero
+            })
+            .collect_vec();
+
+        let ev_inps = (0..c.num_evaluator_inputs())
+            .map(|i| {
+                let q = c.evaluator_input_mod(i);
+                let (zero, _) = garbler.encode_wire(0, q);
+                zero
+            })
+            .collect_vec();
+
+        let mut channel = GarbledChannel::new_writer(None);
+        Channel::with(&mut channel, |channel| {
+            c.eval(&mut garbler, &gb_inps, &ev_inps, channel).unwrap();
+            Ok(())
+        })
+        .unwrap();
+
+        let en = Encoder::new(gb_inps, ev_inps, garbler.get_deltas());
+        let gc = GarbledCircuit::new(channel.writer().blocks.clone());
+
+        Ok((en, gc))
+    }
 }
 
 type Ev<Wire> = Evaluator<Wire>;
-type Gb<Wire> = Garbler<AesRng, Wire>;
 
 /// Evaluate the garbled circuit.
 pub fn eval<Wire: WireLabel, Circuit: EvaluableCircuit<Ev<Wire>>>(
@@ -49,44 +89,6 @@ pub fn eval<Wire: WireLabel, Circuit: EvaluableCircuit<Ev<Wire>>>(
     let mut evaluator = Evaluator::new();
     let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs, channel)?;
     Ok(outputs.expect("evaluator outputs always are Some(u16)"))
-}
-
-/// Garble a circuit without streaming.
-pub fn garble<Wire: WireLabel, Circuit: EvaluableCircuit<Gb<Wire>>>(
-    c: &Circuit,
-) -> Result<(Encoder<Wire>, GarbledCircuit), GarblerError> {
-    let rng = AesRng::new();
-    let mut garbler = Garbler::new(rng);
-
-    // get input wires, ignoring encoded values
-    let gb_inps = (0..c.num_garbler_inputs())
-        .map(|i| {
-            let q = c.garbler_input_mod(i);
-            let (zero, _) = garbler.encode_wire(0, q);
-            zero
-        })
-        .collect_vec();
-
-    let ev_inps = (0..c.num_evaluator_inputs())
-        .map(|i| {
-            let q = c.evaluator_input_mod(i);
-            let (zero, _) = garbler.encode_wire(0, q);
-            zero
-        })
-        .collect_vec();
-
-    let mut channel = GarbledChannel::new_writer(None);
-    Channel::with(&mut channel, |channel| {
-        c.eval(&mut garbler, &gb_inps, &ev_inps, channel).unwrap();
-        Ok(())
-    })
-    .unwrap();
-
-    let en = Encoder::new(gb_inps, ev_inps, garbler.get_deltas());
-
-    let gc = GarbledCircuit::new(channel.writer().blocks.clone());
-
-    Ok((en, gc))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
