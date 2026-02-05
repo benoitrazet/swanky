@@ -322,20 +322,6 @@ pub trait EvaluableCircuit<F: Fancy>: CircuitType {
     ) -> Result<Vec<F::Item>, F::Error>;
 }
 
-/// Map the output `Fancy::Item`s to their actual outputs.
-fn map_wirelabels_to_outputs<F: Fancy>(
-    f: &mut F,
-    output_wirelabels: &[F::Item],
-    channel: &mut Channel,
-) -> Result<Option<Vec<u16>>, F::Error> {
-    let mut outputs = Vec::with_capacity(output_wirelabels.len());
-    for wirelabel in output_wirelabels {
-        let out = f.output(wirelabel, channel)?;
-        outputs.push(out);
-    }
-    Ok(outputs.into_iter().collect())
-}
-
 impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
     fn eval_to_wirelabels(
         &self,
