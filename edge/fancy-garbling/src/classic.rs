@@ -76,15 +76,17 @@ impl GarbledCircuit {
             // associated with the output.
             let zeros = c
                 .eval_to_wirelabels(&mut garbler, &gb_inps, &ev_inps, channel)
-                .unwrap();
+                .map_err(|e| eyre::eyre!(e))?;
             // Next, map the zero output wirelabels to the set of valid outputs.
             // This is needed for evaluators that don't use the output
             // mapping provided as ouput; in that case, we need the channel to
             // contain that mapping, which is what the below does.
-            garbler.outputs(&zeros, channel).unwrap();
+            garbler
+                .outputs(&zeros, channel)
+                .map_err(|e| eyre::eyre!(e))?;
             Ok(zeros)
         })
-        .unwrap();
+        .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
 
         let deltas = garbler.get_deltas();
         let en = Encoder::new(gb_inps, ev_inps, deltas.clone());
