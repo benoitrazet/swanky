@@ -30,7 +30,7 @@ where
     c.bench_function(&format!("garbling::{}_ev ({})", name, q), move |bench| {
         let mut rng = rand::thread_rng();
         let c = make_circuit(q);
-        let (en, ev) = GarbledCircuit::garble::<AllWire, _, _>(&c, AesRng::new()).unwrap();
+        let (en, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&c, AesRng::new()).unwrap();
         let inps = (0..c.num_garbler_inputs())
             .map(|i| rng.gen_u16() % c.garbler_input_mod(i))
             .collect::<Vec<u16>>();

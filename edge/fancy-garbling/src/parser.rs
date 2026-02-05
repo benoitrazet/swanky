@@ -215,7 +215,7 @@ mod tests {
             "../circuits/AES-non-expanded.txt"
         )))
         .unwrap();
-        let (en, gc) = GarbledCircuit::garble::<WireMod2, _, _>(&circ, AesRng::new()).unwrap();
+        let (en, gc, _) = GarbledCircuit::garble::<WireMod2, _, _>(&circ, AesRng::new()).unwrap();
         let gb = en.encode_garbler_inputs(&vec![0u16; 128]);
         let ev = en.encode_evaluator_inputs(&vec![0u16; 128]);
         gc.eval(&circ, &gb, &ev).unwrap();
