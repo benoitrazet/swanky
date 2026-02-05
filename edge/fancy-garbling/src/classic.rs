@@ -4,7 +4,6 @@
 use crate::{
     Fancy, WireLabel,
     circuit::EvaluableCircuit,
-    errors::{EvaluatorError, GarblerError},
     garble::{Evaluator, Garbler},
     util::output_tweak,
 };
@@ -50,7 +49,7 @@ impl GarbledCircuit {
     >(
         c: &Circuit,
         rng: RNG,
-    ) -> Result<(Encoder<Wire>, Self, OutputMapping), GarblerError> {
+    ) -> eyre::Result<(Encoder<Wire>, Self, OutputMapping)> {
         let mut garbler = Garbler::new(rng);
 
         // get input wires, ignoring encoded values
@@ -74,19 +73,14 @@ impl GarbledCircuit {
         let zeros = Channel::with(&mut channel, |channel| {
             // First, garble the circuit, outputting the zero wirelabels
             // associated with the output.
-            let zeros = c
-                .eval_to_wirelabels(&mut garbler, &gb_inps, &ev_inps, channel)
-                .map_err(|e| eyre::eyre!(e))?;
+            let zeros = c.eval_to_wirelabels(&mut garbler, &gb_inps, &ev_inps, channel)?;
             // Next, map the zero output wirelabels to the set of valid outputs.
             // This is needed for evaluators that don't use the output
             // mapping provided as ouput; in that case, we need the channel to
             // contain that mapping, which is what the below does.
-            garbler
-                .outputs(&zeros, channel)
-                .map_err(|e| eyre::eyre!(e))?;
+            garbler.outputs(&zeros, channel)?;
             Ok(zeros)
-        })
-        .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
+        })?;
 
         let deltas = garbler.get_deltas();
         let en = Encoder::new(gb_inps, ev_inps, deltas.clone());
@@ -102,15 +96,12 @@ impl GarbledCircuit {
         c: &Circuit,
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
-    ) -> Result<Vec<u16>, EvaluatorError> {
+    ) -> eyre::Result<Vec<u16>> {
         let output = Channel::with(GarbledChannel::from(self), |channel| {
             let mut evaluator = Evaluator::new();
-            let outputs = c
-                .eval(&mut evaluator, garbler_inputs, evaluator_inputs, channel)
-                .map_err(|e| eyre::eyre!(e))?;
+            let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs, channel)?;
             Ok(outputs.expect("evaluator outputs always are Some(u16)"))
-        })
-        .map_err(|e| EvaluatorError::CommunicationError(e.to_string()))?;
+        })?;
         Ok(output)
     }
 
@@ -121,15 +112,13 @@ impl GarbledCircuit {
         c: &Circuit,
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
-    ) -> Result<Vec<Wire>, EvaluatorError> {
+    ) -> eyre::Result<Vec<Wire>> {
         let wirelabels = Channel::with(GarbledChannel::from(self), |channel| {
             let mut evaluator = Evaluator::new();
-            let wirelabels = c
-                .eval_to_wirelabels(&mut evaluator, garbler_inputs, evaluator_inputs, channel)
-                .map_err(|e| eyre::eyre!(e))?;
+            let wirelabels =
+                c.eval_to_wirelabels(&mut evaluator, garbler_inputs, evaluator_inputs, channel)?;
             Ok(wirelabels)
-        })
-        .map_err(|e| EvaluatorError::CommunicationError(e.to_string()))?;
+        })?;
         Ok(wirelabels)
     }
 }

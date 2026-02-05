@@ -1,7 +1,6 @@
 use crate::{
     AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireLabel, WireMod2,
     check_binary,
-    errors::{FancyError, GarblerError},
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal},
     hash_wires,
     util::{RngExt, output_tweak, tweak, tweak2},
@@ -80,10 +79,8 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
     }
 
     /// Send a wire over the established channel.
-    pub fn send_wire(&mut self, wire: &Wire, channel: &mut Channel) -> Result<(), GarblerError> {
-        channel
-            .write(&wire.as_block())
-            .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
+    pub fn send_wire(&mut self, wire: &Wire, channel: &mut Channel) -> eyre::Result<()> {
+        channel.write(&wire.as_block())?;
         Ok(())
     }
 
@@ -96,15 +93,16 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
     }
 
     /// Encode many wires, producing zero wires as well as encoded values.
+    ///
+    /// # Panics
+    /// Panics if the length of `vals` and `moduli` are not equal.
     pub fn encode_many_wires(
         &mut self,
         vals: &[u16],
         moduli: &[u16],
-    ) -> Result<(Vec<Wire>, Vec<Wire>), GarblerError> {
-        if vals.len() != moduli.len() {
-            return Err(GarblerError::EncodingError);
-        }
-        assert!(vals.len() == moduli.len());
+    ) -> eyre::Result<(Vec<Wire>, Vec<Wire>)> {
+        assert_eq!(vals.len(), moduli.len());
+
         let mut gbs = Vec::with_capacity(vals.len());
         let mut evs = Vec::with_capacity(vals.len());
         for (x, q) in vals.iter().zip(moduli.iter()) {
@@ -120,7 +118,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
         &mut self,
         val: u128,
         modulus: u128,
-    ) -> Result<(CrtBundle<Wire>, CrtBundle<Wire>), GarblerError> {
+    ) -> eyre::Result<(CrtBundle<Wire>, CrtBundle<Wire>)> {
         let ms = crate::util::factor(modulus);
         let xs = crate::util::crt(val, &ms);
         let (gbs, evs) = self.encode_many_wires(&xs, &ms)?;
@@ -132,7 +130,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
         &mut self,
         val: u128,
         nbits: usize,
-    ) -> Result<(BinaryBundle<Wire>, BinaryBundle<Wire>), GarblerError> {
+    ) -> eyre::Result<(BinaryBundle<Wire>, BinaryBundle<Wire>)> {
         let xs = crate::util::u128_to_bits(val, nbits);
         let ms = vec![2; nbits];
         let (gbs, evs) = self.encode_many_wires(&xs, &ms)?;
@@ -192,13 +190,11 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
 }
 
 impl<RNG: RngCore + CryptoRng, Wire: WireLabel> FancyReveal for Garbler<RNG, Wire> {
-    fn reveal(&mut self, x: &Wire, channel: &mut Channel) -> Result<u16, GarblerError> {
+    fn reveal(&mut self, x: &Wire, channel: &mut Channel) -> eyre::Result<u16> {
         // The evaluator needs our cooperation in order to see the output.
         // Hence, we call output() ourselves.
         self.output(x, channel)?;
-        let val = channel
-            .read::<u16>()
-            .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
+        let val = channel.read::<u16>()?;
         Ok(val)
     }
 }
@@ -209,29 +205,25 @@ impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, WireMod2> {
         A: &Self::Item,
         B: &Self::Item,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         let delta = self.delta(2);
         let (gate0, gate1, C) = self.garble_and_gate(A, B, &delta);
-        channel
-            .write(&gate0)
-            .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
-        channel
-            .write(&gate1)
-            .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
+        channel.write(&gate0)?;
+        channel.write(&gate1)?;
         Ok(C)
     }
 
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        Ok(x.plus(y))
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        x.plus(y)
     }
 
     /// We can negate by having garbler xor wire with Delta
     ///
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
-    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Self::Item, Self::Error> {
+    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
         let delta = self.delta(2);
-        self.xor(&delta, x)
+        Ok(self.xor(&delta, x))
     }
 }
 
@@ -240,15 +232,15 @@ impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
     ///
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
-    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Self::Item, Self::Error> {
+    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
         check_binary!(x);
 
         let delta = self.delta(2);
-        self.xor(&delta, x)
+        Ok(self.xor(&delta, x))
     }
 
     /// Xor is just addition
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         check_binary!(x);
         check_binary!(y);
 
@@ -261,17 +253,13 @@ impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> Result<Self::Item, Self::Error> {
+    ) -> eyre::Result<Self::Item> {
         if let (AllWire::Mod2(A), AllWire::Mod2(B), AllWire::Mod2(ref delta)) =
             (x, y, self.delta(2))
         {
             let (gate0, gate1, C) = self.garble_and_gate(A, B, delta);
-            channel
-                .write(&gate0)
-                .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
-            channel
-                .write(&gate1)
-                .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
+            channel.write(&gate0)?;
+            channel.write(&gate1)?;
             return Ok(AllWire::Mod2(C));
         }
         // If we got here, one of the wires isn't binary
@@ -286,25 +274,21 @@ impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
 impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
     for Garbler<RNG, Wire>
 {
-    fn add(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
-        if x.modulus() != y.modulus() {
-            return Err(GarblerError::FancyError(FancyError::UnequalModuli));
-        }
-        Ok(x.plus(y))
+    fn add(&mut self, x: &Wire, y: &Wire) -> Wire {
+        assert_eq!(x.modulus(), y.modulus());
+        x.plus(y)
     }
 
-    fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
-        if x.modulus() != y.modulus() {
-            return Err(GarblerError::FancyError(FancyError::UnequalModuli));
-        }
-        Ok(x.minus(y))
+    fn sub(&mut self, x: &Wire, y: &Wire) -> Wire {
+        assert_eq!(x.modulus(), y.modulus());
+        x.minus(y)
     }
 
-    fn cmul(&mut self, x: &Wire, c: u16) -> Result<Wire, GarblerError> {
-        Ok(x.cmul(c))
+    fn cmul(&mut self, x: &Wire, c: u16) -> Wire {
+        x.cmul(c)
     }
 
-    fn mul(&mut self, A: &Wire, B: &Wire, channel: &mut Channel) -> Result<Wire, GarblerError> {
+    fn mul(&mut self, A: &Wire, B: &Wire, channel: &mut Channel) -> eyre::Result<Wire> {
         if A.modulus() < B.modulus() {
             return self.mul(B, A, channel);
         }
@@ -322,9 +306,10 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         // hack for unequal moduli
         if q != qb {
             // would need to pack minitable into more than one u128 to support qb > 8
-            if qb > 8 {
-                return Err(GarblerError::AsymmetricHalfGateModuliMax8(qb));
-            }
+            assert!(
+                qb <= 8,
+                "`B.modulus()` with asymmetric moduli is capped at 8"
+            );
 
             r = self.rng.gen_u16() % q;
             let t = tweak2(gate_num as u64, 1);
@@ -415,9 +400,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         }
 
         for block in gate.iter() {
-            channel
-                .write(block)
-                .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
+            channel.write(block)?;
         }
         Ok(X.plus_mov(&Y))
     }
@@ -428,9 +411,10 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         q_out: u16,
         tt: Option<Vec<u16>>,
         channel: &mut Channel,
-    ) -> Result<Wire, GarblerError> {
+    ) -> eyre::Result<Wire> {
         warn_proj();
-        let tt = tt.ok_or(GarblerError::TruthTableRequired)?;
+        assert!(tt.is_some(), "`tt` must not be `None`");
+        let tt = tt.unwrap();
 
         let q_in = A.modulus();
         let mut gate = vec![Block::default(); q_in as usize - 1];
@@ -477,9 +461,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         }
 
         for block in gate.iter() {
-            channel
-                .write(block)
-                .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
+            channel.write(block)?;
         }
         Ok(C)
     }
@@ -487,24 +469,21 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
 
 impl<RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
     type Item = Wire;
-    type Error = GarblerError;
 
-    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> Result<Wire, GarblerError> {
+    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> eyre::Result<Wire> {
         let zero = Wire::rand(&mut self.rng, q);
         let wire = zero.plus(self.delta(q).cmul_eq(x));
         self.send_wire(&wire, channel)?;
         Ok(zero)
     }
 
-    fn output(&mut self, X: &Wire, channel: &mut Channel) -> Result<Option<u16>, GarblerError> {
+    fn output(&mut self, X: &Wire, channel: &mut Channel) -> eyre::Result<Option<u16>> {
         let q = X.modulus();
         let i = self.current_output();
         let D = self.delta(q);
         for k in 0..q {
             let block = X.plus(&D.cmul(k)).hash(output_tweak(i, k));
-            channel
-                .write(&block)
-                .map_err(|e| GarblerError::CommunicationError(e.to_string()))?;
+            channel.write(&block)?;
         }
         Ok(None)
     }

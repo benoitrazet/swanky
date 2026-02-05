@@ -7,7 +7,6 @@ use swanky_channel::Channel;
 
 use crate::{
     FancyArithmetic, FancyBinary, check_binary, derive_binary,
-    errors::{DummyError, FancyError},
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
 };
 
@@ -48,15 +47,9 @@ impl Dummy {
 
 impl FancyInput for Dummy {
     type Item = DummyVal;
-    type Error = DummyError;
 
     /// Encode a single dummy value.
-    fn encode(
-        &mut self,
-        value: u16,
-        modulus: u16,
-        _: &mut Channel,
-    ) -> Result<DummyVal, DummyError> {
+    fn encode(&mut self, value: u16, modulus: u16, _: &mut Channel) -> eyre::Result<DummyVal> {
         Ok(DummyVal::new(value, modulus))
     }
 
@@ -66,10 +59,8 @@ impl FancyInput for Dummy {
         xs: &[u16],
         moduli: &[u16],
         _: &mut Channel,
-    ) -> Result<Vec<DummyVal>, DummyError> {
-        if xs.len() != moduli.len() {
-            return Err(DummyError::EncodingError);
-        }
+    ) -> eyre::Result<Vec<DummyVal>> {
+        assert_eq!(xs.len(), moduli.len());
         Ok(xs
             .iter()
             .zip(moduli.iter())
@@ -77,52 +68,39 @@ impl FancyInput for Dummy {
             .collect())
     }
 
-    fn receive_many(
-        &mut self,
-        _moduli: &[u16],
-        _: &mut Channel,
-    ) -> Result<Vec<DummyVal>, DummyError> {
+    fn receive_many(&mut self, _moduli: &[u16], _: &mut Channel) -> eyre::Result<Vec<DummyVal>> {
         // Receive is undefined for Dummy which is a single party "protocol"
-        Err(DummyError::EncodingError)
+        eyre::bail!("`receive_many` is undefined for `Dummy`");
     }
 }
 
 derive_binary!(Dummy);
 
 impl FancyArithmetic for Dummy {
-    fn add(&mut self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, Self::Error> {
-        if x.modulus() != y.modulus() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
-        Ok(DummyVal {
+    fn add(&mut self, x: &DummyVal, y: &DummyVal) -> DummyVal {
+        assert_eq!(x.modulus(), y.modulus());
+        DummyVal {
             val: (x.val + y.val) % x.modulus,
             modulus: x.modulus,
-        })
+        }
     }
 
-    fn sub(&mut self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, Self::Error> {
-        if x.modulus() != y.modulus() {
-            return Err(Self::Error::from(FancyError::UnequalModuli));
-        }
-        Ok(DummyVal {
+    fn sub(&mut self, x: &DummyVal, y: &DummyVal) -> DummyVal {
+        assert_eq!(x.modulus(), y.modulus());
+        DummyVal {
             val: (x.modulus + x.val - y.val) % x.modulus,
             modulus: x.modulus,
-        })
+        }
     }
 
-    fn cmul(&mut self, x: &DummyVal, c: u16) -> Result<DummyVal, Self::Error> {
-        Ok(DummyVal {
+    fn cmul(&mut self, x: &DummyVal, c: u16) -> DummyVal {
+        DummyVal {
             val: (x.val * c) % x.modulus,
             modulus: x.modulus,
-        })
+        }
     }
 
-    fn mul(
-        &mut self,
-        x: &DummyVal,
-        y: &DummyVal,
-        _: &mut Channel,
-    ) -> Result<DummyVal, Self::Error> {
+    fn mul(&mut self, x: &DummyVal, y: &DummyVal, _: &mut Channel) -> eyre::Result<DummyVal> {
         Ok(DummyVal {
             val: x.val * y.val % x.modulus,
             modulus: x.modulus,
@@ -135,11 +113,17 @@ impl FancyArithmetic for Dummy {
         modulus: u16,
         tt: Option<Vec<u16>>,
         _: &mut Channel,
-    ) -> Result<DummyVal, Self::Error> {
-        let tt = tt.ok_or_else(|| Self::Error::from(FancyError::NoTruthTable))?;
-        if tt.len() < x.modulus() as usize || !tt.iter().all(|&x| x < modulus) {
-            return Err(Self::Error::from(FancyError::InvalidTruthTable));
-        }
+    ) -> eyre::Result<DummyVal> {
+        assert!(tt.is_some(), "`tt` must not be `None`");
+        let tt = tt.unwrap();
+        assert!(
+            tt.len() >= x.modulus() as usize,
+            "`tt` not large enough for `x`s modulus"
+        );
+        assert!(
+            tt.iter().all(|&x| x < modulus),
+            "`tt` value larger than `q`"
+        );
         let val = tt[x.val as usize];
         Ok(DummyVal { val, modulus })
     }
@@ -147,24 +131,18 @@ impl FancyArithmetic for Dummy {
 
 impl Fancy for Dummy {
     type Item = DummyVal;
-    type Error = DummyError;
 
-    fn constant(
-        &mut self,
-        val: u16,
-        modulus: u16,
-        _: &mut Channel,
-    ) -> Result<DummyVal, Self::Error> {
+    fn constant(&mut self, val: u16, modulus: u16, _: &mut Channel) -> eyre::Result<DummyVal> {
         Ok(DummyVal { val, modulus })
     }
 
-    fn output(&mut self, x: &DummyVal, _: &mut Channel) -> Result<Option<u16>, Self::Error> {
+    fn output(&mut self, x: &DummyVal, _: &mut Channel) -> eyre::Result<Option<u16>> {
         Ok(Some(x.val))
     }
 }
 
 impl FancyReveal for Dummy {
-    fn reveal(&mut self, x: &DummyVal, _: &mut Channel) -> Result<u16, DummyError> {
+    fn reveal(&mut self, x: &DummyVal, _: &mut Channel) -> eyre::Result<u16> {
         Ok(x.val)
     }
 }
@@ -192,7 +170,7 @@ mod bundle {
             let out = Channel::with(std::io::empty(), |channel| {
                 let x = d.crt_encode(x, q, channel).unwrap();
                 let y = d.crt_encode(y, q, channel).unwrap();
-                let z = d.crt_add(&x, &y).unwrap();
+                let z = d.crt_add(&x, &y);
                 Ok(d.crt_output(&z, channel).unwrap().unwrap())
             })
             .unwrap();
@@ -211,7 +189,7 @@ mod bundle {
             let out = Channel::with(std::io::empty(), |channel| {
                 let x = d.crt_encode(x, q, channel).unwrap();
                 let y = d.crt_encode(y, q, channel).unwrap();
-                let z = d.crt_sub(&x, &y).unwrap();
+                let z = d.crt_sub(&x, &y);
                 Ok(d.crt_output(&z, channel).unwrap().unwrap())
             })
             .unwrap();
@@ -629,7 +607,7 @@ mod bundle {
             let mut d = Dummy::new();
             let out = Channel::with(std::io::empty(), |channel| {
                 let x = d.bin_encode(x, nbits, channel).unwrap();
-                let z = d.bin_rsa(&x, shift_size).unwrap();
+                let z = d.bin_rsa(&x, shift_size);
                 Ok(d.bin_output(&z, channel).unwrap().unwrap() as i64)
             })
             .unwrap();

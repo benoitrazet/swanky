@@ -10,8 +10,6 @@ use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 
-use std::fmt::Debug;
-
 /// A structure that contains both the garbler and the evaluators
 /// wires. This structure simplifies the API of the garbled circuit.
 struct SUMInputs<F> {
@@ -37,10 +35,9 @@ fn gb_sum(rng: &mut AesRng, channel: &mut Channel, input: u128) {
 }
 
 /// The garbler's wire exchange method
-fn gb_set_fancy_inputs<F, E>(gb: &mut F, input: u128, channel: &mut Channel) -> SUMInputs<F::Item>
+fn gb_set_fancy_inputs<F>(gb: &mut F, input: u128, channel: &mut Channel) -> SUMInputs<F::Item>
 where
-    F: FancyInput<Item = AllWire, Error = E>,
-    E: Debug,
+    F: FancyInput<Item = AllWire>,
 {
     // The number of bits needed to represent a single input, in this case a u128
     let nbits = 128;
@@ -81,10 +78,9 @@ fn ev_sum(rng: &mut AesRng, channel: &mut Channel, input: u128) -> u128 {
 }
 
 /// The evaluator's wire exchange method
-fn ev_set_fancy_inputs<F, E>(ev: &mut F, input: u128, channel: &mut Channel) -> SUMInputs<F::Item>
+fn ev_set_fancy_inputs<F>(ev: &mut F, input: u128, channel: &mut Channel) -> SUMInputs<F::Item>
 where
-    F: FancyInput<Item = AllWire, Error = E>,
-    E: Debug,
+    F: FancyInput<Item = AllWire>,
 {
     // The number of bits needed to represent a single input, in this case a u128
     let nbits = 128;
@@ -104,7 +100,7 @@ fn fancy_sum<F>(
     f: &mut F,
     wire_inputs: SUMInputs<F::Item>,
     channel: &mut Channel,
-) -> Result<BinaryBundle<F::Item>, F::Error>
+) -> eyre::Result<BinaryBundle<F::Item>>
 where
     F: FancyReveal + Fancy + BinaryGadgets + FancyBinary + FancyArithmetic,
 {

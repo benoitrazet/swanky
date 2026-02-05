@@ -28,7 +28,7 @@
 use eyre::Ok;
 use fancy_garbling::{
     BinaryBundle, FancyInput,
-    circuit_analyzer::{AnalyzerError, AnalyzerItem, CircuitAnalyzer},
+    circuit_analyzer::{AnalyzerItem, CircuitAnalyzer},
 };
 use rand::{CryptoRng, Rng};
 use swanky_authenticated_bits::{
@@ -55,7 +55,7 @@ pub fn f_preprocessing<P: Party, RNG: CryptoRng + Rng>(
         BinaryBundle<AnalyzerItem>,
         BinaryBundle<AnalyzerItem>,
         &mut Channel,
-    ) -> Result<BinaryBundle<AnalyzerItem>, AnalyzerError>,
+    ) -> eyre::Result<BinaryBundle<AnalyzerItem>>,
     and_generator: &mut AndTripleGenerator<P>,
     input_size: usize,
     channel: &mut Channel,
@@ -107,7 +107,7 @@ mod tests {
         garbler_wires: BinaryBundle<F::Item>,
         evaluator_wires: BinaryBundle<F::Item>,
         channel: &mut Channel,
-    ) -> Result<BinaryBundle<F::Item>, F::Error>
+    ) -> eyre::Result<BinaryBundle<F::Item>>
     where
         F: FancyReveal + Fancy + BinaryGadgets + FancyBinary,
     {

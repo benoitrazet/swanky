@@ -23,6 +23,7 @@ swanky-ot-alsz-kos.workspace = true
 swanky-ocelot-error.workspace = true
 swanky-twopac.workspace = true
 
+eyre.workspace = true
 itertools.workspace = true
 rand.workspace = true
 sha2.workspace = true
