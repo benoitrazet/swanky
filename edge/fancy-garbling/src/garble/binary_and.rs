@@ -3,12 +3,12 @@ use subtle::ConditionallySelectable;
 use swanky_block::Block;
 
 /// The [`BinaryWireLabel`] provides the subroutines to implement AND gates
-/// for the garbler and evaluater in [`crate::fancy::FancyBinary`].
+/// for the garbler and evaluator in [`crate::fancy::FancyBinary`].
 pub trait BinaryWireLabel: WireLabel + ConditionallySelectable {
     /// Garbles an 'and' gate given two input wires and the delta.
     ///
     /// Outputs a tuple consisting of the two gates (that should be transfered to the evaluator)
-    /// and the next wire label for the garbler.
+    /// and the next wirelabel for the garbler.
     fn garble_and_gate(gate_num: usize, A: &Self, B: &Self, delta: &Self) -> (Block, Block, Self);
 
     /// Evaluates an 'and' gate given two inputs wires and two half-gates from the garbler.
