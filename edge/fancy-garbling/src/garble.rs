@@ -14,7 +14,7 @@ mod nonstreaming {
     use crate::{
         AllWire, FancyArithmetic, FancyBinary,
         circuit::{ArithmeticCircuit, CircuitBuilder, CircuitType, eval_plain},
-        classic::{GarbledChannel, GarbledCircuit, eval},
+        classic::GarbledCircuit,
         fancy::{ArithmeticBundleGadgets, Bundle, BundleGadgets, Fancy},
         util::{self, RngExt},
     };
@@ -43,10 +43,7 @@ mod nonstreaming {
                 }
                 // Run the garbled circuit evaluator.
                 let xs = &en.encode_evaluator_inputs(&inps);
-                let decoded = Channel::with(GarbledChannel::from(&ev), |channel| {
-                    Ok(eval(&c, &[], xs, channel).unwrap())
-                })
-                .unwrap();
+                let decoded = ev.eval(&c, &[], xs).unwrap();
 
                 // Run the dummy evaluator.
                 let should_be = eval_plain(&c, &[], &inps).unwrap();
@@ -195,10 +192,7 @@ mod nonstreaming {
                 for y in 0..ymod {
                     println!("TEST x={} y={}", x, y);
                     let xs = &en.encode_evaluator_inputs(&[x, y]);
-                    let decoded = Channel::with(GarbledChannel::from(&ev), |channel| {
-                        Ok(eval(&c, &[], xs, channel).unwrap())
-                    })
-                    .unwrap();
+                    let decoded = ev.eval(&c, &[], xs).unwrap();
                     let should_be = eval_plain(&c, &[], &[x, y]).unwrap();
                     assert_eq!(decoded[0], should_be[0]);
                 }
@@ -240,10 +234,7 @@ mod nonstreaming {
                 ds.extend(util::as_mixed_radix(x, &mods).iter());
             }
             let X = en.encode_evaluator_inputs(&ds);
-            let outputs = Channel::with(GarbledChannel::from(&ev), |channel| {
-                Ok(eval(&circ, &[], &X, channel).unwrap())
-            })
-            .unwrap();
+            let outputs = ev.eval(&circ, &[], &X).unwrap();
             assert_eq!(util::from_mixed_radix(&outputs, &mods), should_be);
         }
     }
@@ -267,10 +258,7 @@ mod nonstreaming {
         for _ in 0..64 {
             let outputs = eval_plain(&circ, &[], &[]).unwrap();
             assert_eq!(outputs[0], c, "plaintext eval failed");
-            let outputs = Channel::with(GarbledChannel::from(&ev), |channel| {
-                Ok(eval::<AllWire, _>(&circ, &[], &[], channel).unwrap())
-            })
-            .unwrap();
+            let outputs = ev.eval::<AllWire, _>(&circ, &[], &[]).unwrap();
             assert_eq!(outputs[0], c, "garbled eval failed");
         }
     }
@@ -300,10 +288,7 @@ mod nonstreaming {
             assert_eq!(outputs[0], (x + c) % q, "plaintext");
 
             let X = en.encode_evaluator_inputs(&[x]);
-            let Y = Channel::with(GarbledChannel::from(&ev), |channel| {
-                Ok(eval(&circ, &[], &X, channel).unwrap())
-            })
-            .unwrap();
+            let Y = ev.eval(&circ, &[], &X).unwrap();
             assert_eq!(Y[0], (x + c) % q, "garbled");
         }
     }

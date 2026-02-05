@@ -75,20 +75,24 @@ impl GarbledCircuit {
 
         Ok((en, gc))
     }
-}
 
-type Ev<Wire> = Evaluator<Wire>;
-
-/// Evaluate the garbled circuit.
-pub fn eval<Wire: WireLabel, Circuit: EvaluableCircuit<Ev<Wire>>>(
-    c: &Circuit,
-    garbler_inputs: &[Wire],
-    evaluator_inputs: &[Wire],
-    channel: &mut Channel,
-) -> Result<Vec<u16>, EvaluatorError> {
-    let mut evaluator = Evaluator::new();
-    let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs, channel)?;
-    Ok(outputs.expect("evaluator outputs always are Some(u16)"))
+    /// Evaluate the garbled circuit.
+    pub fn eval<Wire: WireLabel, Circuit: EvaluableCircuit<Evaluator<Wire>>>(
+        &self,
+        c: &Circuit,
+        garbler_inputs: &[Wire],
+        evaluator_inputs: &[Wire],
+    ) -> Result<Vec<u16>, EvaluatorError> {
+        let output = Channel::with(GarbledChannel::from(self), |channel| {
+            let mut evaluator = Evaluator::new();
+            let outputs = c
+                .eval(&mut evaluator, garbler_inputs, evaluator_inputs, channel)
+                .map_err(|e| eyre::eyre!(e))?;
+            Ok(outputs.expect("evaluator outputs always are Some(u16)"))
+        })
+        .map_err(|e| EvaluatorError::CommunicationError(e.to_string()))?;
+        Ok(output)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -166,7 +170,7 @@ impl<Wire: WireLabel> Encoder<Wire> {
 // blocks
 
 /// A [`Channel`] type for writing and reading a garbled circuit from memory.
-pub struct GarbledChannel {
+struct GarbledChannel {
     reader: Option<GarbledReader>,
     writer: Option<GarbledWriter>,
 }
@@ -177,14 +181,6 @@ impl GarbledChannel {
         Self {
             reader: None,
             writer: Some(GarbledWriter::new(ngates)),
-        }
-    }
-
-    /// Construct a new [`GarbledChannel`] for reading a garbled circuit.
-    pub fn new_reader(blocks: &[Block]) -> Self {
-        Self {
-            reader: Some(GarbledReader::new(blocks)),
-            writer: None,
         }
     }
 
@@ -223,7 +219,7 @@ impl From<&GarbledCircuit> for GarbledChannel {
 
 /// Implementation of the `Read` trait for use by the `Evaluator`.
 #[derive(Debug)]
-pub struct GarbledReader {
+struct GarbledReader {
     blocks: Vec<Block>,
     index: usize,
 }
@@ -260,7 +256,7 @@ impl std::io::Read for GarbledReader {
 
 /// Implementation of the `Write` trait for use by `Garbler`.
 #[derive(Debug)]
-pub struct GarbledWriter {
+struct GarbledWriter {
     blocks: Vec<Block>,
 }
 

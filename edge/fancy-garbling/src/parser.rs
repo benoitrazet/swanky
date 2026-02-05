@@ -162,12 +162,11 @@ impl BinaryCircuit {
 #[cfg(test)]
 mod tests {
     use swanky_aes_rng::AesRng;
-    use swanky_channel::Channel;
 
     use crate::{
         WireMod2,
         circuit::{BinaryCircuit as Circuit, eval_plain},
-        classic::{GarbledChannel, GarbledCircuit, eval},
+        classic::GarbledCircuit,
     };
 
     #[test]
@@ -219,9 +218,6 @@ mod tests {
         let (en, gc) = GarbledCircuit::garble::<WireMod2, _, _>(&circ, AesRng::new()).unwrap();
         let gb = en.encode_garbler_inputs(&vec![0u16; 128]);
         let ev = en.encode_evaluator_inputs(&vec![0u16; 128]);
-        Channel::with(GarbledChannel::from(&gc), |channel| {
-            Ok(eval(&circ, &gb, &ev, channel).unwrap())
-        })
-        .unwrap();
+        gc.eval(&circ, &gb, &ev).unwrap();
     }
 }

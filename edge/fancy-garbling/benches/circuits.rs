@@ -2,14 +2,9 @@
 //! Benchmark code of garbling / evaluating using Nigel's circuits.
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use fancy_garbling::{
-    AllWire, WireMod2,
-    circuit::BinaryCircuit,
-    classic::{GarbledChannel, GarbledCircuit, eval},
-};
+use fancy_garbling::{AllWire, WireMod2, circuit::BinaryCircuit, classic::GarbledCircuit};
 use std::{fs::File, io::BufReader, time::Duration};
 use swanky_aes_rng::AesRng;
-use swanky_channel::Channel;
 
 fn circuit(fname: &str) -> BinaryCircuit {
     // println!("{}", fname);
@@ -29,11 +24,7 @@ fn bench_eval_aes_binary(c: &mut Criterion) {
     let gb = en.encode_garbler_inputs(&vec![0u16; 128]);
     let ev = en.encode_evaluator_inputs(&vec![0u16; 128]);
     c.bench_function("eval::aes-binary", move |bench| {
-        bench.iter(|| {
-            Channel::with(GarbledChannel::from(&gc), |channel| {
-                Ok(eval(&circ, &gb, &ev, channel))
-            })
-        })
+        bench.iter(|| gc.eval(&circ, &gb, &ev))
     });
 }
 
@@ -50,11 +41,7 @@ fn bench_eval_sha_1_binary(c: &mut Criterion) {
     let gb = en.encode_garbler_inputs(&vec![0u16; 512]);
     let ev = en.encode_evaluator_inputs(&[]);
     c.bench_function("eval::sha-1-binary", move |bench| {
-        bench.iter(|| {
-            Channel::with(GarbledChannel::from(&gc), |channel| {
-                Ok(eval(&circ, &gb, &ev, channel))
-            })
-        })
+        bench.iter(|| gc.eval(&circ, &gb, &ev))
     });
 }
 
@@ -71,11 +58,7 @@ fn bench_eval_sha_256_binary(c: &mut Criterion) {
     let gb = en.encode_garbler_inputs(&vec![0u16; 512]);
     let ev = en.encode_evaluator_inputs(&[]);
     c.bench_function("eval::sha-256-binary", move |bench| {
-        bench.iter(|| {
-            Channel::with(GarbledChannel::from(&gc), |channel| {
-                Ok(eval(&circ, &gb, &ev, channel))
-            })
-        })
+        bench.iter(|| gc.eval(&circ, &gb, &ev))
     });
 }
 
@@ -92,11 +75,7 @@ fn bench_eval_aes_arithmetic(c: &mut Criterion) {
     let gb = en.encode_garbler_inputs(&vec![0u16; 128]);
     let ev = en.encode_evaluator_inputs(&vec![0u16; 128]);
     c.bench_function("eval::aes-arithmetic", move |bench| {
-        bench.iter(|| {
-            Channel::with(GarbledChannel::from(&gc), |channel| {
-                Ok(eval(&circ, &gb, &ev, channel))
-            })
-        })
+        bench.iter(|| gc.eval(&circ, &gb, &ev))
     });
 }
 
@@ -113,11 +92,7 @@ fn bench_eval_sha_1_arithmetic(c: &mut Criterion) {
     let gb = en.encode_garbler_inputs(&vec![0u16; 512]);
     let ev = en.encode_evaluator_inputs(&[]);
     c.bench_function("eval::sha-1-arithmetic", move |bench| {
-        bench.iter(|| {
-            Channel::with(GarbledChannel::from(&gc), |channel| {
-                Ok(eval(&circ, &gb, &ev, channel))
-            })
-        })
+        bench.iter(|| gc.eval(&circ, &gb, &ev))
     });
 }
 
@@ -134,11 +109,7 @@ fn bench_eval_sha_256_arithmetic(c: &mut Criterion) {
     let gb = en.encode_garbler_inputs(&vec![0u16; 512]);
     let ev = en.encode_evaluator_inputs(&[]);
     c.bench_function("eval::sha-256-arithmetic", move |bench| {
-        bench.iter(|| {
-            Channel::with(GarbledChannel::from(&gc), |channel| {
-                Ok(eval(&circ, &gb, &ev, channel))
-            })
-        })
+        bench.iter(|| gc.eval(&circ, &gb, &ev))
     });
 }
 
