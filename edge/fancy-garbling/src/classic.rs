@@ -8,30 +8,26 @@ use crate::{
     garble::{Evaluator, Garbler},
 };
 use itertools::Itertools;
-use std::{collections::HashMap, marker::PhantomData};
+use std::collections::HashMap;
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel::Channel;
 
-/// Static evaluator for a circuit, created by the `garble` function.
+/// A garbled circuit.
 ///
-/// Uses `Evaluator` under the hood to actually implement the evaluation.
+/// A garbled circuit at its core is just a vector of garbled rows and constant
+/// wirelabels.
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct GarbledCircuit<W, C> {
+pub struct GarbledCircuit {
     blocks: Vec<Block>,
-    _phantom_wire: PhantomData<W>,
-    _phantom_circ: PhantomData<C>,
 }
 
-impl<W, C> GarbledCircuit<W, C> {
-    /// Create a new object from a vector of garbled gates and constant wires.
+impl GarbledCircuit {
+    /// Create a [`GarbledCircuit`] from a vector of garbled rows and constant
+    /// wirelabels.
     pub fn new(blocks: Vec<Block>) -> Self {
-        GarbledCircuit {
-            blocks,
-            _phantom_wire: PhantomData,
-            _phantom_circ: PhantomData,
-        }
+        GarbledCircuit { blocks }
     }
 
     /// The number of garbled rows and constant wires in the garbled circuit.
@@ -58,7 +54,7 @@ pub fn eval<Wire: WireLabel, Circuit: EvaluableCircuit<Ev<Wire>>>(
 /// Garble a circuit without streaming.
 pub fn garble<Wire: WireLabel, Circuit: EvaluableCircuit<Gb<Wire>>>(
     c: &Circuit,
-) -> Result<(Encoder<Wire>, GarbledCircuit<Wire, Circuit>), GarblerError> {
+) -> Result<(Encoder<Wire>, GarbledCircuit), GarblerError> {
     let rng = AesRng::new();
     let mut garbler = Garbler::new(rng);
 
@@ -214,8 +210,8 @@ impl std::io::Write for GarbledChannel {
     }
 }
 
-impl<W, C> From<&GarbledCircuit<W, C>> for GarbledChannel {
-    fn from(value: &GarbledCircuit<W, C>) -> Self {
+impl From<&GarbledCircuit> for GarbledChannel {
+    fn from(value: &GarbledCircuit) -> Self {
         Self {
             reader: Some(GarbledReader::new(&value.blocks)),
             writer: None,
