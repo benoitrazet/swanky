@@ -37,11 +37,14 @@ use swanky_authenticated_bits::{
 };
 use swanky_channel::Channel;
 use swanky_party::Party;
+use vectoreyes::U8x16;
 
 /// Pre-process a circuit for authenticated garbling.
 ///
 /// Authenticated garbling utilizes pre-computed [`AndTriple`]s and [`AuthShare`]s in its "online" portion.
-/// This function generates the correct number of such triples and shares for a given circuit of interest.
+/// This function generates the correct number of such triples and shares for a given circuit of interest and returns
+/// the delta value used for that generation. This delta value is party specific, and in the case of the Garbler will
+/// be used as the free-XOR delta.
 /// The circuit is provided as a closure which takes in a fancy object (in this case an [`CircuitAnalyzer`]) and circuit inputs
 /// written as [`BinaryBundle`] over fancy items (in this case [`AnalyzerItem`]), and triples and shares are
 /// generated using the provided [`AndTripleGenerator`].
@@ -60,7 +63,7 @@ pub fn f_preprocessing<P: Party, RNG: CryptoRng + Rng>(
     input_size: usize,
     channel: &mut Channel,
     rng: &mut RNG,
-) -> eyre::Result<(Vec<AndTriple<P>>, Vec<AuthShare<P>>)> {
+) -> eyre::Result<(Vec<AndTriple<P>>, Vec<AuthShare<P>>, U8x16)> {
     let mut analyzer = CircuitAnalyzer::new();
     let dummy_wires_self: BinaryBundle<AnalyzerItem> =
         analyzer.bin_encode(0, input_size, channel).unwrap();
@@ -81,8 +84,7 @@ pub fn f_preprocessing<P: Party, RNG: CryptoRng + Rng>(
         channel,
         rng,
     )?;
-
-    Ok((and_shares, auth_shares))
+    Ok((and_shares, auth_shares, and_generator.delta()))
 }
 
 #[cfg(test)]
