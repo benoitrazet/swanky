@@ -34,7 +34,7 @@ pub fn hash_wires<const Q: usize, W: WireLabel>(wires: [&W; Q], tweak: u128) -> 
 where
     ArrayUnrolledOps: UnrollableArraySize<Q>,
 {
-    let batch = wires.array_map(|x| x.as_block());
+    let batch = wires.array_map(|x| x.into_block());
     TweakableCircularCorrelationRobustHash::fixed_key().hash_many(batch, tweak)
 }
 
@@ -48,7 +48,7 @@ pub trait WireLabel: Clone + HasModulus {
     fn digits(&self) -> Vec<u16>;
 
     /// Pack the wire into a `Block`.
-    fn as_block(&self) -> Block;
+    fn into_block(&self) -> Block;
 
     /// Get the color digit of the wire.
     fn color(&self) -> u16;
@@ -142,7 +142,7 @@ pub trait WireLabel: Clone + HasModulus {
     /// Uses fixed-key AES.
     #[inline(never)]
     fn hash(&self, tweak: u128) -> Block {
-        TweakableCircularCorrelationRobustHash::fixed_key().hash(self.as_block(), tweak)
+        TweakableCircularCorrelationRobustHash::fixed_key().hash(self.into_block(), tweak)
     }
 }
 
@@ -157,7 +157,7 @@ pub struct WireMod2 {
 impl ConditionallySelectable for WireMod2 {
     fn conditional_select(a: &Self, b: &Self, choice: subtle::Choice) -> Self {
         WireMod2::from_block(
-            Block::conditional_select(&a.as_block(), &b.as_block(), choice),
+            Block::conditional_select(&a.into_block(), &b.into_block(), choice),
             2,
         )
     }
@@ -320,11 +320,11 @@ impl WireLabel for AllWire {
         }
     }
 
-    fn as_block(&self) -> Block {
+    fn into_block(&self) -> Block {
         match &self {
-            AllWire::Mod2(x) => x.as_block(),
-            AllWire::Mod3(x) => x.as_block(),
-            AllWire::ModN(x) => x.as_block(),
+            AllWire::Mod2(x) => x.into_block(),
+            AllWire::Mod3(x) => x.into_block(),
+            AllWire::ModN(x) => x.into_block(),
         }
     }
     fn color(&self) -> u16 {
@@ -451,7 +451,7 @@ impl WireLabel for WireMod2 {
             .collect()
     }
 
-    fn as_block(&self) -> Block {
+    fn into_block(&self) -> Block {
         self.val
     }
 
@@ -524,7 +524,7 @@ impl WireLabel for WireMod3 {
             .collect()
     }
 
-    fn as_block(&self) -> Block {
+    fn into_block(&self) -> Block {
         Block::from(((self.msb as u128) << 64) | (self.lsb as u128))
     }
 
@@ -628,7 +628,7 @@ impl WireLabel for WireModQ {
         self.ds.clone()
     }
 
-    fn as_block(&self) -> Block {
+    fn into_block(&self) -> Block {
         Block::from(util::from_base_q(&self.ds, self.q))
     }
 
@@ -805,7 +805,7 @@ mod tests {
         for q in 2..256 {
             for _ in 0..1000 {
                 let w = AllWire::rand(rng, q);
-                assert_eq!(w, AllWire::from_block(w.as_block(), q));
+                assert_eq!(w, AllWire::from_block(w.into_block(), q));
             }
         }
     }
