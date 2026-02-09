@@ -47,7 +47,9 @@ pub trait WireLabel: Clone + HasModulus {
     /// Get the digits of the wire
     fn digits(&self) -> Vec<u16>;
 
-    /// Pack the wire into a `Block`.
+    /// Swanky represents circuit wires in one of two ways, either as [`Block`] or
+    /// as a [`WireLabel`]. This function converts a [`WireLabel`] into its [`Block`] representation
+    /// depending on the passed modulus `q`.
     fn into_block(&self) -> Block;
 
     /// Get the color digit of the wire.
@@ -63,7 +65,9 @@ pub trait WireLabel: Clone + HasModulus {
     /// Negate all the digits mod q.
     fn negate_eq(&mut self) -> &mut Self;
 
-    /// Pack the wire into a `Block`.
+    /// Swanky represents circuit wires in one of two ways, either as [`Block`] or
+    /// as a [`WireLabel`]. This function converts a [`Block`] into its [`WireLabel`] representation
+    /// depending on the passed modulus `q`.
     fn from_block(inp: Block, q: u16) -> Self;
 
     /// The zero wire with modulus `q`
@@ -450,7 +454,9 @@ impl WireLabel for WireMod2 {
             .map(|i| ((u128::from(self.val) >> i) as u16) & 1)
             .collect()
     }
-
+    /// This function converts a [`WireMod2`] into its [`Block`] representation.
+    /// Since the value of a [`WireMod2`] is a 128b value, its directly returned
+    /// as a [`Block`].
     fn into_block(&self) -> Block {
         self.val
     }
@@ -476,10 +482,12 @@ impl WireLabel for WireMod2 {
         // Do nothing. Additive inverse is a no-op for mod 2.
         self
     }
-
+    /// This function converts a [`Block`] into its [`WireLabel`] representation
+    /// by just setting the value of [`WireMod2`] to the [`Block`] (i.e. the
+    /// wire's 128b value). If the modulus is not 2, this function panics.
     fn from_block(inp: Block, q: u16) -> Self {
         if q != 2 {
-            panic!("[WireMod2::from_block] Expected modulo 2. Got {}", q);
+            panic!("[WireMod2::from_block Expected modulo 2. Got {}", q);
         }
         Self { val: inp }
     }
@@ -523,7 +531,9 @@ impl WireLabel for WireMod3 {
             .map(|i| (((self.lsb >> i) as u16) & 1) & ((((self.msb >> i) as u16) & 1) << 1))
             .collect()
     }
-
+    /// This function converts a [`WireMod3`] into its [`Block`] representation.
+    /// The two 64b values stored in [`WireMod3`], i.e. the lsb and msb, and packed
+    /// into a 128b value as a [`Block`].
     fn into_block(&self) -> Block {
         Block::from(((self.msb as u128) << 64) | (self.lsb as u128))
     }
@@ -570,7 +580,9 @@ impl WireLabel for WireMod3 {
         std::mem::swap(&mut self.lsb, &mut self.msb);
         self
     }
-
+    /// This function converts a [`Block`] into its [`WireLabel`] representation
+    /// by splitting the [`Block`] into two u64, its least significant bits and
+    /// its most significant bits.
     fn from_block(inp: Block, q: u16) -> Self {
         if q != 3 {
             panic!("[WireMod3::from_block] Expected mod 3. Got mod {}", q)
@@ -627,7 +639,9 @@ impl WireLabel for WireModQ {
     fn digits(&self) -> Vec<u16> {
         self.ds.clone()
     }
-
+    /// This function converts a [`WireMod3`] into its [`Block`] representation.
+    /// The values stored in [`WireModQ`] are repacked depending on q
+    /// into a 128b value as a [`Block`].
     fn into_block(&self) -> Block {
         Block::from(util::from_base_q(&self.ds, self.q))
     }
@@ -674,6 +688,9 @@ impl WireLabel for WireModQ {
         });
         self
     }
+    /// This function converts a [`Block`] into its [`WireLabel`] representation
+    /// by splitting the [`Block`] into several digits mod q that can each fit into 128b.
+    /// If q < 2, this function panics.
     fn from_block(inp: Block, q: u16) -> Self {
         if q < 2 {
             panic!(
