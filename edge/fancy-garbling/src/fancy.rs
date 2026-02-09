@@ -321,6 +321,8 @@ pub trait FancyProj: Fancy {
     }
 }
 
+/// Check if wire is binary
+#[macro_export]
 macro_rules! check_binary {
     ($x:ident) => {
         assert_eq!($x.modulus(), 2);

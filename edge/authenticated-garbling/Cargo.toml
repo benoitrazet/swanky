@@ -15,6 +15,7 @@ fancy-garbling.workspace = true
 swanky-authenticated-bits.workspace = true
 swanky-f-rand.workspace = true
 swanky-channel.workspace = true
+swanky-block.workspace = true
 swanky-party.workspace = true
 swanky-ot-traits.workspace = true
 swanky-adversary.workspace = true
