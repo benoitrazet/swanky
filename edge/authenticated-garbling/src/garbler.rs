@@ -1,4 +1,6 @@
 //! Garbler in Authenticated Garbling
+use crate::{preprocess::f_preprocessing, ps::PartyGarbler};
+use crate::wire::AuthenticatedWireMod2;
 use fancy_garbling::{
     AllWire, BinaryBundle, Fancy, FancyBinary, HasModulus, WireLabel, check_binary,
     util::u128_to_bits,
@@ -6,11 +8,13 @@ use fancy_garbling::{
 use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
 use swanky_channel::Channel;
+use vectoreyes::{SimdBase, U8x16};
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler<RNG, Wire> {
     deltas: HashMap<u16, Wire>, // map from modulus to associated delta wire-label.
     current_output: usize,
     current_gate: usize,
+    zero_input_wires: Vec<AuthenticatedWireMod2<PartyGarbler>>,
     rng: RNG,
 }
 
@@ -21,6 +25,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
             deltas: HashMap::new(),
             current_gate: 0,
             current_output: 0,
+            zero_input_wires: Vec::new(),
             rng,
         }
     }
