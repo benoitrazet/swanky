@@ -7,7 +7,7 @@ use clap::{Error, Parser, Subcommand};
 use ndarray::Array3;
 use serde_json::{self, Value};
 use std::fs::File;
-use std::io::{BufRead, BufReader, Lines, Write};
+use std::io::{BufRead, BufReader, Lines};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use swanky_channel::Channel;
@@ -125,9 +125,7 @@ pub fn main() {
     let dir = cli.dir;
     let ntests = cli.ntests;
 
-    let nn = NeuralNet::try_from(dir.deref()).unwrap_or_else(|e| {
-        panic!("Unable to read neural net from directory: {e}");
-    });
+    let nn = NeuralNet::try_from(dir.deref()).unwrap_or_else(|e| Error::exit(&Error::from(e)));
     println!("{nn:?}");
 
     let mut tests_path = dir.join(Path::new("tests.json"));
@@ -142,8 +140,7 @@ pub fn main() {
     }
 
     print!("reading tests...");
-    std::io::stdout().flush().unwrap();
-    let tests = read_tests(tests_path.to_str().unwrap(), ntests);
+    let tests = read_tests(&tests_path, ntests).unwrap_or_else(|e| Error::exit(&Error::from(e)));
     println!("finished");
 
     let mut labels_path = dir.join(Path::new("labels.json"));
@@ -158,8 +155,7 @@ pub fn main() {
     }
 
     print!("reading labels...");
-    std::io::stdout().flush().unwrap();
-    let labels = read_labels(labels_path.to_str().unwrap());
+    let labels = read_labels(&labels_path).unwrap_or_else(|e| Error::exit(&Error::from(e)));
     println!("finished");
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -249,16 +245,26 @@ pub fn main() {
     }
 }
 
-fn read_tests(filename: &str, num: Option<usize>) -> Vec<Array3<i64>> {
-    if filename.ends_with(".csv") {
+/// Read tests from a file.
+///
+/// The file's extension must be either `csv` or `json`. The second argument
+/// specifies the number of tests to return; `None` means return all tests in
+/// the file.
+fn read_tests(file: &Path, num: Option<usize>) -> std::io::Result<Vec<Array3<i64>>> {
+    if file.extension().is_some_and(|ext| ext == "csv") {
+        let reader = BufReader::new(File::open(file)?);
         // Note: csv can be at most 1-dimensional, if each image gets its own line
-        let iter = get_lines(filename).map(|line| {
-            let data = line
-                .unwrap()
+        let iter = reader.lines().map(|line| {
+            let data = line?
                 .split(",")
-                .map(|s| s.parse().expect("couldn't parse!"))
-                .collect::<Vec<_>>();
-            Array3::from_shape_vec((data.len(), 1, 1), data).expect("couldn't create array!")
+                .map(|s| {
+                    s.parse::<i64>().map_err(|e| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
+                    })
+                })
+                .collect::<Result<Vec<i64>, _>>()?;
+            Array3::from_shape_vec((data.len(), 1, 1), data)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))
         });
 
         if let Some(n) = num {
@@ -266,36 +272,51 @@ fn read_tests(filename: &str, num: Option<usize>) -> Vec<Array3<i64>> {
         } else {
             iter.collect()
         }
-    } else if filename.ends_with(".json") {
-        let file = File::open(filename).expect("couldn't open file!");
-        let obj: Value = serde_json::from_reader(file).expect("couldn't parse json!");
+    } else if file.extension().is_some_and(|ext| ext == "json") {
+        let file = File::open(file)?;
+        let obj: Value = serde_json::from_reader(file)?;
         let iter = obj.as_array().unwrap().iter().map(value_to_array3);
 
         if let Some(n) = num {
-            iter.take(n).collect()
+            Ok(iter.take(n).collect())
         } else {
-            iter.collect()
+            Ok(iter.collect())
         }
     } else {
-        panic!("unsupported filetype: \"{}\"", filename);
+        Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Unsupported filetype: \"{file:?}\"",
+        ))
     }
 }
 
-fn read_labels(filename: &str) -> Vec<Vec<i64>> {
-    if filename.ends_with(".csv") {
-        get_lines(filename)
+/// Read labels from a file.
+///
+/// The file's extension must be either `csv` or `json`.
+fn read_labels(file: &Path) -> std::io::Result<Vec<Vec<i64>>> {
+    if file.extension().is_some_and(|ext| ext == "csv") {
+        let reader = BufReader::new(File::open(file)?);
+        let vec = reader
+            .lines()
             .map(|line| {
-                line.unwrap()
+                let line: Result<Vec<_>, _> = line?
                     .split(",")
-                    .map(|s| s.parse().expect("couldn't parse!"))
-                    .collect()
+                    .map(|s| {
+                        s.parse::<i64>().map_err(|e| {
+                            std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
+                        })
+                    })
+                    .collect();
+                line
             })
-            .collect()
-    } else if filename.ends_with(".json") {
-        let file = File::open(filename).expect("couldn't open file!");
-        let obj: Value = serde_json::from_reader(file).expect("couldn't parse json!");
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(vec)
+    } else if file.extension().is_some_and(|ext| ext == "json") {
+        let file = File::open(file)?;
+        let obj: Value = serde_json::from_reader(file)?;
 
-        obj.as_array()
+        Ok(obj
+            .as_array()
             .unwrap()
             .iter()
             .map(|val| {
@@ -305,8 +326,11 @@ fn read_labels(filename: &str) -> Vec<Vec<i64>> {
                     .map(|val| val.as_i64().unwrap())
                     .collect()
             })
-            .collect()
+            .collect())
     } else {
-        panic!("unsupported filetype: \"{}\"", filename);
+        Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Unsupported filetype: \"{file:?}\"",
+        ))
     }
 }
