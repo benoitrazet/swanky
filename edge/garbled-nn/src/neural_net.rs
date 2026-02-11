@@ -32,7 +32,10 @@ impl std::fmt::Debug for NeuralNet {
     }
 }
 
-/// Converts a directory provided by [`PathBuf`] into a [`NeuralNet`].
+/// Converts a directory into a [`NeuralNet`].
+///
+/// The directory must have properly formatted `model.json` and `weights.json`
+/// files, otherwise an error is thrown.
 ///
 /// # Errors
 /// This returns an error if the directory does not contain a `model.json` file
