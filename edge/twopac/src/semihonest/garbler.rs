@@ -51,7 +51,7 @@ impl<
                 let zero = Wire::rand(&mut self.rng, q);
                 let one = zero.plus(delta);
                 wire = wire.plus(&zero.cmul(1 << i));
-                (zero.as_block(), one.as_block())
+                (zero.to_block(), one.to_block())
             })
             .collect::<Vec<(Block, Block)>>();
         (wire, inputs)
