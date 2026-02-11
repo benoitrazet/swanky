@@ -173,6 +173,14 @@ impl Error {
     pub fn kind(&self) -> ErrorKind {
         self.inner.kind
     }
+
+    /// Create a new error using the kind and message of another.
+    ///
+    /// It is atypical to use this method; see [`WrapErr`] which adds
+    /// this functionality to [`Result<T, U>`] values.
+    pub fn wrap_err(self, other: Self) -> Self {
+        Self::new(other.inner.kind, other.inner.message, Some(Box::new(self)))
+    }
 }
 
 impl Debug for Error {
