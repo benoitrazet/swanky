@@ -1,0 +1,26 @@
+[package]
+name = "swanky-garbled-nn"
+description = "Garbled neural networks using `fancy-garbling`"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+fancy-garbling.workspace = true
+swanky-aes-rng.workspace = true
+swanky-channel.workspace = true
+swanky-ot-alsz-kos.workspace = true
+swanky-twopac.workspace = true
+
+clap.workspace = true
+itertools.workspace = true
+ndarray.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+rand.workspace = true
