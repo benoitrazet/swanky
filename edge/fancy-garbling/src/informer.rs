@@ -265,13 +265,13 @@ impl<F: FancyBinary> FancyBinary for Informer<F> {
         Ok(result)
     }
 
-    fn negate(&mut self, x: &Self::Item) -> eyre::Result<Self::Item> {
-        let result = self.underlying.negate(x)?;
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
+        let result = self.underlying.negate(x);
 
         // Technically only the garbler adds: noop for the evaluator
         self.stats.nadds += 1;
         self.update_moduli(x.modulus());
-        Ok(result)
+        result
     }
 }
 

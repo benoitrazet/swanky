@@ -408,7 +408,7 @@ impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
                     (None, evaluator_inputs[id].clone())
                 }
                 BinaryGate::Constant { val } => (None, f.constant(val, q, channel)?),
-                BinaryGate::Inv { xref, out } => (out, f.negate(cache[xref.ix].as_ref().unwrap())?),
+                BinaryGate::Inv { xref, out } => (out, f.negate(cache[xref.ix].as_ref().unwrap())),
                 BinaryGate::Xor { xref, yref, out } => (
                     out,
                     f.xor(
@@ -747,12 +747,12 @@ impl FancyBinary for CircuitBuilder<BinaryCircuit> {
         self.gate(gate, xref.modulus())
     }
 
-    fn negate(&mut self, xref: &Self::Item) -> eyre::Result<Self::Item> {
+    fn negate(&mut self, xref: &Self::Item) -> Self::Item {
         let gate = BinaryGate::Inv {
             xref: *xref,
             out: None,
         };
-        Ok(self.gate(gate, xref.modulus()))
+        self.gate(gate, xref.modulus())
     }
 
     fn and(
@@ -792,12 +792,12 @@ impl FancyBinary for CircuitBuilder<ArithmeticCircuit> {
         self.mul(x, y, channel)
     }
 
-    fn negate(&mut self, x: &Self::Item) -> eyre::Result<Self::Item> {
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
         check_binary!(x);
 
         let one = self.lookup_constant(1, 2);
 
-        Ok(self.xor(x, &one))
+        self.xor(x, &one)
     }
 }
 

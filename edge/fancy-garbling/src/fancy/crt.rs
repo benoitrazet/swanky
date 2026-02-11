@@ -305,7 +305,7 @@ pub trait CrtGadgets:
         channel: &mut Channel,
     ) -> eyre::Result<Self::Item> {
         let z = self.crt_lt(x, y, accuracy, channel)?;
-        self.negate(&z)
+        Ok(self.negate(&z))
     }
 
     /// Compute the maximum bundle in `xs`.
@@ -322,7 +322,7 @@ pub trait CrtGadgets:
         xs.iter().skip(1).fold(Ok(xs[0].clone()), |x, y| {
             x.map(|x| {
                 let pos = self.crt_lt(&x, y, accuracy, channel)?;
-                let neg = self.negate(&pos)?;
+                let neg = self.negate(&pos);
                 Ok(CrtBundle::new(
                     x.wires()
                         .iter()
@@ -431,7 +431,7 @@ pub trait CrtGadgets:
         channel: &mut Channel,
     ) -> eyre::Result<Self::Item> {
         let z = self.pmr_lt(x, y, channel)?;
-        self.negate(&z)
+        Ok(self.negate(&z))
     }
 
     /// Generic, and expensive, CRT-based addition for two ciphertexts. Uses PMR
