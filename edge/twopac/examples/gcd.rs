@@ -121,7 +121,7 @@ fn fancy_gcd<F>(
     wire_inputs: GCDInputs<F::Item>,
     upper_bound: u128,
     channel: &mut Channel,
-) -> eyre::Result<BinaryBundle<F::Item>>
+) -> swanky_error::Result<BinaryBundle<F::Item>>
 where
     F: FancyReveal + Fancy + BinaryGadgets + FancyBinary + FancyArithmetic,
 {

@@ -26,7 +26,7 @@ mod tests {
         a: &F::Item,
         b: &F::Item,
         channel: &mut Channel,
-    ) -> eyre::Result<Option<u16>> {
+    ) -> swanky_error::Result<Option<u16>> {
         let c = f.add(a, b);
         f.output(&c, channel)
     }

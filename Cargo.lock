@@ -2934,7 +2934,6 @@ version = "0.6.0"
 dependencies = [
  "clap",
  "criterion",
- "eyre",
  "fancy-garbling",
  "itertools 0.14.0",
  "rand 0.8.5",
@@ -2942,6 +2941,7 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-block",
  "swanky-channel",
+ "swanky-error",
  "swanky-ocelot-error",
  "swanky-ot-alsz-kos",
  "swanky-ot-chou-orlandi",
