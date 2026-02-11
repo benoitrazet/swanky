@@ -6,6 +6,7 @@ mod garbler;
 mod security_warning;
 
 pub use crate::garble::{evaluator::Evaluator, garbler::Garbler};
+pub use binary_and::BinaryWireLabel;
 
 ////////////////////////////////////////////////////////////////////////////////
 // tests
