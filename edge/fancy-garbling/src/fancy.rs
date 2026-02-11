@@ -34,7 +34,7 @@ pub trait FancyBinary: Fancy {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item>;
+    ) -> swanky_error::Result<Self::Item>;
 
     /// Binary Not
     fn negate(&mut self, x: &Self::Item) -> Self::Item;
@@ -45,7 +45,7 @@ pub trait FancyBinary: Fancy {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         let notx = self.negate(x);
         let noty = self.negate(y);
         let z = self.and(&notx, &noty, channel)?;
@@ -59,7 +59,7 @@ pub trait FancyBinary: Fancy {
         y: &Self::Item,
         carry_in: Option<&Self::Item>,
         channel: &mut Channel,
-    ) -> eyre::Result<(Self::Item, Self::Item)> {
+    ) -> swanky_error::Result<(Self::Item, Self::Item)> {
         if let Some(c) = carry_in {
             let z1 = self.xor(x, y);
             let z2 = self.xor(&z1, c);
@@ -77,7 +77,11 @@ pub trait FancyBinary: Fancy {
     ///
     /// # Panics
     /// Panics if `args` is empty.
-    fn and_many(&mut self, args: &[Self::Item], channel: &mut Channel) -> eyre::Result<Self::Item> {
+    fn and_many(
+        &mut self,
+        args: &[Self::Item],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Self::Item> {
         assert!(!args.is_empty(), "`args` cannot be empty");
         args.iter()
             .skip(1)
@@ -88,7 +92,11 @@ pub trait FancyBinary: Fancy {
     ///
     /// # Panics
     /// Panics if `args` is empty.
-    fn or_many(&mut self, args: &[Self::Item], channel: &mut Channel) -> eyre::Result<Self::Item> {
+    fn or_many(
+        &mut self,
+        args: &[Self::Item],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Self::Item> {
         assert!(!args.is_empty(), "`args` cannot be empty");
         args.iter()
             .skip(1)
@@ -113,7 +121,7 @@ pub trait FancyBinary: Fancy {
         b1: bool,
         b2: bool,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         match (b1, b2) {
             (false, true) => Ok(x.clone()),
             (true, false) => Ok(self.negate(x)),
@@ -129,7 +137,7 @@ pub trait FancyBinary: Fancy {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         let xor = self.xor(x, y);
         let and = self.and(b, &xor, channel)?;
         Ok(self.xor(&and, x))
@@ -145,18 +153,27 @@ pub trait Fancy {
     type Item: Clone + HasModulus;
 
     /// Create a constant `x` with modulus `q`.
-    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> eyre::Result<Self::Item>;
+    fn constant(
+        &mut self,
+        x: u16,
+        q: u16,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Self::Item>;
 
     /// Process this wire as output. Some `Fancy` implementers don't actually *return*
     /// output, but they need to be involved in the process, so they can return `None`.
-    fn output(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<Option<u16>>;
+    fn output(
+        &mut self,
+        x: &Self::Item,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Option<u16>>;
 
     /// Output a slice of wires.
     fn outputs(
         &mut self,
         xs: &[Self::Item],
         channel: &mut Channel,
-    ) -> eyre::Result<Option<Vec<u16>>> {
+    ) -> swanky_error::Result<Option<Vec<u16>>> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             zs.push(self.output(x, channel)?);
@@ -188,7 +205,7 @@ pub trait FancyArithmetic: Fancy {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item>;
+    ) -> swanky_error::Result<Self::Item>;
 
     /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
     ///
@@ -205,7 +222,7 @@ pub trait FancyArithmetic: Fancy {
         q: u16,
         tt: Option<Vec<u16>>,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item>;
+    ) -> swanky_error::Result<Self::Item>;
 
     ////////////////////////////////////////////////////////////////////////////////
     // Functions built on top of arithmetic fancy operations.
@@ -228,7 +245,7 @@ pub trait FancyArithmetic: Fancy {
         x: &Self::Item,
         to_modulus: u16,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         let from_modulus = x.modulus();
         if from_modulus == to_modulus {
             return Ok(x.clone());

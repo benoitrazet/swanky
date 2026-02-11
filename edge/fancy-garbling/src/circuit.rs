@@ -245,11 +245,11 @@ impl std::fmt::Display for BinaryGate {
 /// that can be evaluated with an `Informer`
 pub trait CircuitInfo {
     /// Print circuit info
-    fn print_info(&self) -> eyre::Result<()>;
+    fn print_info(&self) -> swanky_error::Result<()>;
 }
 
 impl<C: EvaluableCircuit<Informer<Dummy>>> CircuitInfo for C {
-    fn print_info(&self) -> eyre::Result<()> {
+    fn print_info(&self) -> swanky_error::Result<()> {
         let mut informer = crate::informer::Informer::new(Dummy::new());
 
         // encode inputs as InformerVals
@@ -257,13 +257,13 @@ impl<C: EvaluableCircuit<Informer<Dummy>>> CircuitInfo for C {
             self.get_garbler_input_refs()
                 .iter()
                 .map(|r| informer.encode(0, r.modulus(), channel))
-                .collect::<eyre::Result<Vec<DummyVal>>>()
+                .collect::<swanky_error::Result<Vec<DummyVal>>>()
         })?;
         let ev = Channel::with(std::io::empty(), |channel| {
             self.get_evaluator_input_refs()
                 .iter()
                 .map(|r| informer.encode(0, r.modulus(), channel))
-                .collect::<eyre::Result<Vec<DummyVal>>>()
+                .collect::<swanky_error::Result<Vec<DummyVal>>>()
         })?;
 
         Channel::with(std::io::empty(), |c| {
@@ -291,7 +291,7 @@ pub trait EvaluableCircuit<F: Fancy>: CircuitType {
         garbler_inputs: &[F::Item],
         evaluator_inputs: &[F::Item],
         channel: &mut Channel,
-    ) -> eyre::Result<Option<Vec<u16>>> {
+    ) -> swanky_error::Result<Option<Vec<u16>>> {
         let wirelabels = self.eval_to_wirelabels(f, garbler_inputs, evaluator_inputs, channel)?;
         f.outputs(&wirelabels, channel)
     }
@@ -309,7 +309,7 @@ pub trait EvaluableCircuit<F: Fancy>: CircuitType {
         garbler_inputs: &[F::Item],
         evaluator_inputs: &[F::Item],
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<F::Item>>;
+    ) -> swanky_error::Result<Vec<F::Item>>;
 }
 
 impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
@@ -319,7 +319,7 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
         garbler_inputs: &[F::Item],
         evaluator_inputs: &[F::Item],
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<F::Item>> {
+    ) -> swanky_error::Result<Vec<F::Item>> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
             let q = self.modulus(i);
@@ -392,7 +392,7 @@ impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
         garbler_inputs: &[F::Item],
         evaluator_inputs: &[F::Item],
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<F::Item>> {
+    ) -> swanky_error::Result<Vec<F::Item>> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
             let q = 2;
@@ -553,7 +553,7 @@ pub fn eval_plain<C: EvaluableCircuit<Dummy>>(
     circuit: &C,
     garbler_inputs: &[u16],
     evaluator_inputs: &[u16],
-) -> eyre::Result<Vec<u16>> {
+) -> swanky_error::Result<Vec<u16>> {
     assert_eq!(garbler_inputs.len(), circuit.num_garbler_inputs());
     assert_eq!(evaluator_inputs.len(), circuit.num_evaluator_inputs());
 
@@ -760,7 +760,7 @@ impl FancyBinary for CircuitBuilder<BinaryCircuit> {
         xref: &Self::Item,
         yref: &Self::Item,
         _: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         let gate = BinaryGate::And {
             xref: *xref,
             yref: *yref,
@@ -785,7 +785,7 @@ impl FancyBinary for CircuitBuilder<ArithmeticCircuit> {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         check_binary!(x);
         check_binary!(y);
 
@@ -839,7 +839,7 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
         output_modulus: u16,
         tt: Option<Vec<u16>>,
         _: &mut Channel,
-    ) -> eyre::Result<CircuitRef> {
+    ) -> swanky_error::Result<CircuitRef> {
         assert!(tt.is_some(), "`tt` must not be `None`");
         let tt = tt.unwrap();
         assert!(
@@ -864,7 +864,7 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
         xref: &CircuitRef,
         yref: &CircuitRef,
         channel: &mut Channel,
-    ) -> eyre::Result<CircuitRef> {
+    ) -> swanky_error::Result<CircuitRef> {
         if xref.modulus() < yref.modulus() {
             return self.mul(yref, xref, channel);
         }
@@ -883,11 +883,16 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
 impl<Circuit: CircuitType> Fancy for CircuitBuilder<Circuit> {
     type Item = CircuitRef;
 
-    fn constant(&mut self, val: u16, modulus: u16, _: &mut Channel) -> eyre::Result<CircuitRef> {
+    fn constant(
+        &mut self,
+        val: u16,
+        modulus: u16,
+        _: &mut Channel,
+    ) -> swanky_error::Result<CircuitRef> {
         Ok(self.lookup_constant(val, modulus))
     }
 
-    fn output(&mut self, xref: &CircuitRef, _: &mut Channel) -> eyre::Result<Option<u16>> {
+    fn output(&mut self, xref: &CircuitRef, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
         self.circ.push_output_ref(*xref);
         Ok(None)
     }

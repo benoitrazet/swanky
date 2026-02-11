@@ -19,14 +19,14 @@ pub trait FancyInput {
         values: &[u16],
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<Self::Item>>;
+    ) -> swanky_error::Result<Vec<Self::Item>>;
 
     /// Receive many values where the input is not known.
     fn receive_many(
         &mut self,
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<Self::Item>>;
+    ) -> swanky_error::Result<Vec<Self::Item>>;
 
     ////////////////////////////////////////////////////////////////////////////////
     // optional methods
@@ -40,13 +40,13 @@ pub trait FancyInput {
         value: u16,
         modulus: u16,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         let mut xs = self.encode_many(&[value], &[modulus], channel)?;
         Ok(xs.remove(0))
     }
 
     /// Receive a single value.
-    fn receive(&mut self, modulus: u16, channel: &mut Channel) -> eyre::Result<Self::Item> {
+    fn receive(&mut self, modulus: u16, channel: &mut Channel) -> swanky_error::Result<Self::Item> {
         let mut xs = self.receive_many(&[modulus], channel)?;
         Ok(xs.remove(0))
     }
@@ -57,7 +57,7 @@ pub trait FancyInput {
         values: &[u16],
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> eyre::Result<Bundle<Self::Item>> {
+    ) -> swanky_error::Result<Bundle<Self::Item>> {
         self.encode_many(values, moduli, channel).map(Bundle::new)
     }
 
@@ -66,7 +66,7 @@ pub trait FancyInput {
         &mut self,
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> eyre::Result<Bundle<Self::Item>> {
+    ) -> swanky_error::Result<Bundle<Self::Item>> {
         self.receive_many(moduli, channel).map(Bundle::new)
     }
 
@@ -79,7 +79,7 @@ pub trait FancyInput {
         values: &[Vec<u16>],
         moduli: &[Vec<u16>],
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<Bundle<Self::Item>>> {
+    ) -> swanky_error::Result<Vec<Bundle<Self::Item>>> {
         let qs = moduli.iter().flatten().cloned().collect_vec();
         let xs = values.iter().flatten().cloned().collect_vec();
         assert_eq!(xs.len(), qs.len(), "unequal number of values and moduli");
@@ -99,7 +99,7 @@ pub trait FancyInput {
         &mut self,
         moduli: &[Vec<u16>],
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<Bundle<Self::Item>>> {
+    ) -> swanky_error::Result<Vec<Bundle<Self::Item>>> {
         let qs = moduli.iter().flatten().cloned().collect_vec();
         let mut wires = self.receive_many(&qs, channel)?;
         let buns = moduli
@@ -118,7 +118,7 @@ pub trait FancyInput {
         value: u128,
         modulus: u128,
         channel: &mut Channel,
-    ) -> eyre::Result<CrtBundle<Self::Item>> {
+    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
         let qs = util::factor(modulus);
         let xs = util::crt(value, &qs);
         self.encode_bundle(&xs, &qs, channel).map(CrtBundle::from)
@@ -129,7 +129,7 @@ pub trait FancyInput {
         &mut self,
         modulus: u128,
         channel: &mut Channel,
-    ) -> eyre::Result<CrtBundle<Self::Item>> {
+    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
         let qs = util::factor(modulus);
         self.receive_bundle(&qs, channel).map(CrtBundle::from)
     }
@@ -140,7 +140,7 @@ pub trait FancyInput {
         values: &[u128],
         modulus: u128,
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<CrtBundle<Self::Item>>> {
+    ) -> swanky_error::Result<Vec<CrtBundle<Self::Item>>> {
         let mods = util::factor(modulus);
         let nmods = mods.len();
         let xs = values
@@ -166,7 +166,7 @@ pub trait FancyInput {
         n: usize,
         modulus: u128,
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<CrtBundle<Self::Item>>> {
+    ) -> swanky_error::Result<Vec<CrtBundle<Self::Item>>> {
         let mods = util::factor(modulus);
         let nmods = mods.len();
         let qs = itertools::repeat_n(mods, n).flatten().collect_vec();
@@ -186,7 +186,7 @@ pub trait FancyInput {
         value: u128,
         nbits: usize,
         channel: &mut Channel,
-    ) -> eyre::Result<BinaryBundle<Self::Item>> {
+    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
         let xs = util::u128_to_bits(value, nbits);
         self.encode_bundle(&xs, &vec![2; nbits], channel)
             .map(BinaryBundle::from)
@@ -197,7 +197,7 @@ pub trait FancyInput {
         &mut self,
         nbits: usize,
         channel: &mut Channel,
-    ) -> eyre::Result<BinaryBundle<Self::Item>> {
+    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
         self.receive_bundle(&vec![2; nbits], channel)
             .map(BinaryBundle::from)
     }
@@ -208,7 +208,7 @@ pub trait FancyInput {
         values: &[u128],
         nbits: usize,
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<BinaryBundle<Self::Item>>> {
+    ) -> swanky_error::Result<Vec<BinaryBundle<Self::Item>>> {
         let xs = values
             .iter()
             .flat_map(|x| util::u128_to_bits(*x, nbits))
@@ -229,7 +229,7 @@ pub trait FancyInput {
         ninputs: usize,
         nbits: usize,
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<BinaryBundle<Self::Item>>> {
+    ) -> swanky_error::Result<Vec<BinaryBundle<Self::Item>>> {
         let mut wires = self.receive_many(&vec![2; ninputs * nbits], channel)?;
         let buns = (0..ninputs)
             .map(|_| {

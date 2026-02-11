@@ -40,7 +40,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel + DeserializeOwned> Garbler<RNG, 
 
 impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
     /// Create a new [`Garbler`].
-    pub fn new(mut rng: RNG, channel: &mut Channel) -> eyre::Result<Self> {
+    pub fn new(mut rng: RNG, channel: &mut Channel) -> swanky_error::Result<Self> {
         let zero = Wire::rand(&mut rng, 2);
         let delta = Wire::rand_delta(&mut rng, 2);
         let one = zero.plus(&delta);
@@ -91,7 +91,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
     }
 
     /// Send a wire over the established channel.
-    pub fn send_wire(&mut self, wire: &Wire, channel: &mut Channel) -> eyre::Result<()> {
+    pub fn send_wire(&mut self, wire: &Wire, channel: &mut Channel) -> swanky_error::Result<()> {
         channel.write(&wire.to_block())?;
         Ok(())
     }
@@ -154,7 +154,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> FancyInput for Garbler<RNG, Wire
         values: &[u16],
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<Self::Item>> {
+    ) -> swanky_error::Result<Vec<Self::Item>> {
         let (zero, encoded) = self.encode_many_wires(values, moduli);
         for wire in encoded {
             channel.write(&wire.to_block())?;
@@ -162,13 +162,17 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> FancyInput for Garbler<RNG, Wire
         Ok(zero)
     }
 
-    fn receive_many(&mut self, _moduli: &[u16], _: &mut Channel) -> eyre::Result<Vec<Self::Item>> {
+    fn receive_many(
+        &mut self,
+        _moduli: &[u16],
+        _: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
         unimplemented!("Garbler cannot receive values")
     }
 }
 
 impl<RNG: RngCore + CryptoRng, Wire: WireLabel> FancyReveal for Garbler<RNG, Wire> {
-    fn reveal(&mut self, x: &Wire, channel: &mut Channel) -> eyre::Result<u16> {
+    fn reveal(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<u16> {
         // The evaluator needs our cooperation in order to see the output.
         // Hence, we call output() ourselves.
         self.output(x, channel)?;
@@ -183,7 +187,7 @@ impl<RNG: RngCore + CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, 
         A: &Self::Item,
         B: &Self::Item,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         let delta = self.delta(2);
         let gate_num = self.current_gate();
         let (gate0, gate1, C) = W::garble_and_gate(gate_num, A, B, &delta);
@@ -232,7 +236,7 @@ impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         if let (AllWire::Mod2(A), AllWire::Mod2(B), AllWire::Mod2(ref delta)) =
             (x, y, self.delta(2))
         {
@@ -268,7 +272,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         x.cmul(c)
     }
 
-    fn mul(&mut self, A: &Wire, B: &Wire, channel: &mut Channel) -> eyre::Result<Wire> {
+    fn mul(&mut self, A: &Wire, B: &Wire, channel: &mut Channel) -> swanky_error::Result<Wire> {
         if A.modulus() < B.modulus() {
             return self.mul(B, A, channel);
         }
@@ -391,7 +395,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         q_out: u16,
         tt: Option<Vec<u16>>,
         channel: &mut Channel,
-    ) -> eyre::Result<Wire> {
+    ) -> swanky_error::Result<Wire> {
         warn_proj();
         assert!(tt.is_some(), "`tt` must not be `None`");
         let tt = tt.unwrap();
@@ -450,14 +454,14 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
 impl<RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
     type Item = Wire;
 
-    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> eyre::Result<Wire> {
+    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
         let zero = Wire::rand(&mut self.rng, q);
         let wire = zero.plus(self.delta(q).cmul_eq(x));
         self.send_wire(&wire, channel)?;
         Ok(zero)
     }
 
-    fn output(&mut self, X: &Wire, channel: &mut Channel) -> eyre::Result<Option<u16>> {
+    fn output(&mut self, X: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
         let q = X.modulus();
         let i = self.current_output();
         let D = self.delta(q);

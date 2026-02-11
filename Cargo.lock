@@ -795,7 +795,6 @@ name = "fancy-garbling"
 version = "0.6.0"
 dependencies = [
  "criterion",
- "eyre",
  "itertools 0.14.0",
  "rand 0.8.5",
  "regex",
@@ -807,6 +806,7 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-block",
  "swanky-channel",
+ "swanky-error",
  "vectoreyes",
 ]
 

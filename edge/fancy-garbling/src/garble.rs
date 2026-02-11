@@ -496,7 +496,7 @@ mod complex {
         b: &mut F,
         xs: &[CrtBundle<F::Item>],
         channel: &mut Channel,
-    ) -> eyre::Result<Option<Vec<u128>>> {
+    ) -> swanky_error::Result<Option<Vec<u128>>> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             let c = b.crt_constant_bundle(1, x.composite_modulus(), channel)?;
