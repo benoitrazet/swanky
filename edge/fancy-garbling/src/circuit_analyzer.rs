@@ -145,7 +145,7 @@ impl FancyBinary for CircuitAnalyzer {
             depth: max(x.depth, y.depth) + 1,
         })
     }
-    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
         self.nnegs += 1;
 
         // Fancy implements negation with one constant gate and one XOR
@@ -154,11 +154,11 @@ impl FancyBinary for CircuitAnalyzer {
 
         // Fancy's XOR gate calls the underlying arithmetic addition
         self.nadds += 1;
-        Ok(AnalyzerItem {
+        AnalyzerItem {
             modulus: x.modulus,
             // Same depth as a XOR, except that negation is a unary gate
             depth: x.depth,
-        })
+        }
     }
 }
 

@@ -6,7 +6,7 @@
 use swanky_channel::Channel;
 
 use crate::{
-    FancyArithmetic, FancyBinary, check_binary, derive_binary,
+    FancyArithmetic, FancyBinary, check_binary,
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
 };
 
@@ -74,7 +74,32 @@ impl FancyInput for Dummy {
     }
 }
 
-derive_binary!(Dummy);
+impl FancyBinary for Dummy {
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        check_binary!(x);
+        check_binary!(y);
+
+        self.add(x, y)
+    }
+
+    fn and(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        channel: &mut Channel,
+    ) -> eyre::Result<Self::Item> {
+        check_binary!(x);
+        check_binary!(y);
+
+        self.mul(x, y, channel)
+    }
+
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
+        check_binary!(x);
+
+        self.xor(x, &DummyVal::new(1, 2))
+    }
+}
 
 impl FancyArithmetic for Dummy {
     fn add(&mut self, x: &DummyVal, y: &DummyVal) -> DummyVal {

@@ -296,12 +296,12 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         xs: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
     ) -> eyre::Result<BinaryBundle<Self::Item>> {
-        let not_xs = xs
-            .wires()
-            .iter()
-            .map(|x| self.negate(x, channel))
-            .collect::<eyre::Result<Vec<Self::Item>>>()
-            .map(BinaryBundle::new)?;
+        let not_xs = BinaryBundle::new(
+            xs.wires()
+                .iter()
+                .map(|x| self.negate(x))
+                .collect::<Vec<_>>(),
+        );
         let one = self.bin_constant_bundle(1, xs.size(), channel)?;
         self.bin_addition_no_carry(&not_xs, &one, channel)
     }
@@ -400,8 +400,8 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         // determine whether x and y are positive or negative
         let x_neg = &x.wires().last().unwrap();
         let y_neg = &y.wires().last().unwrap();
-        let x_pos = self.negate(x_neg, channel)?;
-        let y_pos = self.negate(y_neg, channel)?;
+        let x_pos = self.negate(x_neg);
+        let y_pos = self.negate(y_neg);
 
         // broken into cases based on x and y being negative or positive
         // base case: if x and y have the same sign - use unsigned lt
@@ -433,7 +433,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         // lhs to remove the y==0 aspect.
         // check if y==0
         let y_contains_1 = self.or_many(y.wires(), channel)?;
-        let y_eq_0 = self.negate(&y_contains_1, channel)?;
+        let y_eq_0 = self.negate(&y_contains_1);
 
         // if x != 0, then x >= y, ... assuming x is not negative
         let x_contains_1 = self.or_many(x.wires(), channel)?;
@@ -446,7 +446,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         // => x >= y && 1
         // => x >= y
         let geq = self.or(&lhs, &rhs, channel)?;
-        let ngeq = self.negate(&geq, channel)?;
+        let ngeq = self.negate(&geq);
 
         let xy_neq_0 = self.or(&y_contains_1, &x_contains_1, channel)?;
         self.and(&xy_neq_0, &ngeq, channel)
@@ -460,7 +460,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         channel: &mut Channel,
     ) -> eyre::Result<Self::Item> {
         let z = self.bin_lt(x, y, channel)?;
-        self.negate(&z, channel)
+        Ok(self.negate(&z))
     }
 
     /// Compute the maximum bundle in `xs`.
@@ -476,7 +476,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         xs.iter().skip(1).fold(Ok(xs[0].clone()), |x, y| {
             x.map(|x| {
                 let pos = self.bin_lt(&x, y, channel)?;
-                let neg = self.negate(&pos, channel)?;
+                let neg = self.negate(&pos);
                 Ok(BinaryBundle::new(
                     x.wires()
                         .iter()
@@ -510,13 +510,13 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         for ix in 0..1 << nbits {
             let mut acc = wires[0].clone();
             if (ix & 1) == 0 {
-                acc = self.negate(&acc, channel)?;
+                acc = self.negate(&acc);
             }
             for (i, w) in wires.iter().enumerate().skip(1) {
                 if ((ix >> i) & 1) > 0 {
                     acc = self.and(&acc, w, channel)?;
                 } else {
-                    let not_w = self.negate(w, channel)?;
+                    let not_w = self.negate(w);
                     acc = self.and(&acc, &not_w, channel)?;
                 }
             }
@@ -576,9 +576,9 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
             .zip_eq(y.wires().iter())
             .map(|(x, y)| {
                 let xy = self.xor(x, y);
-                self.negate(&xy, channel)
+                self.negate(&xy)
             })
-            .collect::<eyre::Result<Vec<Self::Item>>>()?;
+            .collect::<Vec<_>>();
         // and_many will return 1 only if all outputs of xnor are 1
         // indicating equality
         self.and_many(&zs, channel)

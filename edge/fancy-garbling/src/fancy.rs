@@ -37,11 +37,7 @@ pub trait FancyBinary: Fancy {
     ) -> eyre::Result<Self::Item>;
 
     /// Binary Not
-    // TODO: `negate` _should_ be free (i.e., not require `Channel`), but its
-    // not because we need to define a constant (namely, the constant `1`),
-    // which requires `Channel`. We should fix this! This can be done by having
-    // `Fancy` require a one element.
-    fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<Self::Item>;
+    fn negate(&mut self, x: &Self::Item) -> Self::Item;
 
     /// Uses Demorgan's Rule implemented with an and gate and negation.
     fn or(
@@ -50,10 +46,10 @@ pub trait FancyBinary: Fancy {
         y: &Self::Item,
         channel: &mut Channel,
     ) -> eyre::Result<Self::Item> {
-        let notx = self.negate(x, channel)?;
-        let noty = self.negate(y, channel)?;
+        let notx = self.negate(x);
+        let noty = self.negate(y);
         let z = self.and(&notx, &noty, channel)?;
-        self.negate(&z, channel)
+        Ok(self.negate(&z))
     }
 
     /// Binary adder. Returns the result and the carry.
@@ -120,7 +116,7 @@ pub trait FancyBinary: Fancy {
     ) -> eyre::Result<Self::Item> {
         match (b1, b2) {
             (false, true) => Ok(x.clone()),
-            (true, false) => self.negate(x, channel),
+            (true, false) => Ok(self.negate(x)),
             (false, false) => self.constant(0, 2, channel),
             (true, true) => self.constant(1, 2, channel),
         }
@@ -248,46 +244,5 @@ macro_rules! check_binary {
     };
 }
 
-/// Given an `FancyArithmetic` implementation, it is always possible to derive
-/// the operations required for `FancyBinary` by using the given arithmetic gadgets.
-///
-/// In this macro, `xor` and `and` use `add` and `mul` respectively as a subroutine,
-/// while `negate` xors the wire with a constant.
-/// Additionally, the modulus of each input wire is checked to make sure it is equal to 2.
-/// Note, that there are frequently better ways to implement some of these operations (e.g. negate
-/// in GC can often be written without requiring any communication).
-/// However, this is not always relevant, such as when implementing the `Fancy` DSLs for `Dummy`.
-///
-/// Right now the macro can handle X or X<Y,...> mainly because I used it for `CircuitBuilder<ArithmeticCircuit>`
-macro_rules! derive_binary {
-    ($f:ident$(<$( $t:tt ),+>)?) => {
-        impl FancyBinary for $f$(< $($t),* >)? {
-            fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-                check_binary!(x);
-                check_binary!(y);
-
-                self.add(x, y)
-            }
-
-            fn and(&mut self, x: &Self::Item, y: &Self::Item, channel: &mut Channel) -> eyre::Result<Self::Item> {
-                check_binary!(x);
-                check_binary!(y);
-
-                self.mul(x, y, channel)
-            }
-
-            fn negate(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<Self::Item> {
-                check_binary!(x);
-                // TODO: negate _should_ be free, but it's not because we define
-                // a constant here, and this is defined on _every_ negate call.
-                // We should change this! Possibly by having the constant 1 be
-                // required as an entry in the `Fancy` trait.
-                let c = self.constant(1, 2, channel)?;
-                Ok(self.xor(x, &c))
-            }
-        }
-    };
-}
 pub(crate) use check_binary;
-pub(crate) use derive_binary;
 use swanky_channel::Channel;

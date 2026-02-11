@@ -171,9 +171,9 @@ impl<RNG: RngCore + CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, 
     ///
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
-    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
         let delta = self.delta(2);
-        Ok(self.xor(&delta, x))
+        self.xor(&delta, x)
     }
 }
 
@@ -182,11 +182,11 @@ impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
     ///
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
-    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
         check_binary!(x);
 
         let delta = self.delta(2);
-        Ok(self.xor(&delta, x))
+        self.xor(&delta, x)
     }
 
     /// Xor is just addition

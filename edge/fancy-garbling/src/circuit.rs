@@ -2,7 +2,7 @@
 //! where you create a circuit for a computation then garble it.
 
 use crate::{
-    FancyArithmetic, FancyBinary, check_binary, derive_binary,
+    FancyArithmetic, FancyBinary, check_binary,
     dummy::{Dummy, DummyVal},
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyInput, HasModulus},
     informer::Informer,
@@ -408,9 +408,7 @@ impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
                     (None, evaluator_inputs[id].clone())
                 }
                 BinaryGate::Constant { val } => (None, f.constant(val, q, channel)?),
-                BinaryGate::Inv { xref, out } => {
-                    (out, f.negate(cache[xref.ix].as_ref().unwrap(), channel)?)
-                }
+                BinaryGate::Inv { xref, out } => (out, f.negate(cache[xref.ix].as_ref().unwrap())),
                 BinaryGate::Xor { xref, yref, out } => (
                     out,
                     f.xor(
@@ -749,12 +747,12 @@ impl FancyBinary for CircuitBuilder<BinaryCircuit> {
         self.gate(gate, xref.modulus())
     }
 
-    fn negate(&mut self, xref: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
+    fn negate(&mut self, xref: &Self::Item) -> Self::Item {
         let gate = BinaryGate::Inv {
             xref: *xref,
             out: None,
         };
-        Ok(self.gate(gate, xref.modulus()))
+        self.gate(gate, xref.modulus())
     }
 
     fn and(
@@ -774,8 +772,34 @@ impl FancyBinary for CircuitBuilder<BinaryCircuit> {
     }
 }
 
-// We can construct an arithmetic circuit out of binary operations
-derive_binary!(CircuitBuilder<ArithmeticCircuit>);
+impl FancyBinary for CircuitBuilder<ArithmeticCircuit> {
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        check_binary!(x);
+        check_binary!(y);
+
+        self.add(x, y)
+    }
+
+    fn and(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        channel: &mut Channel,
+    ) -> eyre::Result<Self::Item> {
+        check_binary!(x);
+        check_binary!(y);
+
+        self.mul(x, y, channel)
+    }
+
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
+        check_binary!(x);
+
+        let one = self.lookup_constant(1, 2);
+
+        self.xor(x, &one)
+    }
+}
 
 impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
     fn add(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> CircuitRef {
@@ -860,16 +884,7 @@ impl<Circuit: CircuitType> Fancy for CircuitBuilder<Circuit> {
     type Item = CircuitRef;
 
     fn constant(&mut self, val: u16, modulus: u16, _: &mut Channel) -> eyre::Result<CircuitRef> {
-        match self.const_map.get(&(val, modulus)) {
-            Some(&r) => Ok(r),
-            None => {
-                let gate = Circuit::Gate::make_constant(val);
-                let r = self.gate(gate, modulus);
-                self.const_map.insert((val, modulus), r);
-                self.circ.push_const_ref(r);
-                Ok(r)
-            }
-        }
+        Ok(self.lookup_constant(val, modulus))
     }
 
     fn output(&mut self, xref: &CircuitRef, _: &mut Channel) -> eyre::Result<Option<u16>> {
@@ -893,6 +908,21 @@ impl<Circuit: CircuitType> CircuitBuilder<Circuit> {
     /// Finish circuit building, outputting the resulting circuit.
     pub fn finish(self) -> Circuit {
         self.circ
+    }
+
+    /// Look up a constant in the internal constant map, or add it if no such
+    /// constant exists.
+    fn lookup_constant(&mut self, val: u16, modulus: u16) -> CircuitRef {
+        match self.const_map.get(&(val, modulus)) {
+            Some(&r) => r,
+            None => {
+                let gate = Circuit::Gate::make_constant(val);
+                let r = self.gate(gate, modulus);
+                self.const_map.insert((val, modulus), r);
+                self.circ.push_const_ref(r);
+                r
+            }
+        }
     }
 
     fn get_next_garbler_input_id(&mut self) -> usize {
