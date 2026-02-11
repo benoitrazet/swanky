@@ -4,56 +4,72 @@
 
 use std::io::{Read, Write};
 
-use eyre::Context;
+use swanky_error::{ErrorKind, WrapErr};
 
 use crate::Channel;
 
 #[cfg(any(test, not(unix)))]
-fn tcp_socketpair() -> eyre::Result<(std::net::TcpStream, std::net::TcpStream)> {
+fn tcp_socketpair() -> swanky_error::Result<(std::net::TcpStream, std::net::TcpStream)> {
     use std::time::Duration;
 
     const TIMEOUT: Duration = Duration::from_secs(1);
     // Port 0 means the OS will pick an unused port.
-    let server = std::net::TcpListener::bind("127.0.0.1:0").wrap_err("binding to 'localhost:0'")?;
-    let addr = server.local_addr().wrap_err("getting local_addr()")?;
+    let server = std::net::TcpListener::bind("127.0.0.1:0").wrap_err(
+        ErrorKind::NetworkError,
+        "Failed to bind to 'localhost:0'.".to_string(),
+    )?;
+    let addr = server.local_addr().wrap_err(
+        ErrorKind::NetworkError,
+        "Failed to get local_addr().".to_string(),
+    )?;
     let thread = std::thread::spawn(move || std::net::TcpStream::connect_timeout(&addr, TIMEOUT));
     // If something goes wrong, we don't want to hang forever. There doesn't seem to be an accept()
     // timeout in Rust's standard library. We simulate one with sleeping and non-blocking IO.
     const SLEEP_STEP: Duration = Duration::from_micros(250);
     const NUM_STEPS: u128 = TIMEOUT.as_micros() / SLEEP_STEP.as_micros();
-    server
-        .set_nonblocking(true)
-        .wrap_err("set nonblocking on server")?;
+    server.set_nonblocking(true).wrap_err(
+        ErrorKind::NetworkError,
+        "Failed to set nonblocking on server".to_string(),
+    )?;
     for _ in 0..NUM_STEPS {
         match server.accept() {
             Ok((conn1, _)) => {
-                let conn2 = thread
-                    .join()
-                    .expect("thread didn't panic")
-                    .wrap_err("connect() failed from thread")?;
+                let conn2 = thread.join().expect("thread didn't panic").wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to connect() from thread.".to_string(),
+                )?;
                 // On some platforms, the accepted connections start off as non-blocking.
-                server
-                    .set_nonblocking(false)
-                    .wrap_err("undo nonblocking on server")?;
-                conn1
-                    .set_nonblocking(false)
-                    .wrap_err("undo nonblocking on client")?;
-                conn2
-                    .set_nonblocking(false)
-                    .wrap_err("undo nonblocking on client")?;
+                server.set_nonblocking(false).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to undo nonblocking on server.".to_string(),
+                )?;
+                conn1.set_nonblocking(false).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to undo nonblocking on client.".to_string(),
+                )?;
+                conn2.set_nonblocking(false).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to undo nonblocking on client.".to_string(),
+                )?;
                 return Ok((conn1, conn2));
             }
             Err(e) => {
                 if e.kind() != std::io::ErrorKind::WouldBlock
                     && e.kind() != std::io::ErrorKind::Interrupted
                 {
-                    return Err(e).wrap_err("accept() failed with a non-timeout-related error");
+                    return Err(e).wrap_err(
+                        ErrorKind::NetworkError,
+                        "Failed to accept() with a non-timeout-related error.".to_string(),
+                    );
                 }
             }
         }
         std::thread::sleep(SLEEP_STEP);
     }
-    eyre::bail!("Failed to accept() connection in {TIMEOUT:?}");
+    swanky_error::bail!(
+        ErrorKind::NetworkError,
+        "Failed to accept() connection in {TIMEOUT:?}."
+    );
 }
 
 /// An intra-process socket
@@ -83,11 +99,17 @@ impl LocalSocket {
     /// assert_eq!(&buf, b"hello");
     /// handle.join().unwrap().unwrap();
     /// ```
-    pub fn pair() -> eyre::Result<(Self, Self)> {
+    pub fn pair() -> swanky_error::Result<(Self, Self)> {
         #[cfg(unix)]
-        let (a, b) = std::os::unix::net::UnixStream::pair().context("Constructing LocalSocket")?;
+        let (a, b) = std::os::unix::net::UnixStream::pair().wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to construct LocalSocket.".to_string(),
+        )?;
         #[cfg(not(unix))]
-        let (a, b) = tcp_socketpair().context("Constructing LocalSocket")?;
+        let (a, b) = tcp_socketpair().wrap_err(
+            ErrorKind::NetworkError,
+            "Constructing LocalSocket.".to_string(),
+        )?;
         Ok((LocalSocket { inner: a }, LocalSocket { inner: b }))
     }
 }
@@ -130,10 +152,10 @@ impl Write for LocalSocket {
 /// assert_eq!(a, 42);
 /// assert_eq!(b, 42);
 /// ```
-pub fn local_channel_pair<T, U: Send, F, G>(side_f: F, side_g: G) -> eyre::Result<(T, U)>
+pub fn local_channel_pair<T, U: Send, F, G>(side_f: F, side_g: G) -> swanky_error::Result<(T, U)>
 where
-    for<'a, 'b> F: FnOnce(&'b mut Channel<'a>) -> eyre::Result<T>,
-    for<'a, 'b> G: Send + FnOnce(&'b mut Channel<'a>) -> eyre::Result<U>,
+    for<'a, 'b> F: FnOnce(&'b mut Channel<'a>) -> swanky_error::Result<T>,
+    for<'a, 'b> G: Send + FnOnce(&'b mut Channel<'a>) -> swanky_error::Result<U>,
 {
     std::thread::scope(|scope| {
         let (f_sock, g_sock) = LocalSocket::pair()?;
