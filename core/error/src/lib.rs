@@ -323,7 +323,7 @@ pub trait WrapErr: Sealed {
 
     /// Lazily wrap the error value with a new [`Error`], constructing
     /// the message only once an error does occur.
-    fn wrap_err_with(self, kind: ErrorKind, msg: impl FnOnce() -> String) -> Result<Self::Output>;
+    fn wrap_err_with(self, kind: ErrorKind, f: impl FnOnce() -> String) -> Result<Self::Output>;
 }
 
 impl<T, E: std::error::Error + Send + Sync + 'static> WrapErr for std::result::Result<T, E> {
@@ -335,8 +335,8 @@ impl<T, E: std::error::Error + Send + Sync + 'static> WrapErr for std::result::R
     }
 
     #[inline]
-    fn wrap_err_with(self, kind: ErrorKind, msg: impl FnOnce() -> String) -> Result<Self::Output> {
-        self.map_err(|e| Error::new(kind, msg(), Some(Box::new(e))))
+    fn wrap_err_with(self, kind: ErrorKind, f: impl FnOnce() -> String) -> Result<Self::Output> {
+        self.map_err(|e| Error::new(kind, f(), Some(Box::new(e))))
     }
 }
 
