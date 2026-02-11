@@ -145,7 +145,7 @@ impl FancyBinary for CircuitAnalyzer {
             depth: max(x.depth, y.depth) + 1,
         })
     }
-    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
+    fn negate(&mut self, x: &Self::Item) -> eyre::Result<Self::Item> {
         self.nnegs += 1;
 
         // Fancy implements negation with one constant gate and one XOR

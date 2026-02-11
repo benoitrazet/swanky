@@ -94,7 +94,7 @@ impl FancyBinary for Dummy {
         self.mul(x, y, channel)
     }
 
-    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
+    fn negate(&mut self, x: &Self::Item) -> eyre::Result<Self::Item> {
         check_binary!(x);
 
         Ok(self.xor(x, &DummyVal::new(1, 2)))

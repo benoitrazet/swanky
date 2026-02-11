@@ -56,7 +56,7 @@ impl<Wire: WireLabel> Evaluator<Wire> {
 
 impl<W: BinaryWireLabel> FancyBinary for Evaluator<W> {
     /// Negate is a noop for the evaluator
-    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
+    fn negate(&mut self, x: &Self::Item) -> eyre::Result<Self::Item> {
         Ok(*x)
     }
 
@@ -89,7 +89,7 @@ impl<Wire: WireLabel> FancyReveal for Evaluator<Wire> {
 
 impl FancyBinary for Evaluator<AllWire> {
     /// Overriding `negate` to be a noop: entirely handled on garbler's end
-    fn negate(&mut self, x: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
+    fn negate(&mut self, x: &Self::Item) -> eyre::Result<Self::Item> {
         check_binary!(x);
 
         Ok(x.clone())
