@@ -25,8 +25,6 @@ pub enum Error {
     InvalidPayloadsLength,
     /// AES GCM Error
     AESGCMError(aes_gcm::Error),
-    /// An error occurred in the underlying 2PC protocol.
-    TwopacError(swanky_twopac::Error),
     /// The set of payloads is not equal to the set of keys.
     PayloadSetNotComplete {
         /// length of the set of payloads
@@ -66,13 +64,6 @@ impl From<swanky_cointoss::Error> for Error {
     }
 }
 
-impl From<swanky_twopac::Error> for Error {
-    #[inline]
-    fn from(e: swanky_twopac::Error) -> Error {
-        Error::TwopacError(e)
-    }
-}
-
 impl From<eyre::Error> for Error {
     fn from(e: eyre::Error) -> Self {
         Error::EyreError(e)
@@ -97,7 +88,6 @@ impl std::fmt::Display for Error {
             Error::PsiProtocolError(s) => write!(f, "PSI protocol error: {}", s),
             Error::InvalidPayloadsLength => write!(f, "Invalid length of payloads!"),
             Error::AESGCMError(e) => write!(f, "AES GCM Error: {}", e),
-            Error::TwopacError(e) => write!(f, "2PC protocol error: {}", e),
             Error::PayloadSetNotComplete {
                 npayloads,
                 nprimarykeys,

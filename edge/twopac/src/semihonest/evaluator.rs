@@ -1,4 +1,3 @@
-use crate::errors::Error;
 use fancy_garbling::{
     AllWire, ArithmeticWire, Evaluator as Ev, Fancy, FancyArithmetic, FancyBinary, FancyInput,
     FancyReveal, WireLabel, WireMod2,
@@ -22,16 +21,14 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
     Evaluator<RNG, OT, Wire>
 {
     /// Make a new `Evaluator`.
-    pub fn new(channel: &mut Channel, mut rng: RNG) -> Result<Self, Error> {
+    pub fn new(channel: &mut Channel, mut rng: RNG) -> eyre::Result<Self> {
         let ot = OT::init(channel, &mut rng)?;
         let evaluator = Ev::new();
         Ok(Self { evaluator, ot, rng })
     }
 
-    fn run_ot(&mut self, inputs: &[bool], channel: &mut Channel) -> Result<Vec<Block>, Error> {
-        self.ot
-            .receive(channel, inputs, &mut self.rng)
-            .map_err(Error::from)
+    fn run_ot(&mut self, inputs: &[bool], channel: &mut Channel) -> eyre::Result<Vec<Block>> {
+        Ok(self.ot.receive(channel, inputs, &mut self.rng)?)
     }
 }
 
