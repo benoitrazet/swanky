@@ -108,7 +108,7 @@ impl<
 }
 
 impl<RNG: CryptoRng + Rng, OT> FancyBinary for Garbler<RNG, OT, WireMod2> {
-    fn negate(&mut self, x: &Self::Item) -> eyre::Result<Self::Item> {
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
         self.garbler.negate(x)
     }
 
@@ -127,7 +127,7 @@ impl<RNG: CryptoRng + Rng, OT> FancyBinary for Garbler<RNG, OT, WireMod2> {
 }
 
 impl<RNG: CryptoRng + Rng, OT> FancyBinary for Garbler<RNG, OT, AllWire> {
-    fn negate(&mut self, x: &Self::Item) -> eyre::Result<Self::Item> {
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
         self.garbler.negate(x)
     }
 

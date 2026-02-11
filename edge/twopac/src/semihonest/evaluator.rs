@@ -103,7 +103,7 @@ impl<RNG, OT> FancyBinary for Evaluator<RNG, OT, WireMod2> {
         self.evaluator.xor(x, y)
     }
 
-    fn negate(&mut self, x: &Self::Item) -> eyre::Result<Self::Item> {
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
         self.evaluator.negate(x)
     }
 }
@@ -122,7 +122,7 @@ impl<RNG, OT> FancyBinary for Evaluator<RNG, OT, AllWire> {
         self.evaluator.xor(x, y)
     }
 
-    fn negate(&mut self, x: &Self::Item) -> eyre::Result<Self::Item> {
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
         self.evaluator.negate(x)
     }
 }

@@ -37,7 +37,7 @@ pub trait FancyBinary: Fancy {
     ) -> eyre::Result<Self::Item>;
 
     /// Binary Not
-    fn negate(&mut self, x: &Self::Item) -> eyre::Result<Self::Item>;
+    fn negate(&mut self, x: &Self::Item) -> Self::Item;
 
     /// Uses Demorgan's Rule implemented with an and gate and negation.
     fn or(
@@ -46,10 +46,10 @@ pub trait FancyBinary: Fancy {
         y: &Self::Item,
         channel: &mut Channel,
     ) -> eyre::Result<Self::Item> {
-        let notx = self.negate(x)?;
-        let noty = self.negate(y)?;
+        let notx = self.negate(x);
+        let noty = self.negate(y);
         let z = self.and(&notx, &noty, channel)?;
-        self.negate(&z)
+        Ok(self.negate(&z))
     }
 
     /// Binary adder. Returns the result and the carry.
@@ -116,7 +116,7 @@ pub trait FancyBinary: Fancy {
     ) -> eyre::Result<Self::Item> {
         match (b1, b2) {
             (false, true) => Ok(x.clone()),
-            (true, false) => self.negate(x),
+            (true, false) => Ok(self.negate(x)),
             (false, false) => self.constant(0, 2, channel),
             (true, true) => self.constant(1, 2, channel),
         }
