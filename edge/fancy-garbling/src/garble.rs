@@ -340,7 +340,7 @@ mod streaming {
 
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let mut gb = Garbler::new(rng);
+                let mut gb = Garbler::new(rng, channel).unwrap();
                 let (gb_inp, ev_inp) = gb.encode_many_wires(&inputs, &input_mods_).unwrap();
                 for w in ev_inp.iter() {
                     gb.send_wire(w, channel).unwrap();
@@ -349,7 +349,7 @@ mod streaming {
                 Ok(())
             },
             |channel| {
-                let mut ev = Evaluator::new();
+                let mut ev = Evaluator::new(channel).unwrap();
                 let ev_inp = input_mods
                     .iter()
                     .map(|q| ev.read_wire(*q, channel).unwrap())
@@ -532,7 +532,7 @@ mod complex {
 
             let (_, result) = swanky_channel::local::local_channel_pair(
                 |channel| {
-                    let mut garbler = Garbler::<_, AllWire>::new(AesRng::new());
+                    let mut garbler = Garbler::<_, AllWire>::new(AesRng::new(), channel)?;
 
                     // encode input and send it to the evaluator
                     let mut gb_inp = Vec::with_capacity(N);
@@ -547,7 +547,7 @@ mod complex {
                     Ok(())
                 },
                 |channel| {
-                    let mut evaluator = Evaluator::<AllWire>::new();
+                    let mut evaluator = Evaluator::<AllWire>::new(channel)?;
 
                     // receive encoded wires from the garbler thread
                     let mut ev_inp = Vec::with_capacity(N);

@@ -18,19 +18,24 @@ use super::security_warning::warn_proj;
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires. Parallelizable.
 pub struct Evaluator<Wire> {
+    one: Wire,
     current_gate: usize,
     current_output: usize,
     _phantom: PhantomData<Wire>,
 }
 
 impl<Wire: WireLabel> Evaluator<Wire> {
-    /// Create a new `Evaluator`.
-    pub fn new() -> Self {
-        Evaluator {
+    /// Create a new [`Evaluator`].
+    pub fn new(channel: &mut Channel) -> eyre::Result<Self> {
+        // Receive the constant one wirelabel from the garbler. This is used to
+        // make negation free.
+        let one = channel.read::<Block>()?;
+        Ok(Evaluator {
+            one: Wire::from_block(one, 2),
             current_gate: 0,
             current_output: 0,
             _phantom: PhantomData,
-        }
+        })
     }
 
     /// The current non-free gate index of the garbling computation.
@@ -57,7 +62,7 @@ impl<Wire: WireLabel> Evaluator<Wire> {
 impl<W: BinaryWireLabel> FancyBinary for Evaluator<W> {
     /// Negate is a noop for the evaluator
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        *x
+        x.plus(&self.one)
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
@@ -92,7 +97,7 @@ impl FancyBinary for Evaluator<AllWire> {
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         check_binary!(x);
 
-        x.clone()
+        x.plus(&self.one)
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {

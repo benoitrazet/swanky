@@ -38,7 +38,7 @@ impl<
     pub fn new(channel: &mut Channel, mut rng: RNG) -> eyre::Result<Self> {
         let ot = OT::init(channel, &mut rng)?;
 
-        let garbler = Gb::new(RNG::from_seed(rng.r#gen()));
+        let garbler = Gb::new(RNG::from_seed(rng.r#gen()), channel)?;
         Ok(Garbler { garbler, ot, rng })
     }
 

@@ -23,7 +23,7 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
     /// Make a new `Evaluator`.
     pub fn new(channel: &mut Channel, mut rng: RNG) -> eyre::Result<Self> {
         let ot = OT::init(channel, &mut rng)?;
-        let evaluator = Ev::new();
+        let evaluator = Ev::new(channel)?;
         Ok(Self { evaluator, ot, rng })
     }
 
