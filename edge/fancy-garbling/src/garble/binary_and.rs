@@ -52,8 +52,8 @@ impl BinaryWireLabel for WireMod2 {
         let Y = Self::hash_to_mod(hashY, q);
 
         let gate0 =
-            hashA ^ Block::conditional_select(&X.into_block(), &X.plus(D).into_block(), idx.into());
-        let gate1 = hashB ^ Y.plus(A).into_block();
+            hashA ^ Block::conditional_select(&X.to_block(), &X.plus(D).to_block(), idx.into());
+        let gate1 = hashB ^ Y.plus(A).to_block();
 
         (gate0, gate1, X.plus_mov(&Y))
     }
