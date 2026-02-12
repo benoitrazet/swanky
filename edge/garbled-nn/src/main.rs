@@ -123,19 +123,8 @@ pub fn main() {
     let nn = NeuralNet::try_from(dir.deref()).unwrap_or_else(|e| Error::exit(&Error::from(e)));
     println!("{nn:?}");
 
-    let mut tests_path = dir.join(Path::new("tests.json"));
-    if !tests_path.is_file() {
-        tests_path = dir.join(Path::new("tests.csv"));
-        if !tests_path.is_file() {
-            Error::exit(&Error::raw(
-                ErrorKind::InvalidValue,
-                "Given directory contains neither 'tests.json' nor 'tests.csv'",
-            ));
-        }
-    }
-
     print!("reading tests...");
-    let tests = read_tests(&tests_path, ntests).unwrap_or_else(|e| Error::exit(&Error::from(e)));
+    let tests = read_tests(&dir, ntests).unwrap_or_else(|e| Error::exit(&Error::from(e)));
     println!("finished");
 
     let mut labels_path = dir.join(Path::new("labels.json"));
@@ -251,12 +240,23 @@ pub fn main() {
     }
 }
 
-/// Read tests from a file.
+/// Read tests from a directory.
 ///
-/// The file's extension must be either `csv` or `json`. The second argument
-/// specifies the number of tests to return; `None` means return all tests in
-/// the file.
-fn read_tests(file: &Path, num: Option<usize>) -> std::io::Result<Vec<Array3<i64>>> {
+/// The directory must contain either `tests.csv` or `tests.json`. The second
+/// argument specifies the number of tests to return; `None` means return all
+/// tests in the file.
+fn read_tests(dir: &Path, num: Option<usize>) -> std::io::Result<Vec<Array3<i64>>> {
+    let mut file = dir.join(Path::new("tests.json"));
+    if !file.is_file() {
+        file = dir.join(Path::new("tests.csv"));
+        if !file.is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidFilename,
+                "Given directory contains neither 'tests.json' nor 'tests.csv'",
+            ));
+        }
+    }
+
     if file.extension().is_some_and(|ext| ext == "csv") {
         let reader = BufReader::new(File::open(file)?);
         // Note: csv can be at most 1-dimensional, if each image gets its own line
