@@ -30,6 +30,7 @@ use std::{cell::RefCell, thread::LocalKey};
 use rand::{CryptoRng, Rng, SeedableRng, distributions::Standard, prelude::Distribution};
 use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
+use swanky_error::ErrorKind;
 use swanky_party::Party;
 use swanky_serialization::CanonicalSerialize;
 use vectoreyes::U8x16;
@@ -126,7 +127,7 @@ mod entry_points {
 pub fn random<P: Party, T, RNG: CryptoRng + Rng>(
     channel: &mut Channel,
     rng: &mut RNG,
-) -> eyre::Result<T>
+) -> swanky_error::Result<T>
 where
     Standard: Distribution<T>,
 {
@@ -143,7 +144,7 @@ where
 pub fn random_seed<P: Party, RNG: CryptoRng + Rng>(
     channel: &mut Channel,
     rng: &mut RNG,
-) -> eyre::Result<U8x16> {
+) -> swanky_error::Result<U8x16> {
     // The protocol works as follows:
     //
     // 1. The sender generates its seed `s₀`, computes `c ← H(s₀)`, and sends
@@ -171,7 +172,11 @@ pub fn random_seed<P: Party, RNG: CryptoRng + Rng>(
             channel.write(&seed_mine)?;
             let seed_theirs = channel.read::<U8x16>()?;
             let com_ = *blake3::hash(&seed_theirs.to_bytes()).as_bytes();
-            eyre::ensure!(com_ == com, "Commitment check failed");
+            swanky_error::ensure!(
+                com_ == com,
+                ErrorKind::OtherError,
+                "Commitment check failed"
+            );
             seed_mine ^ seed_theirs
         }
     };

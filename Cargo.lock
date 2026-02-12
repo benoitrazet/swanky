@@ -2616,11 +2616,11 @@ version = "0.6.0"
 dependencies = [
  "blake3",
  "criterion",
- "eyre",
  "proptest",
  "rand 0.8.5",
  "swanky-aes-rng",
  "swanky-channel",
+ "swanky-error",
  "swanky-party",
  "swanky-serialization",
  "vectoreyes",
