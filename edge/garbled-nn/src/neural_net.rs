@@ -856,4 +856,66 @@ fn input_shape(
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use crate::{NeuralNet, io::read_tests};
+    use std::path::Path;
+
+    fn binary_and_plaintext_match_for_dir(dir: &Path, bitwidths: &[usize]) {
+        println!("Testing binary-plaintext match for {:?}", dir);
+
+        let nn = NeuralNet::try_from(dir).unwrap();
+        let tests = read_tests(dir, Some(1)).unwrap();
+
+        let plaintext_output = nn.eval_plaintext(&tests[0]);
+        let gc_output = nn
+            .eval_roundtrip_binary(&tests[0], bitwidths, false)
+            .unwrap();
+        for (a, b) in plaintext_output.iter().zip(gc_output.iter()) {
+            assert_eq!(a, b);
+        }
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn binary_and_plaintext_match_for_DINN_30() {
+        binary_and_plaintext_match_for_dir(Path::new("neural_nets/DINN_30"), &[9; 3]);
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn binary_and_plaintext_match_for_DINN_100() {
+        binary_and_plaintext_match_for_dir(Path::new("neural_nets/DINN_100"), &[9; 3]);
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn binary_and_plaintext_match_for_CryptoNets() {
+        binary_and_plaintext_match_for_dir(Path::new("neural_nets/CryptoNets"), &[26; 11]);
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn binary_and_plaintext_match_for_DeepSecure() {
+        binary_and_plaintext_match_for_dir(Path::new("neural_nets/DeepSecure"), &[24; 5]);
+    }
+
+    // This one almost certainly will take too long.
+    // #[test]
+    // #[allow(non_snake_case)]
+    // fn binary_and_plaintext_match_for_MiniONN_CIFAR() {
+    //     binary_and_plaintext_match_for_dir(Path::new("neural_nets/MiniONN_CIFAR"), &[...]);
+    // }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn binary_and_plaintext_match_for_MiniONN_MNIST() {
+        binary_and_plaintext_match_for_dir(Path::new("neural_nets/MiniONN_MNIST"), &[21; 8]);
+    }
+
+    // This one fails, need to debug!
+    // #[test]
+    // #[allow(non_snake_case)]
+    // fn binary_and_plaintext_match_for_SecureML() {
+    //     binary_and_plaintext_match_for_dir(Path::new("neural_nets/SecureML"), &[22; 11]);
+    // }
+}
