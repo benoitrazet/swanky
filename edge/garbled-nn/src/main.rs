@@ -4,6 +4,7 @@ mod garbling_benches;
 
 use clap::error::ErrorKind;
 use clap::{Error, Parser, Subcommand};
+use fancy_garbling::dummy::Dummy;
 use ndarray::Array3;
 use serde_json::{self, Value};
 use std::fs::File;
@@ -225,8 +226,11 @@ pub fn main() {
         }
         Some(Commands::Dummy) => {
             let is_secret = cli.secret;
+            let mut dummy = Dummy::new();
             if cli.boolean {
-                nn.boolean_accuracy_test(&tests, &labels, &bitwidth, is_secret);
+                nn.boolean_accuracy_test::<_, Dummy>(
+                    &mut dummy, &tests, &labels, &bitwidth, is_secret,
+                );
             } else {
                 dummy_tests::arith_accuracy_test(
                     &nn, &tests, &labels, &bitwidth, is_secret, accuracy,

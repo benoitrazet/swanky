@@ -4,7 +4,7 @@ use crate::{
 };
 use fancy_garbling::{
     AllWire, BinaryBundle, BinaryGadgets, CrtBundle, CrtGadgets, Fancy, FancyArithmetic,
-    FancyBinary, FancyInput, HasModulus, WireMod2, dummy::Dummy,
+    FancyBinary, FancyInput, HasModulus, WireMod2,
 };
 use ndarray::Array3;
 use serde_json::{self, Value};
@@ -570,13 +570,17 @@ impl NeuralNet {
 
     /// Evaluate the [`NeuralNet`] over all the provided inputs and track the
     /// accuracy of the evaluations.
-    pub fn boolean_accuracy_test(
+    pub fn boolean_accuracy_test<W, F>(
         &self,
+        f: &mut F,
         images: &[Array3<i64>],
         labels: &[Vec<i64>],
         bitwidth: &[usize],
         secret_weights: bool,
-    ) {
+    ) where
+        W: Clone + HasModulus,
+        F: Fancy<Item = W> + FancyInput<Item = W> + FancyBinary<Item = W>,
+    {
         let mut errors = 0;
 
         let first_layer_nbits = *bitwidth.first().unwrap();
@@ -596,18 +600,9 @@ impl NeuralNet {
             );
 
             let res = Channel::with(std::io::empty(), |channel| {
-                // create a new dummy with the image as the input
-                let mut dummy = Dummy::new();
-
-                let inp = NeuralNet::encode_input_boolean::<_, Dummy>(
-                    &mut dummy,
-                    img,
-                    first_layer_nbits,
-                    channel,
-                );
-                let outs =
-                    self.eval_boolean(&mut dummy, &inp, bitwidth, secret_weights, true, channel);
-                let res = NeuralNet::decode_output_boolean(&mut dummy, &outs, channel);
+                let inp = NeuralNet::encode_input_boolean(f, img, first_layer_nbits, channel);
+                let outs = self.eval_boolean(f, &inp, bitwidth, secret_weights, true, channel);
+                let res = NeuralNet::decode_output_boolean(f, &outs, channel);
                 Ok(res)
             })
             .unwrap();
