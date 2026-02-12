@@ -4,7 +4,7 @@ use crate::{
 };
 use fancy_garbling::{
     AllWire, BinaryBundle, BinaryGadgets, CrtBundle, CrtGadgets, Fancy, FancyArithmetic,
-    FancyBinary, FancyInput, HasModulus, WireMod2,
+    FancyBinary, FancyInput, HasModulus, WireMod2, dummy::Dummy, informer::Informer,
 };
 use ndarray::Array3;
 use serde_json::{self, Value};
@@ -811,6 +811,58 @@ impl NeuralNet {
             inputs.len(),
             100.0 * (1.0 - errors as f32 / inputs.len() as f32)
         );
+    }
+
+    /// Run [`Informer`] in binary mode.
+    pub fn informer_binary(&self, bitwidths: &[usize], secret_weights: bool) -> eyre::Result<()> {
+        let mut informer = Informer::new(Dummy::new());
+
+        Channel::with(std::io::empty(), |channel| {
+            let inps = (0..self.num_inputs())
+                .map(|_| informer.bin_encode(0, bitwidths[0], channel).unwrap())
+                .collect::<Vec<_>>();
+
+            self.eval_boolean(
+                &mut informer,
+                &inps,
+                bitwidths,
+                secret_weights,
+                true,
+                channel,
+            );
+            Ok(())
+        })?;
+        println!("{}", informer.stats());
+        Ok(())
+    }
+
+    /// Run [`Informer`] in arithmetic mode.
+    pub fn informer_arith(
+        &self,
+        moduli: &[u128],
+        secret_weights: bool,
+        accuracy: &Accuracy,
+    ) -> eyre::Result<()> {
+        let mut informer = Informer::new(Dummy::new());
+
+        Channel::with(std::io::empty(), |channel| {
+            let inps = (0..self.num_inputs())
+                .map(|_| informer.crt_encode(0, moduli[0], channel).unwrap())
+                .collect::<Vec<_>>();
+
+            self.eval_arith(
+                &mut informer,
+                &inps,
+                moduli,
+                secret_weights,
+                true,
+                accuracy,
+                channel,
+            );
+            Ok(())
+        })?;
+        println!("{}", informer.stats());
+        Ok(())
     }
 }
 

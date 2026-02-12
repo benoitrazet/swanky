@@ -1,10 +1,6 @@
-use fancy_garbling::FancyInput;
-use fancy_garbling::dummy::Dummy;
-use fancy_garbling::informer::Informer;
 use fancy_garbling::util as numbers;
 use ndarray::Array3;
 use std::time::Instant;
-use swanky_channel::Channel;
 use swanky_garbled_nn::Accuracy;
 use swanky_garbled_nn::NeuralNet;
 
@@ -28,50 +24,11 @@ pub fn bench(
 
     println!("* computing fancy computation info");
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // run the neural network with Informer
-    let mut informer = Informer::new(Dummy::new());
-
     if binary {
-        Channel::with(std::io::empty(), |channel| {
-            let inps = (0..nn.num_inputs())
-                .map(|_| informer.bin_encode(0, bitwidth[0], channel).unwrap())
-                .collect::<Vec<_>>();
-
-            nn.eval_boolean(
-                &mut informer,
-                &inps,
-                bitwidth,
-                secret_weights,
-                true,
-                channel,
-            );
-            Ok(())
-        })
-        .unwrap();
+        nn.informer_binary(bitwidth, secret_weights)?;
     } else {
-        Channel::with(std::io::empty(), |channel| {
-            let inps = (0..nn.num_inputs())
-                .map(|_| informer.crt_encode(0, moduli[0], channel).unwrap())
-                .collect::<Vec<_>>();
-
-            nn.eval_arith(
-                &mut informer,
-                &inps,
-                &moduli,
-                secret_weights,
-                true,
-                accuracy,
-                channel,
-            );
-            Ok(())
-        })
-        .unwrap();
+        nn.informer_arith(&moduli, secret_weights, accuracy)?;
     }
-    println!("{}", informer.stats());
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // bench streaming
 
     println!("* benchmarking garbler streaming to evaluator");
 
