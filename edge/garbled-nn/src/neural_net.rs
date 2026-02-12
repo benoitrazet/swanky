@@ -82,7 +82,7 @@ impl NeuralNet {
         self.layers.len()
     }
 
-    /// Encode a boolean input so it can be evaluated by a [`NeuralNet`].
+    /// Encode an input so it can be evaluated by a boolean [`NeuralNet`].
     pub fn encode_input_boolean<
         W: HasModulus + Clone,
         F: Fancy<Item = W> + FancyInput<Item = W>,
@@ -101,6 +101,22 @@ impl NeuralNet {
             .collect()
     }
 
+    /// Encode an input so it can be evaluated by an arithmetic [`NeuralNet`].
+    pub fn encode_input_arith<W: HasModulus + Clone, F: Fancy<Item = W> + FancyInput<Item = W>>(
+        f: &mut F,
+        input: &Array3<i64>,
+        modulus: u128,
+        channel: &mut Channel,
+    ) -> Vec<CrtBundle<W>> {
+        input
+            .iter()
+            .map(|&x| {
+                f.crt_encode(util::to_mod_q(x, modulus), modulus, channel)
+                    .unwrap()
+            })
+            .collect::<Vec<_>>()
+    }
+
     /// Decode a boolean output of a [`NeuralNet`] evaluation.
     pub fn decode_output_boolean<W: HasModulus + Clone, F: Fancy<Item = W> + BinaryGadgets>(
         f: &mut F,
@@ -116,6 +132,26 @@ impl NeuralNet {
                     .collect::<Option<Vec<_>>>()
                     .unwrap();
                 util::i64_from_bits(&vals)
+            })
+            .collect::<Vec<_>>()
+    }
+
+    /// Decode an arithmetic output of a [`NeuralNet`] evaluation.
+    pub fn decode_output_arith<W: HasModulus + Clone, F: Fancy<Item = W>>(
+        f: &mut F,
+        output: &[CrtBundle<W>],
+        modulus: u128,
+        channel: &mut Channel,
+    ) -> Vec<i64> {
+        output
+            .iter()
+            .map(|out| {
+                let vals = &out
+                    .iter()
+                    .map(|v| f.output(v, channel).unwrap())
+                    .collect::<Option<Vec<_>>>()
+                    .unwrap();
+                util::from_mod_q_crt(vals, modulus)
             })
             .collect::<Vec<_>>()
     }
@@ -630,8 +666,6 @@ impl NeuralNet {
         secret_weights: bool,
         accuracy: &Accuracy,
     ) {
-        println!("* running circuit accuracy evaluation");
-
         let moduli = bitwidth
             .iter()
             .map(|&b| fancy_garbling::util::modulus_with_width(b as u32))
@@ -642,7 +676,7 @@ impl NeuralNet {
 
         let mut errors = 0;
 
-        let mut total_time = Instant::now();
+        let total_time = Instant::now();
 
         for (img_num, img) in images.iter().enumerate() {
             println!(
@@ -656,20 +690,10 @@ impl NeuralNet {
                 100.0 * (1.0 - errors as f32 / img_num as f32)
             );
 
-            let (start, outs) = Channel::with(std::io::empty(), |channel| {
+            let res = Channel::with(std::io::empty(), |channel| {
                 // create a new dummy with the image as the input
                 let mut dummy = Dummy::new();
-                let inp = img
-                    .iter()
-                    .map(|&x| {
-                        dummy
-                            .crt_encode(util::to_mod_q(x, qfirst), qfirst, channel)
-                            .unwrap()
-                    })
-                    .collect::<Vec<_>>();
-
-                // evaluate the fancy computation using the dummy
-                let start = Instant::now();
+                let inp = NeuralNet::encode_input_arith(&mut dummy, img, qfirst, channel);
                 let outs = self.eval_arith(
                     &mut dummy,
                     &inp,
@@ -679,19 +703,10 @@ impl NeuralNet {
                     accuracy,
                     channel,
                 );
-                Ok((start, outs))
+                let res = NeuralNet::decode_output_arith(&mut dummy, &outs, qlast, channel);
+                Ok(res)
             })
             .unwrap();
-            total_time += start.elapsed();
-
-            // decode the output back to i64
-            let res = outs
-                .iter()
-                .map(|out| {
-                    let vals = &out.iter().map(|v| v.val()).collect::<Vec<_>>();
-                    util::from_mod_q_crt(vals, qlast)
-                })
-                .collect::<Vec<_>>();
 
             if util::index_of_max(&res) != util::index_of_max(&labels[img_num]) {
                 errors += 1;
