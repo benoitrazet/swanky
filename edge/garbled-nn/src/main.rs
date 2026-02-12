@@ -215,15 +215,20 @@ pub fn main() {
             nn.plaintext_accuracy_test(&tests, &labels);
         }
         Some(Commands::Dummy) => {
-            let is_secret = cli.secret;
-            let mut dummy = Dummy::new();
-            if cli.boolean {
-                nn.boolean_accuracy_test::<_, Dummy>(
-                    &mut dummy, &tests, &labels, &bitwidth, is_secret,
-                );
-            } else {
-                nn.arith_accuracy_test(&tests, &labels, &bitwidth, is_secret, accuracy);
-            }
+            Channel::with(std::io::empty(), |channel| {
+                let mut dummy = Dummy::new();
+                if cli.boolean {
+                    nn.boolean_accuracy_test::<_, Dummy>(
+                        &mut dummy, &tests, &labels, &bitwidth, cli.secret, channel,
+                    );
+                } else {
+                    nn.arith_accuracy_test(
+                        &mut dummy, &tests, &labels, &bitwidth, cli.secret, accuracy, channel,
+                    );
+                }
+                Ok(())
+            })
+            .unwrap();
         }
         Some(Commands::Bench { niters }) => {
             garbling_benches::bench(&nn, &bitwidth, *niters, cli.secret, cli.boolean, accuracy);

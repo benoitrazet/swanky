@@ -4,7 +4,7 @@ use crate::{
 };
 use fancy_garbling::{
     AllWire, BinaryBundle, BinaryGadgets, CrtBundle, CrtGadgets, Fancy, FancyArithmetic,
-    FancyBinary, FancyInput, HasModulus, WireMod2, dummy::Dummy,
+    FancyBinary, FancyInput, HasModulus, WireMod2,
 };
 use ndarray::Array3;
 use serde_json::{self, Value};
@@ -619,6 +619,7 @@ impl NeuralNet {
         labels: &[Vec<i64>],
         bitwidth: &[usize],
         secret_weights: bool,
+        channel: &mut Channel,
     ) where
         W: Clone + HasModulus,
         F: Fancy<Item = W> + FancyInput<Item = W> + FancyBinary<Item = W>,
@@ -641,14 +642,9 @@ impl NeuralNet {
                 100.0 * (1.0 - errors as f32 / img_num as f32)
             );
 
-            let res = Channel::with(std::io::empty(), |channel| {
-                let inp =
-                    NeuralNet::encode_input_boolean(f, img, first_layer_nbits, channel).unwrap();
-                let outs = self.eval_boolean(f, &inp, bitwidth, secret_weights, true, channel);
-                let res = NeuralNet::decode_output_boolean(f, &outs, channel).unwrap();
-                Ok(res)
-            })
-            .unwrap();
+            let inp = NeuralNet::encode_input_boolean(f, img, first_layer_nbits, channel).unwrap();
+            let outs = self.eval_boolean(f, &inp, bitwidth, secret_weights, true, channel);
+            let res = NeuralNet::decode_output_boolean(f, &outs, channel).unwrap();
 
             if util::index_of_max(&res) != util::index_of_max(&labels[img_num]) {
                 errors += 1;
@@ -665,14 +661,20 @@ impl NeuralNet {
 
     /// Evaluate the [`NeuralNet`] over all the provided arithmetic inputs and
     /// track the accuracy of the evaluations.
-    pub fn arith_accuracy_test(
+    #[allow(clippy::too_many_arguments)]
+    pub fn arith_accuracy_test<W, F>(
         &self,
+        f: &mut F,
         images: &[Array3<i64>],
         labels: &[Vec<i64>],
         bitwidth: &[usize],
         secret_weights: bool,
         accuracy: &Accuracy,
-    ) {
+        channel: &mut Channel,
+    ) where
+        W: Clone + HasModulus,
+        F: Fancy<Item = W> + FancyInput<Item = W> + FancyArithmetic<Item = W> + CrtGadgets,
+    {
         let moduli = bitwidth
             .iter()
             .map(|&b| fancy_garbling::util::modulus_with_width(b as u32))
@@ -696,24 +698,9 @@ impl NeuralNet {
                 100.0 * (1.0 - errors as f32 / img_num as f32)
             );
 
-            let res = Channel::with(std::io::empty(), |channel| {
-                // create a new dummy with the image as the input
-                let mut dummy = Dummy::new();
-                let inp = NeuralNet::encode_input_arith(&mut dummy, img, qfirst, channel).unwrap();
-                let outs = self.eval_arith(
-                    &mut dummy,
-                    &inp,
-                    &moduli,
-                    secret_weights,
-                    true,
-                    accuracy,
-                    channel,
-                );
-                let res =
-                    NeuralNet::decode_output_arith(&mut dummy, &outs, qlast, channel).unwrap();
-                Ok(res)
-            })
-            .unwrap();
+            let inp = NeuralNet::encode_input_arith(f, img, qfirst, channel).unwrap();
+            let outs = self.eval_arith(f, &inp, &moduli, secret_weights, true, accuracy, channel);
+            let res = NeuralNet::decode_output_arith(f, &outs, qlast, channel).unwrap();
 
             if util::index_of_max(&res) != util::index_of_max(&labels[img_num]) {
                 errors += 1;
