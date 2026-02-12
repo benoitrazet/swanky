@@ -1,7 +1,7 @@
 use crate::layer::{Accuracy, Layer};
 use fancy_garbling::{
-    BinaryBundle, CrtBundle, CrtGadgets, Fancy, FancyArithmetic, FancyBinary, FancyInput,
-    HasModulus,
+    AllWire, BinaryBundle, BinaryGadgets, CrtBundle, CrtGadgets, Fancy, FancyArithmetic,
+    FancyBinary, FancyInput, HasModulus, WireMod2,
 };
 use ndarray::Array3;
 use serde_json::{self, Value};
@@ -10,7 +10,10 @@ use std::{
     io::{Error, ErrorKind},
     path::Path,
 };
+use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
+use swanky_ot_alsz_kos::alsz;
+use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 /// A neural network.
 ///
@@ -435,6 +438,92 @@ impl NeuralNet {
         }
 
         Ok(NeuralNet { layers })
+    }
+
+    /// Evaluate [`NeuralNet`] between a [`Garbler`] and [`Evaluator`].
+    pub fn eval_roundtrip(
+        &self,
+        bitwidth: &[usize],
+        moduli: &[u128],
+        secret_weights: bool,
+        binary: bool,
+        accuracy: &Accuracy,
+    ) {
+        swanky_channel::local::local_channel_pair(
+            |channel| {
+                if binary {
+                    let mut gb: Garbler<_, alsz::Sender, WireMod2> =
+                        Garbler::new(channel, AesRng::new()).unwrap();
+                    let inps = gb
+                        .bin_receive_many(self.num_inputs(), bitwidth[0], channel)
+                        .unwrap();
+                    let outputs = self.eval_boolean::<_, _>(
+                        &mut gb,
+                        &inps,
+                        bitwidth,
+                        secret_weights,
+                        true,
+                        channel,
+                    );
+                    let outputs = gb.bin_outputs(&outputs, channel)?;
+                    assert_eq!(outputs, None);
+                } else {
+                    let mut gb: Garbler<_, alsz::Sender, AllWire> =
+                        Garbler::new(channel, AesRng::new()).unwrap();
+                    let inps = gb
+                        .crt_receive_many(self.num_inputs(), moduli[0], channel)
+                        .unwrap();
+                    self.eval_arith::<_, _>(
+                        &mut gb,
+                        &inps,
+                        moduli,
+                        secret_weights,
+                        true,
+                        accuracy,
+                        channel,
+                    );
+                }
+                Ok(())
+            },
+            |channel| {
+                if binary {
+                    let mut ev: Evaluator<AesRng, alsz::Receiver, WireMod2> =
+                        Evaluator::new(channel, AesRng::new()).unwrap();
+                    let inps = ev
+                        .bin_encode_many(&vec![0; self.num_inputs()], bitwidth[0], channel)
+                        .unwrap();
+                    let outputs = self.eval_boolean::<_, _>(
+                        &mut ev,
+                        &inps,
+                        bitwidth,
+                        secret_weights,
+                        false,
+                        channel,
+                    );
+                    let outputs = ev.bin_outputs(&outputs, channel)?;
+                    println!("{outputs:?}");
+                } else {
+                    let mut ev: Evaluator<AesRng, alsz::Receiver, AllWire> =
+                        Evaluator::new(channel, AesRng::new()).unwrap();
+
+                    let inps = ev
+                        .crt_encode_many(&vec![0; self.num_inputs()], moduli[0], channel)
+                        .unwrap();
+                    self.eval_arith::<_, _>(
+                        &mut ev,
+                        &inps,
+                        moduli,
+                        secret_weights,
+                        false,
+                        accuracy,
+                        channel,
+                    );
+                }
+
+                Ok(())
+            },
+        )
+        .unwrap();
     }
 }
 

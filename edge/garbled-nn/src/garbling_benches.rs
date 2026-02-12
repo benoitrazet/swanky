@@ -1,17 +1,11 @@
-use fancy_garbling::AllWire;
-use fancy_garbling::BinaryGadgets;
 use fancy_garbling::FancyInput;
-use fancy_garbling::WireMod2;
 use fancy_garbling::dummy::Dummy;
 use fancy_garbling::informer::Informer;
 use fancy_garbling::util as numbers;
 use std::time::Instant;
-use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
 use swanky_garbled_nn::Accuracy;
 use swanky_garbled_nn::NeuralNet;
-use swanky_ot_alsz_kos::alsz;
-use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 /// Run benchmarks on the given neural network and its associated parameters.
 pub fn bench(
@@ -82,81 +76,7 @@ pub fn bench(
     let total_time = Instant::now();
 
     for _ in 0..niters {
-        swanky_channel::local::local_channel_pair(
-            |channel| {
-                if binary {
-                    let mut gb: Garbler<_, alsz::Sender, WireMod2> =
-                        Garbler::new(channel, AesRng::new()).unwrap();
-                    let inps = gb
-                        .bin_receive_many(nn.num_inputs(), bitwidth[0], channel)
-                        .unwrap();
-                    let outputs = nn.eval_boolean::<_, _>(
-                        &mut gb,
-                        &inps,
-                        bitwidth,
-                        secret_weights,
-                        true,
-                        channel,
-                    );
-                    let outputs = gb.bin_outputs(&outputs, channel)?;
-                    assert_eq!(outputs, None);
-                } else {
-                    let mut gb: Garbler<_, alsz::Sender, AllWire> =
-                        Garbler::new(channel, AesRng::new()).unwrap();
-                    let inps = gb
-                        .crt_receive_many(nn.num_inputs(), moduli[0], channel)
-                        .unwrap();
-                    nn.eval_arith::<_, _>(
-                        &mut gb,
-                        &inps,
-                        &moduli,
-                        secret_weights,
-                        true,
-                        accuracy,
-                        channel,
-                    );
-                }
-                Ok(())
-            },
-            |channel| {
-                if binary {
-                    let mut ev: Evaluator<AesRng, alsz::Receiver, WireMod2> =
-                        Evaluator::new(channel, AesRng::new()).unwrap();
-                    let inps = ev
-                        .bin_encode_many(&vec![0; nn.num_inputs()], bitwidth[0], channel)
-                        .unwrap();
-                    let outputs = nn.eval_boolean::<_, _>(
-                        &mut ev,
-                        &inps,
-                        bitwidth,
-                        secret_weights,
-                        false,
-                        channel,
-                    );
-                    let outputs = ev.bin_outputs(&outputs, channel)?;
-                    println!("{outputs:?}");
-                } else {
-                    let mut ev: Evaluator<AesRng, alsz::Receiver, AllWire> =
-                        Evaluator::new(channel, AesRng::new()).unwrap();
-
-                    let inps = ev
-                        .crt_encode_many(&vec![0; nn.num_inputs()], moduli[0], channel)
-                        .unwrap();
-                    nn.eval_arith::<_, _>(
-                        &mut ev,
-                        &inps,
-                        &moduli,
-                        secret_weights,
-                        false,
-                        accuracy,
-                        channel,
-                    );
-                }
-
-                Ok(())
-            },
-        )
-        .unwrap();
+        nn.eval_roundtrip(bitwidth, &moduli, secret_weights, binary, accuracy);
     }
 
     println!(
