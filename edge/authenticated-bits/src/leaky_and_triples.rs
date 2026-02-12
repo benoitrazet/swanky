@@ -23,6 +23,7 @@ use crate::{
 use itertools::Itertools;
 use rand::{CryptoRng, Rng};
 use swanky_channel::Channel;
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_f_eq::EqualityFunctionality;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
@@ -72,7 +73,7 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
     pub(crate) fn new<RNG: CryptoRng + Rng>(
         channel: &mut Channel,
         mut rng: RNG,
-    ) -> eyre::Result<Self> {
+    ) -> swanky_error::Result<Self> {
         let delta = rng.r#gen::<F128b>();
         // We require that for Party A (the Prover) `lsb(Δ) = 1`, and for Party
         // B (the Verifier) `lsb(Δ) = 0`. So adjust `delta` as needed.
@@ -105,7 +106,7 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
         delta: U8x16,
         channel: &mut Channel,
         rng: RNG,
-    ) -> eyre::Result<Self> {
+    ) -> swanky_error::Result<Self> {
         match P::WHICH {
             WhichParty::Prover(_) => {
                 assert_eq!(lsb(F128b::from(delta)), F2::ONE)
@@ -134,7 +135,7 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
         out: &mut Vec<LeakyAndTriple<P>>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         // The protocol works as follows.
         //
         // The parties begin by generating random shares, and viewing them as an
@@ -228,7 +229,7 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
                       c: F128b,
                       hashed_x_key: F128b,
                       channel: &mut Channel|
-         -> eyre::Result<()> {
+         -> swanky_error::Result<()> {
             let g = hash(F128b::from(x.key()) + delta) + hashed_x_key + c;
             channel.write(&g)?;
             Ok(())
@@ -240,7 +241,7 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
                                            c: F128b,
                                            hashed_x_key: F128b,
                                            channel: &mut Channel|
-         -> eyre::Result<()> {
+         -> swanky_error::Result<()> {
             let g = channel.read::<F128b>()?;
             let e = x.bit() * g + hash(x.mac().into()) + x.bit() * c;
             let s =
@@ -284,24 +285,37 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
         let mut feq = EqualityFunctionality::<P>::new(rng);
 
         // Function for sending the LSB `d` of each party's share of `S`.
-        let send_lsb = |channel: &mut Channel| -> eyre::Result<()> {
-            let mut serializer: F2BitSerializer =
-                SequenceSerializer::new(&mut channel.as_std_io())?;
+        let send_lsb = |channel: &mut Channel| -> swanky_error::Result<()> {
+            let mut serializer: F2BitSerializer = SequenceSerializer::new(&mut channel.as_std_io())
+                .wrap_err(
+                    ErrorKind::InitializationError,
+                    "Failed to initialize bit sequence serializer.".to_string(),
+                )?;
             for s in ss.iter() {
                 let lsb_s_mine = lsb(*s);
-                serializer.write(channel.as_std_io(), lsb_s_mine)?;
+                serializer
+                    .write(channel.as_std_io(), lsb_s_mine)
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write LSB.".to_string())?;
             }
-            serializer.finish(channel.as_std_io())?;
+            serializer.finish(channel.as_std_io()).wrap_err(
+                ErrorKind::SerializationError,
+                "Failed to finalize bit serialization.".to_string(),
+            )?;
             Ok(())
         };
         // Function for receiving the LSB of each party's share of `S`, sending
         // `L := S + dΔ` to `Feq`, and output the updated triple.
-        let receive_lsb = |channel: &mut Channel| -> eyre::Result<()> {
+        let receive_lsb = |channel: &mut Channel| -> swanky_error::Result<()> {
             let mut deserializer: F2BitDeserializer =
-                SequenceDeserializer::new(&mut channel.as_std_io())?;
+                SequenceDeserializer::new(&mut channel.as_std_io()).wrap_err(
+                    ErrorKind::InitializationError,
+                    "Failed to initialize bit sequence deserializer.".to_string(),
+                )?;
             for ((x, y, z), s) in shares.into_iter().tuples().zip(ss.iter()) {
                 let lsb_s_mine = lsb(*s);
-                let lsb_s_other = deserializer.read(channel.as_std_io())?;
+                let lsb_s_other = deserializer
+                    .read(channel.as_std_io())
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read LSB.".to_string())?;
                 let d = lsb_s_mine + lsb_s_other;
                 // Send `L := S + dΔ` to `Feq`.
                 feq.input(U8x16::from(s + d * delta));
@@ -336,7 +350,7 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
         &self,
         triples: &[LeakyAndTriple<P>],
         channel: &mut Channel,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         // Flatten triples into a vector of shares so we can call
         // `AuthShareGenerator::open` on the shares.
         let shares: Vec<AuthShare<_>> = triples
@@ -394,7 +408,7 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
         out: &mut Vec<AndTriple<P>>,
         bucket_size: usize,
         channel: &mut Channel,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         // This protocol works by combining `B` leaky AND triples into one
         // non-leaky AND triple in an iterative way. Two leaky AND triples
         // `(⟨x₁|x₂⟩, ⟨y₁|y₂⟩, ⟨z₁|z₂⟩)` and `(⟨x'₁|x'₂⟩, ⟨y'₁|y'₂⟩, ⟨z'₁|z'₂⟩)`

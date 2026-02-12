@@ -40,7 +40,7 @@
 //! # use swanky_party::private::VerifierPrivate;
 //! # use std::iter::Copied;
 //! # use std::slice::Iter;
-//! # fn main() -> eyre::Result<()> {
+//! # fn main() -> swanky_error::Result<()> {
 //! let (bits_prover, bits_verifier) = swanky_channel::local::local_channel_pair(
 //!     |c| {
 //!         // The prover.
@@ -76,6 +76,7 @@
 
 use rand::{CryptoRng, Rng};
 use swanky_channel::Channel;
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
 use swanky_ot_alsz_kos::kos;
@@ -212,7 +213,7 @@ impl<P: Party> AuthBitGenerator<P> {
     /// Create a new [`AuthBitGenerator`].
     ///
     /// The verifier's $`\Delta`$ value is randomly generated using `rng`.
-    pub fn new<RNG>(channel: &mut Channel, mut rng: RNG) -> eyre::Result<Self>
+    pub fn new<RNG>(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self>
     where
         RNG: CryptoRng + Rng,
     {
@@ -232,18 +233,30 @@ impl<P: Party> AuthBitGenerator<P> {
         delta: VerifierPrivateCopy<P, U8x16>,
         channel: &mut Channel,
         mut rng: RNG,
-    ) -> eyre::Result<Self>
+    ) -> swanky_error::Result<Self>
     where
         RNG: CryptoRng + Rng,
     {
         let result = match P::WHICH {
             WhichParty::Prover(e) => AuthBitGenerator {
                 delta: VerifierPrivateCopy::empty(e),
-                ot: PartyEither::prover_new(e, kos::Receiver::init(channel, &mut rng)?),
+                ot: PartyEither::prover_new(
+                    e,
+                    kos::Receiver::init(channel, &mut rng).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to initialize KOS receiver.".to_string(),
+                    )?,
+                ),
             },
             WhichParty::Verifier(e) => AuthBitGenerator {
                 delta: VerifierPrivateCopy::new(delta.into_inner(e)),
-                ot: PartyEither::verifier_new(e, kos::Sender::init(channel, &mut rng)?),
+                ot: PartyEither::verifier_new(
+                    e,
+                    kos::Sender::init(channel, &mut rng).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to initialize KOS sender.".to_string(),
+                    )?,
+                ),
             },
         };
         Ok(result)
@@ -260,17 +273,21 @@ impl<P: Party> AuthBitGenerator<P> {
         out: &mut Vec<AuthBit<P>>,
         mut channel: &mut Channel,
         rng: &mut RNG,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 let bits = bits_in.prover_into(e);
                 // TODO: Once OT uses F2 instead of bool this line won't be necessary.
                 let bits = bits.map(bool::from).collect::<Vec<bool>>();
-                let macs =
-                    self.ot
-                        .as_mut()
-                        .prover_into(e)
-                        .receive_correlated(&mut channel, &bits, rng)?;
+                let macs = self
+                    .ot
+                    .as_mut()
+                    .prover_into(e)
+                    .receive_correlated(&mut channel, &bits, rng)
+                    .wrap_err(
+                        ErrorKind::NetworkError,
+                        "Failed to receive correlated data.".to_string(),
+                    )?;
 
                 out.extend(bits.into_iter().zip(macs).map(|(bit, mac)| {
                     AuthBit(PartyEitherCopy::prover_new(
@@ -285,12 +302,15 @@ impl<P: Party> AuthBitGenerator<P> {
             }
             WhichParty::Verifier(e) => {
                 let delta = self.delta().into_inner(e);
-                let keys = self.ot.as_mut().verifier_into(e).send_correlated(
-                    &mut channel,
-                    bits_in.verifier_into(e),
-                    delta,
-                    rng,
-                )?;
+                let keys = self
+                    .ot
+                    .as_mut()
+                    .verifier_into(e)
+                    .send_correlated(&mut channel, bits_in.verifier_into(e), delta, rng)
+                    .wrap_err(
+                        ErrorKind::NetworkError,
+                        "Failed to send correlated data.".to_string(),
+                    )?;
                 out.extend(
                     keys.into_iter().map(|key| {
                         AuthBit(PartyEitherCopy::verifier_new(e, VerifierAuthBit { key }))
@@ -317,23 +337,37 @@ impl<P: Party> AuthBitGenerator<P> {
         authbits: &[AuthBit<P>],
         outputs: VerifierPrivate<P, &mut Vec<F2>>,
         channel: &mut Channel,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 let mut bit_ser: F2BitSerializer =
-                    SequenceSerializer::new(&mut channel.as_std_io())?;
+                    SequenceSerializer::new(&mut channel.as_std_io()).wrap_err(
+                        ErrorKind::InitializationError,
+                        "Failed to initialize sequence serializer.".to_string(),
+                    )?;
                 for b in authbits.iter() {
-                    bit_ser.write(channel.as_std_io(), b.bit().into_inner(e))?;
+                    bit_ser
+                        .write(channel.as_std_io(), b.bit().into_inner(e))
+                        .wrap_err(
+                            ErrorKind::SerializationError,
+                            "Failed to write serialized bits.".to_string(),
+                        )?;
                 }
-                bit_ser.finish(channel.as_std_io())?;
+                bit_ser.finish(channel.as_std_io()).wrap_err(
+                    ErrorKind::SerializationError,
+                    "Failed to finish bit serialization.".to_string(),
+                )?;
 
                 for ab in authbits.iter() {
                     channel.write_bytes(ab.mac().into_inner(e).as_ref())?;
                 }
             }
             WhichParty::Verifier(e) => {
-                let mut bit_ser: F2BitDeserializer =
-                    SequenceDeserializer::new(channel.as_std_io())?;
+                let mut bit_ser: F2BitDeserializer = SequenceDeserializer::new(channel.as_std_io())
+                    .wrap_err(
+                        ErrorKind::InitializationError,
+                        "Failed to create sequence deserializer.".to_string(),
+                    )?;
                 let bits_ = outputs.into_inner(e);
                 // We only want to validate the bits we added to the `outputs`
                 // vector, so we save the existing length so we can only
@@ -342,7 +376,10 @@ impl<P: Party> AuthBitGenerator<P> {
                 for _ in 0..authbits.len() {
                     // Optimistically add the opened bits to the output vector.
                     // We remove these added values below if validation fails.
-                    bits_.push(bit_ser.read(channel.as_std_io())?);
+                    bits_.push(bit_ser.read(channel.as_std_io()).wrap_err(
+                        ErrorKind::SerializationError,
+                        "Failed to read serialized bits.".to_string(),
+                    )?);
                 }
                 let mut validation = true;
                 for (ab, bit) in authbits.iter().zip(bits_[outputs_initial_len..].iter()) {
@@ -360,7 +397,7 @@ impl<P: Party> AuthBitGenerator<P> {
                     // are not necessarily valid. So truncate the vector back to
                     // its original size.
                     bits_.truncate(outputs_initial_len);
-                    return Err(eyre::Error::msg("Validation check failed"));
+                    swanky_error::bail!(ErrorKind::OtherError, "Validation check failed");
                 }
             }
         }
