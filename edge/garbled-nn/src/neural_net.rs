@@ -1,4 +1,7 @@
-use crate::layer::{Accuracy, Layer};
+use crate::{
+    layer::{Accuracy, Layer},
+    util,
+};
 use fancy_garbling::{
     AllWire, BinaryBundle, BinaryGadgets, CrtBundle, CrtGadgets, Fancy, FancyArithmetic,
     FancyBinary, FancyInput, HasModulus, WireMod2,
@@ -76,6 +79,44 @@ impl NeuralNet {
     /// The number of layers in the neural net.
     pub fn nlayers(&self) -> usize {
         self.layers.len()
+    }
+
+    /// Encode a boolean input so it can be evaluated by a [`NeuralNet`].
+    pub fn encode_input_boolean<
+        W: HasModulus + Clone,
+        F: Fancy<Item = W> + FancyInput<Item = W>,
+    >(
+        f: &mut F,
+        input: &Array3<i64>,
+        first_layer_bitwidth: usize,
+        channel: &mut Channel,
+    ) -> Vec<BinaryBundle<W>> {
+        input
+            .iter()
+            .map(|&x| {
+                let bits = util::i64_to_twos_complement(x, first_layer_bitwidth);
+                f.bin_encode(bits, first_layer_bitwidth, channel).unwrap()
+            })
+            .collect()
+    }
+
+    /// Decode a boolean output of a [`NeuralNet`] evaluation.
+    pub fn decode_output_boolean<W: HasModulus + Clone, F: Fancy<Item = W> + BinaryGadgets>(
+        f: &mut F,
+        output: &[BinaryBundle<W>],
+        channel: &mut Channel,
+    ) -> Vec<i64> {
+        output
+            .iter()
+            .map(|out| {
+                let vals = out
+                    .iter()
+                    .map(|v| f.output(v, channel).unwrap())
+                    .collect::<Option<Vec<_>>>()
+                    .unwrap();
+                util::i64_from_bits(&vals)
+            })
+            .collect::<Vec<_>>()
     }
 
     /// Evaluate [`NeuralNet`] as an arithmetic garbled circuit.

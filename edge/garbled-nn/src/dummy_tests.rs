@@ -110,11 +110,11 @@ pub fn boolean_accuracy_test(
 
     let first_layer_nbits = *bitwidth.first().unwrap();
 
-    let mut total_time = Instant::now();
+    let total_time = Instant::now();
 
     for (img_num, img) in images.iter().enumerate() {
         println!(
-            "(avg {:?}) [{} errors ({:.2}%)] ",
+            "(avg {:.2?}) [{} errors ({:.2}%)] ",
             if img_num > 0 {
                 total_time.elapsed() / img_num as u32
             } else {
@@ -124,35 +124,21 @@ pub fn boolean_accuracy_test(
             100.0 * (1.0 - errors as f32 / img_num as f32)
         );
 
-        let (start, outs) = Channel::with(std::io::empty(), |channel| {
+        let res = Channel::with(std::io::empty(), |channel| {
             // create a new dummy with the image as the input
             let mut dummy = Dummy::new();
 
-            // encode the image in twos complement
-            let inp = img
-                .iter()
-                .map(|&x| {
-                    let bits = util::i64_to_twos_complement(x, first_layer_nbits);
-                    dummy.bin_encode(bits, first_layer_nbits, channel).unwrap()
-                })
-                .collect_vec();
-
-            // evaluate the fancy computation using the dummy
-            let start = Instant::now();
+            let inp = NeuralNet::encode_input_boolean::<_, Dummy>(
+                &mut dummy,
+                img,
+                first_layer_nbits,
+                channel,
+            );
             let outs = nn.eval_boolean(&mut dummy, &inp, bitwidth, secret_weights, true, channel);
-            Ok((start, outs))
+            let res = NeuralNet::decode_output_boolean(&mut dummy, &outs, channel);
+            Ok(res)
         })
         .unwrap();
-        total_time += start.elapsed();
-
-        // decode the output back to i64
-        let res = outs
-            .iter()
-            .map(|out| {
-                let vals = &out.iter().map(|v| v.val()).collect_vec();
-                util::i64_from_bits(vals)
-            })
-            .collect::<Vec<_>>();
 
         if util::index_of_max(&res) != index_of_max(&labels[img_num]) {
             errors += 1;
