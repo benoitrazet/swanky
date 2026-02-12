@@ -35,7 +35,7 @@ fn bench_pack(c: &mut Criterion, p: u16) {
         let rng = &mut rand::thread_rng();
         let w = AllWire::rand(rng, p);
         b.iter(|| {
-            let x = w.as_block();
+            let x = w.to_block();
             std::hint::black_box(x);
         });
     });

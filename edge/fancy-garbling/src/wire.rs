@@ -34,7 +34,7 @@ pub fn hash_wires<const Q: usize, W: WireLabel>(wires: [&W; Q], tweak: u128) -> 
 where
     ArrayUnrolledOps: UnrollableArraySize<Q>,
 {
-    let batch = wires.array_map(|x| x.as_block());
+    let batch = wires.array_map(|x| x.to_block());
     TweakableCircularCorrelationRobustHash::fixed_key().hash_many(batch, tweak)
 }
 
@@ -47,8 +47,8 @@ pub trait WireLabel: Clone + HasModulus {
     /// Get the digits of the wire
     fn digits(&self) -> Vec<u16>;
 
-    /// Pack the wire into a `Block`.
-    fn as_block(&self) -> Block;
+    /// This function converts a [`WireLabel`] into its [`Block`] representation.
+    fn to_block(&self) -> Block;
 
     /// Get the color digit of the wire.
     fn color(&self) -> u16;
@@ -63,7 +63,10 @@ pub trait WireLabel: Clone + HasModulus {
     /// Negate all the digits mod q.
     fn negate_eq(&mut self) -> &mut Self;
 
-    /// Pack the wire into a `Block`.
+    /// This function converts a [`Block`] into its [`WireLabel`] representation
+    /// depending on the passed modulus `q`.
+    ///
+    /// # Panics if q does not align with the q supported by the [`WireLabel`].
     fn from_block(inp: Block, q: u16) -> Self;
 
     /// The zero wire with modulus `q`
@@ -142,7 +145,7 @@ pub trait WireLabel: Clone + HasModulus {
     /// Uses fixed-key AES.
     #[inline(never)]
     fn hash(&self, tweak: u128) -> Block {
-        TweakableCircularCorrelationRobustHash::fixed_key().hash(self.as_block(), tweak)
+        TweakableCircularCorrelationRobustHash::fixed_key().hash(self.to_block(), tweak)
     }
 }
 
@@ -157,7 +160,7 @@ pub struct WireMod2 {
 impl ConditionallySelectable for WireMod2 {
     fn conditional_select(a: &Self, b: &Self, choice: subtle::Choice) -> Self {
         WireMod2::from_block(
-            Block::conditional_select(&a.as_block(), &b.as_block(), choice),
+            Block::conditional_select(&a.to_block(), &b.to_block(), choice),
             2,
         )
     }
@@ -320,11 +323,11 @@ impl WireLabel for AllWire {
         }
     }
 
-    fn as_block(&self) -> Block {
+    fn to_block(&self) -> Block {
         match &self {
-            AllWire::Mod2(x) => x.as_block(),
-            AllWire::Mod3(x) => x.as_block(),
-            AllWire::ModN(x) => x.as_block(),
+            AllWire::Mod2(x) => x.to_block(),
+            AllWire::Mod3(x) => x.to_block(),
+            AllWire::ModN(x) => x.to_block(),
         }
     }
     fn color(&self) -> u16 {
@@ -451,7 +454,10 @@ impl WireLabel for WireMod2 {
             .collect()
     }
 
-    fn as_block(&self) -> Block {
+    fn to_block(&self) -> Block {
+        // This function converts a [`WireMod2`] into its [`Block`] representation.
+        // Since the value of a [`WireMod2`] is a 128b value, its directly returned
+        // as a [`Block`].
         self.val
     }
 
@@ -478,6 +484,9 @@ impl WireLabel for WireMod2 {
     }
 
     fn from_block(inp: Block, q: u16) -> Self {
+        // This function converts a Block into its WireLabel representation
+        // by just setting the value of WireMod2 to the Block (i.e. the
+        // wire's 128b value).
         if q != 2 {
             panic!("[WireMod2::from_block] Expected modulo 2. Got {}", q);
         }
@@ -524,7 +533,10 @@ impl WireLabel for WireMod3 {
             .collect()
     }
 
-    fn as_block(&self) -> Block {
+    fn to_block(&self) -> Block {
+        // This function converts a [`WireMod3`] into its [`Block`] representation.
+        // The two 64b values stored in [`WireMod3`], i.e. the lsb and msb, and packed
+        // into a 128b value as a [`Block`].
         Block::from(((self.msb as u128) << 64) | (self.lsb as u128))
     }
 
@@ -575,6 +587,9 @@ impl WireLabel for WireMod3 {
         if q != 3 {
             panic!("[WireMod3::from_block] Expected mod 3. Got mod {}", q)
         }
+        // This function converts a Block into its WireLabel representation
+        // by splitting the Block into two u64, its least significant bits and
+        // its most significant bits.
         let inp = u128::from(inp);
         let lsb = inp as u64;
         let msb = (inp >> 64) as u64;
@@ -628,7 +643,10 @@ impl WireLabel for WireModQ {
         self.ds.clone()
     }
 
-    fn as_block(&self) -> Block {
+    fn to_block(&self) -> Block {
+        // This function converts a [`WireMod3`] into its [`Block`] representation.
+        // The values stored in [`WireModQ`] are repacked depending on q
+        // into a 128b value as a [`Block`].
         Block::from(util::from_base_q(&self.ds, self.q))
     }
 
@@ -674,6 +692,7 @@ impl WireLabel for WireModQ {
         });
         self
     }
+
     fn from_block(inp: Block, q: u16) -> Self {
         if q < 2 {
             panic!(
@@ -681,6 +700,9 @@ impl WireLabel for WireModQ {
                 q
             );
         }
+        // This function converts a Block into its WireLabel representation
+        // by splitting the Block into several digits mod q that can each fit
+        // into 128b.
         let ds = if util::is_power_of_2(q) {
             // It's a power of 2, just split the digits.
             let ndigits = util::digits_per_u128(q);
@@ -805,7 +827,7 @@ mod tests {
         for q in 2..256 {
             for _ in 0..1000 {
                 let w = AllWire::rand(rng, q);
-                assert_eq!(w, AllWire::from_block(w.as_block(), q));
+                assert_eq!(w, AllWire::from_block(w.to_block(), q));
             }
         }
     }
