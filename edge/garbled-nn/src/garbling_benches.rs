@@ -78,14 +78,11 @@ pub fn bench(
     let total_time = Instant::now();
 
     for _ in 0..niters {
-        nn.eval_roundtrip(
-            &inputs[0],
-            bitwidth,
-            &moduli,
-            secret_weights,
-            binary,
-            accuracy,
-        )?;
+        if binary {
+            nn.eval_roundtrip_binary(&inputs[0], bitwidth, secret_weights)?;
+        } else {
+            nn.eval_roundtrip_arith(&inputs[0], &moduli, secret_weights, accuracy)?;
+        }
     }
 
     println!(

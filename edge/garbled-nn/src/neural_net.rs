@@ -552,104 +552,115 @@ impl NeuralNet {
         Ok(NeuralNet { layers })
     }
 
-    /// Evaluate [`NeuralNet`] between a [`Garbler`] and [`Evaluator`].
-    pub fn eval_roundtrip(
+    /// Evaluate [`NeuralNet`] between a boolean [`Garbler`] and [`Evaluator`].
+    pub fn eval_roundtrip_binary(
         &self,
         input: &Array3<i64>,
         bitwidth: &[usize],
-        moduli: &[u128],
         secret_weights: bool,
-        binary: bool,
-        accuracy: &Accuracy,
     ) -> eyre::Result<Vec<i64>> {
         assert_eq!(input.len(), self.num_inputs());
         let (_, outputs) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let outputs = if binary {
-                    let mut gb: Garbler<_, alsz::Sender, WireMod2> =
-                        Garbler::new(channel, AesRng::new())?;
-                    let inps =
-                        NeuralNet::encode_input_boolean(&mut gb, input, bitwidth[0], channel)?;
-                    let outputs = self.eval_boolean::<_, _>(
-                        &mut gb,
-                        &inps,
-                        bitwidth,
-                        secret_weights,
-                        true,
-                        channel,
-                    );
-                    let output = NeuralNet::decode_output_boolean(&mut gb, &outputs, channel)?;
-                    channel.force_flush()?;
-                    Ok(output)
-                } else {
-                    let mut gb: Garbler<_, alsz::Sender, AllWire> =
-                        Garbler::new(channel, AesRng::new())?;
-                    let inps = NeuralNet::encode_input_arith(
-                        &mut gb,
-                        input,
-                        *moduli.first().unwrap(),
-                        channel,
-                    )?;
-                    let outputs = self.eval_arith::<_, _>(
-                        &mut gb,
-                        &inps,
-                        moduli,
-                        secret_weights,
-                        true,
-                        accuracy,
-                        channel,
-                    );
-                    NeuralNet::decode_output_arith(
-                        &mut gb,
-                        &outputs,
-                        *moduli.last().unwrap(),
-                        channel,
-                    )
-                }?;
+                let mut gb: Garbler<_, alsz::Sender, WireMod2> =
+                    Garbler::new(channel, AesRng::new())?;
+                let inps = NeuralNet::encode_input_boolean(&mut gb, input, bitwidth[0], channel)?;
+                let outputs = self.eval_boolean::<_, _>(
+                    &mut gb,
+                    &inps,
+                    bitwidth,
+                    secret_weights,
+                    true,
+                    channel,
+                );
+                let outputs = NeuralNet::decode_output_boolean(&mut gb, &outputs, channel)?;
                 // The garbler receives no outputs.
                 assert_eq!(outputs, None);
                 Ok(())
             },
             |channel| {
-                let outputs = if binary {
-                    let mut ev: Evaluator<AesRng, alsz::Receiver, WireMod2> =
-                        Evaluator::new(channel, AesRng::new())?;
-                    let inps =
-                        NeuralNet::receive_input_boolean(&mut ev, input, bitwidth[0], channel)?;
-                    let outputs = self.eval_boolean::<_, _>(
-                        &mut ev,
-                        &inps,
-                        bitwidth,
-                        secret_weights,
-                        false,
-                        channel,
-                    );
-                    NeuralNet::decode_output_boolean(&mut ev, &outputs, channel)
-                } else {
-                    let mut ev: Evaluator<AesRng, alsz::Receiver, AllWire> =
-                        Evaluator::new(channel, AesRng::new())?;
-                    let inps = NeuralNet::receive_input_arith(
-                        &mut ev,
-                        input,
-                        *moduli.first().unwrap(),
-                        channel,
-                    )?;
-                    let outputs = self.eval_arith::<_, _>(
-                        &mut ev,
-                        &inps,
-                        moduli,
-                        secret_weights,
-                        false,
-                        accuracy,
-                        channel,
-                    );
-                    NeuralNet::decode_output_arith(
-                        &mut ev,
-                        &outputs,
-                        *moduli.last().unwrap(),
-                        channel,
-                    )
-                }?;
+                let mut ev: Evaluator<AesRng, alsz::Receiver, WireMod2> =
+                    Evaluator::new(channel, AesRng::new())?;
+                let inps = NeuralNet::receive_input_boolean(&mut ev, input, bitwidth[0], channel)?;
+                let outputs = self.eval_boolean::<_, _>(
+                    &mut ev,
+                    &inps,
+                    bitwidth,
+                    secret_weights,
+                    false,
+                    channel,
+                );
+                let outputs = NeuralNet::decode_output_boolean(&mut ev, &outputs, channel)?;
+                // The evaluator receives the outputs, so the `unwrap` should
+                // never fail here.
+                Ok(outputs.unwrap())
+            },
+        )?;
+        Ok(outputs)
+    }
+
+    /// Evaluate [`NeuralNet`] between an arithmetic [`Garbler`] and [`Evaluator`].
+    pub fn eval_roundtrip_arith(
+        &self,
+        input: &Array3<i64>,
+        moduli: &[u128],
+        secret_weights: bool,
+        accuracy: &Accuracy,
+    ) -> eyre::Result<Vec<i64>> {
+        assert_eq!(input.len(), self.num_inputs());
+        let (_, outputs) = swanky_channel::local::local_channel_pair(
+            |channel| {
+                let mut gb: Garbler<_, alsz::Sender, AllWire> =
+                    Garbler::new(channel, AesRng::new())?;
+                let inps = NeuralNet::encode_input_arith(
+                    &mut gb,
+                    input,
+                    *moduli.first().unwrap(),
+                    channel,
+                )?;
+                let outputs = self.eval_arith::<_, _>(
+                    &mut gb,
+                    &inps,
+                    moduli,
+                    secret_weights,
+                    true,
+                    accuracy,
+                    channel,
+                );
+                let outputs = NeuralNet::decode_output_arith(
+                    &mut gb,
+                    &outputs,
+                    *moduli.last().unwrap(),
+                    channel,
+                )?;
+                // The garbler receives no outputs.
+                assert_eq!(outputs, None);
+                Ok(())
+            },
+            |channel| {
+                let mut ev: Evaluator<AesRng, alsz::Receiver, AllWire> =
+                    Evaluator::new(channel, AesRng::new())?;
+                let inps = NeuralNet::receive_input_arith(
+                    &mut ev,
+                    input,
+                    *moduli.first().unwrap(),
+                    channel,
+                )?;
+                let outputs = self.eval_arith::<_, _>(
+                    &mut ev,
+                    &inps,
+                    moduli,
+                    secret_weights,
+                    false,
+                    accuracy,
+                    channel,
+                );
+                let outputs = NeuralNet::decode_output_arith(
+                    &mut ev,
+                    &outputs,
+                    *moduli.last().unwrap(),
+                    channel,
+                )?;
                 // The evaluator receives the outputs, so the `unwrap` should
                 // never fail here.
                 Ok(outputs.unwrap())
@@ -843,3 +854,6 @@ fn input_shape(
         layers.last().expect("no previous layer!").output_dims()
     }
 }
+
+#[cfg(test)]
+mod tests {}
