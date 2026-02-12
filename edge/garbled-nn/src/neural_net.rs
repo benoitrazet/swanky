@@ -91,12 +91,12 @@ impl NeuralNet {
         input: &Array3<i64>,
         first_layer_bitwidth: usize,
         channel: &mut Channel,
-    ) -> Vec<BinaryBundle<W>> {
+    ) -> eyre::Result<Vec<BinaryBundle<W>>> {
         input
             .iter()
             .map(|&x| {
                 let bits = util::i64_to_twos_complement(x, first_layer_bitwidth);
-                f.bin_encode(bits, first_layer_bitwidth, channel).unwrap()
+                f.bin_encode(bits, first_layer_bitwidth, channel)
             })
             .collect()
     }
@@ -107,14 +107,11 @@ impl NeuralNet {
         input: &Array3<i64>,
         modulus: u128,
         channel: &mut Channel,
-    ) -> Vec<CrtBundle<W>> {
+    ) -> eyre::Result<Vec<CrtBundle<W>>> {
         input
             .iter()
-            .map(|&x| {
-                f.crt_encode(util::to_mod_q(x, modulus), modulus, channel)
-                    .unwrap()
-            })
-            .collect::<Vec<_>>()
+            .map(|&x| f.crt_encode(util::to_mod_q(x, modulus), modulus, channel))
+            .collect()
     }
 
     /// Decode a boolean output of a [`NeuralNet`] evaluation.
@@ -645,7 +642,8 @@ impl NeuralNet {
             );
 
             let res = Channel::with(std::io::empty(), |channel| {
-                let inp = NeuralNet::encode_input_boolean(f, img, first_layer_nbits, channel);
+                let inp =
+                    NeuralNet::encode_input_boolean(f, img, first_layer_nbits, channel).unwrap();
                 let outs = self.eval_boolean(f, &inp, bitwidth, secret_weights, true, channel);
                 let res = NeuralNet::decode_output_boolean(f, &outs, channel).unwrap();
                 Ok(res)
@@ -701,7 +699,7 @@ impl NeuralNet {
             let res = Channel::with(std::io::empty(), |channel| {
                 // create a new dummy with the image as the input
                 let mut dummy = Dummy::new();
-                let inp = NeuralNet::encode_input_arith(&mut dummy, img, qfirst, channel);
+                let inp = NeuralNet::encode_input_arith(&mut dummy, img, qfirst, channel).unwrap();
                 let outs = self.eval_arith(
                     &mut dummy,
                     &inp,
