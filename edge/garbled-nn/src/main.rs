@@ -1,4 +1,3 @@
-mod direct_tests;
 mod garbling_benches;
 
 use clap::error::ErrorKind;
@@ -101,11 +100,7 @@ enum Commands {
     /// Evaluate the neural net to find the maximum bitwidth needed for each layer
     Bitwidth,
     /// Evaluate the given neural net directly over i64 values
-    Direct {
-        /// Show output of each evaluation
-        #[arg(short, long, default_value_t = false)]
-        debug: bool,
-    },
+    Direct,
     /// Test the accuracy of the fancy encoding of the neural network
     Dummy,
     /// Benchmark garbling and evaluating the neural network
@@ -216,12 +211,8 @@ pub fn main() {
                 println!("Layer {}: {} bits", layerno, nbits);
             }
         }
-        Some(Commands::Direct { debug }) => {
-            if *debug {
-                direct_tests::direct_debug(&nn, &tests, &labels);
-            } else {
-                direct_tests::direct_test(&nn, &tests, &labels);
-            }
+        Some(Commands::Direct) => {
+            nn.plaintext_accuracy_test(&tests, &labels);
         }
         Some(Commands::Dummy) => {
             let is_secret = cli.secret;

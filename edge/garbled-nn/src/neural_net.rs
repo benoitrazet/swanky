@@ -720,6 +720,41 @@ impl NeuralNet {
             100.0 * (1.0 - errors as f32 / images.len() as f32)
         );
     }
+
+    /// Evaluate the [`NeuralNet`] in plaintext.
+    pub fn plaintext_accuracy_test(&self, inputs: &[Array3<i64>], labels: &[Vec<i64>]) {
+        println!("* running plaintext accuracy evaluation");
+
+        let mut errors = 0;
+
+        let total_time = Instant::now();
+
+        for (img_num, (img, label)) in inputs.iter().zip(labels.iter()).enumerate() {
+            println!(
+                "(avg {:.2?}) [{} errors ({:.2}%)] ",
+                if img_num > 0 {
+                    total_time.elapsed() / img_num as u32
+                } else {
+                    Duration::ZERO
+                },
+                errors,
+                100.0 * (1.0 - errors as f32 / img_num as f32)
+            );
+
+            let res = self.eval_plaintext(img).iter().cloned().collect::<Vec<_>>();
+
+            if util::index_of_max(&res) != util::index_of_max(label) {
+                errors += 1;
+            }
+        }
+
+        println!(
+            "errors: {}/{}. accuracy: {}%\n",
+            errors,
+            inputs.len(),
+            100.0 * (1.0 - errors as f32 / inputs.len() as f32)
+        );
+    }
 }
 
 /// Map the tensorflow activation functions to ones we support.
