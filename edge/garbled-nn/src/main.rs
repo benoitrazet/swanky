@@ -1,13 +1,13 @@
-mod garbling_benches;
-
 use clap::error::ErrorKind;
 use clap::{Error, Parser, Subcommand};
 use fancy_garbling::dummy::Dummy;
+use ndarray::Array3;
 use serde_json::{self, Value};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 use swanky_channel::Channel;
 use swanky_garbled_nn::Accuracy;
 use swanky_garbled_nn::NeuralNet;
@@ -175,7 +175,7 @@ pub fn main() {
             .unwrap();
         }
         Some(Commands::Bench { niters }) => {
-            garbling_benches::bench(
+            bench(
                 &nn,
                 &tests,
                 &bitwidth,
@@ -193,6 +193,52 @@ pub fn main() {
             ));
         }
     }
+}
+
+/// Run benchmarks on the given neural network and its associated parameters.
+pub fn bench(
+    nn: &NeuralNet,
+    inputs: &[Array3<i64>],
+    bitwidth: &[usize],
+    niters: usize,
+    secret_weights: bool,
+    binary: bool,
+    accuracy: &Accuracy,
+) -> eyre::Result<()> {
+    println!("* running garble/eval benchmark");
+
+    // generate moduli for the given bitwidth
+    let moduli = bitwidth
+        .iter()
+        .map(|&b| fancy_garbling::util::modulus_with_width(b as u32))
+        .collect::<Vec<_>>();
+
+    println!("* computing fancy computation info");
+
+    if binary {
+        nn.informer_binary(bitwidth, secret_weights)?;
+    } else {
+        nn.informer_arith(&moduli, secret_weights, accuracy)?;
+    }
+
+    println!("* benchmarking garbler streaming to evaluator");
+
+    let total_time = Instant::now();
+
+    for _ in 0..niters {
+        if binary {
+            nn.eval_roundtrip_binary(&inputs[0], bitwidth, secret_weights)?;
+        } else {
+            nn.eval_roundtrip_arith(&inputs[0], &moduli, secret_weights, accuracy)?;
+        }
+    }
+
+    println!(
+        "streaming took {:.2?} over {niters} iterations",
+        total_time.elapsed()
+    );
+
+    Ok(())
 }
 
 /// Read labels from a file.
