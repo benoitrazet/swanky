@@ -78,11 +78,9 @@ pub fn bench(
 
     println!("* benchmarking garbler streaming to evaluator");
 
-    let mut total_time = Instant::now();
+    let total_time = Instant::now();
 
     for _ in 0..niters {
-        let start = Instant::now();
-
         swanky_channel::local::local_channel_pair(
             |channel| {
                 if binary {
@@ -154,12 +152,10 @@ pub fn bench(
             },
         )
         .unwrap();
-
-        total_time += start.elapsed();
     }
 
     println!(
-        "streaming took {:?} over {niters} iterations",
+        "streaming took {:.2?} over {niters} iterations",
         total_time.elapsed()
     );
 }
