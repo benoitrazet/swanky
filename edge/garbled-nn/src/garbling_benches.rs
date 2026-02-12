@@ -2,6 +2,7 @@ use fancy_garbling::FancyInput;
 use fancy_garbling::dummy::Dummy;
 use fancy_garbling::informer::Informer;
 use fancy_garbling::util as numbers;
+use ndarray::Array3;
 use std::time::Instant;
 use swanky_channel::Channel;
 use swanky_garbled_nn::Accuracy;
@@ -10,12 +11,13 @@ use swanky_garbled_nn::NeuralNet;
 /// Run benchmarks on the given neural network and its associated parameters.
 pub fn bench(
     nn: &NeuralNet,
+    inputs: &[Array3<i64>],
     bitwidth: &[usize],
     niters: usize,
     secret_weights: bool,
     binary: bool,
     accuracy: &Accuracy,
-) {
+) -> eyre::Result<()> {
     println!("* running garble/eval benchmark");
 
     // generate moduli for the given bitwidth
@@ -76,11 +78,20 @@ pub fn bench(
     let total_time = Instant::now();
 
     for _ in 0..niters {
-        nn.eval_roundtrip(bitwidth, &moduli, secret_weights, binary, accuracy);
+        nn.eval_roundtrip(
+            &inputs[0],
+            bitwidth,
+            &moduli,
+            secret_weights,
+            binary,
+            accuracy,
+        )?;
     }
 
     println!(
         "streaming took {:.2?} over {niters} iterations",
         total_time.elapsed()
     );
+
+    Ok(())
 }

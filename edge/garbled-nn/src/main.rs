@@ -231,7 +231,16 @@ pub fn main() {
             .unwrap();
         }
         Some(Commands::Bench { niters }) => {
-            garbling_benches::bench(&nn, &bitwidth, *niters, cli.secret, cli.boolean, accuracy);
+            garbling_benches::bench(
+                &nn,
+                &tests,
+                &bitwidth,
+                *niters,
+                cli.secret,
+                cli.boolean,
+                accuracy,
+            )
+            .map_err(|e| Error::exit(&Error::raw(ErrorKind::Io, e)));
         }
         None => {
             Error::exit(&Error::raw(
