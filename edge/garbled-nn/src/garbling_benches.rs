@@ -1,4 +1,5 @@
 use fancy_garbling::AllWire;
+use fancy_garbling::BinaryGadgets;
 use fancy_garbling::FancyInput;
 use fancy_garbling::WireMod2;
 use fancy_garbling::dummy::Dummy;
@@ -89,7 +90,7 @@ pub fn bench(
                     let inps = gb
                         .bin_receive_many(nn.num_inputs(), bitwidth[0], channel)
                         .unwrap();
-                    nn.eval_boolean::<_, _>(
+                    let outputs = nn.eval_boolean::<_, _>(
                         &mut gb,
                         &inps,
                         bitwidth,
@@ -97,6 +98,8 @@ pub fn bench(
                         true,
                         channel,
                     );
+                    let outputs = gb.bin_outputs(&outputs, channel)?;
+                    assert_eq!(outputs, None);
                 } else {
                     let mut gb: Garbler<_, alsz::Sender, AllWire> =
                         Garbler::new(channel, AesRng::new()).unwrap();
@@ -122,7 +125,7 @@ pub fn bench(
                     let inps = ev
                         .bin_encode_many(&vec![0; nn.num_inputs()], bitwidth[0], channel)
                         .unwrap();
-                    nn.eval_boolean::<_, _>(
+                    let outputs = nn.eval_boolean::<_, _>(
                         &mut ev,
                         &inps,
                         bitwidth,
@@ -130,6 +133,8 @@ pub fn bench(
                         false,
                         channel,
                     );
+                    let outputs = ev.bin_outputs(&outputs, channel)?;
+                    println!("{outputs:?}");
                 } else {
                     let mut ev: Evaluator<AesRng, alsz::Receiver, AllWire> =
                         Evaluator::new(channel, AesRng::new()).unwrap();
