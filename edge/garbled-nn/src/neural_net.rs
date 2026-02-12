@@ -122,18 +122,17 @@ impl NeuralNet {
         f: &mut F,
         output: &[BinaryBundle<W>],
         channel: &mut Channel,
-    ) -> Vec<i64> {
+    ) -> Option<Vec<i64>> {
         output
             .iter()
             .map(|out| {
                 let vals = out
                     .iter()
                     .map(|v| f.output(v, channel).unwrap())
-                    .collect::<Option<Vec<_>>>()
-                    .unwrap();
-                util::i64_from_bits(&vals)
+                    .collect::<Option<Vec<_>>>();
+                vals.map(|vals| util::i64_from_bits(&vals))
             })
-            .collect::<Vec<_>>()
+            .collect()
     }
 
     /// Decode an arithmetic output of a [`NeuralNet`] evaluation.
@@ -142,18 +141,17 @@ impl NeuralNet {
         output: &[CrtBundle<W>],
         modulus: u128,
         channel: &mut Channel,
-    ) -> Vec<i64> {
+    ) -> Option<Vec<i64>> {
         output
             .iter()
             .map(|out| {
-                let vals = &out
+                let vals = out
                     .iter()
                     .map(|v| f.output(v, channel).unwrap())
-                    .collect::<Option<Vec<_>>>()
-                    .unwrap();
-                util::from_mod_q_crt(vals, modulus)
+                    .collect::<Option<Vec<_>>>();
+                vals.map(|vals| util::from_mod_q_crt(&vals, modulus))
             })
-            .collect::<Vec<_>>()
+            .collect()
     }
 
     /// Evaluate [`NeuralNet`] as an arithmetic garbled circuit.
@@ -526,10 +524,10 @@ impl NeuralNet {
         secret_weights: bool,
         binary: bool,
         accuracy: &Accuracy,
-    ) {
-        swanky_channel::local::local_channel_pair(
+    ) -> Vec<u128> {
+        let (_, outputs) = swanky_channel::local::local_channel_pair(
             |channel| {
-                if binary {
+                let outputs = if binary {
                     let mut gb: Garbler<_, alsz::Sender, WireMod2> =
                         Garbler::new(channel, AesRng::new()).unwrap();
                     let inps = gb
@@ -543,15 +541,14 @@ impl NeuralNet {
                         true,
                         channel,
                     );
-                    let outputs = gb.bin_outputs(&outputs, channel)?;
-                    assert_eq!(outputs, None);
+                    gb.bin_outputs(&outputs, channel)?
                 } else {
                     let mut gb: Garbler<_, alsz::Sender, AllWire> =
                         Garbler::new(channel, AesRng::new()).unwrap();
                     let inps = gb
-                        .crt_receive_many(self.num_inputs(), moduli[0], channel)
+                        .crt_receive_many(self.num_inputs(), *moduli.first().unwrap(), channel)
                         .unwrap();
-                    self.eval_arith::<_, _>(
+                    let outputs = self.eval_arith::<_, _>(
                         &mut gb,
                         &inps,
                         moduli,
@@ -560,11 +557,14 @@ impl NeuralNet {
                         accuracy,
                         channel,
                     );
-                }
+                    gb.crt_outputs(&outputs, channel)?
+                };
+                // The garbler receives no outputs.
+                assert_eq!(outputs, None);
                 Ok(())
             },
             |channel| {
-                if binary {
+                let outputs = if binary {
                     let mut ev: Evaluator<AesRng, alsz::Receiver, WireMod2> =
                         Evaluator::new(channel, AesRng::new()).unwrap();
                     let inps = ev
@@ -578,16 +578,19 @@ impl NeuralNet {
                         false,
                         channel,
                     );
-                    let outputs = ev.bin_outputs(&outputs, channel)?;
-                    println!("{outputs:?}");
+                    ev.bin_outputs(&outputs, channel)?
                 } else {
                     let mut ev: Evaluator<AesRng, alsz::Receiver, AllWire> =
                         Evaluator::new(channel, AesRng::new()).unwrap();
 
                     let inps = ev
-                        .crt_encode_many(&vec![0; self.num_inputs()], moduli[0], channel)
+                        .crt_encode_many(
+                            &vec![0; self.num_inputs()],
+                            *moduli.first().unwrap(),
+                            channel,
+                        )
                         .unwrap();
-                    self.eval_arith::<_, _>(
+                    let outputs = self.eval_arith::<_, _>(
                         &mut ev,
                         &inps,
                         moduli,
@@ -596,13 +599,19 @@ impl NeuralNet {
                         accuracy,
                         channel,
                     );
-                }
-
-                Ok(())
+                    ev.crt_outputs(&outputs, channel)?
+                };
+                // The evaluator receives the outputs, so the `unwrap` should
+                // never fail here.
+                Ok(outputs.unwrap())
             },
         )
         .unwrap();
+        outputs
     }
+
+    // TODO: The `*_accuracy_test` methods have _a lot_ of commonalities. Can we
+    // combine them in some way?
 
     /// Evaluate the [`NeuralNet`] over all the provided boolean inputs and
     /// track the accuracy of the evaluations.
@@ -638,7 +647,7 @@ impl NeuralNet {
             let res = Channel::with(std::io::empty(), |channel| {
                 let inp = NeuralNet::encode_input_boolean(f, img, first_layer_nbits, channel);
                 let outs = self.eval_boolean(f, &inp, bitwidth, secret_weights, true, channel);
-                let res = NeuralNet::decode_output_boolean(f, &outs, channel);
+                let res = NeuralNet::decode_output_boolean(f, &outs, channel).unwrap();
                 Ok(res)
             })
             .unwrap();
@@ -675,7 +684,6 @@ impl NeuralNet {
         let qlast = *moduli.last().unwrap();
 
         let mut errors = 0;
-
         let total_time = Instant::now();
 
         for (img_num, img) in images.iter().enumerate() {
@@ -703,7 +711,8 @@ impl NeuralNet {
                     accuracy,
                     channel,
                 );
-                let res = NeuralNet::decode_output_arith(&mut dummy, &outs, qlast, channel);
+                let res =
+                    NeuralNet::decode_output_arith(&mut dummy, &outs, qlast, channel).unwrap();
                 Ok(res)
             })
             .unwrap();
@@ -723,10 +732,7 @@ impl NeuralNet {
 
     /// Evaluate the [`NeuralNet`] in plaintext.
     pub fn plaintext_accuracy_test(&self, inputs: &[Array3<i64>], labels: &[Vec<i64>]) {
-        println!("* running plaintext accuracy evaluation");
-
         let mut errors = 0;
-
         let total_time = Instant::now();
 
         for (img_num, (img, label)) in inputs.iter().zip(labels.iter()).enumerate() {
@@ -741,7 +747,7 @@ impl NeuralNet {
                 100.0 * (1.0 - errors as f32 / img_num as f32)
             );
 
-            let res = self.eval_plaintext(img).iter().cloned().collect::<Vec<_>>();
+            let res = self.eval_plaintext(img).into_iter().collect::<Vec<_>>();
 
             if util::index_of_max(&res) != util::index_of_max(label) {
                 errors += 1;
