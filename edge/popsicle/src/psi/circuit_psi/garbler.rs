@@ -1,13 +1,11 @@
 //! Defining the Garbler's behavior in Circuit Psi according to PSTY19
-use crate::{
-    errors::Error,
-    psi::circuit_psi::{circuits::*, *},
-};
+use crate::psi::circuit_psi::{circuits::*, *};
 use fancy_garbling::WireMod2;
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
 use swanky_block::Block;
 use swanky_channel::Channel;
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_ot_alsz_kos::alsz::Sender as OtSender;
 use swanky_twopac::semihonest::Garbler;
 
@@ -31,12 +29,15 @@ where
     RNG: RngCore + CryptoRng + Rng + SeedableRng<Seed = Block>,
 {
     /// Creates a PsiGarbler from a dedicated channel and rng
-    pub fn new(channel: &mut Channel, seed: RNG::Seed) -> Result<Self, Error>
+    pub fn new(channel: &mut Channel, seed: RNG::Seed) -> swanky_error::Result<Self>
     where
         Self: Sized,
     {
         Ok(PsiGarbler {
-            gb: Garbler::<RNG, OtSender, WireMod2>::new(channel, RNG::from_seed(seed))?,
+            gb: Garbler::<RNG, OtSender, WireMod2>::new(channel, RNG::from_seed(seed)).wrap_err(
+                ErrorKind::OtherError,
+                "Failed to create garbler.".to_string(),
+            )?,
             rng: RNG::from_seed(seed),
             _base_psi: PhantomData,
         })
@@ -67,13 +68,15 @@ where
         primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
         channel: &mut Channel,
-    ) -> Result<Intersection, Error> {
+    ) -> swanky_error::Result<Intersection> {
         // (0)
         if payloads.is_some() && primary_keys.len() != payloads.unwrap().len() {
-            return Err(Error::PayloadSetNotComplete {
-                npayloads: payloads.unwrap().len(),
-                nprimarykeys: primary_keys.len(),
-            });
+            swanky_error::bail!(
+                ErrorKind::OtherError,
+                "Failed to intersect due to incomplete payload set: (#payloads := {}) != (#primary keys := {})",
+                payloads.unwrap().len(),
+                primary_keys.len(),
+            );
         }
         // (1)
         let circuit_inputs =
@@ -106,7 +109,7 @@ where
         &mut self,
         primary_keys: &[PrimaryKey],
         channel: &mut Channel,
-    ) -> Result<Intersection, Error> {
+    ) -> swanky_error::Result<Intersection> {
         self.intersect_with_payloads(primary_keys, None, channel)
     }
 }

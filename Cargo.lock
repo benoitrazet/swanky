@@ -1801,7 +1801,6 @@ version = "0.6.0"
 dependencies = [
  "aes-gcm",
  "criterion",
- "eyre",
  "fancy-garbling",
  "itertools 0.14.0",
  "proptest",
@@ -1817,6 +1816,7 @@ dependencies = [
  "swanky-channel",
  "swanky-channel-legacy",
  "swanky-cointoss",
+ "swanky-error",
  "swanky-ocelot-error",
  "swanky-oprf-kkrt",
  "swanky-oprf-kmprt",

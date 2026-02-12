@@ -48,7 +48,7 @@ mod tests {
         set_b: &[Vec<u8>],
         seed_sx: u128,
         seed_rx: u128,
-    ) -> Result<u128, Error> {
+    ) -> swanky_error::Result<u128> {
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
                 let mut gb_psi: _ =
@@ -93,7 +93,7 @@ mod tests {
         payload_b: &[Block512],
         seed_sx: u128,
         seed_rx: u128,
-    ) -> Result<u128, Error> {
+    ) -> swanky_error::Result<u128> {
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
                 let mut gb_psi: _ =

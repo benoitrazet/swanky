@@ -1,10 +1,11 @@
 use crate::{
-    circuit_psi::{base_psi::*, utils::*, *},
+    circuit_psi::{base_psi::*, utils::*},
     cuckoo::CuckooHash,
     utils,
 };
 
 use swanky_block::{Block, Block512};
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_oprf_kmprt::Sender as KmprtSender;
 
 /// A struct defining the sender in the base circuit PSI computation.
@@ -51,20 +52,28 @@ impl BasePsi for OpprfSender {
     ///
     /// If the payloads are not needed for the computation, `payload_existence`
     /// should be set to false.
-    fn init<RNG>(channel: &mut Channel, rng: &mut RNG, has_payload: bool) -> Result<Self, Error>
+    fn init<RNG>(
+        channel: &mut Channel,
+        rng: &mut RNG,
+        has_payload: bool,
+    ) -> swanky_error::Result<Self>
     where
         RNG: RngCore + CryptoRng + SeedableRng,
     {
         // The key used during hashing is known to both
         // parties and allows them to hash the same inputs
         // to the same outputs.
-        let key = channel
-            .read()
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
-        let opprf_primary_keys = KmprtSender::init(channel, rng)?;
+        let key = channel.read()?;
+        let opprf_primary_keys = KmprtSender::init(channel, rng).wrap_err(
+            ErrorKind::OtherError,
+            "Failed to initialize KMPRT sender for primary keys.".to_string(),
+        )?;
         let mut opprf_payload = None;
         if has_payload {
-            opprf_payload = Some(KmprtSender::init(channel, rng)?);
+            opprf_payload = Some(KmprtSender::init(channel, rng).wrap_err(
+                ErrorKind::OtherError,
+                "Failed to initialize KMPRT sender for payload.".to_string(),
+            )?);
         }
 
         Ok(Self {
@@ -82,21 +91,17 @@ impl BasePsi for OpprfSender {
         payloads: Option<&[Payload]>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<(), Error>
+    ) -> swanky_error::Result<()>
     where
         RNG: RngCore + CryptoRng + SeedableRng,
     {
         // refresh key if cuckoo hash is full
-        self.key = channel
-            .read::<Block>()
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
+        self.key = channel.read::<Block>()?;
 
         // Receive cuckoo hash info from sender
         // The receiver determines the number of bins
         // to be used by the sender.
-        let nbins = channel
-            .read::<usize>()
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
+        let nbins = channel.read::<usize>()?;
 
         self.nbins = Some(nbins);
 
@@ -148,7 +153,11 @@ impl BasePsi for OpprfSender {
         Ok(())
     }
 
-    fn opprf_exchange<RNG>(&mut self, channel: &mut Channel, rng: &mut RNG) -> Result<(), Error>
+    fn opprf_exchange<RNG>(
+        &mut self,
+        channel: &mut Channel,
+        rng: &mut RNG,
+    ) -> swanky_error::Result<()>
     where
         RNG: RngCore + CryptoRng + SeedableRng,
     {
@@ -160,18 +169,24 @@ impl BasePsi for OpprfSender {
             &self.state.opprf_primary_keys_out,
         );
         self.opprf_primary_keys
-            .send(channel, &opprf_program, self.nbins.unwrap(), rng)?;
+            .send(channel, &opprf_program, self.nbins.unwrap(), rng)
+            .wrap_err(
+                ErrorKind::OtherError,
+                "Failed to send primary keys during exchange.".to_string(),
+            )?;
         if !&self.state.opprf_payloads_in.is_empty() {
             let points_data = flatten_bins_payloads(
                 &self.state.opprf_primary_keys_in,
                 &self.state.opprf_payloads_in,
             );
-            self.opprf_payload.as_mut().unwrap().send(
-                channel,
-                &points_data,
-                self.nbins.unwrap(),
-                rng,
-            )?;
+            self.opprf_payload
+                .as_mut()
+                .unwrap()
+                .send(channel, &points_data, self.nbins.unwrap(), rng)
+                .wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to send payload during exchange.".to_string(),
+                )?;
         }
         Ok(())
     }
@@ -179,7 +194,7 @@ impl BasePsi for OpprfSender {
         &mut self,
         gc_party: &mut F,
         channel: &mut Channel,
-    ) -> Result<CircuitInputs<F::Item>, Error>
+    ) -> swanky_error::Result<CircuitInputs<F::Item>>
     where
         F: FancyInput<Item = WireMod2>,
     {

@@ -1,6 +1,6 @@
 //! The base psi computation that pre-processes the party's
 //! inputs prior to calling the circuit in the circuit psi
-use crate::{circuit_psi::*, errors::Error};
+use crate::circuit_psi::*;
 use fancy_garbling::{FancyInput, WireMod2};
 use rand::{CryptoRng, RngCore, SeedableRng};
 use swanky_channel::Channel;
@@ -28,7 +28,11 @@ pub mod sender;
 /// performed in the garbled circuit with no a-priori pre-processing computation).
 pub trait BasePsi {
     /// Initializes the BasePsi party
-    fn init<RNG>(channel: &mut Channel, rng: &mut RNG, has_payload: bool) -> Result<Self, Error>
+    fn init<RNG>(
+        channel: &mut Channel,
+        rng: &mut RNG,
+        has_payload: bool,
+    ) -> swanky_error::Result<Self>
     where
         Self: Sized,
         RNG: RngCore + CryptoRng + SeedableRng;
@@ -41,7 +45,7 @@ pub trait BasePsi {
         payloads: Option<&[Payload]>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<(), Error>
+    ) -> swanky_error::Result<()>
     where
         RNG: RngCore + CryptoRng + SeedableRng;
     /// Parties call an OPPRF on their inputs
@@ -51,7 +55,11 @@ pub trait BasePsi {
     /// in a garbled circuit. This additionally allows them to mask
     /// their payloads so that only payloads associated with intersection
     /// are kept in the garbled circuit.
-    fn opprf_exchange<RNG>(&mut self, channel: &mut Channel, rng: &mut RNG) -> Result<(), Error>
+    fn opprf_exchange<RNG>(
+        &mut self,
+        channel: &mut Channel,
+        rng: &mut RNG,
+    ) -> swanky_error::Result<()>
     where
         RNG: RngCore + CryptoRng + SeedableRng;
     /// Parties turn their inputs into garbled wires
@@ -59,7 +67,7 @@ pub trait BasePsi {
         &mut self,
         gc_party: &mut F,
         channel: &mut Channel,
-    ) -> Result<CircuitInputs<F::Item>, Error>
+    ) -> swanky_error::Result<CircuitInputs<F::Item>>
     where
         F: FancyInput<Item = WireMod2>;
     /// A wrapper that calls the different pieces of the BasePsi in order
@@ -70,7 +78,7 @@ pub trait BasePsi {
         payloads: Option<&[Payload]>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<CircuitInputs<F::Item>, Error>
+    ) -> swanky_error::Result<CircuitInputs<F::Item>>
     where
         Self: Sized,
         F: FancyInput<Item = WireMod2>,

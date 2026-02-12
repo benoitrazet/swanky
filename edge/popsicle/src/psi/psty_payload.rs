@@ -29,13 +29,13 @@
 
 use crate::{
     cuckoo::{CuckooHash, CuckooItem},
-    errors::Error,
     utils,
 };
 use fancy_garbling::{
     AllWire, ArithmeticBundleGadgets, BinaryBundle, Bundle, CrtBundle, CrtGadgets, Fancy,
     FancyBinary, FancyInput,
 };
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 use itertools::Itertools;
@@ -107,12 +107,16 @@ impl Sender {
     pub fn init<RNG: RngCore + CryptoRng + SeedableRng>(
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
-        let key = channel
-            .read::<Block>()
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
-        let opprf = KmprtSender::init(channel, rng)?;
-        let opprf_payload = KmprtSender::init(channel, rng)?;
+    ) -> swanky_error::Result<Self> {
+        let key = channel.read::<Block>()?;
+        let opprf = KmprtSender::init(channel, rng).wrap_err(
+            ErrorKind::OtherError,
+            "Failed to initialize KMPRT OPPRF sender.".to_string(),
+        )?;
+        let opprf_payload = KmprtSender::init(channel, rng).wrap_err(
+            ErrorKind::OtherError,
+            "Failed to initialize KMPRT OPPRF payload sender.".to_string(),
+        )?;
         Ok(Self {
             key,
             opprf,
@@ -128,7 +132,7 @@ impl Sender {
         payloads: &[Block512],
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<(), Error> {
+    ) -> swanky_error::Result<()> {
         let mut gb =
             Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen())).unwrap();
 
@@ -156,7 +160,7 @@ impl Sender {
         path_deltas: &str,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<(), Error> {
+    ) -> swanky_error::Result<()> {
         let mut gb =
             Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen())).unwrap();
         let _ = gb.load_deltas(path_deltas);
@@ -211,7 +215,7 @@ impl Sender {
         path_deltas: &str,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error> {
+    ) -> swanky_error::Result<(CrtBundle<AllWire>, CrtBundle<AllWire>)> {
         let mut gb =
             Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen())).unwrap();
         let _ = gb.load_deltas(path_deltas);
@@ -258,7 +262,7 @@ impl Sender {
         path_deltas: &str,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<(), Error> {
+    ) -> swanky_error::Result<()> {
         let mut gb =
             Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen())).unwrap();
         let _ = gb.load_deltas(path_deltas);
@@ -287,17 +291,11 @@ impl Sender {
         payloads: &[Block512],
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<(SenderState, usize, usize, usize), Error> {
+    ) -> swanky_error::Result<(SenderState, usize, usize, usize)> {
         // receive cuckoo hash info from sender
-        let megasize = channel
-            .read::<usize>()
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
-        let nmegabins = channel
-            .read::<usize>()
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
-        let nbins = channel
-            .read::<usize>()
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
+        let megasize = channel.read::<usize>()?;
+        let nmegabins = channel.read::<usize>()?;
+        let nbins = channel.read::<usize>()?;
         let hashes = utils::compress_and_hash_inputs(inputs, self.key);
 
         let mut table = vec![Vec::new(); nbins];
@@ -346,7 +344,7 @@ impl Sender {
         nbins: usize,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<(), Error> {
+    ) -> swanky_error::Result<()> {
         let points_id = state
             .table
             .clone()
@@ -366,8 +364,15 @@ impl Sender {
             }
         }
 
-        self.opprf.send(channel, &points_id, nbins, rng)?;
-        self.opprf_payload.send(channel, &points_data, nbins, rng)?;
+        self.opprf
+            .send(channel, &points_id, nbins, rng)
+            .wrap_err(ErrorKind::OtherError, "Failed to send OPPRF.".to_string())?;
+        self.opprf_payload
+            .send(channel, &points_data, nbins, rng)
+            .wrap_err(
+                ErrorKind::OtherError,
+                "Failed to send OPPRF payload.".to_string(),
+            )?;
         Ok(())
     }
 }
@@ -378,16 +383,13 @@ impl SenderState {
         &mut self,
         gb: &mut Garbler<RNG, OtSender, AllWire>,
         channel: &mut Channel,
-    ) -> Result<
-        (
-            Vec<AllWire>,
-            Vec<AllWire>,
-            Vec<AllWire>,
-            Vec<AllWire>,
-            Vec<AllWire>,
-        ),
-        Error,
-    >
+    ) -> swanky_error::Result<(
+        Vec<AllWire>,
+        Vec<AllWire>,
+        Vec<AllWire>,
+        Vec<AllWire>,
+        Vec<AllWire>,
+    )>
     where
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
@@ -430,7 +432,7 @@ impl SenderState {
         &mut self,
         gb: &mut Garbler<RNG, OtSender, AllWire>,
         channel: &mut Channel,
-    ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error>
+    ) -> swanky_error::Result<(CrtBundle<AllWire>, CrtBundle<AllWire>)>
     where
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
@@ -447,14 +449,18 @@ impl Receiver {
     pub fn init<RNG: RngCore + CryptoRng + SeedableRng>(
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> swanky_error::Result<Self> {
         let key = rng.r#gen();
-        channel
-            .write(&key)
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
+        channel.write(&key)?;
 
-        let opprf = KmprtReceiver::init(channel, rng)?;
-        let opprf_payload = KmprtReceiver::init(channel, rng)?;
+        let opprf = KmprtReceiver::init(channel, rng).wrap_err(
+            ErrorKind::OtherError,
+            "Failed to initialize KMPRT OPPRF receiver.".to_string(),
+        )?;
+        let opprf_payload = KmprtReceiver::init(channel, rng).wrap_err(
+            ErrorKind::OtherError,
+            "Failed to initialize KMPRT OPPRF payload receiver.".to_string(),
+        )?;
         Ok(Self {
             key,
             opprf,
@@ -470,7 +476,7 @@ impl Receiver {
         payloads: &[Block512],
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<u128, Error> {
+    ) -> swanky_error::Result<u128> {
         let mut ev =
             Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
                 .unwrap();
@@ -510,7 +516,7 @@ impl Receiver {
         megasize: usize,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<u128, Error> {
+    ) -> swanky_error::Result<u128> {
         let mut ev =
             Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
                 .unwrap();
@@ -542,7 +548,7 @@ impl Receiver {
         payload: Vec<Vec<Block512>>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error> {
+    ) -> swanky_error::Result<(CrtBundle<AllWire>, CrtBundle<AllWire>)> {
         let mut ev =
             Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
                 .unwrap();
@@ -586,7 +592,7 @@ impl Receiver {
         sum_of_weights: Vec<Vec<AllWire>>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<u128, Error> {
+    ) -> swanky_error::Result<u128> {
         let mut ev =
             Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
                 .unwrap();
@@ -625,19 +631,16 @@ impl Receiver {
         payloads: &[Block512],
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<(Vec<Block>, Vec<Block512>), Error> {
+    ) -> swanky_error::Result<(Vec<Block>, Vec<Block512>)> {
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
-        let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
+        let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES).wrap_err(
+            ErrorKind::OtherError,
+            "Failed to create Cuckoo hash.".to_string(),
+        )?;
 
-        channel
-            .write(&0usize)
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
-        channel
-            .write(&0usize)
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
-        channel
-            .write(&cuckoo.nbins)
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?; // The number of bins is sent out to the sender
+        channel.write(&0usize)?;
+        channel.write(&0usize)?;
+        channel.write(&cuckoo.nbins)?; // The number of bins is sent out to the sender
         let table = cuckoo
             .items
             .iter()
@@ -673,22 +676,19 @@ impl Receiver {
         megasize: usize,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<(Vec<Vec<Block>>, Vec<Vec<Block512>>, usize), Error> {
+    ) -> swanky_error::Result<(Vec<Vec<Block>>, Vec<Vec<Block512>>, usize)> {
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
 
-        let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
+        let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES).wrap_err(
+            ErrorKind::OtherError,
+            "Failed to create Cuckoo hash.".to_string(),
+        )?;
         let cuckoo_large: Vec<&[Option<CuckooItem>]> = cuckoo.items.chunks(megasize).collect();
         let nmegabins = cuckoo_large.len();
 
-        channel
-            .write(&megasize)
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?; // The megabin size is sent out to the sender
-        channel
-            .write(&nmegabins)
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?; // The number of megabins is sent out to the sender
-        channel
-            .write(&cuckoo.nbins)
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?; // The number of bins is sent out to the sender
+        channel.write(&megasize)?; // The megabin size is sent out to the sender
+        channel.write(&nmegabins)?; // The number of megabins is sent out to the sender
+        channel.write(&cuckoo.nbins)?; // The number of bins is sent out to the sender
 
         let table = cuckoo_large
             .iter()
@@ -725,9 +725,18 @@ impl Receiver {
         state: &mut ReceiverState,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<(), Error> {
-        state.opprf_ids = self.opprf.receive(channel, &state.table, rng)?;
-        state.opprf_payloads = self.opprf_payload.receive(channel, &state.table, rng)?;
+    ) -> swanky_error::Result<()> {
+        state.opprf_ids = self.opprf.receive(channel, &state.table, rng).wrap_err(
+            ErrorKind::OtherError,
+            "Failed to receive OPPRF.".to_string(),
+        )?;
+        state.opprf_payloads = self
+            .opprf_payload
+            .receive(channel, &state.table, rng)
+            .wrap_err(
+                ErrorKind::OtherError,
+                "Failed to receive OPPRF payloads.".to_string(),
+            )?;
         Ok(())
     }
 }
@@ -738,16 +747,13 @@ impl ReceiverState {
         &mut self,
         ev: &mut Evaluator<RNG, OtReceiver, AllWire>,
         channel: &mut Channel,
-    ) -> Result<
-        (
-            Vec<AllWire>,
-            Vec<AllWire>,
-            Vec<AllWire>,
-            Vec<AllWire>,
-            Vec<AllWire>,
-        ),
-        Error,
-    >
+    ) -> swanky_error::Result<(
+        Vec<AllWire>,
+        Vec<AllWire>,
+        Vec<AllWire>,
+        Vec<AllWire>,
+        Vec<AllWire>,
+    )>
     where
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
     {
@@ -788,7 +794,7 @@ impl ReceiverState {
         &mut self,
         ev: &mut Evaluator<RNG, OtReceiver, AllWire>,
         channel: &mut Channel,
-    ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error>
+    ) -> swanky_error::Result<(CrtBundle<AllWire>, CrtBundle<AllWire>)>
     where
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
@@ -869,7 +875,7 @@ fn fancy_compute_payload_aggregate<
     receiver_payloads: &[F::Item],
     receiver_masks: &[F::Item],
     channel: &mut Channel,
-) -> eyre::Result<(CrtBundle<F::Item>, CrtBundle<F::Item>)> {
+) -> swanky_error::Result<(CrtBundle<F::Item>, CrtBundle<F::Item>)> {
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
     assert_eq!(sender_payloads.len(), receiver_payloads.len());
     assert_eq!(receiver_payloads.len(), receiver_masks.len());
@@ -887,7 +893,7 @@ fn fancy_compute_payload_aggregate<
                 channel,
             )
         })
-        .collect::<eyre::Result<Vec<F::Item>>>()?;
+        .collect::<swanky_error::Result<Vec<F::Item>>>()?;
 
     let reconstructed_payload = sender_payloads
         .chunks(PAYLOAD_PRIME_SIZE_EXPANDED)
@@ -920,7 +926,7 @@ fn fancy_compute_payload_aggregate<
         let b_ws = one
             .iter()
             .map(|w| f.mul(w, &b, channel))
-            .collect::<eyre::Result<Vec<F::Item>>>()?;
+            .collect::<swanky_error::Result<Vec<F::Item>>>()?;
         let b_crt = CrtBundle::new(b_ws);
 
         let mux = f.crt_mul(&b_crt, &weighted_payloads[i], channel)?;
