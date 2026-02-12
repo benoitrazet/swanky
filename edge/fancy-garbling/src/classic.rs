@@ -50,7 +50,8 @@ impl GarbledCircuit {
         c: &Circuit,
         rng: RNG,
     ) -> eyre::Result<(Encoder<Wire>, Self, OutputMapping)> {
-        let mut garbler = Garbler::new(rng);
+        let mut channel = GarbledChannel::new_writer(None);
+        let mut garbler = Channel::with(&mut channel, |channel| Garbler::new(rng, channel))?;
 
         // get input wires, ignoring encoded values
         let gb_inps = (0..c.num_garbler_inputs())
@@ -69,7 +70,6 @@ impl GarbledCircuit {
             })
             .collect_vec();
 
-        let mut channel = GarbledChannel::new_writer(None);
         let zeros = Channel::with(&mut channel, |channel| {
             // First, garble the circuit, outputting the zero wirelabels
             // associated with the output.
@@ -98,7 +98,7 @@ impl GarbledCircuit {
         evaluator_inputs: &[Wire],
     ) -> eyre::Result<Vec<u16>> {
         let output = Channel::with(GarbledChannel::from(self), |channel| {
-            let mut evaluator = Evaluator::new();
+            let mut evaluator = Evaluator::new(channel)?;
             let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs, channel)?;
             Ok(outputs.expect("evaluator outputs always are Some(u16)"))
         })?;
@@ -114,7 +114,7 @@ impl GarbledCircuit {
         evaluator_inputs: &[Wire],
     ) -> eyre::Result<Vec<Wire>> {
         let wirelabels = Channel::with(GarbledChannel::from(self), |channel| {
-            let mut evaluator = Evaluator::new();
+            let mut evaluator = Evaluator::new(channel)?;
             let wirelabels =
                 c.eval_to_wirelabels(&mut evaluator, garbler_inputs, evaluator_inputs, channel)?;
             Ok(wirelabels)

@@ -17,7 +17,10 @@ use super::security_warning::warn_proj;
 
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler<RNG, Wire> {
-    deltas: HashMap<u16, Wire>, // map from modulus to associated delta wire-label.
+    // Zero wirelabel used for binary negation.
+    zero: Wire,
+    // Map from modulus to associated delta wirelabel.
+    deltas: HashMap<u16, Wire>,
     current_output: usize,
     current_gate: usize,
     rng: RNG,
@@ -36,14 +39,23 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel + DeserializeOwned> Garbler<RNG, 
 }
 
 impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
-    /// Create a new garbler.
-    pub fn new(rng: RNG) -> Self {
-        Garbler {
-            deltas: HashMap::new(),
+    /// Create a new [`Garbler`].
+    pub fn new(mut rng: RNG, channel: &mut Channel) -> eyre::Result<Self> {
+        let zero = Wire::rand(&mut rng, 2);
+        let delta = Wire::rand_delta(&mut rng, 2);
+        let one = zero.plus(&delta);
+        let mut deltas = HashMap::new();
+        deltas.insert(2, delta);
+        // Send the one wirelabel to the evaluator. This is used to make binary
+        // negation free.
+        channel.write(&one.to_block())?;
+        Ok(Garbler {
+            zero,
+            deltas,
             current_gate: 0,
             current_output: 0,
             rng,
-        }
+        })
     }
 
     /// The current non-free gate index of the garbling computation
@@ -172,8 +184,8 @@ impl<RNG: RngCore + CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, 
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        let delta = self.delta(2);
-        self.xor(&delta, x)
+        let zero = self.zero.clone();
+        self.xor(&zero, x)
     }
 }
 
@@ -185,8 +197,8 @@ impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         check_binary!(x);
 
-        let delta = self.delta(2);
-        self.xor(&delta, x)
+        let zero = self.zero.clone();
+        self.xor(&zero, x)
     }
 
     /// Xor is just addition
