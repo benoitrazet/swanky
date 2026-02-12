@@ -25,7 +25,6 @@
 //! Garbling for Faster Secure Two-Party Computation".
 //! <https://eprint.iacr.org/2018/578.pdf>
 //!
-use eyre::Ok;
 use fancy_garbling::{
     BinaryBundle, FancyInput,
     circuit_analyzer::{AnalyzerItem, CircuitAnalyzer},
@@ -58,12 +57,12 @@ pub fn f_preprocessing<P: Party, RNG: CryptoRng + Rng>(
         BinaryBundle<AnalyzerItem>,
         BinaryBundle<AnalyzerItem>,
         &mut Channel,
-    ) -> eyre::Result<BinaryBundle<AnalyzerItem>>,
+    ) -> swanky_error::Result<BinaryBundle<AnalyzerItem>>,
     and_generator: &mut AndTripleGenerator<P>,
     input_size: usize,
     channel: &mut Channel,
     rng: &mut RNG,
-) -> eyre::Result<(Vec<AndTriple<P>>, Vec<AuthShare<P>>, U8x16)> {
+) -> swanky_error::Result<(Vec<AndTriple<P>>, Vec<AuthShare<P>>, U8x16)> {
     let mut analyzer = CircuitAnalyzer::new();
     let dummy_wires_self: BinaryBundle<AnalyzerItem> =
         analyzer.bin_encode(0, input_size, channel).unwrap();
@@ -109,7 +108,7 @@ mod tests {
         garbler_wires: BinaryBundle<F::Item>,
         evaluator_wires: BinaryBundle<F::Item>,
         channel: &mut Channel,
-    ) -> eyre::Result<BinaryBundle<F::Item>>
+    ) -> swanky_error::Result<BinaryBundle<F::Item>>
     where
         F: FancyReveal + Fancy + BinaryGadgets + FancyBinary,
     {

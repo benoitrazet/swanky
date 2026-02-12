@@ -2506,7 +2506,6 @@ dependencies = [
 name = "swanky-authenticated-garbling"
 version = "0.6.0"
 dependencies = [
- "eyre",
  "fancy-garbling",
  "itertools 0.14.0",
  "proptest",
@@ -2515,6 +2514,7 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-authenticated-bits",
  "swanky-channel",
+ "swanky-error",
  "swanky-f-rand",
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",

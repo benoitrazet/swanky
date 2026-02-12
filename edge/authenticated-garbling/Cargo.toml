@@ -19,10 +19,10 @@ swanky-party.workspace = true
 swanky-ot-traits.workspace = true
 swanky-adversary.workspace = true
 swanky-aes-rng.workspace = true
+swanky-error.workspace = true
 swanky-ot-alsz-kos.workspace = true
 
 vectoreyes.workspace = true
 rand.workspace = true
 itertools.workspace = true
 proptest.workspace = true
-eyre.workspace = true
