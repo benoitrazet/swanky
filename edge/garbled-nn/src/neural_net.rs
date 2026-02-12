@@ -4,7 +4,7 @@ use crate::{
 };
 use fancy_garbling::{
     AllWire, BinaryBundle, BinaryGadgets, CrtBundle, CrtGadgets, Fancy, FancyArithmetic,
-    FancyBinary, FancyInput, HasModulus, WireMod2,
+    FancyBinary, FancyInput, HasModulus, WireMod2, dummy::Dummy,
 };
 use ndarray::Array3;
 use serde_json::{self, Value};
@@ -12,6 +12,7 @@ use std::{
     fs::File,
     io::{Error, ErrorKind},
     path::Path,
+    time::{Duration, Instant},
 };
 use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
@@ -565,6 +566,63 @@ impl NeuralNet {
             },
         )
         .unwrap();
+    }
+
+    /// Evaluate the [`NeuralNet`] over all the provided inputs and track the
+    /// accuracy of the evaluations.
+    pub fn boolean_accuracy_test(
+        &self,
+        images: &[Array3<i64>],
+        labels: &[Vec<i64>],
+        bitwidth: &[usize],
+        secret_weights: bool,
+    ) {
+        let mut errors = 0;
+
+        let first_layer_nbits = *bitwidth.first().unwrap();
+
+        let total_time = Instant::now();
+
+        for (img_num, img) in images.iter().enumerate() {
+            println!(
+                "(avg {:.2?}) [{} errors ({:.2}%)] ",
+                if img_num > 0 {
+                    total_time.elapsed() / img_num as u32
+                } else {
+                    Duration::ZERO
+                },
+                errors,
+                100.0 * (1.0 - errors as f32 / img_num as f32)
+            );
+
+            let res = Channel::with(std::io::empty(), |channel| {
+                // create a new dummy with the image as the input
+                let mut dummy = Dummy::new();
+
+                let inp = NeuralNet::encode_input_boolean::<_, Dummy>(
+                    &mut dummy,
+                    img,
+                    first_layer_nbits,
+                    channel,
+                );
+                let outs =
+                    self.eval_boolean(&mut dummy, &inp, bitwidth, secret_weights, true, channel);
+                let res = NeuralNet::decode_output_boolean(&mut dummy, &outs, channel);
+                Ok(res)
+            })
+            .unwrap();
+
+            if util::index_of_max(&res) != util::index_of_max(&labels[img_num]) {
+                errors += 1;
+            }
+        }
+
+        println!(
+            "errors: {}/{}. accuracy: {:.2}%",
+            errors,
+            images.len(),
+            100.0 * (1.0 - errors as f32 / images.len() as f32)
+        );
     }
 }
 

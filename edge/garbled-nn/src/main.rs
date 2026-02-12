@@ -226,7 +226,7 @@ pub fn main() {
         Some(Commands::Dummy) => {
             let is_secret = cli.secret;
             if cli.boolean {
-                dummy_tests::boolean_accuracy_test(&nn, &tests, &labels, &bitwidth, is_secret);
+                nn.boolean_accuracy_test(&tests, &labels, &bitwidth, is_secret);
             } else {
                 dummy_tests::arith_accuracy_test(
                     &nn, &tests, &labels, &bitwidth, is_secret, accuracy,
