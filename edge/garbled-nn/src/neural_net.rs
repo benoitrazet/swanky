@@ -4,7 +4,7 @@ use crate::{
 };
 use fancy_garbling::{
     AllWire, BinaryBundle, BinaryGadgets, CrtBundle, CrtGadgets, Fancy, FancyArithmetic,
-    FancyBinary, FancyInput, HasModulus, WireMod2,
+    FancyBinary, FancyInput, HasModulus, WireMod2, dummy::Dummy,
 };
 use ndarray::Array3;
 use serde_json::{self, Value};
@@ -568,8 +568,8 @@ impl NeuralNet {
         .unwrap();
     }
 
-    /// Evaluate the [`NeuralNet`] over all the provided inputs and track the
-    /// accuracy of the evaluations.
+    /// Evaluate the [`NeuralNet`] over all the provided boolean inputs and
+    /// track the accuracy of the evaluations.
     pub fn boolean_accuracy_test<W, F>(
         &self,
         f: &mut F,
@@ -606,6 +606,92 @@ impl NeuralNet {
                 Ok(res)
             })
             .unwrap();
+
+            if util::index_of_max(&res) != util::index_of_max(&labels[img_num]) {
+                errors += 1;
+            }
+        }
+
+        println!(
+            "errors: {}/{}. accuracy: {:.2}%",
+            errors,
+            images.len(),
+            100.0 * (1.0 - errors as f32 / images.len() as f32)
+        );
+    }
+
+    /// Evaluate the [`NeuralNet`] over all the provided arithmetic inputs and
+    /// track the accuracy of the evaluations.
+    pub fn arith_accuracy_test(
+        &self,
+        images: &[Array3<i64>],
+        labels: &[Vec<i64>],
+        bitwidth: &[usize],
+        secret_weights: bool,
+        accuracy: &Accuracy,
+    ) {
+        println!("* running circuit accuracy evaluation");
+
+        let moduli = bitwidth
+            .iter()
+            .map(|&b| fancy_garbling::util::modulus_with_width(b as u32))
+            .collect::<Vec<_>>();
+
+        let qfirst = *moduli.first().unwrap();
+        let qlast = *moduli.last().unwrap();
+
+        let mut errors = 0;
+
+        let mut total_time = Instant::now();
+
+        for (img_num, img) in images.iter().enumerate() {
+            println!(
+                "(avg {:?}) [{} errors ({:.2}%)] ",
+                if img_num > 0 {
+                    total_time.elapsed() / img_num as u32
+                } else {
+                    Duration::ZERO
+                },
+                errors,
+                100.0 * (1.0 - errors as f32 / img_num as f32)
+            );
+
+            let (start, outs) = Channel::with(std::io::empty(), |channel| {
+                // create a new dummy with the image as the input
+                let mut dummy = Dummy::new();
+                let inp = img
+                    .iter()
+                    .map(|&x| {
+                        dummy
+                            .crt_encode(util::to_mod_q(x, qfirst), qfirst, channel)
+                            .unwrap()
+                    })
+                    .collect::<Vec<_>>();
+
+                // evaluate the fancy computation using the dummy
+                let start = Instant::now();
+                let outs = self.eval_arith(
+                    &mut dummy,
+                    &inp,
+                    &moduli,
+                    secret_weights,
+                    true,
+                    accuracy,
+                    channel,
+                );
+                Ok((start, outs))
+            })
+            .unwrap();
+            total_time += start.elapsed();
+
+            // decode the output back to i64
+            let res = outs
+                .iter()
+                .map(|out| {
+                    let vals = &out.iter().map(|v| v.val()).collect::<Vec<_>>();
+                    util::from_mod_q_crt(vals, qlast)
+                })
+                .collect::<Vec<_>>();
 
             if util::index_of_max(&res) != util::index_of_max(&labels[img_num]) {
                 errors += 1;

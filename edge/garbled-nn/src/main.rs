@@ -1,5 +1,4 @@
 mod direct_tests;
-mod dummy_tests;
 mod garbling_benches;
 
 use clap::error::ErrorKind;
@@ -232,9 +231,7 @@ pub fn main() {
                     &mut dummy, &tests, &labels, &bitwidth, is_secret,
                 );
             } else {
-                dummy_tests::arith_accuracy_test(
-                    &nn, &tests, &labels, &bitwidth, is_secret, accuracy,
-                );
+                nn.arith_accuracy_test(&tests, &labels, &bitwidth, is_secret, accuracy);
             }
         }
         Some(Commands::Bench { niters }) => {
