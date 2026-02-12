@@ -1,6 +1,7 @@
 //! Garbled neural networks using `fancy-garbling`
 #![deny(missing_docs)]
 
+pub mod io;
 mod layer;
 mod neural_net;
 pub mod util;

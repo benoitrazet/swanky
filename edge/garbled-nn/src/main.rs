@@ -3,60 +3,14 @@ mod garbling_benches;
 use clap::error::ErrorKind;
 use clap::{Error, Parser, Subcommand};
 use fancy_garbling::dummy::Dummy;
-use ndarray::Array3;
 use serde_json::{self, Value};
 use std::fs::File;
-use std::io::{BufRead, BufReader, Lines};
+use std::io::{BufRead, BufReader};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use swanky_channel::Channel;
 use swanky_garbled_nn::Accuracy;
 use swanky_garbled_nn::NeuralNet;
-
-pub fn get_lines(file: &str) -> Lines<BufReader<File>> {
-    let f = File::open(file).expect("file not found");
-    let r = BufReader::new(f);
-    r.lines()
-}
-
-pub fn value_to_array3(v: &Value) -> Array3<i64> {
-    let rows = v.as_array().expect("value is not an array!");
-
-    let data = rows
-        .iter()
-        .map(|cols| {
-            if cols.is_array() {
-                cols.as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|deps| {
-                        if deps.is_array() {
-                            deps.as_array()
-                                .expect("expected colors!")
-                                .iter()
-                                .map(|val| val.as_i64().expect("expected a number!"))
-                                .collect::<Vec<_>>()
-                        } else {
-                            vec![deps.as_i64().unwrap()]
-                        }
-                    })
-                    .collect::<Vec<_>>()
-            } else {
-                vec![vec![cols.as_i64().unwrap()]]
-            }
-        })
-        .collect::<Vec<_>>();
-
-    let height = data.len();
-    let width = data[0].len();
-    let depth = data[0][0].len();
-
-    Array3::from_shape_vec(
-        (height, width, depth),
-        data.into_iter().flatten().flatten().collect(),
-    )
-    .expect("couldnt create array!")
-}
 
 /// Garbled Neural Net Experiment Launcher
 ///
@@ -124,7 +78,8 @@ pub fn main() {
     println!("{nn:?}");
 
     print!("reading tests...");
-    let tests = read_tests(&dir, ntests).unwrap_or_else(|e| Error::exit(&Error::from(e)));
+    let tests = swanky_garbled_nn::io::read_tests(&dir, ntests)
+        .unwrap_or_else(|e| Error::exit(&Error::from(e)));
     println!("finished");
 
     let mut labels_path = dir.join(Path::new("labels.json"));
@@ -237,62 +192,6 @@ pub fn main() {
                 "no command given! try \"help\"",
             ));
         }
-    }
-}
-
-/// Read tests from a directory.
-///
-/// The directory must contain either `tests.csv` or `tests.json`. The second
-/// argument specifies the number of tests to return; `None` means return all
-/// tests in the file.
-fn read_tests(dir: &Path, num: Option<usize>) -> std::io::Result<Vec<Array3<i64>>> {
-    let mut file = dir.join(Path::new("tests.json"));
-    if !file.is_file() {
-        file = dir.join(Path::new("tests.csv"));
-        if !file.is_file() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidFilename,
-                "Given directory contains neither 'tests.json' nor 'tests.csv'",
-            ));
-        }
-    }
-
-    if file.extension().is_some_and(|ext| ext == "csv") {
-        let reader = BufReader::new(File::open(file)?);
-        // Note: csv can be at most 1-dimensional, if each image gets its own line
-        let iter = reader.lines().map(|line| {
-            let data = line?
-                .split(",")
-                .map(|s| {
-                    s.parse::<i64>().map_err(|e| {
-                        std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-                    })
-                })
-                .collect::<Result<Vec<i64>, _>>()?;
-            Array3::from_shape_vec((data.len(), 1, 1), data)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))
-        });
-
-        if let Some(n) = num {
-            iter.take(n).collect()
-        } else {
-            iter.collect()
-        }
-    } else if file.extension().is_some_and(|ext| ext == "json") {
-        let file = File::open(file)?;
-        let obj: Value = serde_json::from_reader(file)?;
-        let iter = obj.as_array().unwrap().iter().map(value_to_array3);
-
-        if let Some(n) = num {
-            Ok(iter.take(n).collect())
-        } else {
-            Ok(iter.collect())
-        }
-    } else {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "Unsupported filetype: \"{file:?}\"",
-        ))
     }
 }
 
