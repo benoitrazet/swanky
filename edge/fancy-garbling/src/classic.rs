@@ -84,7 +84,7 @@ impl GarbledCircuit {
 
         let deltas = garbler.get_deltas();
         let en = Encoder::new(gb_inps, ev_inps, deltas.clone());
-        let gc = GarbledCircuit::new(channel.writer().blocks.clone());
+        let gc = GarbledCircuit::new(channel.finish_writing());
         let output_mapping = OutputMapping::new(&zeros, &deltas);
 
         Ok((en, gc, output_mapping))
@@ -253,8 +253,12 @@ impl GarbledChannel {
         }
     }
 
-    fn writer(&self) -> &GarbledWriter {
-        self.writer.as_ref().unwrap()
+    /// Consume the [`GarbledChannel`], outputting the resulting garbled circuit.
+    ///
+    /// # Panics
+    /// Panics if there is no valid writer for the [`GarbledChannel`].
+    pub fn finish_writing(self) -> Vec<Block> {
+        self.writer.unwrap().finish()
     }
 }
 
@@ -338,6 +342,11 @@ impl GarbledWriter {
             Vec::new()
         };
         Self { blocks }
+    }
+
+    /// Consume the [`GarbledWriter`], outputting the resulting garbled circuit.
+    fn finish(self) -> Vec<Block> {
+        self.blocks
     }
 }
 
