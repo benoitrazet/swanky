@@ -525,7 +525,7 @@ impl Layer {
         self.eval(f, input, &ops, secret_weights, channel)
     }
 
-    /// Evaluate the layer over the specified [`NueralNetOps`].
+    /// Evaluate the layer over the specified [`NeuralNetOps`].
     ///
     /// # Panics
     /// Panics if `self.input_dims()` does not equal `input.dims()`.
