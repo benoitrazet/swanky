@@ -153,9 +153,12 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> FancyInput for Garbler<RNG, Wire
         &mut self,
         values: &[u16],
         moduli: &[u16],
-        _: &mut Channel,
+        channel: &mut Channel,
     ) -> eyre::Result<Vec<Self::Item>> {
-        let (zero, _) = self.encode_many_wires(values, moduli);
+        let (zero, encoded) = self.encode_many_wires(values, moduli);
+        for wire in encoded {
+            channel.write(&wire.to_block())?;
+        }
         Ok(zero)
     }
 
