@@ -234,12 +234,21 @@ impl OutputMapping {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Reader and Writer impls for simple local structures to collect and release
-// blocks
-
-/// A [`Channel`] type for writing and reading a garbled circuit from memory.
-struct GarbledChannel {
+/// Type for writing and reading a garbled circuit from memory.
+///
+/// A [`GarbledChannel`] provides a way to use the [`Channel`] interface to
+/// write a garbled circuit to memory, alongside the ability to read it from
+/// memory for evaluation.
+///
+/// A [`GarbledChannel`] can be instantiated in one of two ways: either by
+/// calling [`GarbledChannel::new_writer`] to store the garbled circuit in
+/// memory, or [`GarbledChannel::from`] on an existing [`GarbledCircuit`] to
+/// evaluate the garbled circuit.
+///
+/// Note that a [`GarbledChannel`] cannot be both a writer and a reader. For
+/// example, calling [`GarbledChannel::finish_writing`] on a [`GarbledChannel`]
+/// reader results in a panic.
+pub struct GarbledChannel {
     reader: Option<GarbledReader>,
     writer: Option<GarbledWriter>,
 }
