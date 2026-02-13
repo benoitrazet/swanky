@@ -343,8 +343,8 @@ struct GarbledWriter {
 }
 
 impl GarbledWriter {
-    /// Make a new `GarbledWriter`.
-    pub fn new(ngates: Option<usize>) -> Self {
+    /// Make a new [`GarbledWriter`].
+    fn new(ngates: Option<usize>) -> Self {
         let blocks = if let Some(n) = ngates {
             Vec::with_capacity(2 * n)
         } else {
