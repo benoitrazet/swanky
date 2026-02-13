@@ -748,17 +748,13 @@ impl Layer {
 
         for (coordinate, val) in output.indexed_iter() {
             if val.is_none() {
-                println!("{}: uninitialized output at {:?}", self, coordinate);
-                println!("exiting...");
-                std::process::exit(1);
+                panic!("{}: uninitialized output at {:?}", self, coordinate);
             }
         }
 
         output.mapv(|elem| {
             elem.unwrap_or_else(|| {
-                println!("{}: uninitialized output", self);
-                println!("exiting...");
-                std::process::exit(1);
+                panic!("{}: uninitialized output", self);
             })
         })
     }
