@@ -138,7 +138,7 @@ pub struct Encoder<Wire> {
 impl<Wire: WireLabel> Encoder<Wire> {
     /// Make a new [`Encoder`] from lists of garbler and evaluator inputs,
     /// alongside a map of moduli-to-wire-offsets.
-    fn new(
+    pub fn new(
         garbler_inputs: Vec<Wire>,
         evaluator_inputs: Vec<Wire>,
         deltas: HashMap<u16, Wire>,
