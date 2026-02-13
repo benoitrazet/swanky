@@ -1,6 +1,6 @@
 use crate::{
-    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireLabel, WireMod2,
-    check_binary,
+    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyInput, HasModulus, WireLabel,
+    WireMod2, check_binary,
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal},
     garble::binary_and::BinaryWireLabel,
     hash_wires,
@@ -143,6 +143,24 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
         let ms = vec![2; nbits];
         let (gbs, evs) = self.encode_many_wires(&xs, &ms);
         (BinaryBundle::new(gbs), BinaryBundle::new(evs))
+    }
+}
+
+impl<RNG: CryptoRng + RngCore, Wire: WireLabel> FancyInput for Garbler<RNG, Wire> {
+    type Item = Wire;
+
+    fn encode_many(
+        &mut self,
+        values: &[u16],
+        moduli: &[u16],
+        _: &mut Channel,
+    ) -> eyre::Result<Vec<Self::Item>> {
+        let (zero, _) = self.encode_many_wires(values, moduli);
+        Ok(zero)
+    }
+
+    fn receive_many(&mut self, _moduli: &[u16], _: &mut Channel) -> eyre::Result<Vec<Self::Item>> {
+        unimplemented!("Garbler cannot receive values")
     }
 }
 
