@@ -108,11 +108,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
     ///
     /// # Panics
     /// Panics if the length of `vals` and `moduli` are not equal.
-    pub fn encode_many_wires(
-        &mut self,
-        vals: &[u16],
-        moduli: &[u16],
-    ) -> eyre::Result<(Vec<Wire>, Vec<Wire>)> {
+    pub fn encode_many_wires(&mut self, vals: &[u16], moduli: &[u16]) -> (Vec<Wire>, Vec<Wire>) {
         assert_eq!(vals.len(), moduli.len());
 
         let mut gbs = Vec::with_capacity(vals.len());
@@ -122,7 +118,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
             gbs.push(gb);
             evs.push(ev);
         }
-        Ok((gbs, evs))
+        (gbs, evs)
     }
 
     /// Encode a `CrtBundle`, producing zero wires as well as encoded values.
@@ -130,11 +126,11 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
         &mut self,
         val: u128,
         modulus: u128,
-    ) -> eyre::Result<(CrtBundle<Wire>, CrtBundle<Wire>)> {
+    ) -> (CrtBundle<Wire>, CrtBundle<Wire>) {
         let ms = crate::util::factor(modulus);
         let xs = crate::util::crt(val, &ms);
-        let (gbs, evs) = self.encode_many_wires(&xs, &ms)?;
-        Ok((CrtBundle::new(gbs), CrtBundle::new(evs)))
+        let (gbs, evs) = self.encode_many_wires(&xs, &ms);
+        (CrtBundle::new(gbs), CrtBundle::new(evs))
     }
 
     /// Encode a `BinaryBundle`, producing zero wires as well as encoded values.
@@ -142,11 +138,11 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
         &mut self,
         val: u128,
         nbits: usize,
-    ) -> eyre::Result<(BinaryBundle<Wire>, BinaryBundle<Wire>)> {
+    ) -> (BinaryBundle<Wire>, BinaryBundle<Wire>) {
         let xs = crate::util::u128_to_bits(val, nbits);
         let ms = vec![2; nbits];
-        let (gbs, evs) = self.encode_many_wires(&xs, &ms)?;
-        Ok((BinaryBundle::new(gbs), BinaryBundle::new(evs)))
+        let (gbs, evs) = self.encode_many_wires(&xs, &ms);
+        (BinaryBundle::new(gbs), BinaryBundle::new(evs))
     }
 }
 
