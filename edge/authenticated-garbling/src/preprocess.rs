@@ -76,7 +76,7 @@ pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
     and_generator.generate(nands, &mut and_shares, channel, rng)?;
 
     let ninputs = analyzer.ninputs();
-    let mut auth_shares = Vec::with_capacity(ninputs);
+    let mut auth_shares = Vec::with_capacity(nands + ninputs);
     and_generator.auth_share_generator_mut().generate(
         nands + ninputs,
         &mut auth_shares,
