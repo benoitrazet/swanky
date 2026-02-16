@@ -108,7 +108,7 @@ impl LocalSocket {
         #[cfg(not(unix))]
         let (a, b) = tcp_socketpair().wrap_err(
             ErrorKind::NetworkError,
-            "Constructing LocalSocket.".to_string(),
+            "Failed to construct LocalSocket.".to_string(),
         )?;
         Ok((LocalSocket { inner: a }, LocalSocket { inner: b }))
     }
