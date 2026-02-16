@@ -16,7 +16,7 @@ fn tcp_socketpair() -> swanky_error::Result<(std::net::TcpStream, std::net::TcpS
     // Port 0 means the OS will pick an unused port.
     let server = std::net::TcpListener::bind("127.0.0.1:0").wrap_err(
         ErrorKind::NetworkError,
-        "Failed to bind to 'localhost:0'.".to_string(),
+        "Failed to bind to '127.0.0.1:0'.".to_string(),
     )?;
     let addr = server.local_addr().wrap_err(
         ErrorKind::NetworkError,
