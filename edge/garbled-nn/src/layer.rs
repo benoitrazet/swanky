@@ -169,23 +169,23 @@ impl std::fmt::Debug for Layer {
 /// directly over `i64` or as an arithmetic circuit, or whatever. The first
 /// argument to these functions could be a [`Fancy`] object.
 #[allow(clippy::type_complexity)]
-struct NeuralNetOps<B, T> {
+struct NeuralNetOps<F, T> {
     // Encode a constant.
-    enc: Box<dyn Fn(&mut B, i64, &mut Channel) -> T>,
+    enc: Box<dyn Fn(&mut F, i64, &mut Channel) -> T>,
     // Encode a secret.
-    sec: Box<dyn Fn(&mut B, Option<i64>, &mut Channel) -> T>,
+    sec: Box<dyn Fn(&mut F, Option<i64>, &mut Channel) -> T>,
     // Add two values.
-    add: Box<dyn Fn(&mut B, &T, &T, &mut Channel) -> T>,
+    add: Box<dyn Fn(&mut F, &T, &T, &mut Channel) -> T>,
     // Scalar multiplication.
-    cmul: Box<dyn Fn(&mut B, &T, i64, &mut Channel) -> T>,
+    cmul: Box<dyn Fn(&mut F, &T, i64, &mut Channel) -> T>,
     // Apply secret weight to an input.
-    proj: Box<dyn Fn(&mut B, &T, Option<i64>, &mut Channel) -> T>,
+    proj: Box<dyn Fn(&mut F, &T, Option<i64>, &mut Channel) -> T>,
     // Maximum of a slice of encodings.
-    max: Box<dyn Fn(&mut B, &[T], &mut Channel) -> T>,
+    max: Box<dyn Fn(&mut F, &[T], &mut Channel) -> T>,
     // Activation function.
-    act: Box<dyn Fn(&mut B, &ActivationFunction, &T, &mut Channel) -> T>,
+    act: Box<dyn Fn(&mut F, &ActivationFunction, &T, &mut Channel) -> T>,
     // Encode a zero value.
-    zero: Box<dyn Fn(&mut B, &mut Channel) -> T>,
+    zero: Box<dyn Fn(&mut F, &mut Channel) -> T>,
 }
 
 impl Layer {
@@ -369,7 +369,7 @@ impl Layer {
 
     /// Evaluate the layer using arithmetic garbled circuits.
     #[allow(clippy::too_many_arguments)]
-    pub fn as_arith<W, F>(
+    pub fn as_arith<F, W>(
         &self,
         f: &mut F,
         input_modulus: u128,
@@ -471,7 +471,7 @@ impl Layer {
     }
 
     /// Evaluate the layer using binary garbled circuits.
-    pub fn as_binary<W, F>(
+    pub fn as_binary<F, W>(
         &self,
         f: &mut F,
         nbits: usize,
@@ -564,11 +564,11 @@ impl Layer {
     ///
     /// # Panics
     /// Panics if `self.input_dims()` does not equal `input.dims()`.
-    fn eval<T, B>(
+    fn eval<F, T>(
         &self,
-        b: &mut B,
+        b: &mut F,
         input: &Array3<T>,
-        ops: &NeuralNetOps<B, T>,
+        ops: &NeuralNetOps<F, T>,
         secret_weights: bool,
         channel: &mut Channel,
     ) -> Array3<T>
