@@ -13,7 +13,9 @@ workspace = true
 [dependencies]
 fancy-garbling.workspace = true
 swanky-aes-rng.workspace = true
+swanky-block.workspace = true
 swanky-channel.workspace = true
+swanky-error.workspace = true
 swanky-ot-alsz-kos.workspace = true
 swanky-twopac.workspace = true
 
@@ -21,7 +23,5 @@ clap.workspace = true
 eyre.workspace = true
 itertools.workspace = true
 ndarray.workspace = true
-serde_json.workspace = true
-
-[dev-dependencies]
 rand.workspace = true
+serde_json.workspace = true

@@ -2668,7 +2668,9 @@ dependencies = [
  "rand 0.8.5",
  "serde_json",
  "swanky-aes-rng",
+ "swanky-block",
  "swanky-channel",
+ "swanky-error",
  "swanky-ot-alsz-kos",
  "swanky-twopac",
 ]
