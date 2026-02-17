@@ -23,6 +23,51 @@ pub struct Accuracy {
     pub max: String,
 }
 
+/// The supported activation functions.
+pub enum ActivationFunction {
+    /// `Sign(x) = { 1 if x ≥ 0, -1 otherwise }`.
+    Sign,
+    /// `Relu(x) = max(0, x)`.
+    Relu,
+    /// `Identity(x) = x`.
+    Identity,
+}
+
+impl std::fmt::Display for ActivationFunction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ActivationFunction::Sign => write!(f, "Sign"),
+            ActivationFunction::Relu => write!(f, "ReLU"),
+            ActivationFunction::Identity => write!(f, "Identity"),
+        }
+    }
+}
+
+/// Map a string to its associated [`ActivationFunction`].
+///
+/// Not all input activation functions are supported; rather, they are mapped to
+/// ones that we do support internally. Below is the mapping from `tensorflow`
+/// activation functions:
+///
+/// - tanh, hard_sigmoid => [`ActivationFunction::Sign`]
+/// - relu => [`ActivationFunction::Relu`]
+/// - linear, softmax => [`ActivationFunction::Identity`]
+impl TryFrom<&str> for ActivationFunction {
+    type Error = std::io::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "tanh" | "hard_sigmoid" | "sign" => Ok(ActivationFunction::Sign),
+            "relu" => Ok(ActivationFunction::Relu),
+            "linear" | "softmax" | "identity" | "id" => Ok(ActivationFunction::Identity),
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Input is not a valid activation function",
+            )),
+        }
+    }
+}
+
 /// A layer of a [`NeuralNet`](crate::NeuralNet).
 ///
 /// Some layers contains optional weights and biases. If they are not present,
@@ -35,8 +80,7 @@ pub enum Layer {
         /// The layer biases.
         biases: Vec<Option<i64>>,
         /// The activation type.
-        // TODO: This should be an enum!
-        activation: String,
+        activation: ActivationFunction,
     },
     /// A convolution layer.
     Convolutional {
@@ -51,8 +95,7 @@ pub enum Layer {
         /// The stride, given as (y, x).
         stride: (usize, usize),
         /// The activation type.
-        // TODO: This should be an enum!
-        activation: String,
+        activation: ActivationFunction,
         /// Whether to apply padding or not.
         pad: bool,
     },
@@ -77,8 +120,7 @@ pub enum Layer {
     /// An activation layer.
     Activation {
         /// The activation type.
-        // TODO: This should be an enum!
-        activation: String,
+        activation: ActivationFunction,
         /// The input dimensions, given as (height, width, depth).
         input_shape: (usize, usize, usize),
     },
@@ -140,8 +182,8 @@ struct NeuralNetOps<B, T> {
     proj: Box<dyn Fn(&mut B, &T, Option<i64>, &mut Channel) -> T>,
     // Maximum of a slice of encodings.
     max: Box<dyn Fn(&mut B, &[T], &mut Channel) -> T>,
-    // Activation function chosen based on string name.
-    act: Box<dyn Fn(&mut B, &str, &T, &mut Channel) -> T>,
+    // Activation function.
+    act: Box<dyn Fn(&mut B, &ActivationFunction, &T, &mut Channel) -> T>,
     // Encode a zero value.
     zero: Box<dyn Fn(&mut B, &mut Channel) -> T>,
 }
@@ -272,17 +314,16 @@ impl Layer {
                 .unwrap()
         };
 
-        let act = |_: &mut usize, a: &str, x: &i64, _: &mut Channel| match a {
-            "sign" => {
+        let act = |_: &mut usize, a: &ActivationFunction, x: &i64, _: &mut Channel| match a {
+            ActivationFunction::Sign => {
                 if *x >= 0 {
                     1
                 } else {
                     -1
                 }
             }
-            "relu" => std::cmp::max(*x, 0),
-            "id" => *x,
-            act => panic!("unsupported activation {}", act),
+            ActivationFunction::Relu => std::cmp::max(*x, 0),
+            ActivationFunction::Identity => *x,
         };
 
         let ops = NeuralNetOps {
@@ -311,16 +352,15 @@ impl Layer {
             proj: Box::new(|_, _, _, _| panic!("secret not supported for plaintext eval")),
             max: Box::new(|_, xs, _| *xs.iter().max().unwrap()),
             act: Box::new(|_, a, x, _| match a {
-                "sign" => {
+                ActivationFunction::Sign => {
                     if *x >= 0 {
                         1
                     } else {
                         -1
                     }
                 }
-                "relu" => std::cmp::max(*x, 0),
-                "id" => *x,
-                act => panic!("unsupported activation {}", act),
+                ActivationFunction::Relu => std::cmp::max(*x, 0),
+                ActivationFunction::Identity => *x,
             }),
             zero: Box::new(|_, _| 0),
         };
@@ -414,18 +454,15 @@ impl Layer {
             max: Box::new(move |b: &mut F, xs: &[CrtBundle<W>], channel| {
                 b.crt_max(xs, &max_accuracy, channel).unwrap()
             }),
-            act: Box::new(
-                move |b: &mut F, a: &str, x: &CrtBundle<W>, channel| match a {
-                    "sign" => b
-                        .crt_sgn(x, &sign_accuracy, Some(&output_ps), channel)
-                        .unwrap(),
-                    "relu" => b
-                        .crt_relu(x, &relu_accuracy, Some(&output_ps), channel)
-                        .unwrap(),
-                    "id" => x.clone(),
-                    act => panic!("unsupported activation {}", act),
-                },
-            ),
+            act: Box::new(move |b: &mut F, a, x: &CrtBundle<W>, channel| match a {
+                ActivationFunction::Sign => b
+                    .crt_sgn(x, &sign_accuracy, Some(&output_ps), channel)
+                    .unwrap(),
+                ActivationFunction::Relu => b
+                    .crt_relu(x, &relu_accuracy, Some(&output_ps), channel)
+                    .unwrap(),
+                ActivationFunction::Identity => x.clone(),
+            }),
             zero: Box::new(move |b: &mut F, channel: &mut Channel| {
                 b.crt_constant_bundle(0, q, channel).unwrap()
             }),
@@ -501,20 +538,19 @@ impl Layer {
             ),
 
             act: Box::new(
-                move |b: &mut F, a: &str, x: &BinaryBundle<W>, channel: &mut Channel| match a {
-                    "sign" => {
+                move |b: &mut F, a, x: &BinaryBundle<W>, channel: &mut Channel| match a {
+                    ActivationFunction::Sign => {
                         let sign = x.wires().last().unwrap();
                         let neg1 = (1 << nbits) - 1;
                         b.bin_multiplex_constant_bits(sign, 1, neg1, nbits, channel)
                             .unwrap()
                     }
-                    "relu" => {
+                    ActivationFunction::Relu => {
                         let sign = x.wires().last().unwrap();
                         let zeros = b.bin_constant_bundle(0u128, nbits, channel).unwrap();
                         b.bin_multiplex(sign, x, &zeros, channel).unwrap()
                     }
-                    "id" => x.clone(),
-                    act => panic!("unsupported activation {}", act),
+                    ActivationFunction::Identity => x.clone(),
                 },
             ),
 

@@ -1,5 +1,5 @@
 use crate::{
-    layer::{Accuracy, Layer},
+    layer::{Accuracy, ActivationFunction, Layer},
     util,
 };
 use fancy_garbling::{
@@ -386,7 +386,8 @@ impl NeuralNet {
                         }
                     }
 
-                    let activation = map_activation(cfg["activation"].as_str().unwrap());
+                    let activation =
+                        ActivationFunction::try_from(cfg["activation"].as_str().unwrap())?;
                     let biases = weights_and_biases[1]
                         .as_array()
                         .unwrap()
@@ -406,7 +407,8 @@ impl NeuralNet {
                     let padding = cfg["padding"].as_str().unwrap();
                     let pad = padding == "same";
 
-                    let activation = map_activation(cfg["activation"].as_str().unwrap());
+                    let activation =
+                        ActivationFunction::try_from(cfg["activation"].as_str().unwrap())?;
                     let weights_and_biases =
                         weights_iter.next().expect("not enough weights and biases!");
 
@@ -538,7 +540,8 @@ impl NeuralNet {
                 }
 
                 "Activation" => {
-                    let activation = map_activation(cfg["activation"].as_str().unwrap());
+                    let activation =
+                        ActivationFunction::try_from(cfg["activation"].as_str().unwrap())?;
                     layers.push(Layer::Activation {
                         input_shape,
                         activation,
@@ -864,19 +867,6 @@ impl NeuralNet {
         println!("{}", informer.stats());
         Ok(())
     }
-}
-
-/// Map the tensorflow activation functions to ones we support.
-fn map_activation(act: &str) -> String {
-    match act {
-        "tanh" => "sign",
-        "softmax" => "id",
-        "linear" => "id",
-        "relu" => "relu",
-        "hard_sigmoid" => "sign",
-        _ => panic!("unsupported activation: {}", act),
-    }
-    .to_string()
 }
 
 /// Extract the input shape from a JSON value.
