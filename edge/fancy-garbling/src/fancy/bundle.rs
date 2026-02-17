@@ -3,11 +3,13 @@ use crate::{
     fancy::{Fancy, HasModulus},
 };
 use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 use std::ops::Index;
 use swanky_channel::Channel;
 
 /// A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Bundle<W>(Vec<W>);
 
 impl<W: Clone + HasModulus> Bundle<W> {
