@@ -1062,64 +1062,119 @@ fn input_shape(
 
 #[cfg(test)]
 mod tests {
+    #![allow(non_upper_case_globals)]
+    #![allow(non_snake_case)]
+
     use crate::{NeuralNet, io::read_tests};
+    use fancy_garbling::WireMod2;
+    use ndarray::Array3;
     use std::path::Path;
+    use swanky_aes_rng::AesRng;
 
-    fn binary_and_plaintext_match_for_dir(dir: &Path, bitwidths: &[usize]) {
-        println!("Testing binary-plaintext match for {:?}", dir);
+    static DINN_30_DIR: &str = "neural_nets/DINN_30";
+    static DINN_30_Bitwidths: [usize; 3] = [9; 3];
+    static DINN_100_DIR: &str = "neural_nets/DINN_100";
+    static DINN_100_Bitwidths: [usize; 3] = [9; 3];
+    static CryptoNets_DIR: &str = "neural_nets/CryptoNets";
+    static CrytoNets_Bitwidths: [usize; 11] = [26; 11];
+    static DeepSecure_DIR: &str = "neural_nets/DeepSecure";
+    static DeepSecure_Bitwidths: [usize; 5] = [24; 5];
+    static MiniONN_MNIST: &str = "neural_nets/MiniONN_MNIST";
+    static MiniONN_MNIST_Bitwidths: [usize; 8] = [21; 8];
 
+    fn get_nn_and_test(dir: &Path) -> (NeuralNet, Array3<i64>) {
         let nn = NeuralNet::try_from(dir).unwrap();
         let tests = read_tests(dir, Some(1)).unwrap();
+        (nn, tests[0].clone())
+    }
 
-        let plaintext_output = nn.eval_plaintext(&tests[0]);
-        let gc_output = nn
-            .eval_roundtrip_binary(&tests[0], bitwidths, false)
-            .unwrap();
+    fn binary_and_plaintext_match_for_dir(dir: &Path, bitwidths: &[usize]) {
+        let (nn, test) = get_nn_and_test(dir);
+
+        let plaintext_output = nn.eval_plaintext(&test);
+        let gc_output = nn.eval_roundtrip_binary(&test, bitwidths, false).unwrap();
         for (a, b) in plaintext_output.iter().zip(gc_output.iter()) {
             assert_eq!(a, b);
         }
     }
 
     #[test]
-    #[allow(non_snake_case)]
+    fn garbling_works_for_DINN_30() {
+        let (nn, test) = get_nn_and_test(Path::new(DINN_30_DIR));
+        let (encoder, gc, output_map) = nn
+            .gc_garble_boolean::<WireMod2, _>(&DINN_30_Bitwidths, false, AesRng::new())
+            .unwrap();
+        let output = nn
+            .gc_eval_boolean::<WireMod2>(
+                &encoder,
+                &gc,
+                &output_map,
+                &test,
+                &DINN_30_Bitwidths,
+                false,
+            )
+            .unwrap();
+        let plaintext = nn.eval_plaintext(&test);
+        for (a, b) in plaintext.iter().zip(output.iter()) {
+            assert_eq!(a, b);
+        }
+    }
+
+    #[test]
+    fn garbling_works_for_DINN_100() {
+        let (nn, test) = get_nn_and_test(Path::new(DINN_100_DIR));
+        let (encoder, gc, output_map) = nn
+            .gc_garble_boolean::<WireMod2, _>(&DINN_100_Bitwidths, false, AesRng::new())
+            .unwrap();
+        let output = nn
+            .gc_eval_boolean::<WireMod2>(
+                &encoder,
+                &gc,
+                &output_map,
+                &test,
+                &DINN_100_Bitwidths,
+                false,
+            )
+            .unwrap();
+        let plaintext = nn.eval_plaintext(&test);
+        for (a, b) in plaintext.iter().zip(output.iter()) {
+            assert_eq!(a, b);
+        }
+    }
+
+    #[test]
     fn binary_and_plaintext_match_for_DINN_30() {
-        binary_and_plaintext_match_for_dir(Path::new("neural_nets/DINN_30"), &[9; 3]);
+        binary_and_plaintext_match_for_dir(Path::new(DINN_30_DIR), &DINN_30_Bitwidths);
     }
 
     #[test]
-    #[allow(non_snake_case)]
     fn binary_and_plaintext_match_for_DINN_100() {
-        binary_and_plaintext_match_for_dir(Path::new("neural_nets/DINN_100"), &[9; 3]);
+        binary_and_plaintext_match_for_dir(Path::new(DINN_100_DIR), &DINN_100_Bitwidths);
     }
 
     #[test]
-    #[allow(non_snake_case)]
     fn binary_and_plaintext_match_for_CryptoNets() {
-        binary_and_plaintext_match_for_dir(Path::new("neural_nets/CryptoNets"), &[26; 11]);
+        binary_and_plaintext_match_for_dir(Path::new(CryptoNets_DIR), &CrytoNets_Bitwidths);
     }
 
     #[test]
-    #[allow(non_snake_case)]
     fn binary_and_plaintext_match_for_DeepSecure() {
-        binary_and_plaintext_match_for_dir(Path::new("neural_nets/DeepSecure"), &[24; 5]);
+        binary_and_plaintext_match_for_dir(Path::new(DeepSecure_DIR), &DeepSecure_Bitwidths);
     }
 
     // This one almost certainly will take too long.
     // #[test]
-    // #[allow(non_snake_case)]
     // fn binary_and_plaintext_match_for_MiniONN_CIFAR() {
     //     binary_and_plaintext_match_for_dir(Path::new("neural_nets/MiniONN_CIFAR"), &[...]);
     // }
 
     #[test]
-    #[allow(non_snake_case)]
     fn binary_and_plaintext_match_for_MiniONN_MNIST() {
-        binary_and_plaintext_match_for_dir(Path::new("neural_nets/MiniONN_MNIST"), &[21; 8]);
+        binary_and_plaintext_match_for_dir(Path::new(MiniONN_MNIST), &MiniONN_MNIST_Bitwidths);
     }
 
     // This one fails, need to debug!
     // #[test]
-    // #[allow(non_snake_case)]
     // fn binary_and_plaintext_match_for_SecureML() {
     //     binary_and_plaintext_match_for_dir(Path::new("neural_nets/SecureML"), &[22; 11]);
     // }
