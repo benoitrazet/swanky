@@ -60,6 +60,8 @@ error_kind! {
     SerializationError,
     #[doc = "A filesystem error has occurred"]
     FilesystemError,
+    #[doc = "An error occurred while initializing an object/protocol"]
+    InitializationError,
     #[doc = "An error that does not fall under any other Swanky error kind has occurred"]
     OtherError,
 }
