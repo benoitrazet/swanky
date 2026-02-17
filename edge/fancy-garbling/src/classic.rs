@@ -84,7 +84,7 @@ impl GarbledCircuit {
 
         let deltas = garbler.get_deltas();
         let en = Encoder::new(gb_inps, ev_inps, deltas.clone());
-        let gc = GarbledCircuit::new(channel.writer().blocks.clone());
+        let gc = GarbledCircuit::new(channel.finish_writing());
         let output_mapping = OutputMapping::new(&zeros, &deltas);
 
         Ok((en, gc, output_mapping))
@@ -138,7 +138,7 @@ pub struct Encoder<Wire> {
 impl<Wire: WireLabel> Encoder<Wire> {
     /// Make a new [`Encoder`] from lists of garbler and evaluator inputs,
     /// alongside a map of moduli-to-wire-offsets.
-    fn new(
+    pub fn new(
         garbler_inputs: Vec<Wire>,
         evaluator_inputs: Vec<Wire>,
         deltas: HashMap<u16, Wire>,
@@ -234,12 +234,21 @@ impl OutputMapping {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Reader and Writer impls for simple local structures to collect and release
-// blocks
-
-/// A [`Channel`] type for writing and reading a garbled circuit from memory.
-struct GarbledChannel {
+/// Type for writing and reading a garbled circuit from memory.
+///
+/// A [`GarbledChannel`] provides a way to use the [`Channel`] interface to
+/// write a garbled circuit to memory, alongside the ability to read it from
+/// memory for evaluation.
+///
+/// A [`GarbledChannel`] can be instantiated in one of two ways: either by
+/// calling [`GarbledChannel::new_writer`] to store the garbled circuit in
+/// memory, or [`GarbledChannel::from`] on an existing [`GarbledCircuit`] to
+/// evaluate the garbled circuit.
+///
+/// Note that a [`GarbledChannel`] cannot be both a writer and a reader. For
+/// example, calling [`GarbledChannel::finish_writing`] on a [`GarbledChannel`]
+/// reader results in a panic.
+pub struct GarbledChannel {
     reader: Option<GarbledReader>,
     writer: Option<GarbledWriter>,
 }
@@ -253,8 +262,12 @@ impl GarbledChannel {
         }
     }
 
-    fn writer(&self) -> &GarbledWriter {
-        self.writer.as_ref().unwrap()
+    /// Consume the [`GarbledChannel`], outputting the resulting garbled circuit.
+    ///
+    /// # Panics
+    /// Panics if there is no valid writer for the [`GarbledChannel`].
+    pub fn finish_writing(self) -> Vec<Block> {
+        self.writer.unwrap().finish()
     }
 }
 
@@ -330,14 +343,19 @@ struct GarbledWriter {
 }
 
 impl GarbledWriter {
-    /// Make a new `GarbledWriter`.
-    pub fn new(ngates: Option<usize>) -> Self {
+    /// Make a new [`GarbledWriter`].
+    fn new(ngates: Option<usize>) -> Self {
         let blocks = if let Some(n) = ngates {
             Vec::with_capacity(2 * n)
         } else {
             Vec::new()
         };
         Self { blocks }
+    }
+
+    /// Consume the [`GarbledWriter`], outputting the resulting garbled circuit.
+    fn finish(self) -> Vec<Block> {
+        self.blocks
     }
 }
 

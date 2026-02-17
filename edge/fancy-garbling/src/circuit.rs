@@ -479,7 +479,7 @@ impl GateType for ArithmeticGate {
 }
 
 /// Trait representing circuits that can be built by `CircuitBuilder`
-pub trait CircuitType: Clone {
+pub trait CircuitType {
     /// Gates that the circuit is composed of
     type Gate: GateType;
 

@@ -133,7 +133,6 @@ mod tests {
             + 'static,
     {
         circ.print_info().unwrap();
-        let circ_ = circ.clone();
 
         let (_, out) = swanky_channel::local::local_channel_pair(
             |channel| {
@@ -143,7 +142,7 @@ mod tests {
                     .encode_many(&vec![0_u16; 128], &vec![2; 128], channel)
                     .unwrap();
                 let ys = gb.receive_many(&vec![2; 128], channel).unwrap();
-                circ_.eval(&mut gb, &xs, &ys, channel).unwrap();
+                circ.eval(&mut gb, &xs, &ys, channel).unwrap();
                 Ok(())
             },
             |channel| {
@@ -154,7 +153,7 @@ mod tests {
                 let ys = ev
                     .encode_many(&vec![0_u16; 128], &vec![2; 128], channel)
                     .unwrap();
-                let out = circ_.eval(&mut ev, &xs, &ys, channel).unwrap().unwrap();
+                let out = circ.eval(&mut ev, &xs, &ys, channel).unwrap().unwrap();
                 Ok(out)
             },
         )
