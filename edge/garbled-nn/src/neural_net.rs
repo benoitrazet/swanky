@@ -1068,7 +1068,7 @@ mod tests {
     use crate::{NeuralNet, io::read_tests};
     use fancy_garbling::WireMod2;
     use ndarray::Array3;
-    use std::path::Path;
+    use std::{ops::Deref, path::Path};
     use swanky_aes_rng::AesRng;
 
     static DINN_30_DIR: &str = "neural_nets/DINN_30";
@@ -1083,8 +1083,11 @@ mod tests {
     static MiniONN_MNIST_Bitwidths: [usize; 8] = [21; 8];
 
     fn get_nn_and_test(dir: &Path) -> (NeuralNet, Array3<i64>) {
-        let nn = NeuralNet::try_from(dir).unwrap();
-        let tests = read_tests(dir, Some(1)).unwrap();
+        // Set the base path to `$CARGO_MANIFEST_DIR` for CI.
+        let base = env!("CARGO_MANIFEST_DIR");
+        let dir = Path::new(base).join(dir);
+        let nn = NeuralNet::try_from(dir.deref()).unwrap();
+        let tests = read_tests(&dir, Some(1)).unwrap();
         (nn, tests[0].clone())
     }
 
