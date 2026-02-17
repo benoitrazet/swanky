@@ -15,6 +15,7 @@ pub struct Garbler<RNG, Wire> {
     current_output: usize,
     current_gate: usize,
     zero_input_wires: Vec<AuthenticatedWireMod2<PartyGarbler>>,
+    authenticated_wires: Vec<AuthenticatedWireMod2<PartyGarbler>>,
     rng: RNG,
 }
 
@@ -26,6 +27,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
             current_gate: 0,
             current_output: 0,
             zero_input_wires: Vec::new(),
+            authenticated_wires: Vec::new(),
             rng,
         }
     }

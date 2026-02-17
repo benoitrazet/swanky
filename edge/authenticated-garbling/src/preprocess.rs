@@ -78,7 +78,9 @@ pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
     let ninputs = analyzer.ninputs();
     let mut auth_shares = Vec::with_capacity(nands + ninputs);
     and_generator.auth_share_generator_mut().generate(
-        nands + ninputs,
+        // We need authenticated shares for both input labels
+        // and their zero wires.
+        nands + ninputs * 2,
         &mut auth_shares,
         channel,
         rng,
