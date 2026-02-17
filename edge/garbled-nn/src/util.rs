@@ -76,40 +76,10 @@ pub fn i64_from_twos_complement(x: u128, nbits: usize) -> i64 {
     }
 }
 
-/// Convert an `i64` value into its bit representation.
-pub fn i64_to_bits(x: i64, nbits: usize) -> Vec<u16> {
-    let twos = i64_to_twos_complement(x, nbits);
-    numbers::u128_to_bits(twos, nbits)
-}
-
 /// Convert a sequence of bits into its `i64` representation.
 pub fn i64_from_bits(bits: &[u16]) -> i64 {
     let x = numbers::u128_from_bits(bits);
     i64_from_twos_complement(x, bits.len())
-}
-
-/// Encode `input` into its CRT representation.
-pub fn encode_crt(input: impl Iterator<Item = i64>, modulus: u128) -> Vec<u16> {
-    input.flat_map(|x| to_mod_q_crt(x, modulus)).collect()
-}
-
-/// Decode `output` from its CRT representation.
-pub fn decode_crt(output: &[u16], modulus: u128) -> Vec<i64> {
-    let nprimes = numbers::factor(modulus).len();
-    output
-        .chunks(nprimes)
-        .map(|xs| from_mod_q_crt(xs, modulus))
-        .collect()
-}
-
-/// Encode `input` as bits, chunking `input` by `nbits`.
-pub fn encode_binary(input: impl Iterator<Item = i64>, nbits: usize) -> Vec<u16> {
-    input.flat_map(|x| i64_to_bits(x, nbits)).collect()
-}
-
-/// Decode `output` into `i64`s, chunking `output` by `nbits`.
-pub fn decode_binary(output: &[u16], nbits: usize) -> Vec<i64> {
-    output.chunks(nbits).map(i64_from_bits).collect()
 }
 
 #[cfg(test)]
@@ -139,15 +109,5 @@ mod tests {
                 i64_from_twos_complement(i64_to_twos_complement(x, nbits), nbits)
             );
         }
-    }
-
-    #[test]
-    fn binary_encoding() {
-        let mut rng = thread_rng();
-        let nbits = 64;
-        let x = rng.r#gen::<i64>() % (1 << 32);
-        let bits = i64_to_bits(x, nbits);
-        let y = i64_from_bits(&bits);
-        assert_eq!(x, y);
     }
 }
