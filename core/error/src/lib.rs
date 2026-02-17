@@ -62,6 +62,8 @@ error_kind! {
     FilesystemError,
     #[doc = "An error occurred while initializing an object/protocol"]
     InitializationError,
+    #[doc = "An operation that is unsupported was attempted"]
+    UnsupportedError,
     #[doc = "An error that does not fall under any other Swanky error kind has occurred"]
     OtherError,
 }
