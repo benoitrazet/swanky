@@ -266,10 +266,9 @@ impl Layer {
     /// Evaluate this layer in plaintext, returning the layer output alongside
     /// the max value on a wire.
     pub fn max_bitwidth(&self, input: &Array3<i64>, channel: &mut Channel) -> (Array3<i64>, i64) {
-        let max_atomic: Arc<AtomicUsize> = Arc::new(AtomicUsize::new(0));
-        let thread_atomic = max_atomic.clone();
-        let store_max_base = Arc::new(move |x: i64| {
-            thread_atomic.fetch_max(x.unsigned_abs() as usize, Ordering::SeqCst);
+        let max_atomic = AtomicUsize::new(0);
+        let store_max_base = Arc::new(move |x: i64| -> usize {
+            max_atomic.fetch_max(x.unsigned_abs() as usize, Ordering::SeqCst)
         });
 
         let store_max = store_max_base.clone();
@@ -279,7 +278,7 @@ impl Layer {
         };
 
         let store_max = store_max_base.clone();
-        let proj = move |_: &mut usize, inp: &i64, opt_w: Option<i64>, _: &mut Channel| {
+        let proj = move |_: &mut usize, inp: &i64, opt_w, _: &mut Channel| {
             if let Some(w) = opt_w {
                 let x = w * inp;
                 store_max(x);
@@ -338,7 +337,7 @@ impl Layer {
         };
 
         let layer_output = self.eval(&mut 0, input, &ops, false, channel);
-        let max_val = max_atomic.load(Ordering::SeqCst) as i64;
+        let max_val = store_max_base(0) as i64;
         (layer_output, max_val)
     }
 
