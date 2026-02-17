@@ -1098,21 +1098,13 @@ mod tests {
         }
     }
 
-    #[test]
-    fn garbling_works_for_DINN_30() {
-        let (nn, test) = get_nn_and_test(Path::new(DINN_30_DIR));
+    fn garbling_works_for_model(dir: &str, bitwidths: &[usize]) {
+        let (nn, test) = get_nn_and_test(Path::new(dir));
         let (encoder, gc, output_map) = nn
-            .gc_garble_boolean::<WireMod2, _>(&DINN_30_Bitwidths, false, AesRng::new())
+            .gc_garble_boolean::<WireMod2, _>(bitwidths, false, AesRng::new())
             .unwrap();
         let output = nn
-            .gc_eval_boolean::<WireMod2>(
-                &encoder,
-                &gc,
-                &output_map,
-                &test,
-                &DINN_30_Bitwidths,
-                false,
-            )
+            .gc_eval_boolean::<WireMod2>(&encoder, &gc, &output_map, &test, bitwidths, false)
             .unwrap();
         let plaintext = nn.eval_plaintext(&test);
         for (a, b) in plaintext.iter().zip(output.iter()) {
@@ -1121,25 +1113,13 @@ mod tests {
     }
 
     #[test]
+    fn garbling_works_for_DINN_30() {
+        garbling_works_for_model(DINN_30_DIR, &DINN_30_Bitwidths);
+    }
+
+    #[test]
     fn garbling_works_for_DINN_100() {
-        let (nn, test) = get_nn_and_test(Path::new(DINN_100_DIR));
-        let (encoder, gc, output_map) = nn
-            .gc_garble_boolean::<WireMod2, _>(&DINN_100_Bitwidths, false, AesRng::new())
-            .unwrap();
-        let output = nn
-            .gc_eval_boolean::<WireMod2>(
-                &encoder,
-                &gc,
-                &output_map,
-                &test,
-                &DINN_100_Bitwidths,
-                false,
-            )
-            .unwrap();
-        let plaintext = nn.eval_plaintext(&test);
-        for (a, b) in plaintext.iter().zip(output.iter()) {
-            assert_eq!(a, b);
-        }
+        garbling_works_for_model(DINN_100_DIR, &DINN_100_Bitwidths)
     }
 
     #[test]
