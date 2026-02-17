@@ -1,14 +1,12 @@
 use clap::error::ErrorKind;
-use clap::{Error, Parser, Subcommand};
+use clap::{CommandFactory, Error, Parser, Subcommand};
 use fancy_garbling::dummy::Dummy;
 use ndarray::Array3;
-use serde_json::{self, Value};
-use std::fs::File;
-use std::io::{BufRead, BufReader};
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Instant;
 use swanky_channel::Channel;
+use swanky_error::{ErrorKind as SwankyErrorKind, swanky_error};
 use swanky_garbled_nn::Accuracy;
 use swanky_garbled_nn::NeuralNet;
 
@@ -24,9 +22,10 @@ struct Cli {
     /// `weights.json`, either `tests.json` or `tests.csv`, and either
     /// `labels.json` or `labels.csv`.
     dir: PathBuf,
-    /// Comma separated bitwidths to use for each layer (last number is replicated).
-    #[arg(short = 'w', long, default_value = "15")]
-    bitwidth: String,
+    /// Comma separated bitwidths to use for each layer (the last number is
+    /// replicated).
+    #[arg(short = 'w', long, default_value = "15", value_delimiter=',', value_terminator=" ", num_args = 1..)]
+    bitwidth: Vec<usize>,
     /// Run in boolean mode.
     #[arg(short = 'b', long, default_value_t = false)]
     boolean: bool,
@@ -46,7 +45,7 @@ struct Cli {
     #[arg(long = "max", default_value = "100%")]
     max_accuracy: String,
     #[command(subcommand)]
-    command: Option<Commands>,
+    command: Commands,
 }
 
 #[derive(Subcommand)]
@@ -65,19 +64,24 @@ enum Commands {
     },
 }
 
-pub fn main() {
+pub fn main() -> Result<(), swanky_error::Error> {
     let cli = Cli::parse();
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // read tests, labels, and neural net from DIR
+    let mut cmd = Cli::command();
 
     let dir = cli.dir;
     let ntests = cli.ntests;
+    let mut bitwidth = cli.bitwidth;
+
+    let accuracy = &Accuracy {
+        relu: cli.relu_accuracy,
+        sign: cli.sign_accuracy,
+        max: cli.max_accuracy,
+    };
 
     let nn = NeuralNet::try_from(dir.deref()).unwrap_or_else(|e| Error::exit(&Error::from(e)));
     println!("{nn:?}");
 
-    print!("reading tests...");
+    print!("reading tests... ");
     let tests = swanky_garbled_nn::io::read_tests(&dir, ntests)
         .unwrap_or_else(|e| Error::exit(&Error::from(e)));
     println!("finished");
@@ -87,68 +91,47 @@ pub fn main() {
         swanky_garbled_nn::io::read_labels(&dir).unwrap_or_else(|e| Error::exit(&Error::from(e)));
     println!("finished");
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // read global options
-
-    let accuracy = &Accuracy {
-        relu: cli.relu_accuracy,
-        sign: cli.sign_accuracy,
-        max: cli.max_accuracy,
-    };
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // compute bitwidth
-
-    // parse bitwidth argument
-    let mut bitwidth = cli
-        .bitwidth
-        .split(",")
-        .map(|s| {
-            s.trim()
-                .parse::<usize>()
-                .expect("bitwidth: expected number")
-        })
-        .collect::<Vec<_>>();
-
-    // pad the end with the last value
+    // Pad the bitwidth with the last value.
     bitwidth.resize(nn.nlayers() + 1, *bitwidth.last().unwrap());
+    if bitwidth[0] == 0 {
+        Error::exit(&cmd.error(ErrorKind::InvalidValue, "Input bitwidth cannot be 0"));
+    }
 
-    assert!(bitwidth[0] != 0, "you need bits for the input, dude");
-
-    // replace 0s with the previous value
+    // Replace 0s with the previous value.
     for i in 1..bitwidth.len() {
         if bitwidth[i] == 0 {
             bitwidth[i] = bitwidth[i - 1];
         }
     }
 
-    println!("bitwidth: {:?}", bitwidth);
+    println!("Bitwidth: {:?}", bitwidth);
     println!(
-        "nprimes: {:?}",
+        "# Primes: {:?}",
         bitwidth
             .iter()
             .map(|&w| fancy_garbling::util::primes_with_width(w as u32).len())
             .collect::<Vec<_>>()
     );
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // run benches and tests
-
     match &cli.command {
-        Some(Commands::Bitwidth) => {
-            println!("* computing bitwidth for each layer");
+        Commands::Bitwidth => {
             let nbits = Channel::with(std::io::empty(), |channel| {
                 Ok(nn.max_bitwidth(&tests, channel))
             })
-            .unwrap();
+            .map_err(|e| {
+                swanky_error!(
+                    SwankyErrorKind::OtherError,
+                    "Computing bitwidths failed: {e}"
+                )
+            })?;
             for (layerno, nbits) in nbits.into_iter().enumerate() {
                 println!("Layer {}: {} bits", layerno, nbits);
             }
         }
-        Some(Commands::Direct) => {
+        Commands::Direct => {
             nn.plaintext_accuracy_test(&tests, &labels);
         }
-        Some(Commands::Dummy) => {
+        Commands::Dummy => {
             Channel::with(std::io::empty(), |channel| {
                 let mut dummy = Dummy::new();
                 if cli.boolean {
@@ -162,9 +145,9 @@ pub fn main() {
                 }
                 Ok(())
             })
-            .unwrap();
+            .map_err(|e| swanky_error!(SwankyErrorKind::OtherError, "Accuracy test failed: {e}"))?;
         }
-        Some(Commands::Bench { niters }) => {
+        Commands::Bench { niters } => {
             bench(
                 &nn,
                 &tests,
@@ -174,15 +157,10 @@ pub fn main() {
                 cli.boolean,
                 accuracy,
             )
-            .map_err(|e| Error::exit(&Error::raw(ErrorKind::Io, e)));
-        }
-        None => {
-            Error::exit(&Error::raw(
-                ErrorKind::DisplayHelp,
-                "no command given! try \"help\"",
-            ));
+            .map_err(|e| swanky_error!(SwankyErrorKind::OtherError, "Benchmark failed: {e}"))?;
         }
     }
+    Ok(())
 }
 
 /// Run benchmarks on the given neural network and its associated parameters.
@@ -194,32 +172,43 @@ pub fn bench(
     secret_weights: bool,
     binary: bool,
     accuracy: &Accuracy,
-) -> eyre::Result<()> {
-    println!("* running garble/eval benchmark");
-
-    // generate moduli for the given bitwidth
+) -> swanky_error::Result<()> {
+    // Generate moduli for the given bitwidth.
     let moduli = bitwidth
         .iter()
         .map(|&b| fancy_garbling::util::modulus_with_width(b as u32))
         .collect::<Vec<_>>();
 
-    println!("* computing fancy computation info");
-
     if binary {
-        nn.informer_binary(bitwidth, secret_weights)?;
+        nn.informer_binary(bitwidth, secret_weights).map_err(|e| {
+            swanky_error!(SwankyErrorKind::OtherError, "Binary informer failed: {e}")
+        })?;
     } else {
-        nn.informer_arith(&moduli, secret_weights, accuracy)?;
+        nn.informer_arith(&moduli, secret_weights, accuracy)
+            .map_err(|e| {
+                swanky_error!(
+                    SwankyErrorKind::OtherError,
+                    "Arithmetic informer failed: {e}"
+                )
+            })?;
     }
-
-    println!("* benchmarking garbler streaming to evaluator");
 
     let total_time = Instant::now();
 
     for _ in 0..niters {
         if binary {
-            nn.eval_roundtrip_binary(&inputs[0], bitwidth, secret_weights)?;
+            nn.eval_roundtrip_binary(&inputs[0], bitwidth, secret_weights)
+                .map_err(|e| {
+                    swanky_error!(SwankyErrorKind::OtherError, "Binary evaluation failed: {e}")
+                })?;
         } else {
-            nn.eval_roundtrip_arith(&inputs[0], &moduli, secret_weights, accuracy)?;
+            nn.eval_roundtrip_arith(&inputs[0], &moduli, secret_weights, accuracy)
+                .map_err(|e| {
+                    swanky_error!(
+                        SwankyErrorKind::OtherError,
+                        "Arithmetic evaluation failed: {e}"
+                    )
+                })?;
         }
     }
 
