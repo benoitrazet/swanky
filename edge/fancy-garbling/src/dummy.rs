@@ -81,7 +81,7 @@ impl FancyInput for Dummy {
     ) -> swanky_error::Result<Vec<DummyVal>> {
         // Receive is undefined for Dummy which is a single party "protocol"
         swanky_error::bail!(
-            ErrorKind::OtherError,
+            ErrorKind::UnsupportedError,
             "`receive_many` is undefined for `Dummy`"
         );
     }

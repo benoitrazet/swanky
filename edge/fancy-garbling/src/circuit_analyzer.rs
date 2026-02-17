@@ -222,7 +222,10 @@ impl FancyArithmetic for CircuitAnalyzer {
         _tt: Option<Vec<u16>>,
         _: &mut Channel,
     ) -> swanky_error::Result<Self::Item> {
-        swanky_error::bail!(ErrorKind::OtherError, "Projection gates are unsupported")
+        swanky_error::bail!(
+            ErrorKind::UnsupportedError,
+            "Projection gates are unsupported"
+        )
     }
 }
 
