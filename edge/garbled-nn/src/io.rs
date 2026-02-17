@@ -48,7 +48,7 @@ fn value_to_array3(v: &Value) -> Array3<i64> {
     .expect("couldnt create array!")
 }
 
-/// Read tests from a directory.
+/// Read neural network tests from a directory.
 ///
 /// The directory must contain either `tests.csv` or `tests.json`. The second
 /// argument specifies the number of tests to return; `None` means return all
