@@ -1,17 +1,18 @@
 use crate::{
-    FancyBinary,
     fancy::{
-        HasModulus,
         bundle::{Bundle, BundleGadgets},
+        HasModulus,
     },
-    util,
+    util, FancyBinary,
 };
 use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 use swanky_channel::Channel;
 
 /// Bundle which is explicitly binary representation.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BinaryBundle<W>(Bundle<W>);
 
 impl<W: Clone + HasModulus> BinaryBundle<W> {
