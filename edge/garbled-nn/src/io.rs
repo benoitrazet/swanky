@@ -103,3 +103,59 @@ pub fn read_tests(dir: &Path, num: Option<usize>) -> std::io::Result<Vec<Array3<
         ))
     }
 }
+
+/// Read neural network labels from a directory.
+///
+/// The directory must contain either `labels.csv` or `labels.json`.
+pub fn read_labels(dir: &Path) -> std::io::Result<Vec<Vec<i64>>> {
+    let mut file = dir.join(Path::new("labels.json"));
+    if !file.is_file() {
+        file = dir.join(Path::new("labels.csv"));
+        if !file.is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidFilename,
+                "Given directory contains neither 'labels.json' nor 'labels.csv'",
+            ));
+        }
+    }
+
+    if file.extension().is_some_and(|ext| ext == "csv") {
+        let reader = BufReader::new(File::open(file)?);
+        let vec = reader
+            .lines()
+            .map(|line| {
+                let line: Result<Vec<_>, _> = line?
+                    .split(",")
+                    .map(|s| {
+                        s.parse::<i64>().map_err(|e| {
+                            std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
+                        })
+                    })
+                    .collect();
+                line
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(vec)
+    } else if file.extension().is_some_and(|ext| ext == "json") {
+        let file = File::open(file)?;
+        let obj: Value = serde_json::from_reader(file)?;
+
+        Ok(obj
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|val| {
+                val.as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|val| val.as_i64().unwrap())
+                    .collect()
+            })
+            .collect())
+    } else {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Unsupported filetype: \"{file:?}\"",
+        ))
+    }
+}

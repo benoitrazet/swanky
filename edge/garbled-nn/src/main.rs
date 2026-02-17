@@ -82,19 +82,9 @@ pub fn main() {
         .unwrap_or_else(|e| Error::exit(&Error::from(e)));
     println!("finished");
 
-    let mut labels_path = dir.join(Path::new("labels.json"));
-    if !labels_path.is_file() {
-        labels_path = dir.join(Path::new("labels.csv"));
-        if !labels_path.is_file() {
-            Error::exit(&Error::raw(
-                ErrorKind::InvalidValue,
-                "Given directory contains neither 'labels.json' nor 'labels.csv'",
-            ));
-        }
-    }
-
-    print!("reading labels...");
-    let labels = read_labels(&labels_path).unwrap_or_else(|e| Error::exit(&Error::from(e)));
+    print!("reading labels... ");
+    let labels =
+        swanky_garbled_nn::io::read_labels(&dir).unwrap_or_else(|e| Error::exit(&Error::from(e)));
     println!("finished");
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -239,49 +229,4 @@ pub fn bench(
     );
 
     Ok(())
-}
-
-/// Read labels from a file.
-///
-/// The file's extension must be either `csv` or `json`.
-fn read_labels(file: &Path) -> std::io::Result<Vec<Vec<i64>>> {
-    if file.extension().is_some_and(|ext| ext == "csv") {
-        let reader = BufReader::new(File::open(file)?);
-        let vec = reader
-            .lines()
-            .map(|line| {
-                let line: Result<Vec<_>, _> = line?
-                    .split(",")
-                    .map(|s| {
-                        s.parse::<i64>().map_err(|e| {
-                            std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-                        })
-                    })
-                    .collect();
-                line
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(vec)
-    } else if file.extension().is_some_and(|ext| ext == "json") {
-        let file = File::open(file)?;
-        let obj: Value = serde_json::from_reader(file)?;
-
-        Ok(obj
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|val| {
-                val.as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|val| val.as_i64().unwrap())
-                    .collect()
-            })
-            .collect())
-    } else {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "Unsupported filetype: \"{file:?}\"",
-        ))
-    }
 }
