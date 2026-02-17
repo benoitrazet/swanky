@@ -3,10 +3,15 @@ use crate::{
     util,
 };
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryGadgets, CrtBundle, CrtGadgets, Fancy, FancyArithmetic,
-    FancyBinary, FancyInput, HasModulus, WireMod2, dummy::Dummy, informer::Informer,
+    AllWire, BinaryBundle, BinaryGadgets, BinaryWireLabel, CrtBundle, CrtGadgets, Fancy,
+    FancyArithmetic, FancyBinary, FancyInput, HasModulus, WireMod2,
+    classic::{GarbledChannel, GarbledCircuit},
+    dummy::Dummy,
+    informer::Informer,
+    util::output_tweak,
 };
 use ndarray::Array3;
+use rand::{CryptoRng, RngCore};
 use serde_json::{self, Value};
 use std::{
     fs::File,
@@ -15,9 +20,100 @@ use std::{
     time::{Duration, Instant},
 };
 use swanky_aes_rng::AesRng;
+use swanky_block::Block;
 use swanky_channel::Channel;
 use swanky_ot_alsz_kos::alsz;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
+
+/// Input encoder for a garbled neural network.
+///
+/// This is created by the garbler, and allows the evaluator to encode its
+/// (plaintext) input into the appropriate input wirelabels associated with the
+/// garbled neural network.
+pub struct NeuralNetInputEncoder<W> {
+    inputs: Vec<BinaryBundle<W>>,
+    delta: W,
+}
+
+impl<W: BinaryWireLabel> NeuralNetInputEncoder<W> {
+    fn new(inputs: Vec<BinaryBundle<W>>, delta: W) -> Self {
+        Self { inputs, delta }
+    }
+
+    /// Encode a neural network input its associated input wirelabels.
+    pub fn encode_inputs(&self, input: &Array3<i64>, bitwidth: usize) -> Vec<BinaryBundle<W>> {
+        assert_eq!(input.len(), self.inputs.len());
+        self.inputs
+            .iter()
+            .zip(input)
+            .map(|(zeros, &x)| {
+                let bits = util::i64_to_twos_complement(x, bitwidth);
+                BinaryBundle::new(
+                    zeros
+                        .wires()
+                        .iter()
+                        .enumerate()
+                        .map(|(i, zero)| zero.plus(&self.delta.cmul(1 & (bits >> i) as u16)))
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect()
+    }
+}
+
+pub struct NeuralNetOutputMap {
+    // The first entry is the zero wirelabel, and the second entry is the one
+    // wirelabel for that bundle.
+    outputs: Vec<Vec<[Block; 2]>>,
+}
+
+impl NeuralNetOutputMap {
+    fn new<W: BinaryWireLabel>(bundles: &[BinaryBundle<W>], delta: W) -> Self {
+        let mut outputs = Vec::with_capacity(bundles.len());
+        for (i, zeros) in bundles.iter().enumerate() {
+            let wires = zeros
+                .wires()
+                .iter()
+                .map(|zero| {
+                    [
+                        zero.hash(output_tweak(i, 0)),
+                        zero.plus(&delta).hash(output_tweak(i, 1)),
+                    ]
+                })
+                .collect::<Vec<_>>();
+            outputs.push(wires);
+        }
+        Self { outputs }
+    }
+
+    /// Decode a garbled neural network output.
+    pub fn to_outputs<W: BinaryWireLabel>(
+        &self,
+        bundles: &[BinaryBundle<W>],
+    ) -> eyre::Result<Vec<i64>> {
+        let mut outputs = Vec::with_capacity(bundles.len());
+        for (i, bundle) in bundles.iter().enumerate() {
+            let mut bits = Vec::with_capacity(bundle.size());
+            for (j, wire) in bundle.wires().iter().enumerate() {
+                let mut decoded = None;
+                for k in 0..2 {
+                    let hashed = wire.hash(output_tweak(i, k));
+                    if hashed == self.outputs[i][j][k as usize] {
+                        decoded = Some(k);
+                        break;
+                    }
+                }
+                if let Some(bit) = decoded {
+                    bits.push(bit);
+                } else {
+                    eyre::bail!("Decoding failed for wire {j} in bundle {i}");
+                }
+            }
+            outputs.push(util::i64_from_bits(&bits));
+        }
+        Ok(outputs)
+    }
+}
 
 /// A neural network.
 ///
@@ -286,24 +382,21 @@ impl NeuralNet {
     }
 
     /// The max number of bits necessary for a value on any wire for each layer.
-    pub fn max_bitwidth(&self, inputs: &[Array3<i64>], channel: &mut Channel) -> Vec<f64> {
-        let mut max_nbits: Vec<f64> = vec![0.0; self.layers.len()];
+    pub fn max_bitwidth(&self, inputs: &[Array3<i64>], channel: &mut Channel) -> Vec<usize> {
+        let mut max_nbits: Vec<usize> = vec![0; self.layers.len()];
 
-        for input in inputs.iter() {
+        for (i, input) in inputs.iter().enumerate() {
             // TODO: Remove this `println`, use some logging infrastructure instead?
-            println!(
-                "Computing bitwidth: [{}] ",
-                itertools::join(max_nbits.iter().map(|nbits| format!("{:.0}", nbits)), ", ")
-            );
+            println!("Current bitwidth ({}): {max_nbits:?}", i + 1);
 
             let mut input = input.clone();
             for (j, layer) in self.layers.iter().enumerate() {
                 let (output, new_max_val) = layer.max_bitwidth(&input, channel);
 
                 let nbits = if new_max_val < 0 {
-                    1.0 + ((-new_max_val) as f64).log2().ceil()
+                    (1.0 + ((-new_max_val) as f64).log2().ceil()) as usize
                 } else {
-                    (new_max_val as f64).log2().ceil()
+                    (new_max_val as f64).log2().ceil() as usize
                 };
 
                 if nbits > max_nbits[j] {
@@ -559,41 +652,43 @@ impl NeuralNet {
     pub fn eval_roundtrip_binary(
         &self,
         input: &Array3<i64>,
-        bitwidth: &[usize],
+        bitwidths: &[usize],
         secret_weights: bool,
     ) -> eyre::Result<Vec<i64>> {
         assert_eq!(input.len(), self.num_inputs());
         let (_, outputs) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let mut gb: Garbler<_, alsz::Sender, WireMod2> =
+                let mut garbler: Garbler<_, alsz::Sender, WireMod2> =
                     Garbler::new(channel, AesRng::new())?;
-                let inps = NeuralNet::encode_input_boolean(&mut gb, input, bitwidth[0], channel)?;
-                let outputs = self.eval_boolean::<_, _>(
-                    &mut gb,
-                    &inps,
-                    bitwidth,
+                let inputs =
+                    NeuralNet::encode_input_boolean(&mut garbler, input, bitwidths[0], channel)?;
+                let outputs = self.eval_boolean(
+                    &mut garbler,
+                    &inputs,
+                    bitwidths,
                     secret_weights,
                     true,
                     channel,
                 );
-                let outputs = NeuralNet::decode_output_boolean(&mut gb, &outputs, channel)?;
+                let outputs = NeuralNet::decode_output_boolean(&mut garbler, &outputs, channel)?;
                 // The garbler receives no outputs.
                 assert_eq!(outputs, None);
                 Ok(())
             },
             |channel| {
-                let mut ev: Evaluator<AesRng, alsz::Receiver, WireMod2> =
+                let mut evaluator: Evaluator<AesRng, alsz::Receiver, WireMod2> =
                     Evaluator::new(channel, AesRng::new())?;
-                let inps = NeuralNet::receive_input_boolean(&mut ev, input, bitwidth[0], channel)?;
-                let outputs = self.eval_boolean::<_, _>(
-                    &mut ev,
-                    &inps,
-                    bitwidth,
+                let inputs =
+                    NeuralNet::receive_input_boolean(&mut evaluator, input, bitwidths[0], channel)?;
+                let outputs = self.eval_boolean(
+                    &mut evaluator,
+                    &inputs,
+                    bitwidths,
                     secret_weights,
                     false,
                     channel,
                 );
-                let outputs = NeuralNet::decode_output_boolean(&mut ev, &outputs, channel)?;
+                let outputs = NeuralNet::decode_output_boolean(&mut evaluator, &outputs, channel)?;
                 // The evaluator receives the outputs, so the `unwrap` should
                 // never fail here.
                 Ok(outputs.unwrap())
@@ -670,6 +765,74 @@ impl NeuralNet {
             },
         )?;
         Ok(outputs)
+    }
+
+    /// Output a boolean garbling of [`NeuralNet`].
+    pub fn gc_garble_boolean<W: BinaryWireLabel, RNG: CryptoRng + RngCore>(
+        &self,
+        bitwidths: &[usize],
+        secret_weights: bool,
+        rng: RNG,
+    ) -> eyre::Result<(NeuralNetInputEncoder<W>, GarbledCircuit, NeuralNetOutputMap)> {
+        let mut channel = GarbledChannel::new_writer(None);
+        let (inputs, outputs, delta) = Channel::with(&mut channel, |channel| {
+            let mut garbler = fancy_garbling::Garbler::<_, W>::new(rng, channel)?;
+
+            // Construct the zero wires for the input.
+            let inputs = (0..self.num_inputs())
+                .map(|_| {
+                    let (zeros, _) = garbler.bin_encode_wire(0, bitwidths[0]);
+                    zeros
+                })
+                .collect::<Vec<_>>();
+
+            // Evaluate the neural network to derive the zero wires for the output.
+            let outputs = self.eval_boolean(
+                &mut garbler,
+                &inputs,
+                bitwidths,
+                secret_weights,
+                true,
+                channel,
+            );
+
+            let delta = garbler.delta(2);
+            Ok((inputs, outputs, delta))
+        })?;
+        let encoder = NeuralNetInputEncoder::new(inputs, delta);
+        let gc = GarbledCircuit::new(channel.finish_writing());
+        let output_map = NeuralNetOutputMap::new(&outputs, delta);
+        Ok((encoder, gc, output_map))
+    }
+
+    /// Evaluate a boolean garbling of [`NeuralNet`].
+    pub fn gc_eval_boolean<W: BinaryWireLabel>(
+        &self,
+        encoder: &NeuralNetInputEncoder<W>,
+        gc: &GarbledCircuit,
+        output_map: &NeuralNetOutputMap,
+        input: &Array3<i64>,
+        bitwidth: &[usize],
+        secret_weights: bool,
+    ) -> eyre::Result<Vec<i64>> {
+        // Extract the wirelabels associated with our input of interest.
+        let inputs = encoder.encode_inputs(input, bitwidth[0]);
+        // Evaluate the garbled circuit on the input wirelabels.
+        let outputs = Channel::with(GarbledChannel::from(gc), |channel| {
+            let mut evaluator = fancy_garbling::Evaluator::<W>::new(channel)?;
+
+            let outputs = self.eval_boolean(
+                &mut evaluator,
+                &inputs,
+                bitwidth,
+                secret_weights,
+                false,
+                channel,
+            );
+            Ok(outputs)
+        })?;
+        // Map the output wirelabels to values.
+        output_map.to_outputs(&outputs)
     }
 
     // TODO: The `*_accuracy_test` methods have _a lot_ of commonalities. Can we
