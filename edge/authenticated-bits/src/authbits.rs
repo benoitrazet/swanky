@@ -243,7 +243,7 @@ impl<P: Party> AuthBitGenerator<P> {
                 ot: PartyEither::prover_new(
                     e,
                     kos::Receiver::init(channel, &mut rng).wrap_err(
-                        ErrorKind::OtherError,
+                        ErrorKind::InitializationError,
                         "Failed to initialize KOS receiver.".to_string(),
                     )?,
                 ),
@@ -253,7 +253,7 @@ impl<P: Party> AuthBitGenerator<P> {
                 ot: PartyEither::verifier_new(
                     e,
                     kos::Sender::init(channel, &mut rng).wrap_err(
-                        ErrorKind::OtherError,
+                        ErrorKind::InitializationError,
                         "Failed to initialize KOS sender.".to_string(),
                     )?,
                 ),

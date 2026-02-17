@@ -35,7 +35,7 @@ where
         Ok(PsiEvaluator {
             ev: Evaluator::<RNG, OtReceiver, WireMod2>::new(channel, RNG::from_seed(seed))
                 .wrap_err(
-                    ErrorKind::OtherError,
+                    ErrorKind::InitializationError,
                     "Failed to create fancy evaluator.".to_string(),
                 )?,
             rng: RNG::from_seed(seed),

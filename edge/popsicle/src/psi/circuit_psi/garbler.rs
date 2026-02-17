@@ -35,7 +35,7 @@ where
     {
         Ok(PsiGarbler {
             gb: Garbler::<RNG, OtSender, WireMod2>::new(channel, RNG::from_seed(seed)).wrap_err(
-                ErrorKind::OtherError,
+                ErrorKind::InitializationError,
                 "Failed to create garbler.".to_string(),
             )?,
             rng: RNG::from_seed(seed),

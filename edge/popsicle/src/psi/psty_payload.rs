@@ -110,11 +110,11 @@ impl Sender {
     ) -> swanky_error::Result<Self> {
         let key = channel.read::<Block>()?;
         let opprf = KmprtSender::init(channel, rng).wrap_err(
-            ErrorKind::OtherError,
+            ErrorKind::InitializationError,
             "Failed to initialize KMPRT OPPRF sender.".to_string(),
         )?;
         let opprf_payload = KmprtSender::init(channel, rng).wrap_err(
-            ErrorKind::OtherError,
+            ErrorKind::InitializationError,
             "Failed to initialize KMPRT OPPRF payload sender.".to_string(),
         )?;
         Ok(Self {
@@ -454,11 +454,11 @@ impl Receiver {
         channel.write(&key)?;
 
         let opprf = KmprtReceiver::init(channel, rng).wrap_err(
-            ErrorKind::OtherError,
+            ErrorKind::InitializationError,
             "Failed to initialize KMPRT OPPRF receiver.".to_string(),
         )?;
         let opprf_payload = KmprtReceiver::init(channel, rng).wrap_err(
-            ErrorKind::OtherError,
+            ErrorKind::InitializationError,
             "Failed to initialize KMPRT OPPRF payload receiver.".to_string(),
         )?;
         Ok(Self {
@@ -634,7 +634,7 @@ impl Receiver {
     ) -> swanky_error::Result<(Vec<Block>, Vec<Block512>)> {
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES).wrap_err(
-            ErrorKind::OtherError,
+            ErrorKind::InitializationError,
             "Failed to create Cuckoo hash.".to_string(),
         )?;
 
@@ -680,7 +680,7 @@ impl Receiver {
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
 
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES).wrap_err(
-            ErrorKind::OtherError,
+            ErrorKind::InitializationError,
             "Failed to create Cuckoo hash.".to_string(),
         )?;
         let cuckoo_large: Vec<&[Option<CuckooItem>]> = cuckoo.items.chunks(megasize).collect();

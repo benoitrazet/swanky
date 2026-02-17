@@ -71,7 +71,7 @@ impl Sender {
         rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
         let opprf = KmprtSender::init(channel, rng).wrap_err(
-            ErrorKind::OtherError,
+            ErrorKind::InitializationError,
             "Failed to initialize KMPRT sender.".to_string(),
         )?;
         Ok(Self { opprf })
@@ -139,7 +139,7 @@ impl SenderState {
     {
         let mut gb = Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
             .wrap_err(
-            ErrorKind::OtherError,
+            ErrorKind::InitializationError,
             "Failed to initialize garbler during setup.".to_string(),
         )?;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
@@ -216,7 +216,7 @@ impl Receiver {
         rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
         let opprf = KmprtReceiver::init(channel, rng).wrap_err(
-            ErrorKind::OtherError,
+            ErrorKind::InitializationError,
             "Failed to initialize KMPRT receiver.".to_string(),
         )?;
         Ok(Self { opprf })
@@ -232,7 +232,7 @@ impl Receiver {
         let key = rng.r#gen();
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES).wrap_err(
-            ErrorKind::OtherError,
+            ErrorKind::InitializationError,
             "Failed to create new Cuckoo hash.".to_string(),
         )?;
 
@@ -284,7 +284,7 @@ impl ReceiverState {
         let mut ev =
             Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
                 .wrap_err(
-                    ErrorKind::OtherError,
+                    ErrorKind::InitializationError,
                     "Failed to initialize receiver during setup.".to_string(),
                 )?;
 

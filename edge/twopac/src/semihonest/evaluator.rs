@@ -24,7 +24,7 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
     /// Make a new `Evaluator`.
     pub fn new(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self> {
         let ot = OT::init(channel, &mut rng).wrap_err(
-            ErrorKind::OtherError,
+            ErrorKind::InitializationError,
             "Failed to initialize OT.".to_string(),
         )?;
         let evaluator = Ev::new(channel)?;

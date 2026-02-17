@@ -66,14 +66,14 @@ impl BasePsi for OpprfReceiver {
         channel.write(&key)?;
 
         let opprf_primary_keys = KmprtReceiver::init(channel, rng).wrap_err(
-            ErrorKind::OtherError,
+            ErrorKind::InitializationError,
             "Failed to initialize KMPRT receiver for primary keys.".to_string(),
         )?;
 
         let mut opprf_payload = None;
         if has_payload {
             opprf_payload = Some(KmprtReceiver::init(channel, rng).wrap_err(
-                ErrorKind::OtherError,
+                ErrorKind::InitializationError,
                 "Failed to initialize KMPRT receiver for payload.".to_string(),
             )?);
         }

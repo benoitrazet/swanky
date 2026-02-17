@@ -38,7 +38,7 @@ impl<
     /// Make a new `Garbler`.
     pub fn new(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self> {
         let ot = OT::init(channel, &mut rng).wrap_err(
-            ErrorKind::OtherError,
+            ErrorKind::InitializationError,
             "Failed to initialize OT.".to_string(),
         )?;
 
