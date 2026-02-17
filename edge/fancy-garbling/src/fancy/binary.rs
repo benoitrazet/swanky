@@ -1,9 +1,10 @@
 use crate::{
+    FancyBinary,
     fancy::{
-        bundle::{Bundle, BundleGadgets},
         HasModulus,
+        bundle::{Bundle, BundleGadgets},
     },
-    util, FancyBinary,
+    util,
 };
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};

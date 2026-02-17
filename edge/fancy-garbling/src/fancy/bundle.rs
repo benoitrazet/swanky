@@ -1,6 +1,6 @@
 use crate::{
-    fancy::{Fancy, HasModulus},
     FancyArithmetic, FancyBinary,
+    fancy::{Fancy, HasModulus},
 };
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
