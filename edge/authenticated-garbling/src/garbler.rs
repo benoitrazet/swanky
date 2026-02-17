@@ -1,6 +1,7 @@
 //! Garbler in Authenticated Garbling
 use crate::{preprocess::f_preprocessing, ps::PartyGarbler};
 use crate::wire::AuthenticatedWireMod2;
+use fancy_garbling::WireMod2;
 use fancy_garbling::{
     AllWire, BinaryBundle, Fancy, FancyBinary, HasModulus, WireLabel, check_binary,
     util::u128_to_bits,
@@ -9,9 +10,12 @@ use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
 use swanky_channel::Channel;
 use vectoreyes::{SimdBase, U8x16};
+
+type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
+
 /// Streams garbled circuit ciphertexts through a callback.
-pub struct Garbler<RNG, Wire> {
-    deltas: HashMap<u16, Wire>, // map from modulus to associated delta wire-label.
+pub struct Garbler<RNG> {
+    deltas: HashMap<u16, WireMod2>, // map from modulus to associated delta wire-label.
     current_output: usize,
     current_gate: usize,
     zero_input_wires: Vec<AuthenticatedWireMod2<PartyGarbler>>,
@@ -19,7 +23,7 @@ pub struct Garbler<RNG, Wire> {
     rng: RNG,
 }
 
-impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
+impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// Create a new garbler.
     pub fn new(rng: RNG) -> Self {
         Garbler {
@@ -41,11 +45,11 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
 
     /// Create a delta if it has not been created yet for this modulus, otherwise just
     /// return the existing one.
-    pub fn delta(&mut self, q: u16) -> Wire {
+    pub fn delta(&mut self, q: u16) -> WireMod2 {
         if let Some(delta) = self.deltas.get(&q) {
             return delta.clone();
         }
-        let w = Wire::rand_delta(&mut self.rng, q);
+        let w = WireMod2::rand_delta(&mut self.rng, q);
         self.deltas.insert(q, w.clone());
         w
     }
@@ -60,18 +64,22 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
     /// Get the deltas, consuming the Garbler.
     ///
     /// This is useful for reusing wires in multiple garbled circuit instances.
-    pub fn get_deltas(self) -> HashMap<u16, Wire> {
+    pub fn get_deltas(self) -> HashMap<u16, WireMod2> {
         self.deltas
     }
 
     /// Send a wire over the established channel.
-    pub fn send_wire(&mut self, wire: &Wire, channel: &mut Channel) -> swanky_error::Result<()> {
-        channel.write(&wire.to_repr())?;
+    pub fn send_wire(&mut self, wire: &AuthenticatedWire, channel: &mut Channel) -> swanky_error::Result<()> {
+        channel.write(&wire.wire_label().to_repr())?;
         Ok(())
     }
 
     /// Encode a wire, producing the zero wire as well as the encoded value.
-    pub fn encode_wire(&mut self, val: u16, modulus: u16) -> (Wire, Wire) {
+    pub fn encode_wire(
+        &mut self,
+        val: u16,
+        modulus: u16,
+    ) -> (AuthenticatedWire, AuthenticatedWire) {
         todo!()
     }
 
@@ -83,7 +91,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
         &mut self,
         vals: &[u16],
         moduli: &[u16],
-    ) -> swanky_error::Result<(Vec<Wire>, Vec<Wire>)> {
+    ) -> swanky_error::Result<(Vec<AuthenticatedWire>, Vec<AuthenticatedWire>)> {
         assert_eq!(vals.len(), moduli.len());
 
         let mut gbs = Vec::with_capacity(vals.len());
@@ -101,7 +109,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
         &mut self,
         val: u128,
         nbits: usize,
-    ) -> swanky_error::Result<(BinaryBundle<Wire>, BinaryBundle<Wire>)> {
+    ) -> swanky_error::Result<(BinaryBundle<AuthenticatedWire>, BinaryBundle<AuthenticatedWire>)> {
         let xs = u128_to_bits(val, nbits);
         let ms = vec![2; nbits];
         let (gbs, evs) = self.encode_many_wires(&xs, &ms)?;
@@ -109,7 +117,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
     }
 }
 
-impl<RNG> FancyBinary for Garbler<RNG, AllWire>
+impl<RNG> FancyBinary for Garbler<RNG>
 where
     RNG: RngCore + CryptoRng,
 {
@@ -135,8 +143,8 @@ where
     }
 }
 
-impl<RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
-    type Item = Wire;
+impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
+    type Item = AuthenticatedWire;
 
     fn receive_many(
             &mut self,
@@ -153,11 +161,11 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
         ) -> swanky_error::Result<Vec<Self::Item>> {
         todo!()
     }
-    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
+    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<AuthenticatedWire> {
         todo!()
     }
 
-    fn output(&mut self, X: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
+    fn output(&mut self, X: &AuthenticatedWire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
         todo!()
     }
 }
