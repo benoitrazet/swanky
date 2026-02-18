@@ -33,17 +33,17 @@ use swanky_twopac::semihonest::{Evaluator, Garbler};
 /// (plaintext) input into the appropriate input wirelabels associated with the
 /// garbled neural network.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct NeuralNetInputEncoder<W> {
+pub struct InputEncoder<W> {
     inputs: Vec<BinaryBundle<W>>,
     delta: W,
 }
 
-impl<W: BinaryWireLabel> NeuralNetInputEncoder<W> {
+impl<W: BinaryWireLabel> InputEncoder<W> {
     fn new(inputs: Vec<BinaryBundle<W>>, delta: W) -> Self {
         Self { inputs, delta }
     }
 
-    /// Encode a neural network input its associated input wirelabels.
+    /// Encode an input into its associated wirelabels.
     pub fn encode_inputs(&self, input: &Array3<i64>, bitwidth: usize) -> Vec<BinaryBundle<W>> {
         assert_eq!(input.len(), self.inputs.len());
         self.inputs
@@ -65,14 +65,17 @@ impl<W: BinaryWireLabel> NeuralNetInputEncoder<W> {
 }
 
 /// Output map for a garbled neural network.
+///
+/// This is created by the garbler, and allows the evaluator to map its output
+/// wirelabels to their associated (plaintext) outputs.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct NeuralNetOutputMap {
+pub struct OutputMap {
     // The first entry is the zero wirelabel, and the second entry is the one
     // wirelabel for that bundle.
     outputs: Vec<Vec<[Block; 2]>>,
 }
 
-impl NeuralNetOutputMap {
+impl OutputMap {
     fn new<W: BinaryWireLabel>(bundles: &[BinaryBundle<W>], delta: W) -> Self {
         let mut outputs = Vec::with_capacity(bundles.len());
         for (i, zeros) in bundles.iter().enumerate() {
@@ -778,7 +781,7 @@ impl NeuralNet {
         bitwidths: &[usize],
         secret_weights: bool,
         rng: RNG,
-    ) -> eyre::Result<(NeuralNetInputEncoder<W>, GarbledCircuit, NeuralNetOutputMap)> {
+    ) -> eyre::Result<(InputEncoder<W>, GarbledCircuit, OutputMap)> {
         let mut channel = GarbledChannel::new_writer(None);
         let (inputs, outputs, delta) = Channel::with(&mut channel, |channel| {
             let mut garbler = fancy_garbling::Garbler::<_, W>::new(rng, channel)?;
@@ -804,9 +807,9 @@ impl NeuralNet {
             let delta = garbler.delta(2);
             Ok((inputs, outputs, delta))
         })?;
-        let encoder = NeuralNetInputEncoder::new(inputs, delta);
+        let encoder = InputEncoder::new(inputs, delta);
         let gc = GarbledCircuit::new(channel.finish_writing());
-        let output_map = NeuralNetOutputMap::new(&outputs, delta);
+        let output_map = OutputMap::new(&outputs, delta);
         Ok((encoder, gc, output_map))
     }
 
