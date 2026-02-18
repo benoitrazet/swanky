@@ -910,10 +910,7 @@ impl NeuralNet {
         W: Clone + HasModulus,
         F: Fancy<Item = W> + FancyInput<Item = W> + FancyArithmetic<Item = W> + CrtGadgets,
     {
-        let moduli = bitwidth
-            .iter()
-            .map(|&b| fancy_garbling::util::modulus_with_width(b as u32))
-            .collect::<Vec<_>>();
+        let moduli = util::bitwidths_to_moduli(bitwidth);
 
         let qfirst = *moduli.first().unwrap();
         let qlast = *moduli.last().unwrap();

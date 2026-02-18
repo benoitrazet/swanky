@@ -2,6 +2,14 @@
 
 use fancy_garbling::util as numbers;
 
+/// Convert a list of bitwidths to their associated moduli.
+pub fn bitwidths_to_moduli(bitwidths: &[usize]) -> Vec<u128> {
+    bitwidths
+        .iter()
+        .map(|&b| fancy_garbling::util::modulus_with_width(b as u32))
+        .collect()
+}
+
 /// The index of the max value in `xs`.
 pub fn index_of_max(xs: &[i64]) -> usize {
     let mut max_val = i64::MIN;

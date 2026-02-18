@@ -7,8 +7,8 @@ use std::path::PathBuf;
 use std::time::Instant;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind as SwankyErrorKind, swanky_error};
-use swanky_garbled_nn::Accuracy;
 use swanky_garbled_nn::NeuralNet;
+use swanky_garbled_nn::{Accuracy, bitwidths_to_moduli};
 
 /// Garbled Neural Net Experiment Launcher
 ///
@@ -173,11 +173,7 @@ pub fn bench(
     binary: bool,
     accuracy: &Accuracy,
 ) -> swanky_error::Result<()> {
-    // Generate moduli for the given bitwidth.
-    let moduli = bitwidth
-        .iter()
-        .map(|&b| fancy_garbling::util::modulus_with_width(b as u32))
-        .collect::<Vec<_>>();
+    let moduli = bitwidths_to_moduli(bitwidth);
 
     if binary {
         nn.informer_binary(bitwidth, secret_weights).map_err(|e| {

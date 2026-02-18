@@ -8,3 +8,4 @@ mod util;
 
 pub use layer::{Accuracy, ActivationFunction, Layer};
 pub use neural_net::{InputEncoder, NeuralNet, OutputMap};
+pub use util::bitwidths_to_moduli;
