@@ -349,7 +349,7 @@ impl Layer {
             f: PhantomData,
         };
 
-        let layer_output = self.eval(&mut 0, input, &ops, false, channel);
+        let layer_output = self.eval(&mut 0, input, ops, false, channel);
         let max_val = store_max_base(0) as i64;
         (layer_output, max_val)
     }
@@ -378,7 +378,7 @@ impl Layer {
             f: PhantomData,
         };
 
-        self.eval(&mut 0, input, &ops, false, channel)
+        self.eval(&mut 0, input, ops, false, channel)
     }
 
     /// Evaluate the layer using arithmetic garbled circuits.
@@ -472,7 +472,7 @@ impl Layer {
             f: PhantomData,
         };
 
-        self.eval(f, input, &ops, secret_weights, channel)
+        self.eval(f, input, ops, secret_weights, channel)
     }
 
     /// Evaluate the layer using binary garbled circuits.
@@ -548,7 +548,7 @@ impl Layer {
             },
             f: PhantomData,
         };
-        self.eval(f, input, &ops, secret_weights, channel)
+        self.eval(f, input, ops, secret_weights, channel)
     }
 
     /// Evaluate the layer over the specified [`NeuralNetOps`].
@@ -570,7 +570,7 @@ impl Layer {
         &self,
         b: &mut F,
         input: &Array3<T>,
-        ops: &NeuralNetOps<F, T, ENCODE, SECRET, ADD, CMUL, PROJ, MAX, ACTIVATION, ZERO>,
+        ops: NeuralNetOps<F, T, ENCODE, SECRET, ADD, CMUL, PROJ, MAX, ACTIVATION, ZERO>,
         secret_weights: bool,
         channel: &mut Channel,
     ) -> Array3<T>
