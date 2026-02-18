@@ -29,3 +29,10 @@ ndarray.workspace = true
 rand.workspace = true
 serde = { workspace = true, features = ["derive"], optional = true }
 serde_json.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "benches"
+harness = false
