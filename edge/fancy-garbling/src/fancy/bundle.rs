@@ -3,6 +3,7 @@ use crate::{
     fancy::{Fancy, HasModulus},
 };
 use itertools::Itertools;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::ops::Index;
 use swanky_channel::Channel;
