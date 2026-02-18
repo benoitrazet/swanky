@@ -1067,7 +1067,7 @@ mod tests {
     #![allow(non_upper_case_globals)]
     #![allow(non_snake_case)]
 
-    use crate::{NeuralNet, io::read_tests};
+    use crate::{Accuracy, NeuralNet, io::read_tests, util};
     use fancy_garbling::WireMod2;
     use ndarray::Array3;
     use std::{ops::Deref, path::Path};
@@ -1078,7 +1078,7 @@ mod tests {
     static DINN_100_DIR: &str = "neural_nets/DINN_100";
     static DINN_100_Bitwidths: [usize; 3] = [9; 3];
     static CryptoNets_DIR: &str = "neural_nets/CryptoNets";
-    static CrytoNets_Bitwidths: [usize; 11] = [26; 11];
+    static CryptoNets_Bitwidths: [usize; 11] = [26; 11];
     static DeepSecure_DIR: &str = "neural_nets/DeepSecure";
     static DeepSecure_Bitwidths: [usize; 5] = [24; 5];
     static MiniONN_MNIST: &str = "neural_nets/MiniONN_MNIST";
@@ -1098,6 +1098,23 @@ mod tests {
 
         let plaintext_output = nn.eval_plaintext(&test);
         let gc_output = nn.eval_roundtrip_binary(&test, bitwidths, false).unwrap();
+        for (a, b) in plaintext_output.iter().zip(gc_output.iter()) {
+            assert_eq!(a, b);
+        }
+    }
+
+    fn arithmetic_and_plaintext_match_for_dir(dir: &Path, moduli: &[u128]) {
+        let (nn, test) = get_nn_and_test(dir);
+        let accuracy = Accuracy {
+            relu: "100%".to_string(),
+            sign: "100%".to_string(),
+            max: "100%".to_string(),
+        };
+
+        let plaintext_output = nn.eval_plaintext(&test);
+        let gc_output = nn
+            .eval_roundtrip_arith(&test, moduli, false, &accuracy)
+            .unwrap();
         for (a, b) in plaintext_output.iter().zip(gc_output.iter()) {
             assert_eq!(a, b);
         }
@@ -1139,18 +1156,42 @@ mod tests {
     }
 
     #[test]
+    fn arithmetic_and_plaintext_match_for_DINN_30() {
+        let moduli = util::bitwidths_to_moduli(&DINN_30_Bitwidths);
+        arithmetic_and_plaintext_match_for_dir(Path::new(DINN_30_DIR), &moduli);
+    }
+
+    #[test]
     fn binary_and_plaintext_match_for_DINN_100() {
         binary_and_plaintext_match_for_dir(Path::new(DINN_100_DIR), &DINN_100_Bitwidths);
     }
 
     #[test]
+    fn arithmetic_and_plaintext_match_for_DINN_100() {
+        let moduli = util::bitwidths_to_moduli(&DINN_100_Bitwidths);
+        arithmetic_and_plaintext_match_for_dir(Path::new(DINN_100_DIR), &moduli);
+    }
+
+    #[test]
     fn binary_and_plaintext_match_for_CryptoNets() {
-        binary_and_plaintext_match_for_dir(Path::new(CryptoNets_DIR), &CrytoNets_Bitwidths);
+        binary_and_plaintext_match_for_dir(Path::new(CryptoNets_DIR), &CryptoNets_Bitwidths);
+    }
+
+    #[test]
+    fn arithmetic_and_plaintext_match_for_CryptoNets() {
+        let moduli = util::bitwidths_to_moduli(&CryptoNets_Bitwidths);
+        arithmetic_and_plaintext_match_for_dir(Path::new(CryptoNets_DIR), &moduli);
     }
 
     #[test]
     fn binary_and_plaintext_match_for_DeepSecure() {
         binary_and_plaintext_match_for_dir(Path::new(DeepSecure_DIR), &DeepSecure_Bitwidths);
+    }
+
+    #[test]
+    fn arithmetic_and_plaintext_match_for_DeepSecure() {
+        let moduli = util::bitwidths_to_moduli(&DeepSecure_Bitwidths);
+        arithmetic_and_plaintext_match_for_dir(Path::new(DeepSecure_DIR), &moduli);
     }
 
     // This one almost certainly will take too long.
