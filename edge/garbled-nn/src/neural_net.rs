@@ -174,12 +174,12 @@ impl TryFrom<&Path> for NeuralNet {
 }
 
 impl NeuralNet {
-    /// The number of inputs to the first layer.
-    pub fn num_inputs(&self) -> usize {
+    /// The number of inputs to the first layer of the neural network.
+    pub fn ninputs(&self) -> usize {
         self.layers[0].input_size()
     }
 
-    /// The number of layers in the neural net.
+    /// The number of layers in the neural network.
     pub fn nlayers(&self) -> usize {
         self.layers.len()
     }
@@ -661,7 +661,7 @@ impl NeuralNet {
         bitwidths: &[usize],
         secret_weights: bool,
     ) -> eyre::Result<Vec<i64>> {
-        assert_eq!(input.len(), self.num_inputs());
+        assert_eq!(input.len(), self.ninputs());
         let (_, outputs) = swanky_channel::local::local_channel_pair(
             |channel| {
                 let mut garbler: Garbler<_, alsz::Sender, WireMod2> =
@@ -711,7 +711,7 @@ impl NeuralNet {
         secret_weights: bool,
         accuracy: &Accuracy,
     ) -> eyre::Result<Vec<i64>> {
-        assert_eq!(input.len(), self.num_inputs());
+        assert_eq!(input.len(), self.ninputs());
         let (_, outputs) = swanky_channel::local::local_channel_pair(
             |channel| {
                 let mut gb: Garbler<_, alsz::Sender, AllWire> =
@@ -785,7 +785,7 @@ impl NeuralNet {
             let mut garbler = fancy_garbling::Garbler::<_, W>::new(rng, channel)?;
 
             // Construct the zero wires for the input.
-            let inputs = (0..self.num_inputs())
+            let inputs = (0..self.ninputs())
                 .map(|_| {
                     let (zeros, _) = garbler.bin_encode_wire(0, bitwidths[0]);
                     zeros
@@ -984,7 +984,7 @@ impl NeuralNet {
         let mut informer = Informer::new(Dummy::new());
 
         Channel::with(std::io::empty(), |channel| {
-            let inps = (0..self.num_inputs())
+            let inps = (0..self.ninputs())
                 .map(|_| informer.bin_encode(0, bitwidths[0], channel).unwrap())
                 .collect::<Vec<_>>();
 
@@ -1012,7 +1012,7 @@ impl NeuralNet {
         let mut informer = Informer::new(Dummy::new());
 
         Channel::with(std::io::empty(), |channel| {
-            let inps = (0..self.num_inputs())
+            let inps = (0..self.ninputs())
                 .map(|_| informer.crt_encode(0, moduli[0], channel).unwrap())
                 .collect::<Vec<_>>();
 
