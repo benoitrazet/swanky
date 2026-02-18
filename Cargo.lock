@@ -2666,6 +2666,7 @@ dependencies = [
  "itertools 0.14.0",
  "ndarray",
  "rand 0.8.5",
+ "serde",
  "serde_json",
  "swanky-aes-rng",
  "swanky-block",

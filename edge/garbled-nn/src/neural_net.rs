@@ -12,6 +12,8 @@ use fancy_garbling::{
 };
 use ndarray::Array3;
 use rand::{CryptoRng, RngCore};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 use std::{
     fs::File,
@@ -30,6 +32,7 @@ use swanky_twopac::semihonest::{Evaluator, Garbler};
 /// This is created by the garbler, and allows the evaluator to encode its
 /// (plaintext) input into the appropriate input wirelabels associated with the
 /// garbled neural network.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NeuralNetInputEncoder<W> {
     inputs: Vec<BinaryBundle<W>>,
     delta: W,
@@ -61,6 +64,8 @@ impl<W: BinaryWireLabel> NeuralNetInputEncoder<W> {
     }
 }
 
+/// Output map for a garbled neural network.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NeuralNetOutputMap {
     // The first entry is the zero wirelabel, and the second entry is the one
     // wirelabel for that bundle.
