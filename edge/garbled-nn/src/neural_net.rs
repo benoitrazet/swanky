@@ -3,8 +3,8 @@ use crate::{
     util,
 };
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryGadgets, BinaryWireLabel, CrtBundle, CrtGadgets, Fancy,
-    FancyArithmetic, FancyBinary, FancyInput, HasModulus, WireMod2,
+    AllWire, BinaryBundle, BinaryWireLabel, CrtBundle, CrtGadgets, Fancy, FancyArithmetic,
+    FancyBinary, FancyInput, HasModulus, WireMod2,
     classic::{GarbledChannel, GarbledCircuit},
     dummy::Dummy,
     informer::Informer,
@@ -246,7 +246,7 @@ impl NeuralNet {
     }
 
     /// Decode a boolean output of a [`NeuralNet`] evaluation.
-    pub fn decode_output_boolean<W: HasModulus + Clone, F: Fancy<Item = W> + BinaryGadgets>(
+    pub fn decode_output_boolean<W: HasModulus + Clone, F: Fancy<Item = W>>(
         f: &mut F,
         output: &[BinaryBundle<W>],
         channel: &mut Channel,
@@ -269,7 +269,7 @@ impl NeuralNet {
     }
 
     /// Decode an arithmetic output of a [`NeuralNet`] evaluation.
-    pub fn decode_output_arith<W: HasModulus + Clone, F: Fancy<Item = W> + CrtGadgets>(
+    pub fn decode_output_arith<W: HasModulus + Clone, F: Fancy<Item = W>>(
         f: &mut F,
         output: &[CrtBundle<W>],
         modulus: u128,
