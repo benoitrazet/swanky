@@ -123,9 +123,7 @@ impl OutputMap {
     }
 }
 
-/// A neural network.
-///
-/// A neural network consists of a vector of [`Layer`]s.
+/// A neural network that can be garbled.
 pub struct NeuralNet {
     layers: Vec<Layer>,
 }
