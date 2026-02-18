@@ -7,6 +7,7 @@ use crate::{
     util,
 };
 use itertools::Itertools;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 use swanky_channel::Channel;
