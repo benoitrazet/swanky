@@ -811,33 +811,30 @@ impl NeuralNet {
     }
 
     /// Evaluate a boolean garbling of [`NeuralNet`].
+    ///
+    /// The inputs are provided as (bundles of) wirelabels, and the output is a
+    /// vector of (bundles of) wirelabels corresponding to the output.
     pub fn gc_eval_boolean<W: BinaryWireLabel>(
         &self,
-        encoder: &NeuralNetInputEncoder<W>,
+        inputs: &[BinaryBundle<W>],
         gc: &GarbledCircuit,
-        output_map: &NeuralNetOutputMap,
-        input: &Array3<i64>,
         bitwidth: &[usize],
         secret_weights: bool,
-    ) -> eyre::Result<Vec<i64>> {
-        // Extract the wirelabels associated with our input of interest.
-        let inputs = encoder.encode_inputs(input, bitwidth[0]);
+    ) -> eyre::Result<Vec<BinaryBundle<W>>> {
         // Evaluate the garbled circuit on the input wirelabels.
-        let outputs = Channel::with(GarbledChannel::from(gc), |channel| {
+        Channel::with(GarbledChannel::from(gc), |channel| {
             let mut evaluator = fancy_garbling::Evaluator::<W>::new(channel)?;
 
             let outputs = self.eval_boolean(
                 &mut evaluator,
-                &inputs,
+                inputs,
                 bitwidth,
                 secret_weights,
                 false,
                 channel,
             );
             Ok(outputs)
-        })?;
-        // Map the output wirelabels to values.
-        output_map.to_outputs(&outputs)
+        })
     }
 
     // TODO: The `*_accuracy_test` methods have _a lot_ of commonalities. Can we
@@ -1111,9 +1108,15 @@ mod tests {
         let (encoder, gc, output_map) = nn
             .gc_garble_boolean::<WireMod2, _>(bitwidths, false, AesRng::new())
             .unwrap();
-        let output = nn
-            .gc_eval_boolean::<WireMod2>(&encoder, &gc, &output_map, &test, bitwidths, false)
+        // Extract the wirelabels associated with our input of interest.
+        let inputs = encoder.encode_inputs(&test, bitwidths[0]);
+        // Evaluate the garbled circuit.
+        let outputs = nn
+            .gc_eval_boolean::<WireMod2>(&inputs, &gc, bitwidths, false)
             .unwrap();
+        // Map the output wirelabels to values.
+        let output = output_map.to_outputs(&outputs).unwrap();
+
         let plaintext = nn.eval_plaintext(&test);
         for (a, b) in plaintext.iter().zip(output.iter()) {
             assert_eq!(a, b);
