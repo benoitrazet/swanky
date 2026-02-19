@@ -2,11 +2,11 @@
 use std::{fs::File, path::PathBuf};
 
 use clap::{Parser, Subcommand};
-use eyre::Context;
 use mac_n_cheese_event_log::{EventLogEntry, EventLogReader, EventLogSchema};
 use mac_n_cheese_ir::compilation_format::{GraphDegreeCount, Manifest, TaskKind, Type};
 use std::fmt::Write as _;
 use std::io::{BufWriter, Write};
+use swanky_error::{ErrorKind, ResultExt, WrapErr};
 
 /// Inspect full fat mac n'cheese circuits.
 #[derive(Parser, Debug)]
@@ -29,14 +29,26 @@ enum Command {
     },
 }
 
-fn generate_graphviz(circuit: File, mut out: File) -> eyre::Result<()> {
-    let circuit = Manifest::read(circuit).context("Reading circuit manifest")?;
+fn generate_graphviz(circuit: File, mut out: File) -> swanky_error::Result<()> {
+    let circuit = Manifest::read(circuit)?;
     let manifest_hash = circuit.hash();
     let manifest = circuit.manifest();
-    writeln!(out, "digraph X {{")?;
-    writeln!(out, "node [shape=Mrecord];")?;
-    writeln!(out, "fontname=\"Source Code Pro,Menlo,monospace\";")?;
-    writeln!(out, "labelloc=\"t\";")?;
+    writeln!(out, "digraph X {{").wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to write beginning of DOT graph.".to_string(),
+    )?;
+    writeln!(out, "node [shape=Mrecord];").wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to write node shape.".to_string(),
+    )?;
+    writeln!(out, "fontname=\"Source Code Pro,Menlo,monospace\";").wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to write font declaration.".to_string(),
+    )?;
+    writeln!(out, "labelloc=\"t\";").wrap_err(
+        ErrorKind::OtherError,
+        "Failed to write label location declaration.".to_string(),
+    )?;
     let prototypes = manifest.prototypes();
     let mut in_degree = vec![0_u64; manifest.tasks().len()];
     let mut out_degree = vec![0_u64; manifest.tasks().len()];
@@ -53,17 +65,27 @@ fn generate_graphviz(circuit: File, mut out: File) -> eyre::Result<()> {
         if let Some(proto_name) = prototypes.get(task.prototype_id() as usize).name() {
             write!(label, " proto={proto_name}").unwrap();
         }
-        writeln!(out, "subgraph cluster_{} {{", task_id)?;
-        writeln!(out, "label = {:?};", label)?;
+        writeln!(out, "subgraph cluster_{} {{", task_id).wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to write subgraph cluster.".to_string(),
+        )?;
+        writeln!(out, "label = {:?};", label).wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to write label '{label:?}'.".to_string(),
+        )?;
         let mut body_label = String::new();
         let mut first = true;
         let in_degree = &mut in_degree[task_id];
         let mut on_input = |src| {
             *in_degree += 1;
-            *out_degree
-                .get_mut(src)
-                .ok_or_else(|| eyre::eyre!("Invalid task id"))? += 1;
-            eyre::ensure!(src < task_id, "forwards task reference");
+            *out_degree.get_mut(src).ok_or_else(|| {
+                swanky_error::swanky_error!(ErrorKind::OtherError, "Invalid task id")
+            })? += 1;
+            swanky_error::ensure!(
+                src < task_id,
+                ErrorKind::OtherError,
+                "forwards task reference"
+            );
             Ok(())
         };
 
@@ -85,6 +107,10 @@ fn generate_graphviz(circuit: File, mut out: File) -> eyre::Result<()> {
                 input.start(),
                 input.end(),
                 ty,
+            )
+            .wrap_err(
+                ErrorKind::FilesystemError,
+                "Failed to write graph nodes/edge.".to_string(),
             )?;
         }
         for (input_idx, inputs) in task.multi_array_inputs().iter().enumerate() {
@@ -106,36 +132,54 @@ fn generate_graphviz(circuit: File, mut out: File) -> eyre::Result<()> {
                     tributary.start(),
                     tributary.end(),
                     ty,
+                )
+                .wrap_err(
+                    ErrorKind::FilesystemError,
+                    "Failed to write graph nodes/edge.".to_string(),
                 )?;
             }
         }
-        writeln!(out, "T{} [label={:?}];", task_id, body_label)?;
-        writeln!(out, "}}")?;
+        writeln!(out, "T{} [label={:?}];", task_id, body_label).wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to write task node.".to_string(),
+        )?;
+        writeln!(out, "}}").wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to write end of DOT graph.".to_string(),
+        )?;
     }
     // Check that the degrees match what's on disk.
     let mut buf = Vec::new();
     buf.resize(manifest.dependent_counts().length() as usize, 0);
     circuit.read_data_chunk(manifest.dependent_counts(), &mut buf)?;
     let counts: &[GraphDegreeCount] = bytemuck::cast_slice(&buf);
-    eyre::ensure!(
+    swanky_error::ensure!(
         counts.len() == out_degree.len(),
+        ErrorKind::OtherError,
         "counts have the wrong length"
     );
     for (a, b) in counts.iter().zip(out_degree.iter()) {
-        eyre::ensure!(u64::from(*a) == *b, "count mismatch");
+        swanky_error::ensure!(u64::from(*a) == *b, ErrorKind::OtherError, "count mismatch");
     }
     buf.resize(manifest.dependency_counts().length() as usize, 0);
     circuit.read_data_chunk(manifest.dependency_counts(), &mut buf)?;
     let counts: &[GraphDegreeCount] = bytemuck::cast_slice(&buf);
-    eyre::ensure!(
+    swanky_error::ensure!(
         counts.len() == in_degree.len(),
+        ErrorKind::OtherError,
         "counts have the wrong length"
     );
     for (a, b) in counts.iter().zip(in_degree.iter()) {
-        eyre::ensure!(u64::from(*a) == *b, "count mismatch");
+        swanky_error::ensure!(u64::from(*a) == *b, ErrorKind::OtherError, "count mismatch");
     }
-    writeln!(out, "subgraph  cluster_allocations{{")?;
-    writeln!(out, "label={:?};", "Allocation Sizes")?;
+    writeln!(out, "subgraph  cluster_allocations{{").wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to write start of subgraph.".to_string(),
+    )?;
+    writeln!(out, "label={:?};", "Allocation Sizes").wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to write allocation sizes label.".to_string(),
+    )?;
     let mut label = String::new();
     label.push('{');
     for (i, asz) in manifest.allocation_sizes().iter().enumerate() {
@@ -153,10 +197,22 @@ fn generate_graphviz(circuit: File, mut out: File) -> eyre::Result<()> {
         .unwrap();
     }
     label.push('}');
-    writeln!(out, "asz_contents [shape={:?}, label={label:?}]", "record")?;
-    writeln!(out, "}}")?;
-    writeln!(out, "subgraph cluster_task_kinds_used {{")?;
-    writeln!(out, "label={:?};", "Task Kinds Used")?;
+    writeln!(out, "asz_contents [shape={:?}, label={label:?}]", "record").wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to write asz_contents node.".to_string(),
+    )?;
+    writeln!(out, "}}").wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to write end of subgraph.".to_string(),
+    )?;
+    writeln!(out, "subgraph cluster_task_kinds_used {{").wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to write cluster_task_kinds_used subgraph start..".to_string(),
+    )?;
+    writeln!(out, "label={:?};", "Task Kinds Used").wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to write task kinds used label.".to_string(),
+    )?;
     let mut label = String::new();
     label.push('{');
     for (i, tsk) in manifest.task_kinds_used().iter().enumerate() {
@@ -166,27 +222,43 @@ fn generate_graphviz(circuit: File, mut out: File) -> eyre::Result<()> {
         write!(label, "<f{i}> {:?}", TaskKind::try_from(tsk)?).unwrap();
     }
     label.push('}');
-    writeln!(out, "tku_contents [shape={:?}, label={label:?}]", "record")?;
-    writeln!(out, "}}")?;
+    writeln!(out, "tku_contents [shape={:?}, label={label:?}]", "record").wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to write tku_contents.".to_string(),
+    )?;
+    writeln!(out, "}}").wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to write end of subgraph.".to_string(),
+    )?;
     writeln!(
         out,
         "label={:?}",
         format!("Mac n'Cheese Circuit Manifest {manifest_hash:X}")
+    )
+    .wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to write circuit manifest label.".to_string(),
     )?;
-    writeln!(out, "}}")?;
+    writeln!(out, "}}").wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to write end of subgraph.".to_string(),
+    )?;
     Ok(())
 }
 
-fn main() -> eyre::Result<()> {
-    color_eyre::install()?;
+fn main() -> swanky_error::Result<()> {
     let args = Args::parse();
     match args.cmd {
         Command::Dot { circuit, output } => {
-            let circuit_file =
-                File::open(&circuit).with_context(|| format!("Unable to open {circuit:?}"))?;
+            let circuit_file = File::open(&circuit)
+                .wrap_err_with(ErrorKind::FilesystemError, || {
+                    format!("Unable to open {circuit:?}")
+                })?;
             let output = output.unwrap_or_else(|| circuit.with_extension("dot"));
-            let output_file =
-                File::create(&output).with_context(|| format!("Unable to create {output:?}"))?;
+            let output_file = File::create(&output)
+                .wrap_err_with(ErrorKind::FilesystemError, || {
+                    format!("Unable to create {output:?}")
+                })?;
             generate_graphviz(circuit_file, output_file).with_context(|| {
                 format!("Generating graphviz for {circuit:?} and writing it to {output:?}")
             })?;
@@ -209,6 +281,10 @@ fn main() -> eyre::Result<()> {
                     events: evts,
                 },
                 BufWriter::new(stdout_holder.lock()),
+            )
+            .wrap_err(
+                ErrorKind::OtherError,
+                "Failed to convert to a writer.".to_string(),
             )?;
         }
     }

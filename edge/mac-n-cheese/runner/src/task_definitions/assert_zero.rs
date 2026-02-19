@@ -6,6 +6,7 @@ use mac_n_cheese_ir::compilation_format::wire_format::AssertZeroPrototypeWireFor
 use mac_n_cheese_vole::mac::Mac;
 use mac_n_cheese_vole::mac::MacTypes;
 use parking_lot::Mutex;
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_party::Party;
 use swanky_serialization::CanonicalSerialize;
 use vectoreyes::SimdBase;
@@ -30,7 +31,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertZeroTask<P, T> {
         _rng: &mut swanky_aes_rng::AesRng,
         _vc: crate::base_vole::VoleContexts<P>,
         num_runner_threads: usize,
-    ) -> eyre::Result<Self> {
+    ) -> swanky_error::Result<Self> {
         Ok(Self {
             hash_outputs: Vec::from_iter(
                 std::iter::repeat_with(Default::default).take(num_runner_threads),
@@ -45,17 +46,27 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertZeroTask<P, T> {
         mut self,
         c: &mut crate::tls::TlsConnection<P>,
         _rng: &mut swanky_aes_rng::AesRng,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         let mut acu = U8x32::ZERO;
         for out in self.hash_outputs.iter_mut() {
             acu ^= *out.get_mut();
         }
         match P::WHICH {
-            swanky_party::WhichParty::Prover(_) => c.write_all(bytemuck::bytes_of(&acu))?,
+            swanky_party::WhichParty::Prover(_) => c.write_all(bytemuck::bytes_of(&acu)).wrap_err(
+                ErrorKind::NetworkError,
+                "Failed to write 'acu' bytes.".to_string(),
+            )?,
             swanky_party::WhichParty::Verifier(_) => {
                 let mut got = U8x32::ZERO;
-                c.read_exact(bytemuck::bytes_of_mut(&mut got))?;
-                eyre::ensure!(got == acu, "Assert zero hash mismatch.");
+                c.read_exact(bytemuck::bytes_of_mut(&mut got)).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to read bytes from network.".to_string(),
+                )?;
+                swanky_error::ensure!(
+                    got == acu,
+                    ErrorKind::OtherError,
+                    "Assert zero hash mismatch."
+                );
             }
         }
         Ok(())
@@ -67,7 +78,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertZeroTask<P, T> {
         input: &crate::task_framework::TaskInput<P>,
         _incoming_data: crate::alloc::OwnedAlignedBytes,
         _outgoing_data: crate::alloc::AlignedBytesMut,
-    ) -> eyre::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
+    ) -> swanky_error::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
         // TODO: try using a larger size to update
         let mut hash_key = [0; 32];
         hash_key[0..4].copy_from_slice(&ctx.task_id.to_le_bytes());
@@ -96,7 +107,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertZeroTask<P, T> {
         _input: &crate::task_framework::TaskInput<P>,
         _incoming_data: crate::alloc::OwnedAlignedBytes,
         _outgoing_data: crate::alloc::AlignedBytesMut,
-    ) -> eyre::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
+    ) -> swanky_error::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
         unreachable!()
     }
 }

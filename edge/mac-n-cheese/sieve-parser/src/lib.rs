@@ -8,7 +8,7 @@ use std::{io::Write, path::Path};
 
 use crypto_bigint::{CheckedAdd, CheckedMul};
 
-use eyre::{Context, ContextCompat};
+use swanky_error::{ErrorKind, OptionExt, WrapErr};
 
 pub type Identifier<'a> = &'a [u8];
 // This needs to be big enough to store all the moduli of all the fields we support
@@ -21,19 +21,19 @@ pub enum PluginTypeArg {
 }
 
 impl PluginTypeArg {
-    pub fn from_str(s: &str) -> eyre::Result<Self> {
+    pub fn from_str(s: &str) -> swanky_error::Result<Self> {
         if s.starts_with("0x") || s.starts_with("0X") {
             let mut out = Number::default();
             for &byte in s[2..].as_bytes() {
                 out = Option::<_>::from(out.checked_mul(&Number::from_u8(16)))
-                    .context("number too big")?;
+                    .ok_or_swanky_error(ErrorKind::OtherError, "Number too big.")?;
                 let digit = if byte <= b'9' {
                     byte - b'0'
                 } else {
                     byte.to_ascii_lowercase() - b'a' + 10
                 };
                 out = Option::<_>::from(out.checked_add(&Number::from_u8(digit)))
-                    .context("number too big")?;
+                    .ok_or_swanky_error(ErrorKind::OtherError, "Number too big.")?;
             }
             Ok(PluginTypeArg::Number(out))
         } else if s.starts_with("0o") || s.starts_with("0O") {
@@ -43,9 +43,9 @@ impl PluginTypeArg {
             for &byte in s.as_bytes() {
                 if byte.is_ascii_digit() {
                     out = Option::<_>::from(out.checked_mul(&Number::from_u8(10)))
-                        .context("number too big")?;
+                        .ok_or_swanky_error(ErrorKind::OtherError, "Number too big.")?;
                     out = Option::<_>::from(out.checked_add(&Number::from_u8(byte - b'0')))
-                        .context("number too big")?;
+                        .ok_or_swanky_error(ErrorKind::OtherError, "Number too big.")?;
                 }
             }
             Ok(PluginTypeArg::Number(out))
@@ -178,9 +178,10 @@ impl WireRange {
             0
         }
     }
-    pub fn as_single_wire(&self) -> eyre::Result<WireId> {
-        eyre::ensure!(
+    pub fn as_single_wire(&self) -> swanky_error::Result<WireId> {
+        swanky_error::ensure!(
             self.len() == 1,
+            ErrorKind::OtherError,
             "Expected single wire, got a range {}..={}",
             self.start,
             self.end
@@ -209,25 +210,53 @@ pub enum ConversionSemantics {
 }
 
 pub trait FunctionBodyVisitor {
-    fn new(&mut self, ty: TypeId, first: WireId, last: WireId) -> eyre::Result<()>;
-    fn delete(&mut self, ty: TypeId, first: WireId, last: WireId) -> eyre::Result<()>;
-    fn add(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> eyre::Result<()>;
-    fn mul(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> eyre::Result<()>;
-    fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> eyre::Result<()>;
-    fn mulc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> eyre::Result<()>;
-    fn copy(&mut self, ty: TypeId, dst: WireRange, src: &[WireRange]) -> eyre::Result<()>;
-    fn constant(&mut self, ty: TypeId, dst: WireId, src: &Number) -> eyre::Result<()>;
-    fn public_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()>;
-    fn private_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()>;
-    fn assert_zero(&mut self, ty: TypeId, src: WireId) -> eyre::Result<()>;
+    fn new(&mut self, ty: TypeId, first: WireId, last: WireId) -> swanky_error::Result<()>;
+    fn delete(&mut self, ty: TypeId, first: WireId, last: WireId) -> swanky_error::Result<()>;
+    fn add(
+        &mut self,
+        ty: TypeId,
+        dst: WireId,
+        left: WireId,
+        right: WireId,
+    ) -> swanky_error::Result<()>;
+    fn mul(
+        &mut self,
+        ty: TypeId,
+        dst: WireId,
+        left: WireId,
+        right: WireId,
+    ) -> swanky_error::Result<()>;
+    fn addc(
+        &mut self,
+        ty: TypeId,
+        dst: WireId,
+        left: WireId,
+        right: &Number,
+    ) -> swanky_error::Result<()>;
+    fn mulc(
+        &mut self,
+        ty: TypeId,
+        dst: WireId,
+        left: WireId,
+        right: &Number,
+    ) -> swanky_error::Result<()>;
+    fn copy(&mut self, ty: TypeId, dst: WireRange, src: &[WireRange]) -> swanky_error::Result<()>;
+    fn constant(&mut self, ty: TypeId, dst: WireId, src: &Number) -> swanky_error::Result<()>;
+    fn public_input(&mut self, ty: TypeId, dst: WireRange) -> swanky_error::Result<()>;
+    fn private_input(&mut self, ty: TypeId, dst: WireRange) -> swanky_error::Result<()>;
+    fn assert_zero(&mut self, ty: TypeId, src: WireId) -> swanky_error::Result<()>;
     fn convert(
         &mut self,
         dst: TypedWireRange,
         src: TypedWireRange,
         semantics: ConversionSemantics,
-    ) -> eyre::Result<()>;
-    fn call(&mut self, dst: &[WireRange], name: Identifier, args: &[WireRange])
-    -> eyre::Result<()>;
+    ) -> swanky_error::Result<()>;
+    fn call(
+        &mut self,
+        dst: &[WireRange],
+        name: Identifier,
+        args: &[WireRange],
+    ) -> swanky_error::Result<()>;
 }
 pub trait RelationVisitor: FunctionBodyVisitor {
     type FBV<'a>: FunctionBodyVisitor;
@@ -237,16 +266,16 @@ pub trait RelationVisitor: FunctionBodyVisitor {
         outputs: &[TypedCount],
         inputs: &[TypedCount],
         body: BodyCb,
-    ) -> eyre::Result<()>
+    ) -> swanky_error::Result<()>
     where
-        for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> eyre::Result<()>;
+        for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> swanky_error::Result<()>;
     fn define_plugin_function(
         &mut self,
         name: Identifier,
         outputs: &[TypedCount],
         inputs: &[TypedCount],
         body: PluginBinding,
-    ) -> eyre::Result<()>;
+    ) -> swanky_error::Result<()>;
 }
 
 pub struct PrintingVisitor<T: Write>(pub T);
@@ -271,89 +300,158 @@ impl<T: Write> PrintingVisitor<T> {
         }
         Hex(n)
     }
-    fn write_wire_ranges(&mut self, ranges: &[WireRange]) -> eyre::Result<()> {
+    fn write_wire_ranges(&mut self, ranges: &[WireRange]) -> swanky_error::Result<()> {
         for (i, range) in ranges.iter().enumerate() {
             if i != 0 {
-                write!(self.0, ",")?;
+                write!(self.0, ",")
+                    .wrap_err(ErrorKind::OtherError, "Failed to write comma.".to_string())?;
             }
             if range.start == range.end {
-                write!(self.0, "$0x{:x}", range.start)?;
+                write!(self.0, "$0x{:x}", range.start).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to write single wire.".to_string(),
+                )?;
             } else {
-                write!(self.0, "$0x{:x}...$0x{:x}", range.start, range.end)?;
+                write!(self.0, "$0x{:x}...$0x{:x}", range.start, range.end).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to write wire range.".to_string(),
+                )?;
             }
         }
         Ok(())
     }
 }
 impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
-    fn new(&mut self, ty: TypeId, first: WireId, last: WireId) -> eyre::Result<()> {
-        Ok(writeln!(
-            self.0,
-            "@new(0x{ty:x}:$0x{first:x}...$0x{last:x});"
-        )?)
+    fn new(&mut self, ty: TypeId, first: WireId, last: WireId) -> swanky_error::Result<()> {
+        Ok(
+            writeln!(self.0, "@new(0x{ty:x}:$0x{first:x}...$0x{last:x});").wrap_err(
+                ErrorKind::OtherError,
+                "Failed to write 'new' gate.".to_string(),
+            )?,
+        )
     }
-    fn delete(&mut self, ty: TypeId, first: WireId, last: WireId) -> eyre::Result<()> {
-        Ok(writeln!(
-            self.0,
-            "@delete(0x{ty:x} : $0x{first:x}...$0x{last:x});"
-        )?)
+    fn delete(&mut self, ty: TypeId, first: WireId, last: WireId) -> swanky_error::Result<()> {
+        Ok(
+            writeln!(self.0, "@delete(0x{ty:x} : $0x{first:x}...$0x{last:x});").wrap_err(
+                ErrorKind::OtherError,
+                "Failed to write 'delete' gate.".to_string(),
+            )?,
+        )
     }
-    fn add(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> eyre::Result<()> {
+    fn add(
+        &mut self,
+        ty: TypeId,
+        dst: WireId,
+        left: WireId,
+        right: WireId,
+    ) -> swanky_error::Result<()> {
         Ok(writeln!(
             self.0,
             "$0x{dst:x} <- @add(0x{ty:x} : $0x{left:x}, $0x{right:x});"
+        )
+        .wrap_err(
+            ErrorKind::OtherError,
+            "Failed to write 'and' gate.".to_string(),
         )?)
     }
-    fn mul(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> eyre::Result<()> {
+    fn mul(
+        &mut self,
+        ty: TypeId,
+        dst: WireId,
+        left: WireId,
+        right: WireId,
+    ) -> swanky_error::Result<()> {
         Ok(writeln!(
             self.0,
             "$0x{dst:x} <- @mul(0x{ty:x} : $0x{left:x}, $0x{right:x});"
+        )
+        .wrap_err(
+            ErrorKind::OtherError,
+            "Failed to write 'mul' gate.".to_string(),
         )?)
     }
-    fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> eyre::Result<()> {
+    fn addc(
+        &mut self,
+        ty: TypeId,
+        dst: WireId,
+        left: WireId,
+        right: &Number,
+    ) -> swanky_error::Result<()> {
         Ok(writeln!(
             self.0,
             "$0x{dst:x} <- @addc(0x{ty:x} : $0x{left:x}, <{}>);",
             Self::hex(right),
+        )
+        .wrap_err(
+            ErrorKind::OtherError,
+            "Failed to write 'addc' gate.".to_string(),
         )?)
     }
-    fn mulc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> eyre::Result<()> {
+    fn mulc(
+        &mut self,
+        ty: TypeId,
+        dst: WireId,
+        left: WireId,
+        right: &Number,
+    ) -> swanky_error::Result<()> {
         Ok(writeln!(
             self.0,
             "$0x{dst:x} <- @mulc(0x{ty:x} : $0x{left:x}, <{}>);",
             Self::hex(right),
+        )
+        .wrap_err(
+            ErrorKind::OtherError,
+            "Failed to write 'mulc' gate.".to_string(),
         )?)
     }
-    fn copy(&mut self, ty: TypeId, dst: WireRange, src: &[WireRange]) -> eyre::Result<()> {
+    fn copy(&mut self, ty: TypeId, dst: WireRange, src: &[WireRange]) -> swanky_error::Result<()> {
         self.write_wire_ranges(&[dst])?;
-        write!(self.0, " <- 0x{ty:x} : ")?;
+        write!(self.0, " <- 0x{ty:x} : ").wrap_err(
+            ErrorKind::OtherError,
+            "Failed to write 'copy' gate assignment / type.".to_string(),
+        )?;
         self.write_wire_ranges(src)?;
-        Ok(writeln!(self.0, ";")?)
-    }
-    fn constant(&mut self, ty: TypeId, dst: WireId, src: &Number) -> eyre::Result<()> {
-        Ok(writeln!(
-            self.0,
-            "$0x{dst:x} <- 0x{ty:x} : <{}>;",
-            Self::hex(src)
+        Ok(writeln!(self.0, ";").wrap_err(
+            ErrorKind::OtherError,
+            "Failed to write semicolon.".to_string(),
         )?)
     }
-    fn public_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()> {
-        self.write_wire_ranges(&[dst])?;
-        Ok(writeln!(self.0, " <- @public(0x{ty:x});")?)
+    fn constant(&mut self, ty: TypeId, dst: WireId, src: &Number) -> swanky_error::Result<()> {
+        Ok(
+            writeln!(self.0, "$0x{dst:x} <- 0x{ty:x} : <{}>;", Self::hex(src)).wrap_err(
+                ErrorKind::OtherError,
+                "Failed to write constant.".to_string(),
+            )?,
+        )
     }
-    fn private_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()> {
+    fn public_input(&mut self, ty: TypeId, dst: WireRange) -> swanky_error::Result<()> {
         self.write_wire_ranges(&[dst])?;
-        Ok(writeln!(self.0, " <- @private(0x{ty:x});")?)
+        Ok(writeln!(self.0, " <- @public(0x{ty:x});").wrap_err(
+            ErrorKind::OtherError,
+            "Failed to write public input.".to_string(),
+        )?)
     }
-    fn assert_zero(&mut self, ty: TypeId, src: WireId) -> eyre::Result<()> {
-        Ok(writeln!(self.0, "@assert_zero(0x{ty:x} : $0x{src:x});")?)
+    fn private_input(&mut self, ty: TypeId, dst: WireRange) -> swanky_error::Result<()> {
+        self.write_wire_ranges(&[dst])?;
+        Ok(writeln!(self.0, " <- @private(0x{ty:x});").wrap_err(
+            ErrorKind::OtherError,
+            "Failed to write private input.".to_string(),
+        )?)
+    }
+    fn assert_zero(&mut self, ty: TypeId, src: WireId) -> swanky_error::Result<()> {
+        Ok(
+            writeln!(self.0, "@assert_zero(0x{ty:x} : $0x{src:x});").wrap_err(
+                ErrorKind::OtherError,
+                "Failed to write 'assert_zero' gate.".to_string(),
+            )?,
+        )
     }
     fn convert(
         &mut self,
         _dst: TypedWireRange,
         _src: TypedWireRange,
         _semantics: ConversionSemantics,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         todo!()
     }
     fn call(
@@ -361,17 +459,35 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
         dst: &[WireRange],
         name: Identifier,
         args: &[WireRange],
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         if !dst.is_empty() {
             self.write_wire_ranges(dst)?;
-            write!(self.0, " <- ")?;
+            write!(self.0, " <- ").wrap_err(
+                ErrorKind::OtherError,
+                "Failed to write call target arrow.".to_string(),
+            )?;
         }
-        write!(self.0, "@call({}", std::str::from_utf8(name)?)?;
+        write!(
+            self.0,
+            "@call({}",
+            std::str::from_utf8(name).wrap_err(
+                ErrorKind::SerializationError,
+                "Failed to deserialize name from UTF-8 bytes.".to_string()
+            )?
+        )
+        .wrap_err(
+            ErrorKind::OtherError,
+            "Failed to write 'call' gate.".to_string(),
+        )?;
         if !args.is_empty() {
-            write!(self.0, ", ")?;
+            write!(self.0, ", ")
+                .wrap_err(ErrorKind::OtherError, "Failed to write comma.".to_string())?;
             self.write_wire_ranges(args)?;
         }
-        writeln!(self.0, ");")?;
+        writeln!(self.0, ");").wrap_err(
+            ErrorKind::OtherError,
+            "Failed to write paren / semicolon.".to_string(),
+        )?;
         Ok(())
     }
 }
@@ -384,29 +500,47 @@ impl<T: Write> RelationVisitor for PrintingVisitor<T> {
         outputs: &[TypedCount],
         inputs: &[TypedCount],
         body: BodyCb,
-    ) -> eyre::Result<()>
+    ) -> swanky_error::Result<()>
     where
-        for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> eyre::Result<()>,
+        for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> swanky_error::Result<()>,
     {
         write!(
             self.0,
             "@function({}",
-            std::str::from_utf8(name).context("function name isn't utf-8")?
+            std::str::from_utf8(name).wrap_err(
+                ErrorKind::SerializationError,
+                "Function name isn't UTF-8.".to_string()
+            )?
+        )
+        .wrap_err(
+            ErrorKind::OtherError,
+            "Failed to write start of function declaration.".to_string(),
         )?;
         for (name, arr) in [("out", outputs), ("in", inputs)] {
             if !arr.is_empty() {
-                write!(self.0, ", @{name}:")?;
+                write!(self.0, ", @{name}:")
+                    .wrap_err(ErrorKind::OtherError, "Failed to write name.".to_string())?;
                 for (i, entry) in arr.iter().enumerate() {
                     if i != 0 {
-                        write!(self.0, ",")?;
+                        write!(self.0, ",").wrap_err(
+                            ErrorKind::OtherError,
+                            "Failed to write comma.".to_string(),
+                        )?;
                     }
-                    write!(self.0, "0x{:x}:0x{:x}", entry.ty, entry.count)?;
+                    write!(self.0, "0x{:x}:0x{:x}", entry.ty, entry.count).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to write wire counts.".to_string(),
+                    )?;
                 }
             }
         }
-        writeln!(self.0, ")")?;
+        writeln!(self.0, ")").wrap_err(
+            ErrorKind::OtherError,
+            "Failed to write close paren.".to_string(),
+        )?;
         body(self)?;
-        writeln!(self.0, "@end")?;
+        writeln!(self.0, "@end")
+            .wrap_err(ErrorKind::OtherError, "Failed to write '@end'.".to_string())?;
         Ok(())
     }
 
@@ -417,24 +551,43 @@ impl<T: Write> RelationVisitor for PrintingVisitor<T> {
         outputs: &[TypedCount],
         inputs: &[TypedCount],
         body: PluginBinding,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         write!(
             self.0,
             "@function({}",
-            std::str::from_utf8(name).context("function name isn't utf-8")?
+            std::str::from_utf8(name).wrap_err(
+                ErrorKind::SerializationError,
+                "Function name isn't UTF-8.".to_string()
+            )?
+        )
+        .wrap_err(
+            ErrorKind::OtherError,
+            "Failed to write function name.".to_string(),
         )?;
         for (name, arr) in [("out", outputs), ("in", inputs)] {
             if !arr.is_empty() {
-                write!(self.0, ", @{name}:")?;
+                write!(self.0, ", @{name}:").wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to write 'out' or 'in'.".to_string(),
+                )?;
                 for (i, entry) in arr.iter().enumerate() {
                     if i != 0 {
-                        write!(self.0, ",")?;
+                        write!(self.0, ",").wrap_err(
+                            ErrorKind::OtherError,
+                            "Failed to write comma.".to_string(),
+                        )?;
                     }
-                    write!(self.0, "0x{:x}:0x{:x}", entry.ty, entry.count)?;
+                    write!(self.0, "0x{:x}:0x{:x}", entry.ty, entry.count).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to write wire type / count.".to_string(),
+                    )?;
                 }
             }
         }
-        writeln!(self.0, ")")?;
+        writeln!(self.0, ")").wrap_err(
+            ErrorKind::OtherError,
+            "Failed to write close paren.".to_string(),
+        )?;
 
         let PluginBinding {
             plugin_type:
@@ -447,43 +600,66 @@ impl<T: Write> RelationVisitor for PrintingVisitor<T> {
             public_counts,
         } = body;
 
-        write!(self.0, "  @plugin({}, {}", name, operation)?;
+        write!(self.0, "  @plugin({}, {}", name, operation).wrap_err(
+            ErrorKind::OtherError,
+            "Failed to write plugin declaration.".to_string(),
+        )?;
         if !args.is_empty() {
-            write!(self.0, ", ")?;
+            write!(self.0, ", ")
+                .wrap_err(ErrorKind::OtherError, "Failed to write comma.".to_string())?;
             for (i, arg) in args.iter().enumerate() {
                 if i != 0 {
-                    write!(self.0, ",")?;
+                    write!(self.0, ",")
+                        .wrap_err(ErrorKind::OtherError, "Failed to write comma.".to_string())?;
                 }
                 match arg {
-                    PluginTypeArg::Number(n) => write!(self.0, "0x{n:x}")?,
-                    PluginTypeArg::String(s) => write!(self.0, "{s}")?,
+                    PluginTypeArg::Number(n) => write!(self.0, "0x{n:x}").wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to write plugin number argument.".to_string(),
+                    )?,
+                    PluginTypeArg::String(s) => write!(self.0, "{s}").wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to write plugin string argument.".to_string(),
+                    )?,
                 }
             }
         }
         for (name, arr) in [("private", private_counts), ("public", public_counts)] {
             if !arr.is_empty() {
-                write!(self.0, ", @{name}:")?;
+                write!(self.0, ", @{name}:").wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to write 'private' or 'public'.".to_string(),
+                )?;
                 for (i, entry) in arr.iter().enumerate() {
                     if i != 0 {
-                        write!(self.0, ",")?;
+                        write!(self.0, ",").wrap_err(
+                            ErrorKind::OtherError,
+                            "Failed to write comma.".to_string(),
+                        )?;
                     }
-                    write!(self.0, "0x{:x}:0x{:x}", entry.ty, entry.count)?;
+                    write!(self.0, "0x{:x}:0x{:x}", entry.ty, entry.count).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to write private / public type / count.".to_string(),
+                    )?;
                 }
             }
         }
-        writeln!(self.0, ")")?;
+        writeln!(self.0, ")").wrap_err(
+            ErrorKind::OtherError,
+            "Failed to write close paren.".to_string(),
+        )?;
 
         Ok(())
     }
 }
 
 pub trait ValueStreamReader: Sized {
-    fn open(kind: ValueStreamKind, path: &Path) -> eyre::Result<Self>;
+    fn open(kind: ValueStreamKind, path: &Path) -> swanky_error::Result<Self>;
     fn modulus(&self) -> &Number;
-    fn next(&mut self) -> eyre::Result<Option<Number>>;
+    fn next(&mut self) -> swanky_error::Result<Option<Number>>;
 }
 pub trait RelationReader: Sized {
-    fn open(path: &Path) -> eyre::Result<Self>;
+    fn open(path: &Path) -> swanky_error::Result<Self>;
     fn header(&self) -> &Header;
-    fn read(self, rv: &mut impl RelationVisitor) -> eyre::Result<()>;
+    fn read(self, rv: &mut impl RelationVisitor) -> swanky_error::Result<()>;
 }

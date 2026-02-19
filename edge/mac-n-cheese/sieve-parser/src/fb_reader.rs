@@ -5,7 +5,7 @@ use std::{
 };
 
 use crypto_bigint::ArrayEncoding;
-use eyre::{Context, ContextCompat};
+use swanky_error::{ErrorKind, OptionExt, WrapErr};
 
 #[path = "sieve_ir_generated.rs"]
 mod sieve_ir_generated;
@@ -17,8 +17,8 @@ use crate::{
     WireRange,
 };
 
-fn walk_inputs(paths: &[PathBuf]) -> eyre::Result<Vec<PathBuf>> {
-    fn visit(dst: &mut Vec<PathBuf>, input: &Path) -> eyre::Result<()> {
+fn walk_inputs(paths: &[PathBuf]) -> swanky_error::Result<Vec<PathBuf>> {
+    fn visit(dst: &mut Vec<PathBuf>, input: &Path) -> swanky_error::Result<()> {
         if let Some(name) = input.file_name() {
             if name.to_string_lossy().starts_with('.') {
                 // Ignore hidden files
@@ -26,10 +26,14 @@ fn walk_inputs(paths: &[PathBuf]) -> eyre::Result<Vec<PathBuf>> {
             }
         }
         if input.is_dir() {
-            for item in std::fs::read_dir(input)
-                .with_context(|| format!("Unable to open directory {input:?}"))?
-            {
-                let item = item?;
+            for item in std::fs::read_dir(input).wrap_err(
+                ErrorKind::FilesystemError,
+                format!("Unable to open directory {input:?}"),
+            )? {
+                let item = item.wrap_err(
+                    ErrorKind::FilesystemError,
+                    format!("Unable to access directory item"),
+                )?;
                 visit(dst, &item.path())?;
             }
         } else {
@@ -60,28 +64,43 @@ impl MessageReader {
             current_file: None,
         }
     }
-    fn next_root(&mut self) -> eyre::Result<Option<fb::Root<'_>>> {
+    fn next_root(&mut self) -> swanky_error::Result<Option<fb::Root<'_>>> {
         while !self.paths.is_empty() || self.current_file.is_some() {
             match self.current_file.as_mut() {
                 Some(file) => {
-                    let pos = file.stream_position()?;
+                    let pos = file.stream_position().wrap_err(
+                        ErrorKind::FilesystemError,
+                        "Unable to get file stream position.".to_string(),
+                    )?;
                     // This isn't the most efficient way to check this, but it's easy!
                     // This gets called infrequently enough that we don't care.
-                    if pos == file.seek(std::io::SeekFrom::End(0))? {
+                    if pos
+                        == file.seek(std::io::SeekFrom::End(0)).wrap_err(
+                            ErrorKind::FilesystemError,
+                            "Unable to seek to the end of a file.".to_string(),
+                        )?
+                    {
                         self.current_file = None;
                         continue;
                     }
-                    file.seek(std::io::SeekFrom::Start(pos))?;
+                    file.seek(std::io::SeekFrom::Start(pos)).wrap_err(
+                        ErrorKind::FilesystemError,
+                        "Unable to seek to {pos}.".to_string(),
+                    )?;
                     let (len, len_buf) = {
                         let mut len_buf = [0; 4];
-                        file.read_exact(&mut len_buf)
-                            .context("Reading flatbuffer length")?;
+                        file.read_exact(&mut len_buf).wrap_err(
+                            ErrorKind::FilesystemError,
+                            "Failed to read flatbuffer length.".to_string(),
+                        )?;
                         (u32::from_le_bytes(len_buf) as usize, len_buf)
                     };
                     self.buf.resize(len + 4, 0);
                     self.buf[..4].copy_from_slice(&len_buf);
-                    file.read_exact(&mut self.buf[4..])
-                        .context("Reading flatbuffer root message")?;
+                    file.read_exact(&mut self.buf[4..]).wrap_err(
+                        ErrorKind::FilesystemError,
+                        "Reading flatbuffer root message".to_string(),
+                    )?;
                     return Ok(Some(
                         fb::size_prefixed_root_as_root_with_opts(
                             &flatbuffers::VerifierOptions {
@@ -90,30 +109,36 @@ impl MessageReader {
                             },
                             &self.buf,
                         )
-                        .context("failed to verify flatbuffer root buffer")?,
+                        .wrap_err(
+                            ErrorKind::FilesystemError,
+                            "Failed to verify flatbuffer root buffer.".to_string(),
+                        )?,
                     ));
                 }
                 _ => {
                     // If current_file is None, then paths can't be empty, by the above condition.
                     let path = self.paths.pop().unwrap();
-                    self.current_file =
-                        Some(File::open(&path).with_context(|| format!("Opening file {path:?}"))?);
+                    self.current_file = Some(File::open(&path).wrap_err(
+                        ErrorKind::FilesystemError,
+                        format!("Failed to open file {path:?}"),
+                    )?);
                 }
             }
         }
         Ok(None)
     }
-    fn next_relation(&mut self) -> eyre::Result<Option<fb::Relation<'_>>> {
+    fn next_relation(&mut self) -> swanky_error::Result<Option<fb::Relation<'_>>> {
         match self.next_root()? {
-            Some(root) => Ok(Some(root.message_as_relation().with_context(|| {
-                format!("wanted relation, got {:?}", root.message_type())
-            })?)),
+            Some(root) => Ok(Some(root.message_as_relation().ok_or_swanky_error(
+                ErrorKind::OtherError,
+                &format!("wanted relation, got {:?}", root.message_type()),
+            )?)),
             _ => Ok(None),
         }
     }
     fn next_inputs(
         &mut self,
-    ) -> eyre::Result<
+    ) -> swanky_error::Result<
         Option<(
             ValueStreamKind,
             Option<fb::Type<'_>>,
@@ -135,7 +160,8 @@ impl MessageReader {
                         values.inputs(),
                     )))
                 } else {
-                    eyre::bail!(
+                    swanky_error::bail!(
+                        ErrorKind::OtherError,
                         "Expected public or private inputs, got {:?}",
                         root.message_type()
                     );
@@ -151,14 +177,15 @@ pub struct RelationReader {
     header: Header,
 }
 
-fn bytes2number(bytes: &[u8]) -> eyre::Result<Number> {
+fn bytes2number(bytes: &[u8]) -> swanky_error::Result<Number> {
     // We need to use the crypto_bigint version of generic_array.
     let mut buf =
         crypto_bigint::hybrid_array::Array::<u8, <Number as ArrayEncoding>::ByteSize>::default();
     let to_take = buf.len().min(bytes.len());
     buf[..to_take].copy_from_slice(&bytes[..to_take]);
-    eyre::ensure!(
+    swanky_error::ensure!(
         bytes[to_take..].iter().all(|&x| x == 0),
+        ErrorKind::OtherError,
         "number too big (non-zero trailing bytes)"
     );
     Ok(Number::from_le_byte_array(buf))
@@ -170,7 +197,7 @@ impl RelationReader {
         v: &mut impl FunctionBodyVisitor,
         func_out_buf: &mut Vec<WireRange>,
         func_in_buf: &mut Vec<WireRange>,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         if let Some(c) = gate.gate_as_gate_constant() {
             v.constant(
                 c.type_id().into(),
@@ -191,15 +218,22 @@ impl RelationReader {
             let dst = WireRange {
                 start: x
                     .out_id()
-                    .context("copy requires an output wire range")?
+                    .ok_or_swanky_error(
+                        ErrorKind::OtherError,
+                        "Copy requires an output wire range.",
+                    )?
                     .first_id(),
                 end: x
                     .out_id()
-                    .context("copy requires an output wire range")?
+                    .ok_or_swanky_error(
+                        ErrorKind::OtherError,
+                        "Copy requires an output wire range.",
+                    )?
                     .last_id(),
             };
-            eyre::ensure!(
+            swanky_error::ensure!(
                 dst.len() == num_input_wires,
+                ErrorKind::OtherError,
                 "Expected {} total input wires, got {}",
                 dst.len(),
                 num_input_wires
@@ -236,11 +270,17 @@ impl RelationReader {
                 WireRange {
                     start: x
                         .out_id()
-                        .context("public inputs need an output wire range")?
+                        .ok_or_swanky_error(
+                            ErrorKind::OtherError,
+                            "Public inputs need an output wire range",
+                        )?
                         .first_id(),
                     end: x
                         .out_id()
-                        .context("public inputs need an output wire range")?
+                        .ok_or_swanky_error(
+                            ErrorKind::OtherError,
+                            "Public inputs need an output wire range",
+                        )?
                         .last_id(),
                 },
             )?;
@@ -250,11 +290,17 @@ impl RelationReader {
                 WireRange {
                     start: x
                         .out_id()
-                        .context("private inputs need an output wire range")?
+                        .ok_or_swanky_error(
+                            ErrorKind::OtherError,
+                            "Private inputs need an output wire range.",
+                        )?
                         .first_id(),
                     end: x
                         .out_id()
-                        .context("private inputs need an output wire range")?
+                        .ok_or_swanky_error(
+                            ErrorKind::OtherError,
+                            "Private inputs need an output wire range.",
+                        )?
                         .last_id(),
                 },
             )?;
@@ -302,30 +348,39 @@ impl RelationReader {
             v.call(
                 func_out_buf,
                 x.name()
-                    .context("function calls need the name of the funciton to call")?
+                    .ok_or_swanky_error(
+                        ErrorKind::OtherError,
+                        "Function calls need the name of the function to call.",
+                    )?
                     .as_bytes(),
                 func_in_buf,
             )?;
         } else {
-            eyre::bail!("Unknown gate type {:?}", gate.gate_type());
+            swanky_error::bail!(
+                ErrorKind::OtherError,
+                "Unknown gate type {:?}",
+                gate.gate_type()
+            );
         }
         Ok(())
     }
 }
 impl super::RelationReader for RelationReader {
-    fn open(path: &Path) -> eyre::Result<Self> {
+    fn open(path: &Path) -> swanky_error::Result<Self> {
         let paths = walk_inputs(&[path.to_path_buf()])?;
         let mut initial_reader = MessageReader::new(paths.clone());
-        let relation = initial_reader
-            .next_relation()?
-            .context("There needs to be at least one relation")?;
+        let relation = initial_reader.next_relation()?.ok_or_swanky_error(
+            ErrorKind::OtherError,
+            "There needs to be at least one relation.",
+        )?;
         let mut header = Header {
             plugins: Vec::new(),
             types: Vec::new(),
             conversion: Vec::new(),
         };
-        eyre::ensure!(
+        swanky_error::ensure!(
             relation.version() == Some("2.0.0"),
+            ErrorKind::OtherError,
             "Unknown sieve ir version {:?}",
             relation.version()
         );
@@ -338,9 +393,9 @@ impl super::RelationReader for RelationReader {
                     modulus: bytes2number(
                         field
                             .modulo()
-                            .context("field type needs modulus")?
+                            .ok_or_swanky_error(ErrorKind::OtherError, "Field type needs modulus.")?
                             .value()
-                            .context("field type needs modulus")?
+                            .ok_or_swanky_error(ErrorKind::OtherError, "Field type needs modulus.")?
                             .bytes(),
                     )?,
                 })
@@ -365,16 +420,22 @@ impl super::RelationReader for RelationReader {
                         .collect::<Result<Vec<_>, _>>()?,
                 );
                 header.types.push(Type::PluginType(PluginType {
-                    name: String::from(plugin.name().context("plugin type needs plugin name")?),
-                    operation: String::from(
-                        plugin
-                            .operation()
-                            .context("plugin type needs plugin operation")?,
-                    ),
+                    name: String::from(plugin.name().ok_or_swanky_error(
+                        ErrorKind::OtherError,
+                        "Plugin type needs plugin name.",
+                    )?),
+                    operation: String::from(plugin.operation().ok_or_swanky_error(
+                        ErrorKind::OtherError,
+                        "Plugin type needs plugin operation.",
+                    )?),
                     args: args_buf,
                 }))
             } else {
-                eyre::bail!("unknown type {:?}", ty.element_type());
+                swanky_error::bail!(
+                    ErrorKind::OtherError,
+                    "unknown type {:?}",
+                    ty.element_type()
+                );
             }
         }
         for conv in relation.conversions().into_iter().flat_map(|x| x.iter()) {
@@ -395,7 +456,7 @@ impl super::RelationReader for RelationReader {
         })
     }
 
-    fn read(mut self, rv: &mut impl RelationVisitor) -> eyre::Result<()> {
+    fn read(mut self, rv: &mut impl RelationVisitor) -> swanky_error::Result<()> {
         let mut output_buf = Vec::new();
         let mut input_buf = Vec::new();
         let mut func_out_buf = Vec::new();
@@ -430,7 +491,10 @@ impl super::RelationReader for RelationReader {
                     );
                     if let Some(gates) = function.body_as_gates() {
                         rv.define_function(
-                            function.name().context("functions need names")?.as_bytes(),
+                            function
+                                .name()
+                                .ok_or_swanky_error(ErrorKind::OtherError, "Functions need names.")?
+                                .as_bytes(),
                             &output_buf,
                             &input_buf,
                             |v| {
@@ -482,20 +546,23 @@ impl super::RelationReader for RelationReader {
                         );
 
                         rv.define_plugin_function(
-                            function.name().context("functions need names")?.as_bytes(),
+                            function
+                                .name()
+                                .ok_or_swanky_error(ErrorKind::OtherError, "Functions need names.")?
+                                .as_bytes(),
                             &output_buf,
                             &input_buf,
                             PluginBinding {
                                 plugin_type: PluginType {
-                                    name: String::from(
-                                        plugin
-                                            .name()
-                                            .context("plugin binding needs plugin name")?,
-                                    ),
+                                    name: String::from(plugin.name().ok_or_swanky_error(
+                                        ErrorKind::OtherError,
+                                        "Plugin binding needs plugin name.",
+                                    )?),
                                     operation: String::from(
-                                        plugin
-                                            .operation()
-                                            .context("plugin binding needs plugin operation")?,
+                                        plugin.operation().ok_or_swanky_error(
+                                            ErrorKind::OtherError,
+                                            "Plugin binding needs plugin operation.",
+                                        )?,
                                     ),
                                     args: args_buf,
                                 },
@@ -504,10 +571,18 @@ impl super::RelationReader for RelationReader {
                             },
                         )?;
                     } else {
-                        eyre::bail!("unknown function body type {:?}", function.body_type());
+                        swanky_error::bail!(
+                            ErrorKind::OtherError,
+                            "unknown function body type {:?}",
+                            function.body_type()
+                        );
                     }
                 } else {
-                    eyre::bail!("unknown directive type {:?}", directive.directive_type());
+                    swanky_error::bail!(
+                        ErrorKind::OtherError,
+                        "unknown directive type {:?}",
+                        directive.directive_type()
+                    );
                 }
             }
             i += 1;
@@ -524,28 +599,34 @@ pub struct ValueStreamReader {
     modulus: Number,
     buf: Vec<Number>,
     pos: usize,
-    recv: flume::Receiver<eyre::Result<Vec<Number>>>,
+    recv: flume::Receiver<swanky_error::Result<Vec<Number>>>,
 }
 
 impl super::ValueStreamReader for ValueStreamReader {
-    fn open(kind: ValueStreamKind, path: &Path) -> eyre::Result<Self> {
+    fn open(kind: ValueStreamKind, path: &Path) -> swanky_error::Result<Self> {
         let inputs = walk_inputs(&[path.to_path_buf()])?;
         let modulus = {
             let mut reader = MessageReader::new(inputs.clone());
-            let (saw_kind, ty, _) = reader.next_inputs()?.context("some inputs are needed")?;
-            let ty = ty.context("type is not optional")?;
+            let (saw_kind, ty, _) = reader
+                .next_inputs()?
+                .ok_or_swanky_error(ErrorKind::OtherError, "Some inputs are needed.")?;
+            let ty = ty.ok_or_swanky_error(ErrorKind::OtherError, "Type is not optional.")?;
             let modulus = if let Some(ty) = ty.element_as_field() {
                 bytes2number(
                     ty.modulo()
-                        .context("field modulus is required")?
+                        .ok_or_swanky_error(ErrorKind::OtherError, "Field modulus is required.")?
                         .value()
-                        .context("field modulus is required")?
+                        .ok_or_swanky_error(ErrorKind::OtherError, "Field modulus is required.")?
                         .bytes(),
                 )?
             } else {
-                eyre::bail!("Expected field, saw {:?}", ty);
+                swanky_error::bail!(ErrorKind::OtherError, "Expected field, saw {:?}", ty);
             };
-            eyre::ensure!(saw_kind == kind, "Expected {kind:?}. Saw {saw_kind:?}");
+            swanky_error::ensure!(
+                saw_kind == kind,
+                ErrorKind::OtherError,
+                "Expected {kind:?}. Saw {saw_kind:?}"
+            );
             modulus
         };
         let (s, r) = flume::bounded(64);
@@ -553,7 +634,7 @@ impl super::ValueStreamReader for ValueStreamReader {
             .name("ValueStreamReader".to_string())
             .spawn(move || {
                 let mut reader = MessageReader::new(inputs);
-                if let Err(e) = (|| -> eyre::Result<()> {
+                if let Err(e) = (|| -> swanky_error::Result<()> {
                     loop {
                         match reader.next_inputs()? {
                             Some((_, _, values)) => {
@@ -561,7 +642,13 @@ impl super::ValueStreamReader for ValueStreamReader {
                                 let mut chunk = Vec::with_capacity(CHUNK_SIZE);
                                 for value in values.into_iter().flat_map(|x| x.iter()) {
                                     let value = bytes2number(
-                                        value.value().context("values must have values")?.bytes(),
+                                        value
+                                            .value()
+                                            .ok_or_swanky_error(
+                                                ErrorKind::OtherError,
+                                                "Values must have values.",
+                                            )?
+                                            .bytes(),
                                     )?;
                                     chunk.push(value);
                                     if chunk.len() >= CHUNK_SIZE {
@@ -595,7 +682,7 @@ impl super::ValueStreamReader for ValueStreamReader {
     fn modulus(&self) -> &Number {
         &self.modulus
     }
-    fn next(&mut self) -> eyre::Result<Option<Number>> {
+    fn next(&mut self) -> swanky_error::Result<Option<Number>> {
         loop {
             if self.pos >= self.buf.len() {
                 match self.recv.recv() {

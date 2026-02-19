@@ -2,7 +2,7 @@
 use std::{collections::BTreeMap, sync::atomic::AtomicU64};
 
 use allocation::Allocation;
-use eyre::ContextCompat;
+use swanky_error::{ErrorKind, OptionExt};
 use vectoreyes::{SimdBase, SimdBase8, SimdSaturatingArithmetic, U8x32, U16x16, U64x4};
 
 pub type WireId = u64;
@@ -249,7 +249,7 @@ impl<'parent, T> WireMap<'parent, T> {
         &mut self,
         start: WireId,
         allocation: Allocation<'parent, T>,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         let len = allocation.len();
         assert_ne!(len, 0);
         assert!(len < (1 << 48));
@@ -275,15 +275,16 @@ impl<'parent, T> WireMap<'parent, T> {
                 continue;
             }
             let existing_end_inclusive = existing_start + (existing_len as u64 - 1);
-            eyre::ensure!(
+            swanky_error::ensure!(
                 existing_end_inclusive < start,
+                ErrorKind::OtherError,
                 "destination allocation {existing_start}..={existing_end_inclusive} overlaps with {start}..={inclusive_end}"
             );
         }
         self.insert_into_cache(start, allocation);
         Ok(())
     }
-    pub fn alloc(&mut self, start: WireId, inclusive_end: WireId) -> eyre::Result<()> {
+    pub fn alloc(&mut self, start: WireId, inclusive_end: WireId) -> swanky_error::Result<()> {
         if let Some(len) = inclusive_end.checked_sub(start) {
             let len = len + 1;
             self.alloc_from_allocation(start, Allocation::new_owned(len as usize))
@@ -291,7 +292,7 @@ impl<'parent, T> WireMap<'parent, T> {
             Ok(())
         }
     }
-    pub fn free(&mut self, start: WireId, inclusive_end: WireId) -> eyre::Result<()> {
+    pub fn free(&mut self, start: WireId, inclusive_end: WireId) -> swanky_error::Result<()> {
         let mut curr_start = start;
         while curr_start <= inclusive_end {
             let mut alloc_len = 0;
@@ -303,14 +304,16 @@ impl<'parent, T> WireMap<'parent, T> {
                 debug_assert!(alloc_len > 0);
 
                 let found_start = self.cache_starts.as_array()[idx];
-                eyre::ensure!(
+                swanky_error::ensure!(
                     found_start == curr_start,
+                    ErrorKind::OtherError,
                     "Allocation starting with {curr_start} not found. Found an allocation starting with {found_start}."
                 );
 
                 let found_end = found_start + (alloc_len as u64 - 1);
-                eyre::ensure!(
+                swanky_error::ensure!(
                     found_end <= inclusive_end,
+                    ErrorKind::OtherError,
                     "Allocation {found_start}..={found_end} extends past {inclusive_end}."
                 );
 
@@ -332,7 +335,8 @@ impl<'parent, T> WireMap<'parent, T> {
                     // re-insert the cell that we removed and return an error.
                     if found_end > inclusive_end {
                         self.storage.insert(curr_start, cell);
-                        eyre::bail!(
+                        swanky_error::bail!(
+                            ErrorKind::OtherError,
                             "Cannot free {curr_start}..={found_end}, which extends beyond {inclusive_end}."
                         );
                     }
@@ -340,8 +344,9 @@ impl<'parent, T> WireMap<'parent, T> {
 
                 // It's okay if the allocation wasn't found in the BTreeMap, but only if it _was_
                 // found in the cache.
-                None => eyre::ensure!(
+                None => swanky_error::ensure!(
                     was_in_cache,
+                    ErrorKind::OtherError,
                     "Attemping to free non-existent allocation (no allocation starts at {curr_start})",
                 ),
             }
@@ -349,8 +354,9 @@ impl<'parent, T> WireMap<'parent, T> {
             curr_start += alloc_len as u64;
         }
 
-        eyre::ensure!(
+        swanky_error::ensure!(
             curr_start == inclusive_end + 1,
+            ErrorKind::OtherError,
             "The range {start}...{inclusive_end} does not fully cover all allocations it overlaps."
         );
 
@@ -408,7 +414,7 @@ impl<'parent, T> WireMap<'parent, T> {
         &'a self,
         start: WireId,
         inclusive_end: WireId,
-    ) -> eyre::Result<(usize, &'a Allocation<'parent, T>)> {
+    ) -> swanky_error::Result<(usize, &'a Allocation<'parent, T>)> {
         if inclusive_end < start {
             None
         } else {
@@ -445,21 +451,23 @@ impl<'parent, T> WireMap<'parent, T> {
                 None
             }
         }
-        .with_context(|| {
-            format!("{start}..={inclusive_end} could not be found (within a single allocation)")
-        })
+        .ok_or_swanky_error(
+            ErrorKind::OtherError,
+            &format!("{start}..={inclusive_end} could not be found (within a single allocation)"),
+        )
     }
     fn ensure_no_conflict(
         mutable_range_map: &BTreeMap<WireId, WireId>,
         start: WireId,
         inclusive_end: WireId,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         if let Some((&entry_start, &entry_end)) =
             mutable_range_map.range(..=inclusive_end).next_back()
         {
             debug_assert!(entry_start <= entry_end);
-            eyre::ensure!(
+            swanky_error::ensure!(
                 entry_end < start,
+                ErrorKind::OtherError,
                 "Range {start}..={inclusive_end} conflicts with mutable range {entry_start}..={entry_end}"
             );
         }
@@ -469,7 +477,7 @@ impl<'parent, T> WireMap<'parent, T> {
         &mut self,
         start: WireId,
         inclusive_end: WireId,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         if let Some(len) = inclusive_end.checked_sub(start) {
             let len = usize::try_from(len + 1).unwrap();
             // In order for this function to be successful, the given range must be entirely
@@ -478,8 +486,9 @@ impl<'parent, T> WireMap<'parent, T> {
                 // We overlap with an existing allocation. We fail if this allocation doesn't entirely
                 // contain our range.
                 let region_start = start - (wp.pos_in_allocation as u64);
-                eyre::ensure!(
+                swanky_error::ensure!(
                     wp.allocation.len() - wp.pos_in_allocation >= len,
+                    ErrorKind::OtherError,
                     "The range {}..={} has been allocated, and it doesn't fully contain {start}..={inclusive_end}",
                     region_start,
                     region_start + (wp.allocation.len() as u64 - 1)
@@ -497,7 +506,7 @@ impl<'parent, T> WireMap<'parent, T> {
         &mut self,
         mutable_ranges: impl IntoIterator<Item = DestinationRange>,
         immutable_ranges: impl IntoIterator<Item = DestinationRange>,
-    ) -> eyre::Result<WireMap<'_, T>> {
+    ) -> swanky_error::Result<WireMap<'_, T>> {
         let mut out = WireMap {
             storage: Default::default(),
             cache_starts: Default::default(),
@@ -513,8 +522,9 @@ impl<'parent, T> WireMap<'parent, T> {
             mutable_range_map.insert(range.src_start, range.src_inclusive_end);
             let (offset, own_alloc) =
                 self.immutably_borrow_allocation(range.src_start, range.src_inclusive_end)?;
-            eyre::ensure!(
+            swanky_error::ensure!(
                 own_alloc.is_mutable(),
+                ErrorKind::OtherError,
                 "Source range {}..={} isn't mutable",
                 range.src_start,
                 range.src_inclusive_end,

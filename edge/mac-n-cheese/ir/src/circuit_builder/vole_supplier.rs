@@ -34,7 +34,7 @@ impl VoleSupplier {
         &mut self,
         cb: &mut CircuitBuilder,
         prototype: &TaskPrototypeRef,
-    ) -> eyre::Result<&[WireSlice]> {
+    ) -> swanky_error::Result<&[WireSlice]> {
         assert_eq!(prototype.multi_array_inputs().len(), 1);
         let (field, mut count) = prototype
             .multi_array_inputs()

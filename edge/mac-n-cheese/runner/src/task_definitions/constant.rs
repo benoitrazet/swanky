@@ -1,7 +1,7 @@
-use eyre::ContextCompat;
 use mac_n_cheese_ir::compilation_format::FieldMacType;
 use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
 use std::{io::Cursor, ops::Deref, sync::Arc};
+use swanky_error::{ErrorKind, OptionExt, WrapErr};
 use swanky_party::Party;
 use swanky_serialization::{CanonicalSerialize, SequenceDeserializer};
 
@@ -28,7 +28,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for ConstantTask<P, T> {
         _rng: &mut swanky_aes_rng::AesRng,
         vc: crate::base_vole::VoleContexts<P>,
         _num_runner_threads: usize,
-    ) -> eyre::Result<Self> {
+    ) -> swanky_error::Result<Self> {
         Ok(ConstantTask {
             constant_context: vc.get::<T>().constant_context,
         })
@@ -40,7 +40,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for ConstantTask<P, T> {
         self,
         _c: &mut crate::tls::TlsConnection<P>,
         _rng: &mut swanky_aes_rng::AesRng,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         Ok(())
     }
 
@@ -50,20 +50,26 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for ConstantTask<P, T> {
         input: &crate::task_framework::TaskInput<P>,
         _incoming_data: crate::alloc::OwnedAlignedBytes,
         _outgoing_data: crate::alloc::AlignedBytesMut,
-    ) -> eyre::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
+    ) -> swanky_error::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
         let num_outputs = ctx
             .task_prototype
             .outputs()
             .get_opt(0)
-            .context("invalid constant task prototype")?
+            .ok_or_swanky_error(ErrorKind::OtherError, "invalid constant task prototype")?
             .count() as usize;
         let mut out = TaskDataBuffer::with_capacity(num_outputs);
         let mut cursor = Cursor::new(input.task_data().deref());
-        let mut de = <T::VF as CanonicalSerialize>::Deserializer::new(&mut cursor)?;
+        let mut de = <T::VF as CanonicalSerialize>::Deserializer::new(&mut cursor).wrap_err(
+            ErrorKind::SerializationError,
+            "Failed to initialize field element deserializer.".to_string(),
+        )?;
         for _ in 0..num_outputs {
             out.push(Mac::<P, T>::constant(
                 &self.constant_context,
-                de.read(&mut cursor)?,
+                de.read(&mut cursor).wrap_err(
+                    ErrorKind::SerializationError,
+                    "Failed to deserialize field element.".to_string(),
+                )?,
             ));
         }
         Ok(TaskResult::Finished(Arc::new(TaskOutput::new_with::<
@@ -78,7 +84,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for ConstantTask<P, T> {
         _input: &crate::task_framework::TaskInput<P>,
         _incoming_data: crate::alloc::OwnedAlignedBytes,
         _outgoing_data: crate::alloc::AlignedBytesMut,
-    ) -> eyre::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
+    ) -> swanky_error::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
         unreachable!()
     }
 }

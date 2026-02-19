@@ -1,6 +1,5 @@
 #![allow(clippy::all)]
 use crossbeam_queue::SegQueue;
-use eyre::{Context, ContextCompat};
 use parking_lot::{Mutex, MutexGuard, RwLock};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
@@ -15,6 +14,7 @@ use std::{
     io::{Cursor, Write},
     time::{Duration, SystemTime},
 };
+use swanky_error::{ErrorKind, OptionExt, WrapErr};
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EventArgumentType {
@@ -167,7 +167,7 @@ pub mod internal {
     }
 
     impl EventLogWriter {
-        pub fn flush(&mut self, new_buffers: &SegQueue<EventBuffer>) -> eyre::Result<()> {
+        pub fn flush(&mut self, new_buffers: &SegQueue<EventBuffer>) -> swanky_error::Result<()> {
             while let Some(buf) = new_buffers.pop() {
                 self.sources.push(buf);
             }
@@ -189,11 +189,29 @@ pub mod internal {
                 if to_write.is_empty() {
                     continue;
                 }
-                self.dst.write_all(&(thread_id as u64).to_le_bytes())?;
-                self.dst.write_all(&(to_write.len() as u64).to_le_bytes())?;
-                self.dst.write_all(bytemuck::cast_slice(to_write))?;
+                self.dst
+                    .write_all(&(thread_id as u64).to_le_bytes())
+                    .wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to write thread ID to event log.".to_string(),
+                    )?;
+                self.dst
+                    .write_all(&(to_write.len() as u64).to_le_bytes())
+                    .wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to write data length to event log.".to_string(),
+                    )?;
+                self.dst
+                    .write_all(bytemuck::cast_slice(to_write))
+                    .wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to write data to event log.".to_string(),
+                    )?;
             }
-            self.dst.flush()?;
+            self.dst.flush().wrap_err(
+                ErrorKind::OtherError,
+                "Failed to flush event log.".to_string(),
+            )?;
             Ok(())
         }
     }
@@ -290,22 +308,34 @@ pub mod internal {
         dst: &Path,
         schema: &EventLogSchema,
         gs_handle: &'static GlobalStateHandle,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         let mut gs = gs_handle.write();
         if !matches!(&*gs, GlobalState::NotYetOpen) {
             panic!("event log has already been opened");
         }
         let mut dst = lz4::EncoderBuilder::new()
-            .build(BufWriter::new(File::create(dst).wrap_err_with(|| {
-                format!("Opening {:?} to create EventLog", dst)
-            })?))
-            .wrap_err("opening lz4")?;
+            .build(BufWriter::new(
+                File::create(dst).wrap_err_with(ErrorKind::FilesystemError, || {
+                    format!("Opening {:?} to create EventLog", dst)
+                })?,
+            ))
+            .wrap_err(
+                ErrorKind::InitializationError,
+                "Failed to initialize LZ4".to_string(),
+            )?;
         let mut metadata = Cursor::new(Vec::new());
         ciborium::ser::into_writer(schema, &mut metadata)
             .expect("serialization of event log description succeeds");
         let metadata = metadata.into_inner();
-        dst.write_all(&(metadata.len() as u64).to_le_bytes())?;
-        dst.write_all(&metadata)?;
+        dst.write_all(&(metadata.len() as u64).to_le_bytes())
+            .wrap_err(
+                ErrorKind::FilesystemError,
+                "Failed to write metadata length.".to_string(),
+            )?;
+        dst.write_all(&metadata).wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to write metadata.".to_string(),
+        )?;
         let system_start = Instant::now();
         dst.write_all(
             &(SystemTime::now()
@@ -313,8 +343,15 @@ pub mod internal {
                 .unwrap()
                 .as_millis() as u64)
                 .to_le_bytes(),
+        )
+        .wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to write event duration.".to_string(),
         )?;
-        dst.flush()?;
+        dst.flush().wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to flush destination buffer.".to_string(),
+        )?;
         let new_buffers = SegQueue::new();
         *gs = GlobalState::Open {
             system_start,
@@ -350,7 +387,7 @@ pub mod internal {
     }
 
     #[cold]
-    pub fn close_event_log(gs: &GlobalStateHandle) -> eyre::Result<()> {
+    pub fn close_event_log(gs: &GlobalStateHandle) -> swanky_error::Result<()> {
         let gs = std::mem::replace(gs.write().deref_mut(), GlobalState::Closed);
         match gs {
             GlobalState::NotYetOpen => panic!("event log has never been opened"),
@@ -360,10 +397,14 @@ pub mod internal {
                 writer,
             } => {
                 let mut writer = writer.into_inner();
-                writer
-                    .flush(&new_buffers)
-                    .context("Final flush for event log")?;
-                writer.dst.finish().1.context("finalizing event log lz4")?;
+                writer.flush(&new_buffers).wrap_err(
+                    ErrorKind::FilesystemError,
+                    "Failed final flush for event log".to_string(),
+                )?;
+                writer.dst.finish().1.wrap_err(
+                    ErrorKind::FilesystemError,
+                    "Failed to finalize event log lz4".to_string(),
+                )?;
             }
             GlobalState::Closed => panic!("event log has already been closed"),
         }
@@ -529,12 +570,12 @@ macro_rules! define_events {
                 }
             }
             #[cold]
-            pub fn open_event_log(dst: impl std::convert::AsRef<std::path::Path>) -> ::eyre::Result<()> {
+            pub fn open_event_log(dst: impl std::convert::AsRef<std::path::Path>) -> ::swanky_error::Result<()> {
                 $crate::internal::open_event_log(dst.as_ref(), &dump_schema(), &GLOBAL)
             }
 
             #[cold]
-            pub fn close_event_log() -> ::eyre::Result<()> {
+            pub fn close_event_log() -> ::swanky_error::Result<()> {
                 $crate::internal::close_event_log(&GLOBAL)
             }
         }
@@ -576,25 +617,43 @@ pub struct EventLogReader {
 }
 
 impl EventLogReader {
-    pub fn open(path: impl AsRef<Path>) -> eyre::Result<Self> {
+    pub fn open(path: impl AsRef<Path>) -> swanky_error::Result<Self> {
         Self::open_inner(path.as_ref())
     }
-    fn open_inner(path: &Path) -> eyre::Result<Self> {
+    fn open_inner(path: &Path) -> swanky_error::Result<Self> {
         let mut reader = lz4::Decoder::new(BufReader::new(
-            File::open(path).with_context(|| format!("Opening {path:?}"))?,
+            File::open(path).wrap_err_with(ErrorKind::FilesystemError, || {
+                format!("Failed to open {path:?}")
+            })?,
         ))
-        .context("lz4 opening")?;
+        .wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to open LZ4.".to_string(),
+        )?;
         let mut u64_buf = [0; 8];
-        reader.read_exact(&mut u64_buf)?;
+        reader.read_exact(&mut u64_buf).wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to read first 8 bytes.".to_string(),
+        )?;
         let mut metadata_buf = vec![
             0;
-            usize::try_from(u64::from_le_bytes(u64_buf))
-                .context("metadata buffer too big for usize")?
+            usize::try_from(u64::from_le_bytes(u64_buf)).wrap_err(
+                ErrorKind::OtherError,
+                "Metadata buffer too big for usize".to_string()
+            )?
         ];
-        reader.read_exact(&mut metadata_buf)?;
-        let schema = ciborium::de::from_reader(Cursor::new(metadata_buf))
-            .context("unable to decode event buffer schema")?;
-        reader.read_exact(&mut u64_buf)?;
+        reader.read_exact(&mut metadata_buf).wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to read metadata.".to_string(),
+        )?;
+        let schema = ciborium::de::from_reader(Cursor::new(metadata_buf)).wrap_err(
+            ErrorKind::SerializationError,
+            "Unable to decode event buffer schema".to_string(),
+        )?;
+        reader.read_exact(&mut u64_buf).wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to read timestamp.".to_string(),
+        )?;
         // This reads the unix timestamp in milliseconds when the event log was started. We're
         // ignoring this for now.
         Ok(EventLogReader {
@@ -614,32 +673,49 @@ impl EventLogReader {
     pub fn schema(&self) -> &EventLogSchema {
         &self.schema
     }
-    pub fn next_event(&mut self) -> eyre::Result<Option<&EventLogEntry>> {
+    pub fn next_event(&mut self) -> swanky_error::Result<Option<&EventLogEntry>> {
         if self.current_thread_buffer_read_pos >= self.current_thread_buffer.len() {
             // Read the next chunk of data in.
             let thread_id = {
                 let mut buf = [0; 8];
                 // First do a single byte read, so that we can use read_exact most of the time.
-                if self.r.read(&mut buf[0..1])? == 0 {
+                if self.r.read(&mut buf[0..1]).wrap_err(
+                    ErrorKind::FilesystemError,
+                    "Failed to read a byte.".to_string(),
+                )? == 0
+                {
                     // We've hit EOF
                     return Ok(None);
                 }
-                self.r.read_exact(&mut buf[1..])?;
+                self.r.read_exact(&mut buf[1..]).wrap_err(
+                    ErrorKind::FilesystemError,
+                    "Failed to read remaining u64 bytes.".to_string(),
+                )?;
                 u64::from_le_bytes(buf)
             };
             let num_words = {
                 let mut buf = [0; 8];
-                self.r.read_exact(&mut buf)?;
-                usize::try_from(u64::from_le_bytes(buf))
-                    .context("single thread chunk is too big for usize")?
+                self.r.read_exact(&mut buf).wrap_err(
+                    ErrorKind::FilesystemError,
+                    "Failed to read u64 bytes.".to_string(),
+                )?;
+                usize::try_from(u64::from_le_bytes(buf)).wrap_err(
+                    ErrorKind::OtherError,
+                    "Single thread chunk is too big for usize".to_string(),
+                )?
             };
             self.current_thread_buffer.resize(num_words, 0);
             self.r
-                .read_exact(bytemuck::cast_slice_mut(&mut self.current_thread_buffer))?;
+                .read_exact(bytemuck::cast_slice_mut(&mut self.current_thread_buffer))
+                .wrap_err(
+                    ErrorKind::FilesystemError,
+                    "Failed to read current thread data.".to_string(),
+                )?;
             self.current_thread = thread_id;
             self.current_thread_buffer_read_pos = 0;
             if self.last_event_timestamp.len()
-                <= usize::try_from(thread_id).context("too many threads")?
+                <= usize::try_from(thread_id)
+                    .wrap_err(ErrorKind::OtherError, "Too many threads".to_string())?
             {
                 self.last_event_timestamp
                     .resize(thread_id as usize + 1, Duration::default());
@@ -649,11 +725,10 @@ impl EventLogReader {
             u64::from(pair[0]) | (u64::from(pair[1]) << 32)
         }
         let timestamp = {
-            let delta_ns = decode_u64(
-                self.current_thread_buffer
-                    .get(0..2)
-                    .context("Unexpected EOF reading timestamp delta")?,
-            );
+            let delta_ns = decode_u64(self.current_thread_buffer.get(0..2).ok_or_swanky_error(
+                ErrorKind::OtherError,
+                "Unexpected EOF reading timestamp delta",
+            )?);
             let dst = &mut self.last_event_timestamp[self.current_thread as usize];
             *dst += Duration::from_nanos(delta_ns);
             self.current_thread_buffer_read_pos += 2;
@@ -662,7 +737,8 @@ impl EventLogReader {
         let tag = *self
             .current_thread_buffer
             .get(self.current_thread_buffer_read_pos)
-            .context("Unexpected EOF reading event tag")? as usize;
+            .ok_or_swanky_error(ErrorKind::OtherError, "Unexpected EOF reading event tag")?
+            as usize;
         self.current_thread_buffer_read_pos += 1;
         self.ele = EventLogEntry {
             timestamp,
@@ -676,7 +752,10 @@ impl EventLogReader {
                             let word = self
                                 .current_thread_buffer
                                 .get(self.current_thread_buffer_read_pos)
-                                .context("Unexpected EOF trying to read word")?;
+                                .ok_or_swanky_error(
+                                    ErrorKind::OtherError,
+                                    "Unexpected EOF trying to read word",
+                                )?;
                             self.current_thread_buffer_read_pos += 1;
                             args.push(i128::from(*word));
                         }
@@ -684,7 +763,10 @@ impl EventLogReader {
                             let word = self
                                 .current_thread_buffer
                                 .get(self.current_thread_buffer_read_pos)
-                                .context("Unexpected EOF trying to read word")?;
+                                .ok_or_swanky_error(
+                                    ErrorKind::OtherError,
+                                    "Unexpected EOF trying to read word",
+                                )?;
                             self.current_thread_buffer_read_pos += 1;
                             args.push(i128::from(*word as i32));
                         }
@@ -695,7 +777,10 @@ impl EventLogReader {
                                         self.current_thread_buffer_read_pos
                                             ..self.current_thread_buffer_read_pos + 2,
                                     )
-                                    .context("Unexpected EOF trying to read words")?,
+                                    .ok_or_swanky_error(
+                                        ErrorKind::OtherError,
+                                        "Unexpected EOF trying to read words",
+                                    )?,
                             );
                             self.current_thread_buffer_read_pos += 2;
                             args.push(i128::from(word));
@@ -707,7 +792,10 @@ impl EventLogReader {
                                         self.current_thread_buffer_read_pos
                                             ..self.current_thread_buffer_read_pos + 2,
                                     )
-                                    .context("Unexpected EOF trying to read words")?,
+                                    .ok_or_swanky_error(
+                                        ErrorKind::OtherError,
+                                        "Unexpected EOF trying to read words",
+                                    )?,
                             );
                             self.current_thread_buffer_read_pos += 2;
                             args.push(i128::from(word as i64));
@@ -725,7 +813,10 @@ impl EventLogReader {
                             self.current_thread_buffer_read_pos
                                 ..self.current_thread_buffer_read_pos + 2,
                         )
-                        .context("Unexpected EOF trying to read event id")?,
+                        .ok_or_swanky_error(
+                            ErrorKind::OtherError,
+                            "Unexpected EOF trying to read event id",
+                        )?,
                 );
                 self.current_thread_buffer_read_pos += 2;
                 if tag == self.schema.events.len() {
@@ -738,7 +829,7 @@ impl EventLogReader {
                     // Released lock
                     EventLogEntryBody::LockReleased { event_id }
                 } else {
-                    eyre::bail!("Unexpected event log tag {tag}");
+                    swanky_error::bail!(ErrorKind::OtherError, "Unexpected event log tag {tag}");
                 }
             },
         };

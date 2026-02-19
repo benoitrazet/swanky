@@ -25,7 +25,7 @@ where
         _rng: &mut swanky_aes_rng::AesRng,
         _vc: crate::base_vole::VoleContexts<P>,
         _num_runner_threads: usize,
-    ) -> eyre::Result<Self> {
+    ) -> swanky_error::Result<Self> {
         Ok(Self(PhantomData))
     }
 
@@ -35,7 +35,7 @@ where
         self,
         _c: &mut crate::tls::TlsConnection<P>,
         _rng: &mut swanky_aes_rng::AesRng,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         Ok(())
     }
 
@@ -45,7 +45,7 @@ where
         input: &crate::task_framework::TaskInput<P>,
         _incoming_data: crate::alloc::OwnedAlignedBytes,
         _outgoing_data: crate::alloc::AlignedBytesMut,
-    ) -> eyre::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
+    ) -> swanky_error::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
         input.small_binary_mac_task::<2, 1, (F2, TF, SmallBinaryFieldSpecialization)>(
             ctx,
             Xor4PrototypeWireFormat::default(),
@@ -60,7 +60,7 @@ where
         _input: &crate::task_framework::TaskInput<P>,
         _incoming_data: crate::alloc::OwnedAlignedBytes,
         _outgoing_data: crate::alloc::AlignedBytesMut,
-    ) -> eyre::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
+    ) -> swanky_error::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
         unreachable!()
     }
 }

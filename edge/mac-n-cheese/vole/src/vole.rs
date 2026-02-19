@@ -1,6 +1,5 @@
 use arrayvec::ArrayVec;
 use bytemuck::TransparentWrapper;
-use eyre::Context;
 use generic_array::{GenericArray, typenum::Unsigned};
 use keyed_arena::{AllocationKey, KeyedArena};
 use party::{IS_PROVER, IS_VERIFIER, Party};
@@ -10,6 +9,7 @@ use std::{marker::PhantomData, ops::Deref};
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
 use swanky_field::{Degree, DegreeModulo, FiniteField};
 use swanky_ot_alsz_kos::explicit_round::{
@@ -116,11 +116,17 @@ impl<T: MacTypes> VoleSender<T> {
     pub fn init<C: AbstractChannel, RNG: Rng + CryptoRng>(
         channel: &mut C,
         rng: &mut RNG,
-    ) -> eyre::Result<Self> {
+    ) -> swanky_error::Result<Self> {
         let lpn_seeds = Aes128EncryptOnly::new_with_key(
-            swanky_cointoss::send(channel, &[rng.r#gen::<Block>()])?[0],
+            swanky_cointoss::send(channel, &[rng.r#gen::<Block>()]).wrap_err(
+                ErrorKind::NetworkError,
+                "Failed to send seeds to AES key scheduler.".to_string(),
+            )?[0],
         );
-        let ot = KosReceiver::init(channel, rng)?;
+        let ot = KosReceiver::init(channel, rng).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize KOS OT receiver.".to_string(),
+        )?;
         let ggm_seeds = make_ggm_seeds(&lpn_seeds);
         Ok(VoleSender {
             lpn_seeds,
@@ -137,10 +143,11 @@ impl<T: MacTypes> VoleSender<T> {
         rng: &mut (impl Rng + CryptoRng),
         base_voles: &[Mac<party::Prover, T>],
         mut outgoing_bytes: &mut [u8],
-    ) -> eyre::Result<VoleSenderStep3<T>> {
+    ) -> swanky_error::Result<VoleSenderStep3<T>> {
         assert_eq!(base_voles.len(), T::VS.base_voles_needed);
-        eyre::ensure!(
+        swanky_error::ensure!(
             outgoing_bytes.len() == T::VS.comms_1s,
+            ErrorKind::OtherError,
             "incorrect outgoing buffer size"
         );
         let base_voles = BaseVoles::new(base_voles);
@@ -179,7 +186,11 @@ impl<T: MacTypes> VoleSender<T> {
         );
         let ot_stage2 = self
             .ot
-            .receive(arena, selector, choices, rng, outgoing_bytes)?;
+            .receive(arena, selector, choices, rng, outgoing_bytes)
+            .wrap_err(
+                ErrorKind::OtherError,
+                "Failed to receive receiver stage two.".to_string(),
+            )?;
         let mut commitment_key = [0; 32];
         rng.fill_bytes(&mut commitment_key);
         Ok(VoleSenderStep3 {
@@ -210,24 +221,32 @@ impl<T: MacTypes> VoleSenderStep3<T> {
         result: &mut [Mac<party::Prover, T>],
         mut incoming_bytes: &[u8],
         mut outgoing_bytes: &mut [u8],
-    ) -> eyre::Result<VoleSenderStep5<T>> {
+    ) -> swanky_error::Result<VoleSenderStep5<T>> {
         assert_eq!(base_voles.len(), T::VS.base_voles_needed);
         let base_voles = BaseVoles::new(base_voles);
         let alphas_and_betas = arena.borrow_mut(self.alphas_and_betas);
-        eyre::ensure!(
+        swanky_error::ensure!(
             outgoing_bytes.len() == T::VS.comms_3s,
+            ErrorKind::OtherError,
             "outgoing buffer is the wrong size"
         );
-        eyre::ensure!(
+        swanky_error::ensure!(
             incoming_bytes.len() == T::VS.comms_2r,
+            ErrorKind::OtherError,
             "incoming buffer is the wrong size"
         );
         let ot_bytes = KosReceiverStage2::incoming_bytes(T::VS.ot_num_choices);
-        let keys = self.ot_stage2.stage2(
-            arena,
-            &incoming_bytes[0..ot_bytes],
-            &mut outgoing_bytes[0..KosReceiverStage2::OUTGOING_BYTES],
-        )?;
+        let keys = self
+            .ot_stage2
+            .stage2(
+                arena,
+                &incoming_bytes[0..ot_bytes],
+                &mut outgoing_bytes[0..KosReceiverStage2::OUTGOING_BYTES],
+            )
+            .wrap_err(
+                ErrorKind::OtherError,
+                "Failed to perform receiver stage two.".to_string(),
+            )?;
         incoming_bytes = &incoming_bytes[ot_bytes..];
         outgoing_bytes = &mut outgoing_bytes[KosReceiverStage2::OUTGOING_BYTES..];
         let nbits = T::LPN.log2m;
@@ -259,7 +278,10 @@ impl<T: MacTypes> VoleSenderStep3<T> {
                 &incoming_bytes[0..<T::TF as CanonicalSerialize>::ByteReprLen::USIZE],
             );
             incoming_bytes = &incoming_bytes[d.len()..];
-            let d: T::TF = T::TF::from_bytes(&d).context("Failed to read field element")?;
+            let d: T::TF = T::TF::from_bytes(&d).wrap_err(
+                ErrorKind::SerializationError,
+                "Failed to read field element.".to_string(),
+            )?;
             // TODO: is alpha supposed to be private? If so there's a cache timing attack here.
             result[i * m + alpha] = (*beta, w - (d + sum)).into();
         }
@@ -317,19 +339,22 @@ impl<T: MacTypes> VoleSenderStep5<T> {
         result: &mut [Mac<party::Prover, T>],
         incoming_bytes: &[u8],
         outgoing_bytes: &mut [u8],
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         assert_eq!(base_voles.len(), T::VS.base_voles_needed);
-        eyre::ensure!(
+        swanky_error::ensure!(
             outgoing_bytes.len() == T::VS.comms_5s,
+            ErrorKind::OtherError,
             "outgoing buffer is the wrong size"
         );
-        eyre::ensure!(
+        swanky_error::ensure!(
             incoming_bytes.len() == T::VS.comms_4r,
+            ErrorKind::OtherError,
             "incoming buffer is the wrong size"
         );
         outgoing_bytes.copy_from_slice(&self.commitment_key);
-        eyre::ensure!(
+        swanky_error::ensure!(
             self.va.to_bytes().as_slice() == incoming_bytes,
+            ErrorKind::OtherError,
             "equality protocol failed"
         );
         T::S::lpn_sender(
@@ -354,11 +379,17 @@ impl<T: MacTypes> VoleReceiver<T> {
         channel: &mut C,
         rng: &mut RNG,
         delta: T::TF,
-    ) -> eyre::Result<Self> {
+    ) -> swanky_error::Result<Self> {
         let lpn_seeds = Aes128EncryptOnly::new_with_key(
-            swanky_cointoss::receive(channel, &[rng.r#gen::<Block>()])?[0],
+            swanky_cointoss::receive(channel, &[rng.r#gen::<Block>()]).wrap_err(
+                ErrorKind::OtherError,
+                "Failed to receive seeds for AES key scheduler.".to_string(),
+            )?[0],
         );
-        let ot = KosSender::init(channel, rng)?;
+        let ot = KosSender::init(channel, rng).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize KOS OT sender.".to_string(),
+        )?;
         let ggm_seeds = make_ggm_seeds(&lpn_seeds);
         Ok(VoleReceiver {
             lpn_seeds,
@@ -378,17 +409,19 @@ impl<T: MacTypes> VoleReceiver<T> {
         output_voles: &mut [Mac<party::Verifier, T>],
         mut incoming_bytes: &[u8],
         mut outgoing_bytes: &mut [u8],
-    ) -> eyre::Result<VoleReceiverStep4<T>> {
+    ) -> swanky_error::Result<VoleReceiverStep4<T>> {
         assert_eq!(base_voles.len(), T::VS.base_voles_needed);
         assert_eq!(output_voles.len(), T::VS.voles_outputted);
-        eyre::ensure!(
+        swanky_error::ensure!(
             outgoing_bytes.len() == T::VS.comms_2r,
+            ErrorKind::OtherError,
             "outgoing buffer wrong size. Got {}. Expected {}",
             outgoing_bytes.len(),
             T::VS.comms_2r
         );
-        eyre::ensure!(
+        swanky_error::ensure!(
             incoming_bytes.len() == T::VS.comms_1s,
+            ErrorKind::OtherError,
             "incoming buffer wrong size"
         );
         let base_voles = BaseVoles::new(base_voles);
@@ -402,7 +435,10 @@ impl<T: MacTypes> VoleReceiver<T> {
                 &incoming_bytes[0..<T::VF as CanonicalSerialize>::ByteReprLen::USIZE],
             );
             incoming_bytes = &incoming_bytes[<T::VF as CanonicalSerialize>::ByteReprLen::USIZE..];
-            let a_prime = T::VF::from_bytes(&bytes)?;
+            let a_prime = T::VF::from_bytes(&bytes).wrap_err(
+                ErrorKind::SerializationError,
+                "Failed to read field element.".to_string(),
+            )?;
             *gamma = v.tag(IS_VERIFIER) - a_prime * self.delta;
         }
         assert_eq!(T::LPN.weight, lpn_params::LPN_EXTEND_PARAMS_WEIGHT);
@@ -434,14 +470,20 @@ impl<T: MacTypes> VoleReceiver<T> {
             );
         }
         let ot_outgoing_size = KosSender::send_outgoing_bytes(T::VS.ot_num_choices);
-        let ot_stage2 = self.ot.send(
-            arena,
-            selector,
-            &keys,
-            rng,
-            incoming_bytes,
-            &mut outgoing_bytes[0..ot_outgoing_size],
-        )?;
+        let ot_stage2 = self
+            .ot
+            .send(
+                arena,
+                selector,
+                &keys,
+                rng,
+                incoming_bytes,
+                &mut outgoing_bytes[0..ot_outgoing_size],
+            )
+            .wrap_err(
+                ErrorKind::OtherError,
+                "Failed to obliviously send stage two bytes.".to_string(),
+            )?;
         outgoing_bytes = &mut outgoing_bytes[ot_outgoing_size..];
         // This is true by construction. But it's a good reminder of this property.
         debug_assert_eq!(gammas.len() * m, result.len());
@@ -475,21 +517,27 @@ impl<'a, T: MacTypes> VoleReceiverStep4<T> {
         output_voles: &mut [Mac<party::Verifier, T>],
         mut incoming_bytes: &[u8],
         outgoing_bytes: &mut [u8],
-    ) -> eyre::Result<VoleReceiverStep6<T>> {
+    ) -> swanky_error::Result<VoleReceiverStep6<T>> {
         assert_eq!(base_voles.len(), T::VS.base_voles_needed);
         assert_eq!(output_voles.len(), T::VS.voles_outputted);
         let base_voles = BaseVoles::new(base_voles);
         let spsvole_result = output_voles;
-        eyre::ensure!(
+        swanky_error::ensure!(
             outgoing_bytes.len() == T::VS.comms_4r,
+            ErrorKind::OtherError,
             "wrong outgoing buffer size"
         );
-        eyre::ensure!(
+        swanky_error::ensure!(
             incoming_bytes.len() == T::VS.comms_3s,
+            ErrorKind::OtherError,
             "wrong outgoing buffer size"
         );
         self.ot_stage2
-            .stage2(arena, &incoming_bytes[0..KosSenderStage2::INCOMING_BYTES])?;
+            .stage2(arena, &incoming_bytes[0..KosSenderStage2::INCOMING_BYTES])
+            .wrap_err(
+                ErrorKind::OtherError,
+                "Failed to run KOS sender stage two.".to_string(),
+            )?;
         incoming_bytes = &incoming_bytes[KosSenderStage2::INCOMING_BYTES..];
         let mut x_stars: GenericArray<T::VF, DegreeModulo<T::VF, T::TF>> = Default::default();
         for x_star in x_stars.iter_mut() {
@@ -499,7 +547,10 @@ impl<'a, T: MacTypes> VoleReceiverStep4<T> {
                 &incoming_bytes[0..<T::VF as CanonicalSerialize>::ByteReprLen::USIZE],
             );
             incoming_bytes = &incoming_bytes[bytes.len()..];
-            *x_star = T::VF::from_bytes(&bytes)?;
+            *x_star = T::VF::from_bytes(&bytes).wrap_err(
+                ErrorKind::SerializationError,
+                "Failed to read field element.".to_string(),
+            )?;
         }
         let delta = receiver.delta;
         let seed = *<&[u8; 16]>::try_from(&incoming_bytes[0..16]).unwrap();
@@ -542,19 +593,21 @@ impl<'a, T: MacTypes> VoleReceiverStep6<T> {
         base_voles: &[Mac<party::Verifier, T>],
         output_voles: &mut [Mac<party::Verifier, T>],
         incoming_bytes: &[u8],
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         assert_eq!(base_voles.len(), T::VS.base_voles_needed);
         assert_eq!(output_voles.len(), T::VS.voles_outputted);
-        eyre::ensure!(
+        swanky_error::ensure!(
             incoming_bytes.len() == T::VS.comms_5s,
+            ErrorKind::OtherError,
             "invalid incoming bytes size"
         );
         let mut commitment_key = [0; 32];
         commitment_key.copy_from_slice(incoming_bytes);
         // TODO: We don't care about constant time here. I think?
-        eyre::ensure!(
+        swanky_error::ensure!(
             blake3::keyed_hash(&commitment_key, &self.vb.to_bytes()).as_bytes()
                 == self.commitment.as_slice(),
+            ErrorKind::OtherError,
             "sender commitment mismatch"
         );
         T::S::lpn_receiver(

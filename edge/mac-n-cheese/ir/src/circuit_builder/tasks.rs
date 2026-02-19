@@ -3,6 +3,7 @@ use std::any::TypeId;
 use arrayvec::ArrayVec;
 use mac_n_cheese_vole::specialization::FiniteFieldSpecialization;
 use mac_n_cheese_vole::vole::VoleSizes;
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_serialization::SequenceSerializer;
 
@@ -21,16 +22,25 @@ impl<'a> super::CircuitBuilder<'a> {
         &mut self,
         ty: FieldMacType,
         values: I,
-    ) -> eyre::Result<TaskPrototypeRef> {
+    ) -> swanky_error::Result<TaskPrototypeRef> {
         ty.assert_value_field_is::<FE>();
         self.register_prototype(|pb| {
-            let mut s = FE::Serializer::new(pb)?;
+            let mut s = FE::Serializer::new(pb).wrap_err(
+                ErrorKind::InitializationError,
+                "Failed to initialize field element serializer.".to_string(),
+            )?;
             let mut n = 0_u32;
             for value in values {
                 n = n.checked_add(1).unwrap();
-                s.write(pb, value)?;
+                s.write(pb, value).wrap_err(
+                    ErrorKind::SerializationError,
+                    "Failed to write byte of '{value}'.".to_string(),
+                )?;
             }
-            s.finish(pb)?;
+            s.finish(pb).wrap_err(
+                ErrorKind::SerializationError,
+                "Failed to finish field element serialization.".to_string(),
+            )?;
             pb.output(Type::Mac(ty), n);
             Ok(TaskKind::Constant(ty))
         })
@@ -41,7 +51,7 @@ impl<'a> super::CircuitBuilder<'a> {
         ty: FieldMacType,
         input_sizes: &[WireSize],
         operations: I,
-    ) -> eyre::Result<TaskPrototypeRef> {
+    ) -> swanky_error::Result<TaskPrototypeRef> {
         ty.assert_value_field_is::<FE>();
         self.register_prototype(|pb| {
             for sz in input_sizes.iter().copied() {
@@ -65,7 +75,7 @@ impl<'a> super::CircuitBuilder<'a> {
     pub fn new_copy_base_svole_prototype(
         &mut self,
         field: FieldMacType,
-    ) -> eyre::Result<TaskPrototypeRef> {
+    ) -> swanky_error::Result<TaskPrototypeRef> {
         struct V;
         impl FieldTypeMacVisitor for V {
             type Output = u32;
@@ -98,12 +108,12 @@ impl<'a> super::CircuitBuilder<'a> {
         &mut self,
         ty: FieldMacType,
         count: u32,
-    ) -> eyre::Result<TaskPrototypeRef> {
+    ) -> swanky_error::Result<TaskPrototypeRef> {
         assert_ne!(count, 0);
         self.register_prototype(|pb| {
             struct V<'a, 'b, 'c>(&'a mut PrototypeBuilder<'b, 'c>, FieldMacType, u32);
             impl FieldTypeMacVisitor for V<'_, '_, '_> {
-                type Output = eyre::Result<()>;
+                type Output = swanky_error::Result<()>;
                 fn visit<
                     VF: FiniteField + IsSubFieldOf<TF>,
                     TF: FiniteField,
@@ -146,7 +156,7 @@ impl<'a> super::CircuitBuilder<'a> {
         ty: Type,
         input_sizes: &[WireSize],
         wires: impl IntoIterator<Item = Wire>,
-    ) -> eyre::Result<TaskPrototypeRef> {
+    ) -> swanky_error::Result<TaskPrototypeRef> {
         self.register_prototype(|pb| {
             for sz in input_sizes.iter().copied() {
                 pb.add_single_array_input(ty, sz);
@@ -171,7 +181,7 @@ impl<'a> super::CircuitBuilder<'a> {
         ty: FieldMacType,
         input_sizes: &[WireSize],
         wires: impl IntoIterator<Item = [Wire; 2]>,
-    ) -> eyre::Result<TaskPrototypeRef> {
+    ) -> swanky_error::Result<TaskPrototypeRef> {
         self.register_prototype(|pb| {
             for sz in input_sizes.iter().copied() {
                 pb.add_single_array_input(Type::Mac(ty), sz);
@@ -196,7 +206,7 @@ impl<'a> super::CircuitBuilder<'a> {
         ty: FieldMacType,
         input_sizes: &[WireSize],
         wires: impl IntoIterator<Item = [[Wire; 2]; 4]>,
-    ) -> eyre::Result<TaskPrototypeRef> {
+    ) -> swanky_error::Result<TaskPrototypeRef> {
         assert!(ty.uses_small_binary_specialization());
         self.register_prototype(|pb| {
             for sz in input_sizes.iter().copied() {
@@ -223,7 +233,7 @@ impl<'a> super::CircuitBuilder<'a> {
         ty: FieldMacType,
         input_sizes: &[WireSize],
         wires: impl IntoIterator<Item = [Wire; 3]>,
-    ) -> eyre::Result<TaskPrototypeRef> {
+    ) -> swanky_error::Result<TaskPrototypeRef> {
         self.register_prototype(|pb| {
             for sz in input_sizes.iter().copied() {
                 pb.add_single_array_input(Type::Mac(ty), sz);
@@ -282,7 +292,7 @@ impl<'a> super::CircuitBuilder<'a> {
         ty: FieldMacType,
         input_sizes: &[WireSize],
         wires: impl IntoIterator<Item = Wire>,
-    ) -> eyre::Result<TaskPrototypeRef> {
+    ) -> swanky_error::Result<TaskPrototypeRef> {
         self.register_prototype(|pb| {
             for sz in input_sizes.iter().copied() {
                 pb.add_single_array_input(Type::Mac(ty), sz);
@@ -304,7 +314,7 @@ impl<'a> super::CircuitBuilder<'a> {
         &mut self,
         ty: FieldMacType,
         count: WireSize,
-    ) -> eyre::Result<TaskPrototypeRef> {
+    ) -> swanky_error::Result<TaskPrototypeRef> {
         struct V(usize);
         impl FieldTypeMacVisitor for V {
             type Output = u32;

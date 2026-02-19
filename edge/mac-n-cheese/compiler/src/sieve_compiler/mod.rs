@@ -1,10 +1,10 @@
 use std::{fs::File, path::PathBuf, time::Instant};
 
 use clap::{Args, Subcommand};
-use eyre::{Context, ContextCompat};
 use mac_n_cheese_ir::circuit_builder::build_privates;
 use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamKind, ValueStreamReader};
 use mac_n_cheese_wire_map::WireMap;
+use swanky_error::{ErrorKind, OptionExt, ResultExt};
 use swanky_party::{IS_VERIFIER, Party, WhichParty, private::ProverPrivate};
 
 use self::{
@@ -43,18 +43,21 @@ pub enum Command {
     CompileVerifier,
 }
 
-fn to_fe<FE: CompilerField>(x: usize) -> eyre::Result<FE> {
+fn to_fe<FE: CompilerField>(x: usize) -> swanky_error::Result<FE> {
     Ok(match FE::PrimeField::try_from(x as u128) {
         Ok(x) => x,
         Err(_) => {
-            eyre::bail!("Value larger than prime field modulus")
+            swanky_error::bail!(
+                ErrorKind::OtherError,
+                "Value larger than prime field modulus"
+            )
         }
     }
     .into())
 }
 
 // Convert x to a k-bit little-endian number
-fn to_k_bits<FE: CompilerField>(x: usize, k: usize) -> eyre::Result<Vec<FE>> {
+fn to_k_bits<FE: CompilerField>(x: usize, k: usize) -> swanky_error::Result<Vec<FE>> {
     let mut bits = Vec::with_capacity(k);
 
     let mut quot = x;
@@ -64,7 +67,7 @@ fn to_k_bits<FE: CompilerField>(x: usize, k: usize) -> eyre::Result<Vec<FE>> {
     }
 
     if bits.len() > k {
-        eyre::bail!("{x} cannot be expressed in {k} bits");
+        swanky_error::bail!(ErrorKind::OtherError, "{x} cannot be expressed in {k} bits");
     } else {
         bits.append(&mut vec![FE::ZERO; k - bits.len()]);
         Ok(bits)
@@ -72,7 +75,7 @@ fn to_k_bits<FE: CompilerField>(x: usize, k: usize) -> eyre::Result<Vec<FE>> {
 }
 
 // Convert x to a k-bit litle-endian number, inverting all bits
-fn to_k_flipped_bits<FE: CompilerField>(x: usize, k: usize) -> eyre::Result<Vec<FE>> {
+fn to_k_flipped_bits<FE: CompilerField>(x: usize, k: usize) -> swanky_error::Result<Vec<FE>> {
     let mut bits = Vec::with_capacity(k);
 
     let mut quot = x;
@@ -82,14 +85,18 @@ fn to_k_flipped_bits<FE: CompilerField>(x: usize, k: usize) -> eyre::Result<Vec<
     }
 
     if bits.len() > k {
-        eyre::bail!("{x} cannot be expressed in {k} bits");
+        swanky_error::bail!(ErrorKind::OtherError, "{x} cannot be expressed in {k} bits");
     } else {
         bits.append(&mut vec![FE::ONE; k - bits.len()]);
         Ok(bits)
     }
 }
 
-fn put<T>(wm: &mut WireMap<T>, wire: mac_n_cheese_wire_map::WireId, value: T) -> eyre::Result<()> {
+fn put<T>(
+    wm: &mut WireMap<T>,
+    wire: mac_n_cheese_wire_map::WireId,
+    value: T,
+) -> swanky_error::Result<()> {
     match wm.insert(wire, value) {
         mac_n_cheese_wire_map::InsertResult::NotAllocated(value) => {
             // Per the sieve IR spec, we need to allocate space for this one wire.
@@ -102,10 +109,13 @@ fn put<T>(wm: &mut WireMap<T>, wire: mac_n_cheese_wire_map::WireId, value: T) ->
         }
         mac_n_cheese_wire_map::InsertResult::PreviouslyUnset => {}
         mac_n_cheese_wire_map::InsertResult::PreviouslySet => {
-            eyre::bail!("Wire {wire} was previously set")
+            swanky_error::bail!(ErrorKind::OtherError, "Wire {wire} was previously set")
         }
         mac_n_cheese_wire_map::InsertResult::AllocationNotMutable => {
-            eyre::bail!("Wire {wire} is read-only in this scope")
+            swanky_error::bail!(
+                ErrorKind::OtherError,
+                "Wire {wire} is read-only in this scope"
+            )
         }
     }
     Ok(())
@@ -113,14 +123,17 @@ fn put<T>(wm: &mut WireMap<T>, wire: mac_n_cheese_wire_map::WireId, value: T) ->
 
 struct Inputs<VSR: ValueStreamReader>(FieldIndexedArray<Option<VSR>>, ValueStreamKind);
 impl<VSR: ValueStreamReader> Inputs<VSR> {
-    fn open(kind: ValueStreamKind, paths: &[PathBuf]) -> eyre::Result<Self> {
+    fn open(kind: ValueStreamKind, paths: &[PathBuf]) -> swanky_error::Result<Self> {
         let mut out: FieldIndexedArray<Option<VSR>> = Default::default();
         for path in paths {
             let rr = VSR::open(kind, path).with_context(|| format!("Opening {path:?}"))?;
-            let ft = FieldType::from_modulus(rr.modulus())
-                .with_context(|| format!("Unknown modulus {}", rr.modulus()))?;
-            eyre::ensure!(
+            let ft = FieldType::from_modulus(rr.modulus()).ok_or_swanky_error(
+                ErrorKind::OtherError,
+                &format!("Unknown modulus {}", rr.modulus()),
+            )?;
+            swanky_error::ensure!(
                 out[ft].is_none(),
+                ErrorKind::OtherError,
                 "Multiple files for {kind:?} {}",
                 rr.modulus()
             );
@@ -133,20 +146,22 @@ impl<VSR: ValueStreamReader> Inputs<VSR> {
         &mut self,
         n: usize,
         dst: &mut Vec<FE>,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         // It's not super efficient that we keep re-entering the read for each public input that we
         // need. However it seems like public inputs are rarely used, so it's hopefully a non-issue.
         if n == 0 {
             return Ok(());
         }
-        let src = self.0[FE::FIELD_TYPE]
-            .as_mut()
-            .with_context(|| format!("No {:?} inputs provided for {:?}", self.1, FE::FIELD_TYPE))?;
+        let src = self.0[FE::FIELD_TYPE].as_mut().ok_or_swanky_error(
+            ErrorKind::OtherError,
+            &format!("No {:?} inputs provided for {:?}", self.1, FE::FIELD_TYPE),
+        )?;
         dst.reserve(n);
         for _ in 0..n {
-            let num = src
-                .next()?
-                .with_context(|| format!("Ran out of {:?} {:?} inputs", self.1, FE::FIELD_TYPE))?;
+            let num = src.next()?.ok_or_swanky_error(
+                ErrorKind::OtherError,
+                &format!("Ran out of {:?} {:?} inputs", self.1, FE::FIELD_TYPE),
+            )?;
             dst.push(FE::parse_sieve_value(&num)?);
         }
         Ok(())
@@ -160,7 +175,7 @@ fn sieve_compiler_main_party<
 >(
     args: &SieveArgs,
     witness_path: ProverPrivate<P, &[PathBuf]>,
-) -> eyre::Result<()> {
+) -> swanky_error::Result<()> {
     let start = Instant::now();
     let witnesses = witness_path
         .map(|x| Inputs::<VSR>::open(ValueStreamKind::Private, x))
@@ -177,15 +192,15 @@ fn sieve_compiler_main_party<
             ProverPrivate::empty(e),
         ),
     }
-    .context("circuit writing failed")?;
+    .context("circuit writing failed".to_string())?;
     eprintln!("Circuit writing finished in {:?}", start.elapsed());
     Ok(())
 }
 
-pub fn sieve_compiler_main(args: SieveArgs) -> eyre::Result<()> {
+pub fn sieve_compiler_main(args: SieveArgs) -> swanky_error::Result<()> {
     std::thread::Builder::new()
         .name("Main Thread".to_string())
-        .spawn::<_, eyre::Result<()>>(move || {
+        .spawn::<_, swanky_error::Result<()>>(move || {
             match &args.command {
                 Command::CompileProver { witness } => {
                     let witness_path: ProverPrivate<_, &[PathBuf]> = ProverPrivate::new(witness);

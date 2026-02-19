@@ -1,6 +1,5 @@
 use std::{io::Cursor, marker::PhantomData, sync::Arc};
 
-use eyre::ContextCompat;
 use mac_n_cheese_ir::compilation_format::{
     FieldMacType, TaskId, Type,
     fb::{Task, TaskPrototype},
@@ -16,6 +15,7 @@ use mac_n_cheese_vole::{
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use swanky_aes_rng::AesRng;
+use swanky_error::{ErrorKind, OptionExt, WrapErr};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, SmallBinaryField};
 use swanky_party::{
@@ -115,12 +115,12 @@ impl<P: Party> TaskInput<P> {
         &self,
         ctx: &TaskContext<'a>,
         idx: usize,
-    ) -> eyre::Result<&'a [&[T]]> {
+    ) -> swanky_error::Result<&'a [&[T]]> {
         let input = ctx
             .task
             .multi_array_inputs()
             .get_opt(idx)
-            .context("Missing single array input")?;
+            .ok_or_swanky_error(ErrorKind::OtherError, "Missing single array input")?;
         if cfg!(debug_assertions) {
             assert_type_is::<P, T>(Type::try_from(*input.ty())?);
         }
@@ -129,13 +129,16 @@ impl<P: Party> TaskInput<P> {
             let dependency_output = self
                 .task_dependencies
                 .get(&tributary.source().id())
-                .context("Missing input source in task dependency map")?;
+                .ok_or_swanky_error(
+                    ErrorKind::OtherError,
+                    "Missing input source in task dependency map",
+                )?;
             let start = usize::try_from(tributary.start()).unwrap();
             let end = usize::try_from(tributary.end()).unwrap();
             *out = dependency_output
                 .get::<T>()
                 .get(start..end)
-                .context("input out of bounds")?;
+                .ok_or_swanky_error(ErrorKind::OtherError, "input out of bounds")?;
         }
         Ok(out)
     }
@@ -143,44 +146,53 @@ impl<P: Party> TaskInput<P> {
         &self,
         ctx: &TaskContext,
         idx: usize,
-    ) -> eyre::Result<&[T]> {
+    ) -> swanky_error::Result<&[T]> {
         let input = ctx
             .task
             .single_array_inputs()
             .get_opt(idx)
-            .context("Missing single array input")?;
+            .ok_or_swanky_error(ErrorKind::OtherError, "Missing single array input")?;
         let dependency_output = self
             .task_dependencies
             .get(&input.source().id())
-            .context("Missing input source in task dependency map")?;
+            .ok_or_swanky_error(
+                ErrorKind::OtherError,
+                "Missing input source in task dependency map",
+            )?;
         #[cfg(debug_assertions)]
         {
             assert_type_is::<P, T>(Type::try_from(*input.ty())?);
         }
         let start = usize::try_from(input.start()).unwrap();
         let end = usize::try_from(input.end()).unwrap();
-        let count = end.checked_sub(start).context("slice end > start")?;
-        eyre::ensure!(
+        let count = end
+            .checked_sub(start)
+            .ok_or_swanky_error(ErrorKind::OtherError, "slice end > start")?;
+        swanky_error::ensure!(
             usize::try_from(
                 ctx.task_prototype
                     .single_array_inputs()
                     .get_opt(idx)
-                    .context("missing single array input in prototype")?
+                    .ok_or_swanky_error(
+                        ErrorKind::OtherError,
+                        "missing single array input in prototype"
+                    )?
                     .count()
             )
             .unwrap()
                 == count,
+            ErrorKind::OtherError,
             "prototype count matches input count"
         );
         dependency_output
             .get::<T>()
             .get(start..end)
-            .context("input out of bounds")
+            .ok_or_swanky_error(ErrorKind::OtherError, "input out of bounds")
     }
     pub fn single_array_inputs<'a, T: 'static + Send + Sync + Copy>(
         &self,
         ctx: &TaskContext<'a>,
-    ) -> eyre::Result<&'a [&[T]]> {
+    ) -> swanky_error::Result<&'a [&[T]]> {
         let out = ctx
             .arena
             .alloc_slice_fill_default(ctx.task.single_array_inputs().len());
@@ -199,8 +211,8 @@ impl<P: Party> TaskInput<P> {
         &self,
         ctx: &TaskContext,
         _format: simple::WireFormat<Data, NARGS>,
-        mut f: impl FnMut([(T, Data); NARGS]) -> eyre::Result<[T; NOUTPUT]>,
-    ) -> eyre::Result<TaskResult<P, NoContinuation>>
+        mut f: impl FnMut([(T, Data); NARGS]) -> swanky_error::Result<[T; NOUTPUT]>,
+    ) -> swanky_error::Result<TaskResult<P, NoContinuation>>
     where
         ArrayUnrolledOps: UnrollableArraySize<NARGS>,
     {
@@ -239,12 +251,14 @@ impl<P: Party> TaskInput<P> {
                      data,
                  }| {
                     if !VERIFIED {
-                        eyre::ensure!(
+                        swanky_error::ensure!(
                             (which_input as usize) < input_sizes.len(),
+                            ErrorKind::OtherError,
                             "which_input {which_input} is out of range of {input_sizes:?}"
                         );
-                        eyre::ensure!(
+                        swanky_error::ensure!(
                             (which_wire as usize) < input_sizes[which_input as usize],
+                            ErrorKind::OtherError,
                             "which_wire ({which_wire}) is out of range of {which_input}: {}",
                             input_sizes[which_input as usize]
                         );
@@ -277,13 +291,14 @@ impl<P: Party> TaskInput<P> {
         &self,
         ctx: &TaskContext,
         format: simple::WireFormat<Data, NARGS>,
-        f: impl FnMut([(T, Data); NARGS]) -> eyre::Result<[T; NOUTPUT]>,
-    ) -> eyre::Result<TaskResult<P, NoContinuation>>
+        f: impl FnMut([(T, Data); NARGS]) -> swanky_error::Result<[T; NOUTPUT]>,
+    ) -> swanky_error::Result<TaskResult<P, NoContinuation>>
     where
         ArrayUnrolledOps: UnrollableArraySize<NARGS>,
     {
-        eyre::ensure!(
+        swanky_error::ensure!(
             ctx.task_prototype.outputs().len() <= 1,
+            ErrorKind::OtherError,
             "only one task output"
         );
         if ctx.prototype_has_been_verified {
@@ -301,8 +316,8 @@ impl<P: Party> TaskInput<P> {
         &self,
         ctx: &TaskContext,
         _format: simd_batched::WireFormat<NARGS>,
-        mut f: impl FnMut([U64x4; NARGS]) -> eyre::Result<[U64x4; NOUTPUT]>,
-    ) -> eyre::Result<TaskResult<P, NoContinuation>>
+        mut f: impl FnMut([U64x4; NARGS]) -> swanky_error::Result<[U64x4; NOUTPUT]>,
+    ) -> swanky_error::Result<TaskResult<P, NoContinuation>>
     where
         T::TF: SmallBinaryField,
         F2: IsSubFieldOf<T::TF>,
@@ -316,8 +331,9 @@ impl<P: Party> TaskInput<P> {
             .unwrap_or_default();
         let mut out = TaskDataBuffer::<Mac<P, T>>::with_capacity(num_outs);
         let chunks = simd_batched::read(bytemuck::cast_slice(self.task_data()))?;
-        eyre::ensure!(
+        swanky_error::ensure!(
             num_outs == chunks.len() * NOUTPUT * 4,
+            ErrorKind::OtherError,
             "output length is incorrect"
         );
         let inputs = self.single_array_inputs::<Mac<P, T>>(ctx)?;
@@ -350,8 +366,15 @@ impl<P: Party> TaskInput<P> {
             assert_eq!(num_outs % NOUTPUT, 0);
         }
         let mut write_ptr = out.as_mut_ptr() as *mut [U64x4; NOUTPUT];
-        eyre::ensure!(input_sizes.len() < (i32::MAX as usize), "too many inputs");
-        let num_lengths = U32x4::broadcast(input_sizes.len().try_into()?);
+        swanky_error::ensure!(
+            input_sizes.len() < (i32::MAX as usize),
+            ErrorKind::OtherError,
+            "too many inputs"
+        );
+        let num_lengths = U32x4::broadcast(input_sizes.len().try_into().wrap_err(
+            ErrorKind::OtherError,
+            "Failed to convert input_sizes to i32.".to_string(),
+        )?);
         const ONES: U32x4 = U32x4::from_array([u32::MAX; 4]);
         for chunk in chunks {
             if !VERIFIED {
@@ -361,16 +384,18 @@ impl<P: Party> TaskInput<P> {
                          which_input,
                          which_wire,
                      }| {
-                        eyre::ensure!(
+                        swanky_error::ensure!(
                             num_lengths.cmp_gt(which_input) == ONES,
+                            ErrorKind::OtherError,
                             "which_input is out of bounds"
                         );
                         let retrieved_lengths = unsafe {
                             // SAFETY: we just did the bounds check
                             U32x4::gather(input_sizes.as_ptr(), I32x4::from(which_input))
                         };
-                        eyre::ensure!(
+                        swanky_error::ensure!(
                             retrieved_lengths.cmp_gt(which_wire) == ONES,
+                            ErrorKind::OtherError,
                             "which_wire is out of bounds"
                         );
                         Ok(())
@@ -452,15 +477,16 @@ impl<P: Party> TaskInput<P> {
         &self,
         ctx: &TaskContext,
         format: simd_batched::WireFormat<NARGS>,
-        f: impl FnMut([U64x4; NARGS]) -> eyre::Result<[U64x4; NOUTPUT]>,
-    ) -> eyre::Result<TaskResult<P, NoContinuation>>
+        f: impl FnMut([U64x4; NARGS]) -> swanky_error::Result<[U64x4; NOUTPUT]>,
+    ) -> swanky_error::Result<TaskResult<P, NoContinuation>>
     where
         T::TF: SmallBinaryField,
         F2: IsSubFieldOf<T::TF>,
         ArrayUnrolledOps: UnrollableArraySize<NARGS>,
     {
-        eyre::ensure!(
+        swanky_error::ensure!(
             ctx.task_prototype.outputs().len() <= 1,
+            ErrorKind::OtherError,
             "only one task output"
         );
         if ctx.prototype_has_been_verified {
@@ -479,40 +505,55 @@ pub struct ProverPrivateFieldElementCommunicator<'a, P: Party, FE: FiniteField> 
     >,
 }
 impl<'a, P: Party, FE: FiniteField> ProverPrivateFieldElementCommunicator<'a, P, FE> {
-    pub fn new(incoming: &'a [u8], outgoing: &'a mut [u8]) -> eyre::Result<Self> {
+    pub fn new(incoming: &'a [u8], outgoing: &'a mut [u8]) -> swanky_error::Result<Self> {
         Ok(Self {
             content: match P::WHICH {
                 WhichParty::Prover(e) => {
                     let mut cursor = Cursor::new(outgoing);
-                    let s = FE::Serializer::new(&mut cursor)?;
+                    let s = FE::Serializer::new(&mut cursor).wrap_err(
+                        ErrorKind::InitializationError,
+                        "Failed to initialize field element serializer.".to_string(),
+                    )?;
                     PartyEither::prover_new(e, (cursor, s))
                 }
                 WhichParty::Verifier(e) => {
                     let mut cursor = Cursor::new(incoming);
-                    let d = FE::Deserializer::new(&mut cursor)?;
+                    let d = FE::Deserializer::new(&mut cursor).wrap_err(
+                        ErrorKind::InitializationError,
+                        "Failed to initialize field element deserializer.".to_string(),
+                    )?;
                     PartyEither::verifier_new(e, (cursor, d))
                 }
             },
         })
     }
-    pub fn communicate(&mut self, x: ProverPrivateCopy<P, FE>) -> eyre::Result<FE> {
+    pub fn communicate(&mut self, x: ProverPrivateCopy<P, FE>) -> swanky_error::Result<FE> {
         Ok(match P::WHICH {
             WhichParty::Prover(e) => {
                 let x = x.into_inner(e);
                 let (cursor, s) = self.content.as_mut().prover_into(e);
-                s.write(cursor, x)?;
+                s.write(cursor, x).wrap_err(
+                    ErrorKind::SerializationError,
+                    "Failed to serialize field element.".to_string(),
+                )?;
                 x
             }
             WhichParty::Verifier(e) => {
                 let (cursor, d) = self.content.as_mut().verifier_into(e);
-                d.read(cursor)?
+                d.read(cursor).wrap_err(
+                    ErrorKind::SerializationError,
+                    "Failed to deserialize field element.".to_string(),
+                )?
             }
         })
     }
-    pub fn finish(self) -> eyre::Result<()> {
+    pub fn finish(self) -> swanky_error::Result<()> {
         if let WhichParty::Prover(e) = P::WHICH {
             let (mut cursor, s) = self.content.prover_into(e);
-            s.finish(&mut cursor)?;
+            s.finish(&mut cursor).wrap_err(
+                ErrorKind::SerializationError,
+                "Failed to finish serialization of field element.".to_string(),
+            )?;
         }
         Ok(())
     }
@@ -527,16 +568,16 @@ pub trait TaskDefinition<P: Party>: 'static + Sized + Send + Sync {
         rng: &mut AesRng,
         vc: VoleContexts<P>,
         num_runner_threads: usize,
-    ) -> eyre::Result<Self>;
+    ) -> swanky_error::Result<Self>;
     type TaskContinuation: 'static + Send;
-    fn finalize(self, c: &mut TlsConnection<P>, rng: &mut AesRng) -> eyre::Result<()>;
+    fn finalize(self, c: &mut TlsConnection<P>, rng: &mut AesRng) -> swanky_error::Result<()>;
     fn start_task(
         &self,
         ctx: &mut TaskContext,
         input: &TaskInput<P>,
         incoming_data: OwnedAlignedBytes,
         outgoing_data: AlignedBytesMut,
-    ) -> eyre::Result<TaskResult<P, Self::TaskContinuation>>;
+    ) -> swanky_error::Result<TaskResult<P, Self::TaskContinuation>>;
     fn continue_task(
         &self,
         tc: Box<Self::TaskContinuation>,
@@ -544,5 +585,5 @@ pub trait TaskDefinition<P: Party>: 'static + Sized + Send + Sync {
         input: &TaskInput<P>,
         incoming_data: OwnedAlignedBytes,
         outgoing_data: AlignedBytesMut,
-    ) -> eyre::Result<TaskResult<P, Self::TaskContinuation>>;
+    ) -> swanky_error::Result<TaskResult<P, Self::TaskContinuation>>;
 }

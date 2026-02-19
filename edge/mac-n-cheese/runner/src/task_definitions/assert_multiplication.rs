@@ -13,6 +13,7 @@ use party::either::PartyEitherCopy;
 use party::{IsParty, Party, WhichParty};
 use rand::SeedableRng;
 use swanky_aes_rng::AesRng;
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
 use swanky_field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, SmallBinaryField};
@@ -67,7 +68,7 @@ mod vope {
         voles: &[RandomMac<P, T>], // Size DegreeModulo<T::VF, T::TF>>
         e: IsParty<P, party::Verifier>,
         comms: VopeCommunication<T::TF>,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         assert_eq!(voles.len(), DegreeModulo::<T::VF, T::TF>::USIZE);
         let [u, v] = comms;
         let rnd = voles
@@ -76,7 +77,11 @@ mod vope {
             .zip(lifting_vector::<T>().into_iter())
             .map(|(v, entry)| v.0.tag(e) * entry)
             .sum::<T::TF>();
-        eyre::ensure!(t + rnd == u * alpha + v, "vope multiplication check failed");
+        swanky_error::ensure!(
+            t + rnd == u * alpha + v,
+            ErrorKind::OtherError,
+            "vope multiplication check failed"
+        );
         Ok(())
     }
 
@@ -291,7 +296,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
         _rng: &mut swanky_aes_rng::AesRng,
         vc: crate::base_vole::VoleContexts<P>,
         num_runner_threads: usize,
-    ) -> eyre::Result<Self> {
+    ) -> swanky_error::Result<Self> {
         let vc = vc.get::<T>();
         Ok(Self {
             ctx: vc.constant_context,
@@ -306,7 +311,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
         self,
         conn: &mut crate::tls::TlsConnection<P>,
         _rng: &mut swanky_aes_rng::AesRng,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         let mut acu = AssertMultiplyState::<P, T::TF>::default();
         for state in self.state.into_iter() {
             acu += state.into_inner();
@@ -315,17 +320,35 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
             WhichParty::Prover(e) => {
                 let (u, v) = acu.0.prover_into(e);
                 let [a, b] = vope::vope_prover(v, u, &self.voles, e);
-                conn.write_all(&a.to_bytes())?;
-                conn.write_all(&b.to_bytes())?;
+                conn.write_all(&a.to_bytes()).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to write all 'a' bytes to network.".to_string(),
+                )?;
+                conn.write_all(&b.to_bytes()).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to write all 'b' bytes to network.".to_string(),
+                )?;
             }
             WhichParty::Verifier(e) => {
                 let alpha = self.ctx.verifier_into(e);
                 let mut buf: GenericArray<u8, <T::TF as CanonicalSerialize>::ByteReprLen> =
                     Default::default();
-                conn.read_exact(&mut buf)?;
-                let u = T::TF::from_bytes(&buf)?;
-                conn.read_exact(&mut buf)?;
-                let v = T::TF::from_bytes(&buf)?;
+                conn.read_exact(&mut buf).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to read 'u' bytes from network.".to_string(),
+                )?;
+                let u = T::TF::from_bytes(&buf).wrap_err(
+                    ErrorKind::SerializationError,
+                    "Failed to deserialize field element.".to_string(),
+                )?;
+                conn.read_exact(&mut buf).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to read 'v' bytes from network.".to_string(),
+                )?;
+                let v = T::TF::from_bytes(&buf).wrap_err(
+                    ErrorKind::SerializationError,
+                    "Failed to deserialize field element.".to_string(),
+                )?;
                 let t = acu.0.verifier_into(e);
                 vope::vope_verifier(alpha, t, &self.voles, e, [u, v])?;
             }
@@ -339,7 +362,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
         input: &crate::task_framework::TaskInput<P>,
         _incoming_data: crate::alloc::OwnedAlignedBytes,
         _outgoing_data: crate::alloc::AlignedBytesMut,
-    ) -> eyre::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
+    ) -> swanky_error::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
         let mut seed = [0; 16];
         seed.copy_from_slice(&input.challenge.unwrap()[0..16]);
         let mut rng = AesRng::from_seed(seed.into());
@@ -364,7 +387,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
         _input: &crate::task_framework::TaskInput<P>,
         _incoming_data: crate::alloc::OwnedAlignedBytes,
         _outgoing_data: crate::alloc::AlignedBytesMut,
-    ) -> eyre::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
+    ) -> swanky_error::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
         unreachable!()
     }
 }
@@ -393,14 +416,18 @@ where
         rng: &mut AesRng,
         vc: crate::base_vole::VoleContexts<P>,
         num_runner_threads: usize,
-    ) -> eyre::Result<Self> {
+    ) -> swanky_error::Result<Self> {
         UnspecializedSmallBinary::<P, TF>::initialize(c, rng, vc, num_runner_threads)
             .map(|unspecialized| AssertMultiplySmallBinary { unspecialized })
     }
 
     type TaskContinuation = NoContinuation;
 
-    fn finalize(self, c: &mut crate::tls::TlsConnection<P>, rng: &mut AesRng) -> eyre::Result<()> {
+    fn finalize(
+        self,
+        c: &mut crate::tls::TlsConnection<P>,
+        rng: &mut AesRng,
+    ) -> swanky_error::Result<()> {
         self.unspecialized.finalize(c, rng)
     }
 
@@ -410,7 +437,7 @@ where
         input: &crate::task_framework::TaskInput<P>,
         _incoming_data: crate::alloc::OwnedAlignedBytes,
         _outgoing_data: crate::alloc::AlignedBytesMut,
-    ) -> eyre::Result<TaskResult<P, Self::TaskContinuation>> {
+    ) -> swanky_error::Result<TaskResult<P, Self::TaskContinuation>> {
         let mut seed = [0; 16];
         seed.copy_from_slice(&input.challenge.unwrap()[0..16]);
         let mut rng = AesRng::from_seed(seed.into());
@@ -509,7 +536,7 @@ where
         _input: &crate::task_framework::TaskInput<P>,
         _incoming_data: crate::alloc::OwnedAlignedBytes,
         _outgoing_data: crate::alloc::AlignedBytesMut,
-    ) -> eyre::Result<TaskResult<P, Self::TaskContinuation>> {
+    ) -> swanky_error::Result<TaskResult<P, Self::TaskContinuation>> {
         unreachable!()
     }
 }

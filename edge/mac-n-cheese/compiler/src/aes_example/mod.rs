@@ -147,7 +147,7 @@ fn ws(x: impl TryInto<WireSize>) -> WireSize {
     }
 }
 
-pub fn aes_main(args: AesArgs) -> eyre::Result<()> {
+pub fn aes_main(args: AesArgs) -> swanky_error::Result<()> {
     let vole_concurrency = args.vole_concurrency;
     let num_aes_groups = args.num_aes_groups;
     let aes_per_group = args.aes_per_group;
@@ -388,7 +388,7 @@ pub fn aes_main(args: AesArgs) -> eyre::Result<()> {
             for _ in 0..num_threads {
                 channels.push(crossbeam::channel::bounded(2));
             }
-            crossbeam::scope::<_, eyre::Result<()>>(|scope| {
+            crossbeam::scope::<_, swanky_error::Result<()>>(|scope| {
                 for (mut i, (channel_send, _)) in channels.iter().enumerate() {
                     let aes_iterations = &aes_iterations;
                     let circuit = &circuit;

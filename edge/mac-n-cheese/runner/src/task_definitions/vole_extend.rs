@@ -59,7 +59,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
         rng: &mut swanky_aes_rng::AesRng,
         vc: crate::base_vole::VoleContexts<P>,
         _num_runner_threads: usize,
-    ) -> eyre::Result<Self> {
+    ) -> swanky_error::Result<Self> {
         Ok(Self {
             initial: match P::WHICH {
                 WhichParty::Prover(e) => {
@@ -85,7 +85,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
         self,
         _c: &mut crate::tls::TlsConnection<P>,
         _rng: &mut swanky_aes_rng::AesRng,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         Ok(())
     }
 
@@ -95,7 +95,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
         input: &crate::task_framework::TaskInput<P>,
         incoming_data: crate::alloc::OwnedAlignedBytes,
         outgoing_data: crate::alloc::AlignedBytesMut,
-    ) -> eyre::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
+    ) -> swanky_error::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
         let base_voles = input.single_array_inputs::<RandomMac<P, T>>(ctx)?;
         let keyed_arena = self.keyed_arena_pool.get();
         let total_output_size = Self::SIZES.voles_outputted * base_voles.len();
@@ -172,7 +172,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
         input: &crate::task_framework::TaskInput<P>,
         incoming_data: crate::alloc::OwnedAlignedBytes,
         outgoing_data: crate::alloc::AlignedBytesMut,
-    ) -> eyre::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
+    ) -> swanky_error::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
         let base_voles = input.single_array_inputs::<RandomMac<P, T>>(ctx)?;
         let TaskContinuation {
             keyed_arena,

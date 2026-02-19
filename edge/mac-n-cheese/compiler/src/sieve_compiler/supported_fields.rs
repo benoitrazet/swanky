@@ -5,6 +5,7 @@ use mac_n_cheese_wire_map::WireMap;
 use std::ops::{Deref, DerefMut, Index};
 use std::{collections::VecDeque, marker::PhantomData};
 use std::{fmt::Debug, ops::IndexMut};
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteField;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
@@ -12,7 +13,7 @@ use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::F128p;
 
 pub trait ValueParseableFiniteField: FiniteField {
-    fn parse_sieve_value(v: &Number) -> eyre::Result<Self>;
+    fn parse_sieve_value(v: &Number) -> swanky_error::Result<Self>;
 }
 
 pub trait CompilerField: ValueParseableFiniteField {
@@ -51,8 +52,8 @@ impl<'a, T: FieldGenericType> FieldGenericType for std::slice::Iter<'a, T> {
 impl<A: FieldGenericType, B: FieldGenericType> FieldGenericType for (A, B) {
     type Out<FE: CompilerField> = (A::Out<FE>, B::Out<FE>);
 }
-impl<T: FieldGenericType> FieldGenericType for eyre::Result<T> {
-    type Out<FE: CompilerField> = eyre::Result<T::Out<FE>>;
+impl<T: FieldGenericType> FieldGenericType for swanky_error::Result<T> {
+    type Out<FE: CompilerField> = swanky_error::Result<T::Out<FE>>;
 }
 impl<T: FieldGenericType> FieldGenericType for Option<T> {
     type Out<FE: CompilerField> = Option<T::Out<FE>>;
@@ -240,8 +241,8 @@ macro_rules! supported_fields {
             }
             pub fn map_result<V, U: FieldGenericType>(
                 self, v: &mut V
-            ) -> eyre::Result<FieldGenericProduct<U>>
-                where for<'a> &'a mut V: CompilerFieldVisitor<T, Output = eyre::Result<U>>
+            ) -> swanky_error::Result<FieldGenericProduct<U>>
+                where for<'a> &'a mut V: CompilerFieldVisitor<T, Output = swanky_error::Result<U>>
             {
                 $(let $vf = v.visit::<$vf>(self.$vf)?;)*
                 Ok(FieldGenericProduct { $($vf),* })
@@ -339,12 +340,13 @@ fn no_duplicate_moduli() {
     );
 }
 
-fn num2u128(x: &Number) -> eyre::Result<u128> {
+fn num2u128(x: &Number) -> swanky_error::Result<u128> {
     // TODO: make this function work on 32-bit systems
     let le_words = x.as_words();
     let _: u64 = le_words[0]; // Error out (for now) on 32-bit systems.
-    eyre::ensure!(
+    swanky_error::ensure!(
         le_words[2..].iter().all(|word| *word == 0),
+        ErrorKind::OtherError,
         "{x} can't fit in a u128"
     );
     Ok(u128::from(le_words[0]) | (u128::from(le_words[1]) << 64))
@@ -385,23 +387,32 @@ supported_fields! {
 }
 
 impl ValueParseableFiniteField for F2 {
-    fn parse_sieve_value(v: &Number) -> eyre::Result<Self> {
+    fn parse_sieve_value(v: &Number) -> swanky_error::Result<Self> {
         if v == &Number::ZERO {
             Ok(Self::ZERO)
         } else if v == &Number::ONE {
             Ok(Self::ONE)
         } else {
-            eyre::bail!("0x{v:x} isn't a valid F2 value")
+            swanky_error::bail!(
+                ErrorKind::SerializationError,
+                "0x{v:x} isn't a valid F2 value"
+            )
         }
     }
 }
 impl ValueParseableFiniteField for F61p {
-    fn parse_sieve_value(v: &Number) -> eyre::Result<Self> {
-        Ok(Self::try_from(num2u128(v)?)?)
+    fn parse_sieve_value(v: &Number) -> swanky_error::Result<Self> {
+        Ok(Self::try_from(num2u128(v)?).wrap_err(
+            ErrorKind::OtherError,
+            "Failed to convert u128 to F61p.".to_string(),
+        )?)
     }
 }
 impl ValueParseableFiniteField for F128p {
-    fn parse_sieve_value(v: &Number) -> eyre::Result<Self> {
-        Ok(Self::try_from(num2u128(v)?)?)
+    fn parse_sieve_value(v: &Number) -> swanky_error::Result<Self> {
+        Ok(Self::try_from(num2u128(v)?).wrap_err(
+            ErrorKind::OtherError,
+            "Failed to convert u128 to F128p.".to_string(),
+        )?)
     }
 }

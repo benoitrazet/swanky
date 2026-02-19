@@ -3,6 +3,7 @@ use crate::circuit_builder::PrototypeBuilder;
 use generic_array::GenericArray;
 use generic_array::typenum::Unsigned;
 use std::{io::Write, marker::PhantomData};
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_serialization::CanonicalSerialize;
 use vectoreyes::array_utils::ArrayUnrolledExt;
 use vectoreyes::array_utils::{ArrayUnrolledOps, UnrollableArraySize};
@@ -53,7 +54,7 @@ pub mod simple {
             pb: &'b mut PrototypeBuilder<'c, 'd>,
             input_sizes: &'a [WireSize],
             supports_own_wires: SupportsOwnWires,
-        ) -> eyre::Result<Writer<'a, 'b, 'c, 'd, T, NARGS>> {
+        ) -> swanky_error::Result<Writer<'a, 'b, 'c, 'd, T, NARGS>> {
             Ok(Writer {
                 pb,
                 input_sizes,
@@ -87,7 +88,10 @@ pub mod simple {
             }
             self.own_wires = self.own_wires.checked_add(delta).unwrap();
         }
-        pub(crate) fn write_wires(&mut self, wires: [(Wire, T); NARGS]) -> eyre::Result<()> {
+        pub(crate) fn write_wires(
+            &mut self,
+            wires: [(Wire, T); NARGS],
+        ) -> swanky_error::Result<()> {
             for (dst, (wire, t)) in self
                 .buf
                 .chunks_exact_mut(WireFormat::<T, NARGS>::arg_stride())
@@ -107,11 +111,13 @@ pub mod simple {
                 which_wire.copy_from_slice(&ww.to_le_bytes());
                 fe_storage.copy_from_slice(&t.to_bytes());
             }
-            self.pb.write_all(&self.buf)?;
+            self.pb
+                .write_all(&self.buf)
+                .wrap_err(ErrorKind::OtherError, "Failed to write bytes.".to_string())?;
             Ok(())
         }
         /// Returns number of own wires
-        pub(crate) fn finish(self) -> eyre::Result<WireSize> {
+        pub(crate) fn finish(self) -> swanky_error::Result<WireSize> {
             Ok(self.own_wires)
         }
     }
@@ -129,9 +135,10 @@ pub mod simple {
     }
 
     impl<'a, T: CanonicalSerialize, const NARGS: usize> Reader<'a, T, NARGS> {
-        pub fn new(buf: &'a [u8]) -> eyre::Result<Self> {
-            eyre::ensure!(
+        pub fn new(buf: &'a [u8]) -> swanky_error::Result<Self> {
+            swanky_error::ensure!(
                 buf.len() % WireFormat::<T, NARGS>::stride() == 0,
+                ErrorKind::OtherError,
                 "The input buffer's length ({}) isn't a multiple of {} as is needed \
                 for NARGS={NARGS}",
                 buf.len(),
@@ -145,7 +152,7 @@ pub mod simple {
         pub fn len_remaining(&self) -> usize {
             self.buf.len() / WireFormat::<T, NARGS>::stride()
         }
-        pub fn next(&mut self) -> eyre::Result<[ReadWire<T>; NARGS]>
+        pub fn next(&mut self) -> swanky_error::Result<[ReadWire<T>; NARGS]>
         where
             ArrayUnrolledOps: UnrollableArraySize<NARGS>,
         {
@@ -158,7 +165,10 @@ pub mod simple {
                     Ok(ReadWire {
                         which_input: u32::from_le_bytes(<[u8; 4]>::try_from(&arg[0..4]).unwrap()),
                         which_wire: u32::from_le_bytes(<[u8; 4]>::try_from(&arg[4..8]).unwrap()),
-                        data: T::from_bytes(GenericArray::from_slice(&arg[8..]))?,
+                        data: T::from_bytes(GenericArray::from_slice(&arg[8..])).wrap_err(
+                            ErrorKind::SerializationError,
+                            "Failed to decode data bytes.".to_string(),
+                        )?,
                     })
                 });
             <[(); NARGS]>::array_generate(|_| ()).array_map_result(|_| iter.next().unwrap())
@@ -181,7 +191,7 @@ pub mod simd_batched {
             pb: &'b mut PrototypeBuilder<'c, 'd>,
             input_sizes: &'a [WireSize],
             supports_own_wires: SupportsOwnWires,
-        ) -> eyre::Result<Writer<'a, 'b, 'c, 'd, NARGS>> {
+        ) -> swanky_error::Result<Writer<'a, 'b, 'c, 'd, NARGS>> {
             Ok(Writer {
                 pb,
                 input_sizes,
@@ -210,7 +220,7 @@ pub mod simd_batched {
         pub(crate) fn write_wires(
             &mut self,
             inputs: [[Wire; NARGS]; BATCH_SIZE],
-        ) -> eyre::Result<()> {
+        ) -> swanky_error::Result<()> {
             // We'd like to write an array of size (2 * NARGS * BATCH_SIZE), but const generics aren't
             // far enough along for us to do this. As an alternative, we use a multidimentional
             // array as backing storage, and then use bytemuck to turn that array into a slice of
@@ -240,11 +250,13 @@ pub mod simd_batched {
                     *which_wire = ww;
                 }
             }
-            self.pb.write_all(bytemuck::cast_slice(buf))?;
+            self.pb
+                .write_all(bytemuck::cast_slice(buf))
+                .wrap_err(ErrorKind::OtherError, "Failed to write bytes.".to_string())?;
             Ok(())
         }
         /// Returns number of own wires
-        pub(crate) fn finish(self) -> eyre::Result<WireSize> {
+        pub(crate) fn finish(self) -> swanky_error::Result<WireSize> {
             Ok(self.own_wires)
         }
     }
@@ -257,12 +269,13 @@ pub mod simd_batched {
     // This iterator should be TrustedLen
     pub fn read<const NARGS: usize>(
         buf: &[U32x4],
-    ) -> eyre::Result<impl '_ + Iterator<Item = [ReadWire; NARGS]> + ExactSizeIterator>
+    ) -> swanky_error::Result<impl '_ + Iterator<Item = [ReadWire; NARGS]> + ExactSizeIterator>
     where
         ArrayUnrolledOps: UnrollableArraySize<NARGS>,
     {
-        eyre::ensure!(
+        swanky_error::ensure!(
             buf.len() % (2 * NARGS) == 0,
+            ErrorKind::OtherError,
             "buffer isn't the right size for the batched SIMD wire format"
         );
         Ok(buf.chunks_exact(NARGS * 2).map(|inputs| {

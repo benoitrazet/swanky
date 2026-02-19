@@ -40,14 +40,17 @@ impl ReactorResponse {
 pub trait Reactor<P: Party>: 'static + Send + Sync {
     // This may block
     // This must be sent in topological order
-    fn send_outgoing(&self, task_id: RunningTaskId, payload: OwnedAlignedBytes)
-    -> eyre::Result<()>;
+    fn send_outgoing(
+        &self,
+        task_id: RunningTaskId,
+        payload: OwnedAlignedBytes,
+    ) -> swanky_error::Result<()>;
     fn request(
         &self,
         task_id: RunningTaskId,
         req: ReactorRequest,
         cb: ReactorCallback<P>,
-    ) -> eyre::Result<()>;
+    ) -> swanky_error::Result<()>;
     fn close(&self);
 }
 
@@ -58,7 +61,7 @@ pub fn new_reactor<P: Party>(
     extra_connections: Vec<TcpStream>,
     run_queue: RunQueue<P>,
     keys: Keys<P>,
-) -> eyre::Result<Arc<dyn Reactor<P>>> {
+) -> swanky_error::Result<Arc<dyn Reactor<P>>> {
     thread_pool_backend::new_reactor(
         ts,
         circuit_manifest,
