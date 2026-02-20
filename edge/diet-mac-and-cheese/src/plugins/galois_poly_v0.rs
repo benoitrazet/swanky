@@ -3,8 +3,8 @@ use crate::circuit_ir::{
     FunStore, GateM, GatesBody, TypeId, TypeSpecification, TypeStore, WireCount,
     first_unused_wire_id,
 };
-use eyre::{Result, bail, ensure};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
+use swanky_error::{ErrorKind, Result, bail, ensure};
 use swanky_field_binary::{F2, F63b, F128b};
 use swanky_field_f61p::F61p;
 
@@ -26,7 +26,11 @@ impl Plugin for GaloisPolyV0 {
         } else if operation == "shift_eq" {
             Self::shift_eq_body(params, output_counts, input_counts, type_store)
         } else {
-            bail!("{}: Invalid operation: {operation}", Self::NAME)
+            bail!(
+                ErrorKind::UnsupportedError,
+                "{}: Invalid operation: {operation}",
+                Self::NAME
+            )
         }
     }
 }
@@ -48,34 +52,40 @@ impl GaloisPolyV0 {
     ) -> Result<PluginExecution> {
         ensure!(
             params.is_empty(),
+            ErrorKind::OtherError,
             "{}: Invalid number of params (must be zero): {}",
             Self::NAME,
             params.len()
         );
         ensure!(
             output_counts.is_empty(),
+            ErrorKind::OtherError,
             "{}: Output count must be zero",
             Self::NAME
         );
         ensure!(
             input_counts.len() == 3,
+            ErrorKind::OtherError,
             "{}: Input count must be 3",
             Self::NAME
         );
         let type_id = input_counts[0].0;
         ensure!(
             type_id == input_counts[1].0 && type_id == input_counts[2].0,
+            ErrorKind::OtherError,
             "{}: Input type IDs must match",
             Self::NAME
         );
 
         ensure!(
             input_counts[0].1 != 0,
+            ErrorKind::OtherError,
             "{}: p0 must have at least 1 coefficient",
             Self::NAME
         );
         ensure!(
             input_counts[2].1 > 1,
+            ErrorKind::OtherError,
             "{}: q must have at least 2 coefficients",
             Self::NAME
         );
@@ -85,11 +95,13 @@ impl GaloisPolyV0 {
         let q_degree = input_counts[2].1 - 1; // Cannot underflow because we check for length > 1.
         ensure!(
             p1_degree == 1,
+            ErrorKind::OtherError,
             "{}: p1 must be a degree 1 polynomial",
             Self::NAME
         );
         ensure!(
             q_degree == p0_degree + 1, // Cannot overflow as p0_degree was obtained by subtracting 1 from a non-zero value.
+            ErrorKind::OtherError,
             "{}: q must be a degree n+1 polynomial, where n is the degree of p0",
             Self::NAME
         );
@@ -163,28 +175,33 @@ impl GaloisPolyV0 {
     ) -> Result<PluginExecution> {
         ensure!(
             params.is_empty(),
+            ErrorKind::OtherError,
             "{}: Invalid number of params (must be zero): {}",
             Self::NAME,
             params.len()
         );
         ensure!(
             output_counts.is_empty(),
+            ErrorKind::OtherError,
             "{}: Output count must be zero",
             Self::NAME
         );
         ensure!(
             input_counts.len() == 3,
+            ErrorKind::OtherError,
             "{}: Input count must be 3",
             Self::NAME
         );
         let type_id = input_counts[0].0;
         ensure!(
             type_id == input_counts[1].0 && type_id == input_counts[2].0,
+            ErrorKind::OtherError,
             "{}: Input type IDs must match",
             Self::NAME
         );
         ensure!(
             input_counts[0].1 != 0,
+            ErrorKind::OtherError,
             "{}: p must have at least 1 coefficient",
             Self::NAME
         );
@@ -193,11 +210,13 @@ impl GaloisPolyV0 {
         let q_degree = input_counts[2].1 - 1;
         ensure!(
             input_counts[1].1 == 1,
+            ErrorKind::OtherError,
             "{}: c must be a constant",
             Self::NAME
         );
         ensure!(
             q_degree == p_degree,
+            ErrorKind::OtherError,
             "{}: q must have the same degree as p",
             Self::NAME
         );
@@ -282,7 +301,10 @@ impl GaloisPolyV0 {
     ) -> Result<usize> {
         let type_spec = type_store.get(type_id)?;
         let TypeSpecification::Field(field) = type_spec else {
-            bail!("Invalid type specification for inputs; must be `Field`.");
+            bail!(
+                ErrorKind::UnsupportedError,
+                "Invalid type specification for inputs; must be `Field`."
+            );
         };
 
         if degree == 0 {

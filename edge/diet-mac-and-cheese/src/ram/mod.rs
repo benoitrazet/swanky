@@ -4,9 +4,9 @@ mod tx;
 
 use std::marker::PhantomData;
 
-use eyre::Result;
 use protocol::DoraRam;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::Result;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F2;
 use swanky_party::Party;

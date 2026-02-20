@@ -16,10 +16,10 @@ use crate::{
     ram::BooleanRam,
     svole_trait::SvoleT,
 };
-use eyre::Result;
 use generic_array::GenericArray;
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::Result;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F40b};
 use swanky_party::{Party, WhichParty, private::ProverPrivate};
@@ -362,14 +362,18 @@ mod test {
     };
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
+    use swanky_error::{ErrorKind, WrapErr};
     use swanky_field_binary::{F2, F40b};
     use swanky_party::{Prover, Verifier};
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     #[test]
-    fn test_backend_ext_field() -> Result<(), eyre::Error> {
-        let (sender, receiver) = UnixStream::pair()?;
-        let handle: JoinHandle<eyre::Result<()>> = std::thread::spawn(move || {
+    fn test_backend_ext_field() -> swanky_error::Result<()> {
+        let (sender, receiver) = UnixStream::pair().wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to create Unix socket pair.".to_string(),
+        )?;
+        let handle: JoinHandle<swanky_error::Result<()>> = std::thread::spawn(move || {
             let mut rng = AesRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
@@ -398,7 +402,7 @@ mod test {
                     Svole<Prover, F40b, F40b>,
                 >::init_with_fcom(&mut channel, rng, &fcom, &fcom_ext, false)?;
             eval.finalize().unwrap();
-            eyre::Result::Ok(())
+            swanky_error::Result::Ok(())
         });
 
         let mut rng = AesRng::from_seed(Default::default());

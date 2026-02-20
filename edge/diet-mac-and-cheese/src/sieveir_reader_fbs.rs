@@ -20,7 +20,6 @@ use crate::{
 use crate::{
     fields::modulus_to_type_id, sieveir_phase2::sieve_ir_generated::sieve_ir::DirectiveSet as ds,
 };
-use eyre::{Result, ensure, eyre};
 use flatbuffers::{SIZE_UOFFSET, UOffsetT, read_scalar_at};
 use log::info;
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg, ValueStreamKind};
@@ -28,6 +27,7 @@ use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
+use swanky_error::{ErrorKind, Result, WrapErr, ensure, swanky_error};
 
 fn bigint_from_bytes(bytes: &[u8]) -> Number {
     assert!(bytes.len() <= Number::BYTES, "number too big",);
@@ -65,7 +65,9 @@ fn read_size_prefix_in_vec(stream: &mut impl Read, buffer: &mut Vec<u8>) -> Resu
         return Ok(None); // a 0 size prefix
     }
     buffer.resize(size, 0u8);
-    stream.read_exact(&mut buffer[4..])?;
+    stream
+        .read_exact(&mut buffer[4..])
+        .wrap_err(ErrorKind::OtherError, "Failed to read data.".to_string())?;
     Ok(Some(()))
 }
 
@@ -174,7 +176,10 @@ pub struct InputFlatbuffers {
 impl InputFlatbuffers {
     /// Create an `InputFlatbuffers` for private witness inputs.
     pub fn new_private_inputs(path: &PathBuf) -> Result<Self> {
-        let file = std::fs::File::open(path)?;
+        let file = std::fs::File::open(path).wrap_err(
+            ErrorKind::FilesystemError,
+            format!("Failed to open {path:?}."),
+        )?;
         let buffer_file = BufReader::new(file);
         let buffer_mem = vec![];
 
@@ -191,7 +196,10 @@ impl InputFlatbuffers {
 
     /// Create an `InputFlatbuffers` for public instance inputs.
     pub fn new_public_inputs(path: &PathBuf) -> Result<Self> {
-        let file = std::fs::File::open(path)?;
+        let file = std::fs::File::open(path).wrap_err(
+            ErrorKind::FilesystemError,
+            format!("Failed to open {path:?}."),
+        )?;
         let buffer_file = BufReader::new(file);
         let buffer_mem = vec![];
         let mut public_inputs = Self {
@@ -236,6 +244,7 @@ impl InputFlatbuffers {
                 };
                 ensure!(
                     self.field.is_none() || self.field.unwrap() == field_read,
+                    ErrorKind::OtherError,
                     "inconsistent field in tape, previous:{} current:{}",
                     self.field.unwrap(),
                     field_read,
@@ -333,7 +342,10 @@ impl BufRelation {
                 buffer_bytes: Vec::new(),
             })
         } else {
-            Err(eyre!("cannot open file"))
+            Err(swanky_error!(
+                ErrorKind::FilesystemError,
+                "cannot open file"
+            ))
         }
     }
 

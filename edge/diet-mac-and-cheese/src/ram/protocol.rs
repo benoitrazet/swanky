@@ -1,9 +1,9 @@
 use std::{collections::hash_map::Entry, iter, marker::PhantomData};
 
-use eyre::{Result, ensure};
 use rustc_hash::FxHashMap;
 
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::{ErrorKind, Result, WrapErr, ensure};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::{
     Party, WhichParty,
@@ -118,6 +118,7 @@ where
     ) -> Result<Vec<Mac<P, V, F>>> {
         ensure!(
             addr.len() == self.space.addr_size(),
+            ErrorKind::OtherError,
             "Address should be {} elements, but got {}.",
             self.space.addr_size(),
             addr.len()
@@ -189,12 +190,14 @@ where
     ) -> Result<()> {
         ensure!(
             addr.len() == self.space.addr_size(),
+            ErrorKind::OtherError,
             "Address should be {} elements, but got {}.",
             self.space.addr_size(),
             addr.len()
         );
         ensure!(
             value.len() == self.space.value_size(),
+            ErrorKind::OtherError,
             "Value should be {} elements, but got {}.",
             self.space.value_size(),
             value.len()
@@ -290,19 +293,37 @@ where
 
         let (chal_cmbn, chal_perm1) = match P::WHICH {
             WhichParty::Prover(_) => {
-                dmc.channel.flush()?;
+                dmc.channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
                 (
-                    dmc.channel.read_serializable::<V>()?,
-                    dmc.channel.read_serializable::<V>()?,
+                    dmc.channel.read_serializable::<V>().wrap_err(
+                        ErrorKind::NetworkError,
+                        "Failed to read combined challenge.".to_string(),
+                    )?,
+                    dmc.channel.read_serializable::<V>().wrap_err(
+                        ErrorKind::NetworkError,
+                        "Failed to read permutation challenge.".to_string(),
+                    )?,
                 )
             }
             WhichParty::Verifier(_) => {
                 let chals @ (chal_cmbn, chal_perm1) =
                     (V::random(&mut dmc.rng), V::random(&mut dmc.rng));
 
-                dmc.channel.write_serializable(&chal_cmbn)?;
-                dmc.channel.write_serializable(&chal_perm1)?;
-                dmc.channel.flush()?;
+                dmc.channel.write_serializable(&chal_cmbn).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to write combined challenge.".to_string(),
+                )?;
+                dmc.channel.write_serializable(&chal_perm1).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to write permutation challenge.".to_string(),
+                )?;
+                dmc.channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
 
                 chals
             }

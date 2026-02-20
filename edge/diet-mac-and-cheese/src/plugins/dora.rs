@@ -2,8 +2,8 @@ use super::{Plugin, PluginExecution};
 use crate::circuit_ir::{
     FunStore, FunctionBody, GateM, GatesBody, TypeId, TypeIdMapping, TypeStore, WireCount,
 };
-use eyre::{Result, bail, ensure, eyre};
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
+use swanky_error::{ErrorKind, Result, bail, ensure, swanky_error};
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -86,6 +86,7 @@ impl Plugin for DisjunctionV0 {
     ) -> Result<PluginExecution> {
         ensure!(
             operation == "switch",
+            ErrorKind::UnsupportedError,
             "{}: Implementation only handles switches, not: \"{operation}\"",
             Self::NAME,
         );
@@ -99,7 +100,8 @@ impl Plugin for DisjunctionV0 {
         let mut cnts_out = vec![];
 
         let (typ_cond, num_cond) = ins.next().ok_or_else(|| {
-            eyre!(
+            swanky_error!(
+                ErrorKind::OtherError,
                 "{}: There must be atleast one input: the switch condition",
                 Self::NAME,
             )
@@ -108,6 +110,7 @@ impl Plugin for DisjunctionV0 {
         for (typ, num) in ins {
             ensure!(
                 typ == typ_cond,
+                ErrorKind::OtherError,
                 "{}: All inputs must be of the same type as the condition",
                 Self::NAME,
             );
@@ -117,6 +120,7 @@ impl Plugin for DisjunctionV0 {
         for (typ, num) in out {
             ensure!(
                 typ == typ_cond,
+                ErrorKind::OtherError,
                 "{}: All inputs must be of the same type as the condition",
                 Self::NAME,
             );
@@ -131,7 +135,7 @@ impl Plugin for DisjunctionV0 {
                 // this could also hold a default (for a default clause for the switch)
                 assert_eq!(mode, "strict");
             }
-            _ => bail!("{}: Invalid mode", Self::NAME,),
+            _ => bail!(ErrorKind::UnsupportedError, "{}: Invalid mode", Self::NAME,),
         }
 
         // retrieve function and guard pairs from parameters
@@ -140,13 +144,13 @@ impl Plugin for DisjunctionV0 {
             // check guard type
             let guard = match guard {
                 PluginTypeArg::Number(num) => num,
-                _ => bail!("guard must be a number"),
+                _ => bail!(ErrorKind::OtherError, "guard must be a number"),
             };
             // check function type
             if let Some(PluginTypeArg::String(name)) = params.next() {
                 functions.push((guard, name))
             } else {
-                bail!("function name missing")
+                bail!(ErrorKind::OtherError, "function name missing")
             }
         }
 
@@ -157,7 +161,10 @@ impl Plugin for DisjunctionV0 {
             let gates: &[GateM] = match fun_decl.body() {
                 FunctionBody::Gates(gates) => gates.gates(),
                 FunctionBody::Plugin(_) => {
-                    bail!("a clause is a plugin, not supported")
+                    bail!(
+                        ErrorKind::UnsupportedError,
+                        "a clause is a plugin, not supported"
+                    )
                 }
             };
             clauses.push(ClauseGuard {

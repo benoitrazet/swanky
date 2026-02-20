@@ -3,7 +3,7 @@ use std::{
     ops::{Add, Mul, Sub},
 };
 
-use eyre::Result;
+use swanky_error::Result;
 use swanky_field::FiniteField;
 
 use crate::{backend_trait::BackendT, circuit_ir::WireCount};

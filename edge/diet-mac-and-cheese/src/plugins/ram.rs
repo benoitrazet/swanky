@@ -1,5 +1,5 @@
-use eyre::{Result, bail, ensure};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
+use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure};
 use swanky_field_binary::F2;
 
 use crate::circuit_ir::{FunStore, TypeId, TypeSpecification, TypeStore, WireCount};
@@ -169,6 +169,7 @@ impl Plugin for RamBoolV0 {
             "init" => {
                 ensure!(
                     params.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} expects 1 parameter, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -176,6 +177,7 @@ impl Plugin for RamBoolV0 {
 
                 let PluginTypeArg::Number(size) = params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The parameter to {operation} must be numeric.",
                         Self::NAME
                     );
@@ -187,6 +189,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     input_counts.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 1 wire range as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -197,6 +200,7 @@ impl Plugin for RamBoolV0 {
                     type_store.get(&initial_value_type_id)?
                 else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: No type with index {initial_value_type_id}, or that index refers to a plugin-defined type.",
                         Self::NAME
                     )
@@ -204,12 +208,14 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     initial_value_rust_type_id == std::any::TypeId::of::<F2>(),
+                    ErrorKind::OtherError,
                     "{}: This plugin only supports Boolean fields.",
                     Self::NAME,
                 );
 
                 ensure!(
                     output_counts.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts.len(),
@@ -217,6 +223,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     output_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts[0].1,
@@ -227,6 +234,7 @@ impl Plugin for RamBoolV0 {
                     type_store.get(&ram_output_type_id)?
                 else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: {operation} must output a plugin-defined type, but the type with index {ram_output_type_id} refers to a field (or is undefined).",
                         Self::NAME
                     );
@@ -234,6 +242,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     ram_output_type.name.as_str() == Self::NAME,
+                    ErrorKind::OtherError,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_output_type.name,
@@ -241,6 +250,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     ram_output_type.operation.as_str() == "ram",
+                    ErrorKind::OtherError,
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_output_type.operation,
@@ -248,6 +258,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     ram_output_type.params.len() == 6,
+                    ErrorKind::OtherError,
                     "{}: The ram type expects 6 parameters, but {} were given.",
                     Self::NAME,
                     ram_output_type.params.len(),
@@ -255,21 +266,27 @@ impl Plugin for RamBoolV0 {
 
                 let PluginTypeArg::Number(field_id) = ram_output_type.params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.".to_string(),
+                )?;
                 ensure!(
                     field_id == initial_value_type_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the input to {operation} must match the output RAM's address/value type.",
                     Self::NAME,
                 );
 
                 let PluginTypeArg::Number(addr_count) = ram_output_type.params[1] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The second ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -280,6 +297,7 @@ impl Plugin for RamBoolV0 {
 
                 let PluginTypeArg::Number(value_count) = ram_output_type.params[2] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The third ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -290,6 +308,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     value_count == input_counts[0].1,
+                    ErrorKind::OtherError,
                     "{}: The number of wires in the input to {operation} must match the output RAM's value size.",
                     Self::NAME,
                 );
@@ -307,6 +326,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     params.is_empty(),
+                    ErrorKind::OtherError,
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -314,6 +334,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     input_counts.len() == 2,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 2 wire ranges as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -321,6 +342,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     input_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The first input to {operation} must be exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[0].1,
@@ -331,6 +353,7 @@ impl Plugin for RamBoolV0 {
                     type_store.get(&ram_input_type_id)?
                 else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: {operation} takes a plugin-defined type as its first input.",
                         Self::NAME
                     );
@@ -338,6 +361,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     ram_input_type.name.as_str() == Self::NAME,
+                    ErrorKind::OtherError,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_input_type.name,
@@ -345,6 +369,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     ram_input_type.operation.as_str() == "ram",
+                    ErrorKind::OtherError,
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_input_type.operation,
@@ -352,6 +377,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     ram_input_type.params.len() == 6,
+                    ErrorKind::OtherError,
                     "{}: The ram type expects 6 parameters, but {} were given.",
                     Self::NAME,
                     ram_input_type.params.len(),
@@ -359,16 +385,21 @@ impl Plugin for RamBoolV0 {
 
                 let PluginTypeArg::Number(field_id) = ram_input_type.params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.".to_string(),
+                )?;
 
                 let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)? else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: No type with index {field_id}, or that index refers to a plugin-defined type.",
                         Self::NAME
                     );
@@ -376,12 +407,14 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     field_rust_id == std::any::TypeId::of::<F2>(),
+                    ErrorKind::OtherError,
                     "{}: This plugin only supports Boolean fields.",
                     Self::NAME,
                 );
 
                 let PluginTypeArg::Number(addr_count) = ram_input_type.params[1] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The second ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -392,6 +425,7 @@ impl Plugin for RamBoolV0 {
 
                 let PluginTypeArg::Number(value_count) = ram_input_type.params[2] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The third ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -402,12 +436,14 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     input_counts[1].0 == field_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the second input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
                 ensure!(
                     input_counts[1].1 == addr_count,
+                    ErrorKind::OtherError,
                     "{}: The second input to {operation} must have exactly {addr_count} wires, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[1].1,
@@ -415,6 +451,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     output_counts.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts.len(),
@@ -422,12 +459,14 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     output_counts[0].0 == field_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the output of {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
                 ensure!(
                     output_counts[0].1 == value_count,
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs exactly {value_count} wires, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts[0].1,
@@ -446,6 +485,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     params.is_empty(),
+                    ErrorKind::OtherError,
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -453,6 +493,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     input_counts.len() == 3,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 3 wire ranges as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -460,6 +501,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     input_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The first input to {operation} must be exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[0].1,
@@ -470,6 +512,7 @@ impl Plugin for RamBoolV0 {
                     type_store.get(&ram_input_type_id)?
                 else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: {operation} takes a plugin-defined type as its first input.",
                         Self::NAME
                     );
@@ -477,6 +520,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     ram_input_type.name.as_str() == Self::NAME,
+                    ErrorKind::OtherError,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_input_type.name,
@@ -484,6 +528,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     ram_input_type.operation.as_str() == "ram",
+                    ErrorKind::OtherError,
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_input_type.operation,
@@ -491,6 +536,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     ram_input_type.params.len() == 6,
+                    ErrorKind::OtherError,
                     "{}: The ram type expects 6 parameters, but {} were given.",
                     Self::NAME,
                     ram_input_type.params.len(),
@@ -498,16 +544,21 @@ impl Plugin for RamBoolV0 {
 
                 let PluginTypeArg::Number(field_id) = ram_input_type.params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.".to_string(),
+                )?;
 
                 let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)? else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: No type with index {field_id}, or that index refers to a plugin-defined type.",
                         Self::NAME
                     );
@@ -515,12 +566,14 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     field_rust_id == std::any::TypeId::of::<F2>(),
+                    ErrorKind::OtherError,
                     "{}: This plugin only supports Boolean fields.",
                     Self::NAME,
                 );
 
                 let PluginTypeArg::Number(addr_count) = ram_input_type.params[1] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The second ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -531,6 +584,7 @@ impl Plugin for RamBoolV0 {
 
                 let PluginTypeArg::Number(value_count) = ram_input_type.params[2] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The third ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -541,12 +595,14 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     input_counts[1].0 == field_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the second input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
                 ensure!(
                     input_counts[1].1 == addr_count,
+                    ErrorKind::OtherError,
                     "{}: The second input to {operation} must have exactly {addr_count} wires, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[1].1,
@@ -554,12 +610,14 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     input_counts[2].0 == field_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the third input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
                 ensure!(
                     input_counts[2].1 == value_count,
+                    ErrorKind::OtherError,
                     "{}: The third input to {operation} must have exactly {value_count} wires, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[2].1,
@@ -567,6 +625,7 @@ impl Plugin for RamBoolV0 {
 
                 ensure!(
                     output_counts.is_empty(),
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs 0 wire ranges, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts.len(),
@@ -580,7 +639,11 @@ impl Plugin for RamBoolV0 {
                     op,
                 ))))
             }
-            _ => bail!("{}: Unknown operation: {operation}", Self::NAME),
+            _ => bail!(
+                ErrorKind::OtherError,
+                "{}: Unknown operation: {operation}",
+                Self::NAME
+            ),
         }
     }
 }
@@ -600,6 +663,7 @@ impl Plugin for RamBoolV1 {
             "init" => {
                 ensure!(
                     params.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} expects 1 parameter, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -607,6 +671,7 @@ impl Plugin for RamBoolV1 {
 
                 let PluginTypeArg::Number(size) = params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The parameter to {operation} must be numeric.",
                         Self::NAME
                     );
@@ -618,6 +683,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     input_counts.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 1 wire range as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -628,6 +694,7 @@ impl Plugin for RamBoolV1 {
                     type_store.get(&initial_value_type_id)?
                 else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: No type with index {initial_value_type_id}, or that index refers to a plugin-defined type.",
                         Self::NAME
                     )
@@ -635,12 +702,14 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     initial_value_rust_type_id == std::any::TypeId::of::<F2>(),
+                    ErrorKind::OtherError,
                     "{}: This plugin only supports Boolean fields.",
                     Self::NAME,
                 );
 
                 ensure!(
                     output_counts.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts.len(),
@@ -648,6 +717,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     output_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts[0].1,
@@ -658,6 +728,7 @@ impl Plugin for RamBoolV1 {
                     type_store.get(&ram_output_type_id)?
                 else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: {operation} must output a plugin-defined type, but the type with index {ram_output_type_id} refers to a field (or is undefined).",
                         Self::NAME
                     );
@@ -665,6 +736,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     ram_output_type.name.as_str() == Self::NAME,
+                    ErrorKind::OtherError,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_output_type.name,
@@ -672,6 +744,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     ram_output_type.operation.as_str() == "ram",
+                    ErrorKind::OtherError,
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_output_type.operation,
@@ -679,6 +752,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     ram_output_type.params.len() == 3,
+                    ErrorKind::OtherError,
                     "{}: The ram type expects 3 parameters, but {} were given.",
                     Self::NAME,
                     ram_output_type.params.len(),
@@ -686,21 +760,27 @@ impl Plugin for RamBoolV1 {
 
                 let PluginTypeArg::Number(field_id) = ram_output_type.params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.".to_string(),
+                )?;
                 ensure!(
                     field_id == initial_value_type_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the input to {operation} must match the output RAM's address/value type.",
                     Self::NAME,
                 );
 
                 let PluginTypeArg::Number(addr_count) = ram_output_type.params[1] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The second ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -711,6 +791,7 @@ impl Plugin for RamBoolV1 {
 
                 let PluginTypeArg::Number(value_count) = ram_output_type.params[2] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The third ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -721,6 +802,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     value_count == input_counts[0].1,
+                    ErrorKind::OtherError,
                     "{}: The number of wires in the input to {operation} must match the output RAM's value size.",
                     Self::NAME,
                 );
@@ -738,6 +820,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     params.is_empty(),
+                    ErrorKind::OtherError,
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -745,6 +828,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     input_counts.len() == 2,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 2 wire ranges as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -752,6 +836,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     input_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The first input to {operation} must be exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[0].1,
@@ -762,6 +847,7 @@ impl Plugin for RamBoolV1 {
                     type_store.get(&ram_input_type_id)?
                 else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: {operation} takes a plugin-defined type as its first input.",
                         Self::NAME
                     );
@@ -769,6 +855,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     ram_input_type.name.as_str() == Self::NAME,
+                    ErrorKind::OtherError,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_input_type.name,
@@ -776,6 +863,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     ram_input_type.operation.as_str() == "ram",
+                    ErrorKind::OtherError,
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_input_type.operation,
@@ -783,6 +871,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     ram_input_type.params.len() == 3,
+                    ErrorKind::OtherError,
                     "{}: The ram type expects 3 parameters, but {} were given.",
                     Self::NAME,
                     ram_input_type.params.len(),
@@ -790,16 +879,21 @@ impl Plugin for RamBoolV1 {
 
                 let PluginTypeArg::Number(field_id) = ram_input_type.params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.".to_string(),
+                )?;
 
                 let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)? else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: No type with index {field_id}, or that index refers to a plugin-defined type.",
                         Self::NAME
                     );
@@ -807,12 +901,14 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     field_rust_id == std::any::TypeId::of::<F2>(),
+                    ErrorKind::OtherError,
                     "{}: This plugin only supports Boolean fields.",
                     Self::NAME,
                 );
 
                 let PluginTypeArg::Number(addr_count) = ram_input_type.params[1] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The second ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -823,6 +919,7 @@ impl Plugin for RamBoolV1 {
 
                 let PluginTypeArg::Number(value_count) = ram_input_type.params[2] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The third ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -833,12 +930,14 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     input_counts[1].0 == field_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the second input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
                 ensure!(
                     input_counts[1].1 == addr_count,
+                    ErrorKind::OtherError,
                     "{}: The second input to {operation} must have exactly {addr_count} wires, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[1].1,
@@ -846,6 +945,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     output_counts.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts.len(),
@@ -853,12 +953,14 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     output_counts[0].0 == field_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the output of {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
                 ensure!(
                     output_counts[0].1 == value_count,
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs exactly {value_count} wires, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts[0].1,
@@ -877,6 +979,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     params.is_empty(),
+                    ErrorKind::OtherError,
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -884,6 +987,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     input_counts.len() == 3,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 3 wire ranges as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -891,6 +995,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     input_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The first input to {operation} must be exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[0].1,
@@ -901,6 +1006,7 @@ impl Plugin for RamBoolV1 {
                     type_store.get(&ram_input_type_id)?
                 else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: {operation} takes a plugin-defined type as its first input.",
                         Self::NAME
                     );
@@ -908,6 +1014,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     ram_input_type.name.as_str() == Self::NAME,
+                    ErrorKind::OtherError,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_input_type.name,
@@ -915,6 +1022,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     ram_input_type.operation.as_str() == "ram",
+                    ErrorKind::OtherError,
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_input_type.operation,
@@ -922,6 +1030,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     ram_input_type.params.len() == 3,
+                    ErrorKind::OtherError,
                     "{}: The ram type expects 3 parameters, but {} were given.",
                     Self::NAME,
                     ram_input_type.params.len(),
@@ -929,16 +1038,21 @@ impl Plugin for RamBoolV1 {
 
                 let PluginTypeArg::Number(field_id) = ram_input_type.params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.".to_string(),
+                )?;
 
                 let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)? else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: No type with index {field_id}, or that index refers to a plugin-defined type.",
                         Self::NAME
                     );
@@ -946,12 +1060,14 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     field_rust_id == std::any::TypeId::of::<F2>(),
+                    ErrorKind::OtherError,
                     "{}: This plugin only supports Boolean fields.",
                     Self::NAME,
                 );
 
                 let PluginTypeArg::Number(addr_count) = ram_input_type.params[1] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The second ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -962,6 +1078,7 @@ impl Plugin for RamBoolV1 {
 
                 let PluginTypeArg::Number(value_count) = ram_input_type.params[2] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The third ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -972,12 +1089,14 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     input_counts[1].0 == field_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the second input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
                 ensure!(
                     input_counts[1].1 == addr_count,
+                    ErrorKind::OtherError,
                     "{}: The second input to {operation} must have exactly {addr_count} wires, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[1].1,
@@ -985,12 +1104,14 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     input_counts[2].0 == field_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the third input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
                 ensure!(
                     input_counts[2].1 == value_count,
+                    ErrorKind::OtherError,
                     "{}: The third input to {operation} must have exactly {value_count} wires, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[2].1,
@@ -998,6 +1119,7 @@ impl Plugin for RamBoolV1 {
 
                 ensure!(
                     output_counts.is_empty(),
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs 0 wire ranges, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts.len(),
@@ -1011,7 +1133,11 @@ impl Plugin for RamBoolV1 {
                     op,
                 ))))
             }
-            _ => bail!("{}: Unknown operation: {operation}", Self::NAME),
+            _ => bail!(
+                ErrorKind::OtherError,
+                "{}: Unknown operation: {operation}",
+                Self::NAME
+            ),
         }
     }
 }
@@ -1031,6 +1157,7 @@ impl Plugin for RamArithV0 {
             "init" => {
                 ensure!(
                     params.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} expects 1 parameter, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -1038,6 +1165,7 @@ impl Plugin for RamArithV0 {
 
                 let PluginTypeArg::Number(size) = params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The parameter to {operation} must be numeric.",
                         Self::NAME
                     );
@@ -1049,6 +1177,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     input_counts.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 1 wire range as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -1057,6 +1186,7 @@ impl Plugin for RamArithV0 {
                 let initial_value_type_id = input_counts[0].0;
                 let &TypeSpecification::Field(_) = type_store.get(&initial_value_type_id)? else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: No type with index {initial_value_type_id}, or that index refers to a plugin-defined type.",
                         Self::NAME
                     )
@@ -1064,6 +1194,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     input_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes exactly 1 wire as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[0].1,
@@ -1071,6 +1202,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     output_counts.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts.len(),
@@ -1078,6 +1210,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     output_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts[0].1,
@@ -1088,6 +1221,7 @@ impl Plugin for RamArithV0 {
                     type_store.get(&ram_output_type_id)?
                 else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: {operation} must output a plugin-defined type, but the type with index {ram_output_type_id} refers to a field (or is undefined).",
                         Self::NAME
                     );
@@ -1095,6 +1229,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     ram_output_type.name.as_str() == Self::NAME,
+                    ErrorKind::OtherError,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_output_type.name,
@@ -1102,6 +1237,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     ram_output_type.operation.as_str() == "ram",
+                    ErrorKind::OtherError,
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_output_type.operation,
@@ -1109,6 +1245,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     ram_output_type.params.len() == 4,
+                    ErrorKind::OtherError,
                     "{}: The ram type expects 4 parameters, but {} were given.",
                     Self::NAME,
                     ram_output_type.params.len(),
@@ -1116,15 +1253,20 @@ impl Plugin for RamArithV0 {
 
                 let PluginTypeArg::Number(field_id) = ram_output_type.params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.".to_string(),
+                )?;
                 ensure!(
                     field_id == initial_value_type_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the input to {operation} must match the output RAM's address/value type.",
                     Self::NAME,
                 );
@@ -1138,6 +1280,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     params.is_empty(),
+                    ErrorKind::OtherError,
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -1145,6 +1288,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     input_counts.len() == 2,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 2 wire ranges as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -1152,6 +1296,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     input_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The first input to {operation} must be exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[0].1,
@@ -1162,6 +1307,7 @@ impl Plugin for RamArithV0 {
                     type_store.get(&ram_input_type_id)?
                 else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: {operation} takes a plugin-defined type as its first input.",
                         Self::NAME
                     );
@@ -1169,6 +1315,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     ram_input_type.name.as_str() == Self::NAME,
+                    ErrorKind::OtherError,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_input_type.name,
@@ -1176,6 +1323,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     ram_input_type.operation.as_str() == "ram",
+                    ErrorKind::OtherError,
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_input_type.operation,
@@ -1183,6 +1331,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     ram_input_type.params.len() == 4,
+                    ErrorKind::OtherError,
                     "{}: The ram type expects 4 parameters, but {} were given.",
                     Self::NAME,
                     ram_input_type.params.len(),
@@ -1190,16 +1339,21 @@ impl Plugin for RamArithV0 {
 
                 let PluginTypeArg::Number(field_id) = ram_input_type.params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.".to_string(),
+                )?;
 
                 let &TypeSpecification::Field(_) = type_store.get(&field_id)? else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: No type with index {field_id}, or that index refers to a plugin-defined type.",
                         Self::NAME
                     );
@@ -1207,12 +1361,14 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     input_counts[1].0 == field_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the second input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
                 ensure!(
                     input_counts[1].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The second input to {operation} must have exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[1].1,
@@ -1220,6 +1376,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     output_counts.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts.len(),
@@ -1227,12 +1384,14 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     output_counts[0].0 == field_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the output of {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
                 ensure!(
                     output_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts[0].1,
@@ -1247,6 +1406,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     params.is_empty(),
+                    ErrorKind::OtherError,
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -1254,6 +1414,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     input_counts.len() == 3,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 3 wire ranges as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -1261,6 +1422,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     input_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The first input to {operation} must be exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[0].1,
@@ -1271,6 +1433,7 @@ impl Plugin for RamArithV0 {
                     type_store.get(&ram_input_type_id)?
                 else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: {operation} takes a plugin-defined type as its first input.",
                         Self::NAME
                     );
@@ -1278,6 +1441,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     ram_input_type.name.as_str() == Self::NAME,
+                    ErrorKind::OtherError,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_input_type.name,
@@ -1285,6 +1449,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     ram_input_type.operation.as_str() == "ram",
+                    ErrorKind::OtherError,
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_input_type.operation,
@@ -1292,6 +1457,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     ram_input_type.params.len() == 4,
+                    ErrorKind::OtherError,
                     "{}: The ram type expects 4 parameters, but {} were given.",
                     Self::NAME,
                     ram_input_type.params.len(),
@@ -1299,16 +1465,21 @@ impl Plugin for RamArithV0 {
 
                 let PluginTypeArg::Number(field_id) = ram_input_type.params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.".to_string(),
+                )?;
 
                 let &TypeSpecification::Field(_) = type_store.get(&field_id)? else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: No type with index {field_id}, or that index refers to a plugin-defined type.",
                         Self::NAME
                     );
@@ -1316,12 +1487,14 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     input_counts[1].0 == field_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the second input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
                 ensure!(
                     input_counts[1].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The second input to {operation} must have exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[1].1,
@@ -1329,12 +1502,14 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     input_counts[2].0 == field_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the third input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
                 ensure!(
                     input_counts[2].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The third input to {operation} must have exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[2].1,
@@ -1342,6 +1517,7 @@ impl Plugin for RamArithV0 {
 
                 ensure!(
                     output_counts.is_empty(),
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs 0 wire ranges, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts.len(),
@@ -1351,7 +1527,11 @@ impl Plugin for RamArithV0 {
                     RamArithV0::new(ram_input_type_id, field_id, op),
                 )))
             }
-            _ => bail!("{}: Unknown operation: {operation}", Self::NAME),
+            _ => bail!(
+                ErrorKind::OtherError,
+                "{}: Unknown operation: {operation}",
+                Self::NAME
+            ),
         }
     }
 }
@@ -1371,6 +1551,7 @@ impl Plugin for RamArithV1 {
             "init" => {
                 ensure!(
                     params.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} expects 1 parameter, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -1378,6 +1559,7 @@ impl Plugin for RamArithV1 {
 
                 let PluginTypeArg::Number(size) = params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The parameter to {operation} must be numeric.",
                         Self::NAME
                     );
@@ -1389,6 +1571,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     input_counts.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 1 wire range as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -1397,6 +1580,7 @@ impl Plugin for RamArithV1 {
                 let initial_value_type_id = input_counts[0].0;
                 let &TypeSpecification::Field(_) = type_store.get(&initial_value_type_id)? else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: No type with index {initial_value_type_id}, or that index refers to a plugin-defined type.",
                         Self::NAME
                     )
@@ -1404,6 +1588,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     input_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes exactly 1 wire as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[0].1,
@@ -1411,6 +1596,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     output_counts.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts.len(),
@@ -1418,6 +1604,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     output_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts[0].1,
@@ -1428,6 +1615,7 @@ impl Plugin for RamArithV1 {
                     type_store.get(&ram_output_type_id)?
                 else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: {operation} must output a plugin-defined type, but the type with index {ram_output_type_id} refers to a field (or is undefined).",
                         Self::NAME
                     );
@@ -1435,6 +1623,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     ram_output_type.name.as_str() == Self::NAME,
+                    ErrorKind::OtherError,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_output_type.name,
@@ -1442,6 +1631,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     ram_output_type.operation.as_str() == "ram",
+                    ErrorKind::OtherError,
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_output_type.operation,
@@ -1449,6 +1639,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     ram_output_type.params.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: The ram type expects 1 parameters, but {} were given.",
                     Self::NAME,
                     ram_output_type.params.len(),
@@ -1456,15 +1647,20 @@ impl Plugin for RamArithV1 {
 
                 let PluginTypeArg::Number(field_id) = ram_output_type.params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.".to_string(),
+                )?;
                 ensure!(
                     field_id == initial_value_type_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the input to {operation} must match the output RAM's address/value type.",
                     Self::NAME,
                 );
@@ -1478,6 +1674,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     params.is_empty(),
+                    ErrorKind::OtherError,
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -1485,6 +1682,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     input_counts.len() == 2,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 2 wire ranges as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -1492,6 +1690,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     input_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The first input to {operation} must be exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[0].1,
@@ -1502,6 +1701,7 @@ impl Plugin for RamArithV1 {
                     type_store.get(&ram_input_type_id)?
                 else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: {operation} takes a plugin-defined type as its first input.",
                         Self::NAME
                     );
@@ -1509,6 +1709,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     ram_input_type.name.as_str() == Self::NAME,
+                    ErrorKind::OtherError,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_input_type.name,
@@ -1516,6 +1717,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     ram_input_type.operation.as_str() == "ram",
+                    ErrorKind::OtherError,
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_input_type.operation,
@@ -1523,6 +1725,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     ram_input_type.params.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: The ram type expects 1 parameter, but {} were given.",
                     Self::NAME,
                     ram_input_type.params.len(),
@@ -1530,16 +1733,21 @@ impl Plugin for RamArithV1 {
 
                 let PluginTypeArg::Number(field_id) = ram_input_type.params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.".to_string(),
+                )?;
 
                 let &TypeSpecification::Field(_) = type_store.get(&field_id)? else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: No type with index {field_id}, or that index refers to a plugin-defined type.",
                         Self::NAME
                     );
@@ -1547,12 +1755,14 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     input_counts[1].0 == field_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the second input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
                 ensure!(
                     input_counts[1].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The second input to {operation} must have exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[1].1,
@@ -1560,6 +1770,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     output_counts.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts.len(),
@@ -1567,12 +1778,14 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     output_counts[0].0 == field_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the output of {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
                 ensure!(
                     output_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts[0].1,
@@ -1587,6 +1800,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     params.is_empty(),
+                    ErrorKind::OtherError,
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -1594,6 +1808,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     input_counts.len() == 3,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 3 wire ranges as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -1601,6 +1816,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     input_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The first input to {operation} must be exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[0].1,
@@ -1611,6 +1827,7 @@ impl Plugin for RamArithV1 {
                     type_store.get(&ram_input_type_id)?
                 else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: {operation} takes a plugin-defined type as its first input.",
                         Self::NAME
                     );
@@ -1618,6 +1835,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     ram_input_type.name.as_str() == Self::NAME,
+                    ErrorKind::OtherError,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_input_type.name,
@@ -1625,6 +1843,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     ram_input_type.operation.as_str() == "ram",
+                    ErrorKind::OtherError,
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_input_type.operation,
@@ -1632,6 +1851,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     ram_input_type.params.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: The ram type expects 1 parameter, but {} were given.",
                     Self::NAME,
                     ram_input_type.params.len(),
@@ -1639,16 +1859,21 @@ impl Plugin for RamArithV1 {
 
                 let PluginTypeArg::Number(field_id) = ram_input_type.params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.".to_string(),
+                )?;
 
                 let &TypeSpecification::Field(_) = type_store.get(&field_id)? else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: No type with index {field_id}, or that index refers to a plugin-defined type.",
                         Self::NAME
                     );
@@ -1656,12 +1881,14 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     input_counts[1].0 == field_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the second input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
                 ensure!(
                     input_counts[1].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The second input to {operation} must have exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[1].1,
@@ -1669,12 +1896,14 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     input_counts[2].0 == field_id,
+                    ErrorKind::OtherError,
                     "{}: The type of the third input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
                 ensure!(
                     input_counts[2].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The third input to {operation} must have exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[2].1,
@@ -1682,6 +1911,7 @@ impl Plugin for RamArithV1 {
 
                 ensure!(
                     output_counts.is_empty(),
+                    ErrorKind::OtherError,
                     "{}: {operation} outputs 0 wire ranges, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts.len(),
@@ -1691,7 +1921,11 @@ impl Plugin for RamArithV1 {
                     RamArithV1::new(ram_input_type_id, field_id, op),
                 )))
             }
-            _ => bail!("{}: Unknown operation: {operation}", Self::NAME),
+            _ => bail!(
+                ErrorKind::OtherError,
+                "{}: Unknown operation: {operation}",
+                Self::NAME
+            ),
         }
     }
 }

@@ -4,8 +4,8 @@ use crate::circuit_ir::{
     first_unused_wire_id,
 };
 use crate::number_to_u64;
-use eyre::{Context, Result, bail, ensure, eyre};
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
+use swanky_error::{ErrorKind, Result, ResultExt, bail, ensure};
 
 pub(crate) struct IterV0;
 
@@ -41,11 +41,16 @@ impl Plugin for IterV0 {
         let enumerated = match operation {
             "map" => false,
             "map_enumerated" => true,
-            _ => bail!("{}: Unknown operation {operation}.", Self::NAME),
+            _ => bail!(
+                ErrorKind::UnsupportedError,
+                "{}: Unknown operation {operation}.",
+                Self::NAME
+            ),
         };
 
         ensure!(
             params.len() == 3,
+            ErrorKind::OtherError,
             "{}: {operation} expects 3 parametesr, but {} were given.",
             Self::NAME,
             params.len(),
@@ -53,6 +58,7 @@ impl Plugin for IterV0 {
 
         let PluginTypeArg::String(ref func_name) = params[0] else {
             bail!(
+                ErrorKind::OtherError,
                 "{}: The function name parameter must be a string.",
                 Self::NAME
             );
@@ -63,7 +69,7 @@ impl Plugin for IterV0 {
             input_counts: f_input_counts,
             ..
         } = fun_store.get_func_by_name(func_name).with_context(|| {
-            eyre!(
+            format!(
                 "{}: A function named {func_name} was not found.",
                 Self::NAME
             )
@@ -71,6 +77,7 @@ impl Plugin for IterV0 {
 
         ensure!(
             output_counts.len() == f_output_counts.len(),
+            ErrorKind::OtherError,
             "{}: {operation} should return the same number of output ranges as {func_name}: {} != {}.",
             Self::NAME,
             output_counts.len(),
@@ -80,6 +87,7 @@ impl Plugin for IterV0 {
         // Functions used with map_enumerated expect an additional input range
         ensure!(
             input_counts.len() == f_input_counts.len() - if enumerated { 1 } else { 0 },
+            ErrorKind::OtherError,
             "{}: {operation} expected {} inputs, but got {}.",
             Self::NAME,
             input_counts.len(),
@@ -87,13 +95,18 @@ impl Plugin for IterV0 {
         );
 
         let PluginTypeArg::Number(num_env) = params[1] else {
-            bail!("{}: The #env parameter must be numeric.", Self::NAME);
+            bail!(
+                ErrorKind::OtherError,
+                "{}: The #env parameter must be numeric.",
+                Self::NAME
+            );
         };
         // TODO: Should we assume this param fits in a u64?
         let num_env = number_to_u64(&num_env)?;
 
         let PluginTypeArg::Number(iter_count) = params[2] else {
             bail!(
+                ErrorKind::OtherError,
                 "{}: The iteration count parameter must be numeric.",
                 Self::NAME
             );
@@ -103,12 +116,14 @@ impl Plugin for IterV0 {
         for (i, (&(t, wc), &(t_f, wc_f))) in output_counts.iter().zip(f_output_counts).enumerate() {
             ensure!(
                 t == t_f,
+                ErrorKind::OtherError,
                 "{}: The output at position {i} has type {t}, but {func_name} expects {t_f}.",
                 Self::NAME,
             );
 
             ensure!(
                 wc == wc_f * iter_count,
+                ErrorKind::OtherError,
                 "{}: The output at position {i} should be {iter_count} times as large as the corresponding output of {func_name}: {wc} != {wc_f} * {iter_count}.",
                 Self::NAME,
             );
@@ -121,12 +136,14 @@ impl Plugin for IterV0 {
         {
             ensure!(
                 t == t_f,
+                ErrorKind::OtherError,
                 "{}: The parameter at position {i} has type {t}, but {func_name} expects {t_f}.",
                 Self::NAME,
             );
 
             ensure!(
                 wc == wc_f,
+                ErrorKind::OtherError,
                 "{}: The input at position {i} must have exactly the same count as the corresponding input of {func_name}: {wc} != {wc_f}.",
                 Self::NAME,
             );
@@ -145,12 +162,14 @@ impl Plugin for IterV0 {
         {
             ensure!(
                 t == t_f,
+                ErrorKind::OtherError,
                 "{}: The parameter at position {i} has type {t}, but {func_name} expects {t_f}.",
                 Self::NAME,
             );
 
             ensure!(
                 wc == wc_f * iter_count,
+                ErrorKind::OtherError,
                 "{}: The input at position {i} should be {iter_count} times as large as the corresponding input of {func_name}: {wc} != {wc_f} * {iter_count}.",
                 Self::NAME,
             );

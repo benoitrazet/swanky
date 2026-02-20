@@ -18,7 +18,7 @@
 //! specialization, we copy-and-paste.
 
 use crate::backend_trait::BackendT;
-use eyre::Result;
+use swanky_error::Result;
 use swanky_field::FiniteRing;
 
 mod less_than_eq;

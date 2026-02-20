@@ -9,10 +9,10 @@ use crate::{
     plugins::DisjunctionBody,
 };
 
-use eyre::{Result, bail};
 use generic_array::GenericArray;
 use std::marker::PhantomData;
 use swanky_aes_rng::AesRng;
+use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField};
 use swanky_field_binary::{F2, F40b};
 use swanky_party::{Party, WhichParty, private::ProverPrivateCopy};
@@ -109,7 +109,7 @@ where
         if wire.0 == Self::FieldElement::ZERO {
             Ok(())
         } else {
-            bail!("Error assert_zero")
+            bail!(ErrorKind::OtherError, "Error assert_zero")
         }
     }
 

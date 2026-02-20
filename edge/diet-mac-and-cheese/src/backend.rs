@@ -5,10 +5,10 @@ use crate::homcom::{BATCH_SIZE, FCom, MultCheckState, ZeroCheckState};
 use crate::mac::Mac;
 use crate::svole_trait::SvoleT;
 use crate::svole_trait::field_name;
-use eyre::{Result, bail};
 use log::{debug, info, warn};
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::private::ProverPrivateCopy;
 use swanky_party::{Party, WhichParty};
@@ -228,7 +228,10 @@ where
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<DietMacAndCheese<P, T, T, C, VOLE2>> {
-        self.channel.flush()?;
+        self.channel.flush().wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to flush channel.".to_string(),
+        )?;
         match P::WHICH {
             WhichParty::Prover(_) => DietMacAndCheese::<P, T, T, C, VOLE2>::init(
                 &mut self.channel,
@@ -265,7 +268,10 @@ where
 
     fn do_mult_check(&mut self) -> Result<usize> {
         debug!("do mult_check");
-        self.channel.flush()?;
+        self.channel.flush().wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to flush channel.".to_string(),
+        )?;
         let count = self.fcom.quicksilver_finalize(
             &mut self.channel,
             &mut self.rng,
@@ -276,7 +282,10 @@ where
     }
 
     fn do_check_zero(&mut self) -> Result<usize> {
-        self.channel.flush()?;
+        self.channel.flush().wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to flush channel.".to_string(),
+        )?;
         let count = self
             .zero_check_state
             .finalize(&mut self.channel, &mut self.rng)?;
@@ -351,14 +360,29 @@ where
     fn random(&mut self) -> Result<Self::FieldElement> {
         match P::WHICH {
             WhichParty::Prover(_) => {
-                self.channel.flush()?;
-                let challenge = self.channel.read_serializable::<Self::FieldElement>()?;
+                self.channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
+                let challenge = self
+                    .channel
+                    .read_serializable::<Self::FieldElement>()
+                    .wrap_err(
+                        ErrorKind::NetworkError,
+                        "Failed to read challenge data.".to_string(),
+                    )?;
                 Ok(challenge)
             }
             WhichParty::Verifier(_) => {
                 let challenge = Self::FieldElement::random(&mut self.rng);
-                self.channel.write_serializable(&challenge)?;
-                self.channel.flush()?;
+                self.channel.write_serializable(&challenge).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to write challenge data.".to_string(),
+                )?;
+                self.channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
                 Ok(challenge)
             }
         }
@@ -441,12 +465,15 @@ where
                     self.monitor.incr_monitor_witness();
                     self.input(ProverPrivateCopy::new(val))
                 } else {
-                    bail!("No private input given to the prover")
+                    bail!(
+                        ErrorKind::OtherError,
+                        "No private input given to the prover"
+                    )
                 }
             }
             WhichParty::Verifier(ev) => {
                 if val.is_some() {
-                    bail!("Private input given to the verifier")
+                    bail!(ErrorKind::OtherError, "Private input given to the verifier")
                 } else {
                     self.monitor.incr_monitor_witness();
                     self.input(ProverPrivateCopy::empty(ev))
@@ -457,7 +484,10 @@ where
 
     fn finalize(&mut self) -> Result<()> {
         debug!("finalize");
-        self.channel.flush()?;
+        self.channel.flush().wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to flush channel.".to_string(),
+        )?;
         let zero_check_count = self.do_check_zero()?;
         let mult_check_count = self.do_mult_check()?;
         debug!("finalize: mult_check: {mult_check_count:?}, check_zero: {zero_check_count:?}");

@@ -1,7 +1,7 @@
-use eyre::Result;
 use std::iter;
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::Result;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_party::{
     IsParty, Party, Prover, WhichParty,

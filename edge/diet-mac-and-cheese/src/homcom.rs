@@ -5,13 +5,13 @@
 //! These functionalities are used for diet Mac'n'Cheese and in the edabits
 //! conversion protocol for field-switching.
 use crate::{mac::Mac, svole_trait::SvoleT};
-use eyre::{Result, bail, ensure};
 use generic_array::GenericArray;
 use log::{debug, warn};
 use rand::{Rng, SeedableRng};
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure};
 use swanky_field::{DegreeModulo, FiniteField, IsSubFieldOf};
 use swanky_party::either::PartyEither;
 use swanky_party::private::{
@@ -85,8 +85,13 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
     ) -> Result<usize> {
         match P::WHICH {
             WhichParty::Prover(ev) => {
-                channel.flush()?;
-                let chi = channel.read_serializable()?;
+                channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
+                let chi = channel
+                    .read_serializable()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read chi.".to_string())?;
                 let mut chi_power = chi;
 
                 let mut sum_a0 = T::ZERO;
@@ -106,20 +111,36 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
                 let u = sum_a0 + mask.mac();
                 let v = sum_a1 + mask.value().into_inner(ev);
 
-                channel.write_serializable(&u)?;
-                channel.write_serializable(&v)?;
-                channel.flush()?;
+                channel
+                    .write_serializable(&u)
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'u'.".to_string())?;
+                channel
+                    .write_serializable(&v)
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'v'.".to_string())?;
+                channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
 
                 let c = self.count;
                 self.reset(VerifierPrivate::empty(ev))?;
                 Ok(c)
             }
             WhichParty::Verifier(ev) => {
-                channel.write_serializable::<T>(&self.chi.into_inner(ev))?;
-                channel.flush()?;
+                channel
+                    .write_serializable::<T>(&self.chi.into_inner(ev))
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write chi.".to_string())?;
+                channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
 
-                let u = channel.read_serializable::<T>()?;
-                let v = channel.read_serializable::<T>()?;
+                let u = channel
+                    .read_serializable::<T>()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'u'.".to_string())?;
+                let v = channel
+                    .read_serializable::<T>()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'v'.".to_string())?;
 
                 let b_plus = self.sum_b.into_inner(ev) + mask.mac();
                 if b_plus == (u + (-delta.into_inner(ev)) * v) {
@@ -128,7 +149,10 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
                     Ok(c)
                 } else {
                     self.reset(VerifierPrivate::new(rng))?;
-                    bail!("QuickSilver multiplication check failed.")
+                    bail!(
+                        ErrorKind::OtherError,
+                        "QuickSilver multiplication check failed."
+                    )
                 }
             }
         }
@@ -188,13 +212,21 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
     ) -> Result<usize> {
         let mut rng = match P::WHICH {
             WhichParty::Prover(_) => {
-                let seed = channel.read_block()?;
+                let seed = channel.read_block().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to read seed block.".to_string(),
+                )?;
                 AesRng::from_seed(seed)
             }
             WhichParty::Verifier(_) => {
                 let seed = rng.r#gen::<Block>();
-                channel.write_block(&seed)?;
-                channel.flush()?;
+                channel
+                    .write_block(&seed)
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write seed.".to_string())?;
+                channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
                 AesRng::from_seed(seed)
             }
         };
@@ -208,8 +240,13 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
                     let chi = T::random(&mut rng);
                     m += chi * mac.mac();
                 }
-                channel.write_serializable::<T>(&m)?;
-                channel.flush()?;
+                channel
+                    .write_serializable::<T>(&m)
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'm'.".to_string())?;
+                channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
 
                 b
             }
@@ -219,7 +256,9 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
                     let chi = T::random(&mut rng);
                     key_chi += chi * mac.mac();
                 }
-                let m = channel.read_serializable::<T>()?;
+                let m = channel
+                    .read_serializable::<T>()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'm'.".to_string())?;
 
                 key_chi == m
             }
@@ -227,7 +266,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
 
         let count = self.0.len();
         self.reset();
-        ensure!(b, "check zero failed");
+        ensure!(b, ErrorKind::OtherError, "check zero failed");
         Ok(count)
     }
 
@@ -299,7 +338,10 @@ where
                 voles: PartyEither::default(),
             })
         } else {
-            bail!("Should not init with delta for a prover");
+            bail!(
+                ErrorKind::InitializationError,
+                "Should not init with delta for a prover"
+            );
         }
     }
 
@@ -409,7 +451,9 @@ where
         debug!("input_low_level");
         for _ in 0..source {
             let r = self.random(channel, rng)?;
-            let y = channel.read_serializable::<V>()?;
+            let y = channel
+                .read_serializable::<V>()
+                .wrap_err(ErrorKind::NetworkError, "Failed to read 'y'.".to_string())?;
             out.push(Mac::new(
                 ProverPrivateCopy::empty(ev),
                 r.mac() - y * self.delta.into_inner(ev),
@@ -428,7 +472,9 @@ where
         debug!("input1");
         let r = self.random(channel, rng)?;
         let y = x - r.value().into_inner(ev);
-        channel.write_serializable(&y)?;
+        channel
+            .write_serializable(&y)
+            .wrap_err(ErrorKind::NetworkError, "Failed to write 'y'.".to_string())?;
         Ok(r.mac())
     }
 
@@ -440,7 +486,9 @@ where
     ) -> Result<Mac<P, V, T>> {
         debug!("input1");
         let r = self.random(channel, rng)?;
-        let y = channel.read_serializable::<V>()?;
+        let y = channel
+            .read_serializable::<V>()
+            .wrap_err(ErrorKind::NetworkError, "Failed to read 'y'.".to_string())?;
         let out = Mac::new(
             ProverPrivateCopy::empty(ev),
             r.mac() - y * self.delta.into_inner(ev),
@@ -472,11 +520,19 @@ where
     ) -> Result<()> {
         debug!("check_zero");
         let seed = match P::WHICH {
-            WhichParty::Prover(_) => channel.read_block()?,
+            WhichParty::Prover(_) => channel.read_block().wrap_err(
+                ErrorKind::NetworkError,
+                "Failed to read seed block.".to_string(),
+            )?,
             WhichParty::Verifier(_) => {
                 let seed = rng.r#gen::<Block>();
-                channel.write_block(&seed)?;
-                channel.flush()?;
+                channel
+                    .write_block(&seed)
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write seed.".to_string())?;
+                channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
                 seed
             }
         };
@@ -491,8 +547,13 @@ where
                     m += chi * mac.mac();
                     b &= mac.value().into_inner(ev) == V::ZERO;
                 }
-                channel.write_serializable::<T>(&m)?;
-                channel.flush()?;
+                channel
+                    .write_serializable::<T>(&m)
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'm'.".to_string())?;
+                channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
 
                 b
             }
@@ -502,13 +563,15 @@ where
                     let chi = T::random(&mut rng);
                     key_chi += chi * key.mac();
                 }
-                let m = channel.read_serializable::<T>()?;
+                let m = channel
+                    .read_serializable::<T>()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'm'.".to_string())?;
 
                 key_chi == m
             }
         };
 
-        ensure!(b, "check zero failed");
+        ensure!(b, ErrorKind::OtherError, "check zero failed");
         Ok(())
     }
 
@@ -525,14 +588,18 @@ where
         match P::WHICH {
             WhichParty::Prover(ev) => {
                 for mac in batch.iter() {
-                    channel.write_serializable::<V>(&mac.value().into_inner(ev))?;
+                    channel
+                        .write_serializable::<V>(&mac.value().into_inner(ev))
+                        .wrap_err(ErrorKind::NetworkError, "Failed to write MAC.".to_string())?;
                     hasher.update(&mac.value().into_inner(ev).to_bytes());
                 }
             }
             WhichParty::Verifier(ev) => {
                 out.as_mut().into_inner(ev).clear();
                 for _ in 0..batch.len() {
-                    let x = channel.read_serializable::<V>()?;
+                    let x = channel
+                        .read_serializable::<V>()
+                        .wrap_err(ErrorKind::NetworkError, "Failed to read 'x'.".to_string())?;
                     out.as_mut().into_inner(ev).push(x);
                     hasher.update(&x.to_bytes());
                 }
@@ -549,8 +616,13 @@ where
                     let chi = T::random(&mut rng);
                     m += chi * mac.mac();
                 }
-                channel.write_serializable::<T>(&m)?;
-                channel.flush()?;
+                channel
+                    .write_serializable::<T>(&m)
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'm'.".to_string())?;
+                channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
 
                 Ok(())
             }
@@ -563,14 +635,16 @@ where
                     key_chi += chi * mac.mac();
                     x_chi += out.as_ref().into_inner(ev)[i] * chi;
                 }
-                let m = channel.read_serializable::<T>()?;
+                let m = channel
+                    .read_serializable::<T>()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'm'.".to_string())?;
 
                 assert_eq!(out.as_ref().into_inner(ev).len(), batch.len());
                 if key_chi + self.delta.into_inner(ev) * x_chi == m {
                     Ok(())
                 } else {
                     warn!("check_zero fails");
-                    bail!("open fails")
+                    bail!(ErrorKind::OtherError, "open fails")
                 }
             }
         }
@@ -588,7 +662,9 @@ where
                 let mut sum_a0 = T::ZERO;
                 let mut sum_a1 = T::ZERO;
 
-                let chi = channel.read_serializable()?;
+                let chi = channel
+                    .read_serializable()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read chi.".to_string())?;
                 let mut chi_power = chi;
 
                 for ((x, x_mac), (y, y_mac), (_, z_mac)) in triples
@@ -613,16 +689,28 @@ where
                 let u = sum_a0 + mask.mac();
                 let v = sum_a1 + mask.value().into_inner(ev);
 
-                channel.write_serializable(&u)?;
-                channel.write_serializable(&v)?;
-                channel.flush()?;
+                channel
+                    .write_serializable(&u)
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'u'.".to_string())?;
+                channel
+                    .write_serializable(&v)
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'v'.".to_string())?;
+                channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
 
                 Ok(())
             }
             WhichParty::Verifier(ev) => {
                 let chi = T::random(rng);
-                channel.write_serializable::<T>(&chi)?;
-                channel.flush()?;
+                channel
+                    .write_serializable::<T>(&chi)
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write chi.".to_string())?;
+                channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
 
                 let mut sum_b = T::ZERO;
                 let mut chi_power = chi;
@@ -640,14 +728,21 @@ where
                 }
                 let mask = Mac::lift(&vs);
 
-                let u = channel.read_serializable::<T>()?;
-                let v = channel.read_serializable::<T>()?;
+                let u = channel
+                    .read_serializable::<T>()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'u'.".to_string())?;
+                let v = channel
+                    .read_serializable::<T>()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'v'.".to_string())?;
 
                 let b_plus = sum_b + mask.mac();
                 if b_plus == (u + (-self.delta.into_inner(ev)) * v) {
                     Ok(())
                 } else {
-                    bail!("QuickSilver multiplication check failed.")
+                    bail!(
+                        ErrorKind::OtherError,
+                        "QuickSilver multiplication check failed."
+                    )
                 }
             }
         }

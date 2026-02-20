@@ -1,6 +1,5 @@
 //! Svole trait and common implementations.
 
-use eyre::Result;
 use log::{debug, info};
 use std::any::type_name;
 use std::marker::PhantomData;
@@ -11,6 +10,7 @@ use std::{
 };
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::either::PartyEither;
 use swanky_party::{IsParty, Party, Verifier, WhichParty};
@@ -100,14 +100,22 @@ where
             WhichParty::Prover(ev) => Self(
                 PartyEither::prover_new(
                     ev,
-                    RcRefCell::new(Sender::init(channel, rng, lpn_setup, lpn_extend)?),
+                    RcRefCell::new(Sender::init(channel, rng, lpn_setup, lpn_extend).wrap_err(
+                        ErrorKind::InitializationError,
+                        "Failed to initialize VOLE sender.".to_string(),
+                    )?),
                 ),
                 PhantomData,
             ),
             WhichParty::Verifier(ev) => Self(
                 PartyEither::verifier_new(
                     ev,
-                    RcRefCell::new(Receiver::init(channel, rng, lpn_setup, lpn_extend, delta)?),
+                    RcRefCell::new(
+                        Receiver::init(channel, rng, lpn_setup, lpn_extend, delta).wrap_err(
+                            ErrorKind::InitializationError,
+                            "Failed to initialize VOLE receiver.".to_string(),
+                        )?,
+                    ),
                 ),
                 PhantomData,
             ),
@@ -123,19 +131,27 @@ where
         debug!("extend");
         match P::WHICH {
             WhichParty::Prover(ev) => {
-                self.0.as_mut().prover_into(ev).get_refmut().send(
-                    channel,
-                    rng,
-                    out.as_mut().prover_into(ev),
-                )?;
+                self.0
+                    .as_mut()
+                    .prover_into(ev)
+                    .get_refmut()
+                    .send(channel, rng, out.as_mut().prover_into(ev))
+                    .wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to send VOLE extensions.".to_string(),
+                    )?;
             }
             WhichParty::Verifier(ev) => {
                 let start = Instant::now();
-                self.0.as_mut().verifier_into(ev).get_refmut().receive(
-                    channel,
-                    rng,
-                    out.as_mut().verifier_into(ev),
-                )?;
+                self.0
+                    .as_mut()
+                    .verifier_into(ev)
+                    .get_refmut()
+                    .receive(channel, rng, out.as_mut().verifier_into(ev))
+                    .wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to receive VOLE extensions.".to_string(),
+                    )?;
                 info!(
                     "SVOLE<{},{} {:?}>",
                     field_name::<V>(),
