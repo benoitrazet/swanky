@@ -21,7 +21,6 @@ crate-type = ["cdylib", "rlib"]
 clap.workspace = true
 console_error_panic_hook.workspace = true
 console_log.workspace = true
-eyre.workspace = true
 log.workspace = true
 pretty_env_logger.workspace = true
 rand.workspace = true

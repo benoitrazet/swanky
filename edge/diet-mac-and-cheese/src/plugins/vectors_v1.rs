@@ -1,5 +1,5 @@
-use eyre::{Result, bail, ensure};
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
+use swanky_error::{ErrorKind, Result, bail, ensure};
 
 use crate::circuit_ir::{
     FunStore, GateM, GatesBody, TypeId, TypeSpecification, TypeStore, WireCount,
@@ -23,6 +23,7 @@ impl Plugin for VectorsV1 {
     ) -> Result<PluginExecution> {
         ensure!(
             output_counts.len() == 1,
+            ErrorKind::OtherError,
             "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
             Self::NAME,
             output_counts.len(),
@@ -31,6 +32,7 @@ impl Plugin for VectorsV1 {
         let t = output_counts[0].0;
         let TypeSpecification::Field(_) = type_store.get(&t)? else {
             bail!(
+                ErrorKind::OtherError,
                 "{}: {operation} expects only field-typed inputs and outputs, but the type with index {} is plugin-defined.",
                 Self::NAME,
                 t
@@ -41,6 +43,7 @@ impl Plugin for VectorsV1 {
             "add" | "mul" => {
                 ensure!(
                     params.is_empty(),
+                    ErrorKind::OtherError,
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -48,6 +51,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     input_counts.len() == 2,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 2 wire ranges as input, but this declaration specifics {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -55,6 +59,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     input_counts[0].0 == input_counts[1].0,
+                    ErrorKind::OtherError,
                     "{}: The type indices of the inputs to {operation} must match: {} != {}.",
                     Self::NAME,
                     input_counts[0].0,
@@ -63,6 +68,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     input_counts[0].1 == input_counts[1].1,
+                    ErrorKind::OtherError,
                     "{}: The lengths of the inputs to {operation} must match: {} != {}.",
                     Self::NAME,
                     input_counts[0].1,
@@ -71,6 +77,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     output_counts[0].0 == input_counts[0].0,
+                    ErrorKind::OtherError,
                     "{}: The type of the output of {operation} must match the types of the inputs: {} != {}.",
                     Self::NAME,
                     output_counts[0].0,
@@ -79,6 +86,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     output_counts[0].1 == input_counts[0].1,
+                    ErrorKind::OtherError,
                     "{}: The length of the output of {operation} must match the lengths of the inputs: {} != {}.",
                     Self::NAME,
                     output_counts[0].1,
@@ -101,6 +109,7 @@ impl Plugin for VectorsV1 {
             "addc" | "mulc" => {
                 ensure!(
                     params.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} expects 1 parameter (the constant), but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -108,6 +117,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     input_counts.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 1 wire range as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -115,6 +125,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     output_counts[0].0 == input_counts[0].0,
+                    ErrorKind::OtherError,
                     "{}: The type of the output of {operation} must match the type of the input: {} != {}.",
                     Self::NAME,
                     output_counts[0].0,
@@ -123,6 +134,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     output_counts[0].1 == input_counts[0].1,
+                    ErrorKind::OtherError,
                     "{}: The length of the output of {operation} must match the length of the input: {} != {}.",
                     Self::NAME,
                     output_counts[0].1,
@@ -133,6 +145,7 @@ impl Plugin for VectorsV1 {
 
                 let PluginTypeArg::Number(c) = params[0] else {
                     bail!(
+                        ErrorKind::OtherError,
                         "{}: The constant parameter must be numeric, not a string.",
                         Self::NAME
                     );
@@ -152,6 +165,7 @@ impl Plugin for VectorsV1 {
             "add_scalar" | "mul_scalar" => {
                 ensure!(
                     params.is_empty(),
+                    ErrorKind::OtherError,
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -159,6 +173,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     input_counts.len() == 2,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 2 wire ranges as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -166,6 +181,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     input_counts[0].0 == input_counts[1].0,
+                    ErrorKind::OtherError,
                     "{}: The type indices of the inputs to {operation} must match: {} != {}.",
                     Self::NAME,
                     input_counts[0].0,
@@ -174,6 +190,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     output_counts[0].0 == input_counts[0].0,
+                    ErrorKind::OtherError,
                     "{}: The type of the output of {operation} must match the types of the inputs: {} != {}.",
                     Self::NAME,
                     output_counts[0].0,
@@ -182,6 +199,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     output_counts[0].1 == input_counts[0].1,
+                    ErrorKind::OtherError,
                     "{}: The length of the output of {operation} must match the length of the vector input: {} != {}",
                     Self::NAME,
                     output_counts[0].1,
@@ -190,6 +208,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     input_counts[1].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The scalar input to {operation} must be given on a single wire.",
                     Self::NAME,
                 );
@@ -212,6 +231,7 @@ impl Plugin for VectorsV1 {
             "sum" | "product" => {
                 ensure!(
                     params.is_empty(),
+                    ErrorKind::OtherError,
                     "{}; {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -219,6 +239,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     input_counts.len() == 1,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 1 wire range as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -226,6 +247,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     output_counts[0].0 == input_counts[0].0,
+                    ErrorKind::OtherError,
                     "{}: The type of the output of {operation} must match the type of the input: {} != {}.",
                     Self::NAME,
                     output_counts[0].0,
@@ -234,6 +256,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     output_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The length of the output of {operation} must be 1, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts[0].1,
@@ -285,6 +308,7 @@ impl Plugin for VectorsV1 {
             "dotproduct" => {
                 ensure!(
                     params.is_empty(),
+                    ErrorKind::OtherError,
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -292,6 +316,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     input_counts.len() == 2,
+                    ErrorKind::OtherError,
                     "{}: {operation} takes 2 wire ranges as input, but this declarations specifies {}.",
                     Self::NAME,
                     input_counts.len(),
@@ -299,6 +324,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     input_counts[0].0 == input_counts[1].0,
+                    ErrorKind::OtherError,
                     "{}: The type indices of the inputs to {operation} must match: {} != {}.",
                     Self::NAME,
                     input_counts[0].0,
@@ -307,6 +333,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     input_counts[0].1 == input_counts[1].1,
+                    ErrorKind::OtherError,
                     "{}: The lengths of the inputs to {operation} must match: {} != {}.",
                     Self::NAME,
                     input_counts[0].1,
@@ -315,6 +342,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     output_counts[0].0 == input_counts[0].0,
+                    ErrorKind::OtherError,
                     "{}: The type of the output of {operation} must match the types of the inputs: {} != {}.",
                     Self::NAME,
                     output_counts[0].0,
@@ -323,6 +351,7 @@ impl Plugin for VectorsV1 {
 
                 ensure!(
                     output_counts[0].1 == 1,
+                    ErrorKind::OtherError,
                     "{}: The length of the output of {operation} must be 1, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts[0].1,
@@ -366,7 +395,11 @@ impl Plugin for VectorsV1 {
 
                 Ok(GatesBody::new(gates).into())
             }
-            _ => bail!("{}: Unknown operation: {operation}", Self::NAME,),
+            _ => bail!(
+                ErrorKind::OtherError,
+                "{}: Unknown operation: {operation}",
+                Self::NAME,
+            ),
         }
     }
 }

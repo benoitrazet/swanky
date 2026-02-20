@@ -4,8 +4,8 @@ use crate::{
     backend_multifield::BackendLiftT, backend_trait::BackendT,
     gadgets::dotproduct_with_public_powers, mac::MacT,
 };
-use eyre::{Result, ensure};
 use generic_array::{GenericArray, typenum::Unsigned};
+use swanky_error::{ErrorKind, Result, ensure};
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing};
 
 /// A permutation check gadget that asserts that `xs = 𝛑(ys)`, erroring out if
@@ -25,6 +25,7 @@ pub(crate) fn permutation_check<B: BackendT>(
 ) -> Result<()> {
     ensure!(
         <B::FieldElement as FiniteField>::NumberOfBitsInBitDecomposition::USIZE >= 40,
+        ErrorKind::OtherError,
         "Field size must be >= 40 bits"
     );
 

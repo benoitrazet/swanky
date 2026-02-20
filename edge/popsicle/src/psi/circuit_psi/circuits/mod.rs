@@ -1,5 +1,5 @@
 //! Various fancy circuits
-use crate::{circuit_psi::*, errors::Error};
+use crate::circuit_psi::*;
 use fancy_garbling::{BinaryBundle, BinaryGadgets, Fancy, FancyBinary, FancyReveal};
 use itertools::Itertools;
 use swanky_channel::Channel;
@@ -20,7 +20,7 @@ pub fn fancy_intersection_bit_vector<F>(
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
     channel: &mut Channel,
-) -> eyre::Result<Vec<F::Item>>
+) -> swanky_error::Result<Vec<F::Item>>
 where
     F: FancyReveal + Fancy + FancyBinary,
 {
@@ -53,7 +53,7 @@ pub fn fancy_unmask<F>(
     f: &mut F,
     elements: &[BinaryBundle<F::Item>],
     masks: &[BinaryBundle<F::Item>],
-) -> eyre::Result<Vec<BinaryBundle<F::Item>>>
+) -> swanky_error::Result<Vec<BinaryBundle<F::Item>>>
 where
     F: FancyReveal + Fancy + FancyBinary,
 {
@@ -70,7 +70,7 @@ pub fn fancy_cardinality<F>(
     f: &mut F,
     intersect_bitvec: &[<F as Fancy>::Item],
     channel: &mut Channel,
-) -> Result<BinaryBundle<<F as Fancy>::Item>, Error>
+) -> swanky_error::Result<BinaryBundle<<F as Fancy>::Item>>
 where
     F: FancyBinary + Fancy<Item = WireMod2>,
 {
@@ -93,7 +93,7 @@ pub fn fancy_payload_sum<F>(
     payload_a: &[BinaryBundle<<F as Fancy>::Item>],
     payload_b: &[BinaryBundle<<F as Fancy>::Item>],
     channel: &mut Channel,
-) -> Result<BinaryBundle<<F as Fancy>::Item>, Error>
+) -> swanky_error::Result<BinaryBundle<<F as Fancy>::Item>>
 where
     F: FancyBinary + Fancy<Item = WireMod2>,
 {

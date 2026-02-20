@@ -3,7 +3,6 @@
 use crate::homcom::{BATCH_SIZE, FCom, MultCheckState, ZeroCheckState};
 use crate::mac::Mac;
 use crate::svole_trait::{SvoleT, field_name};
-use eyre::{Result, bail, ensure, eyre};
 use generic_array::typenum::Unsigned;
 use log::info;
 use rand::{Rng, SeedableRng};
@@ -13,6 +12,7 @@ use subtle::{ConditionallySelectable, ConstantTimeEq};
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::{AbstractChannel, SyncChannel};
+use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure, swanky_error};
 use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::{F2, F40b};
 use swanky_party::either::{PartyEither, PartyEitherCopy};
@@ -112,7 +112,8 @@ fn check_parameters<FE: FiniteField>(n: usize, gamma: usize) -> Result<()> {
             - usize::try_from(x.leading_zeros()).expect("sizeof(usize) >= sizeof(u32)")
     }
     if log2_floor(n + 1) + gamma >= FE::NumberOfBitsInBitDecomposition::USIZE - 1 {
-        Err(eyre!(
+        Err(swanky_error!(
+            ErrorKind::OtherError,
             "Fdabit invalid parameter configuration: n={}, gamma={}, FE={}",
             n,
             gamma,
@@ -238,6 +239,7 @@ impl<
         let num = x_batch.len();
         ensure!(
             num == y_batch.len(),
+            ErrorKind::OtherError,
             "incompatible input vectors in bit_add_carry"
         );
 
@@ -393,7 +395,10 @@ impl<
         }
         // check all the multiplication in one batch
         if let WhichParty::Prover(_) = P::WHICH {
-            channel.flush()?;
+            channel.flush().wrap_err(
+                ErrorKind::NetworkError,
+                "Failed to flush channel.".to_string(),
+            )?;
         }
         self.fcom_f2
             .quicksilver_finalize(channel, rng, &mut mult_check_state)?;
@@ -702,13 +707,24 @@ impl<
         // step 3)
         let seed = match P::WHICH {
             WhichParty::Prover(_) => {
-                channel.flush()?;
-                channel.read_block()?
+                channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
+                channel.read_block().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to read seed block.".to_string(),
+                )?
             }
             WhichParty::Verifier(_) => {
                 let seed = rng.r#gen::<Block>();
-                channel.write_block(&seed)?;
-                channel.flush()?;
+                channel
+                    .write_block(&seed)
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write seed.".to_string())?;
+                channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
                 seed
             }
         };
@@ -870,7 +886,11 @@ impl<
         self.fcom_fe
             .quicksilver_check_multiply(channel, rng, &triples)?;
 
-        if res { Ok(()) } else { bail!("fail fdabit") }
+        if res {
+            Ok(())
+        } else {
+            bail!(ErrorKind::OtherError, "fail fdabit")
+        }
     }
 
     // The conversion loop requires all of these parameters to function
@@ -1001,11 +1021,19 @@ impl<
 
         // step 3): get seed for permutation
         let seed = match P::WHICH {
-            WhichParty::Prover(_) => channel.read_block()?,
+            WhichParty::Prover(_) => channel.read_block().wrap_err(
+                ErrorKind::NetworkError,
+                "Failed to read seed block.".to_string(),
+            )?,
             WhichParty::Verifier(_) => {
                 let seed = rng.r#gen::<Block>();
-                channel.write_block(&seed)?;
-                channel.flush()?;
+                channel
+                    .write_block(&seed)
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write seed.".to_string())?;
+                channel.flush().wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to flush channel.".to_string(),
+                )?;
                 seed
             }
         };
@@ -1028,7 +1056,7 @@ impl<
                 && convert_bits_to_field::<FE>(a_vec.as_ref().into_inner(ev))
                     != a_m.as_ref().into_inner(ev)[0]
             {
-                bail!("Wrong open random edabit");
+                bail!(ErrorKind::OtherError, "Wrong open random edabit");
             }
         }
 

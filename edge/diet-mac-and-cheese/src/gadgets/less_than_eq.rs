@@ -1,5 +1,5 @@
 use crate::backend_trait::BackendT;
-use eyre::Result;
+use swanky_error::Result;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 

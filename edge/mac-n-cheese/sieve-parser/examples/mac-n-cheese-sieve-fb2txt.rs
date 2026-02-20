@@ -3,7 +3,7 @@ use std::path::Path;
 
 use mac_n_cheese_sieve_parser::{PrintingVisitor, RelationReader, fb_reader};
 
-fn main() -> eyre::Result<()> {
+fn main() -> swanky_error::Result<()> {
     let args = std::env::args().collect::<Vec<_>>();
     let parser = fb_reader::RelationReader::open(Path::new(args[1].as_str()))?;
     println!("{}", parser.header());

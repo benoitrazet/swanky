@@ -1,6 +1,7 @@
 use std::{ops::Deref, sync::Arc};
 
 use parking_lot::{Condvar, Mutex};
+use swanky_error::ErrorKind;
 
 struct Inner {
     // If None, it signals that a thread has errored out.
@@ -24,7 +25,7 @@ impl ThreadSpawner {
     pub fn spawn_daemon(
         &mut self,
         name: String,
-        f: impl 'static + Send + FnOnce() -> eyre::Result<()>,
+        f: impl 'static + Send + FnOnce() -> swanky_error::Result<()>,
     ) {
         let inner = self.inner.clone();
         std::thread::Builder::new()
@@ -45,7 +46,11 @@ impl ThreadSpawner {
             })
             .expect("able to spawn thread");
     }
-    pub fn spawn(&mut self, name: String, f: impl 'static + Send + FnOnce() -> eyre::Result<()>) {
+    pub fn spawn(
+        &mut self,
+        name: String,
+        f: impl 'static + Send + FnOnce() -> swanky_error::Result<()>,
+    ) {
         if let Some(count) = self.inner.state.lock().as_mut() {
             *count += 1;
         }
@@ -75,11 +80,11 @@ impl ThreadSpawner {
             })
             .expect("able to spawn thread");
     }
-    pub fn wait_on_threads(self) -> eyre::Result<()> {
+    pub fn wait_on_threads(self) -> swanky_error::Result<()> {
         let mut guard = self.inner.state.lock();
         loop {
             if guard.deref().is_none() {
-                eyre::bail!("A spawned thread has failed");
+                swanky_error::bail!(ErrorKind::OtherError, "A spawned thread has failed");
             } else if guard.deref() == &Some(0) {
                 return Ok(());
             }

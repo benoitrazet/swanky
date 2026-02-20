@@ -12,8 +12,8 @@ workspace = true
 
 [dependencies]
 vectoreyes.workspace = true
-eyre.workspace = true
 bytemuck.workspace = true
+swanky-error.workspace = true
 
 [dev-dependencies]
 rand.workspace = true

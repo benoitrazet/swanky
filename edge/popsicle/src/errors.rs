@@ -32,8 +32,6 @@ pub enum Error {
         /// length of the set of primary keys
         nprimarykeys: usize,
     },
-    /// An error coming from `eyre`.
-    EyreError(eyre::Error),
 }
 
 impl From<aes_gcm::Error> for Error {
@@ -64,12 +62,6 @@ impl From<swanky_cointoss::Error> for Error {
     }
 }
 
-impl From<eyre::Error> for Error {
-    fn from(e: eyre::Error) -> Self {
-        Error::EyreError(e)
-    }
-}
-
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -96,7 +88,8 @@ impl std::fmt::Display for Error {
                 "The set of payloads (len: {}) is not equal to the set of primary keys (len: {})!",
                 npayloads, nprimarykeys
             ),
-            Error::EyreError(e) => write!(f, "{}", e.to_string()),
         }
     }
 }
+
+impl std::error::Error for Error {}

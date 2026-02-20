@@ -1,5 +1,4 @@
 use bytemuck::Zeroable;
-use eyre::WrapErr;
 use mac_n_cheese_vole::specialization::{
     FiniteFieldSpecialization, NoSpecialization, SmallBinaryFieldSpecialization,
 };
@@ -11,6 +10,7 @@ use std::{
     os::unix::prelude::FileExt,
     sync::atomic::AtomicU32,
 };
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, F63b, SmallBinaryField};
 use swanky_field_f61p::F61p;
@@ -93,9 +93,9 @@ macro_rules! numerical_enum {
             }
         }
         impl TryFrom<NumericalEnumType> for $name {
-            type Error = eyre::Report;
+            type Error = swanky_error::Error;
 
-            fn try_from(x: NumericalEnumType) -> eyre::Result<Self> {
+            fn try_from(x: NumericalEnumType) -> swanky_error::Result<Self> {
                 let kind = x >> Self::DATA_BITS;
                 let mut acu = 0;
                 $(
@@ -103,7 +103,7 @@ macro_rules! numerical_enum {
                         return Ok($name::$variant $(({
                             let data_bits = x & ((1 << Self::DATA_BITS) - 1);
                             let data = <$data>::try_from(data_bits)
-                                .wrap_err_with(|| format!(
+                                .wrap_err(ErrorKind::OtherError, format!(
                                     "Parsing {} data for {}::{}",
                                     std::any::type_name::<$data>(),
                                     std::any::type_name::<$name>(),
@@ -115,7 +115,7 @@ macro_rules! numerical_enum {
                     acu += 1;
                 )*
                 let _ = acu;  // Silence warning
-                eyre::bail!("Unknown discriminant {kind} for {}", std::any::type_name::<Self>());
+                swanky_error::bail!(ErrorKind::OtherError, "Unknown discriminant {kind} for {}", std::any::type_name::<Self>());
             }
         }
         #[cfg(test)]
@@ -418,15 +418,17 @@ impl From<Type> for fb::Type {
     }
 }
 impl TryFrom<fb::Type> for Type {
-    type Error = eyre::Report;
+    type Error = swanky_error::Error;
 
     fn try_from(value: fb::Type) -> Result<Self, Self::Error> {
         value.encoding().try_into()
     }
 }
 impl fb::TaskPrototype<'_> {
-    pub fn kind(&self) -> eyre::Result<TaskKind> {
-        self.kind_encoding().try_into().context("Invalid task kind")
+    pub fn kind(&self) -> swanky_error::Result<TaskKind> {
+        self.kind_encoding()
+            .try_into()
+            .wrap_err(ErrorKind::OtherError, "Invalid task kind".to_string())
     }
 }
 
@@ -438,30 +440,57 @@ pub struct Manifest {
     file: File,
 }
 impl Manifest {
-    pub fn read(mut f: File) -> eyre::Result<Self> {
-        f.seek(std::io::SeekFrom::End(-8 * 4))?;
+    pub fn read(mut f: File) -> swanky_error::Result<Self> {
+        f.seek(std::io::SeekFrom::End(-8 * 4)).wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to seek 32 bytes from end of file.".to_string(),
+        )?;
         let mut footer = [0_u64; 4];
-        f.read_exact(bytemuck::bytes_of_mut(&mut footer))?;
+        f.read_exact(bytemuck::bytes_of_mut(&mut footer)).wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to read footer bytes.".to_string(),
+        )?;
         let [
             manifest_start,
             manifest_decompressed_len,
             manifest_hash,
             version,
         ] = footer;
-        eyre::ensure!(
+        swanky_error::ensure!(
             version == MAC_N_CHEESE_VERSION,
+            ErrorKind::OtherError,
             "Manifest has version {version}, not {MAC_N_CHEESE_VERSION}"
         );
-        let manifest_decompressed_len = usize::try_from(manifest_decompressed_len)
-            .context("manifest size is too big for usize")?;
-        f.seek(std::io::SeekFrom::Start(manifest_start))?;
-        let mut decompressor = lz4::Decoder::new(&mut f)?;
+        let manifest_decompressed_len = usize::try_from(manifest_decompressed_len).wrap_err(
+            ErrorKind::OtherError,
+            "manifest size is too big for usize".to_string(),
+        )?;
+        f.seek(std::io::SeekFrom::Start(manifest_start)).wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to seek to manifest start.".to_string(),
+        )?;
+        let mut decompressor = lz4::Decoder::new(&mut f).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize LZ4 decoder.".to_string(),
+        )?;
         let mut buffer = vec![0; manifest_decompressed_len];
-        decompressor.read_exact(&mut buffer)?;
-        let n = decompressor.read(&mut [0_u8])?;
-        eyre::ensure!(n == 0, "Should have hit LZ4 EOF");
-        decompressor.finish().1?;
-        let _validated_root = fb::root_as_manifest(&buffer)?;
+        decompressor.read_exact(&mut buffer).wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to read decompressed manifest bytes.".to_string(),
+        )?;
+        let n = decompressor.read(&mut [0_u8]).wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to read byte from decompressor.".to_string(),
+        )?;
+        swanky_error::ensure!(n == 0, ErrorKind::OtherError, "Should have hit LZ4 EOF");
+        decompressor.finish().1.wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to finalize decompression.".to_string(),
+        )?;
+        let _validated_root = fb::root_as_manifest(&buffer).wrap_err(
+            ErrorKind::SerializationError,
+            "Failed to parse manifest root from flatbuffers.".to_string(),
+        )?;
         Ok(Self {
             hash: manifest_hash,
             buffer,
@@ -477,7 +506,11 @@ impl Manifest {
             fb::root_as_manifest_unchecked(&self.buffer)
         }
     }
-    pub fn read_data_chunk(&self, chunk: &DataChunkAddress, dst: &mut [u8]) -> eyre::Result<()> {
+    pub fn read_data_chunk(
+        &self,
+        chunk: &DataChunkAddress,
+        dst: &mut [u8],
+    ) -> swanky_error::Result<()> {
         assert_eq!(chunk.length() as usize, dst.len());
         read_data_chunk(&self.file, chunk.start(), chunk.compressed_length(), dst)
     }
@@ -487,7 +520,7 @@ fn read_data_chunk(
     start: u64,
     compressed_len: u32,
     dst: &mut [u8],
-) -> eyre::Result<()> {
+) -> swanky_error::Result<()> {
     if dst.is_empty() {
         return Ok(());
     }
@@ -510,8 +543,15 @@ fn read_data_chunk(
         file,
         pos: start,
         end: start + u64::from(compressed_len),
-    })?;
-    d.read_exact(dst)?;
+    })
+    .wrap_err(
+        ErrorKind::InitializationError,
+        "Failed to initialize LZ4 decoder.".to_string(),
+    )?;
+    d.read_exact(dst).wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to read LZ4 bytes.".to_string(),
+    )?;
     Ok(())
 }
 
@@ -525,7 +565,8 @@ fn test_read_data_chunk() {
         let mut buf_f = std::io::BufWriter::new(f);
         buf_f.write_all(&vec![7; 745]).unwrap();
         let chunk = super::circuit_builder::write_data_chunk(&mut buf_f, |mut dcw| {
-            dcw.write_all(&vec![15; size])?;
+            dcw.write_all(&vec![15; size])
+                .wrap_err(ErrorKind::OtherError, "Failed to write bytes.".to_string())?;
             Ok(())
         })
         .unwrap();
@@ -552,17 +593,32 @@ pub struct PrivateDataAddress {
 }
 
 pub type PrivatesManifest = FxHashMap<TaskId, PrivateDataAddress>;
-pub fn read_private_manifest(f: &mut File) -> eyre::Result<PrivatesManifest> {
+pub fn read_private_manifest(f: &mut File) -> swanky_error::Result<PrivatesManifest> {
     let mut pos = 0_u64;
-    f.seek(std::io::SeekFrom::End(-8))?;
-    f.read_exact(bytemuck::bytes_of_mut(&mut pos))?;
-    f.seek(std::io::SeekFrom::Start(pos))?;
+    f.seek(std::io::SeekFrom::End(-8)).wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to seek to 8 bytes from end of file.".to_string(),
+    )?;
+    f.read_exact(bytemuck::bytes_of_mut(&mut pos)).wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to read position bytes.".to_string(),
+    )?;
+    f.seek(std::io::SeekFrom::Start(pos)).wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to seek to {pos}.".to_string(),
+    )?;
     let mut count = 0_u32;
-    f.read_exact(bytemuck::bytes_of_mut(&mut count))?;
+    f.read_exact(bytemuck::bytes_of_mut(&mut count)).wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to read count bytes.".to_string(),
+    )?;
     let mut out = FxHashMap::with_capacity_and_hasher(count as usize, Default::default());
     let mut entry = PrivatesManifestEntry::zeroed();
     for _ in 0..count {
-        f.read_exact(bytemuck::bytes_of_mut(&mut entry))?;
+        f.read_exact(bytemuck::bytes_of_mut(&mut entry)).wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to read manifest entry bytes.".to_string(),
+        )?;
         let old = out.insert(
             entry.task_id,
             PrivateDataAddress {
@@ -570,7 +626,11 @@ pub fn read_private_manifest(f: &mut File) -> eyre::Result<PrivatesManifest> {
                 len: entry.length,
             },
         );
-        eyre::ensure!(old.is_none(), "private entry for task was duplicated");
+        swanky_error::ensure!(
+            old.is_none(),
+            ErrorKind::OtherError,
+            "private entry for task was duplicated"
+        );
     }
     Ok(out)
 }

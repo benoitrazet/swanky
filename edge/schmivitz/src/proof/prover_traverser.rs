@@ -1,5 +1,5 @@
-use eyre::{Result, bail};
 use mac_n_cheese_sieve_parser::WireId;
+use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 
@@ -63,6 +63,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
             || voles.extended_witness_length() < challenges.len()
         {
             bail!(
+                ErrorKind::OtherError,
                 "Bad input: Length of challenges ({}), extended witness ({}), and VOLEs ({}) did not meet requirements",
                 challenges.len(),
                 wire_values.len(),
@@ -130,6 +131,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
         // challenge list is exactly the extended witness length.
         if next_index >= self.voles.extended_witness_length() {
             bail!(
+                ErrorKind::OtherError,
                 "Bad input: needed at least {} VOLEs, but only got {}",
                 self.vole_assignment_count,
                 self.voles.extended_witness_length()
@@ -147,6 +149,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
         self.challenge_count += 1;
         if next_index >= self.challenges.len() {
             bail!(
+                ErrorKind::OtherError,
                 "Bad input: needed at least {} challenges, but only got {}",
                 self.challenge_count,
                 self.challenges.len()
@@ -164,6 +167,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
     pub(crate) fn into_parts(self) -> Result<(F128b, F128b, Vole)> {
         if self.challenge_count != self.challenges.len() {
             bail!(
+                ErrorKind::OtherError,
                 "Traversal contained more challenges than it needed! Had {}, used {}",
                 self.challenges.len(),
                 self.challenge_count
@@ -171,6 +175,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
         }
         if self.vole_assignment_count != self.voles.extended_witness_length() {
             bail!(
+                ErrorKind::OtherError,
                 "Traversal contained more VOLEs than it needed! Had {}, used {}",
                 self.voles.extended_witness_length(),
                 self.vole_assignment_count
@@ -234,6 +239,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
                     // coefficients being computed
                 }
                 _ => bail!(
+                    ErrorKind::UnsupportedError,
                     "Invalid input: VOLE-in-the-head does not support gate {:?}",
                     g
                 ),
@@ -248,9 +254,9 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
 mod tests {
     use std::iter::repeat_with;
 
-    use eyre::Result;
     use merlin::Transcript;
     use rand::thread_rng;
+    use swanky_error::Result;
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F2, F128b};
 

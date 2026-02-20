@@ -21,7 +21,7 @@ impl<P: Party, T: 'static + Copy + Send + Sync> TaskDefinition<P> for CopyTask<P
         _rng: &mut swanky_aes_rng::AesRng,
         _vc: crate::base_vole::VoleContexts<P>,
         _num_runner_threads: usize,
-    ) -> eyre::Result<Self> {
+    ) -> swanky_error::Result<Self> {
         Ok(Self {
             phantom: PhantomData,
         })
@@ -33,7 +33,7 @@ impl<P: Party, T: 'static + Copy + Send + Sync> TaskDefinition<P> for CopyTask<P
         self,
         _c: &mut crate::tls::TlsConnection<P>,
         _rng: &mut swanky_aes_rng::AesRng,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         Ok(())
     }
 
@@ -43,7 +43,7 @@ impl<P: Party, T: 'static + Copy + Send + Sync> TaskDefinition<P> for CopyTask<P
         input: &crate::task_framework::TaskInput<P>,
         _incoming_data: crate::alloc::OwnedAlignedBytes,
         _outgoing_data: crate::alloc::AlignedBytesMut,
-    ) -> eyre::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
+    ) -> swanky_error::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
         input.simple_wire_task::<1, 1, T, _>(
             ctx,
             CopyPrototypeWireFormat::default(),
@@ -58,7 +58,7 @@ impl<P: Party, T: 'static + Copy + Send + Sync> TaskDefinition<P> for CopyTask<P
         _input: &crate::task_framework::TaskInput<P>,
         _incoming_data: crate::alloc::OwnedAlignedBytes,
         _outgoing_data: crate::alloc::AlignedBytesMut,
-    ) -> eyre::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
+    ) -> swanky_error::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
         unreachable!()
     }
 }

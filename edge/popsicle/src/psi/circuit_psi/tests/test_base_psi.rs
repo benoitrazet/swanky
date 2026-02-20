@@ -1,7 +1,6 @@
 //! Testing the Base Psi protocol
 #[cfg(test)]
 mod tests {
-    use crate::errors::Error;
     use crate::psi::circuit_psi::{
         base_psi::{BasePsi, receiver::OpprfReceiver, sender::OpprfSender},
         tests::{utils::*, *},
@@ -22,8 +21,8 @@ mod tests {
         seed_sx: u64,
         seed_rx: u64,
     ) -> (
-        Result<CircuitInputs<WireMod2>, Error>,
-        Result<CircuitInputs<WireMod2>, Error>,
+        swanky_error::Result<CircuitInputs<WireMod2>>,
+        swanky_error::Result<CircuitInputs<WireMod2>>,
     ) {
         swanky_channel::local::local_channel_pair(
             |channel| {

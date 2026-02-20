@@ -28,8 +28,8 @@ use crate::{
     mac::MacT,
     number_to_u64,
 };
-use eyre::{Result, bail, ensure};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
+use swanky_error::{ErrorKind, Result, bail, ensure};
 use swanky_field_binary::F2;
 
 /// The permutation check plugin.
@@ -107,36 +107,47 @@ impl Plugin for PermutationCheckV1 {
     ) -> Result<PluginExecution> {
         ensure!(
             operation == "assert_perm",
+            ErrorKind::OtherError,
             "{}: Invalid operation: {operation}",
             Self::NAME
         );
         ensure!(
             params.len() == 1,
+            ErrorKind::OtherError,
             "{}: Invalid number of params (must be one): {}",
             Self::NAME,
             params.len()
         );
         let PluginTypeArg::Number(tuple_size) = params[0] else {
             bail!(
+                ErrorKind::OtherError,
                 "{}: The tuple size parameter must be numeric, not a string.",
                 Self::NAME
             );
         };
         let tuple_size: u64 = number_to_u64(&tuple_size)?;
 
-        ensure!(tuple_size != 0, "{}: Tuple size cannot be zero", Self::NAME);
+        ensure!(
+            tuple_size != 0,
+            ErrorKind::OtherError,
+            "{}: Tuple size cannot be zero",
+            Self::NAME
+        );
         ensure!(
             output_counts.is_empty(),
+            ErrorKind::OtherError,
             "{}: Output count must be zero",
             Self::NAME
         );
         ensure!(
             input_counts.len() == 2,
+            ErrorKind::OtherError,
             "{}: Input count must be two",
             Self::NAME
         );
         ensure!(
             input_counts[0].0 == input_counts[1].0,
+            ErrorKind::OtherError,
             "{}: Input type indices must match",
             Self::NAME
         );
@@ -144,12 +155,14 @@ impl Plugin for PermutationCheckV1 {
 
         ensure!(
             input_counts[0].1 == input_counts[1].1,
+            ErrorKind::OtherError,
             "{}: Input lengths must match",
             Self::NAME
         );
         let nwires = input_counts[0].1;
         ensure!(
             nwires.is_multiple_of(tuple_size),
+            ErrorKind::OtherError,
             "{}: Number of wires must be divisible by `t`",
             Self::NAME
         );
@@ -158,7 +171,10 @@ impl Plugin for PermutationCheckV1 {
         let field_type_id = match type_store.get(&type_id)? {
             TypeSpecification::Field(f) => *f,
             _ => {
-                bail!("Plugin does not support plugin types");
+                bail!(
+                    ErrorKind::UnsupportedError,
+                    "Plugin does not support plugin types"
+                );
             }
         };
 

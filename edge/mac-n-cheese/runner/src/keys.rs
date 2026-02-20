@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use aes_gcm::{AeadInPlace, Aes128Gcm, KeyInit};
 use mac_n_cheese_ir::compilation_format::TaskId;
 use rand::RngCore;
+use swanky_error::ErrorKind;
 use swanky_party::{Party, WhichParty};
 use vectoreyes::{Aes128, AesBlockCipher, AesBlockCipherDecrypt, U8x16};
 
@@ -61,12 +62,15 @@ impl<P: Party> Keys<P> {
         &self,
         token: U8x16,
         num_connections: usize,
-    ) -> eyre::Result<usize> {
+    ) -> swanky_error::Result<usize> {
         let idx = u128::from_le_bytes(self.connection_index_key.decrypt(token).into());
         if idx < num_connections as u128 {
             Ok(idx as usize)
         } else {
-            eyre::bail!("bad connection index token. Got {idx} with {num_connections} connections");
+            swanky_error::bail!(
+                ErrorKind::OtherError,
+                "bad connection index token. Got {idx} with {num_connections} connections"
+            );
         }
     }
     fn task_key(
@@ -106,7 +110,7 @@ impl<P: Party> Keys<P> {
         &self,
         mut tdh: TaskDataHeader,
         payload: &mut [u8],
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         let tag = aes_gcm::Tag::from(tdh.tag);
         tdh.tag = Default::default();
         let key = blake3::keyed_hash(&self.task_data_incoming_key, bytemuck::bytes_of(&tdh));
@@ -115,7 +119,7 @@ impl<P: Party> Keys<P> {
             .decrypt_in_place_detached(&Default::default(), bytemuck::bytes_of(&tdh), payload, &tag)
             .is_err()
         {
-            eyre::bail!("Failed to decrypt {tdh:?}");
+            swanky_error::bail!(ErrorKind::OtherError, "Failed to decrypt {tdh:?}");
         }
         Ok(())
     }

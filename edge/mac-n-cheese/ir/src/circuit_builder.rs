@@ -1,4 +1,3 @@
-use eyre::WrapErr;
 use flatbuffers::FlatBufferBuilder;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -7,6 +6,7 @@ use std::fs::File;
 use std::io::{BufWriter, Seek, Write};
 use std::ops::RangeBounds;
 use std::path::Path;
+use swanky_error::{ErrorKind, ResultExt, WrapErr};
 use swanky_field::FiniteField;
 use swanky_serialization::SequenceSerializer;
 
@@ -250,9 +250,13 @@ pub struct CircuitBuilder<'a> {
 }
 
 impl CircuitBuilder<'_> {
-    pub(crate) fn register_prototype<F>(&mut self, thunk: F) -> eyre::Result<TaskPrototypeRef>
+    pub(crate) fn register_prototype<F>(
+        &mut self,
+        thunk: F,
+    ) -> swanky_error::Result<TaskPrototypeRef>
     where
-        for<'a, 'b, 'c> F: FnOnce(&'a mut PrototypeBuilder<'b, 'c>) -> eyre::Result<TaskKind>,
+        for<'a, 'b, 'c> F:
+            FnOnce(&'a mut PrototypeBuilder<'b, 'c>) -> swanky_error::Result<TaskKind>,
     {
         let mut pb_out = None;
         self.round_buffer.clear();
@@ -265,8 +269,10 @@ impl CircuitBuilder<'_> {
                 last_send_was_prover: None,
                 tpr: TaskPrototypeRef {
                     circuit_builder_id: self.id,
-                    prototype_id: TaskPrototypeId::try_from(self.task_prototypes.len()).context(
-                        "Too many prototypes created! It number of prototypes overflowed!",
+                    prototype_id: TaskPrototypeId::try_from(self.task_prototypes.len()).wrap_err(
+                        ErrorKind::OtherError,
+                        "Too many prototypes created! It number of prototypes overflowed!"
+                            .to_string(),
                     )?,
                     single_array_inputs: Default::default(),
                     multi_array_inputs: Default::default(),
@@ -281,7 +287,10 @@ impl CircuitBuilder<'_> {
             pb_out = Some((pb.tpr, pb.first_sender));
             Ok(())
         })
-        .context("writing data for task prototype")?;
+        .wrap_err(
+            ErrorKind::OtherError,
+            "Writing data for task prototype.".to_string(),
+        )?;
         let (mut tpr, first_sender) = pb_out.unwrap();
         self.encoded_task_kinds_used
             .insert(tpr.prototype_kind_encoded);
@@ -331,7 +340,7 @@ impl CircuitBuilder<'_> {
         prototype: &TaskPrototypeRef,
         single_array_inputs: &[WireSlice],
         multi_array_inputs: &[&[WireSlice]],
-    ) -> eyre::Result<TaskOutputRef> {
+    ) -> swanky_error::Result<TaskOutputRef> {
         assert_eq!(prototype.circuit_builder_id, self.id);
         assert_eq!(
             prototype.single_array_inputs.len(),
@@ -419,7 +428,7 @@ impl CircuitBuilder<'_> {
             outputs: prototype.outputs.clone(),
         })
     }
-    fn finish(mut self) -> eyre::Result<()> {
+    fn finish(mut self) -> swanky_error::Result<()> {
         // Compute priority
         // To compute the task priority, we want to visit the tasks in topological order. The
         // reversed WIPTasks are a valid topological order.
@@ -453,7 +462,10 @@ impl CircuitBuilder<'_> {
                     .len()
                     .try_into()
                     .expect("too many graph dependents");
-                f.write_all(&num_dependents.to_le_bytes())?;
+                f.write_all(&num_dependents.to_le_bytes()).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to write num_dependents.".to_string(),
+                )?;
             }
             Ok(())
         })?;
@@ -464,7 +476,10 @@ impl CircuitBuilder<'_> {
                     .len()
                     .try_into()
                     .expect("too many graph dependents");
-                f.write_all(&num_dependencies.to_le_bytes())?;
+                f.write_all(&num_dependencies.to_le_bytes()).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to write num_dependents.".to_string(),
+                )?;
             }
             Ok(())
         })?;
@@ -537,31 +552,65 @@ impl CircuitBuilder<'_> {
             },
         );
         self.builder.finish_minimal(manifest);
-        let manifest_start = self.output_file.stream_position()?;
-        let mut compressor = lz4::EncoderBuilder::new().build(&mut self.output_file)?;
-        compressor.write_all(self.builder.finished_data())?;
-        compressor.finish().1?;
-        self.output_file.write_all(&manifest_start.to_le_bytes())?;
-        self.output_file.write_all(
-            &u64::try_from(self.builder.finished_data().len())
-                .unwrap()
-                .to_le_bytes(),
+        let manifest_start = self.output_file.stream_position().wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to compute output file stream position.".to_string(),
         )?;
+        let mut compressor = lz4::EncoderBuilder::new()
+            .build(&mut self.output_file)
+            .wrap_err(
+                ErrorKind::InitializationError,
+                "Failed to initialize LZ4 encoder.".to_string(),
+            )?;
+        compressor
+            .write_all(self.builder.finished_data())
+            .wrap_err(
+                ErrorKind::FilesystemError,
+                "Failed to write compressed task bytes.".to_string(),
+            )?;
+        compressor.finish().1.wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to finish writing compressed bytes.".to_string(),
+        )?;
+        self.output_file
+            .write_all(&manifest_start.to_le_bytes())
+            .wrap_err(
+                ErrorKind::FilesystemError,
+                "Failed to write all manifest bytes to output.".to_string(),
+            )?;
+        self.output_file
+            .write_all(
+                &u64::try_from(self.builder.finished_data().len())
+                    .unwrap()
+                    .to_le_bytes(),
+            )
+            .wrap_err(
+                ErrorKind::FilesystemError,
+                "Failed to write number of builder bytes to output.".to_string(),
+            )?;
         const MANIFEST_HASH_SEED: u64 = 0xab21cc575f95137;
         let mut h = twox_hash::XxHash64::with_seed(MANIFEST_HASH_SEED);
         std::hash::Hasher::write(&mut h, self.builder.finished_data());
         std::hash::Hasher::write(&mut h, &MAC_N_CHEESE_VERSION.to_le_bytes());
         self.output_file
-            .write_all(&std::hash::Hasher::finish(&h).to_le_bytes())?;
+            .write_all(&std::hash::Hasher::finish(&h).to_le_bytes())
+            .wrap_err(
+                ErrorKind::FilesystemError,
+                "Failed to write hashed builder data to output.".to_string(),
+            )?;
         self.output_file
-            .write_all(&MAC_N_CHEESE_VERSION.to_le_bytes())?;
+            .write_all(&MAC_N_CHEESE_VERSION.to_le_bytes())
+            .wrap_err(
+                ErrorKind::FilesystemError,
+                "Failed to write Mac'n'Cheese version to output.".to_string(),
+            )?;
         Ok(())
     }
 }
 
-pub fn build_circuit<F>(dst: impl AsRef<Path>, thunk: F) -> eyre::Result<()>
+pub fn build_circuit<F>(dst: impl AsRef<Path>, thunk: F) -> swanky_error::Result<()>
 where
-    for<'a> F: FnOnce(&'a mut CircuitBuilder) -> eyre::Result<()>,
+    for<'a> F: FnOnce(&'a mut CircuitBuilder) -> swanky_error::Result<()>,
 {
     let dst = dst.as_ref();
     let arena = bumpalo::Bump::new();
@@ -571,7 +620,10 @@ where
         builder: FlatBufferBuilder::new(),
         output_file: BufWriter::with_capacity(
             1024 * 1024 * 16,
-            File::create(dst).with_context(|| format!("Opening {dst:?} for writing"))?,
+            File::create(dst).wrap_err(
+                ErrorKind::FilesystemError,
+                format!("Opening {dst:?} for writing"),
+            )?,
         ),
         task_prototypes: Vec::new(),
         wip_tasks: Vec::new(),
@@ -581,7 +633,7 @@ where
         allocation_sizes: Default::default(),
         encoded_task_kinds_used: Default::default(),
     };
-    thunk(&mut cb).context("calling circuit builder thunk")?;
+    thunk(&mut cb).context("calling circuit builder thunk".to_string())?;
     cb.finish()
 }
 
@@ -607,15 +659,21 @@ impl Write for DataChunkWriter<'_, '_> {
 pub(crate) fn write_data_chunk<F>(
     t: &mut BufWriter<File>,
     f: F,
-) -> eyre::Result<fb::DataChunkAddress>
+) -> swanky_error::Result<fb::DataChunkAddress>
 where
-    for<'b, 'c> F: FnOnce(DataChunkWriter<'b, 'c>) -> eyre::Result<()>,
+    for<'b, 'c> F: FnOnce(DataChunkWriter<'b, 'c>) -> swanky_error::Result<()>,
 {
     const DATA_CHUNK_HASH_SEED: u64 = 0x2849d23fa51e9690;
-    let start = t.stream_position()?;
+    let start = t.stream_position().wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to compute stream position.".to_string(),
+    )?;
     let mut hasher = twox_hash::XxHash64::with_seed(DATA_CHUNK_HASH_SEED);
     let mut uncompressed_length = 0;
-    let mut compressor = lz4::EncoderBuilder::new().build(t)?;
+    let mut compressor = lz4::EncoderBuilder::new().build(t).wrap_err(
+        ErrorKind::InitializationError,
+        "Failed to initialize LZ4 compression.".to_string(),
+    )?;
     f(DataChunkWriter {
         t: &mut compressor,
         hasher: &mut hasher,
@@ -623,11 +681,24 @@ where
     })?;
     let hash_code = std::hash::Hasher::finish(&hasher);
     let (t, result) = compressor.finish();
-    result?;
-    let compressed_length = u32::try_from(t.stream_position()? - start)
-        .context("data chunk length exceeds u32 size!")?;
-    let uncompressed_length =
-        u32::try_from(uncompressed_length).context("data chunk length exceeds u32 size!")?;
+    result.wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to finish writing compressed bytes.".to_string(),
+    )?;
+    let compressed_length = u32::try_from(
+        t.stream_position().wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to compute stream position.".to_string(),
+        )? - start,
+    )
+    .wrap_err(
+        ErrorKind::OtherError,
+        "Data chunk length exceeds u32 size!".to_string(),
+    )?;
+    let uncompressed_length = u32::try_from(uncompressed_length).wrap_err(
+        ErrorKind::OtherError,
+        "Data chunk length exceeds u32 size!".to_string(),
+    )?;
     Ok(fb::DataChunkAddress::new(
         start,
         uncompressed_length,
@@ -643,9 +714,12 @@ pub struct FixWriter<'a, FE: FiniteField> {
 }
 
 impl<FE: FiniteField> FixWriter<'_, FE> {
-    pub fn add(&mut self, x: FE) -> eyre::Result<()> {
+    pub fn add(&mut self, x: FE) -> swanky_error::Result<()> {
         self.count += 1;
-        self.serializer.write(self.dst, x)?;
+        self.serializer.write(self.dst, x).wrap_err(
+            ErrorKind::SerializationError,
+            "Failed to write '{x}'.".to_string(),
+        )?;
         Ok(())
     }
 }
@@ -661,29 +735,51 @@ pub struct PrivateBuilder {
     manifest: FxHashMap<TaskId, PrivateDataAddress>,
 }
 impl PrivateBuilder {
-    pub fn write_unassociated_fix_data<F, FE: FiniteField>(&mut self, f: F) -> eyre::Result<FixData>
+    pub fn write_unassociated_fix_data<F, FE: FiniteField>(
+        &mut self,
+        f: F,
+    ) -> swanky_error::Result<FixData>
     where
-        for<'a, 'b> F: FnOnce(&'a mut FixWriter<'b, FE>) -> eyre::Result<()>,
+        for<'a, 'b> F: FnOnce(&'a mut FixWriter<'b, FE>) -> swanky_error::Result<()>,
     {
-        let start = self.f.stream_position()?;
-        let serializer = FE::Serializer::new(&mut self.f)?;
+        let start = self.f.stream_position().wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to compute stream position.".to_string(),
+        )?;
+        let serializer = FE::Serializer::new(&mut self.f).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize field element serializer.".to_string(),
+        )?;
         let mut s = FixWriter {
             serializer,
             dst: &mut self.f,
             count: 0,
         };
         f(&mut s)?;
-        s.serializer.finish(&mut s.dst)?;
+        s.serializer.finish(&mut s.dst).wrap_err(
+            ErrorKind::SerializationError,
+            "Failed to finalize field element serialization.".to_string(),
+        )?;
         Ok(FixData {
             data: PrivateDataAddress {
                 offset: start,
-                len: u32::try_from(s.dst.stream_position()? - start).unwrap(),
+                len: u32::try_from(
+                    s.dst.stream_position().wrap_err(
+                        ErrorKind::FilesystemError,
+                        "Failed to compute stream position.".to_string(),
+                    )? - start,
+                )
+                .unwrap(),
             },
             value_field: TypeId::of::<FE>(),
             count: s.count,
         })
     }
-    pub fn associate_fix_data(&mut self, task: &TaskOutputRef, data: FixData) -> eyre::Result<()> {
+    pub fn associate_fix_data(
+        &mut self,
+        task: &TaskOutputRef,
+        data: FixData,
+    ) -> swanky_error::Result<()> {
         let ty = match TaskKind::try_from(task.prototype_kind_encoded).unwrap() {
             TaskKind::Fix(ty) => {
                 struct V(TypeId);
@@ -715,9 +811,9 @@ impl PrivateBuilder {
         &mut self,
         task: &TaskOutputRef,
         f: F,
-    ) -> eyre::Result<()>
+    ) -> swanky_error::Result<()>
     where
-        for<'a, 'b> F: FnOnce(&'a mut FixWriter<'b, FE>) -> eyre::Result<()>,
+        for<'a, 'b> F: FnOnce(&'a mut FixWriter<'b, FE>) -> swanky_error::Result<()>,
     {
         let data = self.write_unassociated_fix_data(f)?;
         self.associate_fix_data(task, data)?;
@@ -725,33 +821,51 @@ impl PrivateBuilder {
     }
 }
 
-pub fn build_privates<F>(dst: impl AsRef<Path>, thunk: F) -> eyre::Result<()>
+pub fn build_privates<F>(dst: impl AsRef<Path>, thunk: F) -> swanky_error::Result<()>
 where
-    for<'a> F: FnOnce(&'a mut PrivateBuilder) -> eyre::Result<()>,
+    for<'a> F: FnOnce(&'a mut PrivateBuilder) -> swanky_error::Result<()>,
 {
     let dst = dst.as_ref();
     let mut pb = PrivateBuilder {
-        f: BufWriter::new(
-            File::create(dst).with_context(|| format!("trying to create {:?}", dst))?,
-        ),
+        f: BufWriter::new(File::create(dst).wrap_err(
+            ErrorKind::FilesystemError,
+            format!("trying to create {:?}", dst),
+        )?),
         manifest: Default::default(),
     };
     thunk(&mut pb)?;
-    let pos = pb.f.stream_position()?;
+    let pos = pb.f.stream_position().wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to compute stream position.".to_string(),
+    )?;
     pb.f.write_all(
         &u32::try_from(pb.manifest.len())
             .expect("Task ID is only 32 bits")
             .to_le_bytes(),
+    )
+    .wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to write manifest length.".to_string(),
     )?;
     for (tid, addr) in pb.manifest.iter() {
         pb.f.write_all(bytemuck::bytes_of(&PrivatesManifestEntry {
             offset: addr.offset,
             length: addr.len,
             task_id: *tid,
-        }))?;
+        }))
+        .wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to write manifest entry bytes.".to_string(),
+        )?;
     }
-    pb.f.write_all(&pos.to_le_bytes())?;
-    pb.f.flush()?;
+    pb.f.write_all(&pos.to_le_bytes()).wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to write position.".to_string(),
+    )?;
+    pb.f.flush().wrap_err(
+        ErrorKind::FilesystemError,
+        "Failed to flush output buffer.".to_string(),
+    )?;
     Ok(())
 }
 

@@ -25,7 +25,7 @@ We assume the $`\lambda`$ security parameter in the spec to be 128 as set in
 For convenience we abbreviate "all-but-one vector commitment" to "1-VC".
 */
 use crate::vole::crypto_primitives::{Com, H1, IV, Key, PRG, Seed, h0};
-use eyre::{Result, bail};
+use swanky_error::{ErrorKind, Result, bail};
 
 /// Hash function hashing a sequence of [`Com`]mitments and returns a hash [`H1`].
 ///
@@ -241,6 +241,7 @@ pub(crate) fn verify(h_com: Com, pdecom: Pdecom, j: Vec<bool>, iv: IV) -> Result
     let (reconstructed_hash, _seeds) = reconstruct(pdecom, j, iv);
     if h_com != reconstructed_hash {
         bail!(
+            ErrorKind::OtherError,
             "Verify algotithm for all-but-one vector commitment scheme failed:
             recomputed hash of commitments differs from received hash from prover."
         );

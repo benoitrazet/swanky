@@ -12,6 +12,7 @@ use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
 use swanky_block::Block;
 use swanky_channel::Channel;
+use swanky_error::ErrorKind;
 
 /// A garbled circuit.
 ///
@@ -49,7 +50,7 @@ impl GarbledCircuit {
     >(
         c: &Circuit,
         rng: RNG,
-    ) -> eyre::Result<(Encoder<Wire>, Self, OutputMapping)> {
+    ) -> swanky_error::Result<(Encoder<Wire>, Self, OutputMapping)> {
         let mut channel = GarbledChannel::new_writer(None);
         let mut garbler = Channel::with(&mut channel, |channel| Garbler::new(rng, channel))?;
 
@@ -96,7 +97,7 @@ impl GarbledCircuit {
         c: &Circuit,
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
-    ) -> eyre::Result<Vec<u16>> {
+    ) -> swanky_error::Result<Vec<u16>> {
         let output = Channel::with(GarbledChannel::from(self), |channel| {
             let mut evaluator = Evaluator::new(channel)?;
             let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs, channel)?;
@@ -112,7 +113,7 @@ impl GarbledCircuit {
         c: &Circuit,
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
-    ) -> eyre::Result<Vec<Wire>> {
+    ) -> swanky_error::Result<Vec<Wire>> {
         let wirelabels = Channel::with(GarbledChannel::from(self), |channel| {
             let mut evaluator = Evaluator::new(channel)?;
             let wirelabels =
@@ -212,7 +213,10 @@ impl OutputMapping {
     /// # Errors
     /// This returns an error if it is unable to find a valid mapping for a
     /// given output wirelabel.
-    pub fn to_outputs<Wire: WireLabel>(&self, wirelabels: &[Wire]) -> eyre::Result<Vec<u16>> {
+    pub fn to_outputs<Wire: WireLabel>(
+        &self,
+        wirelabels: &[Wire],
+    ) -> swanky_error::Result<Vec<u16>> {
         let mut outputs = Vec::new();
         for (i, wirelabel) in wirelabels.into_iter().enumerate() {
             let q = wirelabel.modulus();
@@ -227,7 +231,7 @@ impl OutputMapping {
             if let Some(output) = decoded {
                 outputs.push(output);
             } else {
-                eyre::bail!("Decoding failed");
+                swanky_error::bail!(ErrorKind::OtherError, "Decoding failed");
             }
         }
         Ok(outputs)

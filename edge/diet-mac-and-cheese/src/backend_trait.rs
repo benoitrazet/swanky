@@ -1,7 +1,7 @@
 //! Core backend trait used for Diet Mac'n'Cheese.
 
 use crate::mac::MacT;
-use eyre::Result;
+use swanky_error::Result;
 use swanky_field::FiniteField;
 
 /// An interface for computing a proof over a single [`FiniteField`].

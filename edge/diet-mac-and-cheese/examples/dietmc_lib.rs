@@ -11,7 +11,6 @@ This shows how to run a simple circuit using the library API.
  ```
  */
 
-use eyre::{Result, bail};
 use std::env;
 use std::io::{BufReader, BufWriter};
 use std::net::{TcpListener, TcpStream};
@@ -23,6 +22,7 @@ use diet_mac_and_cheese::svole_trait::Svole;
 use mac_n_cheese_sieve_parser::Number;
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::Channel;
+use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::{F2, F40b};
 use swanky_field_f61p::F61p;
@@ -39,14 +39,17 @@ fn field_to_number<F: FiniteField>(v: F) -> Number {
 }
 
 fn start_connection_verifier(addr: &String) -> Result<TcpStream> {
-    let listener = TcpListener::bind(addr.clone())?;
+    let listener = TcpListener::bind(addr.clone()).wrap_err(
+        ErrorKind::NetworkError,
+        format!("Failed to bind listener to {addr}."),
+    )?;
     match listener.accept() {
         Ok((stream, _addr)) => {
             println!("accept connections on {addr:?}");
             Ok(stream)
         }
         _ => {
-            bail!("Error binding addr: {:?}", addr);
+            bail!(ErrorKind::NetworkError, "Error binding addr: {:?}", addr);
         }
     }
 }
@@ -98,7 +101,10 @@ fn main() -> Result<()> {
 
         println!("Create communication channel");
         let stream = start_connection_verifier(&addr.to_string())?;
-        let reader = BufReader::new(stream.try_clone()?);
+        let reader = BufReader::new(stream.try_clone().wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to clone TCP stream for reader.".to_string(),
+        )?);
         let writer = BufWriter::new(stream);
         let mut channel = Channel::new(reader, writer);
 
@@ -137,7 +143,10 @@ fn main() -> Result<()> {
 
         println!("Create communication channel");
         let stream = start_connection_prover(&addr.to_string())?;
-        let reader = BufReader::new(stream.try_clone()?);
+        let reader = BufReader::new(stream.try_clone().wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to clone TCP stream for reader.".to_string(),
+        )?);
         let writer = BufWriter::new(stream);
         let mut channel = Channel::new(reader, writer);
 

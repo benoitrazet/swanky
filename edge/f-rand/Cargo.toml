@@ -13,12 +13,12 @@ workspace = true
 [dependencies]
 swanky-aes-rng.workspace = true
 swanky-channel.workspace = true
+swanky-error.workspace = true
 swanky-party.workspace = true
 swanky-serialization.workspace = true
 vectoreyes.workspace = true
 
 blake3.workspace = true
-eyre.workspace = true
 rand.workspace = true
 
 [dev-dependencies]

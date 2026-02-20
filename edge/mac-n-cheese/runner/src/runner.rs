@@ -8,7 +8,6 @@ use std::{
 };
 
 use bumpalo::Bump;
-use eyre::{Context, ContextCompat};
 use mac_n_cheese_ir::compilation_format::{
     AtomicGraphDegreeCount, Manifest, NumericalEnumType, PrivatesManifest, TaskId, TaskKind, Type,
     fb,
@@ -16,6 +15,7 @@ use mac_n_cheese_ir::compilation_format::{
 use parking_lot::{Condvar, Mutex, RwLock};
 use rustc_hash::FxHashMap;
 use swanky_aes_rng::AesRng;
+use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
 use swanky_party::{
     Party, WhichParty,
     private::{PartyPrivate, ProverPrivate},
@@ -112,7 +112,7 @@ pub struct RunnerThread<P: Party> {
     task_outputs: LimitedUseArcs<TaskOutput<P>>,
 }
 impl<P: Party> RunnerThread<P> {
-    fn run(&self, thread_idx: usize, rng: AesRng) -> eyre::Result<()> {
+    fn run(&self, thread_idx: usize, rng: AesRng) -> swanky_error::Result<()> {
         let mut per_runner_thread = PerRunnerThread {
             thread_idx,
             arena: Bump::with_capacity(1024 * 1024 * 2),
@@ -133,19 +133,20 @@ impl<P: Party> RunnerThread<P> {
         Ok(())
     }
     // panics if task_id is out of range.
-    fn launch_task(&self, task_id: TaskId) -> eyre::Result<()> {
+    fn launch_task(&self, task_id: TaskId) -> swanky_error::Result<()> {
         event_log::LaunchTask { task_id }.submit();
         let manifest = self.manifest_owned.manifest();
         let task = manifest.tasks().get(task_id as usize);
-        eyre::ensure!(
+        swanky_error::ensure!(
             (task.prototype_id() as usize) < manifest.prototypes().len(),
+            ErrorKind::OtherError,
             "prototype id is invalid"
         );
         let prototype = manifest.prototypes().get(task.prototype_id() as usize);
         let defn = self
             .task_definitions
             .get(&prototype.kind_encoding())
-            .context("Task kind was not listed as used")?
+            .ok_or_swanky_error(ErrorKind::OtherError, "Task kind was not listed as used")?
             .read();
         let req = ReactorRequest {
             want_challenge: defn.needs_challenge(),
@@ -218,7 +219,7 @@ impl<P: Party> RunnerThread<P> {
         &self,
         entry: TaskQueueEntry<Box<(ReactorResponse, ReactorCallback<P>)>>,
         per_runner_thread: &mut PerRunnerThread,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         let mut task_id = entry.id;
         let (
             resp,
@@ -234,7 +235,7 @@ impl<P: Party> RunnerThread<P> {
         let defn = self
             .task_definitions
             .get(&prototype.kind_encoding())
-            .context("Task kind was not listed as used")?
+            .ok_or_swanky_error(ErrorKind::OtherError, "Task kind was not listed as used")?
             .read();
         let prototype_has_been_verified = defn.verified().load(Ordering::Relaxed);
         // TODO: check that response values which shoudln't be provided aren't provided.
@@ -255,8 +256,9 @@ impl<P: Party> RunnerThread<P> {
         };
         let sizes = CommunicatonSizes::of::<P>(prototype, step_number);
         let incoming_data = resp.incoming_bytes.unwrap_or_default();
-        eyre::ensure!(
+        swanky_error::ensure!(
             incoming_data.len() == sizes.incoming,
+            ErrorKind::OtherError,
             "incoming data size mismatch"
         );
         let mut outgoing_data = OwnedAlignedBytes::zeroed(sizes.outgoing);
@@ -358,7 +360,7 @@ impl<P: Party> RunnerThread<P> {
                     match self
                         .remaining_dependencies
                         .get(dependent as usize)
-                        .context("invalid dependent id")?
+                        .ok_or_swanky_error(ErrorKind::OtherError, "invalid dependent id")?
                         .fetch_sub(1, Ordering::Relaxed)
                     {
                         0 => panic!("remaining_dependencies count underflowed"),
@@ -399,9 +401,10 @@ pub fn run_proof_background<P: Party>(
     privates_manifest: ProverPrivate<P, PrivatesManifest>,
     dependent_counts: Vec<AtomicGraphDegreeCount>,
     dependency_counts: Vec<AtomicGraphDegreeCount>,
-) -> eyre::Result<()> {
-    eyre::ensure!(
+) -> swanky_error::Result<()> {
+    swanky_error::ensure!(
         num_threads >= 1,
+        ErrorKind::OtherError,
         "there needs to be at least one runner thread"
     );
     let manifest = manifest_owned.manifest();
@@ -423,7 +426,7 @@ pub fn run_proof_background<P: Party>(
         visit_task_definition::<P, V>(tk, V(&mut voles_needed));
     }
     let vole_contexts = base_vole::init_base_vole::<P, _>(&voles_needed, &mut rng, &mut root_conn)
-        .context("base vole")?;
+        .context("base vole".to_string())?;
     span.finish();
     // initialize task kinds
     let mut task_definitions =
@@ -441,8 +444,8 @@ pub fn run_proof_background<P: Party>(
             usize,
         );
         impl<P: Party> TaskDefinitionVisitor<P> for V<'_, P> {
-            type Output = eyre::Result<ErasedTaskDefinition<P>>;
-            fn visit<T: TaskDefinition<P>>(self) -> eyre::Result<ErasedTaskDefinition<P>> {
+            type Output = swanky_error::Result<ErasedTaskDefinition<P>>;
+            fn visit<T: TaskDefinition<P>>(self) -> swanky_error::Result<ErasedTaskDefinition<P>> {
                 Ok(ErasedTaskDefinition::new(
                     T::initialize(self.2, self.1, self.0, self.3)
                         .with_context(|| format!("Initializing task kind {}", type_name::<T>()))?,
@@ -452,9 +455,16 @@ pub fn run_proof_background<P: Party>(
         let tk = TaskKind::try_from(tk_encoded)?;
         let etd =
             visit_task_definition::<P, V<'_, P>>(tk, V(vc, &mut rng, &mut root_conn, num_threads))?;
-        root_conn.flush()?;
+        root_conn.flush().wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to flush root network connection.".to_string(),
+        )?;
         let old = task_definitions.insert(tk_encoded, RwLock::new(etd));
-        eyre::ensure!(old.is_none(), "Duplicate task kind {tk:?} listed");
+        swanky_error::ensure!(
+            old.is_none(),
+            ErrorKind::OtherError,
+            "Duplicate task kind {tk:?} listed"
+        );
     }
     // spin up the runner threads
     let num_tasks_remaining = AtomicUsize::new(manifest.tasks().len());
@@ -482,8 +492,9 @@ pub fn run_proof_background<P: Party>(
         let manifest = runner_thread.manifest_owned.manifest();
         for tid in manifest.initially_ready_tasks().iter() {
             let tid = tid.id();
-            eyre::ensure!(
+            swanky_error::ensure!(
                 (tid as usize) < manifest.tasks().len(),
+                ErrorKind::OtherError,
                 "task id is out of range"
             );
             runner_thread.launch_task(tid)?;
@@ -498,7 +509,10 @@ pub fn run_proof_background<P: Party>(
         runner_thread.reactor.close();
         runner_thread.run_queue.close();
         // TODO: parallelize the finalization.
-        root_conn.flush()?;
+        root_conn.flush().wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to flush root connection.".to_string(),
+        )?;
         for tk in manifest.task_kinds_used().iter() {
             let span = event_log::FinalizingTaskKind { task_kind: tk }.start();
             runner_thread.task_definitions[&tk]
@@ -507,7 +521,10 @@ pub fn run_proof_background<P: Party>(
                 .with_context(|| {
                     format!("Finalizing task {:?}", TaskKind::try_from(tk).unwrap())
                 })?;
-            root_conn.flush()?;
+            root_conn.flush().wrap_err(
+                ErrorKind::NetworkError,
+                "Failed to flush root connection.".to_string(),
+            )?;
             span.finish();
         }
         Ok(())

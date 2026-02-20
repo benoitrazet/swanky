@@ -14,7 +14,6 @@ use crate::{
     fields::{SieveIrDeserialize, extension_field_to_type_id, modulus_to_type_id},
     plugins::{Plugin, PluginExecution, PluginType, RamArithV0, RamArithV1, RamBoolV0, RamBoolV1},
 };
-use eyre::{Result, bail, ensure, eyre};
 use log::debug;
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use std::{
@@ -22,6 +21,7 @@ use std::{
     collections::{BTreeMap, VecDeque},
     marker::PhantomData,
 };
+use swanky_error::{ErrorKind, Result, bail, ensure, swanky_error};
 use swanky_field::FiniteField;
 
 /// A SIEVE IR wire identifier.
@@ -228,9 +228,12 @@ impl TypeStore {
 
     /// Get the [`TypeSpecification`] associated with a [`TypeId`].
     pub fn get(&self, key: &TypeId) -> Result<&TypeSpecification> {
-        self.0
-            .get(key)
-            .ok_or_else(|| eyre!("Type ID {key} not found in `TypeStore`"))
+        self.0.get(key).ok_or_else(|| {
+            swanky_error!(
+                ErrorKind::OtherError,
+                "Type ID {key} not found in `TypeStore`"
+            )
+        })
     }
 
     /// Return an [`Iterator`] over the [`TypeId`]-[`TypeSpecification`] pairs
@@ -241,7 +244,7 @@ impl TypeStore {
 }
 
 impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
-    type Error = eyre::Error;
+    type Error = swanky_error::Error;
 
     fn try_from(
         types: Vec<mac_n_cheese_sieve_parser::Type>,
@@ -249,6 +252,7 @@ impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
         debug!("Converting Circuit IR types to `TypeStore`");
         ensure!(
             types.len() <= 256,
+            ErrorKind::OtherError,
             "Too many types specified: {} > 256",
             types.len(),
         );
@@ -264,12 +268,15 @@ impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
                     modulus,
                 } => {
                     if index >= i as TypeId {
-                        bail!("Type index too large.");
+                        bail!(ErrorKind::OtherError, "Type index too large.");
                     }
                     let spec = store.get(&index)?;
                     let base_type_id = match spec {
                         TypeSpecification::Field(ty) => *ty,
-                        _ => bail!("Invalid type specification for base field"),
+                        _ => bail!(
+                            ErrorKind::OtherError,
+                            "Invalid type specification for base field"
+                        ),
                     };
                     TypeSpecification::Field(extension_field_to_type_id(
                         base_type_id,
@@ -278,7 +285,10 @@ impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
                     )?)
                 }
                 mac_n_cheese_sieve_parser::Type::Ring { .. } => {
-                    bail!("Rings not supported in Diet Mac'n'Cheese.")
+                    bail!(
+                        ErrorKind::UnsupportedError,
+                        "Rings not supported in Diet Mac'n'Cheese."
+                    )
                 }
                 mac_n_cheese_sieve_parser::Type::PluginType(ty) => {
                     TypeSpecification::Plugin(PluginType::from(ty))
@@ -291,12 +301,13 @@ impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
 }
 
 impl TryFrom<Vec<Number>> for TypeStore {
-    type Error = eyre::Error;
+    type Error = swanky_error::Error;
 
     fn try_from(fields: Vec<Number>) -> std::result::Result<Self, Self::Error> {
         debug!("Converting vector of fields to `TypeStore`");
         ensure!(
             fields.len() <= 256,
+            ErrorKind::OtherError,
             "Too many types specified: {} > 256",
             fields.len(),
         );
@@ -649,7 +660,7 @@ impl FuncDecl {
                 type_store,
                 fun_store,
             )?,
-            name => bail!("Unsupported plugin: {name}"),
+            name => bail!(ErrorKind::UnsupportedError, "Unsupported plugin: {name}"),
         };
 
         let (first_unused_output, first_unused_input) =
@@ -721,6 +732,7 @@ impl FunStore {
     pub fn insert(&mut self, name: String, func: FuncDecl) -> Result<FunId> {
         ensure!(
             !self.0.contains_key(&name),
+            ErrorKind::OtherError,
             "Function with name {name} already exists."
         );
         let fun_id = self
@@ -737,6 +749,7 @@ impl FunStore {
     pub fn get_func(&self, fun_id: FunId) -> Result<&FuncDecl> {
         ensure!(
             (fun_id as usize) < self.1.len(),
+            ErrorKind::OtherError,
             "Missing function id {} in func store",
             fun_id
         );
@@ -754,7 +767,7 @@ impl FunStore {
         self.0
             .get(name)
             .copied()
-            .ok_or_else(|| eyre!("Missing function {name}"))
+            .ok_or_else(|| swanky_error!(ErrorKind::OtherError, "Missing function {name}"))
     }
 }
 

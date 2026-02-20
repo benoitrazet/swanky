@@ -8,9 +8,9 @@
 pub(crate) mod insecure;
 
 use crypto_primitives::Chall3;
-use eyre::Result;
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
+use swanky_error::Result;
 use swanky_field_binary::{F2, F8b, F128b};
 
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};

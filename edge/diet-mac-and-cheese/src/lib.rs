@@ -46,6 +46,7 @@ mod sieveir_phase2;
 
 use serde::Deserialize;
 use std::fmt::Display;
+use swanky_error::ErrorKind;
 use swanky_svole_wykw::{
     LPN_EXTEND_EXTRASMALL, LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_EXTEND_SMALL_MEDIUM,
     LPN_SETUP_EXTRASMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL, LPN_SETUP_SMALL_MEDIUM, LpnParams,
@@ -102,12 +103,12 @@ pub(crate) fn mapping_lpn_size_large_field(lpn_size: LpnSize) -> (LpnParams, Lpn
 use mac_n_cheese_sieve_parser::Number;
 
 /// Convert a [`Number`] into `Some(u64)` if it'll fit, `None` otherwise.
-pub(crate) fn number_to_u64(x: &Number) -> eyre::Result<u64> {
+pub(crate) fn number_to_u64(x: &Number) -> swanky_error::Result<u64> {
     let (lo, hi): (crypto_bigint::U64, _) = x.split_mixed();
     if hi == crypto_bigint::Uint::ZERO {
         Ok(u64::from(lo))
     } else {
-        eyre::bail!("Number {x:?} does not fit in u64")
+        swanky_error::bail!(ErrorKind::OtherError, "Number {x:?} does not fit in u64")
     }
 }
 

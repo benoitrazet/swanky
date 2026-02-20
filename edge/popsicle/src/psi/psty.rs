@@ -1,7 +1,7 @@
 //! Implementation of the Pinkas-Schneider-Tkachenko-Yanai "extended" private
 //! set intersection protocol (cf. <https://eprint.iacr.org/2019/241>).
 
-use crate::{cuckoo::CuckooHash, errors::Error, utils};
+use crate::{cuckoo::CuckooHash, utils};
 use aes_gcm::{
     Aes256Gcm, Key, Nonce,
     aead::{Aead, KeyInit},
@@ -15,6 +15,7 @@ use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
 use swanky_channel::Channel;
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_oprf_kmprt::{Receiver as KmprtReceiver, Sender as KmprtSender};
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 use swanky_twopac::semihonest::{Evaluator, Garbler};
@@ -68,8 +69,11 @@ impl Sender {
     pub fn init<RNG: RngCore + CryptoRng + SeedableRng>(
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
-        let opprf = KmprtSender::init(channel, rng)?;
+    ) -> swanky_error::Result<Self> {
+        let opprf = KmprtSender::init(channel, rng).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize KMPRT sender.".to_string(),
+        )?;
         Ok(Self { opprf })
     }
 
@@ -79,17 +83,13 @@ impl Sender {
         inputs: &[Msg],
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<SenderState, Error> {
+    ) -> swanky_error::Result<SenderState> {
         // receive cuckoo hash info from sender
-        let key = channel
-            .read::<Block>()
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
+        let key = channel.read::<Block>()?;
         let hashes = utils::compress_and_hash_inputs(inputs, key);
 
         // map inputs to table using all hash functions
-        let nbins = channel
-            .read::<usize>()
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
+        let nbins = channel.read::<usize>()?;
         let mut table = vec![Vec::new(); nbins];
 
         for &x in &hashes {
@@ -118,7 +118,10 @@ impl Sender {
             })
             .collect_vec();
 
-        self.opprf.send(channel, &points, nbins, rng)?;
+        self.opprf.send(channel, &points, nbins, rng).wrap_err(
+            ErrorKind::OtherError,
+            "Failed to run PSI as sender.".to_string(),
+        )?;
 
         Ok(SenderState { opprf_outputs: ts })
     }
@@ -130,11 +133,15 @@ impl SenderState {
         &self,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<(Garbler<RNG, OtSender, AllWire>, Vec<AllWire>, Vec<AllWire>), Error>
+    ) -> swanky_error::Result<(Garbler<RNG, OtSender, AllWire>, Vec<AllWire>, Vec<AllWire>)>
     where
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let mut gb = Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))?;
+        let mut gb = Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
+            .wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize garbler during setup.".to_string(),
+        )?;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
         let mods = vec![2; my_input_bits.len()]; // all binary moduli
         let sender_inputs = gb.encode_many(&my_input_bits, &mods, channel)?;
@@ -147,7 +154,7 @@ impl SenderState {
         &self,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<(), Error>
+    ) -> swanky_error::Result<()>
     where
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
@@ -162,7 +169,7 @@ impl SenderState {
         &self,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<(), Error>
+    ) -> swanky_error::Result<()>
     where
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
@@ -177,7 +184,7 @@ impl SenderState {
         &self,
         payload_len: usize,
         channel: &mut Channel,
-    ) -> Result<Vec<Vec<u8>>, Error> {
+    ) -> swanky_error::Result<Vec<Vec<u8>>> {
         let mut payloads = Vec::new();
         for opprf_output in self.opprf_outputs.iter() {
             let mut nonce_bytes = vec![0u8; NONCE_SIZE];
@@ -207,8 +214,11 @@ impl Receiver {
     pub fn init<RNG: RngCore + CryptoRng + SeedableRng>(
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
-        let opprf = KmprtReceiver::init(channel, rng)?;
+    ) -> swanky_error::Result<Self> {
+        let opprf = KmprtReceiver::init(channel, rng).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize KMPRT receiver.".to_string(),
+        )?;
         Ok(Self { opprf })
     }
 
@@ -218,18 +228,17 @@ impl Receiver {
         inputs: &[Msg],
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<ReceiverState, Error> {
+    ) -> swanky_error::Result<ReceiverState> {
         let key = rng.r#gen();
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
-        let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)?;
+        let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to create new Cuckoo hash.".to_string(),
+        )?;
 
         // Send cuckoo hash info to receiver.
-        channel
-            .write(&key)
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
-        channel
-            .write(&cuckoo.nbins)
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
+        channel.write(&key)?;
+        channel.write(&cuckoo.nbins)?;
 
         // Build `table` to include a cuckoo hash entry xored with its hash
         // index, if such a entry exists, or a random value.
@@ -242,7 +251,10 @@ impl Receiver {
             })
             .collect::<Vec<Block>>();
 
-        let opprf_outputs = self.opprf.receive(channel, &table, rng)?;
+        let opprf_outputs = self.opprf.receive(channel, &table, rng).wrap_err(
+            ErrorKind::OtherError,
+            "Failed to receive OPPRF outputs.".to_string(),
+        )?;
 
         Ok(ReceiverState {
             opprf_outputs,
@@ -258,14 +270,11 @@ impl ReceiverState {
         &self,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<
-        (
-            Evaluator<RNG, OtReceiver, AllWire>,
-            Vec<AllWire>,
-            Vec<AllWire>,
-        ),
-        Error,
-    >
+    ) -> swanky_error::Result<(
+        Evaluator<RNG, OtReceiver, AllWire>,
+        Vec<AllWire>,
+        Vec<AllWire>,
+    )>
     where
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
     {
@@ -273,7 +282,11 @@ impl ReceiverState {
         let my_input_bits = encode_inputs(&self.opprf_outputs);
 
         let mut ev =
-            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))?;
+            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
+                .wrap_err(
+                    ErrorKind::InitializationError,
+                    "Failed to initialize receiver during setup.".to_string(),
+                )?;
 
         let mods = vec![2; nbins * HASH_SIZE * 8];
         let sender_inputs = ev.receive_many(&mods, channel)?;
@@ -286,7 +299,7 @@ impl ReceiverState {
         &self,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<Vec<Msg>, Error>
+    ) -> swanky_error::Result<Vec<Msg>>
     where
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
@@ -312,7 +325,7 @@ impl ReceiverState {
         &self,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<usize, Error>
+    ) -> swanky_error::Result<usize>
     where
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
@@ -336,13 +349,13 @@ impl ReceiverState {
         payloads: &[Vec<u8>],
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<(), Error>
+    ) -> swanky_error::Result<()>
     where
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let payload_len = payloads[0].len();
         if !(payloads.iter().all(|p| p.len() == payload_len)) {
-            return Err(Error::InvalidPayloadsLength);
+            swanky_error::bail!(ErrorKind::OtherError, "Invalid payloads length");
         }
         let dummy_payload = vec![0; payload_len];
 
@@ -350,7 +363,7 @@ impl ReceiverState {
             let mut payload = vec![0; PAD_LEN];
             if let Some(item) = opt_item {
                 if item.input_index >= payloads.len() {
-                    return Err(Error::InvalidPayloadsLength);
+                    swanky_error::bail!(ErrorKind::OtherError, "Invalid payloads length");
                 }
                 payload.extend_from_slice(&payloads[item.input_index]);
             } else {
@@ -364,7 +377,13 @@ impl ReceiverState {
             let nonce = Nonce::from_slice(&nonce_bytes);
 
             let cipher = Aes256Gcm::new(&key);
-            let ciphertext = cipher.encrypt(&nonce, payload.as_ref())?;
+            let ciphertext = cipher.encrypt(&nonce, payload.as_ref()).map_err(|_| {
+                swanky_error::Error::new(
+                    ErrorKind::OtherError,
+                    "Failed to encrypt payload.".to_string(),
+                    None, // aes_gcm::Error does not implement std::error::Error
+                )
+            })?;
 
             channel.write_bytes(&nonce)?;
             channel.write_bytes(&ciphertext)?;
@@ -390,7 +409,7 @@ fn fancy_compute_intersection<F: Fancy + BinaryBundleGadgets>(
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
     channel: &mut Channel,
-) -> eyre::Result<Vec<F::Item>> {
+) -> swanky_error::Result<Vec<F::Item>> {
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
     sender_inputs
         .chunks(HASH_SIZE * 8)
@@ -411,7 +430,7 @@ fn fancy_compute_cardinality<F: Fancy + BinaryBundleGadgets + FancyBinary>(
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
     channel: &mut Channel,
-) -> eyre::Result<BinaryBundle<F::Item>> {
+) -> swanky_error::Result<BinaryBundle<F::Item>> {
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
 
     let eqs = sender_inputs
@@ -424,7 +443,7 @@ fn fancy_compute_cardinality<F: Fancy + BinaryBundleGadgets + FancyBinary>(
                 channel,
             )
         })
-        .collect::<eyre::Result<Vec<F::Item>>>()?;
+        .collect::<swanky_error::Result<Vec<F::Item>>>()?;
 
     let mut acc = f.bin_constant_bundle(0, HASH_SIZE * 8, channel)?;
 

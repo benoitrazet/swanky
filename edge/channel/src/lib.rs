@@ -9,6 +9,7 @@ use std::io::{Read, Write};
 
 use bytemuck::TransparentWrapper;
 use generic_array::GenericArray;
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_party::{Party, private::PartyPrivate};
 use swanky_party2::GenericParty;
 use swanky_serialization::CanonicalSerialize;
@@ -88,9 +89,9 @@ impl<'inner> Channel<'inner> {
     ///
     /// This function is equivalent to calling [`Channel::with_sizes`] with the default
     /// [`BufferSizes`]. See that function for more information.
-    pub fn with<C, T, F>(inner: C, thunk: F) -> eyre::Result<T>
+    pub fn with<C, T, F>(inner: C, thunk: F) -> swanky_error::Result<T>
     where
-        for<'a, 'b> F: FnOnce(&'a mut Channel<'b>) -> eyre::Result<T>,
+        for<'a, 'b> F: FnOnce(&'a mut Channel<'b>) -> swanky_error::Result<T>,
         C: Read + Write,
     {
         Self::with_sizes(inner, BufferSizes::default(), thunk)
@@ -114,16 +115,21 @@ impl<'inner> Channel<'inner> {
     /// # Example
     ///
     /// ```rust
-    /// fn do_crypto_with_a_tcp_connection(conn: std::net::TcpStream) -> eyre::Result<()> {
+    /// use swanky_error::{ErrorKind, WrapErr};
+    /// fn do_crypto_with_a_tcp_connection(conn: std::net::TcpStream) -> swanky_error::Result<()> {
     ///     swanky_channel::Channel::with_sizes(conn, Default::default(), |channel| {
     ///         channel.write_bytes(b"hello!")?;
     ///         Ok(())
     ///     })
     /// }
     /// ```
-    pub fn with_sizes<C, T, F>(mut inner: C, sizes: BufferSizes, thunk: F) -> eyre::Result<T>
+    pub fn with_sizes<C, T, F>(
+        mut inner: C,
+        sizes: BufferSizes,
+        thunk: F,
+    ) -> swanky_error::Result<T>
     where
-        for<'a, 'b> F: FnOnce(&'a mut Channel<'b>) -> eyre::Result<T>,
+        for<'a, 'b> F: FnOnce(&'a mut Channel<'b>) -> swanky_error::Result<T>,
         C: Read + Write,
     {
         let mut channel = Channel {
@@ -138,7 +144,10 @@ impl<'inner> Channel<'inner> {
             inner: &mut inner,
         };
         let t = thunk(&mut channel)?;
-        channel.force_flush()?;
+        channel.force_flush().wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to force a channel to flush.".to_string(),
+        )?;
         Ok(t)
     }
 
@@ -182,6 +191,16 @@ impl<'inner> Channel<'inner> {
         }
         Ok(())
     }
+    #[inline]
+    fn write_bytes_io(&mut self, bytes: &[u8]) -> std::io::Result<()> {
+        let available = self.write_buffer.capacity() - self.write_buffer.len();
+        if available >= bytes.len() {
+            self.write_buffer.extend_from_slice(bytes);
+            Ok(())
+        } else {
+            self.write_bytes_slow(bytes)
+        }
+    }
     /// Write all of `bytes` to the peer.
     ///
     /// If this function succeeds, all bytes have been written to the peer.
@@ -189,6 +208,7 @@ impl<'inner> Channel<'inner> {
     /// # Example
     /// ```
     /// use swanky_channel::Channel;
+    /// use swanky_error::{ErrorKind, WrapErr};
     /// let mut dst = [0; 5];
     /// swanky_channel::local::local_channel_pair(
     ///     |c| Ok(c.read_bytes(&mut dst)?),
@@ -198,14 +218,11 @@ impl<'inner> Channel<'inner> {
     /// assert_eq!(dst.as_slice(), b"hello");
     /// ```
     #[inline]
-    pub fn write_bytes(&mut self, bytes: &[u8]) -> std::io::Result<()> {
-        let available = self.write_buffer.capacity() - self.write_buffer.len();
-        if available >= bytes.len() {
-            self.write_buffer.extend_from_slice(bytes);
-            Ok(())
-        } else {
-            self.write_bytes_slow(bytes)
-        }
+    pub fn write_bytes(&mut self, bytes: &[u8]) -> swanky_error::Result<()> {
+        self.write_bytes_io(bytes).wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to write bytes to a channel.".to_string(),
+        )
     }
     fn fill_read_buffer(&mut self) -> std::io::Result<()> {
         self.read_buffer_pos = 0;
@@ -248,21 +265,7 @@ impl<'inner> Channel<'inner> {
         }
         Ok(())
     }
-    /// Read exactly `dst.len()` bytes from the peer into `dst`.
-    ///
-    /// # Example
-    /// ```
-    /// use swanky_channel::Channel;
-    /// let mut dst = [0; 5];
-    /// swanky_channel::local::local_channel_pair(
-    ///     |c| Ok(c.read_bytes(&mut dst)?),
-    ///     |c| Ok(c.write_bytes(b"hello")?),
-    /// )
-    /// .unwrap();
-    /// assert_eq!(dst.as_slice(), b"hello");
-    /// ```
-    #[inline]
-    pub fn read_bytes(&mut self, dst: &mut [u8]) -> std::io::Result<()> {
+    fn read_bytes_io(&mut self, dst: &mut [u8]) -> std::io::Result<()> {
         self.force_flush()?;
         let read_buffer =
             &self.read_buffer[self.read_buffer_pos..self.read_buffer_pos + self.read_buffer_len];
@@ -275,6 +278,27 @@ impl<'inner> Channel<'inner> {
             self.read_bytes_slow(dst)
         }
     }
+    /// Read exactly `dst.len()` bytes from the peer into `dst`.
+    ///
+    /// # Example
+    /// ```
+    /// use swanky_channel::Channel;
+    /// use swanky_error::{ErrorKind, WrapErr};
+    /// let mut dst = [0; 5];
+    /// swanky_channel::local::local_channel_pair(
+    ///     |c| Ok(c.read_bytes(&mut dst)?),
+    ///     |c| Ok(c.write_bytes(b"hello")?),
+    /// )
+    /// .unwrap();
+    /// assert_eq!(dst.as_slice(), b"hello");
+    /// ```
+    #[inline]
+    pub fn read_bytes(&mut self, dst: &mut [u8]) -> swanky_error::Result<()> {
+        self.read_bytes_io(dst).wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to read bytes from a channel.".to_string(),
+        )
+    }
     /// Read a `T` and deserialize it.
     ///
     /// # Example
@@ -286,10 +310,13 @@ impl<'inner> Channel<'inner> {
     /// assert_eq!(r, 42);
     /// ```
     #[inline]
-    pub fn read<T: CanonicalSerialize>(&mut self) -> eyre::Result<T> {
+    pub fn read<T: CanonicalSerialize>(&mut self) -> swanky_error::Result<T> {
         let mut buf = GenericArray::<u8, T::ByteReprLen>::default();
         self.read_bytes(&mut buf)?;
-        Ok(T::from_bytes(&buf)?)
+        T::from_bytes(&buf).wrap_err(
+            ErrorKind::SerializationError,
+            "Failed to deserialize bytes read from a channel.".to_string(),
+        )
     }
     /// Serialize `t` and [`Self::write_bytes()`] it over the wire.
     ///
@@ -302,8 +329,8 @@ impl<'inner> Channel<'inner> {
     /// assert_eq!(r, 42);
     /// ```
     #[inline]
-    pub fn write<T: CanonicalSerialize>(&mut self, t: &T) -> eyre::Result<()> {
-        Ok(self.write_bytes(&t.to_bytes())?)
+    pub fn write<T: CanonicalSerialize>(&mut self, t: &T) -> swanky_error::Result<()> {
+        self.write_bytes(&t.to_bytes())
     }
 
     /// Return an [`IoAdapter`] for this channel which implements [`std::io::Read`] and
@@ -312,9 +339,13 @@ impl<'inner> Channel<'inner> {
     /// # Example
     /// ```
     /// use swanky_channel::Channel;
+    /// use swanky_error::{ErrorKind, WrapErr};
     /// use std::io::Write;
-    /// fn use_write(mut x: impl Write) -> eyre::Result<()> {
-    ///     x.write_all(b"x")?;
+    /// fn use_write(mut x: impl Write) -> swanky_error::Result<()> {
+    ///     x.write_all(b"x").wrap_err(
+    ///         ErrorKind::NetworkError,
+    ///         "Failed to write bytes to a channel.".to_string(),
+    ///     )?;
     ///     Ok(())
     /// }
     /// let (r, _) =
@@ -338,7 +369,7 @@ impl<'inner> Channel<'inner> {
     /// ```
     /// use swanky_channel::{Channel, local::local_channel_pair};
     /// use swanky_party::{Party, Prover, Verifier, private::ProverPrivateCopy};
-    /// fn do_work<P: Party>(c: &mut Channel) -> eyre::Result<i32> {
+    /// fn do_work<P: Party>(c: &mut Channel) -> swanky_error::Result<i32> {
     ///     let x: ProverPrivateCopy<P, i32> = ProverPrivateCopy::new(4586);
     ///     // Only the prover knows x.
     ///     let x: i32 = c.communicate(x)?;
@@ -355,7 +386,7 @@ impl<'inner> Channel<'inner> {
     pub fn communicate<P: Party, T: CanonicalSerialize>(
         &mut self,
         p: impl PartyPrivate<P, T>,
-    ) -> eyre::Result<T> {
+    ) -> swanky_error::Result<T> {
         match p.into_option() {
             Some(t) => {
                 self.write(&t)?;
@@ -386,7 +417,7 @@ impl<'inner> Channel<'inner> {
     ///     }
     /// }
     /// use ot::*;
-    /// fn do_work<P: Party>(c: &mut Channel) -> eyre::Result<i32> {
+    /// fn do_work<P: Party>(c: &mut Channel) -> swanky_error::Result<i32> {
     ///     // Only the sender knows x. We're party P. If P == Sender, then _we_ know x.
     ///     let x: PartyPrivateCopy<Sender, P, i32> = PartyPrivateCopy::new(4586);
     ///     // If we're the sender, send x to the receiver. If P == Receiver, then receive x.
@@ -408,7 +439,7 @@ impl<'inner> Channel<'inner> {
     >(
         &mut self,
         p: swanky_party2::private::PartyPrivateCopy<PrivateTo, P, T>,
-    ) -> eyre::Result<T> {
+    ) -> swanky_error::Result<T> {
         match Option::<T>::from(p) {
             Some(t) => {
                 self.write(&t)?;
@@ -437,16 +468,16 @@ impl std::io::Read for IoAdapter<'_> {
             }
         }
         let to_take = buf.len().min(self.inner.read_buffer_len);
-        self.inner.read_bytes(&mut buf[0..to_take])?;
+        self.inner.read_bytes_io(&mut buf[0..to_take])?;
         Ok(to_take)
     }
     fn read_exact(&mut self, buf: &mut [u8]) -> std::io::Result<()> {
-        self.inner.read_bytes(buf)
+        self.inner.read_bytes_io(buf)
     }
 }
 impl std::io::Write for IoAdapter<'_> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.inner.write_bytes(buf)?;
+        self.inner.write_bytes_io(buf)?;
         Ok(buf.len())
     }
 
@@ -455,7 +486,7 @@ impl std::io::Write for IoAdapter<'_> {
     }
 
     fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
-        self.inner.write_bytes(buf)
+        self.inner.write_bytes_io(buf)
     }
 }
 

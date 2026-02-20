@@ -224,7 +224,7 @@ impl<F: Fancy + FancyInput<Item = <F as Fancy>::Item>> FancyInput for Informer<F
         &mut self,
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<Self::Item>> {
+    ) -> swanky_error::Result<Vec<Self::Item>> {
         self.stats
             .garbler_input_moduli
             .extend(moduli.iter().cloned());
@@ -236,7 +236,7 @@ impl<F: Fancy + FancyInput<Item = <F as Fancy>::Item>> FancyInput for Informer<F
         values: &[u16],
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<Self::Item>> {
+    ) -> swanky_error::Result<Vec<Self::Item>> {
         self.stats
             .garbler_input_moduli
             .extend(moduli.iter().cloned());
@@ -257,7 +257,7 @@ impl<F: FancyBinary> FancyBinary for Informer<F> {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         let result = self.underlying.and(x, y, channel)?;
         self.stats.nmuls += 1;
         self.stats.nciphertexts += 2;
@@ -306,7 +306,7 @@ impl<F: FancyArithmetic> FancyArithmetic for Informer<F> {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         if x.modulus() < y.modulus() {
             return self.mul(y, x, channel);
         }
@@ -327,7 +327,7 @@ impl<F: FancyArithmetic> FancyArithmetic for Informer<F> {
         q: u16,
         tt: Option<Vec<u16>>,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         let result = self.underlying.proj(x, q, tt, channel)?;
         self.stats.nprojs += 1;
         self.stats.nciphertexts += x.modulus() as usize - 1;
@@ -339,13 +339,22 @@ impl<F: FancyArithmetic> FancyArithmetic for Informer<F> {
 impl<F: Fancy> Fancy for Informer<F> {
     type Item = F::Item;
 
-    fn constant(&mut self, val: u16, q: u16, channel: &mut Channel) -> eyre::Result<Self::Item> {
+    fn constant(
+        &mut self,
+        val: u16,
+        q: u16,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Self::Item> {
         self.stats.constants.insert((val, q));
         self.update_moduli(q);
         self.underlying.constant(val, q, channel)
     }
 
-    fn output(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<Option<u16>> {
+    fn output(
+        &mut self,
+        x: &Self::Item,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Option<u16>> {
         let result = self.underlying.output(x, channel)?;
         self.stats.outputs.push(x.modulus());
         Ok(result)
@@ -353,7 +362,7 @@ impl<F: Fancy> Fancy for Informer<F> {
 }
 
 impl<F: Fancy + FancyReveal> FancyReveal for Informer<F> {
-    fn reveal(&mut self, x: &Self::Item, channel: &mut Channel) -> eyre::Result<u16> {
+    fn reveal(&mut self, x: &Self::Item, channel: &mut Channel) -> swanky_error::Result<u16> {
         self.underlying.reveal(x, channel)
     }
 }

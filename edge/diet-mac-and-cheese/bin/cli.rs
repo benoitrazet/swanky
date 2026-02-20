@@ -4,9 +4,9 @@ Cli utilities.
 */
 use clap::Parser;
 use diet_mac_and_cheese::LpnSize;
-use eyre::Result;
 use serde::Deserialize;
 use std::path::PathBuf;
+use swanky_error::{ErrorKind, Result, WrapErr};
 
 const DEFAULT_ADDR: &str = "127.0.0.1:5527";
 const DEFAULT_NO_BATCHING: bool = false;
@@ -68,7 +68,14 @@ impl Config {
     pub fn from_toml_file(toml_file: &PathBuf) -> Result<Self> {
         let mut res = Config::default();
 
-        let toml_contents: Config = toml::from_str(&std::fs::read_to_string(toml_file)?)?;
+        let toml_contents: Config = toml::from_str(&std::fs::read_to_string(toml_file).wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to read DMC config TOML to string.".to_string(),
+        )?)
+        .wrap_err(
+            ErrorKind::SerializationError,
+            "Failed to parse DMC config from TOML.".to_string(),
+        )?;
 
         if let Some(lpn) = toml_contents.lpn {
             res.lpn = Some(lpn)

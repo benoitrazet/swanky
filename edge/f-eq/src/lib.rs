@@ -30,6 +30,7 @@
 use rand::{CryptoRng, Rng};
 use sha2::{Digest, Sha256};
 use swanky_channel::Channel;
+use swanky_error::ErrorKind;
 use swanky_party::{Party, WhichParty, private::ProverPrivate};
 
 /// The equality functionality.
@@ -62,7 +63,7 @@ impl<P: Party> EqualityFunctionality<P> {
         self.hash.update(value);
     }
     /// Runs the equality check on all the inputs provided in [`input(&mut self, value: &[u8])`].
-    pub fn finalize(self, channel: &mut Channel) -> eyre::Result<()> {
+    pub fn finalize(self, channel: &mut Channel) -> swanky_error::Result<()> {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 // Sender computes the commitment as H(H(value)||salt)
@@ -82,8 +83,9 @@ impl<P: Party> EqualityFunctionality<P> {
                 receiver_salted.update(receiver_hash);
                 receiver_salted.update(self.commitment_salt.as_ref().into_inner(e));
                 // The Sender compares the salted values
-                eyre::ensure!(
+                swanky_error::ensure!(
                     sender_commitment == receiver_salted.finalize(),
+                    ErrorKind::OtherError,
                     "Validation check failed"
                 );
                 Ok(())
@@ -101,8 +103,9 @@ impl<P: Party> EqualityFunctionality<P> {
                 receiver_salted.update(hash_receiver);
                 receiver_salted.update(sender_salt);
                 //The Receiver compares the salted valuesS
-                eyre::ensure!(
+                swanky_error::ensure!(
                     sender_commitment == *receiver_salted.finalize(),
+                    ErrorKind::OtherError,
                     "Validation check failed"
                 );
                 Ok(())
@@ -120,7 +123,7 @@ mod tests {
     use swanky_aes_rng::AesRng;
     use swanky_party::{Prover, Verifier};
 
-    fn check_equality(input_pr: &[u8], input_vr: &[u8]) -> eyre::Result<()> {
+    fn check_equality(input_pr: &[u8], input_vr: &[u8]) -> swanky_error::Result<()> {
         swanky_channel::local::local_channel_pair(
             |c| {
                 let mut rng = AesRng::new();
@@ -138,7 +141,10 @@ mod tests {
         Ok(())
     }
 
-    fn batched_check_equality(inputs_pr: &[[u8; 32]], inputs_vr: &[[u8; 32]]) -> eyre::Result<()> {
+    fn batched_check_equality(
+        inputs_pr: &[[u8; 32]],
+        inputs_vr: &[[u8; 32]],
+    ) -> swanky_error::Result<()> {
         swanky_channel::local::local_channel_pair(
             |c| {
                 let mut rng = AesRng::new();

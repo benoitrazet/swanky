@@ -5,9 +5,9 @@ use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
 use crate::vole::functionality::{
     PartialDecommitment, VoleProver, create_vole_prover, create_vole_verifier,
 };
-use eyre::{Result, bail};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
+use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::IsSubFieldOf;
 use swanky_field_binary::{F2, F8b, F128b};
 
@@ -73,6 +73,7 @@ impl RandomVoleP for VoleProver {
             Ok(self.v[i])
         } else {
             bail!(
+                ErrorKind::OtherError,
                 "vole mask index out of range: should be in [0, {}), but got {}",
                 self.extended_witness_length(),
                 i

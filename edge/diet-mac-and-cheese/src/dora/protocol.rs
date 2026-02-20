@@ -1,6 +1,7 @@
-use eyre::Result;
+use swanky_error::Result;
 
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::{
     Party, WhichParty,
@@ -258,18 +259,36 @@ where
         } else {
             match P::WHICH {
                 WhichParty::Prover(_) => {
-                    ch.flush()?;
+                    ch.flush().wrap_err(
+                        ErrorKind::NetworkError,
+                        "Failed to flush channel.".to_string(),
+                    )?;
                     (
-                        dmc.channel.read_serializable::<V>()?,
-                        dmc.channel.read_serializable::<V>()?,
+                        dmc.channel.read_serializable::<V>().wrap_err(
+                            ErrorKind::NetworkError,
+                            "Failed to read permutation challenge.".to_string(),
+                        )?,
+                        dmc.channel.read_serializable::<V>().wrap_err(
+                            ErrorKind::NetworkError,
+                            "Failed to read combined challenge.".to_string(),
+                        )?,
                     )
                 }
                 WhichParty::Verifier(_) => {
                     let chal_perm = V::random(&mut dmc.rng);
                     let chal_cmbn = V::random(&mut dmc.rng);
-                    dmc.channel.write_serializable(&chal_perm)?;
-                    dmc.channel.write_serializable(&chal_cmbn)?;
-                    dmc.channel.flush()?;
+                    dmc.channel.write_serializable(&chal_perm).wrap_err(
+                        ErrorKind::NetworkError,
+                        "Failed to write permutation challenge.".to_string(),
+                    )?;
+                    dmc.channel.write_serializable(&chal_cmbn).wrap_err(
+                        ErrorKind::NetworkError,
+                        "Failed to write combined challenge.".to_string(),
+                    )?;
+                    dmc.channel.flush().wrap_err(
+                        ErrorKind::NetworkError,
+                        "Failed to flush channel.".to_string(),
+                    )?;
                     (chal_perm, chal_cmbn)
                 }
             }

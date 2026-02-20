@@ -2,9 +2,9 @@ use super::{Plugin, PluginExecution};
 use crate::backend_trait::BackendT;
 use crate::circuit_ir::{FunStore, TypeId, TypeSpecification, TypeStore, WireCount};
 use crate::memory::Memory;
-use eyre::{Result, bail, ensure};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
+use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure};
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_party::{Party, WhichParty};
@@ -331,6 +331,7 @@ impl Plugin for MuxV0 {
 
         ensure!(
             params.is_empty(),
+            ErrorKind::OtherError,
             "{}: Invalid number of params (must be zero): {}",
             Self::NAME,
             params.len()
@@ -342,6 +343,7 @@ impl Plugin for MuxV0 {
             false
         } else {
             bail!(
+                ErrorKind::UnsupportedError,
                 "unknown operation (should be strict or permissive), found:{}",
                 operation
             );
@@ -357,12 +359,14 @@ impl Plugin for MuxV0 {
         for (ty_inputs, inp) in input_counts[1..].iter() {
             ensure!(
                 *ty_inputs == type_id,
+                ErrorKind::UnsupportedError,
                 "only homogeneous type is currently supported: {} != {}",
                 ty_inputs,
                 type_id
             );
             ensure!(
                 *inp == branch_shape[i],
+                ErrorKind::OtherError,
                 "input branch has different range than expected output: {} != {}",
                 *inp,
                 branch_shape[i]
@@ -373,12 +377,18 @@ impl Plugin for MuxV0 {
         let field_type_id = match type_store.get(&type_id)? {
             TypeSpecification::Field(f) => *f,
             _ => {
-                bail!("Mux plugin does not support plugin types");
+                bail!(
+                    ErrorKind::UnsupportedError,
+                    "Mux plugin does not support plugin types"
+                );
             }
         };
         Ok(PluginExecution::Mux(MuxVersion::MuxVerV0(MuxV0::new(
             type_id,
-            cond_num_wire.try_into()?,
+            cond_num_wire.try_into().wrap_err(
+                ErrorKind::OtherError,
+                "Failed to represent cond_num_wire as a usize.".to_string(),
+            )?,
             selector_range,
             branch_shape,
             is_permissive,

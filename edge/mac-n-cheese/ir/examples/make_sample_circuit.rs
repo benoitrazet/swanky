@@ -8,8 +8,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_field_f61p::F61p;
 
-fn main() -> eyre::Result<()> {
-    color_eyre::install()?;
+fn main() -> swanky_error::Result<()> {
     build_circuit("example.bin", |cb| {
         build_privates("example.priv.bin", |pb| {
             let c1 = cb.new_constant_prototype(FieldMacType::BinaryF63b, [F2::ZERO, F2::ONE])?;

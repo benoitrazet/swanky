@@ -1,7 +1,6 @@
 //! Testing the hashing phase in Base Psi
 #[cfg(test)]
 mod tests {
-    use crate::errors::Error;
     use crate::psi::circuit_psi::{
         base_psi::{BasePsi, receiver::OpprfReceiver, sender::OpprfSender},
         tests::{utils::*, *},
@@ -21,8 +20,8 @@ mod tests {
     ) -> (
         OpprfSender,
         OpprfReceiver,
-        Result<(), Error>,
-        Result<(), Error>,
+        swanky_error::Result<()>,
+        swanky_error::Result<()>,
     ) {
         let ((sender, result_hash_sender), (receiver, result_hash_receiver)) =
             swanky_channel::local::local_channel_pair(

@@ -1,10 +1,10 @@
-use eyre::bail;
 use generic_array::GenericArray;
 use std::{
     fmt::Debug,
     ops::{Add, Mul, Neg, Sub},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
+use swanky_error::{ErrorKind, bail};
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F40b};
 use swanky_party::{IsParty, Party, Prover, WhichParty, private::ProverPrivateCopy};
@@ -55,7 +55,7 @@ impl<P: Party> From<Mac<P, F2, F40b>> for Mac<P, F40b, F40b> {
 
 // TODO: Is this safe?
 impl<P: Party> TryFrom<Mac<P, F40b, F40b>> for Mac<P, F2, F40b> {
-    type Error = eyre::Error;
+    type Error = swanky_error::Error;
 
     fn try_from(value: Mac<P, F40b, F40b>) -> Result<Self, Self::Error> {
         Ok(Mac::new(
@@ -70,7 +70,10 @@ impl<P: Party> TryFrom<Mac<P, F40b, F40b>> for Mac<P, F2, F40b> {
                     );
 
                     if res.is_none().into() {
-                        bail!("F40b value too large to be an F2 value.")
+                        bail!(
+                            ErrorKind::OtherError,
+                            "F40b value too large to be an F2 value."
+                        )
                     } else {
                         // Safe: We've already checked that res is not none.
                         ProverPrivateCopy::new(res.unwrap())

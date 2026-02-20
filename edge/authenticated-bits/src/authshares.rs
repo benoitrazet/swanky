@@ -23,7 +23,7 @@
 //! # use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
 //! # use swanky_party::either::PartyEitherCopy;
 //! # use swanky_party::private::VerifierPrivate;
-//! # fn main() -> eyre::Result<()> {
+//! # fn main() -> swanky_error::Result<()> {
 //! let nshares = 1000;
 //! let (bits_a, bits_b) = swanky_channel::local::local_channel_pair(
 //!     |c| {
@@ -150,7 +150,10 @@ pub struct AuthShareGenerator<P: Party> {
 
 impl<P: Party> AuthShareGenerator<P> {
     /// Create a new [`AuthShareGenerator`].
-    pub fn new<RNG: CryptoRng + Rng>(channel: &mut Channel, mut rng: RNG) -> eyre::Result<Self> {
+    pub fn new<RNG: CryptoRng + Rng>(
+        channel: &mut Channel,
+        mut rng: RNG,
+    ) -> swanky_error::Result<Self> {
         let delta = rng.r#gen::<U8x16>();
         Self::new_with_delta(delta, channel, rng)
     }
@@ -160,7 +163,7 @@ impl<P: Party> AuthShareGenerator<P> {
         delta: U8x16,
         channel: &mut Channel,
         mut rng: RNG,
-    ) -> eyre::Result<Self> {
+    ) -> swanky_error::Result<Self> {
         match P::WHICH {
             WhichParty::Prover(ev) => {
                 let party_a = AuthBitGenerator::<Prover>::new(channel, &mut rng)?;
@@ -198,7 +201,7 @@ impl<P: Party> AuthShareGenerator<P> {
         shares: &mut Vec<AuthShare<P>>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         let bits: Vec<_> = (0..nshares).map(|_| rng.r#gen::<F2>()).collect();
 
         let mut party_a_auth_bits = Vec::with_capacity(nshares);
@@ -250,7 +253,7 @@ impl<P: Party> AuthShareGenerator<P> {
         shares: &[AuthShare<P>],
         outputs: &mut Vec<F2>,
         channel: &mut Channel,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         // We only want to use the bits that are added to `outputs`, so we grab the
         // initial length here and use it to avoid touching anything already
         // existing in `outputs`.

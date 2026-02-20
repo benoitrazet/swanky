@@ -2,6 +2,7 @@ use std::io::{Read, Write};
 
 use proptest::collection::vec as pvec;
 use proptest::prelude::*;
+use swanky_error::{ErrorKind, WrapErr};
 
 use crate::{
     BufferSizes, Channel,
@@ -68,8 +69,14 @@ fn io_adapter_write() {
             let x: T = 0x8BADF00D;
             let y: T = 0xDEADBEEF;
             let c = c.as_std_io();
-            let _we_use_write_all_under_the_hood = c.write(x.to_le_bytes().as_slice())?;
-            c.write_all(y.to_le_bytes().as_slice())?;
+            let _we_use_write_all_under_the_hood = c.write(x.to_le_bytes().as_slice()).wrap_err(
+                ErrorKind::NetworkError,
+                "Failed to write bytes to channel.".to_string(),
+            )?;
+            c.write_all(y.to_le_bytes().as_slice()).wrap_err(
+                ErrorKind::NetworkError,
+                "Failed to write bytes to channel.".to_string(),
+            )?;
             Ok((x, y))
         },
     )
@@ -83,7 +90,13 @@ fn io_adapter_read_eof() {
     let (a, b) = local_channel_pair(
         |c| {
             let x = c.read::<T>()?;
-            assert_eq!(c.as_std_io().read(&mut [0])?, 0);
+            assert_eq!(
+                c.as_std_io().read(&mut [0]).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to read bytes from a channel.".to_string(),
+                )?,
+                0
+            );
             Ok(x)
         },
         |c| {
@@ -108,10 +121,22 @@ fn io_adapter_read() {
         Channel::with_sizes(&mut a, BufferSizes { read: 2, write: 16 }, |a| {
             let mut buf = vec![0_u8; 8];
             let a = a.as_std_io();
-            a.read_exact(&mut buf[0..1])?;
-            a.read_exact(&mut buf[1..3])?;
-            a.read_exact(&mut buf[3..8])?;
-            a.read_to_end(&mut buf)?;
+            a.read_exact(&mut buf[0..1]).wrap_err(
+                ErrorKind::NetworkError,
+                "Failed to read bytes from a channel.".to_string(),
+            )?;
+            a.read_exact(&mut buf[1..3]).wrap_err(
+                ErrorKind::NetworkError,
+                "Failed to read bytes from a channel.".to_string(),
+            )?;
+            a.read_exact(&mut buf[3..8]).wrap_err(
+                ErrorKind::NetworkError,
+                "Failed to read bytes from a channel.".to_string(),
+            )?;
+            a.read_to_end(&mut buf).wrap_err(
+                ErrorKind::NetworkError,
+                "Failed to read bytes from a channel.".to_string(),
+            )?;
             assert_eq!(buf, msg);
             Ok(())
         })

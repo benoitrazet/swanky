@@ -23,7 +23,6 @@ swanky-ot-alsz-kos.workspace = true
 swanky-ocelot-error.workspace = true
 swanky-twopac.workspace = true
 
-eyre.workspace = true
 itertools.workspace = true
 rand.workspace = true
 sha2.workspace = true
@@ -39,6 +38,7 @@ swanky-bytearray-utils.workspace = true
 swanky-channel.workspace = true
 swanky-channel-legacy.workspace = true
 swanky-cointoss.workspace = true
+swanky-error.workspace = true
 proptest = { workspace = true }
 vectoreyes.workspace = true
 [dev-dependencies]

@@ -9,7 +9,6 @@ of the extra memory cost from storing the 'main' relation gates!
 */
 use crate::circuit_ir::TapeT;
 use crate::circuit_ir::{FunStore, FuncDecl, GateM, TypeStore};
-use eyre::{Result, bail};
 use log::info;
 use mac_n_cheese_sieve_parser::ValueStreamKind;
 use mac_n_cheese_sieve_parser::ValueStreamReader as VSR;
@@ -21,6 +20,7 @@ use mac_n_cheese_sieve_parser::{
 use std::collections::VecDeque;
 use std::fs::File;
 use std::path::Path;
+use swanky_error::{ErrorKind, Result, WrapErr, bail};
 
 /// SIEVE IR inputs (public instances or private witnesses) from text.
 ///
@@ -198,7 +198,10 @@ impl FunctionBodyVisitor for TextRelation {
         semantics: ConversionSemantics,
     ) -> Result<()> {
         if let ConversionSemantics::Modulus = semantics {
-            bail!("Diet Mac'n'Cheese only supports no-modulus conversion semantics")
+            bail!(
+                ErrorKind::UnsupportedError,
+                "Diet Mac'n'Cheese only supports no-modulus conversion semantics"
+            )
         }
 
         // read the output wires
@@ -231,7 +234,12 @@ impl FunctionBodyVisitor for TextRelation {
             inids.push((i.start, i.end));
         }
 
-        let name = std::str::from_utf8(name)?.into();
+        let name = std::str::from_utf8(name)
+            .wrap_err(
+                ErrorKind::SerializationError,
+                format!("Failed to deserialize UTF-8 string from {name:?}."),
+            )?
+            .into();
         let fun_id = self.fun_store.name_to_fun_id(&name)?;
         self.gates
             .push(GateM::Call(Box::new((fun_id, outids, inids))));
@@ -265,7 +273,12 @@ impl RelationVisitor for TextRelation {
             input_counts.push((inp.ty, inp.count));
         }
 
-        let name_s: String = std::str::from_utf8(name)?.into();
+        let name_s: String = std::str::from_utf8(name)
+            .wrap_err(
+                ErrorKind::SerializationError,
+                format!("Failed to deserialize UTF-8 string from {name:?}."),
+            )?
+            .into();
         let fun_body = FuncDecl::new_function(body_struct.gates, output_counts, input_counts);
         info!(
             "function {:?} args_size:{:?} body_max:{:?} type_ids:{:?}",
@@ -285,7 +298,12 @@ impl RelationVisitor for TextRelation {
         inputs: &[TypedCount],
         body: PluginBinding,
     ) -> Result<()> {
-        let name_s: String = std::str::from_utf8(name)?.into();
+        let name_s: String = std::str::from_utf8(name)
+            .wrap_err(
+                ErrorKind::SerializationError,
+                format!("Failed to deserialize UTF-8 string from {name:?}."),
+            )?
+            .into();
 
         let mut output_counts = vec![];
         for output in outputs {

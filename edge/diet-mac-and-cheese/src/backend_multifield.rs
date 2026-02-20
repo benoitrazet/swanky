@@ -27,7 +27,6 @@ use crate::{
     dora::{Disjunction, Dora},
     gadgets::less_than_eq_with_public,
 };
-use eyre::{OptionExt, Result, bail, ensure};
 use generic_array::typenum::Unsigned;
 use log::{debug, info, warn};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
@@ -41,6 +40,7 @@ use std::marker::PhantomData;
 use std::path::PathBuf;
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::{ErrorKind, OptionExt, Result, WrapErr, bail, ensure};
 use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField, StatisticallySecureField};
 use swanky_field_binary::{F2, F40b};
 use swanky_field_f61p::F61p;
@@ -688,7 +688,10 @@ impl<
                 )?;
             }
         }
-        self.dmc.channel.flush()?;
+        self.dmc.channel.flush().wrap_err(
+            ErrorKind::OtherError,
+            "Error during channel flush (using legacy channel).".to_string(),
+        )?;
         Ok(())
     }
 }
@@ -948,7 +951,7 @@ where
                 let wire = self.memory.get(*inp);
                 debug!("AssertZero wire: {wire:?}");
                 if self.backend.assert_zero(wire).is_err() {
-                    bail!("Assert zero fails on wire {}", *inp);
+                    bail!(ErrorKind::OtherError, "Assert zero fails on wire {}", *inp);
                 }
             }
 
@@ -1156,7 +1159,10 @@ where
                         assert_eq!(outputs.len(), 1);
                         assert_eq!((outputs[0].1 - outputs[0].0 + 1) as usize, *value_count);
 
-                        let ram_id = ram_id.ok_or_eyre("ram_id should be Some for Read/Write")?;
+                        let ram_id = ram_id.ok_or_swanky_error(
+                            ErrorKind::OtherError,
+                            "ram_id should be Some for Read/Write",
+                        )?;
                         let addr: Vec<_> = copy_mem(&self.memory, inputs[1]).copied().collect();
 
                         let values = self.backend.ram_read(ram_id, &addr)?;
@@ -1173,7 +1179,10 @@ where
                         assert_eq!((inputs[2].1 - inputs[2].0 + 1) as usize, *value_count);
                         assert_eq!(outputs.len(), 0);
 
-                        let ram_id = ram_id.ok_or_eyre("ram_id should be Some for Read/Write")?;
+                        let ram_id = ram_id.ok_or_swanky_error(
+                            ErrorKind::OtherError,
+                            "ram_id should be Some for Read/Write",
+                        )?;
                         let addr: Vec<_> = copy_mem(&self.memory, inputs[1]).copied().collect();
                         let new: Vec<_> = copy_mem(&self.memory, inputs[2]).copied().collect();
 
@@ -1181,7 +1190,10 @@ where
                     }
                 },
             },
-            _ => bail!("Plugin {plugin:?} is unsupported"),
+            _ => bail!(
+                ErrorKind::UnsupportedError,
+                "Plugin {plugin:?} is unsupported"
+            ),
         };
         Ok(None)
     }
@@ -1201,7 +1213,10 @@ where
     ) -> Result<Vec<Mac<P, F2, F40b>>> {
         if *start != *end {
             if self.is_boolean {
-                let mut v = Vec::with_capacity((end + 1 - start).try_into()?);
+                let mut v = Vec::with_capacity((end + 1 - start).try_into().wrap_err(
+                    ErrorKind::OtherError,
+                    format!("{} + 1 - {} does not fit in a usize.", end, start),
+                )?);
                 for inp in *start..(*end + 1) {
                     let in_wire = self.memory.get(inp);
                     debug!("CONV GET {in_wire:?}");
@@ -1213,7 +1228,10 @@ where
                 // NOTE: Without reverse in case conversation gates are little-endian instead of big-endian
                 //return Ok(v);
             } else {
-                bail!("field switching from multiple wires on non-boolean field is not supported");
+                bail!(
+                    ErrorKind::UnsupportedError,
+                    "field switching from multiple wires on non-boolean field is not supported"
+                );
             }
         } else {
             let in_wire = self.memory.get(*start);
@@ -1243,7 +1261,10 @@ where
                 }
                 Ok(())
             } else {
-                bail!("field switching to multiple wires on non-boolean field is not supported");
+                bail!(
+                    ErrorKind::UnsupportedError,
+                    "field switching to multiple wires on non-boolean field is not supported"
+                );
             }
         } else {
             let v = self.backend.assert_conv_from_bits(bits)?;
@@ -1565,6 +1586,7 @@ impl<
                 "ram" => {
                     ensure!(
                         params.len() == 6,
+                        ErrorKind::OtherError,
                         "v0 Boolean RAM types must specify six parameters, but {} were given.",
                         params.len()
                     );
@@ -1572,16 +1594,24 @@ impl<
                     // Validate type index refers to F2
                     let PluginTypeArg::Number(field_id) = params[0] else {
                         bail!(
+                            ErrorKind::OtherError,
                             "The v0 Boolean RAM type expects a number as its first parameter, but a string was found"
                         )
                     };
-                    let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                    let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to represent field ID as a u8.".to_string(),
+                    )?;
                     let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)?
                     else {
-                        bail!("The first v0 Boolean RAM type parameter must refer to a field")
+                        bail!(
+                            ErrorKind::OtherError,
+                            "The first v0 Boolean RAM type parameter must refer to a field"
+                        )
                     };
                     ensure!(
                         field_rust_id == std::any::TypeId::of::<F2>(),
+                        ErrorKind::UnsupportedError,
                         "v0 Boolean RAMs only support Boolean addresses/values"
                     );
 
@@ -1589,6 +1619,7 @@ impl<
                     for (i, p) in params.iter().enumerate().skip(1) {
                         if let PluginTypeArg::String(_) = p {
                             bail!(
+                                ErrorKind::OtherError,
                                 "The v0 Boolean RAM type expects a number for parameter {}, but a string was found",
                                 i
                             )
@@ -1599,12 +1630,18 @@ impl<
 
                     Ok(())
                 }
-                _ => bail!("{} is not a type defined by {}", operation, name),
+                _ => bail!(
+                    ErrorKind::OtherError,
+                    "{} is not a type defined by {}",
+                    operation,
+                    name
+                ),
             },
             "ram_bool_v1" => match operation {
                 "ram" => {
                     ensure!(
                         params.len() == 3,
+                        ErrorKind::OtherError,
                         "Boolean RAM types must specify three parameters, but {} were given",
                         params.len()
                     );
@@ -1612,28 +1649,38 @@ impl<
                     // Validate type index refers to F2
                     let PluginTypeArg::Number(field_id) = params[0] else {
                         bail!(
+                            ErrorKind::OtherError,
                             "The Boolean RAM type expects a number as its first parameter, but a string was found"
                         )
                     };
-                    let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                    let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to represent field ID as a u8.".to_string(),
+                    )?;
                     let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)?
                     else {
-                        bail!("The first Boolean RAM type parameter must refer to a field")
+                        bail!(
+                            ErrorKind::OtherError,
+                            "The first Boolean RAM type parameter must refer to a field"
+                        )
                     };
                     ensure!(
                         field_rust_id == std::any::TypeId::of::<F2>(),
+                        ErrorKind::UnsupportedError,
                         "Boolean RAMs only support Boolean addresses/values"
                     );
 
                     // Just check that the other parameters are numeric
                     if let PluginTypeArg::String(_) = params[1] {
                         bail!(
+                            ErrorKind::OtherError,
                             "The Boolean RAM type expects a number as its second parameter, but a string was found"
                         )
                     }
 
                     if let PluginTypeArg::String(_) = params[2] {
                         bail!(
+                            ErrorKind::OtherError,
                             "The Boolean RAM type expects a number as its third parameter, but a string was found"
                         )
                     }
@@ -1642,12 +1689,18 @@ impl<
 
                     Ok(())
                 }
-                _ => bail!("{} is not a type defined by {}", operation, name),
+                _ => bail!(
+                    ErrorKind::OtherError,
+                    "{} is not a type defined by {}",
+                    operation,
+                    name
+                ),
             },
             "ram_arith_v0" => match operation {
                 "ram" => {
                     ensure!(
                         params.len() == 4,
+                        ErrorKind::OtherError,
                         "v0 Arithmetic RAM types must specify four parameters, but {} were given",
                         params.len()
                     );
@@ -1655,18 +1708,26 @@ impl<
                     // Validate type index refers to a field
                     let PluginTypeArg::Number(field_id) = params[0] else {
                         bail!(
+                            ErrorKind::OtherError,
                             "The v0 arithmetic RAM type expects a number as its first parameter, but a string was found"
                         )
                     };
-                    let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                    let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to represent field ID as a u8.".to_string(),
+                    )?;
                     if let TypeSpecification::Plugin(_) = type_store.get(&field_id)? {
-                        bail!("The first v0 arithmetic RAM type parameter must refer to a field")
+                        bail!(
+                            ErrorKind::OtherError,
+                            "The first v0 arithmetic RAM type parameter must refer to a field"
+                        )
                     }
 
                     // Just check that the other parameters are numeric
                     for (i, p) in params.iter().enumerate().skip(1) {
                         if let PluginTypeArg::String(_) = p {
                             bail!(
+                                ErrorKind::OtherError,
                                 "The v0 arithmetic RAM type expects a number for parameter {}, but a string was found",
                                 i
                             )
@@ -1677,12 +1738,18 @@ impl<
 
                     Ok(())
                 }
-                _ => bail!("{} is not a type defined by {}", operation, name),
+                _ => bail!(
+                    ErrorKind::OtherError,
+                    "{} is not a type defined by {}",
+                    operation,
+                    name
+                ),
             },
             "ram_arith_v1" => match operation {
                 "ram" => {
                     ensure!(
                         params.len() == 1,
+                        ErrorKind::OtherError,
                         "Arithmetic RAM types must specify one parameter, but {} were given",
                         params.len()
                     );
@@ -1690,21 +1757,38 @@ impl<
                     // Validate type index refers to a field
                     let PluginTypeArg::Number(field_id) = params[0] else {
                         bail!(
+                            ErrorKind::OtherError,
                             "The arithmetic RAM type expects a number as its first parameter, but a string was found"
                         )
                     };
-                    let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                    let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to represent field ID as a u8.".to_string(),
+                    )?;
                     if let TypeSpecification::Plugin(_) = type_store.get(&field_id)? {
-                        bail!("The first arithmetic RAM type parameter must refer to a field")
+                        bail!(
+                            ErrorKind::OtherError,
+                            "The first arithmetic RAM type parameter must refer to a field"
+                        )
                     }
 
                     self.eval.push(Box::new(EvaluatorRam(Memory::new())));
 
                     Ok(())
                 }
-                _ => bail!("{} is not a type defined by {}", operation, name),
+                _ => bail!(
+                    ErrorKind::OtherError,
+                    "{} is not a type defined by {}",
+                    operation,
+                    name
+                ),
             },
-            _ => bail!("Plugin type not supported yet: {}:{}", name, operation),
+            _ => bail!(
+                ErrorKind::UnsupportedError,
+                "Plugin type not supported yet: {}:{}",
+                name,
+                operation
+            ),
         }
     }
 
@@ -1807,7 +1891,11 @@ impl<
             self.load_backend_fe::<F384q>(channel, rng, idx, lpn_setup, lpn_extend)?;
             Ok(())
         } else {
-            bail!("Unknown or unsupported field {:?}", field);
+            bail!(
+                ErrorKind::UnsupportedError,
+                "Unknown or unsupported field {:?}",
+                field
+            );
         }
     }
 
@@ -1827,7 +1915,11 @@ impl<
                     self.load_backend_plaintext(*field, *idx as usize)?;
                 }
                 _ => {
-                    bail!("Type not supported yet: {:?}", spec);
+                    bail!(
+                        ErrorKind::UnsupportedError,
+                        "Type not supported yet: {:?}",
+                        spec
+                    );
                 }
             }
         }
@@ -1896,7 +1988,11 @@ impl<
             self.load_backend_fe_plaintext::<F384q>(idx)?;
             Ok(())
         } else {
-            bail!("Unknown or unsupported field {:?}", field);
+            bail!(
+                ErrorKind::UnsupportedError,
+                "Unknown or unsupported field {:?}",
+                field
+            );
         }
     }
 
@@ -2078,7 +2174,11 @@ impl<
                 lpn_extend,
             )
         } else {
-            bail!("Unknown or unsupported field {:?}", field);
+            bail!(
+                ErrorKind::UnsupportedError,
+                "Unknown or unsupported field {:?}",
+                field
+            );
         }
     }
 
@@ -2239,6 +2339,7 @@ impl<
         let output_counts = func.output_counts();
         ensure!(
             out_ranges.len() == output_counts.len(),
+            ErrorKind::OtherError,
             "Output range does not match output counts: {} != {}",
             out_ranges.len(),
             output_counts.len()
@@ -2259,6 +2360,7 @@ impl<
         let input_counts = func.input_counts();
         ensure!(
             in_ranges.len() == input_counts.len(),
+            ErrorKind::OtherError,
             "Input range does not match input counts: {} != {}",
             in_ranges.len(),
             input_counts.len()
@@ -2384,7 +2486,10 @@ impl<
                                         in_ranges,
                                         body,
                                     )?
-                                    .ok_or_eyre("RamInit should return a RamId")?;
+                                    .ok_or_swanky_error(
+                                        ErrorKind::OtherError,
+                                        "RamInit should return a RamId",
+                                    )?;
 
                                 // Safety: The above will fail if out_ranges is
                                 // not exactly one wire range of length 1
@@ -2565,6 +2670,7 @@ pub(crate) mod tests {
     };
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::{Channel, SyncChannel};
+    use swanky_error::{ErrorKind, WrapErr};
     use swanky_field::FiniteRing;
     use swanky_field::PrimeFiniteField;
     use swanky_field_binary::F2;
@@ -2635,15 +2741,18 @@ pub(crate) mod tests {
         gates: Vec<GateM>,
         instances: Vec<Vec<Number>>,
         witnesses: Vec<Vec<Number>>,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         let func_store_prover = func_store.clone();
         let gates_prover = gates.clone();
         let ins_prover = instances.clone();
         let wit_prover = witnesses;
         let type_store = TypeStore::try_from(fields.clone())?;
         let type_store_prover = type_store.clone();
-        let (sender, receiver) = UnixStream::pair()?;
-        let handle: JoinHandle<eyre::Result<()>> = std::thread::spawn(move || {
+        let (sender, receiver) = UnixStream::pair().wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to create Unix socket pair.".to_string(),
+        )?;
+        let handle: JoinHandle<swanky_error::Result<()>> = std::thread::spawn(move || {
             let rng = AesRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
@@ -2669,7 +2778,7 @@ pub(crate) mod tests {
             )?;
             eval.load_backends(&mut channel, LpnSize::Small)?;
             eval.evaluate_gates(&gates_prover, &func_store_prover)?;
-            eyre::Result::Ok(())
+            swanky_error::Result::Ok(())
         });
 
         let rng = AesRng::from_seed(Default::default());
@@ -2704,7 +2813,7 @@ pub(crate) mod tests {
         gates: Vec<GateM>,
         instances: Vec<Vec<Number>>,
         witnesses: Vec<Vec<Number>>,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         let type_store = TypeStore::try_from(fields.clone())?;
 
         let mut inputs = CircInputs::default();
@@ -2725,7 +2834,7 @@ pub(crate) mod tests {
         >::new_plaintext(inputs, type_store)?;
         eval.load_backends_plaintext()?;
         eval.evaluate_gates(&gates, &func_store)?;
-        eyre::Result::Ok(())
+        swanky_error::Result::Ok(())
     }
 
     fn test_conv_00() {

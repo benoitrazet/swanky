@@ -1,6 +1,5 @@
-use eyre::{Result, ensure};
-
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::{ErrorKind, Result, ensure};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::{IsParty, Party, Prover};
 
@@ -42,8 +41,16 @@ impl<B: BackendT> ComittedAcc<B> {
     /// for an honest prover this junk will be zero, however it is
     /// not required to enforce this for soundness.
     pub fn verify(&self, backend: &mut B, r1cs: &R1CS<B::FieldElement>) -> Result<()> {
-        ensure!(self.wit.len() >= r1cs.dim(), "witness dimension too small");
-        ensure!(self.err.len() >= r1cs.rows(), "error dimension too small");
+        ensure!(
+            self.wit.len() >= r1cs.dim(),
+            ErrorKind::OtherError,
+            "witness dimension too small"
+        );
+        ensure!(
+            self.err.len() >= r1cs.rows(),
+            ErrorKind::OtherError,
+            "error dimension too small"
+        );
 
         let u = &self.wit[0];
 

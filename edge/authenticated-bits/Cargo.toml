@@ -17,6 +17,7 @@ swanky-adversary.workspace = true
 swanky-party.workspace = true
 swanky-channel.workspace = true
 swanky-cointoss.workspace = true
+swanky-error.workspace = true
 swanky-f-eq.workspace = true
 swanky-f-rand.workspace = true
 swanky-field-binary.workspace = true
@@ -30,7 +31,6 @@ bytemuck.workspace = true
 itertools.workspace = true
 rand.workspace = true
 proptest.workspace = true
-eyre.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

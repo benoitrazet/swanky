@@ -7,11 +7,11 @@
 //! Emmanuela Orsini, Lawrence Roy, and Peter Scholl. [Publicly Verifiable Zero-Knowledge and
 //! Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
 //!
-use eyre::{Result, bail};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
 use rayon::iter::*;
 use std::{iter::zip, marker::PhantomData};
+use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b, F128b};
 
@@ -154,6 +154,7 @@ where
         // The proof and the decommitted VOLEs should agree on what this size is
         if self.witness_commitment.len() != voles.extended_witness_length() {
             bail!(
+                ErrorKind::OtherError,
                 "Invalid proof: Did not commit to the same number of witnesses {} as there are VOLEs {}",
                 self.witness_commitment.len(),
                 voles.extended_witness_length()
@@ -249,7 +250,10 @@ where {
         // Get the VOLE decommitment challenge and make sure it's valid
         let decommitment_challenge = transcript.extract_decommitment_challenge();
         if self.decommitment_challenge != decommitment_challenge {
-            bail!("Verification failed: VOLE challenge did not match expected value");
+            bail!(
+                ErrorKind::OtherError,
+                "Verification failed: VOLE challenge did not match expected value"
+            );
         }
         log::info!("6: last check {:?}", t.elapsed());
 
@@ -283,11 +287,11 @@ impl AsSecretBytes for Vec<F2> {
 
 #[cfg(test)]
 mod tests {
-    use eyre::Result;
     use merlin::Transcript;
     use rand::thread_rng;
     use std::io::Write;
     use std::{fs::File, io::Cursor};
+    use swanky_error::{ErrorKind, Result, WrapErr};
     use tempfile::tempdir;
 
     use crate::{
@@ -430,9 +434,15 @@ mod tests {
             @end ";
         let small_circuit_text = &mut Cursor::new(small_circuit_bytes.as_bytes());
 
-        let dir = tempdir()?;
+        let dir = tempdir().wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to create a temporary directory.".to_string(),
+        )?;
         let private_input_path = dir.path().join("basic_happy_small_test_path");
-        let mut private_input = File::create(private_input_path.clone())?;
+        let mut private_input = File::create(private_input_path.clone()).wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to create private input file.".to_string(),
+        )?;
         let private_input_bytes = "version 2.0.0;
             private_input;
             @type field 2;
@@ -443,7 +453,10 @@ mod tests {
                 < 0 >;
                 < 1 >;
             @end ";
-        writeln!(private_input, "{private_input_bytes}")?;
+        writeln!(private_input, "{private_input_bytes}").wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to write private input bytes to file.".to_string(),
+        )?;
 
         let small_circuit = load_circuit_prover(small_circuit_text, &private_input_path)?;
         let rng = &mut thread_rng();

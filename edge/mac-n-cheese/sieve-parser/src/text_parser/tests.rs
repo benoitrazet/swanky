@@ -5,8 +5,6 @@ use crate::PrintingVisitor;
 use super::RelationReader;
 
 fn roundtrip(input: &str) -> String {
-    static ONCE: std::sync::Once = std::sync::Once::new();
-    ONCE.call_once(|| std::mem::drop(color_eyre::install()));
     eprintln!("=====\n{input}\n========");
     use std::fmt::Write;
     let mut out = String::new();

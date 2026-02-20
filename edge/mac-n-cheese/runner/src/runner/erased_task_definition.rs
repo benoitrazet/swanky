@@ -17,7 +17,7 @@ trait ObjectSafeTaskDefinition<P: Party>: 'static + Send + Sync {
         input: &TaskInput<P>,
         incoming_data: OwnedAlignedBytes,
         outgoing_data: AlignedBytesMut,
-    ) -> eyre::Result<TaskResult<P, Box<dyn Any + Send>>>;
+    ) -> swanky_error::Result<TaskResult<P, Box<dyn Any + Send>>>;
     fn continue_task(
         &self,
         tc: Box<dyn Any + Send>,
@@ -25,8 +25,8 @@ trait ObjectSafeTaskDefinition<P: Party>: 'static + Send + Sync {
         input: &TaskInput<P>,
         incoming_data: OwnedAlignedBytes,
         outgoing_data: AlignedBytesMut,
-    ) -> eyre::Result<TaskResult<P, Box<dyn Any + Send>>>;
-    fn finalize(&mut self, c: &mut TlsConnection<P>, rng: &mut AesRng) -> eyre::Result<()>;
+    ) -> swanky_error::Result<TaskResult<P, Box<dyn Any + Send>>>;
+    fn finalize(&mut self, c: &mut TlsConnection<P>, rng: &mut AesRng) -> swanky_error::Result<()>;
 }
 
 struct TaskDefinitionWrapper<P: Party, T: TaskDefinition<P>>(Option<T>, PhantomData<P>);
@@ -50,7 +50,7 @@ impl<P: Party, T: TaskDefinition<P>> ObjectSafeTaskDefinition<P> for TaskDefinit
     fn needs_challenge(&self) -> bool {
         T::NEEDS_CHALLENGE
     }
-    fn finalize(&mut self, c: &mut TlsConnection<P>, rng: &mut AesRng) -> eyre::Result<()> {
+    fn finalize(&mut self, c: &mut TlsConnection<P>, rng: &mut AesRng) -> swanky_error::Result<()> {
         self.0
             .take()
             .expect("Finalized called multiple times")
@@ -63,7 +63,7 @@ impl<P: Party, T: TaskDefinition<P>> ObjectSafeTaskDefinition<P> for TaskDefinit
         input: &TaskInput<P>,
         incoming_data: OwnedAlignedBytes,
         outgoing_data: AlignedBytesMut,
-    ) -> eyre::Result<TaskResult<P, Box<dyn Any + Send>>> {
+    ) -> swanky_error::Result<TaskResult<P, Box<dyn Any + Send>>> {
         /*eprintln!(
             "Starting task {} {}",
             ctx.task_id,
@@ -83,7 +83,7 @@ impl<P: Party, T: TaskDefinition<P>> ObjectSafeTaskDefinition<P> for TaskDefinit
         input: &TaskInput<P>,
         incoming_data: OwnedAlignedBytes,
         outgoing_data: AlignedBytesMut,
-    ) -> eyre::Result<TaskResult<P, Box<dyn Any + Send>>> {
+    ) -> swanky_error::Result<TaskResult<P, Box<dyn Any + Send>>> {
         /*eprintln!(
             "Continuing task {} {}",
             ctx.task_id,
@@ -118,7 +118,11 @@ impl<P: Party> ErasedTaskDefinition<P> {
     pub fn needs_challenge(&self) -> bool {
         self.contents.needs_challenge()
     }
-    pub fn finalize(&mut self, c: &mut TlsConnection<P>, rng: &mut AesRng) -> eyre::Result<()> {
+    pub fn finalize(
+        &mut self,
+        c: &mut TlsConnection<P>,
+        rng: &mut AesRng,
+    ) -> swanky_error::Result<()> {
         self.contents.finalize(c, rng)
     }
 
@@ -128,7 +132,7 @@ impl<P: Party> ErasedTaskDefinition<P> {
         input: &TaskInput<P>,
         incoming_data: OwnedAlignedBytes,
         outgoing_data: AlignedBytesMut,
-    ) -> eyre::Result<TaskResult<P, Box<dyn Any + Send>>> {
+    ) -> swanky_error::Result<TaskResult<P, Box<dyn Any + Send>>> {
         self.contents
             .start_task(ctx, input, incoming_data, outgoing_data)
     }
@@ -139,7 +143,7 @@ impl<P: Party> ErasedTaskDefinition<P> {
         input: &TaskInput<P>,
         incoming_data: OwnedAlignedBytes,
         outgoing_data: AlignedBytesMut,
-    ) -> eyre::Result<TaskResult<P, Box<dyn Any + Send>>> {
+    ) -> swanky_error::Result<TaskResult<P, Box<dyn Any + Send>>> {
         self.contents
             .continue_task(tc, ctx, input, incoming_data, outgoing_data)
     }

@@ -2,7 +2,6 @@ use std::{
     any::TypeId, collections::BTreeMap, marker::PhantomData, path::Path, sync::Arc, time::Instant,
 };
 
-use eyre::{Context, ContextCompat};
 use mac_n_cheese_ir::circuit_builder::{
     CircuitBuilder, PrivateBuilder, TaskOutputRef, TaskPrototypeRef, build_circuit,
     vole_supplier::VoleSupplier,
@@ -10,6 +9,7 @@ use mac_n_cheese_ir::circuit_builder::{
 use mac_n_cheese_sieve_parser::ValueStreamReader;
 use mac_n_cheese_wire_map::WireMap;
 use rustc_hash::FxHashMap;
+use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
 use swanky_field_binary::F2;
 use swanky_party::{
     Party, WhichParty,
@@ -167,7 +167,7 @@ impl<P: Party, FE: CompilerField> CircuitMaker<P, FE> {
         cb: &mut CircuitBuilder,
         vs: &mut VoleSupplier,
         pb: &mut ProverPrivate<P, &mut PrivateBuilder>,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         if self.fix_data.is_empty() {
             return Ok(());
         }
@@ -196,7 +196,7 @@ impl<P: Party, FE: CompilerField> CircuitMaker<P, FE> {
         vs: &mut VoleSupplier,
         pb: &mut ProverPrivate<P, &mut PrivateBuilder>,
         x: ProverPrivateCopy<P, FE>,
-    ) -> eyre::Result<WireRef> {
+    ) -> swanky_error::Result<WireRef> {
         let out = WireRef {
             which_task: self.fix_id,
             which_wire: self.fix_data.len().try_into().unwrap(),
@@ -207,7 +207,7 @@ impl<P: Party, FE: CompilerField> CircuitMaker<P, FE> {
         }
         Ok(out)
     }
-    fn flush_constant(&mut self, cb: &mut CircuitBuilder) -> eyre::Result<()> {
+    fn flush_constant(&mut self, cb: &mut CircuitBuilder) -> swanky_error::Result<()> {
         if self.constant_data.is_empty() {
             return Ok(());
         }
@@ -219,7 +219,7 @@ impl<P: Party, FE: CompilerField> CircuitMaker<P, FE> {
         self.constant_id = Self::next_id(&mut self.next_id);
         Ok(())
     }
-    fn constant(&mut self, cb: &mut CircuitBuilder, x: FE) -> eyre::Result<WireRef> {
+    fn constant(&mut self, cb: &mut CircuitBuilder, x: FE) -> swanky_error::Result<WireRef> {
         let out = WireRef {
             which_task: self.constant_id,
             which_wire: self.constant_data.len().try_into().unwrap(),
@@ -230,7 +230,7 @@ impl<P: Party, FE: CompilerField> CircuitMaker<P, FE> {
         }
         Ok(out)
     }
-    fn flush_assert_zero(&mut self, cb: &mut CircuitBuilder) -> eyre::Result<()> {
+    fn flush_assert_zero(&mut self, cb: &mut CircuitBuilder) -> swanky_error::Result<()> {
         if self.assert_zero_data.is_empty() {
             return Ok(());
         }
@@ -246,7 +246,7 @@ impl<P: Party, FE: CompilerField> CircuitMaker<P, FE> {
         self.assert_zero_id = Self::next_id(&mut self.next_id);
         Ok(())
     }
-    fn assert_zero(&mut self, cb: &mut CircuitBuilder, x: WireRef) -> eyre::Result<()> {
+    fn assert_zero(&mut self, cb: &mut CircuitBuilder, x: WireRef) -> swanky_error::Result<()> {
         self.assert_zero_data.push(x);
         if self.assert_zero_data.len() >= 1024 * 1024 {
             self.flush_assert_zero(cb)?;
@@ -254,7 +254,7 @@ impl<P: Party, FE: CompilerField> CircuitMaker<P, FE> {
         Ok(())
     }
 
-    fn flush_assert_multiply(&mut self, cb: &mut CircuitBuilder) -> eyre::Result<()> {
+    fn flush_assert_multiply(&mut self, cb: &mut CircuitBuilder) -> swanky_error::Result<()> {
         if self.assert_multiply_data.is_empty() {
             return Ok(());
         }
@@ -284,7 +284,7 @@ impl<P: Party, FE: CompilerField> CircuitMaker<P, FE> {
         x: WireRef,
         y: WireRef,
         z: WireRef,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         self.assert_multiply_data.push([x, y, z]);
         if self.assert_multiply_data.len() >= 1024 * 1024 {
             self.flush_assert_multiply(cb)?;
@@ -298,7 +298,7 @@ impl<P: Party, FE: CompilerField> CircuitMaker<P, FE> {
         a_c: FE,
         b: WireRef,
         b_c: FE,
-    ) -> eyre::Result<WireRef> {
+    ) -> swanky_error::Result<WireRef> {
         if TypeId::of::<FE>() == TypeId::of::<F2>() {
             match (a_c == FE::ONE, b_c == FE::ONE) {
                 (true, true) => {
@@ -325,7 +325,7 @@ impl<P: Party, FE: CompilerField> CircuitMaker<P, FE> {
         }
         Ok(out)
     }
-    fn flush_linear(&mut self, cb: &mut CircuitBuilder) -> eyre::Result<()> {
+    fn flush_linear(&mut self, cb: &mut CircuitBuilder) -> swanky_error::Result<()> {
         if self.linear_data.is_empty() {
             return Ok(());
         }
@@ -373,7 +373,7 @@ fn mul<P: Party, FE: CompilerField>(
     cm: &mut CircuitMaker<P, FE>,
     (left, left_v): (WireRef, ProverPrivateCopy<P, FE>),
     (right, right_v): (WireRef, ProverPrivateCopy<P, FE>),
-) -> eyre::Result<(WireRef, ProverPrivateCopy<P, FE>)> {
+) -> swanky_error::Result<(WireRef, ProverPrivateCopy<P, FE>)> {
     let product_v = left_v.zip(right_v).map(|(a, b)| a * b);
     let product = cm.fix(cb, vs, pb, product_v)?;
     cm.assert_multiply(cb, left, right, product)?;
@@ -393,8 +393,11 @@ struct EvaluateFieldInstructions<'a, 'b, 'c, 'd, P: Party, VSR: ValueStreamReade
 impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c FieldInstructionsTy>
     for EvaluateFieldInstructions<'a, 'b, '_, '_, P, VSR>
 {
-    type Output = InvariantType<eyre::Result<()>>;
-    fn visit<FE: CompilerField>(self, instructions: &'c FieldInstructions<FE>) -> eyre::Result<()> {
+    type Output = InvariantType<swanky_error::Result<()>>;
+    fn visit<FE: CompilerField>(
+        self,
+        instructions: &'c FieldInstructions<FE>,
+    ) -> swanky_error::Result<()> {
         let mut witness_buf = Vec::<FE>::with_capacity(1);
         let wm = self.wm.as_mut().get::<FE>();
         let public_inputs = self.public_inputs.as_mut().get::<FE>();
@@ -407,32 +410,51 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                     (cm.constant(self.cb, src)?, ProverPrivateCopy::new(src)),
                 )?,
                 FieldInstruction::AssertZero { src } => {
-                    let (src, src_value) = *wm.get(src)?;
+                    let (src, src_value) = *wm.get(src).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to get wire {src}.".to_string(),
+                    )?;
                     if let WhichParty::Prover(e) = P::WHICH {
-                        eyre::ensure!(
+                        swanky_error::ensure!(
                             src_value.into_inner(e) == FE::ZERO,
+                            ErrorKind::OtherError,
                             "assert zero will fail!"
                         );
                     }
                     cm.assert_zero(self.cb, src)?;
                 }
                 FieldInstruction::Copy { dst, src } => {
-                    let src = *wm.get(src).with_context(|| {
-                        format!(
-                            "Copy to {dst} from {src} in {}",
-                            std::any::type_name::<FE>()
+                    let src = *wm
+                        .get(src)
+                        .wrap_err(
+                            ErrorKind::OtherError,
+                            "Failed to get wire {src}.".to_string(),
                         )
-                    })?;
+                        .with_context(|| {
+                            format!(
+                                "Copy to {dst} from {src} in {}",
+                                std::any::type_name::<FE>()
+                            )
+                        })?;
                     put(wm, dst, src)?;
                 }
                 FieldInstruction::Add { dst, left, right } => {
-                    let (left, left_v) = *wm.get(left).with_context(|| {
-                        format!(
-                            "Add to {dst} from {left} in {}",
-                            std::any::type_name::<FE>()
+                    let (left, left_v) = *wm
+                        .get(left)
+                        .wrap_err(
+                            ErrorKind::OtherError,
+                            "Failed to get wire {left}.".to_string(),
                         )
-                    })?;
-                    let (right, right_v) = *wm.get(right)?;
+                        .with_context(|| {
+                            format!(
+                                "Add to {dst} from {left} in {}",
+                                std::any::type_name::<FE>()
+                            )
+                        })?;
+                    let (right, right_v) = *wm.get(right).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to get wire {right}.".to_string(),
+                    )?;
                     put(
                         wm,
                         dst,
@@ -443,8 +465,14 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                     )?;
                 }
                 FieldInstruction::Mul { dst, left, right } => {
-                    let (left, left_v) = *wm.get(left)?;
-                    let (right, right_v) = *wm.get(right)?;
+                    let (left, left_v) = *wm.get(left).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to get wire {left}.".to_string(),
+                    )?;
+                    let (right, right_v) = *wm.get(right).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to get wire {right}.".to_string(),
+                    )?;
                     let (product, product_v) = mul(
                         self.cb,
                         self.vs,
@@ -456,7 +484,10 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                     put(wm, dst, (product, product_v))?;
                 }
                 FieldInstruction::AddConstant { dst, left, right } => {
-                    let (left, left_v) = *wm.get(left)?;
+                    let (left, left_v) = *wm.get(left).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to get wire {left}.".to_string(),
+                    )?;
                     let right_c = cm.constant(self.cb, right)?;
                     put(
                         wm,
@@ -468,7 +499,10 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                     )?;
                 }
                 FieldInstruction::MulConstant { dst, left, right } => {
-                    let (left, left_v) = *wm.get(left)?;
+                    let (left, left_v) = *wm.get(left).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to get wire {left}.".to_string(),
+                    )?;
                     put(
                         wm,
                         dst,
@@ -479,7 +513,9 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                     )?;
                 }
                 FieldInstruction::GetPublicInput { dst } => {
-                    let c = public_inputs.next().context("need public input")?;
+                    let c = public_inputs
+                        .next()
+                        .ok_or_swanky_error(ErrorKind::OtherError, "need public input")?;
                     put(
                         wm,
                         dst,
@@ -515,7 +551,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
     instructions: &[Instruction],
     public_inputs: &mut FieldGenericProduct<std::vec::IntoIter<FieldGenericIdentity>>,
     functions: &[Arc<FunctionDefinition>],
-) -> eyre::Result<()> {
+) -> swanky_error::Result<()> {
     for instruction in instructions {
         match instruction {
             Instruction::FieldInstructions(instructions) => {
@@ -549,11 +585,11 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                         CompilerFieldVisitor<&'b mut WireMap<'c, ValuedWire<P>>>
                         for &'_ mut V<'a, '_, P>
                     {
-                        type Output = eyre::Result<WireMap<'b, ValuedWire<P>>>;
+                        type Output = swanky_error::Result<WireMap<'b, ValuedWire<P>>>;
                         fn visit<FE: CompilerField>(
                             self,
                             parent: &'b mut WireMap<'c, (WireRef, ProverPrivateCopy<P, FE>)>,
-                        ) -> eyre::Result<WireMap<'b, (WireRef, ProverPrivateCopy<P, FE>)>>
+                        ) -> swanky_error::Result<WireMap<'b, (WireRef, ProverPrivateCopy<P, FE>)>>
                         {
                             let cm = self.cm.as_mut().get::<FE>();
 
@@ -687,8 +723,8 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                     phantom: PhantomData<P>,
                 }
                 impl<'a, 'b, P: Party> CompilerFieldVisitor for &'_ mut V<'a, 'b, '_, '_, P> {
-                    type Output = InvariantType<eyre::Result<()>>;
-                    fn visit<FE: CompilerField>(self, _arg: ()) -> eyre::Result<()> {
+                    type Output = InvariantType<swanky_error::Result<()>>;
+                    fn visit<FE: CompilerField>(self, _arg: ()) -> swanky_error::Result<()> {
                         let wm = self.wm.as_mut().get::<FE>();
                         let cm = self.cm.as_mut().get::<FE>();
 
@@ -714,7 +750,10 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                 let mut cond_wires =
                                     Vec::with_capacity(cond_wire_range.len() as usize);
                                 for w in cond_wire_range.start..=cond_wire_range.inclusive_end {
-                                    cond_wires.push(*wm.get(w)?);
+                                    cond_wires.push(*wm.get(w).wrap_err(
+                                        ErrorKind::OtherError,
+                                        "Failed to get wire {w}.".to_string(),
+                                    )?);
                                 }
 
                                 for i in 0..num_branches {
@@ -735,8 +774,10 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                     }
 
                                     // Multiply the results
-                                    let &(mut g_i, mut g_i_v) =
-                                        xors.get(0).context("Mux condition empty")?;
+                                    let &(mut g_i, mut g_i_v) = xors.get(0).ok_or_swanky_error(
+                                        ErrorKind::OtherError,
+                                        "Mux condition empty",
+                                    )?;
                                     for &(xor, xor_v) in &xors[1..] {
                                         (g_i, g_i_v) = mul(
                                             self.cb,
@@ -755,7 +796,10 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                 debug_assert_eq!(cond_wire_range.len(), 1);
 
                                 // c
-                                let (cond, cond_v) = *wm.get(cond_wire_range.start)?;
+                                let (cond, cond_v) = *wm.get(cond_wire_range.start).wrap_err(
+                                    ErrorKind::OtherError,
+                                    format!("Failed to get wire {}.", cond_wire_range.start),
+                                )?;
 
                                 for i in 0..num_branches {
                                     let i = to_fe(i)?;
@@ -792,7 +836,9 @@ fn eval<P: Party, VSR: ValueStreamReader>(
 
                         // For strict mode, assert sum(g_i) = 1
                         if let Permissiveness::Strict = self.permissiveness {
-                            let &(mut sum, _) = g.get(0).context("Mux has no branches")?;
+                            let &(mut sum, _) = g
+                                .get(0)
+                                .ok_or_swanky_error(ErrorKind::OtherError, "Mux has no branches")?;
 
                             // sum(g_i)
                             for &(g_i, _) in &g[1..] {
@@ -840,20 +886,30 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                 debug_assert_eq!(jth_branch_wires.len(), num_branches);
 
                                 // The first product is computed outside the loop
-                                let &g_0 = g.get(0).context("Mux has no branches")?;
+                                let &g_0 = g.get(0).ok_or_swanky_error(
+                                    ErrorKind::OtherError,
+                                    "Mux has no branches",
+                                )?;
 
                                 // b_i_j is the jth wire of input branch i
-                                let b_0_j = *wm.get(
-                                    jth_branch_wires
-                                        .next()
-                                        .context("Mux has no input branches")?,
-                                )?;
+                                let b_0_j = *wm
+                                    .get(jth_branch_wires.next().ok_or_swanky_error(
+                                        ErrorKind::OtherError,
+                                        "Mux has no input branches",
+                                    )?)
+                                    .wrap_err(
+                                        ErrorKind::OtherError,
+                                        "Failed to get b_0_jth wire.".to_string(),
+                                    )?;
 
                                 let (mut sum, mut sum_v) =
                                     mul(self.cb, self.vs, self.pb, cm, g_0, b_0_j)?;
 
                                 for (b_i_j, &g_i) in jth_branch_wires.zip(&g[1..]) {
-                                    let b_i_j = *wm.get(b_i_j)?;
+                                    let b_i_j = *wm.get(b_i_j).wrap_err(
+                                        ErrorKind::OtherError,
+                                        "Failed to get wire {b_i_j}.".to_string(),
+                                    )?;
                                     let (prod, prod_v) =
                                         mul(self.cb, self.vs, self.pb, cm, g_i, b_i_j)?;
                                     sum = cm.linear(self.cb, sum, FE::ONE, prod, FE::ONE)?;
@@ -887,10 +943,10 @@ fn eval<P: Party, VSR: ValueStreamReader>(
 
 pub(super) fn write_circuit<P: Party, VSR: ValueStreamReader + Send + 'static>(
     dst: &Path,
-    circuit_chunks: flume::Receiver<eyre::Result<CircuitChunk>>,
+    circuit_chunks: flume::Receiver<swanky_error::Result<CircuitChunk>>,
     mut witness_reader: ProverPrivate<P, Inputs<VSR>>,
     mut private_builder: ProverPrivate<P, &mut PrivateBuilder>,
-) -> eyre::Result<()> {
+) -> swanky_error::Result<()> {
     build_circuit(dst, |cb| {
         let mut functions = Vec::new();
         let mut root_wm = FieldGenericProduct::<WireMap<ValuedWire<P>>>::default();
@@ -933,8 +989,11 @@ pub(super) fn write_circuit<P: Party, VSR: ValueStreamReader + Send + 'static>(
             phantom: PhantomData<P>,
         }
         impl<P: Party> CompilerFieldVisitor<CircuitMakerTy<P>> for &'_ mut V<'_, '_, '_, P> {
-            type Output = eyre::Result<()>;
-            fn visit<FE: CompilerField>(self, mut cm: CircuitMaker<P, FE>) -> eyre::Result<()> {
+            type Output = swanky_error::Result<()>;
+            fn visit<FE: CompilerField>(
+                self,
+                mut cm: CircuitMaker<P, FE>,
+            ) -> swanky_error::Result<()> {
                 cm.flush_fix(self.cb, self.vs, self.pb)?;
                 cm.flush_constant(self.cb)?;
                 cm.flush_assert_zero(self.cb)?;
@@ -945,7 +1004,7 @@ pub(super) fn write_circuit<P: Party, VSR: ValueStreamReader + Send + 'static>(
                     cb: &mut CircuitBuilder,
                     protos: &Protos,
                     finished_tasks: &mut FxHashMap<u32, TaskOutputRef>,
-                ) -> eyre::Result<()> {
+                ) -> swanky_error::Result<()> {
                     let mut inputs = Vec::new();
                     for (task_id, (proto, tids_and_lengths)) in protos.iter() {
                         inputs.clear();
@@ -954,6 +1013,10 @@ pub(super) fn write_circuit<P: Party, VSR: ValueStreamReader + Send + 'static>(
                             inputs.push(
                                 finished_tasks
                                     .get(tid)
+                                    .ok_or_swanky_error(
+                                        ErrorKind::OtherError,
+                                        "Failed to get task {tid}.",
+                                    )
                                     .with_context(|| {
                                         format!("{task_id} is unable to find task id {tid}")
                                     })

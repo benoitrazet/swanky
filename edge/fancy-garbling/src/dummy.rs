@@ -4,6 +4,7 @@
 //! creating any circuits.
 
 use swanky_channel::Channel;
+use swanky_error::ErrorKind;
 
 use crate::{
     FancyArithmetic, FancyBinary, check_binary,
@@ -49,7 +50,12 @@ impl FancyInput for Dummy {
     type Item = DummyVal;
 
     /// Encode a single dummy value.
-    fn encode(&mut self, value: u16, modulus: u16, _: &mut Channel) -> eyre::Result<DummyVal> {
+    fn encode(
+        &mut self,
+        value: u16,
+        modulus: u16,
+        _: &mut Channel,
+    ) -> swanky_error::Result<DummyVal> {
         Ok(DummyVal::new(value, modulus))
     }
 
@@ -59,7 +65,7 @@ impl FancyInput for Dummy {
         xs: &[u16],
         moduli: &[u16],
         _: &mut Channel,
-    ) -> eyre::Result<Vec<DummyVal>> {
+    ) -> swanky_error::Result<Vec<DummyVal>> {
         assert_eq!(xs.len(), moduli.len());
         Ok(xs
             .iter()
@@ -68,9 +74,16 @@ impl FancyInput for Dummy {
             .collect())
     }
 
-    fn receive_many(&mut self, _moduli: &[u16], _: &mut Channel) -> eyre::Result<Vec<DummyVal>> {
+    fn receive_many(
+        &mut self,
+        _moduli: &[u16],
+        _: &mut Channel,
+    ) -> swanky_error::Result<Vec<DummyVal>> {
         // Receive is undefined for Dummy which is a single party "protocol"
-        eyre::bail!("`receive_many` is undefined for `Dummy`");
+        swanky_error::bail!(
+            ErrorKind::UnsupportedError,
+            "`receive_many` is undefined for `Dummy`"
+        );
     }
 }
 
@@ -87,7 +100,7 @@ impl FancyBinary for Dummy {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         check_binary!(x);
         check_binary!(y);
 
@@ -125,7 +138,12 @@ impl FancyArithmetic for Dummy {
         }
     }
 
-    fn mul(&mut self, x: &DummyVal, y: &DummyVal, _: &mut Channel) -> eyre::Result<DummyVal> {
+    fn mul(
+        &mut self,
+        x: &DummyVal,
+        y: &DummyVal,
+        _: &mut Channel,
+    ) -> swanky_error::Result<DummyVal> {
         Ok(DummyVal {
             val: x.val * y.val % x.modulus,
             modulus: x.modulus,
@@ -138,7 +156,7 @@ impl FancyArithmetic for Dummy {
         modulus: u16,
         tt: Option<Vec<u16>>,
         _: &mut Channel,
-    ) -> eyre::Result<DummyVal> {
+    ) -> swanky_error::Result<DummyVal> {
         assert!(tt.is_some(), "`tt` must not be `None`");
         let tt = tt.unwrap();
         assert!(
@@ -157,17 +175,22 @@ impl FancyArithmetic for Dummy {
 impl Fancy for Dummy {
     type Item = DummyVal;
 
-    fn constant(&mut self, val: u16, modulus: u16, _: &mut Channel) -> eyre::Result<DummyVal> {
+    fn constant(
+        &mut self,
+        val: u16,
+        modulus: u16,
+        _: &mut Channel,
+    ) -> swanky_error::Result<DummyVal> {
         Ok(DummyVal { val, modulus })
     }
 
-    fn output(&mut self, x: &DummyVal, _: &mut Channel) -> eyre::Result<Option<u16>> {
+    fn output(&mut self, x: &DummyVal, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
         Ok(Some(x.val))
     }
 }
 
 impl FancyReveal for Dummy {
-    fn reveal(&mut self, x: &DummyVal, _: &mut Channel) -> eyre::Result<u16> {
+    fn reveal(&mut self, x: &DummyVal, _: &mut Channel) -> swanky_error::Result<u16> {
         Ok(x.val)
     }
 }

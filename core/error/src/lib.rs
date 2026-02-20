@@ -60,6 +60,10 @@ error_kind! {
     SerializationError,
     #[doc = "A filesystem error has occurred"]
     FilesystemError,
+    #[doc = "An error occurred while initializing an object/protocol"]
+    InitializationError,
+    #[doc = "An operation that is unsupported was attempted"]
+    UnsupportedError,
     #[doc = "An error that does not fall under any other Swanky error kind has occurred"]
     OtherError,
 }
@@ -172,6 +176,14 @@ impl Error {
     /// (as `ErrorKind` may be extended in the future).
     pub fn kind(&self) -> ErrorKind {
         self.inner.kind
+    }
+
+    /// Create a new error using the kind and message of another.
+    ///
+    /// It is atypical to use this method; see [`WrapErr`] which adds
+    /// this functionality to [`Result<T, U>`] values.
+    pub fn wrap_err(self, other: Self) -> Self {
+        Self::new(other.inner.kind, other.inner.message, Some(Box::new(self)))
     }
 }
 
@@ -323,7 +335,7 @@ pub trait WrapErr: Sealed {
 
     /// Lazily wrap the error value with a new [`Error`], constructing
     /// the message only once an error does occur.
-    fn wrap_err_with(self, kind: ErrorKind, msg: impl FnOnce() -> String) -> Result<Self::Output>;
+    fn wrap_err_with(self, kind: ErrorKind, f: impl FnOnce() -> String) -> Result<Self::Output>;
 }
 
 impl<T, E: std::error::Error + Send + Sync + 'static> WrapErr for std::result::Result<T, E> {
@@ -335,8 +347,8 @@ impl<T, E: std::error::Error + Send + Sync + 'static> WrapErr for std::result::R
     }
 
     #[inline]
-    fn wrap_err_with(self, kind: ErrorKind, msg: impl FnOnce() -> String) -> Result<Self::Output> {
-        self.map_err(|e| Error::new(kind, msg(), Some(Box::new(e))))
+    fn wrap_err_with(self, kind: ErrorKind, f: impl FnOnce() -> String) -> Result<Self::Output> {
+        self.map_err(|e| Error::new(kind, f(), Some(Box::new(e))))
     }
 }
 

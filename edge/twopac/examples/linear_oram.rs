@@ -105,7 +105,7 @@ fn fancy_linear_oram<F>(
     f: &mut F,
     wire_inputs: ORAMInputs<F::Item>,
     channel: &mut Channel,
-) -> eyre::Result<BinaryBundle<F::Item>>
+) -> swanky_error::Result<BinaryBundle<F::Item>>
 where
     F: FancyReveal + Fancy + BinaryGadgets + FancyBinary + FancyArithmetic,
 {

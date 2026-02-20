@@ -21,7 +21,6 @@ doctest = false
 serde = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
-eyre.workspace = true
 vectoreyes.workspace = true
 itertools.workspace = true
 rand.workspace = true
@@ -34,6 +33,7 @@ swanky-aes-hash.workspace = true
 swanky-aes-rng.workspace = true
 swanky-block.workspace = true
 swanky-channel.workspace = true
+swanky-error.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

@@ -35,7 +35,7 @@ fn setup_panic_handler() {
     }));
 }
 
-fn main() -> eyre::Result<()> {
+fn main() -> swanky_error::Result<()> {
     /*let profiler = dhat::Profiler::builder().trim_backtraces(None).build();
     std::thread::spawn(move || {
         TcpListener::bind("localhost:9999")
@@ -44,7 +44,6 @@ fn main() -> eyre::Result<()> {
             .unwrap();
         std::mem::drop(profiler);
     });*/
-    color_eyre::install()?;
     setup_panic_handler();
     match Cli::parse().command {
         Commands::CompileAesBenchmark(args) => aes_example::aes_main(args),

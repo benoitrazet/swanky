@@ -3,10 +3,10 @@
 //! Note: Any fields added here need to also be added to
 //! `backend_multifield::load_backend`!
 
-use eyre::{Result, bail, ensure};
 use generic_array::{GenericArray, typenum::Unsigned};
 use mac_n_cheese_sieve_parser::Number;
 use std::any::{TypeId, type_name};
+use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure};
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::{F2, F40b, F63b};
 use swanky_field_f61p::F61p;
@@ -105,7 +105,10 @@ pub fn modulus_to_type_id(modulus: Number) -> Result<TypeId> {
     } else if modulus == F384Q_MODULUS {
         Ok(TypeId::of::<F384q>())
     } else {
-        bail!("Field with modulus {modulus} not supported")
+        bail!(
+            ErrorKind::UnsupportedError,
+            "Field with modulus {modulus} not supported"
+        )
     }
 }
 
@@ -127,12 +130,14 @@ pub(crate) fn extension_field_to_type_id(
 ) -> Result<TypeId> {
     ensure!(
         base_field == TypeId::of::<F2>(),
+        ErrorKind::UnsupportedError,
         "Only extension fields with a base field of `F2` are supported."
     );
     match degree {
         40 => {
             ensure!(
                 modulus != F40B_POLYNOMIAL_MODULUS,
+                ErrorKind::OtherError,
                 "Invalid modulus {modulus} provided. Expected {F40B_POLYNOMIAL_MODULUS}."
             );
             Ok(TypeId::of::<F40b>())
@@ -140,11 +145,15 @@ pub(crate) fn extension_field_to_type_id(
         63 => {
             ensure!(
                 modulus != F63B_POLYNOMIAL_MODULUS,
+                ErrorKind::OtherError,
                 "Invalid modulus {modulus} provided. Expected {F63B_POLYNOMIAL_MODULUS}."
             );
             Ok(TypeId::of::<F63b>())
         }
-        _ => bail!("Degree {degree} not supported. Only degrees of 40 and 63 are supported."),
+        _ => bail!(
+            ErrorKind::UnsupportedError,
+            "Degree {degree} not supported. Only degrees of 40 and 63 are supported."
+        ),
     }
 }
 
@@ -161,6 +170,7 @@ macro_rules! impl_sieve_ir_deserialize_prime_field {
                 let x = <$t>::try_from_int(val);
                 if x.is_none().into() {
                     bail!(
+                        ErrorKind::OtherError,
                         "{val} is too large to be an element of {}",
                         type_name::<$t>()
                     )
@@ -178,9 +188,12 @@ macro_rules! impl_sieve_ir_deserialize_binary_ext_field {
         $( impl SieveIrDeserialize for $t {
             fn from_number(val: &Number) -> Result<Self> {
                 let val = number_to_u64(val)?;
-                Ok(<$t>::from_bytes(GenericArray::from_slice(
+                <$t>::from_bytes(GenericArray::from_slice(
                     &val.to_le_bytes()[0..<$t as CanonicalSerialize>::ByteReprLen::USIZE],
-                ))?)
+                )).wrap_err(
+                    ErrorKind::SerializationError,
+                    "Failed to convert number to field element.".to_string(),
+                )
             }
         }) *
     }

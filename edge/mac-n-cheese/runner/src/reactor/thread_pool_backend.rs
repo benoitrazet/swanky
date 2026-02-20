@@ -17,6 +17,7 @@ use moka::sync::SegmentedCache;
 use parking_lot::Mutex;
 use rand::RngCore;
 use rustc_hash::FxHashMap;
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_party::{Party, WhichParty, either::PartyEither, private::ProverPrivate};
 
 use crate::{
@@ -131,7 +132,11 @@ impl<P: Party> ThreadPoolReactor<P> {
         self.maybe_launch_incoming(task_id, &mut guard);
     }
 
-    fn outgoing_thread(&self, mut conn: TcpStream, connection_idx: u64) -> eyre::Result<()> {
+    fn outgoing_thread(
+        &self,
+        mut conn: TcpStream,
+        connection_idx: u64,
+    ) -> swanky_error::Result<()> {
         while let Some(mut data) = self.outgoing_data.dequeue() {
             let span = event_log::EncryptingOutgoingData {
                 task_id: data.task_id,
@@ -147,22 +152,49 @@ impl<P: Party> ThreadPoolReactor<P> {
             }
             .start();
             // TODO: do a vectored send
-            conn.write_all(bytemuck::bytes_of(&tdh))?;
-            conn.write_all(&data.payload)?;
-            conn.flush()?; // shouldn't actually do anything
+            conn.write_all(bytemuck::bytes_of(&tdh)).wrap_err(
+                ErrorKind::NetworkError,
+                "Failed to write task data handler bytes.".to_string(),
+            )?;
+            conn.write_all(&data.payload).wrap_err(
+                ErrorKind::NetworkError,
+                "Failed to write payload bytes.".to_string(),
+            )?;
+            conn.flush().wrap_err(
+                ErrorKind::NetworkError,
+                "Failed to flush network connection.".to_string(),
+            )?; // shouldn't actually do anything
             span.finish();
         }
         Ok(())
     }
-    fn incoming_thread(&self, mut conn: TcpStream, connection_idx: u64) -> eyre::Result<()> {
+    fn incoming_thread(
+        &self,
+        mut conn: TcpStream,
+        connection_idx: u64,
+    ) -> swanky_error::Result<()> {
         loop {
             let mut tdh = TaskDataHeader::zeroed();
-            if conn.read(&mut bytemuck::bytes_of_mut(&mut tdh)[0..1])? == 0 {
+            if conn
+                .read(&mut bytemuck::bytes_of_mut(&mut tdh)[0..1])
+                .wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to read first task data handler byte.".to_string(),
+                )?
+                == 0
+            {
                 return Ok(());
             }
-            conn.read_exact(&mut bytemuck::bytes_of_mut(&mut tdh)[1..])?;
+            conn.read_exact(&mut bytemuck::bytes_of_mut(&mut tdh)[1..])
+                .wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to read remaining task data handler bytes.".to_string(),
+                )?;
             let mut buf = OwnedAlignedBytes::zeroed(tdh.length as usize);
-            conn.read_exact(&mut buf)?;
+            conn.read_exact(&mut buf).wrap_err(
+                ErrorKind::NetworkError,
+                "Failed to read encrypted bytes.".to_string(),
+            )?;
             self.keys.decrypt_incoming(tdh, &mut buf)?;
             event_log::ReadIncomingData {
                 task_id: tdh.task_id,
@@ -176,7 +208,7 @@ impl<P: Party> ThreadPoolReactor<P> {
             });
         }
     }
-    fn challenge_thread(&self, mut conn: TcpStream) -> eyre::Result<()> {
+    fn challenge_thread(&self, mut conn: TcpStream) -> swanky_error::Result<()> {
         // TODO: enable nagle's algorithm and disable delayed ack?
         #[repr(C)]
         #[derive(Clone, Copy, bytemuck::Zeroable, bytemuck::Pod)]
@@ -192,10 +224,17 @@ impl<P: Party> ThreadPoolReactor<P> {
                 loop {
                     let mut buf = [0; std::mem::size_of::<ChallengeData>()
                         + std::mem::size_of::<aes_gcm::Tag>()];
-                    if conn.read(&mut buf[0..1])? == 0 {
+                    if conn.read(&mut buf[0..1]).wrap_err(
+                        ErrorKind::NetworkError,
+                        "Failed to read first challenge data byte.".to_string(),
+                    )? == 0
+                    {
                         break;
                     }
-                    conn.read_exact(&mut buf[1..])?;
+                    conn.read_exact(&mut buf[1..]).wrap_err(
+                        ErrorKind::NetworkError,
+                        "Failed to read remaining challenge data bytes.".to_string(),
+                    )?;
                     let (data, tag) = buf.split_at_mut(std::mem::size_of::<ChallengeData>());
                     let mut nonce: Nonce<<Aes128Gcm as AeadCore>::NonceSize> = Default::default();
                     nonce[0..8].copy_from_slice(&ctr.to_le_bytes());
@@ -208,7 +247,12 @@ impl<P: Party> ThreadPoolReactor<P> {
                             // We need to use the rustcrypto version of GenericArray
                             aes_gcm::aead::generic_array::GenericArray::from_slice(tag),
                         )
-                        .map_err(|_| eyre::eyre!("Error decrypting challenge"))?;
+                        .map_err(|_| {
+                            swanky_error::swanky_error!(
+                                ErrorKind::OtherError,
+                                "Error decrypting challenge"
+                            )
+                        })?;
                     let mut cd = ChallengeData::zeroed();
                     bytemuck::bytes_of_mut(&mut cd).copy_from_slice(data);
                     ctr += 1;
@@ -245,18 +289,28 @@ impl<P: Party> ThreadPoolReactor<P> {
                         .unwrap();
                     tag_dst.copy_from_slice(&tag);
                     ctr += 1;
-                    conn.write_all(&buf)?;
-                    conn.flush()?; // shouldn't actually do anything
+                    conn.write_all(&buf).wrap_err(
+                        ErrorKind::NetworkError,
+                        "Failed to write bytes.".to_string(),
+                    )?;
+                    conn.flush().wrap_err(
+                        ErrorKind::NetworkError,
+                        "Failed to flush network.".to_string(),
+                    )?; // shouldn't actually do anything
                     span.finish();
                 }
             }
         }
         Ok(())
     }
-    fn fulfill_read_request(&self, req: FileReadRequest) -> eyre::Result<BytesFromDisk> {
+    fn fulfill_read_request(&self, req: FileReadRequest) -> swanky_error::Result<BytesFromDisk> {
         match req {
             FileReadRequest::Public(req) => {
-                let mut out = OwnedAlignedBytes::zeroed(usize::try_from(req.chunk.length())?);
+                let mut out =
+                    OwnedAlignedBytes::zeroed(usize::try_from(req.chunk.length()).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to represent request length as a usize.".to_string(),
+                    )?);
                 self.manifest.read_data_chunk(&req.chunk, &mut out)?;
                 Ok(Arc::new(out))
             }
@@ -267,7 +321,11 @@ impl<P: Party> ThreadPoolReactor<P> {
                         .privates_file
                         .as_ref()
                         .into_inner(e)
-                        .read_exact_at(&mut out, req.offset)?,
+                        .read_exact_at(&mut out, req.offset)
+                        .wrap_err(
+                            ErrorKind::FilesystemError,
+                            format!("Failed to read bytes at offset {}", req.offset),
+                        )?,
                     WhichParty::Verifier(_) => {
                         panic!("The verifier shouldn't be reading private data")
                     }
@@ -276,7 +334,7 @@ impl<P: Party> ThreadPoolReactor<P> {
             }
         }
     }
-    fn disk_thread(&self) -> eyre::Result<()> {
+    fn disk_thread(&self) -> swanky_error::Result<()> {
         while let Some(job) = self.file_read_requests.blocking_dequeue() {
             let span = event_log::ReadingFromDisk {
                 task_id: job.id.task_id,
@@ -293,7 +351,10 @@ impl<P: Party> ThreadPoolReactor<P> {
                         Ok(x) => x,
                         Err(e) => {
                             eprintln!("Error reading from disk {e:?}");
-                            eyre::bail!("Error reading from disk")
+                            swanky_error::bail!(
+                                ErrorKind::FilesystemError,
+                                "Error reading from disk"
+                            )
                         }
                     }
                 }
@@ -343,7 +404,7 @@ impl<P: Party> Reactor<P> for ThreadPoolReactor<P> {
         &self,
         task_id: RunningTaskId,
         payload: OwnedAlignedBytes,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         let task_id = task_id.task_id;
         let length = payload.len();
         let od = OutgoingData { task_id, payload };
@@ -362,7 +423,7 @@ impl<P: Party> Reactor<P> for ThreadPoolReactor<P> {
         task_id: RunningTaskId,
         req: ReactorRequest,
         cb: ReactorCallback<P>,
-    ) -> eyre::Result<()> {
+    ) -> swanky_error::Result<()> {
         // Request data from disk
         let new_task_data = if let Some(addr) = req.want_task_data {
             let frr = FileReadRequest::Public(PublicReadRequest { chunk: addr });
@@ -454,7 +515,7 @@ pub fn new_reactor<P: Party>(
     mut extra_connections: Vec<TcpStream>,
     run_queue: RunQueue<P>,
     keys: Keys<P>,
-) -> eyre::Result<Arc<dyn Reactor<P>>> {
+) -> swanky_error::Result<Arc<dyn Reactor<P>>> {
     let challenge_connection = extra_connections.pop().expect("at least two connections");
     assert!(!extra_connections.is_empty());
     let tpr: Arc<ThreadPoolReactor<P>> = Arc::new(ThreadPoolReactor {
@@ -479,7 +540,10 @@ pub fn new_reactor<P: Party>(
     // Spin up the outgoing network threads.
     for (i, conn) in extra_connections.iter().enumerate() {
         let tpr = tpr.clone();
-        let conn = conn.try_clone()?;
+        let conn = conn.try_clone().wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to clone TCP stream.".to_string(),
+        )?;
         ts.spawn(format!("Outgoing network thread {i}"), move || {
             tpr.outgoing_thread(conn, i as u64)
         });

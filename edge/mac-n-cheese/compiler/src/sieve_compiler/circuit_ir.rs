@@ -220,7 +220,7 @@ impl CircuitChunk {
     pub fn stream<RR: RelationReader + Send + 'static, VSR: ValueStreamReader + Send + 'static>(
         relation: &Path,
         public_inputs: &[PathBuf],
-    ) -> flume::Receiver<eyre::Result<CircuitChunk>> {
+    ) -> flume::Receiver<swanky_error::Result<CircuitChunk>> {
         reader::read_circuit::<RR, VSR>(relation, public_inputs)
     }
 }

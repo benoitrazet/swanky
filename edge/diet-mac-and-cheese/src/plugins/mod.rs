@@ -1,6 +1,6 @@
 use crate::circuit_ir::{FunStore, GatesBody, TypeId, TypeIdMapping, TypeStore, WireCount};
-use eyre::Result;
 use mac_n_cheese_sieve_parser::PluginTypeArg;
+use swanky_error::Result;
 
 #[derive(Clone, Debug)]
 pub struct PluginType {

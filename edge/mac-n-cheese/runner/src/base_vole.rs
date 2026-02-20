@@ -2,7 +2,6 @@ use crate::{
     channel_adapter::ChannelAdapter, task_framework::GlobalVolesNeeded, type_map::SmallTypeMap,
     types::RandomMac,
 };
-use eyre::Context;
 use mac_n_cheese_ir::compilation_format::{FieldMacType, FieldTypeMacVisitor};
 use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
 use std::{
@@ -12,6 +11,7 @@ use std::{
 };
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::{ErrorKind, ResultExt, WrapErr};
 use swanky_party::{Party, WhichParty};
 use swanky_svole_wykw::base_svole::{Receiver as BaseReceiver, Sender as BaseSender};
 
@@ -35,7 +35,7 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
     gvn: &[GlobalVolesNeeded],
     rng: &mut AesRng,
     conn: &mut C,
-) -> eyre::Result<Vec<VoleContexts<P>>> {
+) -> swanky_error::Result<Vec<VoleContexts<P>>> {
     // TODO: we shouldn't service the entirety of these requests with base vole.
     struct V<'a, P: Party, C: Read + Write> {
         rng: &'a mut AesRng,
@@ -47,7 +47,7 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
     }
 
     impl<'a, P: Party, C: Read + Write> FieldTypeMacVisitor for V<'a, P, C> {
-        type Output = eyre::Result<()>;
+        type Output = swanky_error::Result<()>;
         fn visit<
             VF: swanky_field::FiniteField + swanky_field::IsSubFieldOf<TF>,
             TF: swanky_field::FiniteField,
@@ -77,12 +77,26 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
                     WhichParty::Prover(e) => {
                         let mut base =
                             BaseSender::<TF>::init(&mut channel, Default::default(), self.rng)
-                                .context("base sender init")?;
-                        channel.flush()?;
+                                .wrap_err(
+                                    ErrorKind::InitializationError,
+                                    "Failed to initialize SVOLE sender.".to_string(),
+                                )
+                                .context("base sender init".to_string())?;
+                        channel.flush().wrap_err(
+                            ErrorKind::NetworkError,
+                            "Failed to flush SVOLE channel.".to_string(),
+                        )?;
                         let base_voles = base
                             .send(&mut channel, self.count, self.rng)
-                            .context("base voles")?;
-                        channel.flush()?;
+                            .wrap_err(
+                                ErrorKind::OtherError,
+                                "Failed to send base VOLEs.".to_string(),
+                            )
+                            .context("base voles".to_string())?;
+                        channel.flush().wrap_err(
+                            ErrorKind::NetworkError,
+                            "Failed to flush SVOLE channel.".to_string(),
+                        )?;
                         // We need to convince Rust that (VF == TF::PrimeField). We roundtrip thru
                         // Any in order to do that.
                         let base_voles: &dyn Any = &base_voles;
@@ -99,12 +113,26 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
                     WhichParty::Verifier(e) => {
                         let mut base =
                             BaseReceiver::<TF>::init(&mut channel, Default::default(), self.rng)
-                                .context("base receiver init")?;
-                        channel.flush()?;
+                                .wrap_err(
+                                    ErrorKind::InitializationError,
+                                    "Failed to initialize base VOLE receiver.".to_string(),
+                                )
+                                .context("base receiver init".to_string())?;
+                        channel.flush().wrap_err(
+                            ErrorKind::NetworkError,
+                            "Failed to flush VOLE channel.".to_string(),
+                        )?;
                         let base_voles = base
                             .receive(&mut channel, self.count, self.rng)
-                            .context("base voles")?;
-                        channel.flush()?;
+                            .wrap_err(
+                                ErrorKind::OtherError,
+                                "Failed to receive base VOLEs.".to_string(),
+                            )
+                            .context("base voles".to_string())?;
+                        channel.flush().wrap_err(
+                            ErrorKind::NetworkError,
+                            "Failed to flush VOLE channel.".to_string(),
+                        )?;
                         let alpha = -base.delta();
                         VoleContext {
                             base_voles: base_voles

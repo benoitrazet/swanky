@@ -1,4 +1,4 @@
-use eyre::Result;
+use swanky_error::Result;
 
 use crate::backend_trait::BackendT;
 

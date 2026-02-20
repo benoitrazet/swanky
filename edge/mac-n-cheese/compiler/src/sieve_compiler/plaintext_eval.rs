@@ -1,8 +1,8 @@
 use std::{path::PathBuf, sync::Arc, time::Instant};
 
-use eyre::{Context, ContextCompat};
 use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamKind, ValueStreamReader};
 use mac_n_cheese_wire_map::WireMap;
+use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
 
 use crate::sieve_compiler::{
     circuit_ir::{CircuitChunk, CounterInfo, Instruction, Permissiveness, WireRange},
@@ -32,8 +32,11 @@ struct EvaluateFieldInstructions<'a, 'b, VSR: ValueStreamReader> {
 impl<'a, 'b, 'c, VSR: ValueStreamReader> CompilerFieldVisitor<&'c FieldInstructionsTy>
     for EvaluateFieldInstructions<'a, 'b, VSR>
 {
-    type Output = InvariantType<eyre::Result<()>>;
-    fn visit<FE: CompilerField>(self, instructions: &'c FieldInstructions<FE>) -> eyre::Result<()> {
+    type Output = InvariantType<swanky_error::Result<()>>;
+    fn visit<FE: CompilerField>(
+        self,
+        instructions: &'c FieldInstructions<FE>,
+    ) -> swanky_error::Result<()> {
         let mut witness_buf = Vec::<FE>::with_capacity(1);
         let wm = self.wm.as_mut().get::<FE>();
         let public_inputs = self.public_inputs.as_mut().get::<FE>();
@@ -41,44 +44,84 @@ impl<'a, 'b, 'c, VSR: ValueStreamReader> CompilerFieldVisitor<&'c FieldInstructi
             match insn {
                 FieldInstruction::Constant { dst, src } => put(wm, dst, src)?,
                 FieldInstruction::AssertZero { src } => {
-                    let src = *wm.get(src)?;
-                    eyre::ensure!(src == FE::ZERO, "assert zero failed")
+                    let src = *wm.get(src).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to get wire {src}.".to_string(),
+                    )?;
+                    swanky_error::ensure!(
+                        src == FE::ZERO,
+                        ErrorKind::OtherError,
+                        "assert zero failed"
+                    )
                 }
                 FieldInstruction::Copy { dst, src } => {
-                    let src = *wm.get(src).with_context(|| {
-                        format!(
-                            "Copy to {dst} from {src} in {}",
-                            std::any::type_name::<FE>()
+                    let src = *wm
+                        .get(src)
+                        .wrap_err(
+                            ErrorKind::OtherError,
+                            "Failed to get wire {src}.".to_string(),
                         )
-                    })?;
+                        .with_context(|| {
+                            format!(
+                                "Copy to {dst} from {src} in {}",
+                                std::any::type_name::<FE>()
+                            )
+                        })?;
                     put(wm, dst, src)?;
                 }
                 FieldInstruction::Add { dst, left, right } => {
-                    let left = *wm.get(left).with_context(|| {
-                        format!(
-                            "Add to {dst} from {left} in {}",
-                            std::any::type_name::<FE>()
+                    let left = *wm
+                        .get(left)
+                        .wrap_err(
+                            ErrorKind::OtherError,
+                            "Failed to get wire {left}.".to_string(),
                         )
-                    })?;
-                    let right = *wm.get(right)?;
+                        .with_context(|| {
+                            format!(
+                                "Add to {dst} from {left} in {}",
+                                std::any::type_name::<FE>()
+                            )
+                        })?;
+                    let right = *wm.get(right).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to get wire {right}.".to_string(),
+                    )?;
                     put(wm, dst, left + right)?;
                 }
                 FieldInstruction::Mul { dst, left, right } => {
                     self.muls_per_field[FE::FIELD_TYPE] += 1;
-                    let left = *wm.get(left)?;
-                    let right = *wm.get(right)?;
+                    let left = *wm.get(left).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to get wire {left}.".to_string(),
+                    )?;
+                    let right = *wm.get(right).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to get wire {right}.".to_string(),
+                    )?;
                     put(wm, dst, left * right)?;
                 }
                 FieldInstruction::AddConstant { dst, left, right } => {
-                    let left = *wm.get(left)?;
+                    let left = *wm.get(left).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to get wire {left}.".to_string(),
+                    )?;
                     put(wm, dst, left + right)?;
                 }
                 FieldInstruction::MulConstant { dst, left, right } => {
-                    let left = *wm.get(left)?;
+                    let left = *wm.get(left).wrap_err(
+                        ErrorKind::OtherError,
+                        "Failed to get wire {left}.".to_string(),
+                    )?;
                     put(wm, dst, left * right)?;
                 }
                 FieldInstruction::GetPublicInput { dst } => {
-                    put(wm, dst, public_inputs.next().context("need public input")?)?;
+                    put(
+                        wm,
+                        dst,
+                        public_inputs
+                            .next()
+                            .ok_or_swanky_error(ErrorKind::OtherError, "need public input")?,
+                    )?;
                 }
                 FieldInstruction::GetWitness { dst } => {
                     witness_buf.clear();
@@ -100,7 +143,7 @@ fn eval<VSR: ValueStreamReader>(
     public_inputs: &mut FieldGenericProduct<std::vec::IntoIter<FieldGenericIdentity>>,
     functions: &[Arc<FunctionDefinition>],
     muls_per_field: &mut FieldIndexedArray<u64>,
-) -> eyre::Result<()> {
+) -> swanky_error::Result<()> {
     for instruction in instructions {
         match instruction {
             Instruction::FieldInstructions(instructions) => {
@@ -125,11 +168,11 @@ fn eval<VSR: ValueStreamReader>(
                         counter_info: &'a Option<CounterInfo>,
                     }
                     impl<'a, 'b, 'c> CompilerFieldVisitor<&'b mut WireMap<'c, FieldGenericIdentity>> for &'_ mut V<'a> {
-                        type Output = eyre::Result<WireMap<'b, FieldGenericIdentity>>;
+                        type Output = swanky_error::Result<WireMap<'b, FieldGenericIdentity>>;
                         fn visit<FE: CompilerField>(
                             self,
                             parent: &'b mut WireMap<'c, FE>,
-                        ) -> eyre::Result<WireMap<'b, FE>> {
+                        ) -> swanky_error::Result<WireMap<'b, FE>> {
                             let in_ranges = &self.in_ranges[FE::FIELD_TYPE];
                             let out_ranges = &self.out_ranges[FE::FIELD_TYPE];
                             for range in out_ranges.iter() {
@@ -244,8 +287,8 @@ fn eval<VSR: ValueStreamReader>(
                     out_ranges: &'a Vec<WireRange>,
                 }
                 impl<'a, 'b> CompilerFieldVisitor for &'_ mut V<'a, 'b> {
-                    type Output = InvariantType<eyre::Result<()>>;
-                    fn visit<FE: CompilerField>(self, _arg: ()) -> eyre::Result<()> {
+                    type Output = InvariantType<swanky_error::Result<()>>;
+                    fn visit<FE: CompilerField>(self, _arg: ()) -> swanky_error::Result<()> {
                         let wm = self.wm.as_mut().get::<FE>();
 
                         for range in self.out_ranges.iter() {
@@ -261,12 +304,15 @@ fn eval<VSR: ValueStreamReader>(
                         // bits should be little-endian
                         fn bits_to_usize(
                             bits: impl IntoIterator<Item = bool>,
-                        ) -> eyre::Result<usize> {
+                        ) -> swanky_error::Result<usize> {
                             bits.into_iter().fold(Ok(0_usize), |acc, b| {
                                 2_usize
                                     .checked_mul(acc?)
                                     .and_then(|x| x.checked_add(b.into()))
-                                    .context("Overflow while computing condition value")
+                                    .ok_or_swanky_error(
+                                        ErrorKind::OtherError,
+                                        "Overflow while computing condition value",
+                                    )
                             })
                         }
 
@@ -278,8 +324,13 @@ fn eval<VSR: ValueStreamReader>(
                                 let le_vals = (cond_wire_range.start
                                     ..=cond_wire_range.inclusive_end)
                                     .rev()
-                                    .map(|w| Ok(*wm.get(w)?))
-                                    .collect::<eyre::Result<Vec<_>>>()?;
+                                    .map(|w| {
+                                        Ok(*wm.get(w).wrap_err(
+                                            ErrorKind::OtherError,
+                                            "Failed to get wire {w}.".to_string(),
+                                        )?)
+                                    })
+                                    .collect::<swanky_error::Result<Vec<_>>>()?;
 
                                 bits_to_usize(
                                     le_vals.iter().flat_map(|b| FE::bit_decomposition(b)),
@@ -288,9 +339,12 @@ fn eval<VSR: ValueStreamReader>(
                             _ => {
                                 debug_assert_eq!(cond_wire_range.len(), 1);
                                 bits_to_usize(
-                                    FE::bit_decomposition(wm.get(cond_wire_range.start)?)
-                                        .into_iter()
-                                        .rev(),
+                                    FE::bit_decomposition(wm.get(cond_wire_range.start).wrap_err(
+                                        ErrorKind::OtherError,
+                                        format!("Failed to get wire {}", cond_wire_range.start),
+                                    )?)
+                                    .into_iter()
+                                    .rev(),
                                 )?
                             }
                         };
@@ -309,7 +363,8 @@ fn eval<VSR: ValueStreamReader>(
                                         }
                                     }
                                 }
-                                Permissiveness::Strict => eyre::bail!(
+                                Permissiveness::Strict => swanky_error::bail!(
+                                    ErrorKind::OtherError,
                                     "Strict mux failed: selector value {cond} >= number of branches {}",
                                     num_branches
                                 ),
@@ -323,7 +378,10 @@ fn eval<VSR: ValueStreamReader>(
                                 for (in_w, out_w) in (in_wr.start..=in_wr.inclusive_end)
                                     .zip(out_wr.start..=out_wr.inclusive_end)
                                 {
-                                    let src = *wm.get(in_w)?;
+                                    let src = *wm.get(in_w).wrap_err(
+                                        ErrorKind::OtherError,
+                                        "Failed to get wire {in_w}.".to_string(),
+                                    )?;
                                     put(wm, out_w, src)?;
                                 }
                             }
@@ -351,7 +409,7 @@ pub(super) fn plaintext_evaluate<
 >(
     args: &SieveArgs,
     witnesses: &[PathBuf],
-) -> eyre::Result<()> {
+) -> swanky_error::Result<()> {
     let mut witnesses = Inputs::<VSR>::open(ValueStreamKind::Private, witnesses)?;
     let chunks = CircuitChunk::stream::<RR, VSR>(&args.relation, &args.public_inputs);
     let mut functions = Vec::new();

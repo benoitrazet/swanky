@@ -6,6 +6,7 @@ use crate::{
 };
 use std::cmp::max;
 use swanky_channel::Channel;
+use swanky_error::ErrorKind;
 
 /// An instantiation of [`FancyInput::Item`] used by [`CircuitAnalyzer`].
 ///
@@ -91,7 +92,11 @@ impl CircuitAnalyzer {
 impl FancyInput for CircuitAnalyzer {
     type Item = AnalyzerItem;
 
-    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> eyre::Result<Vec<Self::Item>> {
+    fn receive_many(
+        &mut self,
+        moduli: &[u16],
+        _: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
         self.ninputs += moduli.len();
         Ok(moduli
             .iter()
@@ -107,7 +112,7 @@ impl FancyInput for CircuitAnalyzer {
         _values: &[u16],
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<Self::Item>> {
+    ) -> swanky_error::Result<Vec<Self::Item>> {
         self.receive_many(moduli, channel)
     }
 }
@@ -124,7 +129,12 @@ impl FancyBinary for CircuitAnalyzer {
         }
     }
 
-    fn and(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
+    fn and(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        _: &mut Channel,
+    ) -> swanky_error::Result<Self::Item> {
         self.nands += 1;
         // Fancy's AND gate calls the underlying arithmetic multiplication
         self.nmuls += 1;
@@ -134,7 +144,12 @@ impl FancyBinary for CircuitAnalyzer {
             depth: max(x.depth, y.depth) + 1,
         })
     }
-    fn or(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
+    fn or(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        _: &mut Channel,
+    ) -> swanky_error::Result<Self::Item> {
         self.nands += 1;
         self.nnegs += 3;
         // Fancy binary's AND gate calls the underlying arithmetic multiplication
@@ -187,7 +202,12 @@ impl FancyArithmetic for CircuitAnalyzer {
         }
     }
 
-    fn mul(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> eyre::Result<Self::Item> {
+    fn mul(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        _: &mut Channel,
+    ) -> swanky_error::Result<Self::Item> {
         self.nmuls += 1;
         Ok(AnalyzerItem {
             modulus: x.modulus,
@@ -201,15 +221,18 @@ impl FancyArithmetic for CircuitAnalyzer {
         _q: u16,
         _tt: Option<Vec<u16>>,
         _: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
-        eyre::bail!("Projection gates are unsupported")
+    ) -> swanky_error::Result<Self::Item> {
+        swanky_error::bail!(
+            ErrorKind::UnsupportedError,
+            "Projection gates are unsupported"
+        )
     }
 }
 
 impl Fancy for CircuitAnalyzer {
     type Item = AnalyzerItem;
 
-    fn constant(&mut self, _val: u16, q: u16, _: &mut Channel) -> eyre::Result<Self::Item> {
+    fn constant(&mut self, _val: u16, q: u16, _: &mut Channel) -> swanky_error::Result<Self::Item> {
         self.nconstants += 1;
         Ok(AnalyzerItem {
             modulus: q,
@@ -217,14 +240,14 @@ impl Fancy for CircuitAnalyzer {
         })
     }
 
-    fn output(&mut self, x: &Self::Item, _: &mut Channel) -> eyre::Result<Option<u16>> {
+    fn output(&mut self, x: &Self::Item, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
         self.mul_depth = max(self.mul_depth, x.depth);
         Ok(None)
     }
 }
 
 impl FancyReveal for CircuitAnalyzer {
-    fn reveal(&mut self, _x: &Self::Item, _: &mut Channel) -> eyre::Result<u16> {
+    fn reveal(&mut self, _x: &Self::Item, _: &mut Channel) -> swanky_error::Result<u16> {
         Ok(0)
     }
 }

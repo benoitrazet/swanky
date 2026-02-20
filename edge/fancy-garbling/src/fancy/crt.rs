@@ -58,7 +58,7 @@ pub trait CrtGadgets:
         x: u128,
         q: u128,
         channel: &mut Channel,
-    ) -> eyre::Result<CrtBundle<Self::Item>> {
+    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
         let ps = util::factor(q);
         let xs = ps.iter().map(|&p| (x % p as u128) as u16).collect_vec();
         self.constant_bundle(&xs, &ps, channel).map(CrtBundle)
@@ -69,7 +69,7 @@ pub trait CrtGadgets:
         &mut self,
         x: &CrtBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> eyre::Result<Option<u128>> {
+    ) -> swanky_error::Result<Option<u128>> {
         let q = x.composite_modulus();
         Ok(self
             .output_bundle(x, channel)?
@@ -81,7 +81,7 @@ pub trait CrtGadgets:
         &mut self,
         xs: &[CrtBundle<Self::Item>],
         channel: &mut Channel,
-    ) -> eyre::Result<Option<Vec<u128>>> {
+    ) -> swanky_error::Result<Option<Vec<u128>>> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             let z = self.crt_output(x, channel)?;
@@ -129,7 +129,7 @@ pub trait CrtGadgets:
         x: &CrtBundle<Self::Item>,
         y: &CrtBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> eyre::Result<CrtBundle<Self::Item>> {
+    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
         self.mul_bundles(x, y, channel).map(CrtBundle)
     }
 
@@ -139,7 +139,7 @@ pub trait CrtGadgets:
         x: &CrtBundle<Self::Item>,
         c: u16,
         channel: &mut Channel,
-    ) -> eyre::Result<CrtBundle<Self::Item>> {
+    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
         x.wires()
             .iter()
             .map(|x| {
@@ -149,7 +149,7 @@ pub trait CrtGadgets:
                     .collect_vec();
                 self.proj(x, p, Some(tab), channel)
             })
-            .collect::<eyre::Result<_>>()
+            .collect::<swanky_error::Result<_>>()
             .map(CrtBundle::new)
     }
 
@@ -162,7 +162,7 @@ pub trait CrtGadgets:
         x: &CrtBundle<Self::Item>,
         p: u16,
         channel: &mut Channel,
-    ) -> eyre::Result<CrtBundle<Self::Item>> {
+    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
         let i = x.moduli().iter().position(|&q| p == q);
         assert!(i.is_some(), "`p` is not a modulus in the `x` bundle");
         let i = i.unwrap();
@@ -170,7 +170,7 @@ pub trait CrtGadgets:
         x.moduli()
             .iter()
             .map(|&q| self.mod_change(w, q, channel))
-            .collect::<eyre::Result<_>>()
+            .collect::<swanky_error::Result<_>>()
             .map(CrtBundle::new)
     }
 
@@ -184,7 +184,7 @@ pub trait CrtGadgets:
         bun: &CrtBundle<Self::Item>,
         ms: &[u16],
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         let ndigits = ms.len();
 
         let q = util::product(&bun.moduli());
@@ -210,7 +210,7 @@ pub trait CrtGadgets:
                 .into_iter()
                 .enumerate()
                 .map(|(i, tt)| self.proj(wire, ms[i], Some(tt), channel))
-                .collect::<eyre::Result<Vec<Self::Item>>>()?;
+                .collect::<swanky_error::Result<Vec<Self::Item>>>()?;
 
             ds.push(Bundle::new(new_ds));
         }
@@ -227,7 +227,7 @@ pub trait CrtGadgets:
         accuracy: &str,
         output_moduli: Option<&[u16]>,
         channel: &mut Channel,
-    ) -> eyre::Result<CrtBundle<Self::Item>> {
+    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
         let factors_of_m = &get_ms(x, accuracy);
         let res = self.crt_fractional_mixed_radix(x, factors_of_m, channel)?;
 
@@ -244,7 +244,7 @@ pub trait CrtGadgets:
             .wires()
             .iter()
             .map(|x| self.mul(x, &mask, channel))
-            .collect::<eyre::Result<_>>()
+            .collect::<swanky_error::Result<_>>()
             .map(CrtBundle::new)
     }
 
@@ -254,7 +254,7 @@ pub trait CrtGadgets:
         x: &CrtBundle<Self::Item>,
         accuracy: &str,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         let factors_of_m = &get_ms(x, accuracy);
         let res = self.crt_fractional_mixed_radix(x, factors_of_m, channel)?;
         let p = *factors_of_m.last().unwrap();
@@ -271,7 +271,7 @@ pub trait CrtGadgets:
         accuracy: &str,
         output_moduli: Option<&[u16]>,
         channel: &mut Channel,
-    ) -> eyre::Result<CrtBundle<Self::Item>> {
+    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
         let sign = self.crt_sign(x, accuracy, channel)?;
         output_moduli
             .unwrap_or(&x.moduli())
@@ -280,7 +280,7 @@ pub trait CrtGadgets:
                 let tt = vec![1, p - 1];
                 self.proj(&sign, p, Some(tt), channel)
             })
-            .collect::<eyre::Result<_>>()
+            .collect::<swanky_error::Result<_>>()
             .map(CrtBundle::new)
     }
 
@@ -291,7 +291,7 @@ pub trait CrtGadgets:
         y: &CrtBundle<Self::Item>,
         accuracy: &str,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         let z = self.crt_sub(x, y);
         self.crt_sign(&z, accuracy, channel)
     }
@@ -303,7 +303,7 @@ pub trait CrtGadgets:
         y: &CrtBundle<Self::Item>,
         accuracy: &str,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         let z = self.crt_lt(x, y, accuracy, channel)?;
         Ok(self.negate(&z))
     }
@@ -317,7 +317,7 @@ pub trait CrtGadgets:
         xs: &[CrtBundle<Self::Item>],
         accuracy: &str,
         channel: &mut Channel,
-    ) -> eyre::Result<CrtBundle<Self::Item>> {
+    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
         assert!(!xs.is_empty(), "`xs` cannot be empty");
         xs.iter().skip(1).fold(Ok(xs[0].clone()), |x, y| {
             x.map(|x| {
@@ -332,7 +332,7 @@ pub trait CrtGadgets:
                             let yp = self.mul(y, &pos, channel)?;
                             Ok(self.add(&xp, &yp))
                         })
-                        .collect::<eyre::Result<Vec<Self::Item>>>()?,
+                        .collect::<swanky_error::Result<Vec<Self::Item>>>()?,
                 ))
             })?
         })
@@ -343,7 +343,7 @@ pub trait CrtGadgets:
         &mut self,
         xs: &CrtBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> eyre::Result<Bundle<Self::Item>> {
+    ) -> swanky_error::Result<Bundle<Self::Item>> {
         let gadget_projection_tt = |p: u16, q: u16| -> Vec<u16> {
             let pq = p as u32 + q as u32 - 1;
             let mut tab = Vec::with_capacity(pq as usize);
@@ -370,7 +370,7 @@ pub trait CrtGadgets:
             tab
         };
 
-        let mut gadget = |x: &Self::Item, y: &Self::Item| -> eyre::Result<Self::Item> {
+        let mut gadget = |x: &Self::Item, y: &Self::Item| -> swanky_error::Result<Self::Item> {
             let p = x.modulus();
             let q = y.modulus();
             let x_ = self.mod_change(x, p + q - 1, channel)?;
@@ -410,7 +410,7 @@ pub trait CrtGadgets:
         x: &CrtBundle<Self::Item>,
         y: &CrtBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         let z = self.crt_sub(x, y);
         let mut pmr = self.crt_to_pmr(&z, channel)?;
         let w = pmr.pop().unwrap();
@@ -429,7 +429,7 @@ pub trait CrtGadgets:
         x: &CrtBundle<Self::Item>,
         y: &CrtBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         let z = self.pmr_lt(x, y, channel)?;
         Ok(self.negate(&z))
     }
@@ -444,7 +444,7 @@ pub trait CrtGadgets:
         x: &CrtBundle<Self::Item>,
         y: &CrtBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> eyre::Result<CrtBundle<Self::Item>> {
+    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
         assert_eq!(x.moduli(), y.moduli());
 
         let q = x.composite_modulus();

@@ -11,6 +11,7 @@ use crate::{
 };
 use swanky_block::Block;
 use swanky_channel::Channel;
+use swanky_error::ErrorKind;
 
 use super::security_warning::warn_proj;
 
@@ -27,7 +28,7 @@ pub struct Evaluator<Wire> {
 
 impl<Wire: WireLabel> Evaluator<Wire> {
     /// Create a new [`Evaluator`].
-    pub fn new(channel: &mut Channel) -> eyre::Result<Self> {
+    pub fn new(channel: &mut Channel) -> swanky_error::Result<Self> {
         // Receive the constant one wirelabel from the garbler. This is used to
         // make negation free.
         let one = channel.read::<Block>()?;
@@ -54,7 +55,7 @@ impl<Wire: WireLabel> Evaluator<Wire> {
     }
 
     /// Read a Wire from the reader.
-    pub fn read_wire(&mut self, modulus: u16, channel: &mut Channel) -> eyre::Result<Wire> {
+    pub fn read_wire(&mut self, modulus: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
         let block = channel.read()?;
         Ok(Wire::from_block(block, modulus))
     }
@@ -75,7 +76,7 @@ impl<W: BinaryWireLabel> FancyBinary for Evaluator<W> {
         A: &Self::Item,
         B: &Self::Item,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         let gate_num = self.current_gate();
         let gate0 = channel.read()?;
         let gate1 = channel.read()?;
@@ -91,7 +92,7 @@ impl<Wire: BinaryWireLabel> FancyInput for Evaluator<Wire> {
         _values: &[u16],
         _moduli: &[u16],
         _: &mut Channel,
-    ) -> eyre::Result<Vec<Self::Item>> {
+    ) -> swanky_error::Result<Vec<Self::Item>> {
         unimplemented!("Evaluator cannot encode values")
     }
 
@@ -99,7 +100,7 @@ impl<Wire: BinaryWireLabel> FancyInput for Evaluator<Wire> {
         &mut self,
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<Self::Item>> {
+    ) -> swanky_error::Result<Vec<Self::Item>> {
         (0..moduli.len())
             .map(|_| {
                 let block = channel.read()?;
@@ -110,7 +111,7 @@ impl<Wire: BinaryWireLabel> FancyInput for Evaluator<Wire> {
 }
 
 impl<Wire: WireLabel> FancyReveal for Evaluator<Wire> {
-    fn reveal(&mut self, x: &Wire, channel: &mut Channel) -> eyre::Result<u16> {
+    fn reveal(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<u16> {
         let val = self
             .output(x, channel)?
             .expect("Evaluator always outputs Some(u16)");
@@ -139,7 +140,7 @@ impl FancyBinary for Evaluator<AllWire> {
         x: &Self::Item,
         y: &Self::Item,
         channel: &mut Channel,
-    ) -> eyre::Result<Self::Item> {
+    ) -> swanky_error::Result<Self::Item> {
         if let (AllWire::Mod2(A), AllWire::Mod2(B)) = (x, y) {
             let gate_num = self.current_gate();
             let gate0 = channel.read()?;
@@ -173,7 +174,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
         x.cmul(c)
     }
 
-    fn mul(&mut self, A: &Wire, B: &Wire, channel: &mut Channel) -> eyre::Result<Wire> {
+    fn mul(&mut self, A: &Wire, B: &Wire, channel: &mut Channel) -> swanky_error::Result<Wire> {
         if A.modulus() < B.modulus() {
             return self.mul(B, A, channel);
         }
@@ -230,7 +231,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
         q: u16,
         _: Option<Vec<u16>>,
         channel: &mut Channel,
-    ) -> eyre::Result<Wire> {
+    ) -> swanky_error::Result<Wire> {
         warn_proj();
         let ngates = (x.modulus() - 1) as usize;
         let mut gate = Vec::with_capacity(ngates);
@@ -251,11 +252,11 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
 impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
     type Item = Wire;
 
-    fn constant(&mut self, _: u16, q: u16, channel: &mut Channel) -> eyre::Result<Wire> {
+    fn constant(&mut self, _: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
         self.read_wire(q, channel)
     }
 
-    fn output(&mut self, x: &Wire, channel: &mut Channel) -> eyre::Result<Option<u16>> {
+    fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
         let q = x.modulus();
         let i = self.current_output();
 
@@ -279,7 +280,7 @@ impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
         if let Some(output) = decoded {
             Ok(Some(output))
         } else {
-            eyre::bail!("Decoding failed");
+            swanky_error::bail!(ErrorKind::OtherError, "Decoding failed");
         }
     }
 }

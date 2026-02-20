@@ -1,9 +1,6 @@
 //! Implementation of the Pinkas-Schneider-Tkachenko-Yanai "extended" private
 //! set intersection protocol (cf. <https://eprint.iacr.org/2019/241>).
-use crate::{
-    errors::Error,
-    psi::circuit_psi::{base_psi::*, circuits::*},
-};
+use crate::psi::circuit_psi::{base_psi::*, circuits::*};
 use fancy_garbling::{BinaryBundle, Fancy, FancyBinary, FancyReveal, WireMod2};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use swanky_block::Block512;
@@ -97,13 +94,10 @@ pub struct Intersection {
 fn bundle_payloads<F>(
     f: &mut F,
     circuit_inputs: &CircuitInputs<F::Item>,
-) -> Result<
-    (
-        Vec<BinaryBundle<<F as Fancy>::Item>>,
-        Vec<BinaryBundle<<F as Fancy>::Item>>,
-    ),
-    Error,
->
+) -> swanky_error::Result<(
+    Vec<BinaryBundle<<F as Fancy>::Item>>,
+    Vec<BinaryBundle<<F as Fancy>::Item>>,
+)>
 where
     F: FancyBinary + FancyReveal + Fancy<Item = WireMod2>,
 {
@@ -120,7 +114,7 @@ where
 
 fn bundle_primary_keys<F>(
     circuit_inputs: &CircuitInputs<F::Item>,
-) -> Result<Vec<BinaryBundle<<F as Fancy>::Item>>, Error>
+) -> swanky_error::Result<Vec<BinaryBundle<<F as Fancy>::Item>>>
 where
     F: FancyBinary + FancyReveal + Fancy<Item = WireMod2>,
 {
@@ -159,11 +153,11 @@ pub trait CircuitPsi {
         primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
         channel: &mut Channel,
-    ) -> Result<Intersection, Error>;
+    ) -> swanky_error::Result<Intersection>;
     /// Computes the Circuit PSI on the parties' inputs with no payloads.
     fn intersect(
         &mut self,
         keys: &[PrimaryKey],
         channel: &mut Channel,
-    ) -> Result<Intersection, Error>;
+    ) -> swanky_error::Result<Intersection>;
 }
