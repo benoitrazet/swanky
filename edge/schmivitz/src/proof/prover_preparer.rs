@@ -1,5 +1,5 @@
-use eyre::bail;
 use mac_n_cheese_sieve_parser::WireId;
+use swanky_error::{ErrorKind, bail};
 use swanky_field_binary::F2;
 
 use crate::circuit::{Circuit, CircuitMemory, GateM};
@@ -31,7 +31,7 @@ pub(crate) struct ProverPreparer {
 }
 
 impl ProverPreparer {
-    pub(crate) fn new(max_wire_id: WireId) -> eyre::Result<Self> {
+    pub(crate) fn new(max_wire_id: WireId) -> swanky_error::Result<Self> {
         Ok(Self {
             wire_values: CircuitMemory::new(max_wire_id),
             witness: Vec::default(),
@@ -47,7 +47,7 @@ impl ProverPreparer {
     }
 
     /// Save a value in our wire map.
-    fn save_wire(&mut self, wid: WireId, value: F2) -> eyre::Result<()> {
+    fn save_wire(&mut self, wid: WireId, value: F2) -> swanky_error::Result<()> {
         // Assumption: Every wire ID will be assigned to exactly once, so if there's already a
         // value associated with a wire ID, the circuit is malformed.
         self.wire_values.insert(wid, value);
@@ -62,7 +62,7 @@ impl ProverPreparer {
     }
 
     /// Execute a circuit.
-    pub(crate) fn execute(&mut self, circuit: &Circuit) -> eyre::Result<()> {
+    pub(crate) fn execute(&mut self, circuit: &Circuit) -> swanky_error::Result<()> {
         let mut priv_input_pos: usize = 0;
         for g in circuit.gates.iter().cloned() {
             match g {
@@ -106,6 +106,7 @@ impl ProverPreparer {
                     }
                 }
                 _ => bail!(
+                    ErrorKind::UnsupportedError,
                     "Invalid input: VOLE-in-the-head does not support gate {:?}",
                     g
                 ),
@@ -128,7 +129,7 @@ mod tests {
     use crate::proof::prover_preparer::ProverPreparer;
 
     /// Take a string description of a circuit and parse it with the circuit preparer.
-    fn prepare_circuit(circuit: &str) -> eyre::Result<ProverPreparer> {
+    fn prepare_circuit(circuit: &str) -> swanky_error::Result<ProverPreparer> {
         let rng = &mut thread_rng();
         // Generate a private input vector with 100 random inputs
         let random_private_inputs: Vec<F2> = (0..100).map(|_| F2::random(rng)).collect();
@@ -146,7 +147,7 @@ mod tests {
     }
 
     #[test]
-    fn private_inputs_count_correctly() -> eyre::Result<()> {
+    fn private_inputs_count_correctly() -> swanky_error::Result<()> {
         let private_input_only = "version 2.0.0;
             circuit;
             @type field 2;
@@ -170,7 +171,7 @@ mod tests {
     }
 
     #[test]
-    fn multiplication_gates_count_correctly() -> eyre::Result<()> {
+    fn multiplication_gates_count_correctly() -> swanky_error::Result<()> {
         let one_mul = "version 2.0.0;
             circuit;
             @type field 2;
@@ -199,7 +200,7 @@ mod tests {
     }
 
     #[test]
-    fn add_gates_are_not_counted_in_extended_witness() -> eyre::Result<()> {
+    fn add_gates_are_not_counted_in_extended_witness() -> swanky_error::Result<()> {
         // These are the same circuits as in `multiplication_gates_count_correctly`, but with an
         // extra `@add` thrown in.
         let one_mul = "version 2.0.0;
@@ -232,7 +233,7 @@ mod tests {
     }
 
     #[test]
-    fn add_gates_eval_correctly() -> eyre::Result<()> {
+    fn add_gates_eval_correctly() -> swanky_error::Result<()> {
         let one_add = "version 2.0.0;
             circuit;
             @type field 2;
@@ -253,7 +254,7 @@ mod tests {
     }
 
     #[test]
-    fn mul_gates_eval_correctly() -> eyre::Result<()> {
+    fn mul_gates_eval_correctly() -> swanky_error::Result<()> {
         let one_mul = "version 2.0.0;
             circuit;
             @type field 2;

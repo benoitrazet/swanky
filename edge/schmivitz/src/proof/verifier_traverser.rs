@@ -1,7 +1,7 @@
 use diet_mac_and_cheese::fields::SieveIrDeserialize;
-use eyre::{Result, bail};
 use mac_n_cheese_sieve_parser::WireId;
 use std::borrow::Borrow;
+use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_field_binary::F128b;
@@ -56,6 +56,7 @@ impl VerifierTraverser {
     ) -> Result<Self> {
         if challenges.len() > masked_witnesses.len() {
             bail!(
+                ErrorKind::OtherError,
                 "Bad input: There should be no more challenges ({}) than masked witnesses ({})",
                 challenges.len(),
                 masked_witnesses.len(),
@@ -102,6 +103,7 @@ impl VerifierTraverser {
         // challenge list is exactly the extended witness length.
         if next_index >= self.masked_witnesses.len() {
             bail!(
+                ErrorKind::OtherError,
                 "Bad input: needed at least {} masked witnesses, but only got {}",
                 self.assigned_witness_count,
                 self.masked_witnesses.len()
@@ -119,6 +121,7 @@ impl VerifierTraverser {
         self.challenge_count += 1;
         if next_index >= self.challenges.len() {
             bail!(
+                ErrorKind::OtherError,
                 "Bad input: needed at least {} challenges, but only got {}",
                 self.challenge_count,
                 self.challenges.len()
@@ -144,6 +147,7 @@ impl VerifierTraverser {
     pub(crate) fn into_parts(self) -> Result<F128b> {
         if self.challenge_count != self.challenges.len() {
             bail!(
+                ErrorKind::OtherError,
                 "Proof contained more challenges than it needed! Had {}, used {}",
                 self.challenges.len(),
                 self.challenge_count
@@ -151,6 +155,7 @@ impl VerifierTraverser {
         }
         if self.assigned_witness_count != self.masked_witnesses.len() {
             bail!(
+                ErrorKind::OtherError,
                 "Proof contained more masked witnesses than it needed! Had {}, used {}",
                 self.masked_witnesses.len(),
                 self.assigned_witness_count
@@ -220,6 +225,7 @@ impl VerifierTraverser {
                     }
                 }
                 _ => bail!(
+                    ErrorKind::UnsupportedError,
                     "Invalid input: VOLE-in-the-head does not support gate {:?}",
                     g
                 ),
@@ -234,8 +240,8 @@ impl VerifierTraverser {
 mod tests {
     use std::{collections::HashSet, iter::repeat_with};
 
-    use eyre::Result;
     use rand::{Rng, thread_rng};
+    use swanky_error::Result;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F128b;
 

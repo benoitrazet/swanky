@@ -5,7 +5,6 @@
  * The evaluation of a circuit requires a memory that is implemented with `CircuitMemory`.
 */
 use crate::parameters::FIELD_SIZE;
-use eyre::{bail, eyre};
 use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, RelationVisitor, Type, TypeId,
     TypedWireRange, ValueStreamKind, ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
@@ -17,6 +16,7 @@ use std::{
     io::{Cursor, Read, Seek, Write},
     path::Path,
 };
+use swanky_error::{ErrorKind, bail, swanky_error};
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::F2;
 use tempfile::tempdir;
@@ -72,13 +72,18 @@ pub enum GateM {
     Comment(String),
 }
 
-fn ingest_private_inputs_from_path(path: &Path) -> eyre::Result<Vec<F2>> {
+fn ingest_private_inputs_from_path(path: &Path) -> swanky_error::Result<Vec<F2>> {
     let mut private_inputs_text = ValueStreamReader::open(ValueStreamKind::Private, path)?;
 
     let mut private_inputs = vec![];
     while let Some(value) = private_inputs_text.next()? {
         let maybe_f2: Option<F2> = F2::try_from_int(value).into();
-        let f2 = maybe_f2.ok_or_else(|| eyre!("Invalid input: Private input was not in F2"))?;
+        let f2 = maybe_f2.ok_or_else(|| {
+            swanky_error!(
+                ErrorKind::OtherError,
+                "Invalid input: Private input was not in F2"
+            )
+        })?;
 
         // Save private input
         private_inputs.push(f2);
@@ -96,7 +101,7 @@ pub(crate) struct CircuitIngestor {
 }
 
 impl CircuitIngestor {
-    pub(crate) fn new_prover(private_inputs: Vec<F2>) -> eyre::Result<Self> {
+    pub(crate) fn new_prover(private_inputs: Vec<F2>) -> swanky_error::Result<Self> {
         Ok(Self {
             gates: vec![],
             priv_inputs: private_inputs,
@@ -106,7 +111,7 @@ impl CircuitIngestor {
         })
     }
 
-    pub(crate) fn new_verifier() -> eyre::Result<Self> {
+    pub(crate) fn new_verifier() -> swanky_error::Result<Self> {
         Ok(Self {
             gates: vec![],
             priv_inputs: vec![],
@@ -130,25 +135,49 @@ impl CircuitIngestor {
 }
 
 impl FunctionBodyVisitor for CircuitIngestor {
-    fn new(&mut self, __ty: TypeId, _first: WireId, _last: WireId) -> eyre::Result<()> {
-        bail!("Invalid input: VOLE-in-the-head does not support `new` gates");
+    fn new(&mut self, __ty: TypeId, _first: WireId, _last: WireId) -> swanky_error::Result<()> {
+        bail!(
+            ErrorKind::UnsupportedError,
+            "Invalid input: VOLE-in-the-head does not support `new` gates"
+        );
     }
-    fn delete(&mut self, _ty: TypeId, _first: WireId, _last: WireId) -> eyre::Result<()> {
-        bail!("Invalid input: VOLE-in-the-head does not support `delete` gates");
+    fn delete(&mut self, _ty: TypeId, _first: WireId, _last: WireId) -> swanky_error::Result<()> {
+        bail!(
+            ErrorKind::UnsupportedError,
+            "Invalid input: VOLE-in-the-head does not support `delete` gates"
+        );
     }
-    fn add(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> eyre::Result<()> {
+    fn add(
+        &mut self,
+        ty: TypeId,
+        dst: WireId,
+        left: WireId,
+        right: WireId,
+    ) -> swanky_error::Result<()> {
         self.gates.push(GateM::Add(ty, dst, left, right));
         self.update_max_output_wire(dst);
         Ok(())
     }
 
-    fn mul(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> eyre::Result<()> {
+    fn mul(
+        &mut self,
+        ty: TypeId,
+        dst: WireId,
+        left: WireId,
+        right: WireId,
+    ) -> swanky_error::Result<()> {
         self.gates.push(GateM::Mul(ty, dst, left, right));
         self.update_max_output_wire(dst);
         Ok(())
     }
 
-    fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> eyre::Result<()> {
+    fn addc(
+        &mut self,
+        ty: TypeId,
+        dst: WireId,
+        left: WireId,
+        right: &Number,
+    ) -> swanky_error::Result<()> {
         self.gates
             .push(GateM::AddConstant(ty, dst, left, Box::new(*right)));
         self.update_max_output_wire(dst);
@@ -160,24 +189,42 @@ impl FunctionBodyVisitor for CircuitIngestor {
         _dst: WireId,
         _left: WireId,
         _right: &Number,
-    ) -> eyre::Result<()> {
-        bail!("Invalid input: VOLE-in-the-head does not support `mulc` gates");
+    ) -> swanky_error::Result<()> {
+        bail!(
+            ErrorKind::UnsupportedError,
+            "Invalid input: VOLE-in-the-head does not support `mulc` gates"
+        );
     }
-    fn copy(&mut self, _ty: TypeId, _dst: WireRange, _src: &[WireRange]) -> eyre::Result<()> {
-        bail!("Invalid input: VOLE-in-the-head does not support `copy` gates");
+    fn copy(
+        &mut self,
+        _ty: TypeId,
+        _dst: WireRange,
+        _src: &[WireRange],
+    ) -> swanky_error::Result<()> {
+        bail!(
+            ErrorKind::UnsupportedError,
+            "Invalid input: VOLE-in-the-head does not support `copy` gates"
+        );
     }
-    fn constant(&mut self, _ty: TypeId, _dst: WireId, _src: &Number) -> eyre::Result<()> {
-        bail!("Invalid input: VOLE-in-the-head does not support `constant` gates");
+    fn constant(&mut self, _ty: TypeId, _dst: WireId, _src: &Number) -> swanky_error::Result<()> {
+        bail!(
+            ErrorKind::UnsupportedError,
+            "Invalid input: VOLE-in-the-head does not support `constant` gates"
+        );
     }
-    fn public_input(&mut self, _ty: TypeId, _dst: WireRange) -> eyre::Result<()> {
-        bail!("Invalid input: VOLE-in-the-head does not support `public_input` gates");
+    fn public_input(&mut self, _ty: TypeId, _dst: WireRange) -> swanky_error::Result<()> {
+        bail!(
+            ErrorKind::UnsupportedError,
+            "Invalid input: VOLE-in-the-head does not support `public_input` gates"
+        );
     }
 
-    fn private_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()> {
+    fn private_input(&mut self, ty: TypeId, dst: WireRange) -> swanky_error::Result<()> {
         if self.is_prover {
             let how_many_wires = dst.end - dst.start + 1;
             if self.private_input_count + how_many_wires > (self.priv_inputs.len() as u64) {
                 bail!(
+                    ErrorKind::OtherError,
                     "Not enough private inputs for this circuit. The circuit requires more than {} private inputs",
                     self.private_input_count + 1
                 );
@@ -190,24 +237,33 @@ impl FunctionBodyVisitor for CircuitIngestor {
         Ok(())
     }
 
-    fn assert_zero(&mut self, _ty: TypeId, _src: WireId) -> eyre::Result<()> {
-        bail!("Invalid input: VOLE-in-the-head does not support `assert_zero` gates");
+    fn assert_zero(&mut self, _ty: TypeId, _src: WireId) -> swanky_error::Result<()> {
+        bail!(
+            ErrorKind::UnsupportedError,
+            "Invalid input: VOLE-in-the-head does not support `assert_zero` gates"
+        );
     }
     fn convert(
         &mut self,
         _dst: TypedWireRange,
         _src: TypedWireRange,
         _semantics: ConversionSemantics,
-    ) -> eyre::Result<()> {
-        bail!("Invalid input: VOLE-in-the-head does not support `convert` gates");
+    ) -> swanky_error::Result<()> {
+        bail!(
+            ErrorKind::UnsupportedError,
+            "Invalid input: VOLE-in-the-head does not support `convert` gates"
+        );
     }
     fn call(
         &mut self,
         _dst: &[WireRange],
         _name: Identifier,
         _args: &[WireRange],
-    ) -> eyre::Result<()> {
-        bail!("Invalid input: VOLE-in-the-head does not support `call` gates");
+    ) -> swanky_error::Result<()> {
+        bail!(
+            ErrorKind::UnsupportedError,
+            "Invalid input: VOLE-in-the-head does not support `call` gates"
+        );
     }
 }
 
@@ -219,11 +275,14 @@ impl RelationVisitor for CircuitIngestor {
         _outputs: &[mac_n_cheese_sieve_parser::TypedCount],
         _inputs: &[mac_n_cheese_sieve_parser::TypedCount],
         _body: BodyCb,
-    ) -> eyre::Result<()>
+    ) -> swanky_error::Result<()>
     where
-        for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> eyre::Result<()>,
+        for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> swanky_error::Result<()>,
     {
-        bail!("Invalid input: VOLE-in-the-head does not support function definition");
+        bail!(
+            ErrorKind::UnsupportedError,
+            "Invalid input: VOLE-in-the-head does not support function definition"
+        );
     }
 
     fn define_plugin_function(
@@ -232,8 +291,11 @@ impl RelationVisitor for CircuitIngestor {
         _outputs: &[mac_n_cheese_sieve_parser::TypedCount],
         _inputs: &[mac_n_cheese_sieve_parser::TypedCount],
         _body: mac_n_cheese_sieve_parser::PluginBinding,
-    ) -> eyre::Result<()> {
-        bail!("Invalid input: VOLE-in-the-head does not support function definition");
+    ) -> swanky_error::Result<()> {
+        bail!(
+            ErrorKind::UnsupportedError,
+            "Invalid input: VOLE-in-the-head does not support function definition"
+        );
     }
 }
 
@@ -257,20 +319,31 @@ pub struct Circuit {
 /// - Must not allow any plugins
 /// - Must not allow any conversions
 /// - Must not allow any types other than $`\mathbb F_2`$
-fn validate_circuit_header<T: Read + Seek>(circuit_reader: &RelationReader<T>) -> eyre::Result<()> {
+fn validate_circuit_header<T: Read + Seek>(
+    circuit_reader: &RelationReader<T>,
+) -> swanky_error::Result<()> {
     let header = circuit_reader.header();
     if !header.plugins.is_empty() {
-        bail!("Invalid circuit: VOLE-in-the-head does not support any plugins")
+        bail!(
+            ErrorKind::UnsupportedError,
+            "Invalid circuit: VOLE-in-the-head does not support any plugins"
+        )
     }
 
     if !header.conversion.is_empty() {
-        bail!("Invalid circuit: VOLE-in-the-head does not support conversions")
+        bail!(
+            ErrorKind::UnsupportedError,
+            "Invalid circuit: VOLE-in-the-head does not support conversions"
+        )
     }
 
     let expected_modulus = Number::from(FIELD_SIZE as u64);
     match header.types[..] {
         [Type::Field { modulus }] if modulus == expected_modulus => {}
-        _ => bail!("Invalid circuit: VOLE-in-the-head only supports elements in F_2"),
+        _ => bail!(
+            ErrorKind::UnsupportedError,
+            "Invalid circuit: VOLE-in-the-head only supports elements in F_2"
+        ),
     }
 
     Ok(())
@@ -280,7 +353,7 @@ fn validate_circuit_header<T: Read + Seek>(circuit_reader: &RelationReader<T>) -
 pub fn load_circuit_prover<T: Read + Seek + Clone>(
     circuit_text: &mut T,
     private_input_path: &Path,
-) -> eyre::Result<Circuit> {
+) -> swanky_error::Result<Circuit> {
     let reader = RelationReader::new(circuit_text)?;
     validate_circuit_header(&reader)?;
 
@@ -295,7 +368,7 @@ pub fn load_circuit_prover<T: Read + Seek + Clone>(
 /// Load a circuit as verifier
 pub fn load_circuit_verifier<T: Read + Seek + Clone>(
     circuit_text: &mut T,
-) -> eyre::Result<Circuit> {
+) -> swanky_error::Result<Circuit> {
     let reader = RelationReader::new(circuit_text)?;
     validate_circuit_header(&reader)?;
 
@@ -310,7 +383,7 @@ pub fn load_circuit_verifier<T: Read + Seek + Clone>(
 pub fn load_circuit_from_strings_prover(
     circuit_bytes: &'static str,
     private_input_bytes: &'static str,
-) -> eyre::Result<Circuit> {
+) -> swanky_error::Result<Circuit> {
     let mut circuit_cursor = Cursor::new(circuit_bytes.as_bytes());
 
     let dir = tempdir().unwrap();
@@ -427,7 +500,7 @@ mod tests {
     }
 
     #[test]
-    fn tiny_header_works() -> eyre::Result<()> {
+    fn tiny_header_works() -> swanky_error::Result<()> {
         let tiny_header = "version 2.0.0;
             circuit;
             @type field 2;

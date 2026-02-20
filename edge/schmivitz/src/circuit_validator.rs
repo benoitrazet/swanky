@@ -9,9 +9,9 @@
 
 use crate::circuit::Circuit;
 use crate::circuit::GateM;
-use eyre::bail;
 use mac_n_cheese_sieve_parser::WireId;
 use std::collections::BTreeMap;
+use swanky_error::{ErrorKind, bail};
 
 #[derive(Default)]
 struct ValidatorMemory {
@@ -19,24 +19,24 @@ struct ValidatorMemory {
 }
 
 impl ValidatorMemory {
-    pub(crate) fn assign(&mut self, wid: WireId) -> eyre::Result<()> {
+    pub(crate) fn assign(&mut self, wid: WireId) -> swanky_error::Result<()> {
         if self.mem.contains_key(&wid) {
-            bail!("wire {wid} already assigned")
+            bail!(ErrorKind::OtherError, "wire {wid} already assigned")
         }
         self.mem.insert(wid, ());
         Ok(())
     }
 
-    pub(crate) fn check_free(&self, wid: &WireId) -> eyre::Result<()> {
+    pub(crate) fn check_free(&self, wid: &WireId) -> swanky_error::Result<()> {
         if self.mem.contains_key(wid) {
-            bail!("wire {wid} is not free")
+            bail!(ErrorKind::OtherError, "wire {wid} is not free")
         }
         Ok(())
     }
 
-    pub(crate) fn check_assigned(&self, wid: &WireId) -> eyre::Result<()> {
+    pub(crate) fn check_assigned(&self, wid: &WireId) -> swanky_error::Result<()> {
         if !self.mem.contains_key(wid) {
-            bail!("wire {wid} not assigned")
+            bail!(ErrorKind::OtherError, "wire {wid} not assigned")
         }
         Ok(())
     }
@@ -48,7 +48,7 @@ struct Validator {
 }
 
 impl Validator {
-    fn validate(&mut self, circuit: &Circuit) -> eyre::Result<()> {
+    fn validate(&mut self, circuit: &Circuit) -> swanky_error::Result<()> {
         for g in circuit.gates.iter().cloned() {
             match g {
                 GateM::Add(_ty, dst, left, right) => {
@@ -78,6 +78,7 @@ impl Validator {
                     }
                 }
                 _ => bail!(
+                    ErrorKind::UnsupportedError,
                     "Invalid input: VOLE-in-the-head does not support gate {:?}",
                     g
                 ),
@@ -88,7 +89,7 @@ impl Validator {
 }
 
 /// Validate a circuit
-pub fn validate_circuit(circuit: &Circuit) -> eyre::Result<()> {
+pub fn validate_circuit(circuit: &Circuit) -> swanky_error::Result<()> {
     Validator::default().validate(circuit)
 }
 

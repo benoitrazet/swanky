@@ -1,5 +1,4 @@
 mod test {
-    use eyre::Result;
     use merlin::Transcript;
     use rand::thread_rng;
     use schmivitz::{
@@ -9,6 +8,7 @@ mod test {
         vole::functionality::{VoleProver, VoleVerifier},
     };
     use std::sync::Once;
+    use swanky_error::Result;
 
     static DO_LOGGING: bool = false;
     static INIT: Once = Once::new();

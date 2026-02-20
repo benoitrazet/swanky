@@ -7,9 +7,9 @@
 use std::iter::{repeat_with, zip};
 
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
-use eyre::{Result, bail};
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
+use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b, F128b};
 
@@ -139,6 +139,7 @@ impl RandomVoleP for InsecureVole {
     fn vole_mask(&self, i: usize) -> Result<F128b> {
         if i >= self.extended_witness_length() {
             bail!(
+                ErrorKind::OtherError,
                 "vole mask index out of range: should be in [0, {}), but got {}",
                 self.extended_witness_length(),
                 i
@@ -199,6 +200,7 @@ impl InsecureCommitments {
             self.extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM;
         if self.verifier_commitments.len() != expected_num_commitments {
             bail!(
+                ErrorKind::OtherError,
                 "Invalid insecure partial vole decommit: expected {} commitments, got {}",
                 expected_num_commitments,
                 self.verifier_commitments.len()
