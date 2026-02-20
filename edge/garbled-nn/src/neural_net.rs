@@ -17,13 +17,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 use std::{
     fs::File,
-    io::{Error, ErrorKind},
     path::Path,
     time::{Duration, Instant},
 };
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel::Channel;
+use swanky_error::{ErrorKind, Result};
 use swanky_ot_alsz_kos::alsz;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
@@ -95,10 +95,7 @@ impl OutputMap {
     }
 
     /// Decode a garbled neural network output.
-    pub fn to_outputs<W: BinaryWireLabel>(
-        &self,
-        bundles: &[BinaryBundle<W>],
-    ) -> eyre::Result<Vec<i64>> {
+    pub fn to_outputs<W: BinaryWireLabel>(&self, bundles: &[BinaryBundle<W>]) -> Result<Vec<i64>> {
         let mut outputs = Vec::with_capacity(bundles.len());
         for (i, bundle) in bundles.iter().enumerate() {
             let mut bits = Vec::with_capacity(bundle.size());
@@ -114,7 +111,10 @@ impl OutputMap {
                 if let Some(bit) = decoded {
                     bits.push(bit);
                 } else {
-                    eyre::bail!("Decoding failed for wire {j} in bundle {i}");
+                    swanky_error::bail!(
+                        ErrorKind::OtherError,
+                        "Decoding failed for wire {j} in bundle {i}"
+                    );
                 }
             }
             outputs.push(util::i64_from_bits(&bits));
@@ -152,11 +152,11 @@ impl std::fmt::Debug for NeuralNet {
 impl TryFrom<&Path> for NeuralNet {
     type Error = std::io::Error;
 
-    fn try_from(dir: &Path) -> Result<Self, Self::Error> {
+    fn try_from(dir: &Path) -> std::result::Result<Self, Self::Error> {
         let model_path = dir.join(Path::new("model.json"));
         if !model_path.is_file() {
             return Err(Self::Error::new(
-                ErrorKind::InvalidFilename,
+                std::io::ErrorKind::InvalidFilename,
                 "`model.json` does not exist in the given diretory",
             ));
         }
@@ -164,7 +164,7 @@ impl TryFrom<&Path> for NeuralNet {
         let weights_path = dir.join(Path::new("weights.json"));
         if !weights_path.is_file() {
             return Err(Self::Error::new(
-                ErrorKind::InvalidFilename,
+                std::io::ErrorKind::InvalidFilename,
                 "`weights.json` does not exist in the given diretory",
             ));
         }
@@ -193,7 +193,7 @@ impl NeuralNet {
         input: &Array3<i64>,
         first_layer_bitwidth: usize,
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<BinaryBundle<W>>> {
+    ) -> Result<Vec<BinaryBundle<W>>> {
         input
             .iter()
             .map(|&x| {
@@ -212,7 +212,7 @@ impl NeuralNet {
         input: &Array3<i64>,
         first_layer_bitwidth: usize,
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<BinaryBundle<W>>> {
+    ) -> Result<Vec<BinaryBundle<W>>> {
         input
             .iter()
             .map(|_| f.bin_receive(first_layer_bitwidth, channel))
@@ -225,7 +225,7 @@ impl NeuralNet {
         input: &Array3<i64>,
         modulus: u128,
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<CrtBundle<W>>> {
+    ) -> Result<Vec<CrtBundle<W>>> {
         input
             .iter()
             .map(|&x| f.crt_encode(util::to_mod_q(x, modulus), modulus, channel))
@@ -238,7 +238,7 @@ impl NeuralNet {
         input: &Array3<i64>,
         modulus: u128,
         channel: &mut Channel,
-    ) -> eyre::Result<Vec<CrtBundle<W>>> {
+    ) -> Result<Vec<CrtBundle<W>>> {
         input
             .iter()
             .map(|_| f.crt_receive(modulus, channel))
@@ -250,13 +250,13 @@ impl NeuralNet {
         f: &mut F,
         output: &[BinaryBundle<W>],
         channel: &mut Channel,
-    ) -> eyre::Result<Option<Vec<i64>>> {
+    ) -> Result<Option<Vec<i64>>> {
         let mut result = Vec::with_capacity(output.len());
         for out in output.iter() {
             let vals = out
                 .iter()
                 .map(|v| f.output(v, channel))
-                .collect::<eyre::Result<Vec<_>>>()?;
+                .collect::<Result<Vec<_>>>()?;
             let vals = vals.into_iter().collect::<Option<Vec<_>>>();
             let val = vals.map(|vals| util::i64_from_bits(&vals));
             result.push(val);
@@ -274,13 +274,13 @@ impl NeuralNet {
         output: &[CrtBundle<W>],
         modulus: u128,
         channel: &mut Channel,
-    ) -> eyre::Result<Option<Vec<i64>>> {
+    ) -> Result<Option<Vec<i64>>> {
         let mut result = Vec::with_capacity(output.len());
         for out in output.iter() {
             let vals = out
                 .iter()
                 .map(|v| f.output(v, channel))
-                .collect::<eyre::Result<Vec<_>>>()?;
+                .collect::<Result<Vec<_>>>()?;
             let vals = vals.into_iter().collect::<Option<Vec<_>>>();
             let val = vals.map(|vals| util::from_mod_q_crt(&vals, modulus));
             result.push(val);
@@ -428,7 +428,10 @@ impl NeuralNet {
 
     /// Read a [`NeuralNet`] from model and weights files containing data in
     /// tensorflow JSON output.
-    pub fn from_json(model_filename: &str, weights_filename: &str) -> Result<Self, Error> {
+    pub fn from_json(
+        model_filename: &str,
+        weights_filename: &str,
+    ) -> std::result::Result<Self, std::io::Error> {
         let file = File::open(model_filename)
             .unwrap_or_else(|_| panic!("couldn't open file: {}", model_filename));
         let obj: Value = serde_json::from_reader(file)?;
@@ -660,7 +663,7 @@ impl NeuralNet {
         input: &Array3<i64>,
         bitwidths: &[usize],
         secret_weights: bool,
-    ) -> eyre::Result<Vec<i64>> {
+    ) -> Result<Vec<i64>> {
         assert_eq!(input.len(), self.ninputs());
         let (_, outputs) = swanky_channel::local::local_channel_pair(
             |channel| {
@@ -710,7 +713,7 @@ impl NeuralNet {
         moduli: &[u128],
         secret_weights: bool,
         accuracy: &Accuracy,
-    ) -> eyre::Result<Vec<i64>> {
+    ) -> Result<Vec<i64>> {
         assert_eq!(input.len(), self.ninputs());
         let (_, outputs) = swanky_channel::local::local_channel_pair(
             |channel| {
@@ -779,7 +782,7 @@ impl NeuralNet {
         bitwidths: &[usize],
         secret_weights: bool,
         rng: RNG,
-    ) -> eyre::Result<(InputEncoder<W>, GarbledCircuit, OutputMap)> {
+    ) -> Result<(InputEncoder<W>, GarbledCircuit, OutputMap)> {
         let mut channel = GarbledChannel::new_writer(None);
         let (inputs, outputs, delta) = Channel::with(&mut channel, |channel| {
             let mut garbler = fancy_garbling::Garbler::<_, W>::new(rng, channel)?;
@@ -821,7 +824,7 @@ impl NeuralNet {
         gc: &GarbledCircuit,
         bitwidth: &[usize],
         secret_weights: bool,
-    ) -> eyre::Result<Vec<BinaryBundle<W>>> {
+    ) -> Result<Vec<BinaryBundle<W>>> {
         // Evaluate the garbled circuit on the input wirelabels.
         Channel::with(GarbledChannel::from(gc), |channel| {
             let mut evaluator = fancy_garbling::Evaluator::<W>::new(channel)?;
@@ -980,7 +983,7 @@ impl NeuralNet {
     }
 
     /// Run [`Informer`] in binary mode.
-    pub fn informer_binary(&self, bitwidths: &[usize], secret_weights: bool) -> eyre::Result<()> {
+    pub fn informer_binary(&self, bitwidths: &[usize], secret_weights: bool) -> Result<()> {
         let mut informer = Informer::new(Dummy::new());
 
         Channel::with(std::io::empty(), |channel| {
@@ -1008,7 +1011,7 @@ impl NeuralNet {
         moduli: &[u128],
         secret_weights: bool,
         accuracy: &Accuracy,
-    ) -> eyre::Result<()> {
+    ) -> Result<()> {
         let mut informer = Informer::new(Dummy::new());
 
         Channel::with(std::io::empty(), |channel| {
