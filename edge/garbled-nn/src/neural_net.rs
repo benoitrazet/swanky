@@ -169,7 +169,7 @@ impl TryFrom<&Path> for NeuralNet {
             ));
         }
 
-        NeuralNet::from_json(model_path.to_str().unwrap(), weights_path.to_str().unwrap())
+        NeuralNet::from_json(&model_path, &weights_path)
     }
 }
 
@@ -429,11 +429,11 @@ impl NeuralNet {
     /// Read a [`NeuralNet`] from model and weights files containing data in
     /// tensorflow JSON output.
     pub fn from_json(
-        model_filename: &str,
-        weights_filename: &str,
+        model_filename: &Path,
+        weights_filename: &Path,
     ) -> std::result::Result<Self, std::io::Error> {
         let file = File::open(model_filename)
-            .unwrap_or_else(|_| panic!("couldn't open file: {}", model_filename));
+            .unwrap_or_else(|_| panic!("couldn't open file: {:?}", model_filename));
         let obj: Value = serde_json::from_reader(file)?;
         let obj = obj
             .as_object()
