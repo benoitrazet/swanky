@@ -342,7 +342,7 @@ impl NeuralNet {
                 secret_weights_owned,
                 accuracy,
                 channel,
-            );
+            )?;
         }
         Ok(acc.into_raw_vec())
     }
@@ -389,13 +389,17 @@ impl NeuralNet {
                 secret_weights,
                 secret_weights_owned,
                 channel,
-            );
+            )?;
         }
         Ok(acc.into_raw_vec())
     }
 
     /// The max number of bits necessary for a value on any wire for each layer.
-    pub fn max_bitwidth(&self, inputs: &[Array3<i64>], channel: &mut Channel) -> Vec<usize> {
+    pub fn max_bitwidth(
+        &self,
+        inputs: &[Array3<i64>],
+        channel: &mut Channel,
+    ) -> Result<Vec<usize>> {
         let mut max_nbits: Vec<usize> = vec![0; self.layers.len()];
 
         for (i, input) in inputs.iter().enumerate() {
@@ -404,7 +408,7 @@ impl NeuralNet {
 
             let mut input = input.clone();
             for (j, layer) in self.layers.iter().enumerate() {
-                let (output, new_max_val) = layer.max_bitwidth(&input, channel);
+                let (output, new_max_val) = layer.max_bitwidth(&input, channel)?;
 
                 let nbits = if new_max_val < 0 {
                     (1.0 + ((-new_max_val) as f64).log2().ceil()) as usize
@@ -420,15 +424,15 @@ impl NeuralNet {
             }
         }
 
-        max_nbits
+        Ok(max_nbits)
     }
 
     /// Evaluate [`NeuralNet`] over `i64` values.
     pub fn eval_plaintext(&self, input: &Array3<i64>) -> Result<Array3<i64>> {
         Channel::with(std::io::empty(), |channel| {
-            Ok(self.layers.iter().fold(input.clone(), |acc, layer| {
+            self.layers.iter().try_fold(input.clone(), |acc, layer| {
                 layer.as_plaintext(&acc, channel)
-            }))
+            })
         })
     }
 

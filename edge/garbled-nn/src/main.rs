@@ -115,15 +115,13 @@ pub fn main() -> Result<(), swanky_error::Error> {
 
     match &cli.command {
         Commands::Bitwidth => {
-            let nbits = Channel::with(std::io::empty(), |channel| {
-                Ok(nn.max_bitwidth(&tests, channel))
-            })
-            .map_err(|e| {
-                swanky_error!(
-                    SwankyErrorKind::OtherError,
-                    "Computing bitwidths failed: {e}"
-                )
-            })?;
+            let nbits = Channel::with(std::io::empty(), |channel| nn.max_bitwidth(&tests, channel))
+                .map_err(|e| {
+                    swanky_error!(
+                        SwankyErrorKind::OtherError,
+                        "Computing bitwidths failed: {e}"
+                    )
+                })?;
             for (layerno, nbits) in nbits.into_iter().enumerate() {
                 println!("Layer {}: {} bits", layerno, nbits);
             }
