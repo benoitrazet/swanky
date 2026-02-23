@@ -23,7 +23,7 @@ use std::{
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel::Channel;
-use swanky_error::{ErrorKind, Result};
+use swanky_error::{ErrorKind, Result, swanky_error};
 use swanky_ot_alsz_kos::alsz;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
@@ -307,7 +307,7 @@ impl NeuralNet {
         secret_weights_owned: bool,
         accuracy: &Accuracy,
         channel: &mut Channel,
-    ) -> Vec<CrtBundle<W>>
+    ) -> Result<Vec<CrtBundle<W>>>
     where
         W: HasModulus + Clone,
         F: Fancy<Item = W>
@@ -322,10 +322,13 @@ impl NeuralNet {
         );
 
         // Map the user-provided inputs to the input layer dimensions.
-        //
-        // Note: This panics if the user-provided inputs are not of the right dimension!
-        let mut acc =
-            Array3::from_shape_vec(self.layers[0].input_dims(), circuit_inputs.to_vec()).unwrap();
+        let mut acc = Array3::from_shape_vec(self.layers[0].input_dims(), circuit_inputs.to_vec())
+            .map_err(|e| {
+                swanky_error!(
+                    ErrorKind::InitializationError,
+                    "Failed to initialize input layer: {e}"
+                )
+            })?;
         // Evaluate the neural net layer-by-layer.
         for (i, layer) in self.layers.iter().enumerate() {
             let inp_mod = moduli[i];
@@ -341,7 +344,7 @@ impl NeuralNet {
                 channel,
             );
         }
-        acc.into_raw_vec()
+        Ok(acc.into_raw_vec())
     }
 
     /// Evaluate [`NeuralNet`] as a boolean garbled circuit.
@@ -357,7 +360,7 @@ impl NeuralNet {
         secret_weights: bool,
         secret_weights_owned: bool,
         channel: &mut Channel,
-    ) -> Vec<BinaryBundle<W>>
+    ) -> Result<Vec<BinaryBundle<W>>>
     where
         W: Clone + HasModulus,
         F: Fancy<Item = W> + FancyInput<Item = W> + FancyBinary<Item = W>,
@@ -369,10 +372,14 @@ impl NeuralNet {
         );
 
         // Map the user-provided inputs to the input layer dimensions.
-        //
-        // Note: This panics if the user-provided inputs are not of the right dimension!
-        let mut acc =
-            Array3::from_shape_vec(self.layers[0].input_dims(), circuit_inputs.to_vec()).unwrap();
+        let mut acc = Array3::from_shape_vec(self.layers[0].input_dims(), circuit_inputs.to_vec())
+            .map_err(|e| {
+                swanky_error!(
+                    ErrorKind::InitializationError,
+                    "Failed to initialize input layer: {e}"
+                )
+            })?;
+
         // Evaluate the neural net layer-by-layer.
         for (i, layer) in self.layers.iter().enumerate() {
             acc = layer.as_binary(
@@ -384,7 +391,7 @@ impl NeuralNet {
                 channel,
             );
         }
-        acc.iter().cloned().collect()
+        Ok(acc.into_raw_vec())
     }
 
     /// The max number of bits necessary for a value on any wire for each layer.
@@ -417,13 +424,12 @@ impl NeuralNet {
     }
 
     /// Evaluate [`NeuralNet`] over `i64` values.
-    pub fn eval_plaintext(&self, input: &Array3<i64>) -> Array3<i64> {
+    pub fn eval_plaintext(&self, input: &Array3<i64>) -> Result<Array3<i64>> {
         Channel::with(std::io::empty(), |channel| {
             Ok(self.layers.iter().fold(input.clone(), |acc, layer| {
                 layer.as_plaintext(&acc, channel)
             }))
         })
-        .unwrap()
     }
 
     /// Read a [`NeuralNet`] from model and weights files containing data in
@@ -678,7 +684,7 @@ impl NeuralNet {
                     secret_weights,
                     true,
                     channel,
-                );
+                )?;
                 let outputs = NeuralNet::decode_output_boolean(&mut garbler, &outputs, channel)?;
                 // The garbler receives no outputs.
                 assert_eq!(outputs, None);
@@ -696,7 +702,7 @@ impl NeuralNet {
                     secret_weights,
                     false,
                     channel,
-                );
+                )?;
                 let outputs = NeuralNet::decode_output_boolean(&mut evaluator, &outputs, channel)?;
                 // The evaluator receives the outputs, so the `unwrap` should
                 // never fail here.
@@ -733,7 +739,7 @@ impl NeuralNet {
                     true,
                     accuracy,
                     channel,
-                );
+                )?;
                 let outputs = NeuralNet::decode_output_arith(
                     &mut gb,
                     &outputs,
@@ -761,7 +767,7 @@ impl NeuralNet {
                     false,
                     accuracy,
                     channel,
-                );
+                )?;
                 let outputs = NeuralNet::decode_output_arith(
                     &mut ev,
                     &outputs,
@@ -803,7 +809,7 @@ impl NeuralNet {
                 secret_weights,
                 true,
                 channel,
-            );
+            )?;
 
             let delta = garbler.delta(2);
             Ok((inputs, outputs, delta))
@@ -829,15 +835,14 @@ impl NeuralNet {
         Channel::with(GarbledChannel::from(gc), |channel| {
             let mut evaluator = fancy_garbling::Evaluator::<W>::new(channel)?;
 
-            let outputs = self.eval_boolean(
+            self.eval_boolean(
                 &mut evaluator,
                 inputs,
                 bitwidth,
                 secret_weights,
                 false,
                 channel,
-            );
-            Ok(outputs)
+            )
         })
     }
 
@@ -854,7 +859,8 @@ impl NeuralNet {
         bitwidth: &[usize],
         secret_weights: bool,
         channel: &mut Channel,
-    ) where
+    ) -> Result<()>
+    where
         W: Clone + HasModulus,
         F: Fancy<Item = W> + FancyInput<Item = W> + FancyBinary<Item = W>,
     {
@@ -876,11 +882,9 @@ impl NeuralNet {
                 100.0 * (1.0 - errors as f32 / img_num as f32)
             );
 
-            let inp = NeuralNet::encode_input_boolean(f, img, first_layer_nbits, channel).unwrap();
-            let outs = self.eval_boolean(f, &inp, bitwidth, secret_weights, true, channel);
-            let res = NeuralNet::decode_output_boolean(f, &outs, channel)
-                .unwrap()
-                .unwrap();
+            let inp = NeuralNet::encode_input_boolean(f, img, first_layer_nbits, channel)?;
+            let outs = self.eval_boolean(f, &inp, bitwidth, secret_weights, true, channel)?;
+            let res = NeuralNet::decode_output_boolean(f, &outs, channel)?.unwrap();
 
             if util::index_of_max(&res) != util::index_of_max(&labels[img_num]) {
                 errors += 1;
@@ -893,6 +897,7 @@ impl NeuralNet {
             images.len(),
             100.0 * (1.0 - errors as f32 / images.len() as f32)
         );
+        Ok(())
     }
 
     /// Evaluate the [`NeuralNet`] over all the provided arithmetic inputs and
@@ -907,7 +912,8 @@ impl NeuralNet {
         secret_weights: bool,
         accuracy: &Accuracy,
         channel: &mut Channel,
-    ) where
+    ) -> Result<()>
+    where
         W: Clone + HasModulus,
         F: Fancy<Item = W> + FancyInput<Item = W> + FancyArithmetic<Item = W> + CrtGadgets,
     {
@@ -931,11 +937,10 @@ impl NeuralNet {
                 100.0 * (1.0 - errors as f32 / img_num as f32)
             );
 
-            let inp = NeuralNet::encode_input_arith(f, img, qfirst, channel).unwrap();
-            let outs = self.eval_arith(f, &inp, &moduli, secret_weights, true, accuracy, channel);
-            let res = NeuralNet::decode_output_arith(f, &outs, qlast, channel)
-                .unwrap()
-                .unwrap();
+            let inp = NeuralNet::encode_input_arith(f, img, qfirst, channel)?;
+            let outs =
+                self.eval_arith(f, &inp, &moduli, secret_weights, true, accuracy, channel)?;
+            let res = NeuralNet::decode_output_arith(f, &outs, qlast, channel)?.unwrap();
 
             if util::index_of_max(&res) != util::index_of_max(&labels[img_num]) {
                 errors += 1;
@@ -948,10 +953,15 @@ impl NeuralNet {
             images.len(),
             100.0 * (1.0 - errors as f32 / images.len() as f32)
         );
+        Ok(())
     }
 
     /// Evaluate the [`NeuralNet`] in plaintext.
-    pub fn plaintext_accuracy_test(&self, inputs: &[Array3<i64>], labels: &[Vec<i64>]) {
+    pub fn plaintext_accuracy_test(
+        &self,
+        inputs: &[Array3<i64>],
+        labels: &[Vec<i64>],
+    ) -> Result<()> {
         let mut errors = 0;
         let total_time = Instant::now();
 
@@ -967,7 +977,7 @@ impl NeuralNet {
                 100.0 * (1.0 - errors as f32 / img_num as f32)
             );
 
-            let res = self.eval_plaintext(img).into_iter().collect::<Vec<_>>();
+            let res = self.eval_plaintext(img)?.into_iter().collect::<Vec<_>>();
 
             if util::index_of_max(&res) != util::index_of_max(label) {
                 errors += 1;
@@ -980,6 +990,8 @@ impl NeuralNet {
             inputs.len(),
             100.0 * (1.0 - errors as f32 / inputs.len() as f32)
         );
+
+        Ok(())
     }
 
     /// Run [`Informer`] in binary mode.
@@ -988,8 +1000,8 @@ impl NeuralNet {
 
         Channel::with(std::io::empty(), |channel| {
             let inps = (0..self.ninputs())
-                .map(|_| informer.bin_encode(0, bitwidths[0], channel).unwrap())
-                .collect::<Vec<_>>();
+                .map(|_| informer.bin_encode(0, bitwidths[0], channel))
+                .collect::<Result<Vec<_>>>()?;
 
             self.eval_boolean(
                 &mut informer,
@@ -998,8 +1010,7 @@ impl NeuralNet {
                 secret_weights,
                 true,
                 channel,
-            );
-            Ok(())
+            )
         })?;
         println!("{}", informer.stats());
         Ok(())
@@ -1016,8 +1027,8 @@ impl NeuralNet {
 
         Channel::with(std::io::empty(), |channel| {
             let inps = (0..self.ninputs())
-                .map(|_| informer.crt_encode(0, moduli[0], channel).unwrap())
-                .collect::<Vec<_>>();
+                .map(|_| informer.crt_encode(0, moduli[0], channel))
+                .collect::<Result<Vec<_>>>()?;
 
             self.eval_arith(
                 &mut informer,
@@ -1027,8 +1038,7 @@ impl NeuralNet {
                 true,
                 accuracy,
                 channel,
-            );
-            Ok(())
+            )
         })?;
         println!("{}", informer.stats());
         Ok(())
@@ -1097,7 +1107,7 @@ mod tests {
     fn binary_and_plaintext_match_for_dir(dir: &Path, bitwidths: &[usize]) {
         let (nn, test) = get_nn_and_test(dir);
 
-        let plaintext_output = nn.eval_plaintext(&test);
+        let plaintext_output = nn.eval_plaintext(&test).unwrap();
         let gc_output = nn.eval_roundtrip_binary(&test, bitwidths, false).unwrap();
         for (a, b) in plaintext_output.iter().zip(gc_output.iter()) {
             assert_eq!(a, b);
@@ -1112,7 +1122,7 @@ mod tests {
             max: "100%".to_string(),
         };
 
-        let plaintext_output = nn.eval_plaintext(&test);
+        let plaintext_output = nn.eval_plaintext(&test).unwrap();
         let gc_output = nn
             .eval_roundtrip_arith(&test, moduli, false, &accuracy)
             .unwrap();
@@ -1135,7 +1145,7 @@ mod tests {
         // Map the output wirelabels to values.
         let output = output_map.to_outputs(&outputs).unwrap();
 
-        let plaintext = nn.eval_plaintext(&test);
+        let plaintext = nn.eval_plaintext(&test).unwrap();
         for (a, b) in plaintext.iter().zip(output.iter()) {
             assert_eq!(a, b);
         }

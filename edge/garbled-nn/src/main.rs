@@ -129,7 +129,7 @@ pub fn main() -> Result<(), swanky_error::Error> {
             }
         }
         Commands::Direct => {
-            nn.plaintext_accuracy_test(&tests, &labels);
+            nn.plaintext_accuracy_test(&tests, &labels)?;
         }
         Commands::Dummy => {
             Channel::with(std::io::empty(), |channel| {
@@ -137,11 +137,11 @@ pub fn main() -> Result<(), swanky_error::Error> {
                 if cli.boolean {
                     nn.boolean_accuracy_test::<_, Dummy>(
                         &mut dummy, &tests, &labels, &bitwidth, cli.secret, channel,
-                    );
+                    )?;
                 } else {
                     nn.arith_accuracy_test(
                         &mut dummy, &tests, &labels, &bitwidth, cli.secret, accuracy, channel,
-                    );
+                    )?;
                 }
                 Ok(())
             })
