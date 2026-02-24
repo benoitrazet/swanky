@@ -29,7 +29,7 @@ use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
 #[cfg(test)]
-use swanky_malicious_hooks::{new_entry_point, run_with_entry_point, test_entry_point};
+use swanky_malicious_hooks::{run_with_entry_point, test_entry_point};
 use swanky_party::Party;
 use swanky_serialization::CanonicalSerialize;
 use vectoreyes::U8x16;
