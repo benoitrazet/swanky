@@ -16,6 +16,7 @@ swanky-channel.workspace = true
 swanky-error.workspace = true
 swanky-party.workspace = true
 swanky-serialization.workspace = true
+swanky-malicious-hooks.workspace = true
 vectoreyes.workspace = true
 
 blake3.workspace = true
