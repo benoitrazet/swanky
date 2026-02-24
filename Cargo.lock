@@ -2656,6 +2656,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-malicious-hooks"
+version = "0.6.0"
+
+[[package]]
 name = "swanky-ocelot-error"
 version = "0.6.0"
 dependencies = [
