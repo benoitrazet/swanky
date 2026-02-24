@@ -2552,6 +2552,7 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-channel",
  "swanky-error",
+ "swanky-malicious-hooks",
  "swanky-party",
  "swanky-serialization",
  "vectoreyes",
