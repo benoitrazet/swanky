@@ -1,41 +1,61 @@
 //! Functions for reading neural net info from disk.
 
+use ndarray::Array3;
+use serde_json::Value;
+use std::io::{Error, ErrorKind, Result};
 use std::{
     fs::File,
     io::{BufRead, BufReader},
     path::Path,
 };
 
-use ndarray::Array3;
-use serde_json::Value;
-
-fn value_to_array3(v: &Value) -> Array3<i64> {
-    let rows = v.as_array().expect("value is not an array!");
+fn value_to_array3(v: &Value) -> Result<Array3<i64>> {
+    let rows = v.as_array().ok_or(Error::new(
+        ErrorKind::InvalidData,
+        "Cannot interpret value as array",
+    ))?;
 
     let data = rows
         .iter()
         .map(|cols| {
             if cols.is_array() {
                 cols.as_array()
-                    .unwrap()
+                    .ok_or(Error::new(
+                        ErrorKind::InvalidData,
+                        "Cannot interpret value as array",
+                    ))?
                     .iter()
                     .map(|deps| {
                         if deps.is_array() {
                             deps.as_array()
-                                .expect("expected colors!")
+                                .ok_or(Error::new(
+                                    ErrorKind::InvalidData,
+                                    "Cannot interpret value as array",
+                                ))?
                                 .iter()
-                                .map(|val| val.as_i64().expect("expected a number!"))
-                                .collect::<Vec<_>>()
+                                .map(|val| {
+                                    val.as_i64().ok_or(Error::new(
+                                        ErrorKind::InvalidData,
+                                        "Cannot interpret value as i64",
+                                    ))
+                                })
+                                .collect::<Result<Vec<_>>>()
                         } else {
-                            vec![deps.as_i64().unwrap()]
+                            Ok(vec![deps.as_i64().ok_or(Error::new(
+                                ErrorKind::InvalidData,
+                                "Cannot interpret value as i64",
+                            ))?])
                         }
                     })
-                    .collect::<Vec<_>>()
+                    .collect::<Result<Vec<_>>>()
             } else {
-                vec![vec![cols.as_i64().unwrap()]]
+                Ok(vec![vec![cols.as_i64().ok_or(Error::new(
+                    ErrorKind::InvalidData,
+                    "Cannot interpret value as i64",
+                ))?]])
             }
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>>>()?;
 
     let height = data.len();
     let width = data[0].len();
@@ -45,7 +65,12 @@ fn value_to_array3(v: &Value) -> Array3<i64> {
         (height, width, depth),
         data.into_iter().flatten().flatten().collect(),
     )
-    .expect("couldnt create array!")
+    .map_err(|e| {
+        Error::new(
+            ErrorKind::InvalidData,
+            format!("Cannot create array from vec: {e}"),
+        )
+    })
 }
 
 /// Read neural network tests from a directory.
@@ -58,8 +83,8 @@ pub fn read_tests(dir: &Path, num: Option<usize>) -> std::io::Result<Vec<Array3<
     if !file.is_file() {
         file = dir.join(Path::new("tests.csv"));
         if !file.is_file() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidFilename,
+            return Err(Error::new(
+                ErrorKind::InvalidFilename,
                 "Given directory contains neither 'tests.json' nor 'tests.csv'",
             ));
         }
@@ -72,13 +97,12 @@ pub fn read_tests(dir: &Path, num: Option<usize>) -> std::io::Result<Vec<Array3<
             let data = line?
                 .split(",")
                 .map(|s| {
-                    s.parse::<i64>().map_err(|e| {
-                        std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-                    })
+                    s.parse::<i64>()
+                        .map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))
                 })
-                .collect::<Result<Vec<i64>, _>>()?;
+                .collect::<Result<Vec<_>>>()?;
             Array3::from_shape_vec((data.len(), 1, 1), data)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))
+                .map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))
         });
 
         if let Some(n) = num {
@@ -89,17 +113,24 @@ pub fn read_tests(dir: &Path, num: Option<usize>) -> std::io::Result<Vec<Array3<
     } else if file.extension().is_some_and(|ext| ext == "json") {
         let file = File::open(file)?;
         let obj: Value = serde_json::from_reader(file)?;
-        let iter = obj.as_array().unwrap().iter().map(value_to_array3);
+        let iter = obj
+            .as_array()
+            .ok_or(Error::new(
+                ErrorKind::InvalidData,
+                "Cannot interpret value as array",
+            ))?
+            .iter()
+            .map(value_to_array3);
 
         if let Some(n) = num {
-            Ok(iter.take(n).collect())
+            iter.take(n).collect()
         } else {
-            Ok(iter.collect())
+            iter.collect()
         }
     } else {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "Unsupported filetype: \"{file:?}\"",
+        Err(Error::new(
+            ErrorKind::InvalidInput,
+            format!("Unsupported filetype: \"{file:?}\""),
         ))
     }
 }
@@ -107,13 +138,13 @@ pub fn read_tests(dir: &Path, num: Option<usize>) -> std::io::Result<Vec<Array3<
 /// Read neural network labels from a directory.
 ///
 /// The directory must contain either `labels.csv` or `labels.json`.
-pub fn read_labels(dir: &Path) -> std::io::Result<Vec<Vec<i64>>> {
+pub fn read_labels(dir: &Path) -> Result<Vec<Vec<i64>>> {
     let mut file = dir.join(Path::new("labels.json"));
     if !file.is_file() {
         file = dir.join(Path::new("labels.csv"));
         if !file.is_file() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidFilename,
+            return Err(Error::new(
+                ErrorKind::InvalidFilename,
                 "Given directory contains neither 'labels.json' nor 'labels.csv'",
             ));
         }
@@ -124,38 +155,47 @@ pub fn read_labels(dir: &Path) -> std::io::Result<Vec<Vec<i64>>> {
         let vec = reader
             .lines()
             .map(|line| {
-                let line: Result<Vec<_>, _> = line?
+                let line: Result<Vec<_>> = line?
                     .split(",")
                     .map(|s| {
-                        s.parse::<i64>().map_err(|e| {
-                            std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-                        })
+                        s.parse::<i64>()
+                            .map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))
                     })
                     .collect();
                 line
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>>>()?;
         Ok(vec)
     } else if file.extension().is_some_and(|ext| ext == "json") {
         let file = File::open(file)?;
         let obj: Value = serde_json::from_reader(file)?;
 
-        Ok(obj
-            .as_array()
-            .unwrap()
+        obj.as_array()
+            .ok_or(Error::new(
+                ErrorKind::InvalidData,
+                "Cannot interpret value as array",
+            ))?
             .iter()
             .map(|val| {
                 val.as_array()
-                    .unwrap()
+                    .ok_or(Error::new(
+                        ErrorKind::InvalidData,
+                        "Cannot interpret value as array",
+                    ))?
                     .iter()
-                    .map(|val| val.as_i64().unwrap())
-                    .collect()
+                    .map(|val| {
+                        val.as_i64().ok_or(Error::new(
+                            ErrorKind::InvalidData,
+                            "Cannot interpret value as i64",
+                        ))
+                    })
+                    .collect::<Result<Vec<_>>>()
             })
-            .collect())
+            .collect::<Result<_>>()
     } else {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "Unsupported filetype: \"{file:?}\"",
+        Err(Error::new(
+            ErrorKind::InvalidInput,
+            format!("Unsupported filetype: \"{file:?}\""),
         ))
     }
 }

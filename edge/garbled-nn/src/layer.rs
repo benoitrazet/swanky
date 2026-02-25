@@ -328,7 +328,7 @@ impl Layer {
                     x
                 })
                 .max()
-                .unwrap())
+                .unwrap_or(0))
         };
 
         let act = |_: &mut usize, a: &ActivationFunction, x: &i64, _: &mut Channel| match a {
@@ -368,7 +368,7 @@ impl Layer {
             add: |_, x, y, _| Ok(x + y),
             cmul: |_, x, y, _| Ok(x * y),
             proj: |_, _, _, _| panic!("secret not supported for plaintext eval"),
-            max: |_, xs, _| Ok(*xs.iter().max().unwrap()),
+            max: |_, xs, _| Ok(*xs.iter().max().unwrap_or(&0)),
             act: |_, a, x, _| match a {
                 ActivationFunction::Sign => {
                     if *x >= 0 {
