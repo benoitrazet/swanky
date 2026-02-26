@@ -1,4 +1,9 @@
-//! Low-level operations on wire-labels, the basic building block of garbled circuits.
+//! Wirelabels for use in garbled circuits.
+//!
+//! This module contains a [`WireLabel`] trait, alongside various instantiations
+//! of this trait. The [`WireLabel`] trait is the core underlying primitive used
+//! in garbled circuits, and represents an encoding of the value on any given
+//! wire of the circuit.
 
 use crate::{fancy::HasModulus, util};
 use rand::{CryptoRng, Rng, RngCore};
@@ -14,7 +19,7 @@ mod modq;
 pub use modq::WireModQ;
 mod npaths_tab;
 
-/// Batch hashing of wires
+/// Hash a batch of wires, using the same tweak for each wire.
 pub fn hash_wires<const Q: usize, W: WireLabel>(wires: [&W; Q], tweak: u128) -> [Block; Q]
 where
     ArrayUnrolledOps: UnrollableArraySize<Q>,
@@ -23,111 +28,115 @@ where
     TweakableCircularCorrelationRobustHash::fixed_key().hash_many(batch, tweak)
 }
 
-/// Marker trait indicating an arithmetic wire
+/// A marker trait indicating that the given [`WireLabel`] instantiation
+/// supports arithmetic operations.
 pub trait ArithmeticWire: Clone {}
 
-/// Trait implementing a wire that can be used for secure computation
-/// via garbled circuits
+/// A trait that defines a wirelabel as used in garbled circuits.
+///
+/// At its core, a [`WireLabel`] is a way of encoding values, and operating on
+/// those encoded values.
 pub trait WireLabel: Clone + HasModulus {
-    /// Get the digits of the wire
+    /// The underlying digits encoded by the [`WireLabel`].
     fn digits(&self) -> Vec<u16>;
 
-    /// This function converts a [`WireLabel`] into its [`Block`] representation.
+    /// Converts a [`WireLabel`] into its [`Block`] representation.
     fn to_block(&self) -> Block;
 
-    /// Get the color digit of the wire.
+    /// The color digit of the wire.
     fn color(&self) -> u16;
 
-    /// Add another wire digit-wise into this one. Assumes that both wires have
-    /// the same modulus.
+    /// Adds two [`WireLabel`]s together.
     fn plus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self;
 
-    /// Multiply each digit by a constant `c mod q`.
+    /// Multiplies the [`WireLabel`] by a constant `c mod q`.
     fn cmul_eq(&mut self, c: u16) -> &mut Self;
 
-    /// Negate all the digits mod q.
+    /// Negates the [`WireLabel`].
     fn negate_eq(&mut self) -> &mut Self;
 
-    /// This function converts a [`Block`] into its [`WireLabel`] representation
-    /// depending on the passed modulus `q`.
+    /// Converts a [`Block`] into its [`WireLabel`] representation, based on the
+    /// modulus `q`.
     ///
-    /// # Panics if q does not align with the q supported by the [`WireLabel`].
+    /// # Panics
+    /// This panics if `q` does not align with the modulus supported by the
+    /// [`WireLabel`].
     fn from_block(inp: Block, q: u16) -> Self;
 
-    /// The zero wire with modulus `q`
+    /// The zero [`WireLabel`], based on the modulus `q`.
+    // TODO: This is deceiving. It is _not_ a zero wirelabel as it is called in
+    // the literature, but rather simply a zero _value_. This could lead to bugs
+    // and should be changed!
     fn zero(q: u16) -> Self;
 
-    /// Get a random wire label mod `q`, with the first digit set to `1`
+    /// A random [`WireLabel`] `mod q`, with the first digit set to `1`.
     fn rand_delta<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self;
 
-    /// Get a random wire `mod q`.
+    /// A random [`WireLabel`] `mod q`.
     fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self;
 
-    /// Subroutine of hashback that converts the hash block into a valid wire of the given
-    /// modulus. Also useful when batching hashes ahead of time for later conversion.
+    /// Converts a hashed block into a valid wire of the given modulus `q`.
     fn hash_to_mod(hash: Block, q: u16) -> Self;
 
-    /// Compute the hash of this wire, converting the result back to a wire.
-    ///
-    /// Uses fixed-key AES.
+    /// Computes the hash of this [`WireLabel`], converting the result back into
+    /// a [`WireLabel`] based on the modulus `q`.
     fn hashback(&self, tweak: u128, q: u16) -> Self {
         let hash = self.hash(tweak);
         Self::hash_to_mod(hash, q)
     }
 
-    /// Negate all the digits `mod q`, consuming it for chained computations.
+    /// Negates the [`WireLabel`], consuming the input.
     fn negate_mov(mut self) -> Self {
         self.negate_eq();
         self
     }
 
-    /// Multiply each digit by a constant `c mod q`, consuming it for chained computations.
+    /// Multiplies the [`WireLabel`] by a constant `c mod q`, consuming the
+    /// input.
     fn cmul_mov(mut self, c: u16) -> Self {
         self.cmul_eq(c);
         self
     }
 
-    /// Multiply each digit by a constant `c mod q`, returning a new wire.
+    /// Multiplies the [`WireLabel`] by a constant `c mod q`.
     fn cmul(&self, c: u16) -> Self {
         self.clone().cmul_mov(c)
     }
 
-    /// Add another wire into this one, consuming it for chained computations.
+    /// Adds two [`WireLabel`]s together, consuming the input.
     fn plus_mov(mut self, other: &Self) -> Self {
         self.plus_eq(other);
         self
     }
 
-    /// Add two wires digit-wise, returning a new wire.
+    /// Adds two [`WireLabel`]s together.
     fn plus(&self, other: &Self) -> Self {
         self.clone().plus_mov(other)
     }
 
-    /// Negate all the digits `mod q`, returning a new wire.
+    /// Negates the [`WireLabel`].
     fn negate(&self) -> Self {
         self.clone().negate_mov()
     }
 
-    /// Subtract a wire from this one, consuming it for chained computations.
+    /// Subtracts a [`WireLabel`] from this one, consuming the input.
     fn minus_mov(mut self, other: &Self) -> Self {
         self.minus_eq(other);
         self
     }
 
-    /// Subtract two wires, returning the result.
+    /// Subtracts a [`WireLabel`] from this one.
     fn minus(&self, other: &Self) -> Self {
         self.clone().minus_mov(other)
     }
 
-    /// Subtract a wire from this one.
+    /// Subtracts a [`WireLabel`] from this one.
     fn minus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self {
         self.plus_eq(&other.negate());
         self
     }
 
-    /// Compute the hash of this wire.
-    ///
-    /// Uses fixed-key AES.
+    /// Computes the hash of the [`WireLabel`].
     #[inline(never)]
     fn hash(&self, tweak: u128) -> Block {
         TweakableCircularCorrelationRobustHash::fixed_key().hash(self.to_block(), tweak)
@@ -136,15 +145,13 @@ pub trait WireLabel: Clone + HasModulus {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-/// The core wire-label type.
+/// A [`WireLabel`] that supports all possible moduli
 pub enum AllWire {
-    /// Modulo2 Wire
+    /// A `mod 2` [`WireLabel`].
     Mod2(WireMod2),
-
-    /// Modulo3 Wire
+    /// A `mod 3` [`WireLabel`].
     Mod3(WireMod3),
-
-    /// Modulo q Wire: 3 < q < 2^16
+    /// A `mod q` [`WireLabel`], where `3 < q < 2^16`.
     ModN(WireModQ),
 }
 
