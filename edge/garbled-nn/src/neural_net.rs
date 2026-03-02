@@ -437,10 +437,7 @@ impl NeuralNet {
 
     /// Read a [`NeuralNet`] from model and weights files containing data in
     /// tensorflow JSON output.
-    pub fn from_json(
-        model_filename: &Path,
-        weights_filename: &Path,
-    ) -> std::result::Result<Self, std::io::Error> {
+    pub fn from_json(model_filename: &Path, weights_filename: &Path) -> std::io::Result<Self> {
         let file = File::open(model_filename)
             .unwrap_or_else(|_| panic!("couldn't open file: {:?}", model_filename));
         let obj: Value = serde_json::from_reader(file)?;
