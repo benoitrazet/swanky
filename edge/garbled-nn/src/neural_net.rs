@@ -144,21 +144,19 @@ impl std::fmt::Debug for NeuralNet {
     }
 }
 
-/// Converts a directory into a [`NeuralNet`].
-///
-/// The directory must have properly formatted `model.json` and `weights.json`
-/// files, otherwise an error is thrown.
-///
-/// # Errors
-/// This returns an error if the directory does not contain a `model.json` file
-/// and a `weights.json` file.
-impl TryFrom<&Path> for NeuralNet {
-    type Error = std::io::Error;
-
-    fn try_from(dir: &Path) -> std::result::Result<Self, Self::Error> {
+impl NeuralNet {
+    /// Converts a directory into a [`NeuralNet`].
+    ///
+    /// The directory must have properly formatted `model.json` and `weights.json`
+    /// files, otherwise an error is thrown.
+    ///
+    /// # Errors
+    /// This returns an error if the directory does not contain a `model.json` file
+    /// and a `weights.json` file.
+    pub fn from_dir(dir: &Path) -> std::io::Result<Self> {
         let model_path = dir.join(Path::new("model.json"));
         if !model_path.is_file() {
-            return Err(Self::Error::new(
+            return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidFilename,
                 "`model.json` does not exist in the given diretory",
             ));
@@ -166,7 +164,7 @@ impl TryFrom<&Path> for NeuralNet {
 
         let weights_path = dir.join(Path::new("weights.json"));
         if !weights_path.is_file() {
-            return Err(Self::Error::new(
+            return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidFilename,
                 "`weights.json` does not exist in the given diretory",
             ));
@@ -174,9 +172,7 @@ impl TryFrom<&Path> for NeuralNet {
 
         NeuralNet::from_json(&model_path, &weights_path)
     }
-}
 
-impl NeuralNet {
     /// The number of inputs to the first layer of the neural network.
     pub fn ninputs(&self) -> usize {
         self.layers[0].input_size()
@@ -1088,7 +1084,7 @@ mod tests {
     use crate::{Accuracy, NeuralNet, io::read_tests, util};
     use fancy_garbling::WireMod2;
     use ndarray::Array3;
-    use std::{ops::Deref, path::Path};
+    use std::path::Path;
     use swanky_aes_rng::AesRng;
 
     static DINN_30_DIR: &str = "neural_nets/DINN_30";
@@ -1106,7 +1102,7 @@ mod tests {
         // Set the base path to `$CARGO_MANIFEST_DIR` for CI.
         let base = env!("CARGO_MANIFEST_DIR");
         let dir = Path::new(base).join(dir);
-        let nn = NeuralNet::try_from(dir.deref()).unwrap();
+        let nn = NeuralNet::from_dir(&dir).unwrap();
         let tests = read_tests(&dir, Some(1)).unwrap();
         (nn, tests[0].clone())
     }

@@ -2,7 +2,6 @@ use clap::error::ErrorKind;
 use clap::{CommandFactory, Error, Parser, Subcommand};
 use fancy_garbling::dummy::Dummy;
 use ndarray::Array3;
-use std::ops::Deref;
 use std::path::PathBuf;
 use std::time::Instant;
 use swanky_channel::Channel;
@@ -78,7 +77,7 @@ pub fn main() -> swanky_error::Result<()> {
         max: cli.max_accuracy,
     };
 
-    let nn = NeuralNet::try_from(dir.deref()).unwrap_or_else(|e| Error::exit(&Error::from(e)));
+    let nn = NeuralNet::from_dir(&dir).unwrap_or_else(|e| Error::exit(&Error::from(e)));
     println!("{nn:?}");
 
     print!("reading tests... ");

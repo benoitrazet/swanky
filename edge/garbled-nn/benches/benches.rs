@@ -1,7 +1,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::WireMod2;
 use ndarray::Array3;
-use std::{hint::black_box, ops::Deref, path::Path, time::Duration};
+use std::{hint::black_box, path::Path, time::Duration};
 use swanky_aes_rng::AesRng;
 use swanky_garbled_nn::{NeuralNet, io::read_tests};
 
@@ -9,7 +9,7 @@ fn get_nn_and_test(dir: &Path) -> (NeuralNet, Array3<i64>) {
     // Set the base path to `$CARGO_MANIFEST_DIR` for CI.
     let base = env!("CARGO_MANIFEST_DIR");
     let dir = Path::new(base).join(dir);
-    let nn = NeuralNet::try_from(dir.deref()).unwrap();
+    let nn = NeuralNet::from_dir(&dir).unwrap();
     let tests = read_tests(&dir, Some(1)).unwrap();
     (nn, tests[0].clone())
 }
