@@ -20,18 +20,12 @@ fn value_to_array3(v: &Value) -> Result<Array3<i64>> {
         .map(|cols| {
             if cols.is_array() {
                 cols.as_array()
-                    .ok_or(Error::new(
-                        ErrorKind::InvalidData,
-                        "Cannot interpret value as array",
-                    ))?
+                    .unwrap() // We check that `cols.is_array()` so this `unwrap` should never fail.
                     .iter()
                     .map(|deps| {
                         if deps.is_array() {
                             deps.as_array()
-                                .ok_or(Error::new(
-                                    ErrorKind::InvalidData,
-                                    "Cannot interpret value as array",
-                                ))?
+                                .unwrap() // We check that `deps.is_array()` so this `unwrap` should never fail.
                                 .iter()
                                 .map(|val| {
                                     val.as_i64().ok_or(Error::new(
@@ -75,7 +69,7 @@ fn value_to_array3(v: &Value) -> Result<Array3<i64>> {
 
 /// Read neural network tests from a directory.
 ///
-/// The directory must contain either `tests.csv` or `tests.json`. The second
+/// The directory must contain either `tests.csv` or `tests.json`. The `num`
 /// argument specifies the number of tests to return; `None` means return all
 /// tests in the file.
 pub fn read_tests(dir: &Path, num: Option<usize>) -> std::io::Result<Vec<Array3<i64>>> {
@@ -159,7 +153,7 @@ pub fn read_labels(dir: &Path) -> Result<Vec<Vec<i64>>> {
                     .split(",")
                     .map(|s| {
                         s.parse::<i64>()
-                            .map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))
+                            .map_err(|e| Error::new(ErrorKind::InvalidData, e))
                     })
                     .collect();
                 line
