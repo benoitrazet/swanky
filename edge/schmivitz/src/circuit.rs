@@ -239,11 +239,9 @@ impl FunctionBodyVisitor for CircuitIngestor {
         Ok(())
     }
 
-    fn assert_zero(&mut self, _ty: TypeId, _src: WireId) -> swanky_error::Result<()> {
-        bail!(
-            ErrorKind::UnsupportedError,
-            "Invalid input: VOLE-in-the-head does not support `assert_zero` gates"
-        );
+    fn assert_zero(&mut self, ty: TypeId, src: WireId) -> swanky_error::Result<()> {
+        self.gates.push(GateM::AssertZero(ty, src));
+        Ok(())
     }
     fn convert(
         &mut self,
@@ -377,6 +375,13 @@ impl<'a> CircuitExecuter<F2> for CircuitInterpreter<'a> {
 
                         memory.insert(wid, res);
                     }
+                }
+                GateM::AssertZero(ty, src) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(*ty, 0);
+
+                    let src = memory.get_result(src)?;
+                    backend.assert_zero(src)?;
                 }
                 _ => bail!(
                     ErrorKind::OtherError,

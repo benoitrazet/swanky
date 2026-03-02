@@ -34,6 +34,10 @@ pub(crate) struct VerifierTraverser {
     /// After traversal, this should have the value
     /// $`\sum_{i \in [t]} \chi_i \cdot c_i(\Delta)`$.
     aggregate: F128b,
+
+    /// Partial aggregation of the assert zero check.
+    /// TODO: Add this to the specification and reference it.
+    aggregate_assert_zero: F128b,
 }
 
 impl VerifierTraverser {
@@ -57,6 +61,7 @@ impl VerifierTraverser {
             masked_witnesses,
             assigned_witness_count: 0,
             aggregate: F128b::ZERO,
+            aggregate_assert_zero: F128b::ZERO,
         })
     }
 
@@ -107,7 +112,7 @@ impl VerifierTraverser {
     /// during full circuit traversal.
     ///
     /// This will fail if there were unused challenges or masked witnesses.
-    pub(crate) fn into_parts(self) -> Result<F128b> {
+    pub(crate) fn into_parts(self) -> Result<(F128b, F128b)> {
         if self.challenge_count != self.challenges.len() {
             bail!(
                 ErrorKind::OtherError,
@@ -124,7 +129,7 @@ impl VerifierTraverser {
                 self.assigned_witness_count
             );
         }
-        Ok(self.aggregate)
+        Ok((self.aggregate, self.aggregate_assert_zero))
     }
 }
 
@@ -175,7 +180,10 @@ impl FieldBackend<F2> for VerifierTraverser {
     fn mulc(&mut self, _lhs: &Self::Wire, _rhs: F2) -> CircuitResult<Self::Wire> {
         todo!();
     }
-    fn assert_zero(&mut self, _arg: &Self::Wire) -> CircuitResult<()> {
-        todo!();
+    fn assert_zero(&mut self, arg: &Self::Wire) -> CircuitResult<()> {
+        let challenge = self.next_challenge()?;
+
+        self.aggregate_assert_zero += challenge * arg;
+        Ok(())
     }
 }

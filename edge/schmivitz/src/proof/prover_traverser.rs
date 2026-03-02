@@ -35,6 +35,10 @@ pub(crate) struct ProverTraverser<Vole> {
     ///
     /// After traversal, this should have the value $$`\sum_{i \in [t]} \chi_i \cdot A_{i,0}`$$.
     aggregate_degree_1: F128b,
+
+    /// Partial aggregation of the assert zero check.
+    /// TODO: Add this to the specification and reference it.
+    aggregate_assert_zero: F128b,
 }
 
 impl<Vole: RandomVoleP> ProverTraverser<Vole> {
@@ -75,6 +79,8 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
 
             aggregate_degree_0: F128b::ZERO,
             aggregate_degree_1: F128b::ZERO,
+
+            aggregate_assert_zero: F128b::ZERO,
         })
     }
 
@@ -119,7 +125,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
     /// The components that were passed to [`Self::new()`] are returned unchanged.
     ///
     /// This will fail if there were unused challenges or VOLEs.
-    pub(crate) fn into_parts(self) -> Result<(F128b, F128b, Vole)> {
+    pub(crate) fn into_parts(self) -> Result<(F128b, F128b, F128b, Vole)> {
         if self.challenge_count != self.challenges.len() {
             bail!(
                 ErrorKind::OtherError,
@@ -136,7 +142,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
                 self.vole_assignment_count
             );
         }
-        Ok((self.aggregate_degree_0, self.aggregate_degree_1, self.voles))
+        Ok((self.aggregate_degree_0, self.aggregate_degree_1, self.aggregate_assert_zero, self.voles))
     }
 
     /// Get the next extended witness value.
@@ -212,7 +218,10 @@ impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
     fn mulc(&mut self, _: &Self::Wire, _: F2) -> CircuitResult<Self::Wire> {
         todo!()
     }
-    fn assert_zero(&mut self, _: &Self::Wire) -> CircuitResult<()> {
-        todo!()
+    fn assert_zero(&mut self, wire: &Self::Wire) -> CircuitResult<()> {
+        let challenge = self.next_challenge()?;
+        self.aggregate_assert_zero += challenge * wire.1;
+        
+        Ok(())
     }
 }

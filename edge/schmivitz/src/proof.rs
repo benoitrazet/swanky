@@ -40,6 +40,8 @@ pub struct Proof<Vole: RandomVoleP, VoleV: RandomVoleV> {
     /// Aggregated commitment to the degree-1 term coefficients for each gate in the circuit
     /// ($`\tilde a`$ in the paper).
     degree_1_commitment: F128b,
+    /// Aggregated commitment to the assert_zero gates.
+    assert_zero_commitment: F128b,
     /// Challenge generated to decommit to the VOLEs after committing to the degree coefficients.
     decommitment_challenge: [u8; SECURITY_PARAM / 8],
     /// Partial decommitment of the VOLEs.
@@ -141,7 +143,7 @@ where
         // the challenges.
         let mut circuit_traverser = ProverTraverser::new(witness, witness_challenges, voles)?;
         circuit.execute(&mut circuit_traverser)?;
-        let (degree_0_aggregation, degree_1_aggregation, voles) = circuit_traverser.into_parts()?;
+        let (degree_0_aggregation, degree_1_aggregation, assert_zero_commitment, voles) = circuit_traverser.into_parts()?;
 
         log::info!("4: circuit_traverser.into_parts: {:?}", t.elapsed());
 
@@ -155,7 +157,7 @@ where
         let degree_1_commitment = degree_1_aggregation + degree_1_mask;
 
         // Add aggregated responses to transcript
-        transcript.append_polynomial_commitments(&degree_0_commitment, &degree_1_commitment);
+        transcript.append_polynomial_commitments(&degree_0_commitment, &degree_1_commitment, &assert_zero_commitment);
         let decommitment_challenge = transcript.extract_decommitment_challenge();
 
         // Decommit the VOLEs
@@ -166,6 +168,7 @@ where
         Ok(Self {
             witness_commitment,
             degree_1_commitment,
+            assert_zero_commitment,
             polynomial_count,
             decommitment_challenge,
             partial_decommitment,
@@ -272,7 +275,7 @@ where
             masked_witnesses,
         )?;
         circuit.execute(&mut verifier_traverser)?;
-        let validation_aggregate = verifier_traverser.into_parts()?;
+        let (validation_aggregate, aggregate_assert_zero) = verifier_traverser.into_parts()?;
         log::info!("5: circuit traverser {:?}", t.elapsed());
 
         let t = std::time::Instant::now();
@@ -282,7 +285,7 @@ where
             validation - self.degree_1_commitment * reconstructed_voles.verifier_key();
 
         // Add aggregated responses to the transcript
-        transcript.append_polynomial_commitments(&degree_0_commitment, &self.degree_1_commitment);
+        transcript.append_polynomial_commitments(&degree_0_commitment, &self.degree_1_commitment, &self.assert_zero_commitment);
 
         // Get the VOLE decommitment challenge and make sure it's valid
         let decommitment_challenge = transcript.extract_decommitment_challenge();
@@ -292,6 +295,15 @@ where
                 "Verification failed: VOLE challenge did not match expected value"
             );
         }
+
+        // Assert zero check
+        if self.assert_zero_commitment != aggregate_assert_zero {
+            bail!(
+                ErrorKind::OtherError,
+                "Verification failed: Assert zero check failed"
+            );
+        }
+
         log::info!("6: last check {:?}", t.elapsed());
 
         Ok(())
