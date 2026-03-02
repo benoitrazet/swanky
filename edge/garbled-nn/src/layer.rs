@@ -11,7 +11,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use swanky_channel::Channel;
-use swanky_error::Result;
+use swanky_error::{ErrorKind, Result};
 
 /// The accuracy to use for each activation function.
 // TODO: Replace these with an enum. See #361.
@@ -206,10 +206,10 @@ impl Layer {
     pub fn input_dims(&self) -> (usize, usize, usize) {
         match self {
             Layer::Dense { weights, .. } => weights.iter().next().map_or((0, 0, 0), |w0| w0.dim()),
-            Layer::Convolutional { input_shape, .. } => *input_shape,
-            Layer::MaxPooling2D { input_shape, .. } => *input_shape,
-            Layer::Flatten { input_shape, .. } => *input_shape,
-            Layer::Activation { input_shape, .. } => *input_shape,
+            Layer::Convolutional { input_shape, .. }
+            | Layer::MaxPooling2D { input_shape, .. }
+            | Layer::Flatten { input_shape, .. }
+            | Layer::Activation { input_shape, .. } => *input_shape,
         }
     }
 
@@ -364,10 +364,16 @@ impl Layer {
     pub fn as_plaintext(&self, input: &Array3<i64>, channel: &mut Channel) -> Result<Array3<i64>> {
         let ops = NeuralNetOps {
             enc: |_, x, _| Ok(x),
-            sec: |_, _, _| panic!("secret not supported for plaintext eval"),
+            sec: |_, _, _| {
+                unreachable!("There are no secret weights, so this should be unreachable!")
+            },
             add: |_, x, y, _| Ok(x + y),
             cmul: |_, x, y, _| Ok(x * y),
-            proj: |_, _, _, _| panic!("secret not supported for plaintext eval"),
+            proj: |_, _, _, _| {
+                unreachable!(
+                    "Projection gates are only used for secret weights, which shouldn't exist in plaintext evaluation!"
+                )
+            },
             max: |_, xs, _| Ok(*xs.iter().max().unwrap_or(&0)),
             act: |_, a, x, _| match a {
                 ActivationFunction::Sign => {
@@ -388,6 +394,9 @@ impl Layer {
     }
 
     /// Evaluate the layer using arithmetic garbled circuits.
+    ///
+    /// # Panics
+    /// Panics if `self.input_dims()` does not equal `input.dims()`.
     #[allow(clippy::too_many_arguments)]
     pub fn as_arith<F, W>(
         &self,
@@ -473,6 +482,9 @@ impl Layer {
     }
 
     /// Evaluate the layer using binary garbled circuits.
+    ///
+    /// # Panics
+    /// Panics if `self.input_dims()` does not equal `input.dims()`.
     pub fn as_binary<F, W>(
         &self,
         f: &mut F,
@@ -511,11 +523,9 @@ impl Layer {
                 // ignore the input weight - it needs to be a garbler input
                 let weight_bits = opt_w.map(|w| util::i64_to_twos_complement(w, nbits));
                 let w = if secret_weights_owned {
-                    b.bin_encode(weight_bits.unwrap(), nbits, channel)
-                        .expect("could not encode binary secret")
+                    b.bin_encode(weight_bits.unwrap(), nbits, channel)?
                 } else {
-                    b.bin_receive(nbits, channel)
-                        .expect("could not receive binary secret")
+                    b.bin_receive(nbits, channel)?
                 };
                 b.bin_multiplication_lower_half(inp, &w, channel)
             },
@@ -602,9 +612,8 @@ impl Layer {
                                         channel,
                                     )?
                                 } else {
-                                    let w = weights[neuron][(i, j, k)].expect(
-                                        "Dense layer eval: weights required for evaluation",
-                                    );
+                                    let w = weights[neuron][(i, j, k)]
+                                        .expect("weights required for evaluation");
                                     (ops.cmul)(b, &input[(i, j, k)], w, channel)?
                                 };
                                 x = (ops.add)(b, &x, &prod, channel)?;
@@ -651,7 +660,11 @@ impl Layer {
                             let mut x = if secret_weights {
                                 (ops.sec)(b, biases[filterno], channel)?
                             } else {
-                                (ops.enc)(b, biases[filterno].expect("no bias"), channel)?
+                                (ops.enc)(
+                                    b,
+                                    biases[filterno].expect("biases required for evaluation"),
+                                    channel,
+                                )?
                             };
 
                             for i in 0..kheight {
@@ -681,7 +694,8 @@ impl Layer {
                                             (ops.cmul)(
                                                 b,
                                                 input_val,
-                                                filters[filterno][(i, j, k)].expect("no weight"),
+                                                filters[filterno][(i, j, k)]
+                                                    .expect("weights required for evaluation"),
                                                 channel,
                                             )?
                                         };
@@ -762,7 +776,9 @@ impl Layer {
 
             Layer::Flatten { output_shape, .. } => {
                 output = input.map(|v| Option::Some(v.clone()));
-                output = output.into_shape(*output_shape).unwrap();
+                output = output
+                    .into_shape(*output_shape)
+                    .expect("output shape is invalid");
             }
 
             Layer::Activation { activation, .. } => {
@@ -775,15 +791,15 @@ impl Layer {
         }
 
         for (coordinate, val) in output.indexed_iter() {
-            if val.is_none() {
-                panic!("{}: uninitialized output at {:?}", self, coordinate);
-            }
+            swanky_error::ensure!(
+                val.is_some(),
+                ErrorKind::OtherError,
+                "{self}: uninitialized output at {coordinate:?}"
+            );
         }
 
-        Ok(output.mapv(|elem| {
-            elem.unwrap_or_else(|| {
-                panic!("{}: uninitialized output", self);
-            })
-        }))
+        Ok(output.mapv(
+            |elem| elem.unwrap(), // Ok `unwrap`: we checked above that all the outputs are not `None`.
+        ))
     }
 }
