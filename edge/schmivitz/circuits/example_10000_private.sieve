@@ -1,0 +1,7 @@
+version 2.2.0;
+private_input;
+@type field 2;
+
+@begin
+<0>;
+@end

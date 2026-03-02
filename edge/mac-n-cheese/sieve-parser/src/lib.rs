@@ -4,7 +4,7 @@
 pub mod fb_reader;
 pub mod text_parser;
 
-use std::{io::Write, path::Path};
+use std::{io::Write, ops::RangeInclusive, path::Path};
 
 use crypto_bigint::{CheckedAdd, CheckedMul};
 
@@ -188,6 +188,9 @@ impl WireRange {
         );
 
         Ok(self.start)
+    }
+    pub fn range(&self) -> RangeInclusive<WireId> {
+        self.start..=self.end
     }
 }
 
