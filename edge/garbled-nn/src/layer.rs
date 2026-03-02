@@ -14,7 +14,7 @@ use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// The accuracy to use for each activation function.
-// TODO: these should be enums, not `String`s!
+// TODO: Replace these with an enum. See #361.
 #[derive(Clone, Debug)]
 pub struct Accuracy {
     /// The accuracy to use for the ReLU activation function.
