@@ -44,6 +44,9 @@ impl<W: BinaryWireLabel> InputEncoder<W> {
     }
 
     /// Encode an input into its associated wirelabels.
+    ///
+    /// # Panics
+    /// This panics if `input.len() ≠ self.inputs.len()`.
     pub fn encode_inputs(&self, input: &Array3<i64>, bitwidth: usize) -> Vec<BinaryBundle<W>> {
         assert_eq!(input.len(), self.inputs.len());
         self.inputs
