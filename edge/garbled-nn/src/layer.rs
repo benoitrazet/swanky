@@ -51,9 +51,9 @@ impl std::fmt::Display for ActivationFunction {
 /// ones that we do support internally. Below is the mapping from `tensorflow`
 /// activation functions:
 ///
-/// - tanh, hard_sigmoid => [`ActivationFunction::Sign`]
+/// - tanh, hard_sigmoid, sign => [`ActivationFunction::Sign`]
 /// - relu => [`ActivationFunction::Relu`]
-/// - linear, softmax => [`ActivationFunction::Identity`]
+/// - linear, softmax, identity, id => [`ActivationFunction::Identity`]
 impl TryFrom<&str> for ActivationFunction {
     type Error = std::io::Error;
 
@@ -64,7 +64,7 @@ impl TryFrom<&str> for ActivationFunction {
             "linear" | "softmax" | "identity" | "id" => Ok(ActivationFunction::Identity),
             _ => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
-                "Input is not a valid activation function",
+                "Input is either an invalid or unsupported activation function",
             )),
         }
     }
