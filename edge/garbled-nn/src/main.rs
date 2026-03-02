@@ -64,7 +64,7 @@ enum Commands {
     },
 }
 
-pub fn main() -> Result<(), swanky_error::Error> {
+pub fn main() -> swanky_error::Result<()> {
     let cli = Cli::parse();
     let mut cmd = Cli::command();
 
