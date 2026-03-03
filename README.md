@@ -34,8 +34,6 @@ have a lesser stability guarantee.
 - **`mac-n-cheese-wire-map`**: An implementation of a sparse array
 - **`popsicle`**: A library for private set intersection
 - **`schmivitz`**: A library for zero-knowledge protocols using VOLE-in-the-head
-- **`sieve-ir-api`**: A library providing a Rust API for defining zero-knowledge circuits.
-- **`sieve-ir-codegen`**: A library providing macros to statically parse SIEVE IR zero-knowledge circuits.
 - **`simple-arith-circuit`**: Simple arithmetic circuit library
 - **`swanky-adversary`**: Traits describing MPC adversaries.
 - **`swanky-aes-hash`**: Correlation-robust hashing based on fixed-key AES.
