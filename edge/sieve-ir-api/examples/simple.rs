@@ -1,5 +1,5 @@
-use sieve_ir_api::*;
 use swanky_field_binary::F2;
+use swanky_sieve_ir_api::*;
 
 fn example1<B>(backend: &mut B) -> CircuitResult<()>
 where

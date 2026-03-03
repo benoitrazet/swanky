@@ -1,5 +1,5 @@
-use sieve_ir_api::{CircuitExecuter, CircuitResult, FieldBackend};
 use swanky_field_binary::F2;
+use swanky_sieve_ir_api::{CircuitExecuter, CircuitResult, FieldBackend};
 
 pub struct ExampleCircuit<const N: usize>;
 

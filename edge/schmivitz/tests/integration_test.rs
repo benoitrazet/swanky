@@ -7,9 +7,9 @@ mod test {
         circuit::load_circuit_from_strings_prover,
         vole::functionality::{VoleProver, VoleVerifier},
     };
-    use sieve_ir_codegen::compile_sieve_ir_str;
     use std::sync::Once;
     use swanky_error::Result;
+    use swanky_sieve_ir_codegen::compile_sieve_ir_str;
 
     static DO_LOGGING: bool = false;
     static INIT: Once = Once::new();

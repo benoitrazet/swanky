@@ -1,6 +1,6 @@
-use sieve_ir_api::*;
 use swanky_field_binary::F2;
 use swanky_field_ff_primes::F128p;
+use swanky_sieve_ir_api::*;
 
 fn sieve_compiled_f<B>(
     backend: &mut B,

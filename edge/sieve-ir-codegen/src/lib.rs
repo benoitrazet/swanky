@@ -146,14 +146,14 @@ fn codegen_impls<T: Read + Seek>(
     let main = codegen.main;
     quote! {
         impl #struct_name {
-            pub fn main<B: #ty_constraints>(&self, backend: &mut B) -> sieve_ir_api::CircuitResult<()> {
+            pub fn main<B: #ty_constraints>(&self, backend: &mut B) -> swanky_sieve_ir_api::CircuitResult<()> {
                 use swanky_serialization::CanonicalSerialize;
                 #main
                 Ok(())
             }
         }
-        impl sieve_ir_api::CircuitExecuter<swanky_field_binary::F2> for #struct_name {
-            fn execute<B: #ty_constraints>(&self, backend: &mut B) -> sieve_ir_api::CircuitResult<()> {
+        impl swanky_sieve_ir_api::CircuitExecuter<swanky_field_binary::F2> for #struct_name {
+            fn execute<B: #ty_constraints>(&self, backend: &mut B) -> swanky_sieve_ir_api::CircuitResult<()> {
                 self.main(backend)
             }
         }
@@ -193,7 +193,7 @@ fn type_constraints<T: Read + Seek>(circuit_parser: &RelationReader<T>) -> Token
                 let ty_var = modulus_to_type_var(modulus);
 
                 quote! {
-                    sieve_ir_api::FieldBackend<#ty_var>,
+                    swanky_sieve_ir_api::FieldBackend<#ty_var>,
                 }
             }
             _ => {
@@ -276,7 +276,7 @@ impl FunctionBodyVisitor for Codegen {
         let left = self.to_wire_ident(left);
         let right = self.to_wire_ident(right);
         self.main.extend(quote! {
-            let #dst = <B as sieve_ir_api::FieldBackend<#ty>>::add(backend, &#left, &#right)?;
+            let #dst = <B as swanky_sieve_ir_api::FieldBackend<#ty>>::add(backend, &#left, &#right)?;
         });
         Ok(())
     }
@@ -292,7 +292,7 @@ impl FunctionBodyVisitor for Codegen {
         let left = self.to_wire_ident(left);
         let right = self.to_wire_ident(right);
         self.main.extend(quote! {
-            let #dst = <B as sieve_ir_api::FieldBackend<#ty>>::mul(backend, &#left, &#right)?;
+            let #dst = <B as swanky_sieve_ir_api::FieldBackend<#ty>>::mul(backend, &#left, &#right)?;
         });
         Ok(())
     }
@@ -308,7 +308,7 @@ impl FunctionBodyVisitor for Codegen {
         let left = self.to_wire_ident(left);
         let right = self.reify_constant(ty, *right);
         self.main.extend(quote! {
-            let #dst = <B as sieve_ir_api::FieldBackend<#fty>>::addc(backend, &#left, #right)?;
+            let #dst = <B as swanky_sieve_ir_api::FieldBackend<#fty>>::addc(backend, &#left, #right)?;
         });
         Ok(())
     }
@@ -342,7 +342,7 @@ impl FunctionBodyVisitor for Codegen {
             .map(|wid| {
                 let var = self.to_wire_ident(wid);
                 quote! {
-                    let #var = <B as sieve_ir_api::FieldBackend<#ty>>::input_private(backend)?;
+                    let #var = <B as swanky_sieve_ir_api::FieldBackend<#ty>>::input_private(backend)?;
                 }
             })
             .collect::<Vec<_>>();

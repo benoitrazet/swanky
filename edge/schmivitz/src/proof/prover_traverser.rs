@@ -1,8 +1,8 @@
 use mac_n_cheese_sieve_parser::WireId;
-use sieve_ir_api::{CircuitResult, FieldBackend};
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
+use swanky_sieve_ir_api::{CircuitResult, FieldBackend};
 
 use crate::vole::RandomVoleP;
 

@@ -11,11 +11,11 @@ use mac_n_cheese_sieve_parser::WireId;
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
 use rayon::iter::*;
-use sieve_ir_api::CircuitExecuter;
 use std::{iter::zip, marker::PhantomData};
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b, F128b};
+use swanky_sieve_ir_api::CircuitExecuter;
 
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
@@ -120,7 +120,7 @@ where
         // Commit to extended witness (`d` in the paper)
         let witness_commitment: Vec<F2> = voles
             .witness_mask()
-            .into_iter()
+            .iter()
             .zip(witness.iter())
             .map(|(u, w)| w - u)
             .collect();

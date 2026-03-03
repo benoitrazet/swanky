@@ -1,8 +1,8 @@
-use sieve_ir_api::{CircuitResult, FieldBackend};
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_field_binary::F128b;
+use swanky_sieve_ir_api::{CircuitResult, FieldBackend};
 
 /// A [`VerifierTraverser`] allows the verifier to execute the gate-by-gate evaluation portion of
 /// the VOLE-in-the-head verification protocol.

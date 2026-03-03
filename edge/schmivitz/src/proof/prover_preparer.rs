@@ -1,7 +1,7 @@
 use mac_n_cheese_sieve_parser::WireId;
-use sieve_ir_api::{CircuitResult, FieldBackend};
 use swanky_error::{ErrorKind, bail};
 use swanky_field_binary::F2;
+use swanky_sieve_ir_api::{CircuitResult, FieldBackend};
 
 /// A [`ProverPreparer`] allows the prover to prepare for VOLE-in-the-head by evaluating the
 /// circuit in the clear and determining the full extended witness.
@@ -109,9 +109,9 @@ mod tests {
     use std::io::Cursor;
 
     use mac_n_cheese_sieve_parser::text_parser::RelationReader;
-    use sieve_ir_api::CircuitExecuter;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
+    use swanky_sieve_ir_api::CircuitExecuter;
 
     use crate::circuit::CircuitIngestor;
     use crate::proof::{Circuit, prover_preparer::ProverPreparer};
@@ -120,8 +120,7 @@ mod tests {
     fn load_circuit(circuit: &str) -> swanky_error::Result<Circuit> {
         let rng = &mut thread_rng();
         // Generate a private input vector with 100 random inputs
-        let random_private_inputs: Vec<F2> =
-            (0..100).into_iter().map(|_| F2::random(rng)).collect();
+        let random_private_inputs: Vec<F2> = (0..100).map(|_| F2::random(rng)).collect();
 
         let cursor = &mut Cursor::new(circuit.as_bytes());
         let reader = RelationReader::new(cursor)?;
@@ -249,7 +248,7 @@ mod tests {
         let circuit = load_circuit(one_mul)?;
         let counter = prepare_circuit(&circuit)?;
         assert_eq!(
-            counter.witness.get(0).unwrap() * counter.witness.get(1).unwrap(),
+            counter.witness.first().unwrap() * counter.witness.get(1).unwrap(),
             *counter.witness.get(2).unwrap()
         );
 

@@ -11,7 +11,6 @@ use mac_n_cheese_sieve_parser::{
     TypedWireRange, ValueStreamKind, ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
     text_parser::RelationReader, text_parser::ValueStreamReader,
 };
-use sieve_ir_api::{CircuitExecuter, CircuitResult, FieldBackend};
 use std::{
     cmp::max,
     fs::File,
@@ -21,6 +20,7 @@ use std::{
 use swanky_error::{ErrorKind, bail, swanky_error};
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::F2;
+use swanky_sieve_ir_api::{CircuitExecuter, CircuitResult, FieldBackend};
 use tempfile::tempdir;
 
 /// Gates
