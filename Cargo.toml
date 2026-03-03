@@ -96,8 +96,6 @@ mac-n-cheese-vole = { path = "edge/mac-n-cheese/vole" }
 mac-n-cheese-wire-map = { path = "edge/mac-n-cheese/wire-map" }
 popsicle = { path = "edge/popsicle" }
 schmivitz = { path = "edge/schmivitz" }
-sieve-ir-api = { path = "edge/sieve-ir-api" }
-sieve-ir-codegen = { path = "edge/sieve-ir-codegen" }
 simple-arith-circuit = { path = "edge/simple-arith-circuit" }
 swanky-adversary = { path = "edge/adversary" }
 swanky-aes-hash = { path = "edge/aes-hash" }
@@ -136,6 +134,8 @@ swanky-party = { path = "edge/party" }
 swanky-party2 = { path = "edge/party2" }
 swanky-polynomial = { path = "edge/polynomial" }
 swanky-serialization = { path = "edge/serialization" }
+swanky-sieve-ir-api = { path = "edge/sieve-ir-api" }
+swanky-sieve-ir-codegen = { path = "edge/sieve-ir-codegen" }
 swanky-svole-wykw = { path = "edge/svole-wykw" }
 swanky-twopac = { path = "edge/twopac" }
 vectoreyes = { path = "core/vectoreyes" }

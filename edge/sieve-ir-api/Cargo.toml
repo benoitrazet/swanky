@@ -1,5 +1,5 @@
 [package]
-name = "sieve-ir-api"
+name = "swanky-sieve-ir-api"
 description = "A library providing a Rust API for defining zero-knowledge circuits."
 categories = ["cryptography"]
 keywords = [
