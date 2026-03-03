@@ -904,6 +904,9 @@ impl NeuralNet {
     }
 
     /// Evaluate [`NeuralNet`] between a boolean [`Garbler`] and [`Evaluator`].
+    ///
+    /// # Panics
+    /// This panics if `input.len() ≠ self.ninputs()`.
     pub fn eval_roundtrip_binary(
         &self,
         input: &Array3<i64>,
@@ -953,6 +956,9 @@ impl NeuralNet {
     }
 
     /// Evaluate [`NeuralNet`] between an arithmetic [`Garbler`] and [`Evaluator`].
+    ///
+    /// # Panics
+    /// This panics if `input.len() ≠ self.ninputs()`.
     pub fn eval_roundtrip_arith(
         &self,
         input: &Array3<i64>,
