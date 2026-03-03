@@ -92,6 +92,9 @@ pub trait WireLabel: Clone + HasModulus {
 
     /// Converts a hashed block into a valid wire of the given modulus `q`.
     ///
+    /// This is useful when separately using [`hash_wires`] to hash a set of
+    /// wires in one shot for efficiency reasons.
+    ///
     /// # Panics
     /// This panics if `q` does not align with the modulus supported by the
     /// [`WireLabel`].
@@ -99,6 +102,10 @@ pub trait WireLabel: Clone + HasModulus {
 
     /// Computes the hash of this [`WireLabel`], converting the result back into
     /// a [`WireLabel`] based on the modulus `q`.
+    ///
+    /// This is equivalent to `WireLabel::hash_to_mod(self.hash(tweak), q)`, and
+    /// is useful when stringing together a sequence of operations on a
+    /// [`WireLabel`].
     ///
     /// # Panics
     /// This panics if `q` does not align with the modulus supported by the
