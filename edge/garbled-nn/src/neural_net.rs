@@ -14,7 +14,7 @@ use ndarray::Array3;
 use rand::{CryptoRng, RngCore};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use serde_json::{self, Value};
+use serde_json::{self, Map, Value};
 use std::{
     fs::File,
     path::Path,
@@ -437,150 +437,397 @@ impl NeuralNet {
 
     /// Read a [`NeuralNet`] from model and weights files containing data in
     /// tensorflow JSON output.
-    pub fn from_json(model_filename: &Path, weights_filename: &Path) -> std::io::Result<Self> {
-        let file = File::open(model_filename)
-            .unwrap_or_else(|_| panic!("couldn't open file: {:?}", model_filename));
-        let obj: Value = serde_json::from_reader(file)?;
-        let obj = obj
-            .as_object()
-            .expect("root value in model.json is not an object");
-        let layers_obj = if obj["config"].is_array() {
-            &obj["config"]
-        } else {
-            &obj["config"]
-                .as_object()
-                .expect("base config is not an object!")["layers"]
-        };
-        let layer_objs = layers_obj
-            .as_array()
-            .expect("layers is not an array")
-            .iter()
-            .map(|c| c.as_object().unwrap());
+    pub fn from_json(model: &Path, weights: &Path) -> std::io::Result<Self> {
+        use std::io::{Error, ErrorKind, Result};
 
-        let file = File::open(weights_filename)?;
-        let obj: Value = serde_json::from_reader(file)?;
-        let mut weights_iter = obj.as_array().unwrap().chunks(2);
+        // Extract the layers from `model`.
+        let file = File::open(model)?;
+        let root: Value = serde_json::from_reader(file)?;
+        let root = root.as_object().ok_or(Error::new(
+            ErrorKind::InvalidData,
+            format!("Root value in {model:?} must be an object"),
+        ))?;
+
+        let layers_json = if root
+            .get("config")
+            .ok_or(Error::new(
+                ErrorKind::InvalidData,
+                format!("Root object in {model:?} must contain 'config' key"),
+            ))?
+            .is_array()
+        {
+            &root["config"]
+        } else {
+            let config = root["config"].as_object().ok_or(Error::new(
+                ErrorKind::InvalidData,
+                "Config value must be either an array or an object",
+            ))?;
+            config.get("layers").ok_or(Error::new(
+                ErrorKind::InvalidData,
+                "Config object must contain 'layers' key",
+            ))?
+        };
+
+        // Extract the weights and biases from `weights`.
+        let file = File::open(weights)?;
+        let root: Value = serde_json::from_reader(file)?;
+        let mut weights_and_biases_iter = root
+            .as_array()
+            .ok_or(Error::new(
+                ErrorKind::InvalidData,
+                format!("Root value in {weights:?} must be an array"),
+            ))?
+            .chunks_exact(2);
 
         let mut layers: Vec<Layer> = Vec::new();
+        for layer in layers_json
+            .as_array()
+            .ok_or(Error::new(
+                ErrorKind::InvalidData,
+                "Layers value must be an array",
+            ))?
+            .iter()
+            .map(|c| {
+                c.as_object().ok_or(Error::new(
+                    ErrorKind::InvalidData,
+                    "Layers array value must be an object",
+                ))
+            })
+        {
+            let layer = layer?;
+            let cfg = layer
+                .get("config")
+                .ok_or(Error::new(
+                    ErrorKind::InvalidData,
+                    "Layer object must contain 'config' key",
+                ))?
+                .as_object()
+                .ok_or(Error::new(
+                    ErrorKind::InvalidData,
+                    "Config value must be an object",
+                ))?;
 
-        for layer in layer_objs {
-            let cfg = layer["config"].as_object().unwrap();
-            let input_shape = input_shape(cfg, &layers);
+            // Extract whether to use padding from the config object.
+            let is_padding = |cfg: &Map<String, Value>| -> Result<bool> {
+                let padding = cfg
+                    .get("padding")
+                    .ok_or(Error::new(
+                        ErrorKind::InvalidData,
+                        "Config object must contain 'padding' key",
+                    ))?
+                    .as_str()
+                    .ok_or(Error::new(
+                        ErrorKind::InvalidData,
+                        "Padding value must be a string",
+                    ))?;
+                Ok(padding == "same")
+            };
 
-            match layer["class_name"].as_str().unwrap() {
+            // Extract the biases from the biases object.
+            let biases = |biases_json: &Value| -> Result<Vec<Option<i64>>> {
+                let mut biases = Vec::new();
+                for bias in biases_json
+                    .as_array()
+                    .ok_or(Error::new(
+                        ErrorKind::InvalidData,
+                        "Biases value must be an array",
+                    ))?
+                    .iter()
+                {
+                    let bias = bias.as_i64().ok_or(Error::new(
+                        ErrorKind::InvalidData,
+                        "Bias value must be an integer",
+                    ))?;
+                    biases.push(Some(bias));
+                }
+                Ok(biases)
+            };
+
+            // Extract the `ActivationFunction` from the config object.
+            let activation = |cfg: &Map<String, Value>| -> Result<ActivationFunction> {
+                ActivationFunction::try_from(
+                    cfg.get("activation")
+                        .ok_or(Error::new(
+                            ErrorKind::InvalidData,
+                            "Config object must contain 'activation' key",
+                        ))?
+                        .as_str()
+                        .ok_or(Error::new(
+                            ErrorKind::InvalidData,
+                            "Activation value must be a string",
+                        ))?,
+                )
+            };
+
+            // Extract the stride from the config object.
+            let stride = |cfg: &Map<String, Value>| -> Result<(usize, usize)> {
+                let stride = cfg
+                    .get("strides")
+                    .ok_or(Error::new(
+                        ErrorKind::InvalidData,
+                        "Config object must contain 'strides' key",
+                    ))?
+                    .as_array()
+                    .ok_or(Error::new(
+                        ErrorKind::InvalidData,
+                        "Strides value must be an array",
+                    ))?
+                    .iter()
+                    .map(|v| {
+                        v.as_u64().ok_or(Error::new(
+                            ErrorKind::InvalidData,
+                            "Strides array value must be an integer",
+                        ))
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                if stride.len() < 2 {
+                    return Err(Error::new(
+                        ErrorKind::InvalidData,
+                        "Strides array must have at least two elements",
+                    ));
+                }
+                Ok((stride[0] as usize, stride[1] as usize))
+            };
+
+            let input_shape = if let Some(v) = cfg.get("batch_input_shape") {
+                let mut shape = v
+                    .as_array()
+                    .ok_or(Error::new(
+                        ErrorKind::InvalidData,
+                        "Batch input shape must be an array",
+                    ))?
+                    .clone();
+                if shape[0].is_null() {
+                    shape.remove(0);
+                }
+                let height = shape[0].as_u64().ok_or(Error::new(
+                    ErrorKind::InvalidData,
+                    "Height must be an unsigned integer",
+                ))? as usize;
+                let width = if shape.len() > 1 {
+                    shape[1].as_u64().ok_or(Error::new(
+                        ErrorKind::InvalidData,
+                        "Width must be an unsigned integer",
+                    ))? as usize
+                } else {
+                    1
+                };
+                let depth = if shape.len() > 2 {
+                    shape[2].as_u64().ok_or(Error::new(
+                        ErrorKind::InvalidData,
+                        "Depth must be an unsigned integer",
+                    ))? as usize
+                } else {
+                    1
+                };
+                (height, width, depth)
+            } else {
+                layers
+                    .last()
+                    .ok_or(Error::new(
+                        ErrorKind::InvalidData,
+                        "No last layer to extract input shape",
+                    ))?
+                    .output_dims()
+            };
+
+            match layer
+                .get("class_name")
+                .ok_or(Error::new(
+                    ErrorKind::InvalidData,
+                    "Layer object must contain 'class_name' key",
+                ))?
+                .as_str()
+                .ok_or(Error::new(
+                    ErrorKind::InvalidData,
+                    "Layer class name must be a string",
+                ))? {
                 "Dense" => {
-                    let weights_and_biases =
-                        weights_iter.next().expect("not enough weights and biases!");
-                    let num_neurons = cfg["units"].as_u64().unwrap() as usize;
+                    let weights_and_biases = weights_and_biases_iter.next().ok_or(Error::new(
+                        ErrorKind::InvalidData,
+                        "Not enough weights and biases",
+                    ))?;
+                    let num_neurons = cfg
+                        .get("units")
+                        .ok_or(Error::new(
+                            ErrorKind::InvalidData,
+                            "Config object must contain 'units' key",
+                        ))?
+                        .as_u64()
+                        .ok_or(Error::new(
+                            ErrorKind::InvalidData,
+                            "Units value must be an unsigned integer",
+                        ))? as usize;
                     let mut weights = vec![Array3::from_elem(input_shape, Some(0)); num_neurons];
 
-                    // keras outputs the weights in the transposition of what we need
-                    let data_arr = weights_and_biases[0].as_array().unwrap();
-                    assert_eq!(data_arr.len(), input_shape.0);
+                    // Keras outputs the weights in the transposition of what we need.
+                    let weights_data = weights_and_biases[0].as_array().ok_or(Error::new(
+                        ErrorKind::InvalidData,
+                        "Weights value must be an array",
+                    ))?;
+                    if weights_data.len() != input_shape.0 {
+                        return Err(Error::new(
+                            ErrorKind::InvalidData,
+                            "Weights length must equal input shape",
+                        ));
+                    }
 
-                    let data = data_arr.iter().map(|v| {
-                        v.as_array()
-                            .unwrap_or_else(|| panic!("not an array: {}", v))
+                    for (inp_num, data) in weights_data.iter().enumerate() {
+                        for (neuron_num, val) in data
+                            .as_array()
+                            .ok_or(Error::new(
+                                ErrorKind::InvalidData,
+                                "Weights value must be an array",
+                            ))?
                             .iter()
                             .map(|v| {
-                                v.as_i64()
-                                    .unwrap_or_else(|| panic!("non-integer in weights.json: {}", v))
+                                v.as_i64().ok_or(Error::new(
+                                    ErrorKind::InvalidData,
+                                    "Weight value must be an integer",
+                                ))
                             })
-                    });
-
-                    for (inp_num, data_iter) in data.enumerate() {
-                        for (neuron_num, val) in data_iter.enumerate() {
-                            weights[neuron_num][(inp_num, 0, 0)] = Some(val);
+                            .enumerate()
+                        {
+                            weights[neuron_num][(inp_num, 0, 0)] = Some(val?);
                         }
                     }
 
-                    let activation =
-                        ActivationFunction::try_from(cfg["activation"].as_str().unwrap())?;
-                    let biases = weights_and_biases[1]
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .map(|n| Some(n.as_i64().unwrap()))
-                        .collect::<Vec<_>>();
+                    let biases = biases(&weights_and_biases[1])?;
+
+                    let activation = activation(cfg)?;
+
                     layers.push(Layer::Dense {
                         weights,
                         biases,
                         activation,
                     });
                 }
-
                 "Dropout" => continue,
-
                 "Conv2D" => {
-                    let padding = cfg["padding"].as_str().unwrap();
-                    let pad = padding == "same";
+                    let pad = is_padding(cfg)?;
 
-                    let activation =
-                        ActivationFunction::try_from(cfg["activation"].as_str().unwrap())?;
-                    let weights_and_biases =
-                        weights_iter.next().expect("not enough weights and biases!");
+                    let weights_and_biases = weights_and_biases_iter.next().ok_or(Error::new(
+                        ErrorKind::InvalidData,
+                        "Not enough weights and biases",
+                    ))?;
 
-                    let kernel_size = cfg["kernel_size"]
+                    let kernel_size = cfg
+                        .get("kernel_size")
+                        .ok_or(Error::new(
+                            ErrorKind::InvalidData,
+                            "Config object must contain 'kernel_size' key",
+                        ))?
                         .as_array()
-                        .unwrap()
+                        .ok_or(Error::new(
+                            ErrorKind::InvalidData,
+                            "Kernel size value must be an array",
+                        ))?
                         .iter()
-                        .map(|v| v.as_i64().unwrap() as usize)
-                        .collect::<Vec<_>>();
-                    let kernel_shape = (kernel_size[0], kernel_size[1], input_shape.2);
+                        .map(|v| {
+                            v.as_u64().ok_or(Error::new(
+                                ErrorKind::InvalidData,
+                                "Kernel size array value must be an unsigned integer",
+                            ))
+                        })
+                        .collect::<Result<Vec<_>>>()?;
+                    if kernel_size.len() < 2 {
+                        return Err(Error::new(
+                            ErrorKind::InvalidData,
+                            "Kernel size array must have at least two elements",
+                        ));
+                    }
+                    let kernel_shape = (
+                        kernel_size[0] as usize,
+                        kernel_size[1] as usize,
+                        input_shape.2,
+                    );
 
-                    let stride = cfg["strides"]
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .map(|v| v.as_i64().unwrap() as usize)
-                        .collect::<Vec<_>>();
-                    let stride = (stride[0], stride[1]);
+                    let stride = stride(cfg)?;
 
                     let weights = weights_and_biases[0]
                         .as_array()
-                        .unwrap()
+                        .ok_or(Error::new(
+                            ErrorKind::InvalidData,
+                            "Weights value must be an array",
+                        ))?
                         .iter()
-                        .map(|v| {
-                            v.as_array()
-                                .unwrap()
+                        .map(|x| {
+                            x.as_array()
+                                .ok_or(Error::new(
+                                    ErrorKind::InvalidData,
+                                    "Weights x-coordinate must be an array",
+                                ))?
                                 .iter()
-                                .map(|v| {
-                                    v.as_array()
-                                        .unwrap()
+                                .map(|y| {
+                                    y.as_array()
+                                        .ok_or(Error::new(
+                                            ErrorKind::InvalidData,
+                                            "Weights y-coordinate must be an array",
+                                        ))?
                                         .iter()
-                                        .map(|v| {
-                                            v.as_array()
-                                                .unwrap()
+                                        .map(|z| {
+                                            z.as_array()
+                                                .ok_or(Error::new(
+                                                    ErrorKind::InvalidData,
+                                                    "Weights z-coordinate must be an array",
+                                                ))?
                                                 .iter()
                                                 .map(|v| {
-                                                    v.as_i64().unwrap_or_else(|| {
-                                                        panic!(
-                                                            "reading weights: {} not an integer",
-                                                            v
-                                                        )
-                                                    })
+                                                    v.as_i64().ok_or(Error::new(
+                                                        ErrorKind::InvalidData,
+                                                        "Weight value must be an integer",
+                                                    ))
                                                 })
-                                                .collect::<Vec<_>>()
+                                                .collect::<Result<Vec<_>>>()
                                         })
-                                        .collect::<Vec<_>>()
+                                        .collect::<Result<Vec<_>>>()
                                 })
-                                .collect::<Vec<_>>()
+                                .collect::<Result<Vec<_>>>()
                         })
-                        .collect::<Vec<_>>();
+                        .collect::<Result<Vec<_>>>()?;
 
-                    let nfilters = cfg["filters"].as_u64().unwrap() as usize;
+                    let nfilters = cfg
+                        .get("filters")
+                        .ok_or(Error::new(
+                            ErrorKind::InvalidData,
+                            "Config object must contain 'filters' key",
+                        ))?
+                        .as_u64()
+                        .ok_or(Error::new(
+                            ErrorKind::InvalidData,
+                            "Filters value must be an unsigned integer",
+                        ))? as usize;
                     let mut filters = vec![Array3::from_elem(kernel_shape, Some(0)); nfilters];
-
-                    assert_eq!(weights.len(), kernel_shape.0);
+                    if weights.len() != kernel_shape.0 {
+                        return Err(Error::new(
+                            ErrorKind::InvalidData,
+                            "Weights length must equal kernel shape",
+                        ));
+                    }
 
                     for (x, weights) in weights.into_iter().enumerate() {
-                        assert_eq!(weights.len(), kernel_shape.1);
+                        if weights.len() != kernel_shape.1 {
+                            return Err(Error::new(
+                                ErrorKind::InvalidData,
+                                "Weights x-coordinate length must equal kernel shape",
+                            ));
+                        }
 
                         for (y, weights) in weights.into_iter().enumerate() {
-                            assert_eq!(weights.len(), kernel_shape.2);
+                            if weights.len() != kernel_shape.2 {
+                                return Err(Error::new(
+                                    ErrorKind::InvalidData,
+                                    "Weights y-coordinate length must equal kernel shape",
+                                ));
+                            }
 
                             for (z, weights) in weights.into_iter().enumerate() {
-                                assert_eq!(weights.len(), nfilters);
+                                if weights.len() != nfilters {
+                                    return Err(Error::new(
+                                        ErrorKind::InvalidData,
+                                        "Weights z-coordinate length must equal the number of filters",
+                                    ));
+                                }
 
                                 for (filter_num, val) in weights.into_iter().enumerate() {
                                     filters[filter_num][(x, y, z)] = Some(val);
@@ -589,14 +836,15 @@ impl NeuralNet {
                         }
                     }
 
-                    let biases = weights_and_biases[1]
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .map(|n| Some(n.as_i64().unwrap()))
-                        .collect::<Vec<_>>();
+                    let biases = biases(&weights_and_biases[1])?;
+                    if biases.len() != nfilters {
+                        return Err(Error::new(
+                            ErrorKind::InvalidData,
+                            "Biases length must equal the number of filters",
+                        ));
+                    }
 
-                    assert_eq!(biases.len(), nfilters);
+                    let activation = activation(cfg)?;
 
                     layers.push(Layer::Convolutional {
                         filters,
@@ -610,18 +858,8 @@ impl NeuralNet {
                 }
 
                 "MaxPooling2D" => {
-                    let padding = cfg["padding"].as_str().unwrap();
-
-                    let pad = padding == "same";
-
-                    let stride = cfg["strides"]
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .map(|v| v.as_i64().unwrap() as usize)
-                        .collect::<Vec<_>>();
-                    let stride = (stride[0], stride[1]);
-
+                    let pad = is_padding(cfg)?;
+                    let stride = stride(cfg)?;
                     let size = cfg["pool_size"]
                         .as_array()
                         .unwrap()
@@ -637,7 +875,6 @@ impl NeuralNet {
                         pad,
                     });
                 }
-
                 "Flatten" => {
                     let (height, width, depth) = input_shape;
 
@@ -646,17 +883,20 @@ impl NeuralNet {
                         output_shape: (height * width * depth, 1, 1),
                     });
                 }
-
                 "Activation" => {
-                    let activation =
-                        ActivationFunction::try_from(cfg["activation"].as_str().unwrap())?;
+                    let activation = activation(cfg)?;
+
                     layers.push(Layer::Activation {
                         input_shape,
                         activation,
                     });
                 }
-
-                ty => panic!("unsupported layer type \"{}\"", ty),
+                name => {
+                    return Err(Error::new(
+                        ErrorKind::InvalidData,
+                        format!("Invalid layer class name: {name}"),
+                    ))?;
+                }
             }
         }
 
@@ -1042,34 +1282,6 @@ impl NeuralNet {
         })?;
         println!("{}", informer.stats());
         Ok(())
-    }
-}
-
-/// Extract the input shape from a JSON value.
-fn input_shape(
-    cfg: &serde_json::map::Map<String, Value>,
-    layers: &[Layer],
-) -> (usize, usize, usize) {
-    // input_shape is the target shape for each weights array
-    if let Some(v) = cfg.get("batch_input_shape") {
-        let mut shape = v.as_array().unwrap().clone();
-        if shape[0].is_null() {
-            shape.remove(0);
-        }
-        let height = shape[0].as_u64().unwrap() as usize;
-        let width = if shape.len() > 1 {
-            shape[1].as_u64().unwrap() as usize
-        } else {
-            1
-        };
-        let depth = if shape.len() > 2 {
-            shape[2].as_u64().unwrap() as usize
-        } else {
-            1
-        };
-        (height, width, depth)
-    } else {
-        layers.last().expect("no previous layer!").output_dims()
     }
 }
 
