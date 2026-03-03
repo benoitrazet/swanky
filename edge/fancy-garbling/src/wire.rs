@@ -47,6 +47,9 @@ pub trait WireLabel: Clone + HasModulus {
     fn color(&self) -> u16;
 
     /// Adds two [`WireLabel`]s together.
+    ///
+    /// See the documentation of specific implementations for detailed
+    /// restrictions on the types of the operands.
     fn plus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self;
 
     /// Multiplies the [`WireLabel`] by a constant `c mod q`.
@@ -64,22 +67,42 @@ pub trait WireLabel: Clone + HasModulus {
     fn from_block(inp: Block, q: u16) -> Self;
 
     /// The zero [`WireLabel`], based on the modulus `q`.
+    ///
+    /// # Panics
+    /// This panics if `q` does not align with the modulus supported by the
+    /// [`WireLabel`].
     // TODO: This is deceiving. It is _not_ a zero wirelabel as it is called in
     // the literature, but rather simply a zero _value_. This could lead to bugs
     // and should be changed!
     fn zero(q: u16) -> Self;
 
     /// A random [`WireLabel`] `mod q`, with the first digit set to `1`.
+    ///
+    /// # Panics
+    /// This panics if `q` does not align with the modulus supported by the
+    /// [`WireLabel`].
     fn rand_delta<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self;
 
     /// A random [`WireLabel`] `mod q`.
+    ///
+    /// # Panics
+    /// This panics if `q` does not align with the modulus supported by the
+    /// [`WireLabel`].
     fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self;
 
     /// Converts a hashed block into a valid wire of the given modulus `q`.
+    ///
+    /// # Panics
+    /// This panics if `q` does not align with the modulus supported by the
+    /// [`WireLabel`].
     fn hash_to_mod(hash: Block, q: u16) -> Self;
 
     /// Computes the hash of this [`WireLabel`], converting the result back into
     /// a [`WireLabel`] based on the modulus `q`.
+    ///
+    /// # Panics
+    /// This panics if `q` does not align with the modulus supported by the
+    /// [`WireLabel`].
     fn hashback(&self, tweak: u128, q: u16) -> Self {
         let hash = self.hash(tweak);
         Self::hash_to_mod(hash, q)
@@ -104,12 +127,18 @@ pub trait WireLabel: Clone + HasModulus {
     }
 
     /// Adds two [`WireLabel`]s together, consuming the input.
+    ///
+    /// See the documentation of specific implementations for detailed
+    /// restrictions on the types of the operands.
     fn plus_mov(mut self, other: &Self) -> Self {
         self.plus_eq(other);
         self
     }
 
     /// Adds two [`WireLabel`]s together.
+    ///
+    /// See the documentation of specific implementations for detailed
+    /// restrictions on the types of the operands.
     fn plus(&self, other: &Self) -> Self {
         self.clone().plus_mov(other)
     }
@@ -120,17 +149,26 @@ pub trait WireLabel: Clone + HasModulus {
     }
 
     /// Subtracts a [`WireLabel`] from this one, consuming the input.
+    ///
+    /// See the documentation of specific implementations for detailed
+    /// restrictions on the types of the operands.
     fn minus_mov(mut self, other: &Self) -> Self {
         self.minus_eq(other);
         self
     }
 
     /// Subtracts a [`WireLabel`] from this one.
+    ///
+    /// See the documentation of specific implementations for detailed
+    /// restrictions on the types of the operands.
     fn minus(&self, other: &Self) -> Self {
         self.clone().minus_mov(other)
     }
 
     /// Subtracts a [`WireLabel`] from this one.
+    ///
+    /// See the documentation of specific implementations for detailed
+    /// restrictions on the types of the operands.
     fn minus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self {
         self.plus_eq(&other.negate());
         self
