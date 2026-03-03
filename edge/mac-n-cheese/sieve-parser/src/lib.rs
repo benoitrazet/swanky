@@ -164,7 +164,7 @@ impl std::fmt::Display for Header {
 /// A range of wire values, as defined in the SIEVE IR spec.
 ///
 /// Note that this range is _inclusive_; iteration should use
-/// [`RangeInclusive`](std::ops::RangeInclusive) syntax to account for this.
+/// [`RangeInclusive`] syntax to account for this.
 #[derive(Debug, Clone, Copy)]
 pub struct WireRange {
     pub start: WireId,
