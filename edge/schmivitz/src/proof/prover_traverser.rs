@@ -104,7 +104,12 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
                 self.vole_assignment_count
             );
         }
-        Ok((self.aggregate_degree_0, self.aggregate_degree_1, self.aggregate_assert_zero, self.voles))
+        Ok((
+            self.aggregate_degree_0,
+            self.aggregate_degree_1,
+            self.aggregate_assert_zero,
+            self.voles,
+        ))
     }
 
     /// Get the next extended witness value.
@@ -183,7 +188,7 @@ impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
     fn assert_zero(&mut self, wire: &Self::Wire) -> CircuitResult<()> {
         let challenge = self.chi_challenge.next();
         self.aggregate_assert_zero += challenge * wire.1;
-        
+
         Ok(())
     }
 }

@@ -20,7 +20,10 @@ use swanky_sieve_ir_api::CircuitExecuter;
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
     parameters::SECURITY_PARAM,
-    proof::{prover_preparer::ProverPreparer, prover_traverser::ProverTraverser, transcript::ChiGenerator},
+    proof::{
+        prover_preparer::ProverPreparer, prover_traverser::ProverTraverser,
+        transcript::ChiGenerator,
+    },
     vole::{AsSecretBytes, RandomVoleP, RandomVoleV},
 };
 
@@ -142,7 +145,8 @@ where
         // the challenges.
         let mut circuit_traverser = ProverTraverser::new(witness, chi_challenge, voles)?;
         circuit.execute(&mut circuit_traverser)?;
-        let (degree_0_aggregation, degree_1_aggregation, assert_zero_commitment, voles) = circuit_traverser.into_parts()?;
+        let (degree_0_aggregation, degree_1_aggregation, assert_zero_commitment, voles) =
+            circuit_traverser.into_parts()?;
 
         log::info!("4: circuit_traverser.into_parts: {:?}", t.elapsed());
 
@@ -156,7 +160,11 @@ where
         let degree_1_commitment = degree_1_aggregation + degree_1_mask;
 
         // Add aggregated responses to transcript
-        transcript.append_polynomial_commitments(&degree_0_commitment, &degree_1_commitment, &assert_zero_commitment);
+        transcript.append_polynomial_commitments(
+            &degree_0_commitment,
+            &degree_1_commitment,
+            &assert_zero_commitment,
+        );
         let decommitment_challenge = transcript.extract_decommitment_challenge();
 
         // Decommit the VOLEs
@@ -283,7 +291,11 @@ where
             validation - self.degree_1_commitment * reconstructed_voles.verifier_key();
 
         // Add aggregated responses to the transcript
-        transcript.append_polynomial_commitments(&degree_0_commitment, &self.degree_1_commitment, &self.assert_zero_commitment);
+        transcript.append_polynomial_commitments(
+            &degree_0_commitment,
+            &self.degree_1_commitment,
+            &self.assert_zero_commitment,
+        );
 
         // Get the VOLE decommitment challenge and make sure it's valid
         let decommitment_challenge = transcript.extract_decommitment_challenge();

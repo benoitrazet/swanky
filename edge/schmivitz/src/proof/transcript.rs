@@ -83,8 +83,10 @@ impl Transcript<'_> {
             .append_message(b"b~: degree 0 commitment", &degree_0_commitment.to_bytes());
         self.0
             .append_message(b"a~: degree 1 commitment", &degree_1_commitment.to_bytes());
-        self.0
-            .append_message(b"assert_zero commitment", &assert_zero_commitment.to_bytes());
+        self.0.append_message(
+            b"assert_zero commitment",
+            &assert_zero_commitment.to_bytes(),
+        );
     }
 
     pub(crate) fn extract_decommitment_challenge(&mut self) -> [u8; SECURITY_PARAM / 8] {
