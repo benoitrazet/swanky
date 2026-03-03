@@ -930,7 +930,7 @@ impl NeuralNet {
                 )?;
                 let outputs = NeuralNet::decode_output_boolean(&mut garbler, &outputs, channel)?;
                 // The garbler receives no outputs.
-                assert_eq!(outputs, None);
+                debug_assert_eq!(outputs, None);
                 Ok(())
             },
             |channel| {
@@ -949,6 +949,7 @@ impl NeuralNet {
                 let outputs = NeuralNet::decode_output_boolean(&mut evaluator, &outputs, channel)?;
                 // The evaluator receives the outputs, so the `unwrap` should
                 // never fail here.
+                debug_assert!(outputs.is_some());
                 Ok(outputs.unwrap())
             },
         )?;
@@ -993,7 +994,7 @@ impl NeuralNet {
                     channel,
                 )?;
                 // The garbler receives no outputs.
-                assert_eq!(outputs, None);
+                debug_assert_eq!(outputs, None);
                 Ok(())
             },
             |channel| {
@@ -1022,6 +1023,7 @@ impl NeuralNet {
                 )?;
                 // The evaluator receives the outputs, so the `unwrap` should
                 // never fail here.
+                debug_assert!(outputs.is_some());
                 Ok(outputs.unwrap())
             },
         )?;
