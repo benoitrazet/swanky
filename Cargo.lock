@@ -2657,6 +2657,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-garbled-nn"
+version = "0.6.0"
+dependencies = [
+ "clap",
+ "criterion",
+ "fancy-garbling",
+ "itertools 0.14.0",
+ "ndarray",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "swanky-aes-rng",
+ "swanky-block",
+ "swanky-channel",
+ "swanky-error",
+ "swanky-ot-alsz-kos",
+ "swanky-twopac",
+]
+
+[[package]]
 name = "swanky-malicious-hooks"
 version = "0.6.0"
 

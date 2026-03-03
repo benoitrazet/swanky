@@ -56,6 +56,7 @@ have a lesser stability guarantee.
 - **`swanky-field-fft`**: FFT implementations for finite fields
 - **`swanky-field-test`**: Utilitites for testing correctness of finite field implementations
 - **`swanky-flatbuffer-build`**: Tooling to automate compiling flatbuffer schemas
+- **`swanky-garbled-nn`**: Garbled neural networks using `fancy-garbling`
 - **`swanky-malicious-hooks`**: Hooks for testing malicious behavior in various cryptographic protocols.
 - **`swanky-ocelot-error`**: [DEPRECATED] An error type used by crates formerly contained in ocelot
 - **`swanky-oprf-kkrt`**: An implementation of the kkrt OPRF protocol
