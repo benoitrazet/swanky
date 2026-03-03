@@ -59,7 +59,7 @@ pub trait FieldBackend<F> {
 }
 
 /// `CircuitExecuter` abstracts over backends to execute a circuit over a single field type.
-/// Note that this is necessary since Rust currently does not support higher order trait bounds. See https://github.com/rust-lang/rust/issues/108185#issuecomment-2819123578
+/// Note that this is necessary since Rust currently does not support higher order trait bounds. See <https://github.com/rust-lang/rust/issues/108185#issuecomment-2819123578>
 pub trait CircuitExecuter<F> {
     /// The body of the circuit to execute, given a backend.
     fn execute<B: FieldBackend<F>>(&self, backend: &mut B) -> CircuitResult<()>;
