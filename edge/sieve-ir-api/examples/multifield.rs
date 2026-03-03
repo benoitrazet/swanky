@@ -11,12 +11,13 @@ fn sieve_compiled_f<B>(
 where
     B: FieldBackend<F2>,
 {
-    let v1 = backend.add(&arg1, &arg2)?;
-    let v2 = backend.add(&arg3, &v1)?;
+    let v1 = backend.add(arg1, arg2)?;
+    let v2 = backend.add(arg3, &v1)?;
 
     Ok((v1, v2))
 }
 
+#[allow(dead_code)]
 fn example1<B>(backend: &mut B) -> CircuitResult<()>
 where
     B: FieldBackend<F2>,

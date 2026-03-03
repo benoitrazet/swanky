@@ -71,7 +71,7 @@ pub fn compile_sieve_ir(input: proc_macro::TokenStream) -> proc_macro::TokenStre
     let mut manifest_path = PathBuf::from(std::str::from_utf8(&output).unwrap().trim());
     manifest_path.pop();
 
-    let mut path = PathBuf::from(manifest_path);
+    let mut path = manifest_path;
     path.push(relative_path);
 
     // Remove filename from path.
@@ -80,7 +80,7 @@ pub fn compile_sieve_ir(input: proc_macro::TokenStream) -> proc_macro::TokenStre
     }
 
     // Append input file.
-    path.push(&input_file.value());
+    path.push(input_file.value());
 
     let circuit = std::fs::read_to_string(path).expect("Failed to read input circuit file");
 
@@ -115,7 +115,7 @@ fn codegen_sieve_ir(circuit: &str, struct_name: &Ident) -> proc_macro::TokenStre
     let parser =
         RelationReader::new(std::io::Cursor::new(circuit)).expect("Invalid SIEVE IR circuit");
 
-    let impls = codegen_impls(parser, &struct_name);
+    let impls = codegen_impls(parser, struct_name);
     quote! {
         #[derive(Copy, Clone, Debug)]
         pub struct #struct_name;
@@ -238,7 +238,7 @@ impl Codegen {
                     let bytes = f.to_bytes();
                     let arr = bytes
                         .into_iter()
-                        .map(|b| Literal::u8_suffixed(b))
+                        .map(Literal::u8_suffixed)
                         .collect::<Vec<_>>();
                     quote! {
                         swanky_field_binary::F2::from_bytes(&generic_array::GenericArray::<u8, <swanky_field_binary::F2 as CanonicalSerialize>::ByteReprLen>::from_array([#(#arr,)*])).unwrap()

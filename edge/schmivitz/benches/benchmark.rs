@@ -1,7 +1,7 @@
 // mod aes;
 mod example;
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 use merlin::Transcript;
 use rand::thread_rng;
@@ -11,6 +11,7 @@ use schmivitz::{
     circuit_validator::validate_circuit,
     vole::functionality::{VoleProver, VoleVerifier},
 };
+use std::hint::black_box;
 
 // use crate::aes::AES256;
 use crate::example::ExampleCircuit;
