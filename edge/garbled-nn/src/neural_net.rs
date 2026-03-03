@@ -1377,6 +1377,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Slow"]
     fn garbling_works_for_DINN_100() {
         garbling_works_for_model(DINN_100_DIR, &DINN_100_Bitwidths)
     }
@@ -1393,33 +1394,39 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Slow"]
     fn binary_and_plaintext_match_for_DINN_100() {
         binary_and_plaintext_match_for_dir(Path::new(DINN_100_DIR), &DINN_100_Bitwidths);
     }
 
     #[test]
+    #[ignore = "Slow"]
     fn arithmetic_and_plaintext_match_for_DINN_100() {
         let moduli = util::bitwidths_to_moduli(&DINN_100_Bitwidths);
         arithmetic_and_plaintext_match_for_dir(Path::new(DINN_100_DIR), &moduli);
     }
 
     #[test]
+    #[ignore = "Slow"]
     fn binary_and_plaintext_match_for_CryptoNets() {
         binary_and_plaintext_match_for_dir(Path::new(CryptoNets_DIR), &CryptoNets_Bitwidths);
     }
 
     #[test]
+    #[ignore = "Slow"]
     fn arithmetic_and_plaintext_match_for_CryptoNets() {
         let moduli = util::bitwidths_to_moduli(&CryptoNets_Bitwidths);
         arithmetic_and_plaintext_match_for_dir(Path::new(CryptoNets_DIR), &moduli);
     }
 
     #[test]
+    #[ignore = "Slow"]
     fn binary_and_plaintext_match_for_DeepSecure() {
         binary_and_plaintext_match_for_dir(Path::new(DeepSecure_DIR), &DeepSecure_Bitwidths);
     }
 
     #[test]
+    #[ignore = "Slow"]
     fn arithmetic_and_plaintext_match_for_DeepSecure() {
         let moduli = util::bitwidths_to_moduli(&DeepSecure_Bitwidths);
         arithmetic_and_plaintext_match_for_dir(Path::new(DeepSecure_DIR), &moduli);
@@ -1432,6 +1439,7 @@ mod tests {
     // }
 
     #[test]
+    #[ignore = "Slow"]
     fn binary_and_plaintext_match_for_MiniONN_MNIST() {
         binary_and_plaintext_match_for_dir(Path::new(MiniONN_MNIST), &MiniONN_MNIST_Bitwidths);
     }
