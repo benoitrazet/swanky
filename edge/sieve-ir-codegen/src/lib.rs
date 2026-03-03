@@ -44,7 +44,7 @@ impl Parse for Input {
 ///
 /// The following example creates a struct `Example` whose `execute` function matches the
 /// `example.sieve` circuit file:
-/// ```
+/// ```ignore
 /// compile_sieve_ir!(Example, "../circuits/example.sieve");
 /// ```
 #[proc_macro]
@@ -93,7 +93,7 @@ pub fn compile_sieve_ir(input: proc_macro::TokenStream) -> proc_macro::TokenStre
 ///
 /// The following example creates a struct `Example` whose `execute` function matches the
 /// SIEVE IR circuit given as a string.
-/// ```
+/// ```ignore
 /// compile_sieve_ir_str!( Example,
 ///     "version 2.0.0;
 ///     circuit;
