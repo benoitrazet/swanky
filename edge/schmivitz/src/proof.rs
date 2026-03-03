@@ -20,7 +20,7 @@ use swanky_sieve_ir_api::CircuitExecuter;
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
     parameters::SECURITY_PARAM,
-    proof::{prover_preparer::ProverPreparer, prover_traverser::ProverTraverser},
+    proof::{prover_preparer::ProverPreparer, prover_traverser::ProverTraverser, transcript::ChiGenerator},
     vole::{AsSecretBytes, RandomVoleP, RandomVoleV},
 };
 
@@ -36,7 +36,6 @@ mod verifier_traverser;
 pub struct Proof<Vole: RandomVoleP, VoleV: RandomVoleV> {
     /// Commitment to the extended witness ($`d`$ in the paper).
     witness_commitment: Vec<F2>,
-    polynomial_count: usize,
     /// Aggregated commitment to the degree-1 term coefficients for each gate in the circuit
     /// ($`\tilde a`$ in the paper).
     degree_1_commitment: F128b,
@@ -106,7 +105,7 @@ where
         let mut circuit_preparer = ProverPreparer::new(private_input, max_wire_id)?;
         circuit.execute(&mut circuit_preparer)?;
 
-        let (witness, polynomial_count) = circuit_preparer.into_parts();
+        let (witness, _challenge_count) = circuit_preparer.into_parts();
         log::info!("1: circuit preparer: {:?}", t.elapsed());
 
         let t = std::time::Instant::now();
@@ -136,12 +135,12 @@ where
 
         // Add witness commitment to the transcript and generate a challenge for each polynomial
         transcript.append_witness_commitment(witness_commitment.as_slice());
-        let witness_challenges = transcript.extract_witness_challenges(polynomial_count);
+        let chi_challenge = transcript.extract_challenge();
 
         // Traverse circuit to compute the coefficients for the degree 0 and 1 terms for each
         // gate / polynomial (`A_i0` and `A_i1` in the paper) and start to aggregate these with
         // the challenges.
-        let mut circuit_traverser = ProverTraverser::new(witness, witness_challenges, voles)?;
+        let mut circuit_traverser = ProverTraverser::new(witness, chi_challenge, voles)?;
         circuit.execute(&mut circuit_traverser)?;
         let (degree_0_aggregation, degree_1_aggregation, assert_zero_commitment, voles) = circuit_traverser.into_parts()?;
 
@@ -169,7 +168,6 @@ where
             witness_commitment,
             degree_1_commitment,
             assert_zero_commitment,
-            polynomial_count,
             decommitment_challenge,
             partial_decommitment,
             vole: PhantomData,
@@ -234,8 +232,8 @@ where
         // Add hV (from VOLE) to the transcript here instead of in the vole part.
 
         // TODO: Should we be doing something with these challenges?
-        let witness_challenges = transcript.extract_witness_challenges(self.polynomial_count);
-        log::info!("3: extract_witness_challenges {:?}", t.elapsed());
+        let chi_challenge = transcript.extract_challenge();
+        log::info!("3: extract_challenges {:?}", t.elapsed());
 
         // Compute masked witnesses Q' = Q[..l] + d * Delta
         let t = std::time::Instant::now();
@@ -270,7 +268,7 @@ where
 
         // Run circuit traversal and get the aggregate value (part of c~)
         let mut verifier_traverser = VerifierTraverser::new(
-            witness_challenges,
+            chi_challenge,
             reconstructed_voles.verifier_key(),
             masked_witnesses,
         )?;
@@ -527,23 +525,10 @@ mod tests {
             rng,
         )?;
 
-        // Adding an extra challenge should fail
-        let mut too_many_challenges = proof.clone();
-        too_many_challenges.polynomial_count += 1;
-
         assert!(
-            too_many_challenges
+            proof
                 .verify_with_circuit(&small_circuit, &mut transcript())
-                .is_err()
-        );
-
-        // Not having enough challenges should fail
-        let mut too_few_challenges = proof.clone();
-        too_few_challenges.polynomial_count += 1;
-        assert!(
-            too_few_challenges
-                .verify_with_circuit(&small_circuit, &mut transcript())
-                .is_err()
+                .is_ok()
         );
 
         Ok(())

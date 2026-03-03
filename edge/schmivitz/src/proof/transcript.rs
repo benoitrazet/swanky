@@ -60,24 +60,16 @@ impl Transcript<'_> {
             .append_message(b"d: commitment to witness", bytes.as_slice());
     }
 
-    /// Extracts a challenge for each polynomial from the transcript.
+    /// Extracts a challenge for each polynomial and assert zero from the transcript.
     ///
     /// Use the transcript to extract a seed challenge and use exponentiation to
     /// derive a vector of random values.
-    pub(crate) fn extract_witness_challenges(&mut self, polynomial_count: usize) -> Vec<F128b> {
+    pub(crate) fn extract_challenge(&mut self) -> ChiGenerator {
         let mut bytes = [0u8; 16];
         self.0
             .challenge_bytes(b"chi_i: witness challenge", &mut bytes);
         let seed = F128b::from_uniform_bytes(&bytes);
-
-        let mut v = seed;
-        let mut out = Vec::with_capacity(polynomial_count);
-        for _ in 0..polynomial_count {
-            out.push(v);
-            v *= seed;
-        }
-
-        out
+        ChiGenerator::new(seed)
     }
 
     /// Adds the commitment to the aggregated polynomial coefficients to the transcript.
@@ -100,5 +92,25 @@ impl Transcript<'_> {
         self.0
             .challenge_bytes(b"decommitment challenge", &mut challenge);
         challenge
+    }
+}
+
+/// Iterator that generates powers of chi challenges.
+pub(crate) struct ChiGenerator {
+    chi: F128b,
+    power_of_chi: F128b,
+}
+
+impl ChiGenerator {
+    pub(crate) fn new(chi: F128b) -> ChiGenerator {
+        ChiGenerator {
+            chi,
+            power_of_chi: F128b::ONE,
+        }
+    }
+
+    pub(crate) fn next(&mut self) -> F128b {
+        self.power_of_chi *= self.chi;
+        self.power_of_chi
     }
 }

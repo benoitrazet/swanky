@@ -4,6 +4,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use swanky_sieve_ir_api::{CircuitResult, FieldBackend};
 
+use crate::proof::ChiGenerator;
 use crate::vole::RandomVoleP;
 
 /// A [`ProverTraverser`] allows the prover to execute the gate-by-gate evaluation portion of the
@@ -17,15 +18,13 @@ pub(crate) struct ProverTraverser<Vole> {
 
     /// Map containing the wire values for the extended witness (private inputs and multiplication gates in the circuit).
     extended_witness: Vec<F2>,
-    /// Fiat-Shamir challenges. There should be one for each polynomial (e.g. non-linear gate).
-    challenges: Vec<F128b>,
+    /// Fiat-Shamir challenges as powers of chi. There should be one for each polynomial (e.g. non-linear gate) and assert zero.
+    chi_challenge: ChiGenerator,
 
     /// Random VOLE values. There should be one for each extended witness value.
     voles: Vole,
     /// Count of how many of the custom VOLEs have been assigned.
     vole_assignment_count: usize,
-    /// Count of how many of the challenges have been assigned to polynomials (non-linear gates).
-    challenge_count: usize,
 
     /// Partial aggregation of the value $`\tilde a`$ from the protocol.
     ///
@@ -53,29 +52,17 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
     ///   corresponding to every gate in the extended witness.
     pub(crate) fn new(
         extended_witness: Vec<F2>,
-        challenges: Vec<F128b>,
+        chi_challenge: ChiGenerator,
         voles: Vole,
     ) -> Result<Self> {
-        if extended_witness.len() < challenges.len()
-            || voles.extended_witness_length() < challenges.len()
-        {
-            bail!(
-                ErrorKind::OtherError,
-                "Bad input: Length of challenges ({}), extended witness ({}), and VOLEs ({}) did not meet requirements",
-                challenges.len(),
-                extended_witness.len(),
-                voles.extended_witness_length(),
-            );
-        }
-
+        // TODO: debug_assert!(extended_witness.len() == voles.extended_witness_length())
         Ok(Self {
             wire_values_pos: 0,
             extended_witness,
-            challenges,
+            chi_challenge,
 
             voles,
             vole_assignment_count: 0,
-            challenge_count: 0,
 
             aggregate_degree_0: F128b::ZERO,
             aggregate_degree_1: F128b::ZERO,
@@ -102,23 +89,6 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
         self.voles.vole_mask(next_index)
     }
 
-    /// Retrieves the next unused challenge.
-    ///
-    /// Fails if there aren't enough challenges.
-    fn next_challenge(&mut self) -> Result<F128b> {
-        let next_index = self.challenge_count;
-        self.challenge_count += 1;
-        if next_index >= self.challenges.len() {
-            bail!(
-                ErrorKind::OtherError,
-                "Bad input: needed at least {} challenges, but only got {}",
-                self.challenge_count,
-                self.challenges.len()
-            )
-        }
-        Ok(self.challenges[next_index])
-    }
-
     /// Decomposes into the aggregate components that we constructed during the
     /// full circuit traversal.
     ///
@@ -126,14 +96,6 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
     ///
     /// This will fail if there were unused challenges or VOLEs.
     pub(crate) fn into_parts(self) -> Result<(F128b, F128b, F128b, Vole)> {
-        if self.challenge_count != self.challenges.len() {
-            bail!(
-                ErrorKind::OtherError,
-                "Traversal contained more challenges than it needed! Had {}, used {}",
-                self.challenges.len(),
-                self.challenge_count
-            );
-        }
         if self.vole_assignment_count != self.voles.extended_witness_length() {
             bail!(
                 ErrorKind::OtherError,
@@ -203,7 +165,7 @@ impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
 
         // Assign a fresh VOLE to the output wire and get the corresponding challenge
         let vole = self.next_vole()?;
-        let challenge = self.next_challenge()?;
+        let challenge = self.chi_challenge.next();
 
         // Compute coefficient values `A_i1` and `A_i0` (respectively). These are derived from the
         // `c_i(X)` polynomial defined in the paper -- see Fig 7 and page 32-33 for details.
@@ -219,7 +181,7 @@ impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
         todo!()
     }
     fn assert_zero(&mut self, wire: &Self::Wire) -> CircuitResult<()> {
-        let challenge = self.next_challenge()?;
+        let challenge = self.chi_challenge.next();
         self.aggregate_assert_zero += challenge * wire.1;
         
         Ok(())
