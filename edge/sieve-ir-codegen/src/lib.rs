@@ -354,7 +354,7 @@ impl FunctionBodyVisitor for Codegen {
         let src = self.to_wire_ident(src);
 
         self.main.extend(quote! {
-            <B as sieve_ir_api::FieldBackend<#fty>>::assert_zero(backend, &#src)?;
+            <B as swanky_sieve_ir_api::FieldBackend<#fty>>::assert_zero(backend, &#src)?;
         });
         Ok(())
     }
