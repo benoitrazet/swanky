@@ -208,10 +208,7 @@ impl<E> EdabitsMap<E> {
     }
 
     fn push_elem(&mut self, bit_width: usize, e: E) {
-        self.0
-            .entry(bit_width)
-            .and_modify(|v| v.push(e))
-            .or_default();
+        self.0.entry(bit_width).or_default().push(e);
     }
 
     fn get_edabits(&mut self, bit_width: usize) -> Option<&mut Vec<E>> {
@@ -2648,6 +2645,7 @@ impl<
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use super::EdabitsMap;
     use super::TypeStore;
     use crate::LpnSize;
     use crate::svole_trait::Svole;
@@ -3044,6 +3042,25 @@ pub(crate) mod tests {
         let witnesses = vec![vec![two::<F61p>()], vec![]];
 
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
+
+    #[test]
+    fn test_edabits_map_push_elem_inserts_first() {
+        let mut map = EdabitsMap::<u8>::new();
+
+        map.push_elem(5, 42);
+        {
+            let edabits = map.get_edabits(5).expect("missing entry for bit width 5");
+            assert_eq!(edabits.len(), 1);
+            assert_eq!(edabits[0], 42);
+        }
+
+        map.push_elem(5, 7);
+        {
+            let edabits = map.get_edabits(5).expect("missing entry for bit width 5");
+            assert_eq!(edabits.len(), 2);
+            assert_eq!(edabits[1], 7);
+        }
     }
 
     #[test]
