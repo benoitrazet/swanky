@@ -1,7 +1,6 @@
 #!/bin/sh
 
-# Copy this file into `.git/hooks/` to enable its use:
-#  `$> cp etc/hooks/* .git/hooks`
+# Run install_git_hooks.sh to enable this Git hook
 
 # Invariant 1: We want to run the formatter and linter for Swanky before every commit
 ./swanky lint # Note that `./swanky link` runs `./swanky fmt --check`
