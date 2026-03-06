@@ -305,7 +305,7 @@ pub trait ResultExt<T>: Sealed {
 
     /// Provide additional context to the error value, evaluating the
     /// context lazily only once an error does occur.
-    fn with_context(self, msg: impl FnOnce() -> String) -> Result<T>;
+    fn with_context(self, f: impl FnOnce() -> String) -> Result<T>;
 }
 
 impl<T> ResultExt<T> for Result<T> {
@@ -314,8 +314,8 @@ impl<T> ResultExt<T> for Result<T> {
         self.map_err(|e| e.context(msg))
     }
     #[inline]
-    fn with_context(self, msg: impl FnOnce() -> String) -> Result<T> {
-        self.map_err(|e| e.context(msg()))
+    fn with_context(self, f: impl FnOnce() -> String) -> Result<T> {
+        self.map_err(|e| e.context(f()))
     }
 }
 
