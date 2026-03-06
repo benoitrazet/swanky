@@ -37,10 +37,10 @@ impl<
 {
     /// Make a new `Garbler`.
     pub fn new(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self> {
-        let ot = OT::init(channel, &mut rng).wrap_err(
-            ErrorKind::InitializationError,
-            "Failed to initialize OT.".to_string(),
-        )?;
+        let ot = OT::init(channel, &mut rng)
+            .wrap_err_with(ErrorKind::InitializationError, || {
+                "Failed to initialize OT.".to_string()
+            })?;
 
         let garbler = Gb::new(RNG::from_seed(rng.r#gen()), channel)?;
         Ok(Garbler { garbler, ot, rng })
@@ -114,10 +114,11 @@ impl<
                 inputs.push(i);
             }
         }
-        self.ot.send(channel, &inputs, &mut self.rng).wrap_err(
-            ErrorKind::OtherError,
-            "Failed to send obliviously.".to_string(),
-        )?;
+        self.ot
+            .send(channel, &inputs, &mut self.rng)
+            .wrap_err_with(ErrorKind::OtherError, || {
+                "Failed to send obliviously.".to_string()
+            })?;
         Ok(wires)
     }
 }
