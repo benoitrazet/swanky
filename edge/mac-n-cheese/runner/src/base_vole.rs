@@ -81,7 +81,7 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
                                     ErrorKind::InitializationError,
                                     "Failed to initialize SVOLE sender.".to_string(),
                                 )
-                                .context("base sender init".to_string())?;
+                                .with_context(|| "base sender init".to_string())?;
                         channel.flush().wrap_err(
                             ErrorKind::NetworkError,
                             "Failed to flush SVOLE channel.".to_string(),
@@ -92,7 +92,7 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
                                 ErrorKind::OtherError,
                                 "Failed to send base VOLEs.".to_string(),
                             )
-                            .context("base voles".to_string())?;
+                            .with_context(|| "base voles".to_string())?;
                         channel.flush().wrap_err(
                             ErrorKind::NetworkError,
                             "Failed to flush SVOLE channel.".to_string(),
@@ -117,7 +117,7 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
                                     ErrorKind::InitializationError,
                                     "Failed to initialize base VOLE receiver.".to_string(),
                                 )
-                                .context("base receiver init".to_string())?;
+                                .with_context(|| "base receiver init".to_string())?;
                         channel.flush().wrap_err(
                             ErrorKind::NetworkError,
                             "Failed to flush VOLE channel.".to_string(),
@@ -128,7 +128,7 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
                                 ErrorKind::OtherError,
                                 "Failed to receive base VOLEs.".to_string(),
                             )
-                            .context("base voles".to_string())?;
+                            .with_context(|| "base voles".to_string())?;
                         channel.flush().wrap_err(
                             ErrorKind::NetworkError,
                             "Failed to flush VOLE channel.".to_string(),

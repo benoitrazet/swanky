@@ -633,7 +633,7 @@ where
         allocation_sizes: Default::default(),
         encoded_task_kinds_used: Default::default(),
     };
-    thunk(&mut cb).context("calling circuit builder thunk".to_string())?;
+    thunk(&mut cb).with_context(|| "calling circuit builder thunk".to_string())?;
     cb.finish()
 }
 

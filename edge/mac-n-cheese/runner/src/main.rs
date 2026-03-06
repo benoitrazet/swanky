@@ -157,7 +157,7 @@ fn party_main<P: Party>(
         .lift_result()?;
     let dependent_counts =
         read_atomic_graph_degree_counts(&circuit_manifest, manifest.dependent_counts())
-            .context("Reading dependent counts".to_string())?;
+            .with_context(|| "Reading dependent counts".to_string())?;
     swanky_error::ensure!(
         dependent_counts.len() == manifest.tasks().len(),
         ErrorKind::OtherError,
@@ -165,13 +165,13 @@ fn party_main<P: Party>(
     );
     let dependency_counts =
         read_atomic_graph_degree_counts(&circuit_manifest, manifest.dependency_counts())
-            .context("Reading dependency counts".to_string())?;
+            .with_context(|| "Reading dependency counts".to_string())?;
     alloc::init_alloc_pool(&mut extract_allocation_sizes::<P>(
         manifest.allocation_sizes(),
     )?);
     let (keys, mut root_conn, extra_conns) =
         tls::initiate_tls::<P>(opt.address, &opt.root_cas, &opt.tls_cert, num_connections)
-            .context("initiating root tls connection".to_string())?;
+            .with_context(|| "initiating root tls connection".to_string())?;
     let start_time = Instant::now();
     event_log::ProofStart.submit();
     eprintln!("Starting proof!");
@@ -304,7 +304,7 @@ fn main() -> swanky_error::Result<()> {
         }
     };
     let close_error_log_result = if opt.event_log.is_some() {
-        event_log::close_event_log().context("Closing event log".to_string())
+        event_log::close_event_log().with_context(|| "Closing event log".to_string())
     } else {
         Ok(())
     };

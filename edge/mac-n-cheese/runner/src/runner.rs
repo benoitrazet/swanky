@@ -426,7 +426,7 @@ pub fn run_proof_background<P: Party>(
         visit_task_definition::<P, V>(tk, V(&mut voles_needed));
     }
     let vole_contexts = base_vole::init_base_vole::<P, _>(&voles_needed, &mut rng, &mut root_conn)
-        .context("base vole".to_string())?;
+        .with_context(|| "base vole".to_string())?;
     span.finish();
     // initialize task kinds
     let mut task_definitions =

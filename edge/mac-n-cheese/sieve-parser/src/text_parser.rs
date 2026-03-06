@@ -164,7 +164,9 @@ impl<T: Read + Seek> ParseState<T> {
             ps: &mut ParseState<T>,
             dst: &mut Vec<u8>,
         ) -> swanky_error::Result<()> {
-            let byte = ps.consume_byte().context("Expected token.".to_string())?;
+            let byte = ps
+                .consume_byte()
+                .with_context(|| "Expected token.".to_string())?;
             swanky_error::ensure!(
                 ParseState::<T>::is_valid_token_start(byte),
                 ErrorKind::OtherError,
@@ -582,7 +584,7 @@ impl<T: Read + Seek> RelationReader<T> {
             type_id = self
                 .ps
                 .u8()
-                .context("Parsing type id before wire".to_string())?;
+                .with_context(|| "Parsing type id before wire".to_string())?;
             self.ps.colon()?;
         }
         let wire_id = self.read_wire_id()?;
@@ -590,7 +592,7 @@ impl<T: Read + Seek> RelationReader<T> {
     }
     fn read_wire_id(&mut self) -> swanky_error::Result<WireId> {
         self.ps.dollar()?;
-        self.ps.u64().context("Parsing wire id".to_string())
+        self.ps.u64().with_context(|| "Parsing wire id".to_string())
     }
     fn read_new_or_delete_body(&mut self) -> swanky_error::Result<(TypeId, WireId, WireId)> {
         self.ps.expect_byte(b'(')?;
@@ -800,10 +802,10 @@ impl<T: Read + Seek> RelationReader<T> {
                             let ty = if peeked != b'<' && peeked != b'$' {
                                 // If we see neither a < or $, then assume that it's the type
                                 // number up first.
-                                let ty = self.ps.u8().context(
+                                let ty = self.ps.u8().with_context(|| {
                                     "Expecting type number following '<-' for constant or copy"
-                                        .to_string(),
-                                )?;
+                                        .to_string()
+                                })?;
                                 self.ps.colon()?;
                                 ty
                             } else {
@@ -847,7 +849,7 @@ impl<T: Read + Seek> RelationReader<T> {
                     let dst_type_id = self
                         .ps
                         .u8()
-                        .context("parsing type id of conversion destination".to_string())?;
+                        .with_context(|| "parsing type id of conversion destination".to_string())?;
                     self.ps.colon()?;
                     let dst = self.read_wire_range()?;
                     self.ps.larrow()?;

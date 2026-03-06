@@ -192,7 +192,7 @@ fn sieve_compiler_main_party<
             ProverPrivate::empty(e),
         ),
     }
-    .context("circuit writing failed".to_string())?;
+    .with_context(|| "circuit writing failed".to_string())?;
     eprintln!("Circuit writing finished in {:?}", start.elapsed());
     Ok(())
 }
