@@ -39,10 +39,10 @@ fn field_to_number<F: FiniteField>(v: F) -> Number {
 }
 
 fn start_connection_verifier(addr: &String) -> Result<TcpStream> {
-    let listener = TcpListener::bind(addr.clone()).wrap_err(
-        ErrorKind::NetworkError,
-        format!("Failed to bind listener to {addr}."),
-    )?;
+    let listener = TcpListener::bind(addr.clone())
+        .wrap_err_with(ErrorKind::NetworkError, || {
+            format!("Failed to bind listener to {addr}.")
+        })?;
     match listener.accept() {
         Ok((stream, _addr)) => {
             println!("accept connections on {addr:?}");
@@ -101,10 +101,13 @@ fn main() -> Result<()> {
 
         println!("Create communication channel");
         let stream = start_connection_verifier(&addr.to_string())?;
-        let reader = BufReader::new(stream.try_clone().wrap_err(
-            ErrorKind::NetworkError,
-            "Failed to clone TCP stream for reader.".to_string(),
-        )?);
+        let reader = BufReader::new(
+            stream
+                .try_clone()
+                .wrap_err_with(ErrorKind::NetworkError, || {
+                    "Failed to clone TCP stream for reader.".to_string()
+                })?,
+        );
         let writer = BufWriter::new(stream);
         let mut channel = Channel::new(reader, writer);
 
@@ -143,10 +146,13 @@ fn main() -> Result<()> {
 
         println!("Create communication channel");
         let stream = start_connection_prover(&addr.to_string())?;
-        let reader = BufReader::new(stream.try_clone().wrap_err(
-            ErrorKind::NetworkError,
-            "Failed to clone TCP stream for reader.".to_string(),
-        )?);
+        let reader = BufReader::new(
+            stream
+                .try_clone()
+                .wrap_err_with(ErrorKind::NetworkError, || {
+                    "Failed to clone TCP stream for reader.".to_string()
+                })?,
+        );
         let writer = BufWriter::new(stream);
         let mut channel = Channel::new(reader, writer);
 

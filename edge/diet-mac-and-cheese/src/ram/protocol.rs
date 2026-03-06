@@ -293,37 +293,43 @@ where
 
         let (chal_cmbn, chal_perm1) = match P::WHICH {
             WhichParty::Prover(_) => {
-                dmc.channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
+                dmc.channel
+                    .flush()
+                    .wrap_err_with(ErrorKind::NetworkError, || {
+                        "Failed to flush channel.".to_string()
+                    })?;
                 (
-                    dmc.channel.read_serializable::<V>().wrap_err(
-                        ErrorKind::NetworkError,
-                        "Failed to read combined challenge.".to_string(),
-                    )?,
-                    dmc.channel.read_serializable::<V>().wrap_err(
-                        ErrorKind::NetworkError,
-                        "Failed to read permutation challenge.".to_string(),
-                    )?,
+                    dmc.channel
+                        .read_serializable::<V>()
+                        .wrap_err_with(ErrorKind::NetworkError, || {
+                            "Failed to read combined challenge.".to_string()
+                        })?,
+                    dmc.channel
+                        .read_serializable::<V>()
+                        .wrap_err_with(ErrorKind::NetworkError, || {
+                            "Failed to read permutation challenge.".to_string()
+                        })?,
                 )
             }
             WhichParty::Verifier(_) => {
                 let chals @ (chal_cmbn, chal_perm1) =
                     (V::random(&mut dmc.rng), V::random(&mut dmc.rng));
 
-                dmc.channel.write_serializable(&chal_cmbn).wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to write combined challenge.".to_string(),
-                )?;
-                dmc.channel.write_serializable(&chal_perm1).wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to write permutation challenge.".to_string(),
-                )?;
-                dmc.channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
+                dmc.channel
+                    .write_serializable(&chal_cmbn)
+                    .wrap_err_with(ErrorKind::NetworkError, || {
+                        "Failed to write combined challenge.".to_string()
+                    })?;
+                dmc.channel
+                    .write_serializable(&chal_perm1)
+                    .wrap_err_with(ErrorKind::NetworkError, || {
+                        "Failed to write permutation challenge.".to_string()
+                    })?;
+                dmc.channel
+                    .flush()
+                    .wrap_err_with(ErrorKind::NetworkError, || {
+                        "Failed to flush channel.".to_string()
+                    })?;
 
                 chals
             }

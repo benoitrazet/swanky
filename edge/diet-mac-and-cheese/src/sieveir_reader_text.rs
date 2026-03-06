@@ -235,10 +235,9 @@ impl FunctionBodyVisitor for TextRelation {
         }
 
         let name = std::str::from_utf8(name)
-            .wrap_err(
-                ErrorKind::SerializationError,
-                format!("Failed to deserialize UTF-8 string from {name:?}."),
-            )?
+            .wrap_err_with(ErrorKind::SerializationError, || {
+                format!("Failed to deserialize UTF-8 string from {name:?}.")
+            })?
             .into();
         let fun_id = self.fun_store.name_to_fun_id(&name)?;
         self.gates
@@ -274,10 +273,9 @@ impl RelationVisitor for TextRelation {
         }
 
         let name_s: String = std::str::from_utf8(name)
-            .wrap_err(
-                ErrorKind::SerializationError,
-                format!("Failed to deserialize UTF-8 string from {name:?}."),
-            )?
+            .wrap_err_with(ErrorKind::SerializationError, || {
+                format!("Failed to deserialize UTF-8 string from {name:?}.")
+            })?
             .into();
         let fun_body = FuncDecl::new_function(body_struct.gates, output_counts, input_counts);
         info!(
@@ -299,10 +297,9 @@ impl RelationVisitor for TextRelation {
         body: PluginBinding,
     ) -> Result<()> {
         let name_s: String = std::str::from_utf8(name)
-            .wrap_err(
-                ErrorKind::SerializationError,
-                format!("Failed to deserialize UTF-8 string from {name:?}."),
-            )?
+            .wrap_err_with(ErrorKind::SerializationError, || {
+                format!("Failed to deserialize UTF-8 string from {name:?}.")
+            })?
             .into();
 
         let mut output_counts = vec![];

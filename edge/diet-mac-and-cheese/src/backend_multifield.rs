@@ -685,10 +685,12 @@ impl<
                 )?;
             }
         }
-        self.dmc.channel.flush().wrap_err(
-            ErrorKind::OtherError,
-            "Error during channel flush (using legacy channel).".to_string(),
-        )?;
+        self.dmc
+            .channel
+            .flush()
+            .wrap_err_with(ErrorKind::OtherError, || {
+                "Error during channel flush (using legacy channel).".to_string()
+            })?;
         Ok(())
     }
 }
@@ -1210,10 +1212,13 @@ where
     ) -> Result<Vec<Mac<P, F2, F40b>>> {
         if *start != *end {
             if self.is_boolean {
-                let mut v = Vec::with_capacity((end + 1 - start).try_into().wrap_err(
-                    ErrorKind::OtherError,
-                    format!("{} + 1 - {} does not fit in a usize.", end, start),
-                )?);
+                let mut v = Vec::with_capacity(
+                    (end + 1 - start)
+                        .try_into()
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            format!("{} + 1 - {} does not fit in a usize.", end, start)
+                        })?,
+                );
                 for inp in *start..(*end + 1) {
                     let in_wire = self.memory.get(inp);
                     debug!("CONV GET {in_wire:?}");
@@ -1595,10 +1600,10 @@ impl<
                             "The v0 Boolean RAM type expects a number as its first parameter, but a string was found"
                         )
                     };
-                    let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to represent field ID as a u8.".to_string(),
-                    )?;
+                    let field_id = u8::try_from(number_to_u64(&field_id)?)
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            "Failed to represent field ID as a u8.".to_string()
+                        })?;
                     let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)?
                     else {
                         bail!(
@@ -1650,10 +1655,10 @@ impl<
                             "The Boolean RAM type expects a number as its first parameter, but a string was found"
                         )
                     };
-                    let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to represent field ID as a u8.".to_string(),
-                    )?;
+                    let field_id = u8::try_from(number_to_u64(&field_id)?)
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            "Failed to represent field ID as a u8.".to_string()
+                        })?;
                     let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)?
                     else {
                         bail!(
@@ -1709,10 +1714,10 @@ impl<
                             "The v0 arithmetic RAM type expects a number as its first parameter, but a string was found"
                         )
                     };
-                    let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to represent field ID as a u8.".to_string(),
-                    )?;
+                    let field_id = u8::try_from(number_to_u64(&field_id)?)
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            "Failed to represent field ID as a u8.".to_string()
+                        })?;
                     if let TypeSpecification::Plugin(_) = type_store.get(&field_id)? {
                         bail!(
                             ErrorKind::OtherError,
@@ -1758,10 +1763,10 @@ impl<
                             "The arithmetic RAM type expects a number as its first parameter, but a string was found"
                         )
                     };
-                    let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to represent field ID as a u8.".to_string(),
-                    )?;
+                    let field_id = u8::try_from(number_to_u64(&field_id)?)
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            "Failed to represent field ID as a u8.".to_string()
+                        })?;
                     if let TypeSpecification::Plugin(_) = type_store.get(&field_id)? {
                         bail!(
                             ErrorKind::OtherError,
@@ -2746,10 +2751,10 @@ pub(crate) mod tests {
         let wit_prover = witnesses;
         let type_store = TypeStore::try_from(fields.clone())?;
         let type_store_prover = type_store.clone();
-        let (sender, receiver) = UnixStream::pair().wrap_err(
-            ErrorKind::NetworkError,
-            "Failed to create Unix socket pair.".to_string(),
-        )?;
+        let (sender, receiver) = UnixStream::pair()
+            .wrap_err_with(ErrorKind::NetworkError, || {
+                "Failed to create Unix socket pair.".to_string()
+            })?;
         let handle: JoinHandle<swanky_error::Result<()>> = std::thread::spawn(move || {
             let rng = AesRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
