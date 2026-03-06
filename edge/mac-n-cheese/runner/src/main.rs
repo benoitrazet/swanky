@@ -129,10 +129,10 @@ fn party_main<P: Party>(
     num_connections: PartyEitherCopy<P, (), usize>,
 ) -> swanky_error::Result<()> {
     let rng = AesRng::from_rng(rand::rngs::OsRng).unwrap();
-    let circuit_file = File::open(&opt.circuit).wrap_err(
-        ErrorKind::FilesystemError,
-        format!("Opening circuit {:?}", opt.circuit),
-    )?;
+    let circuit_file = File::open(&opt.circuit)
+        .wrap_err_with(ErrorKind::FilesystemError, || {
+            format!("Opening circuit {:?}", opt.circuit)
+        })?;
     let span = event_log::ReadingCircuit.start();
     let circuit_manifest = Manifest::read(circuit_file)
         .with_context(|| format!("Reading circuit {:?}", opt.circuit))?;
@@ -140,10 +140,9 @@ fn party_main<P: Party>(
     span.finish();
     let mut private_file = ProverPrivate::from(private_data)
         .map(|path| {
-            File::open(path).wrap_err(
-                ErrorKind::FilesystemError,
-                format!("Opening private data {path:?}"),
-            )
+            File::open(path).wrap_err_with(ErrorKind::FilesystemError, || {
+                format!("Opening private data {path:?}")
+            })
         })
         .lift_result()?;
     let private_manifest = private_file
@@ -179,21 +178,22 @@ fn party_main<P: Party>(
         WhichParty::Prover(_) => {
             root_conn
                 .write_all(&circuit_manifest.hash().to_le_bytes())
-                .wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to write manifest hash.".to_string(),
-                )?;
-            root_conn.flush().wrap_err(
-                ErrorKind::NetworkError,
-                "Failed to flush root connection.".to_string(),
-            )?;
+                .wrap_err_with(ErrorKind::NetworkError, || {
+                    "Failed to write manifest hash.".to_string()
+                })?;
+            root_conn
+                .flush()
+                .wrap_err_with(ErrorKind::NetworkError, || {
+                    "Failed to flush root connection.".to_string()
+                })?;
         }
         WhichParty::Verifier(_) => {
             let mut buf = [0; 8];
-            root_conn.read_exact(&mut buf).wrap_err(
-                ErrorKind::NetworkError,
-                "Failed to read circuit hash.".to_string(),
-            )?;
+            root_conn
+                .read_exact(&mut buf)
+                .wrap_err_with(ErrorKind::NetworkError, || {
+                    "Failed to read circuit hash.".to_string()
+                })?;
             if u64::from_le_bytes(buf) != circuit_manifest.hash() {
                 eprintln!("WARNING: CIRCUIT HASH MISMATCH!");
             }
@@ -229,10 +229,10 @@ fn party_main<P: Party>(
     event_log::ProofFinish.submit();
     eprintln!("Proof finished in {proof_time:?}");
     if let Some(path) = &opt.write_run_time_to {
-        std::fs::write(path, proof_time.as_nanos().to_string().as_bytes()).wrap_err(
-            ErrorKind::FilesystemError,
-            format!("Failed to write proof time to {path:?}."),
-        )?;
+        std::fs::write(path, proof_time.as_nanos().to_string().as_bytes())
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                format!("Failed to write proof time to {path:?}.")
+            })?;
     }
     Ok(())
 }
@@ -244,10 +244,9 @@ fn extract_allocation_sizes<P: Party>(
     for sz in allocation_sizes.iter() {
         out.push(
             usize::try_from(sz.count())
-                .wrap_err(
-                    ErrorKind::OtherError,
-                    "Failed to represent allocation size as a usize.".to_string(),
-                )?
+                .wrap_err_with(ErrorKind::OtherError, || {
+                    "Failed to represent allocation size as a usize.".to_string()
+                })?
                 .checked_mul(if let Some(ty) = sz.type_() {
                     let ty = Type::try_from(ty.encoding())?;
                     struct V<P: Party>(PhantomData<P>);
