@@ -9,7 +9,7 @@
 use crate::{
     GenericParty, GenericWhichParty, OppositeParty, Party0, Party1,
     either::{
-        PartyEither,
+        PartyEither, PartyEitherCopy,
         raw::{EitherBound, RawEither, bounds, is_t0, is_t1},
     },
     ty_eq::{EqualityProposition as EqProp, Witness, generics},
@@ -205,6 +205,7 @@ macro_rules! private {
     ($(
         $(#[$meta:meta])*
         type $PartyPrivate:ident$(: $Copy:ident)? => $bound:ty;
+        type $PartyEither:ident;
     )*) => {$(
         #[derive(TransparentWrapper)]
         #[repr(transparent)]
@@ -484,6 +485,18 @@ macro_rules! private {
                 }
             }
         }
+        impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T0$(: $Copy)?, T1$(: $Copy)?>
+            From<$PartyEither<P, T0, T1>>
+            for $PartyPrivate<PrivateTo, P, RawEither<$bound, PrivateTo, T0, T1>>
+        {
+            #[inline(always)]
+            fn from(value: $PartyEither<P, T0, T1>) -> Self {
+                match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(w) => Self::new(value.into_inner(w.sym())),
+                    PrivateWhich::Empty(w) => Self::empty(w),
+                }
+            }
+        }
     )*};
 }
 impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T: Copy> Clone
@@ -509,6 +522,7 @@ impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T: 
 
 private! {
     type PartyPrivate => bounds::Any;
+    type PartyEither;
     /// # Copy
     /// [`PartyPrivateCopy`] is identical to [`PartyPrivate`] except that it implements [`Copy`] (and
     /// correspondingly requires `T` to implement `Copy`, too).
@@ -529,20 +543,7 @@ private! {
     /// }
     /// ```
     type PartyPrivateCopy: Copy => bounds::Copy;
-}
-
-// TODO: Add this to the macro so it also applies to copy types
-impl<PrivateTo: GenericParty, P: GenericParty<PartySystem = PrivateTo::PartySystem>, T0, T1>
-    From<PartyEither<P, T0, T1>>
-    for PartyPrivate<PrivateTo, P, RawEither<bounds::Any, PrivateTo, T0, T1>>
-{
-    #[inline(always)]
-    fn from(value: PartyEither<P, T0, T1>) -> Self {
-        match const { private_which::<PrivateTo, P>() } {
-            PrivateWhich::Full(w) => Self::new(value.into_inner(w.sym())),
-            PrivateWhich::Empty(w) => Self::empty(w),
-        }
-    }
+    type PartyEitherCopy;
 }
 
 mod copy_conversions;
