@@ -373,6 +373,32 @@ macro_rules! either {
                 }
             }
         }
+
+        impl<'a, P: GenericParty, T0 $(: $Copy)?, T1 $(: $Copy)?> $PartyEither<P, &'a [T0], &'a [T1]> {
+            /// Convert a slice of `PartyEither` to a `PartyEither` of
+            /// slices.
+            pub fn pull_either_outside(slice: &'a [$PartyEither<P, T0, T1>]) -> Self {
+                match P::GENERIC_WHICH {
+                    GenericWhichParty::Party0(e) => {
+                        Self::new(e, unsafe {
+                            std::slice::from_raw_parts(
+                                slice.as_ptr() as *const T0,
+                                slice.len()
+                            )
+                        })
+                    }
+                    GenericWhichParty::Party1(e) => {
+                        Self::new(e, unsafe {
+                            std::slice::from_raw_parts(
+                                slice.as_ptr() as *const T1,
+                                slice.len()
+                            )
+                        })
+                    }
+                }
+            }
+        }
+
         impl<P: GenericParty, T0: Default$(+ $Copy)?, T1: Default$(+ $Copy)?>
             Default for $PartyEither<P, T0, T1>
         {
