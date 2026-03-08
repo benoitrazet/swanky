@@ -23,7 +23,7 @@ use swanky_channel_legacy::AbstractChannel;
 use swanky_error::Result;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F40b};
-use swanky_party2::private::PartyPrivate;
+use swanky_party::private::PartyPrivate;
 
 pub(crate) struct DietMacAndCheeseExtField<
     P: Party,

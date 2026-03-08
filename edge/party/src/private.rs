@@ -3,371 +3,595 @@
 //! It is often the case that in a multi-party protocol, one of the two parties
 //! has access to information that the other does not.
 //!
-//! This module implements the [`ProverPrivate`] and [`VerifierPrivate`] types,
-//! specializations of [`PartyEither`] for this case of privileged information.
-//!
-//! Note that because these types are symmetric, we focus on `ProverPrivate`
-//! in the following examples.
-//!
-//! The type `ProverPrivate<P: Party, T>` collapses to `T` when `P` is `Prover`
-//! and a unit/"do nothing" type when `P` is `Verifier`. Like with
-//! `PartyEither`, we provide a separate `ProverPrivateCopy<P: Party, T: Copy>`
-//! with the same API (and conveniences to convert between these types where
-//! appropriate.)
-//!
-//! Using this type is straightforward:
-//!
-//! ```rust,ignore
-//! // Some secrets only the prover knows
-//! struct ProverSecrets;
-//!
-//! // A party-generic structure with access to secrets in the prover context
-//! struct PartyManager<P: Party> {
-//!     secrets: ProverPrivate<P, ProverSecrets>
-//! }
-//!
-//! // Do something with the secrets if they're available
-//! fn foo<P: Party>(x: PartyManager<P>) {
-//!     // ...
-//!     x.secrets.map(|ps| /* ... ps is a ProverSecrets ... */)
-//!     // ...
-//! }
-//! ```
-//!
-//! The API provides methods to combine/split party secrets, safely cast to
-//! the inner type in known-party contexts, and operate in a "monadic chain"
-//! of operations via `and_then` (analogous to the same method on e.g.
-//! `Option`.) See the relevant method documentation for details.
+//! Rather than duplicating functionality between two distinct implementations of these parties,
+//! [`PartyPrivate`] types allow for functionality to be shared between the parties.
 
-use super::either::*;
-use super::*;
+use crate::{
+    GenericParty, GenericWhichParty, OppositeParty, Party0, Party1,
+    either::{
+        PartyEither, PartyEitherCopy,
+        raw::{EitherBound, RawEither, bounds, is_t0, is_t1},
+    },
+    ty_eq::{EqualityProposition as EqProp, Witness, generics},
+};
+use bytemuck::TransparentWrapper;
+use std::fmt::Debug;
 
-#[derive(Debug, Clone, Copy)]
-struct UnknownProverSecret;
+pub mod raw {
+    //! Internals of [`PartyPrivate`]s
+    //!
+    //! For advanced uses, just like you might need to use [`RawEither`] instead of
+    //! [`PartyEither`], you might need to access the
+    //! [`PartyPrivateRaw`] internals of a [`PartyPrivate`].
+    //!
+    //! [`PartyPrivate`] is a [`TransparentWrapper`] over [`PartyPrivateRaw`].
+    use super::*;
+    /// A zero-sized typed used to represent a value private to not the current party
+    #[derive(
+        bytemuck::Pod,
+        bytemuck::Zeroable,
+        Clone,
+        Copy,
+        PartialEq,
+        Eq,
+        PartialOrd,
+        Ord,
+        Hash,
+        Debug,
+        Default,
+    )]
+    #[repr(transparent)]
+    pub struct PrivateToOtherParty;
+    impl PrivateToOtherParty {
+        /// Get a `&'a mut PrivateToOtherParty` for any `'a`
+        ///
+        /// For an immutable `&'a PrivateToOtherParty` you can simply write
+        /// ```
+        /// # use swanky_party::private::raw::*;
+        /// let x: &'static PrivateToOtherParty = &PrivateToOtherParty;
+        /// ```
+        ///
+        /// But for a mutable reference, you can't [due to Rust not supporting it yet](https://github.com/rust-lang/rust/blob/c018ae5389c49cc4bcb8343d80dd8e7323325410/compiler/rustc_mir_transform/src/promote_consts.rs#L411-L413)
+        ///
+        /// ```compile_fail
+        /// # use swanky_party::private::raw::*;
+        /// let x: &'static mut PrivateToOtherParty = &mut PrivateToOtherParty;
+        /// ```
+        ///
+        /// `ref_mut()` lets you generate `&'a mut PrivateToOtherParty` just like you can for
+        /// immutable references.
+        #[inline]
+        pub fn ref_mut<'a>() -> &'a mut Self {
+            // Due to https://github.com/rust-lang/rust/blob/c018ae5389c49cc4bcb8343d80dd8e7323325410/compiler/rustc_mir_transform/src/promote_consts.rs#L411-L413
+            // we need to use unsafe code or Box::new() for this.
+            //
+            // Box::new() doesn't actually do any allocation for a zero-sized type.
+            //
+            // This trick due to @spernsteiner
+            Box::leak(Box::new(PrivateToOtherParty))
+        }
+    }
+    #[test]
+    fn private_to_other_party_ref_mut_doesnt_leak() {
+        assert_eq!(
+            PrivateToOtherParty::ref_mut(),
+            PrivateToOtherParty::ref_mut()
+        );
+        assert_eq!(
+            PrivateToOtherParty::ref_mut() as *mut PrivateToOtherParty,
+            std::ptr::dangling_mut()
+        );
+    }
 
-macro_rules! make_prover_private_type {
-    ($ProverPrivate:ident $PartyEither:ident $(: $Copy:ident)?) => {
-        /// A value known only to `Prover`s.
-        #[derive(Clone $(, $Copy)?)]
-        pub struct $ProverPrivate<P: Party, T $(: $Copy)?>($PartyEither<P, T, UnknownProverSecret>);
-        impl<P: Party, T $(: $Copy)?> sealed::Sealed for $ProverPrivate<P, T> {}
-        impl<P: Party, T $(: $Copy)?> PartyPrivate<P, T> for $ProverPrivate<P, T> {
-            fn unwrap_or_else<F: FnOnce() -> T>(self, f: F) -> T {
-                match P::WHICH {
-                    WhichParty::Prover(e) => self.into_inner(e),
-                    WhichParty::Verifier(_) => f(),
+    /// Evidence that a [`PartyPrivate`] is either full or empty.
+    ///
+    /// Constructed via [`private_which`]
+    #[derive(Clone, Copy, Debug)]
+    pub enum PrivateWhich<Full, Empty> {
+        /// Evidence that the [`PartyPrivate`] is full
+        ///
+        /// i.e. evidence that `PrivateTo == P`
+        Full(Full),
+        /// Evidence that the [`PartyPrivate`] is empty
+        ///
+        /// i.e. evidence that `OppositeParty<PrivateTo> == P`
+        Empty(Empty),
+    }
+    /// Construct a [`PrivateWhich`] to prove whether a
+    /// [`PartyPrivate<PrivateTo, P, _>`](PartyPrivate) would be full or empty.
+    #[inline(always)]
+    pub const fn private_which<
+        PrivateTo: GenericParty<PartySystem = P::PartySystem>,
+        P: GenericParty,
+    >() -> PrivateWhich<
+        Witness<impl EqProp<PrivateTo, P>>,
+        Witness<impl EqProp<OppositeParty<PrivateTo>, P>>,
+    > {
+        match (PrivateTo::GENERIC_WHICH, P::GENERIC_WHICH) {
+            (GenericWhichParty::Party0(a), GenericWhichParty::Party0(b)) => {
+                PrivateWhich::Full(a.and_then(b.sym()).join_left().join())
+            }
+            (GenericWhichParty::Party0(a), GenericWhichParty::Party1(b)) => PrivateWhich::Empty(
+                is_t0::<bounds::GenericParty, PrivateTo, Party1<P>, Party0<P>>(a)
+                    .sym()
+                    .and_then(b.sym())
+                    .join_left()
+                    .join(),
+            ),
+            (GenericWhichParty::Party1(a), GenericWhichParty::Party0(b)) => PrivateWhich::Empty(
+                is_t1::<bounds::GenericParty, PrivateTo, Party1<P>, Party0<P>>(a)
+                    .sym()
+                    .and_then(b.sym())
+                    .join_right()
+                    .join(),
+            ),
+            (GenericWhichParty::Party1(a), GenericWhichParty::Party1(b)) => {
+                PrivateWhich::Full(a.and_then(b.sym()).join_right().join())
+            }
+        }
+    }
+
+    /// The [`RawEither`] which [`PartyPrivate`] is a [`TransparentWrapper`] to
+    pub type PartyPrivateRaw<Bound, PrivateTo, P, T> = RawEither<
+        Bound,
+        PrivateTo,
+        RawEither<Bound, P, T, PrivateToOtherParty>,
+        RawEither<Bound, P, PrivateToOtherParty, T>,
+    >;
+
+    /// Given that `PrivateTo == P`, conclude that `T == PartyPrivateRaw<B, PrivateTo, P, T>`
+    #[inline(always)]
+    pub const fn private_full<
+        B: EitherBound<T, PrivateToOtherParty>
+            + EitherBound<PrivateToOtherParty, T>
+            + EitherBound<
+                RawEither<B, P, T, PrivateToOtherParty>,
+                RawEither<B, P, PrivateToOtherParty, T>,
+            >,
+        PrivateTo: GenericParty<PartySystem = P::PartySystem>,
+        P: GenericParty,
+        T,
+    >(
+        w: Witness<impl EqProp<PrivateTo, P>>,
+    ) -> Witness<impl EqProp<T, PartyPrivateRaw<B, PrivateTo, P, T>>> {
+        let _ = w;
+        match const { (PrivateTo::GENERIC_WHICH, P::GENERIC_WHICH) } {
+            (GenericWhichParty::Party0(a), GenericWhichParty::Party0(b)) => is_t0::<B, _, _, _>(b)
+                .and_then(is_t0::<B, _, _, _>(a))
+                .join_left()
+                .join(),
+            (GenericWhichParty::Party1(a), GenericWhichParty::Party1(b)) => is_t1::<B, _, _, _>(b)
+                .and_then(is_t1::<B, _, _, _>(a))
+                .join_right()
+                .join(),
+            (GenericWhichParty::Party0(_), GenericWhichParty::Party1(_))
+            | (GenericWhichParty::Party1(_), GenericWhichParty::Party0(_)) => unreachable!(),
+        }
+    }
+    /// Given that `OppositeParty<PrivateTo> == P`, conclude that
+    /// `PrivateToOtherParty == PartyPrivateRaw<B, PrivateTo, P, T>`
+    #[inline(always)]
+    pub const fn private_empty<
+        B: EitherBound<T, PrivateToOtherParty>
+            + EitherBound<PrivateToOtherParty, T>
+            + EitherBound<
+                RawEither<B, P, T, PrivateToOtherParty>,
+                RawEither<B, P, PrivateToOtherParty, T>,
+            >,
+        PrivateTo: GenericParty<PartySystem = P::PartySystem>,
+        P: GenericParty,
+        T,
+    >(
+        w: Witness<impl EqProp<OppositeParty<PrivateTo>, P>>,
+    ) -> Witness<impl EqProp<PrivateToOtherParty, PartyPrivateRaw<B, PrivateTo, P, T>>> {
+        let _ = w;
+        match const { (PrivateTo::GENERIC_WHICH, P::GENERIC_WHICH) } {
+            (GenericWhichParty::Party0(a), GenericWhichParty::Party1(b)) => is_t1::<B, _, _, _>(b)
+                .and_then(is_t0::<B, _, _, _>(a))
+                .join_left()
+                .join(),
+            (GenericWhichParty::Party1(a), GenericWhichParty::Party0(b)) => is_t0::<B, _, _, _>(b)
+                .and_then(is_t1::<B, _, _, _>(a))
+                .join_right()
+                .join(),
+            (GenericWhichParty::Party0(_), GenericWhichParty::Party0(_))
+            | (GenericWhichParty::Party1(_), GenericWhichParty::Party1(_)) => unreachable!(),
+        }
+    }
+}
+use raw::*;
+
+macro_rules! private {
+    ($(
+        $(#[$meta:meta])*
+        type $PartyPrivate:ident$(: $Copy:ident)? => $bound:ty;
+        type $PartyEither:ident;
+    )*) => {$(
+        #[derive(TransparentWrapper)]
+        #[repr(transparent)]
+        #[doc=concat!(
+            "`", stringify!($PartyPrivate), "` is a wrapper type which is `repr(transparent)` to ",
+            "`T` if `PrivateTo == P` and [`PrivateToOtherParty`] otherwise"
+        )]
+        $(#[$meta])*
+        pub struct $PartyPrivate<
+            PrivateTo: GenericParty<PartySystem = P::PartySystem>,
+            P: GenericParty,
+            T$(: $Copy)?,
+        >(PartyPrivateRaw<$bound, PrivateTo, P, T>);
+        impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T$(: $Copy)?>
+            $PartyPrivate<PrivateTo, P, T>
+        {
+            /// Construct a new `PartyPrivate`. If `P == PrivateTo` it'll contain `t`, otherwise
+            /// it'll be empty.
+            ///
+            /// # Example
+            /// ```
+            /// # use swanky_party::{*, private::*};
+            /// party_system! {
+            ///     mod ps {
+            ///         Alice,
+            ///         Bob,
+            ///     }
+            /// }
+            /// use ps::*;
+            /// // Values that are private only to Alice.
+            /// type AlicePrivate<P, T> = PartyPrivate<Alice, P, T>;
+            /// let p1: AlicePrivate<Alice, i32> = PartyPrivate::new(12);
+            /// // p2 is empty because this value is private to Alice, but the current party is Bob
+            /// let p2: AlicePrivate<Bob, i32> = PartyPrivate::new(13);
+            /// ```
+            #[inline(always)]
+            pub fn new(t: T) -> Self {
+                match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(e) => Self(private_full::<$bound, _, _, _>(e).cast(t)),
+                    PrivateWhich::Empty(e) => Self::empty(e),
                 }
             }
-            fn into_option(self) -> Option<T> {
+            /// Construct a new `PartyPrivate`. If `P == PrivateTo`
+            /// it'll contain `constructor()`, otherwise it'll be empty.
+            ///
+            /// # Example
+            /// ```
+            /// # use swanky_party::{*, private::*};
+            /// party_system! {
+            ///     mod ps {
+            ///         Alice,
+            ///         Bob,
+            ///     }
+            /// }
+            /// use ps::*;
+            /// // Values that are private only to Alice.
+            /// type AlicePrivate<P, T> = PartyPrivate<Alice, P, T>;
+            /// let p1: AlicePrivate<Alice, i32> = PartyPrivate::new_with(|| 12);
+            /// // p2 is empty because this value is private to Alice, but the current party is Bob
+            /// let p2: AlicePrivate<Bob, i32> = PartyPrivate::new_with(|| 13);
+            /// ```
+            #[inline(always)]
+            pub fn new_with(constructor: impl FnOnce() -> T) -> Self {
+                match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(_) => Self::new(constructor()),
+                    PrivateWhich::Empty(e) => Self::empty(e),
+                }
+            }
+            /// Construct an empty `PartyPrivate`, given that `PrivateTo != P`
+            ///
+            /// # Example
+            /// ```
+            /// # use swanky_party::{*, private::*, ty_eq::Witness};
+            /// party_system! {
+            ///     mod ps {
+            ///         Alice,
+            ///         Bob,
+            ///     }
+            /// }
+            /// use ps::*;
+            /// // Values that are private only to Alice.
+            /// type AlicePrivate<P, T> = PartyPrivate<Alice, P, T>;
+            /// let p: AlicePrivate<Bob, i32> = PartyPrivate::empty(Witness::EQUAL_TYPES);
+            /// ```
+            #[inline(always)]
+            pub fn empty(e: Witness<impl EqProp<OppositeParty<PrivateTo>, P>>) -> Self {
+                Self(private_empty::<$bound, PrivateTo, P, T>(e).cast(PrivateToOtherParty))
+            }
+            /// Extract the contents of a private value, given `PrivateTo = P`
+            ///
+            /// # Example
+            /// ```
+            /// # use swanky_party::{*, private::*, ty_eq::Witness};
+            /// party_system! {
+            ///     mod ps {
+            ///         Alice,
+            ///         Bob,
+            ///     }
+            /// }
+            /// use ps::*;
+            /// // Values that are private only to Alice.
+            /// type AlicePrivate<P, T> = PartyPrivate<Alice, P, T>;
+            /// let p: AlicePrivate<Alice, i32> = PartyPrivate::new(13);
+            /// assert_eq!(p.into_inner(Witness::EQUAL_TYPES), 13);
+            /// ```
+            #[inline(always)]
+            pub fn into_inner(self, e: Witness<impl EqProp<PrivateTo, P>>) -> T {
+                private_full::<$bound, _, _, _>(e).sym().cast(self.0)
+            }
+            /// Convert from `&PartyPrivate<PrivateTo, P, T>` into `PartyPrivate<PrivateTo, P, &T>`
+            ///
+            /// This serves the same purpose as [`Option::as_ref`]
+            ///
+            /// This is frequently useful to _borrow_ the contents of a `PartyPrivate`.
+            #[inline(always)]
+            pub fn as_ref(&self) -> $PartyPrivate<PrivateTo, P, &T> {
+                match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(e) => $PartyPrivate::new(
+                        private_full::<$bound, _, _, _>(e)
+                            .sym()
+                            .with_generic::<generics::Ref, _, _>()
+                            .cast(&self.0)
+                    ),
+                    PrivateWhich::Empty(e) => $PartyPrivate::empty(e),
+                }
+            }
+            /// Convert from `&mut PartyPrivate<PrivateTo, P, T>` into `PartyPrivate<PrivateTo, P, &mut T>`
+            ///
+            /// This serves the same purpose as [`Option::as_mut`]
+            ///
+            /// This is frequently useful to _borrow_ the contents of a `PartyPrivate`.
+            #[inline(always)]
+            pub fn as_mut(&mut self) -> PartyPrivate<PrivateTo, P, &mut T> {
+                match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(e) => PartyPrivate::new(
+                        private_full::<$bound, _, _, _>(e)
+                            .sym()
+                            .with_generic::<generics::RefMut, _, _>()
+                            .cast(&mut self.0)
+                    ),
+                    PrivateWhich::Empty(e) => PartyPrivate::empty(e),
+                }
+            }
+            /// Create a new `PartyPrivate` by running `f` on the
+            /// contents if `P == PrivateTo`.
+            #[inline(always)]
+            pub fn map<U$(: $Copy)?>(self, f: impl FnOnce(T) -> U) -> $PartyPrivate<PrivateTo, P, U> {
+                match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(ev) => $PartyPrivate::new(f(self.into_inner(ev))),
+                    PrivateWhich::Empty(ev) => $PartyPrivate::empty(ev),
+                }
+            }
+
+            /// Combine `self` with another `PartyPrivate` by zipping them.
+            ///
+            /// Compare to [`Option::zip`].
+            #[inline(always)]
+            pub fn zip<U$(: $Copy)?>(
+                self,
+                other: $PartyPrivate<PrivateTo, P, U>,
+            ) ->$PartyPrivate<PrivateTo, P, (T, U)> {
+                match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(ev) => {
+                        $PartyPrivate::new((self.into_inner(ev), other.into_inner(ev)))
+                    }
+                    PrivateWhich::Empty(ev) => $PartyPrivate::empty(ev),
+                }
+            }
+            /// Combine `self` with another `PartyPrivate` by zipping
+            /// them with `mapper`.
+            ///
+            /// Compare to [`Option::zip_with`].
+            #[inline(always)]
+            pub fn zip_with<Tx$(: $Copy)?, U$(: $Copy)?>(
+                self,
+                other: $PartyPrivate<PrivateTo, P, Tx>,
+                mapper: impl FnOnce(T, Tx) -> U,
+            ) ->$PartyPrivate<PrivateTo, P, U> {
+                match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(ev) => {
+                        $PartyPrivate::new(mapper(self.into_inner(ev), other.into_inner(ev)))
+                    }
+                    PrivateWhich::Empty(ev) => $PartyPrivate::empty(ev),
+                }
+            }
+
+            /// Return the private value (if `self` is private to
+            /// `P`), or else run the given closure.
+            pub fn unwrap_or_else<F: FnOnce() -> T>(self, f: F) -> T {
+                match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(ev) => self.into_inner(ev),
+                    PrivateWhich::Empty(_) => f(),
+                }
+            }
+
+            /// Return the private value (if `self` is private to
+            /// `P`), or else return `None`.
+            pub fn into_option(self) -> Option<T> {
                 self.map(Some).unwrap_or_else(|| None)
             }
         }
-        impl<P: Party, T $(: $Copy)?> $ProverPrivate<P, T> {
-            /// Given evidence that `P = Verifier`, create an empty
-            /// `ProverPrivate(Copy)` value.
-            pub fn empty(e: IsParty<P, Verifier>) -> Self {
-                Self($PartyEither::verifier_new(e, UnknownProverSecret))
-            }
-
-            /// Given a `T`, create a new `ProverPrivate(Copy)<P, T>`. This
-            /// is equivalent to `ProverPrivate(Copy)::empty()` in verifier
-            /// contexts.
-            pub fn new(t: T) -> Self {
-                match P::WHICH {
-                    WhichParty::Prover(e) => Self($PartyEither::prover_new(e, t)),
-                    WhichParty::Verifier(e) => Self::empty(e),
-                }
-            }
-
-            /// Given evidence that `P = Prover`, cast to the underlying type.
-            pub fn into_inner(self, e: IsParty<P, Prover>) -> T {
-                self.0.prover_into(e)
-            }
-
-            /// Convert from `ProverPrivate(Copy)<P, T>` to
-            /// `ProverPrivate(Copy)<P, &T>`.
-            pub fn as_ref(&self) -> $ProverPrivate<P, &T> {
-                match P::WHICH {
-                    WhichParty::Prover(e) => $ProverPrivate::new(self.0.as_ref().prover_into(e)),
-                    WhichParty::Verifier(e) => $ProverPrivate::empty(e),
-                }
-            }
-
-            /// Convert from `ProverPrivate(Copy)<P, T>` to
-            /// `ProverPrivate(Copy)<P, &mut T>`.
-            pub fn as_mut(&mut self) -> ProverPrivate<P, &mut T> {
-                match P::WHICH {
-                    WhichParty::Prover(e) => ProverPrivate::new(self.0.as_mut().prover_into(e)),
-                    WhichParty::Verifier(e) => ProverPrivate::empty(e),
-                }
-            }
-
-            /// Zip two `ProverPrivate(Copy)` in the natural way.
-            pub fn zip<U$(: $Copy)?>(self, other: $ProverPrivate<P, U>) -> $ProverPrivate<P, (T, U)> {
-                match P::WHICH {
-                    WhichParty::Prover(e) =>
-                        $ProverPrivate::new((self.into_inner(e), other.into_inner(e))),
-                    WhichParty::Verifier(e) => $ProverPrivate::empty(e),
-                }
-            }
-
-            /// Given a function from the prover-private type, map over a
-            /// `ProverPrivate(Copy)` in the natural way.
-            ///
-            /// Note that in verifier contexts, the function will never be
-            /// called.
-            pub fn map<U$(: $Copy)?, F: FnOnce(T) -> U>(self, f: F) -> $ProverPrivate<P, U> {
-                match P::WHICH {
-                    WhichParty::Prover(e) =>
-                        $ProverPrivate::new(f(self.into_inner(e))),
-                    WhichParty::Verifier(e) => $ProverPrivate::empty(e),
-                }
-            }
-
-            /// Return `ProverPrivate(Copy)::empty()` in a verifier context,
-            /// otherwise call `f` on the prover-private value and return the
-            /// result.
-            ///
-            /// This is analogous to `and_then` as defined on `Option`.
-            pub fn and_then<U$(: $Copy)?, F: FnOnce(T) -> $ProverPrivate<P, U>>(self, f: F) -> $ProverPrivate<P, U> {
-                match P::WHICH {
-                    WhichParty::Prover(e) =>
-                        f(self.into_inner(e)),
-                    WhichParty::Verifier(e) => $ProverPrivate::empty(e),
-                }
-            }
-        }
-        impl<P: Party, T $(: $Copy)?, U $(: $Copy)?> $ProverPrivate<P, (T, U)> {
-            /// Convert a `ProverPrivate(Copy)<P, (T, U)>` to a
-            /// `(ProverPrivate(Copy)<P, T>, ProverPrivate(Copy)<P, U>)`.
-            pub fn unzip(self) -> ($ProverPrivate<P, T>, $ProverPrivate<P, U>) {
-                match P::WHICH {
-                    WhichParty::Prover(e) => {
-                        let (a, b) = self.into_inner(e);
-                        ($ProverPrivate::new(a), $ProverPrivate::new(b))
-                    }
-                    WhichParty::Verifier(e) => {
-                        ($ProverPrivate::empty(e), $ProverPrivate::empty(e))
-                    }
-                }
-            }
-        }
-        impl<P: Party, T: Default $(+ $Copy)?> Default for $ProverPrivate<P, T> {
-            fn default() -> Self {
-                match P::WHICH {
-                    WhichParty::Prover(_) => Self::new(T::default()),
-                    WhichParty::Verifier(e) => Self::empty(e),
-                }
-            }
-        }
-        impl<P: Party, T: std::fmt::Debug $(+ $Copy)?> std::fmt::Debug for $ProverPrivate<P, T> {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                match P::WHICH {
-                    WhichParty::Prover(e) => write!(f, "{:?}", self.as_ref().into_inner(e)),
-                    WhichParty::Verifier(_) => write!(f, "ProverSecret"),
-                }
-            }
-        }
-        impl<P: Party, T $(: $Copy)?, E $(: $Copy)?> $ProverPrivate<P, Result<T, E>>
+        impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T: Default $(+ $Copy)?>
+            Default for $PartyPrivate<PrivateTo, P, T>
         {
-            /// Convert a `ProverPrivate(Copy)<P, Result<T, E>>` to a
-            /// `Result<ProverPrivate(Copy)<P, T>, E>` in the natural way.
-            pub fn lift_result(self) -> Result<$ProverPrivate<P, T>, E> {
-                Ok(match P::WHICH {
-                    WhichParty::Prover(e) => $ProverPrivate::new(self.into_inner(e)?),
-                    WhichParty::Verifier(e) => $ProverPrivate::empty(e),
+            #[inline(always)]
+            fn default() -> Self {
+                match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(_) => Self::new(T::default()),
+                    PrivateWhich::Empty(e) => Self::empty(e),
+                }
+            }
+        }
+        impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T: Debug $(+ $Copy)?>
+            Debug for $PartyPrivate<PrivateTo, P, T>
+        {
+            #[inline(always)]
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(e) => writeln!(f, "{:?}", self.as_ref().into_inner(e)),
+                    PrivateWhich::Empty(_) => writeln!(f, "{:?}", PrivateToOtherParty),
+                }
+            }
+        }
+        impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T $(: $Copy)?, E $(: $Copy)?> $PartyPrivate<PrivateTo, P, Result<T, E>> {
+            /// Convert a `PartyPrivate<PrivateTo, P, Result<T, E>>`
+            /// to a `Result<PartyPrivate<PrivateTo, P, T>, E>` in the
+            /// natural way.
+            pub fn lift_result(self) -> Result<$PartyPrivate<PrivateTo, P, T>, E> {
+                Ok(match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(e) => $PartyPrivate::new(self.into_inner(e)?),
+                    PrivateWhich::Empty(e) => $PartyPrivate::empty(e),
                 })
             }
         }
-    };
-}
-make_prover_private_type!(ProverPrivate PartyEither);
-make_prover_private_type!(ProverPrivateCopy PartyEitherCopy: Copy);
-
-impl<P: Party, T: Copy> From<ProverPrivate<P, T>> for ProverPrivateCopy<P, T> {
-    fn from(x: ProverPrivate<P, T>) -> Self {
-        Self(x.0.into())
-    }
-}
-impl<P: Party, T: Copy> From<ProverPrivateCopy<P, T>> for ProverPrivate<P, T> {
-    fn from(x: ProverPrivateCopy<P, T>) -> Self {
-        Self(x.0.into())
-    }
-}
-impl<P: Party, T: PartialEq> PartialEq for ProverPrivate<P, T> {
-    fn eq(&self, other: &Self) -> bool {
-        match P::WHICH {
-            WhichParty::Prover(ev) => self.as_ref().into_inner(ev) == other.as_ref().into_inner(ev),
-            WhichParty::Verifier(_) => true,
-        }
-    }
-}
-
-impl<P: Party, T: Copy + PartialEq> PartialEq for ProverPrivateCopy<P, T> {
-    fn eq(&self, other: &Self) -> bool {
-        match P::WHICH {
-            WhichParty::Prover(ev) => self.into_inner(ev) == other.into_inner(ev),
-            WhichParty::Verifier(_) => true,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct UnknownVerifierSecret;
-
-macro_rules! make_verifier_private_type {
-    ($VerifierPrivate:ident $PartyEither:ident $(: $Copy:ident)?) => {
-        /// A value known only to `Verifier`s.
-        #[derive(Clone $(, $Copy)?)]
-        pub struct $VerifierPrivate<P: Party, T $(: $Copy)?>($PartyEither<P, UnknownVerifierSecret, T>);
-        impl<P: Party, T $(: $Copy)?> sealed::Sealed for $VerifierPrivate<P, T> {}
-        impl<P: Party, T $(: $Copy)?> PartyPrivate<P, T> for $VerifierPrivate<P, T> {
-            fn unwrap_or_else<F: FnOnce() -> T>(self, f: F) -> T {
-                match P::WHICH {
-                    WhichParty::Prover(_) => f(),
-                    WhichParty::Verifier(e) => self.into_inner(e),
-                }
-            }
-            fn into_option(self) -> Option<T> {
-                self.map(Some).unwrap_or_else(|| None)
-            }
-        }
-        impl<P: Party, T $(: $Copy)?> $VerifierPrivate<P, T> {
-            /// Given evidence that `P = Prover`, create an empty
-            /// `VerifierPrivate(Copy)` value.
-            pub fn empty(e: IsParty<P, Prover>) -> Self {
-                Self($PartyEither::prover_new(e, UnknownVerifierSecret))
-            }
-
-            /// Given a `T`, create a new `VerifierPrivate(Copy)<P, T>`. This
-            /// is equivalent to `VerifierPrivate(Copy)::empty()` in prover
-            /// contexts.
-            pub fn new(t: T) -> Self {
-                match P::WHICH {
-                    WhichParty::Prover(e) => Self::empty(e),
-                    WhichParty::Verifier(e) => Self($PartyEither::verifier_new(e, t)),
-                }
-            }
-
-            /// Given evidence that `P = Verifier`, cast to the underlying
-            /// type.
-            pub fn into_inner(self, e: IsParty<P, Verifier>) -> T {
-                self.0.verifier_into(e)
-            }
-
-            /// Convert from `ProverPrivate(Copy)<P, T>` to
-            /// `ProverPrivate(Copy)<P, &T>`.
-            pub fn as_ref(&self) -> $VerifierPrivate<P, &T> {
-                match P::WHICH {
-                    WhichParty::Prover(e) => $VerifierPrivate::empty(e),
-                    WhichParty::Verifier(e) => $VerifierPrivate::new(self.0.as_ref().verifier_into(e)),
-                }
-            }
-
-            /// Convert from `VerifierPrivate(Copy)<P, T>` to
-            /// `VerifierPrivate<P, &mut T>`.
-            pub fn as_mut(&mut self) -> VerifierPrivate<P, &mut T> {
-                match P::WHICH {
-                    WhichParty::Prover(e) => VerifierPrivate::empty(e),
-                    WhichParty::Verifier(e) => VerifierPrivate::new(self.0.as_mut().verifier_into(e)),
-                }
-            }
-
-            /// Zip two `VerifierPrivate(Copy)` in the natural way.
-            pub fn zip<U$(: $Copy)?>(self, other: $VerifierPrivate<P, U>) -> $VerifierPrivate<P, (T, U)> {
-                match P::WHICH {
-                    WhichParty::Prover(e) => $VerifierPrivate::empty(e),
-                    WhichParty::Verifier(e) =>
-                        $VerifierPrivate::new((self.into_inner(e), other.into_inner(e))),
-                }
-            }
-
-            /// Given a function from the verifier-private type, map over a
-            /// `VerifierPrivate(Copy)` in the natural way.
-            ///
-            /// Note that in prover contexts, the function will never be
-            /// called.
-            pub fn map<U$(: $Copy)?, F: FnOnce(T) -> U>(self, f: F) -> $VerifierPrivate<P, U> {
-                match P::WHICH {
-                    WhichParty::Prover(e) => $VerifierPrivate::empty(e),
-                    WhichParty::Verifier(e) =>
-                        $VerifierPrivate::new(f(self.into_inner(e))),
-                }
-            }
-
-            /// Return `VerifierPrivate(Copy)::empty()` in a prover context,
-            /// otherwise call `f` on the verifier-private value and return the
-            /// result.
-            ///
-            /// This is analogous to `and_then` as defined on `Option`.
-            pub fn and_then<U$(: $Copy)?, F: FnOnce(T) -> $VerifierPrivate<P, U>>(self, f: F) -> $VerifierPrivate<P, U> {
-                match P::WHICH {
-                    WhichParty::Prover(e) => $VerifierPrivate::empty(e),
-                    WhichParty::Verifier(e) =>
-                        f(self.into_inner(e)),
-                }
-            }
-        }
-        impl<P: Party, T $(: $Copy)?, U $(: $Copy)?> $VerifierPrivate<P, (T, U)> {
-            /// Convert a `VerifierPrivate(Copy)<P, (T, U)>` to a
-            /// `(VerifierPrivate(Copy)<P, T>, VerifierPrivate(Copy)<P, U>).
-            pub fn unzip(self) -> ($VerifierPrivate<P, T>, $VerifierPrivate<P, U>) {
-                match P::WHICH {
-                    WhichParty::Prover(e) => {
-                        ($VerifierPrivate::empty(e), $VerifierPrivate::empty(e))
-                    }
-                    WhichParty::Verifier(e) => {
-                        let (a, b) = self.into_inner(e);
-                        ($VerifierPrivate::new(a), $VerifierPrivate::new(b))
-                    }
-                }
-            }
-        }
-        impl<P: Party, T: Default $(+ $Copy)?> Default for $VerifierPrivate<P, T> {
-            fn default() -> Self {
-                match P::WHICH {
-                    WhichParty::Prover(e) => Self::empty(e),
-                    WhichParty::Verifier(_) => Self::new(T::default()),
-                }
-            }
-        }
-        impl<P: Party, T $(: $Copy)?, E $(: $Copy)?> $VerifierPrivate<P, Result<T, E>>
+        unsafe impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T: Send $(+ $Copy)?>
+            Send for $PartyPrivate<PrivateTo, P, T>
+        {}
+        unsafe impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T: Sync $(+ $Copy)?>
+            Sync for $PartyPrivate<PrivateTo, P, T>
+        {}
+        impl<'a, PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T$(: $Copy)?>
+            From<&'a $PartyPrivate<PrivateTo, P, T>> for $PartyPrivate<PrivateTo, P, &'a T>
         {
-            /// Convert a `VerifierPrivate(Copy)<P, Result<T, E>>` to a
-            /// `Result<VerifierPrivate(Copy)<P, T>, E>` in the natural way.
-            pub fn lift_result(self) -> Result<$VerifierPrivate<P, T>, E> {
-                Ok(match P::WHICH {
-                    WhichParty::Prover(e) => $VerifierPrivate::empty(e),
-                    WhichParty::Verifier(e) => $VerifierPrivate::new(self.into_inner(e)?),
+            #[inline(always)]
+            fn from(x: &'a $PartyPrivate<PrivateTo, P, T>) -> Self {
+                x.as_ref()
+            }
+        }
+        impl<'a, PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T$(: $Copy)?>
+            From<$PartyPrivate<PrivateTo, P, &'a T>> for &'a $PartyPrivate<PrivateTo, P, T>
+        {
+            #[inline(always)]
+            fn from(x: $PartyPrivate<PrivateTo, P, &'a T>) -> Self {
+                TransparentWrapper::wrap_ref(match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(e) => {
+                        private_full::<$bound, PrivateTo, P, T>(e)
+                            .with_generic::<generics::Ref, _, _>()
+                            .cast(x.into_inner(e))
+                    }
+                    PrivateWhich::Empty(e) => {
+                        private_empty::<$bound, PrivateTo, P, T>(e)
+                            .with_generic::<generics::Ref, _, _>()
+                            .cast(&PrivateToOtherParty)
+                    }
                 })
             }
         }
-    };
+        impl<'a, PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T$(: $Copy)?>
+            From<&'a mut $PartyPrivate<PrivateTo, P, T>> for PartyPrivate<PrivateTo, P, &'a mut T>
+        {
+            #[inline(always)]
+            fn from(x: &'a mut $PartyPrivate<PrivateTo, P, T>) -> Self {
+                x.as_mut()
+            }
+        }
+        impl<'a, PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T$(: $Copy)?>
+            From<PartyPrivate<PrivateTo, P, &'a mut T>> for &'a mut $PartyPrivate<PrivateTo, P, T>
+        {
+            #[inline(always)]
+            fn from(x: PartyPrivate<PrivateTo, P, &'a mut T>) -> Self {
+                TransparentWrapper::wrap_mut(match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(e) => {
+                        private_full::<$bound, PrivateTo, P, T>(e)
+                            .with_generic::<generics::RefMut, _, _>()
+                            .cast(x.into_inner(e))
+                    }
+                    PrivateWhich::Empty(e) => {
+                        private_empty::<$bound, PrivateTo, P, T>(e)
+                            .with_generic::<generics::RefMut, _, _>()
+                            .cast(PrivateToOtherParty::ref_mut())
+                    }
+                })
+            }
+        }
+        impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T$(: $Copy)?>
+            From<$PartyPrivate<PrivateTo, P, T>> for Option<T>
+        {
+            #[inline(always)]
+            fn from(p: $PartyPrivate<PrivateTo, P, T>) -> Self {
+                match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(e) => Some(p.into_inner(e)),
+                    PrivateWhich::Empty(_) => None,
+                }
+            }
+        }
+        impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T0$(: $Copy)?, T1$(: $Copy)?>
+            From<$PartyEither<P, T0, T1>>
+            for $PartyPrivate<PrivateTo, P, RawEither<$bound, PrivateTo, T0, T1>>
+        {
+            #[inline(always)]
+            fn from(value: $PartyEither<P, T0, T1>) -> Self {
+                match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(w) => Self::new(value.into_inner(w.sym())),
+                    PrivateWhich::Empty(w) => Self::empty(w),
+                }
+            }
+        }
+    )*};
 }
-make_verifier_private_type!(VerifierPrivate PartyEither);
-make_verifier_private_type!(VerifierPrivateCopy PartyEitherCopy: Copy);
-
-impl<P: Party, T: Copy> From<VerifierPrivate<P, T>> for VerifierPrivateCopy<P, T> {
-    fn from(x: VerifierPrivate<P, T>) -> Self {
-        Self(x.0.into())
+impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T: Copy> Clone
+    for PartyPrivateCopy<PrivateTo, P, T>
+{
+    #[inline(always)]
+    fn clone(&self) -> Self {
+        *self
     }
 }
-impl<P: Party, T: Copy> From<VerifierPrivateCopy<P, T>> for VerifierPrivate<P, T> {
-    fn from(x: VerifierPrivateCopy<P, T>) -> Self {
-        Self(x.0.into())
+impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T: Copy> Copy
+    for PartyPrivateCopy<PrivateTo, P, T>
+{
+}
+impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T: Clone> Clone
+    for PartyPrivate<PrivateTo, P, T>
+{
+    #[inline(always)]
+    fn clone(&self) -> Self {
+        self.as_ref().map(|x| x.clone())
     }
 }
 
-mod sealed {
-    /// An internal sealed trait to limit `impl`s of the `PartyPrivate` trait.
-    pub trait Sealed {}
+private! {
+    type PartyPrivate => bounds::Any;
+    type PartyEither;
+    /// # Copy
+    /// [`PartyPrivateCopy`] is identical to [`PartyPrivate`] except that it implements [`Copy`] (and
+    /// correspondingly requires `T` to implement `Copy`, too).
+    ///
+    /// To convert between [`PartyPrivateCopy`] and [`PartyPrivate`], you can use [`From::from`].
+    ///
+    /// ```
+    /// # use swanky_party::{*, private::*};
+    /// party_system! {
+    ///     mod ps {
+    ///         Alice,
+    ///         Bob,
+    ///     }
+    /// }
+    /// use ps::*;
+    /// fn convert<P: Party>(e: PartyPrivate<P, Alice, i32>) -> PartyPrivateCopy<P, Alice, i32> {
+    ///     e.into()
+    /// }
+    /// ```
+    type PartyPrivateCopy: Copy => bounds::Copy;
+    type PartyEitherCopy;
 }
 
-/// A trait to add utilities to all of the `*Private` types.
-pub trait PartyPrivate<P: Party, T>: sealed::Sealed {
-    /// Return the private value (if `self` is private to `P`), or else run the given closure.
-    fn unwrap_or_else<F: FnOnce() -> T>(self, f: F) -> T;
-
-    /// Return the private value (if `self` is private to `P`), or else return `None`.
-    fn into_option(self) -> Option<T>;
+impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T: PartialEq> PartialEq
+    for PartyPrivate<PrivateTo, P, T>
+{
+    fn eq(&self, other: &Self) -> bool {
+        match const { private_which::<PrivateTo, P>() } {
+            PrivateWhich::Full(e) => self.as_ref().into_inner(e) == other.as_ref().into_inner(e),
+            PrivateWhich::Empty(_) => true,
+        }
+    }
 }
+
+impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T: Copy + PartialEq>
+    PartialEq for PartyPrivateCopy<PrivateTo, P, T>
+{
+    fn eq(&self, other: &Self) -> bool {
+        match const { private_which::<PrivateTo, P>() } {
+            PrivateWhich::Full(e) => self.into_inner(e) == other.into_inner(e),
+            PrivateWhich::Empty(_) => true,
+        }
+    }
+}
+
+mod copy_conversions;

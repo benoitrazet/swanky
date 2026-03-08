@@ -35,7 +35,7 @@ use swanky_authenticated_bits::{
     authshares::AuthShare,
 };
 use swanky_channel::Channel;
-use swanky_party2::GenericParty;
+use swanky_party::GenericParty;
 use vectoreyes::U8x16;
 
 /// Pre-process a circuit for authenticated garbling.
@@ -91,7 +91,7 @@ mod tests {
     use super::*;
     use fancy_garbling::{BinaryGadgets, Fancy, FancyBinary, FancyReveal};
     use swanky_aes_rng::AesRng;
-    use swanky_party2::party_system;
+    use swanky_party::party_system;
 
     party_system! {
         mod ps {

@@ -17,7 +17,7 @@ use parking_lot::{Condvar, Mutex, RwLock};
 use rustc_hash::FxHashMap;
 use swanky_aes_rng::AesRng;
 use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
-use swanky_party2::private::PartyPrivate;
+use swanky_party::private::PartyPrivate;
 
 use crate::{
     alloc::OwnedAlignedBytes,

@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, ensure};
 use swanky_field::{FiniteField, IsSubFieldOf};
-use swanky_party2::private::{PartyPrivate, PartyPrivateCopy};
+use swanky_party::private::{PartyPrivate, PartyPrivateCopy};
 
 use crate::{
     DietMacAndCheese,

@@ -12,7 +12,7 @@ use mac_n_cheese_vole::party::{Party, WhichParty};
 use rand::RngCore;
 use rustls::{ClientConnection, ServerConnection, StreamOwned};
 use swanky_error::{ErrorKind, WrapErr};
-use swanky_party2::either::{PartyEither, PartyEitherCopy};
+use swanky_party::either::{PartyEither, PartyEitherCopy};
 use vectoreyes::SimdBase;
 
 use crate::{MAC_N_CHEESE_RUNNER_VERSION, keys::Keys};

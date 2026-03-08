@@ -12,7 +12,7 @@ use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, ensure, swanky_error};
 use swanky_field::{FiniteField, IsSubFieldOf};
-use swanky_party2::{
+use swanky_party::{
     either::PartyEither,
     ty_eq::{EqualityProposition, Witness},
 };
@@ -440,7 +440,7 @@ mod test {
     };
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
-    use swanky_party2::{either::PartyEither, ty_eq::Witness};
+    use swanky_party::{either::PartyEither, ty_eq::Witness};
 
     fn produce(s: &SvoleAtomic<Verifier, u32, u32>, v: u32) {
         loop {

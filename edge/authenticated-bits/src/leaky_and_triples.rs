@@ -27,7 +27,7 @@ use swanky_error::{ErrorKind, WrapErr};
 use swanky_f_eq::EqualityFunctionality;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
-use swanky_party2::{GenericParty, GenericWhichParty};
+use swanky_party::{GenericParty, GenericWhichParty};
 use swanky_serialization::{CanonicalSerialize, SequenceDeserializer, SequenceSerializer};
 use vectoreyes::{SimdBase, U8x16};
 
@@ -519,7 +519,7 @@ mod tests {
     use proptest::prelude::*;
     use rand::SeedableRng;
     use swanky_aes_rng::AesRng;
-    use swanky_party2::party_system;
+    use swanky_party::party_system;
 
     party_system! {
         mod ps {

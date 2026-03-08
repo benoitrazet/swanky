@@ -22,7 +22,7 @@ use party::ty_eq::Witness;
 use rand::SeedableRng;
 use swanky_aes_rng::AesRng;
 use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
-use swanky_party2 as party;
+use swanky_party as party;
 use types::visit_type;
 
 use crate::runner::RunQueue;

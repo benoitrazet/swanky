@@ -46,7 +46,7 @@ swanky-channel-legacy.workspace = true
 swanky-error.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true
-swanky-party2.workspace = true
+swanky-party.workspace = true
 swanky-serialization.workspace = true
 swanky-svole-wykw.workspace = true
 

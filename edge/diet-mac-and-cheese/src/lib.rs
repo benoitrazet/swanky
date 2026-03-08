@@ -52,7 +52,7 @@ use swanky_svole_wykw::{
     LPN_SETUP_EXTRASMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL, LPN_SETUP_SMALL_MEDIUM, LpnParams,
 };
 
-swanky_party2::party_system! {
+swanky_party::party_system! {
     pub mod party {
         /// The ZK prover.
         Prover,

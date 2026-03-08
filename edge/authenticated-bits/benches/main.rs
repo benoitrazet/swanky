@@ -8,7 +8,7 @@ use swanky_authenticated_bits::and_triples::{AndTriple, AndTripleGenerator};
 use swanky_authenticated_bits::authbits::{AuthBit, AuthBitGenerator};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_field_binary::F2;
-use swanky_party2::{either::PartyEither, party_system, private::PartyPrivate, ty_eq::Witness};
+use swanky_party::{either::PartyEither, party_system, private::PartyPrivate, ty_eq::Witness};
 
 party_system! {
     mod ps {

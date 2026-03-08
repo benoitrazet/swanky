@@ -11,7 +11,7 @@ version.workspace = true
 workspace = true
 
 [dependencies]
-swanky-party2.workspace = true
+swanky-party.workspace = true
 swanky-channel.workspace = true
 swanky-aes-rng.workspace = true
 swanky-error.workspace = true

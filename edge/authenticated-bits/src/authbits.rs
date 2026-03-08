@@ -35,7 +35,7 @@
 //! # use rand::Rng;
 //! # use swanky_authenticated_bits::authbits::{AuthBit, AuthBitGenerator};
 //! # use swanky_field_binary::F2;
-//! # use swanky_party2::{party_system, either::PartyEither, private::PartyPrivate, ty_eq::Witness};
+//! # use swanky_party::{party_system, either::PartyEither, private::PartyPrivate, ty_eq::Witness};
 //! # use std::iter::Copied;
 //! # use std::slice::Iter;
 //! # party_system! {
@@ -86,7 +86,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
 use swanky_ot_alsz_kos::kos;
 use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender, Receiver, Sender};
-use swanky_party2::{
+use swanky_party::{
     GenericParty, GenericWhichParty, Party0, Party1,
     either::{PartyEither, PartyEitherCopy},
     private::{PartyPrivate, PartyPrivateCopy},
@@ -446,7 +446,7 @@ mod tests {
     use rand::SeedableRng;
     use swanky_aes_rng::AesRng;
     use swanky_field::FiniteRing;
-    use swanky_party2::{party_system, ty_eq::Witness};
+    use swanky_party::{party_system, ty_eq::Witness};
 
     party_system! {
         mod ps {

@@ -19,7 +19,7 @@ use swanky_aes_rng::AesRng;
 use swanky_error::{ErrorKind, OptionExt, WrapErr};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, SmallBinaryField};
-use swanky_party2::{
+use swanky_party::{
     either::PartyEither,
     private::{PartyPrivate, PartyPrivateCopy},
 };

@@ -31,7 +31,7 @@ use rand::{CryptoRng, Rng};
 use sha2::{Digest, Sha256};
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
-use swanky_party2::{GenericParty, GenericWhichParty, Party0, private::PartyPrivate};
+use swanky_party::{GenericParty, GenericWhichParty, Party0, private::PartyPrivate};
 
 /// The equality functionality.
 ///
@@ -121,7 +121,7 @@ mod tests {
     use proptest::test_runner::TestRunner;
     use rand::SeedableRng;
     use swanky_aes_rng::AesRng;
-    use swanky_party2::party_system;
+    use swanky_party::party_system;
 
     party_system! {
         mod ps {

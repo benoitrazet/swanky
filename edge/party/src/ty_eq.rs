@@ -185,7 +185,7 @@ mod sealed {
 /// `Generic` type, we let you define your own generic helpers!
 ///
 /// ```
-/// # use swanky_party2::ty_eq::*;
+/// # use swanky_party::ty_eq::*;
 /// # use std::collections::{HashMap, HashSet};
 /// # use std::any::TypeId;
 /// pub struct MyHashSetGeneric;
@@ -305,7 +305,7 @@ pub trait EqualityProposition<T0: ?Sized, T1: ?Sized>:
     ///
     /// # Examples
     /// ```
-    /// # use swanky_party2::ty_eq::*;
+    /// # use swanky_party::ty_eq::*;
     /// assert!(<TrueEqualityProposition as EqualityProposition<i32, i32>>::SUMMON.is_some());
     /// assert!(<NotNeccessarilyTrueEqualityProposition as EqualityProposition<i32, String>>::SUMMON.is_none());
     /// ```
@@ -324,7 +324,7 @@ pub trait EqualityProposition<T0: ?Sized, T1: ?Sized>:
 ///
 /// # Example
 /// ```
-/// # use swanky_party2::ty_eq::*;
+/// # use swanky_party::ty_eq::*;
 /// fn convert<T>(t: T, w: Witness<impl EqualityProposition<T, i32>>) -> i32 {
 ///     w.cast(t)
 /// }
@@ -354,7 +354,7 @@ impl Witness<TrueEqualityProposition> {
     ///
     /// # Example
     /// ```
-    /// # use swanky_party2::ty_eq::{Witness, EqualityProposition};
+    /// # use swanky_party::ty_eq::{Witness, EqualityProposition};
     /// fn t_is_i32<T>(t: T, w: Witness<impl EqualityProposition<T, i32>>) {}
     /// t_is_i32(17_i32, Witness::EQUAL_TYPES);
     /// ```
@@ -387,7 +387,7 @@ impl<
     ///
     /// # Example
     /// ```
-    /// # use swanky_party2::ty_eq::{Witness, EqualityProposition};
+    /// # use swanky_party::ty_eq::{Witness, EqualityProposition};
     /// fn convert<T>(t: T, w: Witness<impl EqualityProposition<T, i32>>) -> i32 {
     ///     w.cast(t)
     /// }
@@ -403,14 +403,14 @@ impl<
     /// Turn a witness showing `T0 == T1` into a witness showing `T1 == T0`
     /// # Example
     /// ```compile_fail
-    /// # use swanky_party2::ty_eq::{Witness, EqualityProposition};
+    /// # use swanky_party::ty_eq::{Witness, EqualityProposition};
     /// fn convert<T>(t: T, w: Witness<impl EqualityProposition<i32, T>>) -> i32 {
     ///     // This fails because `w` is setup to convert _from_ i32, not _into_ i32
     ///     w.cast(t)
     /// }
     /// ```
     /// ```
-    /// # use swanky_party2::ty_eq::{Witness, EqualityProposition};
+    /// # use swanky_party::ty_eq::{Witness, EqualityProposition};
     /// fn convert<T>(t: T, w: Witness<impl EqualityProposition<i32, T>>) -> i32 {
     ///     // Using .sym() will swap i32 and T (and turn w into
     ///     // Witness<impl EqualityProposition<T, i32>>)
@@ -430,7 +430,7 @@ impl<
     ///
     /// # Example
     /// ```
-    /// # use swanky_party2::ty_eq::{Witness, EqualityProposition};
+    /// # use swanky_party::ty_eq::{Witness, EqualityProposition};
     /// fn convert<T0, T1>(
     ///     t: T0,
     ///     w0: Witness<impl EqualityProposition<T0, T1>>,
@@ -455,7 +455,7 @@ impl<
     ///
     /// # Example
     /// ```
-    /// # use swanky_party2::ty_eq::*;
+    /// # use swanky_party::ty_eq::*;
     /// // Given that T0 == T1, we can conclude that &'a T0 == &'a T1
     /// fn as_ref<'a, T0: 'a, T1: 'a>(
     ///     w: Witness<impl EqualityProposition<T0, T1>>
@@ -504,7 +504,7 @@ impl<
 ///
 /// Consider the following code:
 /// ```compile_fail
-/// # use swanky_party2::ty_eq::*;
+/// # use swanky_party::ty_eq::*;
 /// enum Foo<A, B> {
 ///     A(A),
 ///     B(B),
@@ -533,7 +533,7 @@ impl<
 /// That's where [`Witness::join_left`] and [`Witness::join_right`] come in.
 ///
 /// ```
-/// # use swanky_party2::ty_eq::*;
+/// # use swanky_party::ty_eq::*;
 /// enum Foo<A, B> {
 ///     A(A),
 ///     B(B),
@@ -607,12 +607,12 @@ impl<T: ?Sized> EqualityProposition<T, T> for TrueEqualityProposition {
 ///
 /// # Example
 /// ```
-/// # use swanky_party2::ty_eq::IsSameType;
+/// # use swanky_party::ty_eq::IsSameType;
 /// fn foo<T: IsSameType<U>, U>(t: T, u: U) {}
 /// foo(String::new(), String::new());
 /// ```
 /// ```compile_fail
-/// # use swanky_party2::ty_eq::IsSameType;
+/// # use swanky_party::ty_eq::IsSameType;
 /// # fn foo<T: IsSameType<U>, U>(t: T, u: U) {}
 /// foo(String::new(), 12);
 /// ```
@@ -623,7 +623,7 @@ pub trait IsSameType<T>: From<T> + Into<T> {
     ///
     /// # Example
     /// ```
-    /// # use swanky_party2::ty_eq::*;
+    /// # use swanky_party::ty_eq::*;
     /// fn foo<T: IsSameType<U>, U>(t: T) -> U {
     ///     T::WITNESS.cast(t)
     /// }
@@ -641,7 +641,7 @@ impl<T> IsSameType<T> for T {
 /// this proposition. Thus, we can use it in situations where an equality does not hold.
 ///
 /// ```
-/// # use swanky_party2::ty_eq::*;
+/// # use swanky_party::ty_eq::*;
 /// fn foo<P: EqualityProposition<i32, String>>() {}
 /// foo::<NotNeccessarilyTrueEqualityProposition>();
 /// ```
@@ -653,7 +653,7 @@ impl<T> IsSameType<T> for T {
 /// providing a `NotNeccessarilyTrueEqualityProposition` for equal types.
 ///
 /// ```
-/// # use swanky_party2::ty_eq::*;
+/// # use swanky_party::ty_eq::*;
 /// fn foo<P: EqualityProposition<i32, i32>>() {}
 /// foo::<NotNeccessarilyTrueEqualityProposition>();
 /// ```

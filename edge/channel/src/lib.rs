@@ -10,7 +10,7 @@ use std::io::{Read, Write};
 use bytemuck::TransparentWrapper;
 use generic_array::GenericArray;
 use swanky_error::{ErrorKind, WrapErr};
-use swanky_party2::GenericParty;
+use swanky_party::GenericParty;
 use swanky_serialization::CanonicalSerialize;
 
 pub mod local;
@@ -359,7 +359,7 @@ impl<'inner> Channel<'inner> {
         IoAdapter::wrap_mut(self)
     }
 
-    /// Turn a `swanky_party2::PartyPrivate<P, T>` into a `T` by communicating it.
+    /// Turn a `swanky_party::PartyPrivate<P, T>` into a `T` by communicating it.
     ///
     /// If `p` is private to `P`, then send it over the wire and return it. Otherwise, read the
     /// peer's value from over the wire and return that.
@@ -367,7 +367,7 @@ impl<'inner> Channel<'inner> {
     /// # Example
     /// ```
     /// use swanky_channel::{Channel, local::local_channel_pair};
-    /// use swanky_party2::{private::PartyPrivateCopy, party_system};
+    /// use swanky_party::{private::PartyPrivateCopy, party_system};
     ///
     /// party_system! {
     ///     // These names are arbitrary; they're representative of parties for oblivious transfer.
@@ -398,7 +398,7 @@ impl<'inner> Channel<'inner> {
         T: CanonicalSerialize,
     >(
         &mut self,
-        p: swanky_party2::private::PartyPrivateCopy<PrivateTo, P, T>,
+        p: swanky_party::private::PartyPrivateCopy<PrivateTo, P, T>,
     ) -> swanky_error::Result<T> {
         match Option::<T>::from(p) {
             Some(t) => {

@@ -16,8 +16,8 @@ use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
 use swanky_field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, SmallBinaryField};
-use swanky_party2::either::PartyEitherCopy;
-use swanky_party2::ty_eq::{EqualityProposition, Witness};
+use swanky_party::either::PartyEitherCopy;
+use swanky_party::ty_eq::{EqualityProposition, Witness};
 use swanky_serialization::CanonicalSerialize;
 
 use std::io::Read;
@@ -95,7 +95,7 @@ mod vope {
         };
         use rand::SeedableRng;
         use swanky_aes_rng::AesRng;
-        use swanky_party2::ty_eq::Witness;
+        use swanky_party::ty_eq::Witness;
 
         use super::*;
 
@@ -205,7 +205,7 @@ fn test_assert_multiply_state() {
     use mac_n_cheese_ir::compilation_format::FieldTypeMacVisitor;
     use mac_n_cheese_vole::party::{Prover, Verifier};
     use mac_n_cheese_vole::specialization::FiniteFieldSpecialization;
-    use swanky_party2::ty_eq::Witness;
+    use swanky_party::ty_eq::Witness;
     fn do_test<T: MacTypes>() {
         eprintln!("Testing {}", std::any::type_name::<T>());
         for i in 1_u128..=256 {

@@ -16,7 +16,7 @@ use swanky_aes_rng::AesRng;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField};
 use swanky_field_binary::{F2, F40b};
-use swanky_party2::private::PartyPrivateCopy;
+use swanky_party::private::PartyPrivateCopy;
 
 // This file provides an implementation of the Plaintext backend.
 // `DietMacAndCheePlaintext<V,T>` is the main struct for this backend.

@@ -30,7 +30,7 @@ use swanky_channel::Channel;
 use swanky_error::ErrorKind;
 #[cfg(test)]
 use swanky_malicious_hooks::{run_with_entry_point, test_entry_point};
-use swanky_party2::{GenericParty, GenericWhichParty};
+use swanky_party::{GenericParty, GenericWhichParty};
 use swanky_serialization::CanonicalSerialize;
 use vectoreyes::U8x16;
 
@@ -109,7 +109,7 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
     use swanky_aes_rng::AesRng;
-    use swanky_party2::party_system;
+    use swanky_party::party_system;
     use vectoreyes::{SimdBase, array_utils::ArrayUnrolledExt};
 
     party_system! {

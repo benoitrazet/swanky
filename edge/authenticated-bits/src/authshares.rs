@@ -20,7 +20,7 @@
 //! # use rand::Rng;
 //! # use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 //! # use swanky_field_binary::F2;
-//! # use swanky_party2::party_system;
+//! # use swanky_party::party_system;
 //! # party_system! {
 //! #     mod ps {
 //! #         PartyA,
@@ -64,7 +64,7 @@ use crate::authbits::{AuthBit, AuthBitGenerator};
 use rand::{CryptoRng, Rng};
 use swanky_channel::Channel;
 use swanky_field_binary::F2;
-use swanky_party2::{
+use swanky_party::{
     GenericParty, GenericWhichParty, Party0, Party1,
     either::{PartyEither, PartyEitherCopy},
     private::{PartyPrivate, PartyPrivateCopy},
@@ -381,7 +381,7 @@ mod tests {
     use proptest::prelude::*;
     use rand::SeedableRng;
     use swanky_aes_rng::AesRng;
-    use swanky_party2::party_system;
+    use swanky_party::party_system;
 
     party_system! {
         mod ps {

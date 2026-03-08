@@ -16,7 +16,7 @@ use swanky_channel_legacy::{AbstractChannel, SyncChannel};
 use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure, swanky_error};
 use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::{F2, F40b};
-use swanky_party2::{
+use swanky_party::{
     either::{PartyEither, PartyEitherCopy},
     private::{PartyPrivate, PartyPrivateCopy},
     ty_eq::{EqualityProposition, Witness},
@@ -1110,7 +1110,7 @@ mod tests {
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
     use swanky_field_f61p::F61p;
-    use swanky_party2::{
+    use swanky_party::{
         either::PartyEither,
         private::{PartyPrivate, PartyPrivateCopy},
         ty_eq::Witness,

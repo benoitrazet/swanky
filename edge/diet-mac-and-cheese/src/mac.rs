@@ -9,7 +9,7 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 use swanky_error::{ErrorKind, bail};
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F40b};
-use swanky_party2::{
+use swanky_party::{
     private::PartyPrivateCopy,
     ty_eq::{EqualityProposition, Witness},
 };
@@ -198,7 +198,7 @@ pub(crate) fn validate<V: IsSubFieldOf<T>, T: FiniteField>(
     verifier: Mac<Verifier, V, T>,
     delta: T,
 ) {
-    use swanky_party2::ty_eq::Witness;
+    use swanky_party::ty_eq::Witness;
 
     assert_eq!(
         prover.value().into_inner(Witness::EQUAL_TYPES) * delta + verifier.mac(),
@@ -212,7 +212,7 @@ mod tests {
     use swanky_aes_rng::AesRng;
     use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b};
-    use swanky_party2::{private::PartyPrivateCopy, ty_eq::Witness};
+    use swanky_party::{private::PartyPrivateCopy, ty_eq::Witness};
 
     use crate::{
         mac::validate,

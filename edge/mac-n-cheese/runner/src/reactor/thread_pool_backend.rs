@@ -19,7 +19,7 @@ use parking_lot::Mutex;
 use rand::RngCore;
 use rustc_hash::FxHashMap;
 use swanky_error::{ErrorKind, WrapErr};
-use swanky_party2::{either::PartyEither, private::PartyPrivate};
+use swanky_party::{either::PartyEither, private::PartyPrivate};
 
 use crate::{
     alloc::{BytesFromDisk, OwnedAlignedBytes},

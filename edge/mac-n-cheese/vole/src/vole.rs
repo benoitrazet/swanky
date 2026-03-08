@@ -14,7 +14,7 @@ use swanky_field::{Degree, DegreeModulo, FiniteField};
 use swanky_ot_alsz_kos::explicit_round::{
     KosReceiver, KosReceiverStage2, KosSender, KosSenderStage2,
 };
-use swanky_party2::ty_eq::Witness;
+use swanky_party::ty_eq::Witness;
 use swanky_serialization::CanonicalSerialize;
 use swanky_svole_wykw::ggm_utils::*;
 

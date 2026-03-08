@@ -46,7 +46,7 @@ use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer};
-use swanky_party2::{
+use swanky_party::{
     GenericParty, GenericWhichParty, Party1, either::PartyEither, private::PartyPrivate,
 };
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
@@ -447,7 +447,7 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
     use swanky_aes_rng::AesRng;
-    use swanky_party2::party_system;
+    use swanky_party::party_system;
 
     party_system! {
         mod ps {

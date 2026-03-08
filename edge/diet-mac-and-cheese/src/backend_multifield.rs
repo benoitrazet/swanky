@@ -46,7 +46,7 @@ use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField, StatisticallySecur
 use swanky_field_binary::{F2, F40b};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F127p, F128p, F384p, F384q, Secp256k1, Secp256k1order};
-use swanky_party2::{
+use swanky_party::{
     private::{PartyPrivate, PartyPrivateCopy},
     ty_eq::{EqualityProposition, Witness},
 };

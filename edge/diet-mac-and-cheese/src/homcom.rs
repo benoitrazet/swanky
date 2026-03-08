@@ -17,7 +17,7 @@ use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure};
 use swanky_field::{DegreeModulo, FiniteField, IsSubFieldOf};
-use swanky_party2::{
+use swanky_party::{
     either::PartyEither,
     private::{PartyPrivate, PartyPrivateCopy},
     ty_eq::{EqualityProposition, Witness},
@@ -838,7 +838,7 @@ mod tests {
     use swanky_field::{FiniteField, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b};
     use swanky_field_f61p::F61p;
-    use swanky_party2::{
+    use swanky_party::{
         private::{PartyPrivate, PartyPrivateCopy},
         ty_eq::Witness,
     };

@@ -12,7 +12,7 @@ use mac_n_cheese_wire_map::WireMap;
 use rustc_hash::FxHashMap;
 use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
 use swanky_field_binary::F2;
-use swanky_party2::private::{PartyPrivate, PartyPrivateCopy};
+use swanky_party::private::{PartyPrivate, PartyPrivateCopy};
 
 use super::{
     Inputs,

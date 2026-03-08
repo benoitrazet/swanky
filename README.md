@@ -69,7 +69,6 @@ have a lesser stability guarantee.
 - **`swanky-ot-test`**: Testing utilities for oblivious transfer protocols
 - **`swanky-ot-traits`**: Base traits for Obliivious Transfer protocols
 - **`swanky-party`**: Support for types indexed by a party.
-- **`swanky-party2`**: Support for types indexed by a party (version 2)
 - **`swanky-polynomial`**: Support for various representations of polynomials over finite fields
 - **`swanky-serialization`**: Traits and utilities for compact serialization into a canonical byte representation
 - **`swanky-svole-wykw`**: An implementation of the WYKW svole protocol

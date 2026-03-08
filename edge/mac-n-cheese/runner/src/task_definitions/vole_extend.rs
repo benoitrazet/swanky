@@ -13,7 +13,7 @@ use mac_n_cheese_vole::{
     },
 };
 use smallvec::SmallVec;
-use swanky_party2::either::PartyEither;
+use swanky_party::either::PartyEither;
 
 use crate::{
     alloc::TaskDataBuffer,

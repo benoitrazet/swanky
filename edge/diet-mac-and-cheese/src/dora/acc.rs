@@ -1,7 +1,7 @@
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, ensure};
 use swanky_field::{FiniteField, IsSubFieldOf};
-use swanky_party2::ty_eq::{EqualityProposition, Witness};
+use swanky_party::ty_eq::{EqualityProposition, Witness};
 
 use crate::{
     DietMacAndCheese,

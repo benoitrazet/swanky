@@ -35,7 +35,7 @@ type WireId = usize;
 pub use disjunction::Disjunction;
 pub use protocol::Dora;
 use swanky_field::IsSubFieldOf;
-use swanky_party2::private::PartyPrivate;
+use swanky_party::private::PartyPrivate;
 use translate::translate;
 
 use crate::{

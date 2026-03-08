@@ -3,7 +3,7 @@ pub mod mac;
 pub mod specialization;
 pub mod vole;
 
-use swanky_party2::party_system;
+use swanky_party::party_system;
 
 party_system! {
     pub mod party {

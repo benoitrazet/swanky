@@ -11,7 +11,7 @@ use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_field::{FiniteField, IsSubFieldOf};
-use swanky_party2::private::PartyPrivateCopy;
+use swanky_party::private::PartyPrivateCopy;
 use swanky_svole_wykw::LpnParams;
 
 // Some design decisions:
@@ -517,7 +517,7 @@ mod tests {
     use swanky_field::{FiniteField, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b};
     use swanky_field_f61p::F61p;
-    use swanky_party2::ty_eq::Witness;
+    use swanky_party::ty_eq::Witness;
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     fn test<V: IsSubFieldOf<T>, T: FiniteField>()

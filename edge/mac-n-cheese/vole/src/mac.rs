@@ -2,9 +2,9 @@ use bytemuck::{TransparentWrapper, Zeroable};
 use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, SmallBinaryField};
-use swanky_party2::either::PartyEitherCopy;
-use swanky_party2::private::PartyPrivateCopy;
-use swanky_party2::ty_eq::{EqualityProposition, Witness};
+use swanky_party::either::PartyEitherCopy;
+use swanky_party::private::PartyPrivateCopy;
+use swanky_party::ty_eq::{EqualityProposition, Witness};
 
 use crate::party;
 use crate::party::{Party, Prover, Verifier, WhichParty};

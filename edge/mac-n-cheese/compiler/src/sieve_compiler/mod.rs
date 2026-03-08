@@ -6,7 +6,7 @@ use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamKind, ValueStreamRead
 use mac_n_cheese_vole::party::{Party, Prover, Verifier, WhichParty};
 use mac_n_cheese_wire_map::WireMap;
 use swanky_error::{ErrorKind, OptionExt, ResultExt};
-use swanky_party2::{private::PartyPrivate, ty_eq::Witness};
+use swanky_party::{private::PartyPrivate, ty_eq::Witness};
 
 use self::{
     circuit_ir::CircuitChunk,

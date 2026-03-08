@@ -678,7 +678,7 @@ dependencies = [
  "swanky-field-f61p",
  "swanky-field-ff-primes",
  "swanky-flatbuffer-build",
- "swanky-party2",
+ "swanky-party",
  "swanky-polynomial",
  "swanky-serialization",
  "swanky-svole-wykw",
@@ -1333,7 +1333,7 @@ dependencies = [
  "swanky-field-binary",
  "swanky-field-f61p",
  "swanky-field-ff-primes",
- "swanky-party2",
+ "swanky-party",
  "vectoreyes",
 ]
 
@@ -1437,7 +1437,7 @@ dependencies = [
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
- "swanky-party2",
+ "swanky-party",
  "swanky-serialization",
  "swanky-svole-wykw",
  "vectoreyes",
@@ -1478,7 +1478,7 @@ dependencies = [
  "swanky-field-f61p",
  "swanky-field-ff-primes",
  "swanky-ot-alsz-kos",
- "swanky-party2",
+ "swanky-party",
  "swanky-serialization",
  "swanky-svole-wykw",
  "vectoreyes",
@@ -2477,7 +2477,7 @@ dependencies = [
  "swanky-field-binary",
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",
- "swanky-party2",
+ "swanky-party",
  "swanky-serialization",
  "vectoreyes",
 ]
@@ -2498,7 +2498,7 @@ dependencies = [
  "swanky-f-rand",
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",
- "swanky-party2",
+ "swanky-party",
  "vectoreyes",
 ]
 
@@ -2537,7 +2537,7 @@ dependencies = [
  "generic-array 1.3.5",
  "proptest",
  "swanky-error",
- "swanky-party2",
+ "swanky-party",
  "swanky-serialization",
 ]
 
@@ -2586,7 +2586,7 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-channel",
  "swanky-error",
- "swanky-party2",
+ "swanky-party",
 ]
 
 [[package]]
@@ -2601,7 +2601,7 @@ dependencies = [
  "swanky-channel",
  "swanky-error",
  "swanky-malicious-hooks",
- "swanky-party2",
+ "swanky-party",
  "swanky-serialization",
  "vectoreyes",
 ]
@@ -2874,13 +2874,6 @@ dependencies = [
 
 [[package]]
 name = "swanky-party"
-version = "0.6.0"
-dependencies = [
- "bytemuck",
-]
-
-[[package]]
-name = "swanky-party2"
 version = "0.6.0"
 dependencies = [
  "bytemuck",

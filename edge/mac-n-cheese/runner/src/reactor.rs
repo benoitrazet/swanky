@@ -11,7 +11,7 @@ use crate::{
 use mac_n_cheese_ir::compilation_format::{Manifest, PrivateDataAddress, fb::DataChunkAddress};
 use mac_n_cheese_vole::party::{Party, Prover};
 use std::fs::File;
-use swanky_party2::private::PartyPrivate;
+use swanky_party::private::PartyPrivate;
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct ReactorRequest {

@@ -53,7 +53,6 @@ members = [
   "edge/ot-test",
   "edge/ot-traits",
   "edge/party",
-  "edge/party2",
   "edge/polynomial",
   "edge/popsicle",
   "edge/schmivitz",
@@ -131,7 +130,6 @@ swanky-ot-noar-pinkas = { path = "edge/ot-noar-pinkas" }
 swanky-ot-test = { path = "edge/ot-test" }
 swanky-ot-traits = { path = "edge/ot-traits" }
 swanky-party = { path = "edge/party" }
-swanky-party2 = { path = "edge/party2" }
 swanky-polynomial = { path = "edge/polynomial" }
 swanky-serialization = { path = "edge/serialization" }
 swanky-svole-wykw = { path = "edge/svole-wykw" }

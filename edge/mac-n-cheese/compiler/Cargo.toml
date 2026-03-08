@@ -34,7 +34,7 @@ swanky-field.workspace = true
 swanky-field-binary.workspace = true
 swanky-field-f61p.workspace = true
 swanky-field-ff-primes.workspace = true
-swanky-party2.workspace = true
+swanky-party.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
