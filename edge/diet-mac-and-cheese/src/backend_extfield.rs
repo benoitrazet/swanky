@@ -12,6 +12,7 @@ use crate::{
     fields::SieveIrDeserialize,
     homcom::FCom,
     mac::Mac,
+    party::{Party, Prover, WhichParty},
     plugins::DisjunctionBody,
     ram::BooleanRam,
     svole_trait::SvoleT,
@@ -22,7 +23,7 @@ use swanky_channel_legacy::AbstractChannel;
 use swanky_error::Result;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F40b};
-use swanky_party::{Party, WhichParty, private::ProverPrivate};
+use swanky_party2::private::PartyPrivate;
 
 pub(crate) struct DietMacAndCheeseExtField<
     P: Party,
@@ -251,7 +252,8 @@ impl<
                 // Note that this uses 1 condition wire!
                 let disjunction = Disjunction::compile(disj, 1, fun_store);
 
-                let mut resolver: ProverPrivate<P, HashMap<F40b, _>> = ProverPrivate::default();
+                let mut resolver: PartyPrivate<Prover, P, HashMap<F40b, _>> =
+                    PartyPrivate::default();
                 if let WhichParty::Prover(ev) = P::WHICH {
                     for (i, guard) in disj.guards().enumerate() {
                         let guard = F40b::from_number(guard)?;
@@ -353,6 +355,7 @@ mod test {
     use super::DietMacAndCheeseExtField;
     use crate::backend_trait::BackendT;
     use crate::homcom::FCom;
+    use crate::party::{Prover, Verifier};
     use crate::svole_trait::Svole;
     use rand::SeedableRng;
     use std::thread::JoinHandle;
@@ -364,7 +367,6 @@ mod test {
     use swanky_channel_legacy::Channel;
     use swanky_error::{ErrorKind, WrapErr};
     use swanky_field_binary::{F2, F40b};
-    use swanky_party::{Prover, Verifier};
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     #[test]

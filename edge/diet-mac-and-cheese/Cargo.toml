@@ -47,7 +47,7 @@ toml = { workspace = true, features = ["display", "parse"] }
 swanky-aes-rng.workspace = true
 swanky-block.workspace = true
 swanky-channel-legacy.workspace = true
-swanky-party.workspace = true
+swanky-party2.workspace = true
 swanky-serialization.workspace = true
 rustc-hash.workspace = true
 

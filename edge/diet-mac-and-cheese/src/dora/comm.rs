@@ -3,13 +3,18 @@ use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::Result;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
-use swanky_party::{
-    IsParty, Party, Prover, WhichParty,
-    private::{ProverPrivate, ProverPrivateCopy},
+use swanky_party2::{
+    private::{PartyPrivate, PartyPrivateCopy},
+    ty_eq::{EqualityProposition, Witness},
 };
 
 use crate::{
-    DietMacAndCheese, backend_trait::BackendT, homcom::FCom, mac::Mac, svole_trait::SvoleT,
+    DietMacAndCheese,
+    backend_trait::BackendT,
+    homcom::FCom,
+    mac::Mac,
+    party::{Party, Prover, WhichParty},
+    svole_trait::SvoleT,
 };
 
 use super::{
@@ -39,8 +44,8 @@ fn commit_vec<
     backend: &mut FCom<P, V, F, SvoleF>,
     channel: &mut C,
     rng: &mut AesRng,
-    sec: ProverPrivate<P, I>, // secret values
-    len: usize,               // padded length
+    sec: PartyPrivate<Prover, P, I>, // secret values
+    len: usize,                      // padded length
 ) -> Result<impl Iterator<Item = Mac<P, V, F>> + use<P, V, F, C, I, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
@@ -63,7 +68,7 @@ where
             Ok(tag
                 .into_iter()
                 .zip(pad)
-                .map(|(t, v)| Mac::new(ProverPrivateCopy::new(v), t))
+                .map(|(t, v)| Mac::new(PartyPrivateCopy::new(v), t))
                 .collect::<Vec<_>>()
                 .into_iter())
         }
@@ -93,7 +98,7 @@ where
         backend: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
         disj: &'a Disjunction<V>,
         input: I,
-        witness: ProverPrivate<P, &'b ExtendedWitness<V>>,
+        witness: PartyPrivate<Prover, P, &'b ExtendedWitness<V>>,
     ) -> Result<Self> {
         let free = commit_vec(
             &mut backend.fcom,
@@ -110,11 +115,15 @@ where
         Self::from_parts(backend, disj, input, free)
     }
 
-    pub fn value(&self, ev: IsParty<P, Prover>, clause: &R1CS<V>) -> ExtendedWitness<V> {
+    pub fn value(
+        &self,
+        ev: Witness<impl EqualityProposition<P, Prover>>,
+        clause: &R1CS<V>,
+    ) -> ExtendedWitness<V> {
         let mut wit = Vec::with_capacity(clause.dim());
         debug_assert!(self.wit.len() >= clause.dim());
         for i in 0..clause.dim() {
-            wit.push(self.wit[i].value().into_inner(ev));
+            wit.push(self.wit[i].value().into_inner(ev.sym()));
         }
         ExtendedWitness {
             inputs: clause.input,
@@ -176,7 +185,7 @@ where
         channel: &mut (impl AbstractChannel + Clone),
         backend: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
         disj: &Disjunction<V>,
-        cxt: ProverPrivate<P, &CrossTerms<V>>,
+        cxt: PartyPrivate<Prover, P, &CrossTerms<V>>,
     ) -> Result<Self> {
         let mut terms = Vec::with_capacity(disj.dim_err());
         terms.extend(commit_vec(
@@ -204,7 +213,7 @@ where
         channel: &mut (impl AbstractChannel + Clone),
         backend: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
         disj: &Disjunction<V>,
-        acc: &ProverPrivate<P, &Accumulator<V>>,
+        acc: &PartyPrivate<Prover, P, &Accumulator<V>>,
     ) -> Result<Self> {
         let wit = commit_vec(
             &mut backend.fcom,

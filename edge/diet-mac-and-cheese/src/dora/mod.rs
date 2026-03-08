@@ -35,12 +35,13 @@ type WireId = usize;
 pub use disjunction::Disjunction;
 pub use protocol::Dora;
 use swanky_field::IsSubFieldOf;
-use swanky_party::{Party, private::ProverPrivate};
+use swanky_party2::private::PartyPrivate;
 use translate::translate;
 
 use crate::{
     circuit_ir::{FunStore, GateM, TypeId},
     fields::SieveIrDeserialize,
+    party::{Party, Prover},
     svole_trait::SvoleT,
 };
 
@@ -135,7 +136,7 @@ pub struct DoraState<
     F::PrimeField: IsSubFieldOf<V>,
 {
     // map used to lookup the guard -> active clause index
-    pub clause_resolver: ProverPrivate<P, HashMap<F, usize>>,
+    pub clause_resolver: PartyPrivate<Prover, P, HashMap<F, usize>>,
     // dora for this particular switch/mux
     pub dora: Dora<P, V, F, C, SvoleF>,
 }

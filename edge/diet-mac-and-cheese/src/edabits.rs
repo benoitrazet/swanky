@@ -2,6 +2,7 @@
 
 use crate::homcom::{BATCH_SIZE, FCom, MultCheckState, ZeroCheckState};
 use crate::mac::Mac;
+use crate::party::{Party, Prover, Verifier, WhichParty};
 use crate::svole_trait::{SvoleT, field_name};
 use generic_array::typenum::Unsigned;
 use log::info;
@@ -15,9 +16,11 @@ use swanky_channel_legacy::{AbstractChannel, SyncChannel};
 use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure, swanky_error};
 use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::{F2, F40b};
-use swanky_party::either::{PartyEither, PartyEitherCopy};
-use swanky_party::private::{ProverPrivate, ProverPrivateCopy, VerifierPrivate};
-use swanky_party::{IsParty, Party, Prover, WhichParty};
+use swanky_party2::{
+    either::{PartyEither, PartyEitherCopy},
+    private::{PartyPrivate, PartyPrivateCopy},
+    ty_eq::{EqualityProposition, Witness},
+};
 
 /// Edabits struct
 #[derive(Clone)]
@@ -52,7 +55,7 @@ fn convert_bits_to_field<FE: FiniteField>(v: &[F2]) -> FE {
 }
 
 fn convert_bits_to_field_mac<P: Party, FE: FiniteField>(
-    ev: IsParty<P, Prover>,
+    ev: Witness<impl EqualityProposition<Prover, P>>,
     v: &[Mac<P, F2, F40b>],
 ) -> FE {
     let mut res = FE::ZERO;
@@ -155,7 +158,7 @@ impl<
         channel: &mut C,
         r_batch: &[Dabit<P, FE>],
         x_batch: &[Mac<P, F2, F40b>],
-        r_mac_plus_x_mac: &mut VerifierPrivate<P, &mut Vec<Mac<P, F2, F40b>>>,
+        r_mac_plus_x_mac: &mut PartyPrivate<Verifier, P, &mut Vec<Mac<P, F2, F40b>>>,
         c_batch: &mut PartyEither<P, &mut Vec<Mac<P, F2, F40b>>, &mut Vec<F2>>,
         x_m_batch: &mut Vec<Mac<P, FE::PrimeField, FE>>,
     ) -> Result<()> {
@@ -164,7 +167,7 @@ impl<
 
         match P::WHICH {
             WhichParty::Prover(ev) => {
-                c_batch.as_mut().prover_into(ev).clear();
+                c_batch.as_mut().into_inner(ev).clear();
             }
             WhichParty::Verifier(ev) => {
                 r_mac_plus_x_mac.as_mut().into_inner(ev).clear();
@@ -178,13 +181,13 @@ impl<
                 for i in 0..n {
                     c_batch
                         .as_mut()
-                        .prover_into(ev)
+                        .into_inner(ev)
                         .push(r_batch[i].bit + x_batch[i]);
                 }
                 self.fcom_f2.open(
                     channel,
-                    c_batch.as_ref().prover_into(ev),
-                    &mut VerifierPrivate::empty(ev),
+                    c_batch.as_ref().into_inner(ev),
+                    &mut PartyPrivate::empty(ev),
                 )?;
             }
             WhichParty::Verifier(ev) => {
@@ -197,17 +200,15 @@ impl<
                 self.fcom_f2.open(
                     channel,
                     r_mac_plus_x_mac.as_ref().into_inner(ev),
-                    &mut VerifierPrivate::new(c_batch.as_mut().verifier_into(ev)),
+                    &mut PartyPrivate::new(c_batch.as_mut().into_inner(ev)),
                 )?;
             }
         }
 
         for (i, r) in r_batch.iter().enumerate() {
             let c = match P::WHICH {
-                WhichParty::Prover(ev) => {
-                    c_batch.as_ref().prover_into(ev)[i].value().into_inner(ev)
-                }
-                WhichParty::Verifier(ev) => c_batch.as_ref().verifier_into(ev)[i],
+                WhichParty::Prover(ev) => c_batch.as_ref().into_inner(ev)[i].value().into_inner(ev),
+                WhichParty::Verifier(ev) => c_batch.as_ref().into_inner(ev)[i],
             };
 
             let c_m = f2_to_fe::<FE::PrimeField>(c);
@@ -247,29 +248,27 @@ impl<
 
         // input c0
         let mut ci_batch = match P::WHICH {
-            WhichParty::Prover(ev) => PartyEither::prover_new(ev, vec![F2::ZERO; num]),
+            WhichParty::Prover(ev) => PartyEither::new::<Prover>(ev, vec![F2::ZERO; num]),
             WhichParty::Verifier(ev) => {
-                PartyEither::verifier_new(ev, self.fcom_f2.input_verifier(ev, channel, rng, num)?)
+                PartyEither::new(ev, self.fcom_f2.input_verifier(ev, channel, rng, num)?)
             }
         };
         let mut ci_mac_batch = match P::WHICH {
-            WhichParty::Prover(ev) => ProverPrivate::new(self.fcom_f2.input_prover(
-                ev,
-                channel,
-                rng,
-                ci_batch.as_ref().prover_into(ev),
-            )?),
-            WhichParty::Verifier(ev) => ProverPrivate::empty(ev),
+            WhichParty::Prover(ev) => PartyPrivate::<Prover, _, _>::new(
+                self.fcom_f2
+                    .input_prover(ev, channel, rng, ci_batch.as_ref().into_inner(ev))?,
+            ),
+            WhichParty::Verifier(ev) => PartyPrivate::empty(ev),
         };
 
         // loop on the m bits over the batch of n addition
         let mut mult_check_state = MultCheckState::<P, F2, F40b>::init(rng)?;
         let mut aux_batch = Vec::with_capacity(num);
-        let mut and_res_batch = ProverPrivate::new(Vec::with_capacity(num));
+        let mut and_res_batch = PartyPrivate::<Prover, _, _>::new(Vec::with_capacity(num));
         let mut z_batch = vec![Vec::with_capacity(m); num];
         let mut and_res_mac_batch = match P::WHICH {
-            WhichParty::Prover(ev) => PartyEither::prover_new(ev, Vec::with_capacity(num)),
-            WhichParty::Verifier(ev) => PartyEither::verifier_new(ev, Vec::with_capacity(num)),
+            WhichParty::Prover(ev) => PartyEither::new::<Prover>(ev, Vec::with_capacity(num)),
+            WhichParty::Verifier(ev) => PartyEither::new(ev, Vec::with_capacity(num)),
         };
         for i in 0..m {
             if let WhichParty::Prover(ev) = P::WHICH {
@@ -279,21 +278,21 @@ impl<
             for n in 0..num {
                 let ci_clr = match P::WHICH {
                     WhichParty::Prover(ev) => {
-                        ProverPrivateCopy::new(ci_batch.as_ref().prover_into(ev)[n])
+                        PartyPrivateCopy::<Prover, _, _>::new(ci_batch.as_ref().into_inner(ev)[n])
                     }
-                    WhichParty::Verifier(ev) => ProverPrivateCopy::empty(ev),
+                    WhichParty::Verifier(ev) => PartyPrivateCopy::empty(ev),
                 };
-                let ci_mac: ProverPrivateCopy<_, _> = ci_mac_batch
+                let ci_mac: PartyPrivateCopy<_, _, _> = ci_mac_batch
                     .as_ref()
                     .map(|ci_mac_batch| ci_mac_batch[n])
                     .into();
 
                 let ci = match P::WHICH {
                     WhichParty::Prover(ev) => Mac::new(
-                        ProverPrivateCopy::new(ci_clr.into_inner(ev)),
+                        PartyPrivateCopy::new(ci_clr.into_inner(ev)),
                         ci_mac.into_inner(ev),
                     ),
-                    WhichParty::Verifier(ev) => ci_batch.as_ref().verifier_into(ev)[n],
+                    WhichParty::Verifier(ev) => ci_batch.as_ref().into_inner(ev)[n],
                 };
 
                 let x = &x_batch[n].bits;
@@ -314,7 +313,7 @@ impl<
 
                     let c = ci_clr.into_inner(ev) + and_res;
                     // let c_mac = ci_mac + and_res_mac; // is done in the next step
-                    ci_batch.as_mut().prover_into(ev)[n] = c;
+                    ci_batch.as_mut().into_inner(ev)[n] = c;
                     and_res_batch.as_mut().into_inner(ev).push(and_res);
                 }
 
@@ -329,14 +328,14 @@ impl<
                     channel,
                     rng,
                     and_res_batch.as_ref().into_inner(ev),
-                    and_res_mac_batch.as_mut().prover_into(ev),
+                    and_res_mac_batch.as_mut().into_inner(ev),
                 )?,
                 WhichParty::Verifier(ev) => self.fcom_f2.input_verifier_low_level(
                     ev,
                     channel,
                     rng,
                     num,
-                    and_res_mac_batch.as_mut().verifier_into(ev),
+                    and_res_mac_batch.as_mut().into_inner(ev),
                 )?,
             }
 
@@ -345,12 +344,12 @@ impl<
                     WhichParty::Prover(ev) => {
                         let (and1, and2) = aux;
                         let and_res = and_res_batch.as_ref().into_inner(ev)[n];
-                        let and_res_mac = and_res_mac_batch.as_ref().prover_into(ev)[n];
+                        let and_res_mac = and_res_mac_batch.as_ref().into_inner(ev)[n];
                         mult_check_state.accumulate(
                             &(
                                 and1,
                                 and2,
-                                Mac::new(ProverPrivateCopy::new(and_res), and_res_mac),
+                                Mac::new(PartyPrivateCopy::new(and_res), and_res_mac),
                             ),
                             self.fcom_f2.get_delta(),
                         );
@@ -371,7 +370,7 @@ impl<
                     }
                     WhichParty::Verifier(ev) => {
                         let (and1_mac, and2_mac) = aux;
-                        let and_res_mac = and_res_mac_batch.as_ref().verifier_into(ev)[n];
+                        let and_res_mac = and_res_mac_batch.as_ref().into_inner(ev)[n];
                         mult_check_state.accumulate(
                             &(and1_mac, and2_mac, and_res_mac),
                             self.fcom_f2.get_delta(),
@@ -386,9 +385,9 @@ impl<
                             )?;
                         }
 
-                        let ci = ci_batch.as_ref().verifier_into(ev)[n];
+                        let ci = ci_batch.as_ref().into_inner(ev)[n];
                         let c_mac = ci + and_res_mac;
-                        ci_batch.as_mut().verifier_into(ev)[n] = c_mac;
+                        ci_batch.as_mut().into_inner(ev)[n] = c_mac;
                     }
                 }
             }
@@ -410,10 +409,10 @@ impl<
                 zs,
                 match P::WHICH {
                     WhichParty::Prover(ev) => Mac::new(
-                        ProverPrivateCopy::new(ci_batch.as_ref().prover_into(ev)[i]),
+                        PartyPrivateCopy::new(ci_batch.as_ref().into_inner(ev)[i]),
                         ci_mac_batch.as_ref().into_inner(ev)[i],
                     ),
-                    WhichParty::Verifier(ev) => ci_batch.as_ref().verifier_into(ev)[i],
+                    WhichParty::Verifier(ev) => ci_batch.as_ref().into_inner(ev)[i],
                 },
             ));
         }
@@ -431,7 +430,7 @@ impl<
     ) -> Result<Vec<Edabits<P, FE>>> {
         let mut edabits_vec = Vec::with_capacity(num);
         let mut aux_bits = Vec::with_capacity(num);
-        let mut aux_r_m = ProverPrivate::new(Vec::with_capacity(num));
+        let mut aux_r_m = PartyPrivate::new(Vec::with_capacity(num));
         for _ in 0..num {
             let mut bits = Vec::with_capacity(nb_bits);
             for _ in 0..nb_bits {
@@ -450,13 +449,13 @@ impl<
         }
 
         let aux_r_m_mac = match P::WHICH {
-            WhichParty::Prover(ev) => PartyEither::prover_new(
+            WhichParty::Prover(ev) => PartyEither::new::<Prover>(
                 ev,
                 self.fcom_fe
                     .input_prover(ev, channel, rng, aux_r_m.as_ref().into_inner(ev))?,
             ),
             WhichParty::Verifier(ev) => {
-                PartyEither::verifier_new(ev, self.fcom_fe.input_verifier(ev, channel, rng, num)?)
+                PartyEither::new(ev, self.fcom_fe.input_verifier(ev, channel, rng, num)?)
             }
         };
 
@@ -464,9 +463,9 @@ impl<
             let value = match P::WHICH {
                 WhichParty::Prover(ev) => Mac::new(
                     aux_r_m.as_ref().map(|aux_r_m| aux_r_m[i]).into(),
-                    aux_r_m_mac.as_ref().prover_into(ev)[i],
+                    aux_r_m_mac.as_ref().into_inner(ev)[i],
                 ),
-                WhichParty::Verifier(ev) => aux_r_m_mac.as_ref().verifier_into(ev)[i],
+                WhichParty::Verifier(ev) => aux_r_m_mac.as_ref().into_inner(ev)[i],
             };
             edabits_vec.push(Edabits {
                 bits: aux_bits,
@@ -485,7 +484,7 @@ impl<
     ) -> Result<Vec<Dabit<P, FE>>> {
         let mut dabit_vec = Vec::with_capacity(num);
         let mut b_batch = Vec::with_capacity(num);
-        let mut b_m_batch = ProverPrivate::new(Vec::with_capacity(num));
+        let mut b_m_batch = PartyPrivate::new(Vec::with_capacity(num));
 
         for _ in 0..num {
             let b = self.fcom_f2.random(channel, rng)?;
@@ -497,22 +496,22 @@ impl<
         }
 
         let b_m_mac_batch = match P::WHICH {
-            WhichParty::Prover(ev) => PartyEither::prover_new(
+            WhichParty::Prover(ev) => PartyEither::new::<Prover>(
                 ev,
                 self.fcom_fe
                     .input_prover(ev, channel, rng, b_m_batch.as_ref().into_inner(ev))?,
             ),
             WhichParty::Verifier(ev) => {
-                PartyEither::verifier_new(ev, self.fcom_fe.input_verifier(ev, channel, rng, num)?)
+                PartyEither::new(ev, self.fcom_fe.input_verifier(ev, channel, rng, num)?)
             }
         };
         for (i, &b) in b_batch.iter().enumerate() {
             let value = match P::WHICH {
                 WhichParty::Prover(ev) => Mac::new(
-                    ProverPrivateCopy::new(b_m_batch.as_ref().into_inner(ev)[i]),
-                    b_m_mac_batch.as_ref().prover_into(ev)[i],
+                    PartyPrivateCopy::new(b_m_batch.as_ref().into_inner(ev)[i]),
+                    b_m_mac_batch.as_ref().into_inner(ev)[i],
                 ),
-                WhichParty::Verifier(ev) => b_m_mac_batch.as_ref().verifier_into(ev)[i],
+                WhichParty::Verifier(ev) => b_m_mac_batch.as_ref().into_inner(ev)[i],
             };
             dabit_vec.push(Dabit { bit: b, value })
         }
@@ -549,14 +548,14 @@ impl<
         }
 
         // step 1)
-        let mut c_m = ProverPrivate::new(
+        let mut c_m: PartyPrivate<Prover, _, _> = PartyPrivate::new(
             (0..s)
                 .map(|_| Vec::with_capacity(gamma))
                 .collect::<Vec<_>>(),
         );
         let mut c_m_mac = match P::WHICH {
-            WhichParty::Prover(ev) => PartyEither::prover_new(ev, Vec::with_capacity(s)),
-            WhichParty::Verifier(ev) => PartyEither::verifier_new(ev, Vec::with_capacity(s)),
+            WhichParty::Prover(ev) => PartyEither::new::<Prover>(ev, Vec::with_capacity(s)),
+            WhichParty::Verifier(ev) => PartyEither::new(ev, Vec::with_capacity(s)),
         };
 
         if let WhichParty::Prover(ev) = P::WHICH {
@@ -578,16 +577,16 @@ impl<
                         rng,
                         c_m.as_ref().into_inner(ev)[k].as_slice(),
                     )?;
-                    c_m_mac.as_mut().prover_into(ev).push(b_m_mac);
+                    c_m_mac.as_mut().into_inner(ev).push(b_m_mac);
                 }
                 WhichParty::Verifier(ev) => {
                     let b_m_mac = self.fcom_fe.input_verifier(ev, channel, rng, gamma)?;
-                    c_m_mac.as_mut().verifier_into(ev).push(b_m_mac);
+                    c_m_mac.as_mut().into_inner(ev).push(b_m_mac);
                 }
             }
         }
 
-        let mut c1 = ProverPrivate::new(Vec::with_capacity(s));
+        let mut c1 = PartyPrivate::new(Vec::with_capacity(s));
         if let WhichParty::Prover(ev) = P::WHICH {
             for k in 0..s {
                 if c_m.as_ref().into_inner(ev)[k][0] == FE::PrimeField::ZERO {
@@ -598,66 +597,65 @@ impl<
             }
         }
         let c1_mac = match P::WHICH {
-            WhichParty::Prover(ev) => PartyEither::prover_new(
+            WhichParty::Prover(ev) => PartyEither::new::<Prover>(
                 ev,
                 self.fcom_f2
                     .input_prover(ev, channel, rng, c1.as_ref().into_inner(ev))?,
             ),
             WhichParty::Verifier(ev) => {
-                PartyEither::verifier_new(ev, self.fcom_f2.input_verifier(ev, channel, rng, s)?)
+                PartyEither::new(ev, self.fcom_f2.input_verifier(ev, channel, rng, s)?)
             }
         };
 
         // step 2)
         let mut triples = Vec::with_capacity(gamma * s);
-        let mut andl_batch = ProverPrivate::new(Vec::with_capacity(gamma * s));
+        let mut andl_batch: PartyPrivate<Prover, _, _> =
+            PartyPrivate::new(Vec::with_capacity(gamma * s));
         let mut andl_mac_batch = match P::WHICH {
-            WhichParty::Prover(ev) => PartyEither::prover_new(ev, Vec::with_capacity(gamma * s)),
-            WhichParty::Verifier(ev) => {
-                PartyEither::verifier_new(ev, Vec::with_capacity(gamma * s))
-            }
+            WhichParty::Prover(ev) => PartyEither::new::<Prover>(ev, Vec::with_capacity(gamma * s)),
+            WhichParty::Verifier(ev) => PartyEither::new(ev, Vec::with_capacity(gamma * s)),
         };
-        let mut one_minus_ci_batch = ProverPrivate::new(Vec::with_capacity(gamma * s));
+        let mut one_minus_ci_batch: PartyPrivate<Prover, _, _> =
+            PartyPrivate::new(Vec::with_capacity(gamma * s));
         let mut one_minus_ci_mac_batch = match P::WHICH {
-            WhichParty::Prover(ev) => PartyEither::prover_new(ev, Vec::with_capacity(gamma * s)),
-            WhichParty::Verifier(ev) => {
-                PartyEither::verifier_new(ev, Vec::with_capacity(gamma * s))
-            }
+            WhichParty::Prover(ev) => PartyEither::new::<Prover>(ev, Vec::with_capacity(gamma * s)),
+            WhichParty::Verifier(ev) => PartyEither::new(ev, Vec::with_capacity(gamma * s)),
         };
-        let mut and_res_batch = ProverPrivate::new(Vec::with_capacity(gamma * s));
+        let mut and_res_batch: PartyPrivate<Prover, _, _> =
+            PartyPrivate::new(Vec::with_capacity(gamma * s));
         for k in 0..s {
             for i in 0..gamma {
                 match P::WHICH {
                     WhichParty::Prover(ev) => {
                         let andl = c_m.as_ref().into_inner(ev)[k][i];
-                        let andl_mac = c_m_mac.as_ref().prover_into(ev)[k][i];
+                        let andl_mac = c_m_mac.as_ref().into_inner(ev)[k][i];
                         let minus_ci = // -ci
-                            Mac::new(ProverPrivateCopy::new(andl), andl_mac) * -FE::PrimeField::ONE;
+                            Mac::new(PartyPrivateCopy::new(andl), andl_mac) * -FE::PrimeField::ONE;
                         let one_minus_ci = // 1 - ci
                             self.fcom_fe.affine_add_cst(FE::PrimeField::ONE, minus_ci);
                         let and_res = andl * one_minus_ci.value().into_inner(ev);
                         andl_batch.as_mut().into_inner(ev).push(andl);
-                        andl_mac_batch.as_mut().prover_into(ev).push(andl_mac);
+                        andl_mac_batch.as_mut().into_inner(ev).push(andl_mac);
                         one_minus_ci_batch
                             .as_mut()
                             .into_inner(ev)
                             .push(one_minus_ci.value().into_inner(ev));
                         one_minus_ci_mac_batch
                             .as_mut()
-                            .prover_into(ev)
+                            .into_inner(ev)
                             .push(one_minus_ci.mac());
                         and_res_batch.as_mut().into_inner(ev).push(and_res);
                     }
                     WhichParty::Verifier(ev) => {
-                        let andl_mac = c_m_mac.as_ref().verifier_into(ev)[k][i];
+                        let andl_mac = c_m_mac.as_ref().into_inner(ev)[k][i];
                         let minus_ci_mac = // -ci
                             andl_mac * -FE::PrimeField::ONE;
                         let one_minus_ci_mac = // 1 - ci
                             self.fcom_fe.affine_add_cst(FE::PrimeField::ONE, minus_ci_mac);
-                        andl_mac_batch.as_mut().verifier_into(ev).push(andl_mac);
+                        andl_mac_batch.as_mut().into_inner(ev).push(andl_mac);
                         one_minus_ci_mac_batch
                             .as_mut()
-                            .verifier_into(ev)
+                            .into_inner(ev)
                             .push(one_minus_ci_mac);
                     }
                 }
@@ -665,7 +663,7 @@ impl<
         }
 
         let and_res_mac_batch = match P::WHICH {
-            WhichParty::Prover(ev) => PartyEither::prover_new(
+            WhichParty::Prover(ev) => PartyEither::new::<Prover>(
                 ev,
                 self.fcom_fe.input_prover(
                     ev,
@@ -674,7 +672,7 @@ impl<
                     and_res_batch.as_ref().into_inner(ev),
                 )?,
             ),
-            WhichParty::Verifier(ev) => PartyEither::verifier_new(
+            WhichParty::Verifier(ev) => PartyEither::new(
                 ev,
                 self.fcom_fe.input_verifier(ev, channel, rng, gamma * s)?,
             ),
@@ -683,22 +681,22 @@ impl<
             triples.push(match P::WHICH {
                 WhichParty::Prover(ev) => (
                     Mac::new(
-                        ProverPrivateCopy::new(andl_batch.as_ref().into_inner(ev)[j]),
-                        andl_mac_batch.as_ref().prover_into(ev)[j],
+                        PartyPrivateCopy::new(andl_batch.as_ref().into_inner(ev)[j]),
+                        andl_mac_batch.as_ref().into_inner(ev)[j],
                     ),
                     Mac::new(
-                        ProverPrivateCopy::new(one_minus_ci_batch.as_ref().into_inner(ev)[j]),
-                        one_minus_ci_mac_batch.as_ref().prover_into(ev)[j],
+                        PartyPrivateCopy::new(one_minus_ci_batch.as_ref().into_inner(ev)[j]),
+                        one_minus_ci_mac_batch.as_ref().into_inner(ev)[j],
                     ),
                     Mac::new(
-                        ProverPrivateCopy::new(and_res_batch.as_ref().into_inner(ev)[j]),
-                        and_res_mac_batch.as_ref().prover_into(ev)[j],
+                        PartyPrivateCopy::new(and_res_batch.as_ref().into_inner(ev)[j]),
+                        and_res_mac_batch.as_ref().into_inner(ev)[j],
                     ),
                 ),
                 WhichParty::Verifier(ev) => (
-                    andl_mac_batch.as_ref().verifier_into(ev)[j],
-                    one_minus_ci_mac_batch.as_ref().verifier_into(ev)[j],
-                    and_res_mac_batch.as_ref().verifier_into(ev)[j],
+                    andl_mac_batch.as_ref().into_inner(ev)[j],
+                    one_minus_ci_mac_batch.as_ref().into_inner(ev)[j],
+                    and_res_mac_batch.as_ref().into_inner(ev)[j],
                 ),
             });
         }
@@ -740,10 +738,10 @@ impl<
         // step 4)
         let mut r_mac_batch = Vec::with_capacity(s);
         for k in 0..s {
-            let mut r: ProverPrivateCopy<_, _> = c1.as_ref().map(|c1| c1[k]).into();
+            let mut r: PartyPrivateCopy<Prover, _, _> = c1.as_ref().map(|c1| c1[k]).into();
             let mut r_mac = match P::WHICH {
-                WhichParty::Prover(ev) => c1_mac.as_ref().prover_into(ev)[k],
-                WhichParty::Verifier(ev) => c1_mac.as_ref().verifier_into(ev)[k].mac(),
+                WhichParty::Prover(ev) => c1_mac.as_ref().into_inner(ev)[k],
+                WhichParty::Verifier(ev) => c1_mac.as_ref().into_inner(ev)[k].mac(),
             };
             for (dabit, &eki) in dabits.iter().zip(e[k].iter()) {
                 // TODO: do not need to do it when e[i] is ZERO
@@ -763,11 +761,11 @@ impl<
         }
 
         // step 5)
-        let mut r_batch = VerifierPrivate::new(Vec::with_capacity(s));
+        let mut r_batch = PartyPrivate::new(Vec::with_capacity(s));
         match P::WHICH {
             WhichParty::Prover(ev) => {
                 self.fcom_f2
-                    .open(channel, &r_mac_batch, &mut VerifierPrivate::empty(ev))?
+                    .open(channel, &r_mac_batch, &mut PartyPrivate::empty(ev))?
             }
             WhichParty::Verifier(_) => {
                 self.fcom_f2
@@ -777,12 +775,13 @@ impl<
 
         // step 6)
         let mut r_prime_batch = match P::WHICH {
-            WhichParty::Prover(ev) => PartyEither::prover_new(ev, Vec::with_capacity(s)),
-            WhichParty::Verifier(ev) => PartyEither::verifier_new(ev, Vec::with_capacity(s)),
+            WhichParty::Prover(ev) => PartyEither::new::<Prover>(ev, Vec::with_capacity(s)),
+            WhichParty::Verifier(ev) => PartyEither::new(ev, Vec::with_capacity(s)),
         };
         for ek in e.iter() {
             // NOTE: for performance maybe step 4 and 6 should be combined in one loop
-            let mut r_prime = ProverPrivateCopy::new(FE::PrimeField::ZERO);
+            let mut r_prime: PartyPrivateCopy<Prover, _, _> =
+                PartyPrivateCopy::new(FE::PrimeField::ZERO);
             let mut r_prime_mac = FE::ZERO;
             for (dabit, &eki) in dabits.iter().zip(ek.iter()) {
                 // TODO: do not need to do it when e[i] is ZERO
@@ -801,11 +800,9 @@ impl<
             match P::WHICH {
                 WhichParty::Prover(ev) => r_prime_batch
                     .as_mut()
-                    .prover_into(ev)
+                    .into_inner(ev)
                     .push((r_prime.into_inner(ev), r_prime_mac)),
-                WhichParty::Verifier(ev) => {
-                    r_prime_batch.as_mut().verifier_into(ev).push(r_prime_mac)
-                }
+                WhichParty::Verifier(ev) => r_prime_batch.as_mut().into_inner(ev).push(r_prime_mac),
             }
         }
 
@@ -824,11 +821,11 @@ impl<
                 let tmp = match P::WHICH {
                     WhichParty::Prover(ev) => {
                         Mac::new(
-                            ProverPrivateCopy::new(c_m.as_ref().into_inner(ev)[k][i]),
-                            c_m_mac.as_ref().prover_into(ev)[k][i],
+                            PartyPrivateCopy::new(c_m.as_ref().into_inner(ev)[k][i]),
+                            c_m_mac.as_ref().into_inner(ev)[k][i],
                         ) * twos
                     }
-                    WhichParty::Verifier(ev) => c_m_mac.as_ref().verifier_into(ev)[k][i] * twos,
+                    WhichParty::Verifier(ev) => c_m_mac.as_ref().into_inner(ev)[k][i] * twos,
                 };
                 match P::WHICH {
                     WhichParty::Prover(ev) => {
@@ -838,36 +835,36 @@ impl<
                                 tmp.value().into_inner(ev)
                             );
                         }
-                        tau.as_mut().prover_into(ev).0 += tmp.value().into_inner(ev);
-                        tau.as_mut().prover_into(ev).1 += tmp.mac();
+                        tau.as_mut().into_inner(ev).0 += tmp.value().into_inner(ev);
+                        tau.as_mut().into_inner(ev).1 += tmp.mac();
                     }
                     WhichParty::Verifier(ev) => {
-                        *tau.as_mut().verifier_into(ev) += tmp.mac();
+                        *tau.as_mut().into_inner(ev) += tmp.mac();
                     }
                 }
                 twos += twos;
             }
             tau_mac_batch.push(match P::WHICH {
                 WhichParty::Prover(ev) => Mac::new(
-                    ProverPrivateCopy::new(tau.prover_into(ev).0),
-                    tau.prover_into(ev).1,
+                    PartyPrivateCopy::new(tau.into_inner(ev).0),
+                    tau.into_inner(ev).1,
                 ),
                 WhichParty::Verifier(ev) => {
-                    Mac::new(ProverPrivateCopy::empty(ev), tau.verifier_into(ev))
+                    Mac::new(PartyPrivateCopy::empty(ev), tau.into_inner(ev))
                 }
             });
         }
 
-        let mut tau_batch = VerifierPrivate::new(Vec::with_capacity(s));
+        let mut tau_batch: PartyPrivate<Verifier, _, _> = PartyPrivate::new(Vec::with_capacity(s));
         match P::WHICH {
             WhichParty::Prover(ev) => {
                 self.fcom_fe
-                    .open(channel, &tau_mac_batch, &mut VerifierPrivate::empty(ev))?
+                    .open(channel, &tau_mac_batch, &mut PartyPrivate::empty(ev))?
             }
             WhichParty::Verifier(ev) => self.fcom_fe.open(
                 channel,
                 &tau_mac_batch,
-                &mut VerifierPrivate::new(tau_batch.as_mut().into_inner(ev)),
+                &mut PartyPrivate::new(tau_batch.as_mut().into_inner(ev)),
             )?,
         }
 
@@ -902,10 +899,10 @@ impl<
         edabits_vector: &[Edabits<P, FE>],
         r: &[Edabits<P, FE>],
         dabits: &[Dabit<P, FE>],
-        convert_bit_2_field_aux1: &mut VerifierPrivate<P, &mut Vec<Mac<P, F2, F40b>>>,
+        convert_bit_2_field_aux1: &mut PartyPrivate<Verifier, P, &mut Vec<Mac<P, F2, F40b>>>,
         convert_bit_2_field_aux2: &mut PartyEither<P, &mut Vec<Mac<P, F2, F40b>>, &mut Vec<F2>>,
         e_m_batch: &mut Vec<Mac<P, FE, FE>>,
-        ei_batch: &mut VerifierPrivate<P, &mut Vec<F2>>,
+        ei_batch: &mut PartyPrivate<Verifier, P, &mut Vec<F2>>,
     ) -> Result<()> {
         let n = edabits_vector.len();
         let nb_bits = edabits_vector[0].bits.len();
@@ -953,7 +950,7 @@ impl<
         match P::WHICH {
             WhichParty::Prover(ev) => {
                 self.fcom_f2
-                    .open(channel, &ei_mac_batch, &mut VerifierPrivate::empty(ev))?
+                    .open(channel, &ei_mac_batch, &mut PartyPrivate::empty(ev))?
             }
             WhichParty::Verifier(_) => self.fcom_f2.open(channel, &ei_mac_batch, ei_batch)?,
         }
@@ -1047,8 +1044,8 @@ impl<
 
         // step 5)a)
         let base = n * num_bucket;
-        let mut a_vec = VerifierPrivate::new(Vec::with_capacity(nb_bits));
-        let mut a_m = VerifierPrivate::new(Vec::with_capacity(1));
+        let mut a_vec = PartyPrivate::new(Vec::with_capacity(nb_bits));
+        let mut a_m = PartyPrivate::new(Vec::with_capacity(1));
         for i in 0..num_cut {
             let idx = base + i;
             let a = &r[idx];
@@ -1067,13 +1064,13 @@ impl<
 
         // step 6)
         if bucket_channels.is_none() {
-            let mut convert_bit_2_field_aux1 = VerifierPrivate::new(Vec::with_capacity(n));
+            let mut convert_bit_2_field_aux1 = PartyPrivate::new(Vec::with_capacity(n));
             let mut convert_bit_2_field_aux2 = match P::WHICH {
-                WhichParty::Prover(ev) => PartyEither::prover_new(ev, Vec::with_capacity(n)),
-                WhichParty::Verifier(ev) => PartyEither::verifier_new(ev, Vec::with_capacity(n)),
+                WhichParty::Prover(ev) => PartyEither::new(ev, Vec::with_capacity(n)),
+                WhichParty::Verifier(ev) => PartyEither::new(ev, Vec::with_capacity(n)),
             };
             let mut e_m_batch = Vec::with_capacity(n);
-            let mut ei_batch = VerifierPrivate::new(Vec::with_capacity(n));
+            let mut ei_batch = PartyPrivate::new(Vec::with_capacity(n));
             for j in 0..num_bucket {
                 // base index for the window of `idx_base..idx_base + n` values
                 let idx_base = j * n;
@@ -1101,6 +1098,7 @@ mod tests {
     use super::super::mac::Mac;
     use super::{Conv, Dabit, Edabits, f2_to_fe};
     use crate::homcom::FCom;
+    use crate::party::{Prover, Verifier};
     use crate::svole_trait::Svole;
     use std::{
         io::{BufReader, BufWriter},
@@ -1112,9 +1110,11 @@ mod tests {
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
     use swanky_field_f61p::F61p;
-    use swanky_party::either::PartyEither;
-    use swanky_party::private::{ProverPrivateCopy, VerifierPrivate};
-    use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier};
+    use swanky_party2::{
+        either::PartyEither,
+        private::{PartyPrivate, PartyPrivateCopy},
+        ty_eq::Witness,
+    };
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     const DEFAULT_NUM_BUCKET: usize = 5;
@@ -1141,29 +1141,30 @@ mod tests {
                     .fcom_f2
                     .random(&mut channel, &mut rng)
                     .unwrap()
-                    .decompose(IS_PROVER);
+                    .decompose(Witness::EQUAL_TYPES);
                 let rm = f2_to_fe(rb);
                 let rm_mac = fconv
                     .fcom_fe
-                    .input_prover(IS_PROVER, &mut channel, &mut rng, &[rm])
+                    .input_prover(Witness::EQUAL_TYPES, &mut channel, &mut rng, &[rm])
                     .unwrap()[0];
                 let (x_f2, x_f2_mac) = fconv
                     .fcom_f2
                     .random(&mut channel, &mut rng)
                     .unwrap()
-                    .decompose(IS_PROVER);
+                    .decompose(Witness::EQUAL_TYPES);
 
-                let mut convert_bit_2_field_aux = PartyEither::prover_new(IS_PROVER, Vec::new());
+                let mut convert_bit_2_field_aux =
+                    PartyEither::new(Witness::EQUAL_TYPES, Vec::new());
                 let mut x_m_batch = Vec::new();
                 fconv
                     .convert_bit_2_field(
                         &mut channel,
                         &[Dabit {
-                            bit: Mac::new(ProverPrivateCopy::new(rb), rb_mac),
-                            value: Mac::new(ProverPrivateCopy::new(rm), rm_mac),
+                            bit: Mac::new(PartyPrivateCopy::new(rb), rb_mac),
+                            value: Mac::new(PartyPrivateCopy::new(rm), rm_mac),
                         }],
-                        &[Mac::new(ProverPrivateCopy::new(x_f2), x_f2_mac)],
-                        &mut VerifierPrivate::empty(IS_PROVER),
+                        &[Mac::new(PartyPrivateCopy::new(x_f2), x_f2_mac)],
+                        &mut PartyPrivate::empty(Witness::EQUAL_TYPES),
                         &mut convert_bit_2_field_aux.as_mut(),
                         &mut x_m_batch,
                     )
@@ -1174,15 +1175,15 @@ mod tests {
                     .open(
                         &mut channel,
                         &x_m_batch,
-                        &mut VerifierPrivate::empty(IS_PROVER),
+                        &mut PartyPrivate::empty(Witness::EQUAL_TYPES),
                     )
                     .unwrap();
 
                 assert_eq!(
                     f2_to_fe::<FE::PrimeField>(x_f2),
-                    x_m_batch[0].value().into_inner(IS_PROVER)
+                    x_m_batch[0].value().into_inner(Witness::EQUAL_TYPES)
                 );
-                res.push((x_f2, x_m_batch[0].value().into_inner(IS_PROVER)));
+                res.push((x_f2, x_m_batch[0].value().into_inner(Witness::EQUAL_TYPES)));
             }
             res
         });
@@ -1201,12 +1202,12 @@ mod tests {
             let rb_mac = fconv.fcom_f2.random(&mut channel, &mut rng).unwrap();
             let r_m_mac = fconv
                 .fcom_fe
-                .input_verifier(IS_VERIFIER, &mut channel, &mut rng, 1)
+                .input_verifier(Witness::EQUAL_TYPES, &mut channel, &mut rng, 1)
                 .unwrap()[0];
             let x_f2_mac = fconv.fcom_f2.random(&mut channel, &mut rng).unwrap();
 
-            let mut convert_bit_2_field_aux1 = VerifierPrivate::new(Vec::new());
-            let mut convert_bit_2_field_aux2 = PartyEither::verifier_new(IS_VERIFIER, Vec::new());
+            let mut convert_bit_2_field_aux1 = PartyPrivate::new(Vec::new());
+            let mut convert_bit_2_field_aux2 = PartyEither::new(Witness::EQUAL_TYPES, Vec::new());
             let mut x_m_batch = Vec::new();
             fconv
                 .convert_bit_2_field(
@@ -1228,7 +1229,7 @@ mod tests {
                 .open(
                     &mut channel,
                     &[x_m_batch[0]],
-                    &mut VerifierPrivate::new(&mut x_m),
+                    &mut PartyPrivate::new(&mut x_m),
                 )
                 .unwrap();
             res.push(x_m[0]);
@@ -1268,23 +1269,23 @@ mod tests {
 
             let x_mac = fconv
                 .fcom_f2
-                .input_prover(IS_PROVER, &mut channel, &mut rng, &x)
+                .input_prover(Witness::EQUAL_TYPES, &mut channel, &mut rng, &x)
                 .unwrap();
             let y_mac = fconv
                 .fcom_f2
-                .input_prover(IS_PROVER, &mut channel, &mut rng, &y)
+                .input_prover(Witness::EQUAL_TYPES, &mut channel, &mut rng, &y)
                 .unwrap();
 
             let mut vx = Vec::new();
             for i in 0..power {
-                vx.push(Mac::new(ProverPrivateCopy::new(x[i]), x_mac[i]));
+                vx.push(Mac::new(PartyPrivateCopy::new(x[i]), x_mac[i]));
             }
 
             let mut vy = Vec::new();
             for i in 0..power {
-                vy.push(Mac::new(ProverPrivateCopy::new(y[i]), y_mac[i]));
+                vy.push(Mac::new(PartyPrivateCopy::new(y[i]), y_mac[i]));
             }
-            let default_fe = Mac::new(ProverPrivateCopy::new(FE::PrimeField::ZERO), FE::ZERO);
+            let default_fe = Mac::new(PartyPrivateCopy::new(FE::PrimeField::ZERO), FE::ZERO);
             let (res, c) = fconv
                 .bit_add_carry(
                     &mut channel,
@@ -1303,12 +1304,20 @@ mod tests {
 
             fconv
                 .fcom_f2
-                .open(&mut channel, &res, &mut VerifierPrivate::empty(IS_PROVER))
+                .open(
+                    &mut channel,
+                    &res,
+                    &mut PartyPrivate::empty(Witness::EQUAL_TYPES),
+                )
                 .unwrap();
 
             fconv
                 .fcom_f2
-                .open(&mut channel, &[c], &mut VerifierPrivate::empty(IS_PROVER))
+                .open(
+                    &mut channel,
+                    &[c],
+                    &mut PartyPrivate::empty(Witness::EQUAL_TYPES),
+                )
                 .unwrap();
             (res, c)
         });
@@ -1324,14 +1333,14 @@ mod tests {
 
         let x_mac = fconv
             .fcom_f2
-            .input_verifier(IS_VERIFIER, &mut channel, &mut rng, power)
+            .input_verifier(Witness::EQUAL_TYPES, &mut channel, &mut rng, power)
             .unwrap();
         let y_mac = fconv
             .fcom_f2
-            .input_verifier(IS_VERIFIER, &mut channel, &mut rng, power)
+            .input_verifier(Witness::EQUAL_TYPES, &mut channel, &mut rng, power)
             .unwrap();
 
-        let default_fe = Mac::new(ProverPrivateCopy::empty(IS_VERIFIER), FE::ZERO);
+        let default_fe = Mac::new(PartyPrivateCopy::empty(Witness::EQUAL_TYPES), FE::ZERO);
         let (res_mac, c_mac) = fconv
             .bit_add_carry(
                 &mut channel,
@@ -1351,13 +1360,13 @@ mod tests {
         let mut res = Vec::new();
         fconv
             .fcom_f2
-            .open(&mut channel, &res_mac, &mut VerifierPrivate::new(&mut res))
+            .open(&mut channel, &res_mac, &mut PartyPrivate::new(&mut res))
             .unwrap();
 
         let mut c = Vec::new();
         fconv
             .fcom_f2
-            .open(&mut channel, &[c_mac], &mut VerifierPrivate::new(&mut c))
+            .open(&mut channel, &[c_mac], &mut PartyPrivate::new(&mut c))
             .unwrap();
 
         let _resprover = handle.join().unwrap();

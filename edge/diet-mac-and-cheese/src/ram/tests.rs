@@ -9,10 +9,14 @@ fn test_arithmetic_ram() {
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_field_f61p::F61p;
-    use swanky_party::{Prover, Verifier};
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
-    use crate::{DietMacAndCheese, backend_trait::BackendT, svole_trait::Svole};
+    use crate::{
+        DietMacAndCheese,
+        backend_trait::BackendT,
+        party::{Prover, Verifier},
+        svole_trait::Svole,
+    };
 
     use super::{Arithmetic, protocol::DoraRam};
 
@@ -93,10 +97,14 @@ fn test_boolean_ram() {
     use swanky_channel_legacy::Channel;
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F2, F40b};
-    use swanky_party::{Prover, Verifier};
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
-    use crate::{DietMacAndCheese, backend_trait::BackendT, svole_trait::Svole};
+    use crate::{
+        DietMacAndCheese,
+        backend_trait::BackendT,
+        party::{Prover, Verifier},
+        svole_trait::Svole,
+    };
 
     use super::{Boolean, protocol::DoraRam};
 

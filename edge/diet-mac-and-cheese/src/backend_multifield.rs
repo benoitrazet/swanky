@@ -10,6 +10,7 @@ use crate::fields::SieveIrDeserialize;
 use crate::homcom::FCom;
 use crate::mac::{Mac, MacT};
 use crate::memory::Memory;
+use crate::party::{Party, Prover, WhichParty};
 use crate::plaintext::DietMacAndCheesePlaintext;
 use crate::plugins::{
     DisjunctionBody, PluginExecution, PluginType, Ram, RamArithV0, RamArithV1, RamBoolV0,
@@ -45,8 +46,10 @@ use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField, StatisticallySecur
 use swanky_field_binary::{F2, F40b};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F127p, F128p, F384p, F384q, Secp256k1, Secp256k1order};
-use swanky_party::private::{ProverPrivate, ProverPrivateCopy};
-use swanky_party::{IsParty, Party, Prover, WhichParty};
+use swanky_party2::{
+    private::{PartyPrivate, PartyPrivateCopy},
+    ty_eq::{EqualityProposition, Witness},
+};
 use swanky_svole_wykw::LpnParams;
 
 // This file implements IR0+ support for diet-mac-n-cheese and is broken up into the following components:
@@ -433,7 +436,7 @@ impl<
             C: AbstractChannel + Clone,
             SvoleF: SvoleT<P, F, F>,
         >(
-            ev: IsParty<P, Prover>,
+            ev: Witness<impl EqualityProposition<P, Prover>>,
             dmc: &mut DietMacAndCheese<P, F, F, C, SvoleF>,
             wit_tape: I,
             inputs: &[<DietMacAndCheese<P, F, F, C, SvoleF> as BackendT>::Wire],
@@ -444,18 +447,18 @@ impl<
             debug_assert_eq!(cond, 1);
 
             // so the guard is the last input
-            let guard_val = inputs[inputs.len() - 1].value().into_inner(ev);
+            let guard_val = inputs[inputs.len() - 1].value().into_inner(ev.sym());
 
             // lookup the clause based on the guard
             let opt = *st
                 .clause_resolver
                 .as_ref()
-                .into_inner(ev)
+                .into_inner(ev.sym())
                 .get(&guard_val)
                 .expect("no clause guard is satisfied");
 
             st.dora
-                .mux(dmc, wit_tape, inputs, ProverPrivateCopy::new(opt))
+                .mux(dmc, wit_tape, inputs, PartyPrivateCopy::new(opt))
         }
 
         match self.dora_states.entry(disj.id()) {
@@ -472,15 +475,15 @@ impl<
                     &mut self.dmc,
                     iter::empty(),
                     inputs,
-                    ProverPrivateCopy::empty(ev),
+                    PartyPrivateCopy::empty(ev),
                 ),
             },
             Entry::Vacant(entry) => {
                 // compile disjunction to the field
                 let disjunction = Disjunction::compile(disj, disj.cond(), fun_store);
 
-                let mut resolver: ProverPrivate<P, HashMap<FP, _>> =
-                    ProverPrivate::new(Default::default());
+                let mut resolver: PartyPrivate<Prover, P, HashMap<FP, _>> =
+                    PartyPrivate::new(Default::default());
                 if let WhichParty::Prover(ev) = P::WHICH {
                     for (i, guard) in disj.guards().enumerate() {
                         let guard = FP::try_from_int(*guard).unwrap();
@@ -508,7 +511,7 @@ impl<
                         &mut self.dmc,
                         iter::empty(),
                         inputs,
-                        ProverPrivateCopy::empty(ev),
+                        PartyPrivateCopy::empty(ev),
                     ),
                 }
             }
@@ -541,7 +544,7 @@ impl<
                         &mut self.dmc.rng,
                         b2,
                     )?;
-                    v.push(Mac::new(ProverPrivateCopy::new(b2), mac));
+                    v.push(Mac::new(PartyPrivateCopy::new(b2), mac));
                 }
             }
             WhichParty::Verifier(ev) => {
@@ -579,8 +582,8 @@ impl<
     }
 
     fn assert_conv_from_bits(&mut self, x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire> {
-        let mut power_twos = ProverPrivateCopy::new(FE::ONE);
-        let mut recomposed_value = ProverPrivateCopy::new(FE::ZERO);
+        let mut power_twos: PartyPrivateCopy<Prover, _, _> = PartyPrivateCopy::new(FE::ONE);
+        let mut recomposed_value: PartyPrivateCopy<Prover, _, _> = PartyPrivateCopy::new(FE::ZERO);
 
         let mut bits = Vec::with_capacity(x.len());
 
@@ -2653,6 +2656,7 @@ pub(crate) mod tests {
     use super::EdabitsMap;
     use super::TypeStore;
     use crate::LpnSize;
+    use crate::party::{Prover, Verifier};
     use crate::svole_trait::Svole;
     use crate::{
         backend_multifield::EvaluatorCirc,
@@ -2679,7 +2683,6 @@ pub(crate) mod tests {
     use swanky_field_binary::F2;
     use swanky_field_f61p::F61p;
     use swanky_field_ff_primes::{F384p, F384q, Secp256k1, Secp256k1order};
-    use swanky_party::{Prover, Verifier};
 
     pub(crate) const FF0: u8 = 0;
     const FF1: u8 = 1;

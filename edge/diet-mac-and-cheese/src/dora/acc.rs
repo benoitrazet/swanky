@@ -1,9 +1,14 @@
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, ensure};
 use swanky_field::{FiniteField, IsSubFieldOf};
-use swanky_party::{IsParty, Party, Prover};
+use swanky_party2::ty_eq::{EqualityProposition, Witness};
 
-use crate::{DietMacAndCheese, backend_trait::BackendT, svole_trait::SvoleT};
+use crate::{
+    DietMacAndCheese,
+    backend_trait::BackendT,
+    party::{Party, Prover},
+    svole_trait::SvoleT,
+};
 
 use super::{
     comm::{CommittedCrossTerms, CommittedWitness},
@@ -120,7 +125,11 @@ impl<
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
-    pub fn value(&self, ev: IsParty<P, Prover>, clause: &R1CS<V>) -> Accumulator<V> {
+    pub fn value(
+        &self,
+        ev: Witness<impl EqualityProposition<P, Prover>>,
+        clause: &R1CS<V>,
+    ) -> Accumulator<V> {
         let mut wit = Vec::with_capacity(clause.dim());
         let mut err = Vec::with_capacity(clause.rows());
 
@@ -128,11 +137,11 @@ where
         debug_assert!(self.err.len() >= clause.rows());
 
         for i in 0..clause.dim() {
-            wit.push(self.wit[i].value().into_inner(ev));
+            wit.push(self.wit[i].value().into_inner(ev.sym()));
         }
 
         for i in 0..clause.rows() {
-            err.push(self.err[i].value().into_inner(ev));
+            err.push(self.err[i].value().into_inner(ev.sym()));
         }
 
         Accumulator { wit, err }

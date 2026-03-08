@@ -678,7 +678,7 @@ dependencies = [
  "swanky-field-f61p",
  "swanky-field-ff-primes",
  "swanky-flatbuffer-build",
- "swanky-party",
+ "swanky-party2",
  "swanky-polynomial",
  "swanky-serialization",
  "swanky-svole-wykw",
@@ -3336,7 +3336,6 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-channel-legacy",
  "swanky-field-binary",
- "swanky-party",
  "wasm-bindgen",
 ]
 
@@ -3357,7 +3356,6 @@ dependencies = [
  "swanky-channel-legacy",
  "swanky-error",
  "swanky-field-binary",
- "swanky-party",
  "tungstenite",
 ]
 

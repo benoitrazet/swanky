@@ -5,6 +5,7 @@ use clap::Parser;
 use cli::Cli;
 use diet_mac_and_cheese::EvaluatorCirc;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
+use diet_mac_and_cheese::party::{Party, Prover, Verifier, WhichParty};
 use diet_mac_and_cheese::sieveir_reader_fbs::{InputFlatbuffers, read_types};
 use diet_mac_and_cheese::sieveir_reader_text::InputText;
 use diet_mac_and_cheese::svole_thread::SvoleAtomic;
@@ -23,7 +24,6 @@ use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::{Channel, SyncChannel};
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_field_binary::{F2, F40b};
-use swanky_party::{Party, Prover, Verifier, WhichParty};
 
 #[cfg(feature = "jemalloc")]
 use jemallocator::Jemalloc;
