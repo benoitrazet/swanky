@@ -8,14 +8,20 @@ use swanky_authenticated_bits::and_triples::{AndTriple, AndTripleGenerator};
 use swanky_authenticated_bits::authbits::{AuthBit, AuthBitGenerator};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_field_binary::F2;
-use swanky_party::either::PartyEither;
-use swanky_party::private::VerifierPrivate;
-use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier};
+use swanky_party2::{either::PartyEither, party_system, private::PartyPrivate, ty_eq::Witness};
+
+party_system! {
+    mod ps {
+        PartyA,
+        PartyB,
+    }
+}
+use ps::{PartyA, PartyB};
 
 fn authbit_generators(
     prover_rng: &mut AesRng,
     verifier_rng: &mut AesRng,
-) -> (AuthBitGenerator<Prover>, AuthBitGenerator<Verifier>) {
+) -> (AuthBitGenerator<PartyA>, AuthBitGenerator<PartyB>) {
     swanky_channel::local::local_channel_pair(
         |c| AuthBitGenerator::new(c, prover_rng),
         |c| AuthBitGenerator::new(c, verifier_rng),
@@ -36,9 +42,9 @@ fn bench_auth_bits(c: &mut Criterion<WallTime>) {
             swanky_channel::local::local_channel_pair(
                 |c| {
                     // The prover.
-                    let mut authbits: Vec<AuthBit<Prover>> = vec![];
+                    let mut authbits: Vec<AuthBit<PartyA>> = vec![];
                     generator_a.generate(
-                        PartyEither::prover_new(IS_PROVER, bits.iter().copied()),
+                        PartyEither::new(Witness::EQUAL_TYPES, bits.iter().copied()),
                         &mut authbits,
                         c,
                         &mut prover_rng,
@@ -47,9 +53,9 @@ fn bench_auth_bits(c: &mut Criterion<WallTime>) {
                 },
                 |c| {
                     // The verifier.
-                    let mut authbits: Vec<AuthBit<Verifier>> = vec![];
+                    let mut authbits: Vec<AuthBit<PartyB>> = vec![];
                     let input: PartyEither<_, Copied<Iter<'_, F2>>, _> =
-                        PartyEither::verifier_new(IS_VERIFIER, COUNT);
+                        PartyEither::new(Witness::EQUAL_TYPES, COUNT);
                     generator_b.generate(input, &mut authbits, c, &mut verifier_rng)?;
                     Ok(())
                 },
@@ -70,9 +76,9 @@ fn bench_auth_bits_open(c: &mut Criterion<WallTime>) {
     let (authbits_a, authbits_b) = swanky_channel::local::local_channel_pair(
         |c| {
             // The prover.
-            let mut authbits: Vec<AuthBit<Prover>> = vec![];
+            let mut authbits: Vec<AuthBit<PartyA>> = vec![];
             generator_a.generate(
-                PartyEither::prover_new(IS_PROVER, bits.iter().copied()),
+                PartyEither::new(Witness::EQUAL_TYPES, bits.iter().copied()),
                 &mut authbits,
                 c,
                 &mut prover_rng,
@@ -81,9 +87,9 @@ fn bench_auth_bits_open(c: &mut Criterion<WallTime>) {
         },
         |c| {
             // The verifier.
-            let mut authbits: Vec<AuthBit<Verifier>> = vec![];
+            let mut authbits: Vec<AuthBit<PartyB>> = vec![];
             let input: PartyEither<_, Copied<Iter<'_, F2>>, _> =
-                PartyEither::verifier_new(IS_VERIFIER, COUNT);
+                PartyEither::new(Witness::EQUAL_TYPES, COUNT);
 
             generator_b.generate(input, &mut authbits, c, &mut verifier_rng)?;
             Ok(authbits)
@@ -93,10 +99,10 @@ fn bench_auth_bits_open(c: &mut Criterion<WallTime>) {
     c.bench_function(&format!("open_authbits::{COUNT}"), |b| {
         b.iter(|| {
             swanky_channel::local::local_channel_pair(
-                |c| generator_a.open(&authbits_a, VerifierPrivate::empty(IS_PROVER), c),
+                |c| generator_a.open(&authbits_a, PartyPrivate::empty(Witness::EQUAL_TYPES), c),
                 |c| {
                     let mut outputs = Vec::with_capacity(COUNT);
-                    generator_b.open(&authbits_b, VerifierPrivate::new(&mut outputs), c)
+                    generator_b.open(&authbits_b, PartyPrivate::new(&mut outputs), c)
                 },
             )
             .unwrap();
@@ -120,13 +126,13 @@ fn bench_auth_shares(c: &mut Criterion<WallTime>) {
             swanky_channel::local::local_channel_pair(
                 |c| {
                     // Party A (the "prover").
-                    let mut authshares: Vec<AuthShare<Prover>> = vec![];
+                    let mut authshares: Vec<AuthShare<PartyA>> = vec![];
                     generator_a.generate(COUNT, &mut authshares, c, &mut prover_rng)?;
                     Ok(())
                 },
                 |c| {
                     // Party B (the "verifier").
-                    let mut authshares: Vec<AuthShare<Verifier>> = vec![];
+                    let mut authshares: Vec<AuthShare<PartyB>> = vec![];
                     generator_b.generate(COUNT, &mut authshares, c, &mut verifier_rng)?;
                     Ok(())
                 },
@@ -152,13 +158,13 @@ fn bench_and_triples(c: &mut Criterion<WallTime>) {
             swanky_channel::local::local_channel_pair(
                 |c| {
                     // Party A (the "prover").
-                    let mut triples: Vec<AndTriple<Prover>> = vec![];
+                    let mut triples: Vec<AndTriple<PartyA>> = vec![];
                     generator_a.generate(COUNT, &mut triples, c, &mut prover_rng)?;
                     Ok(())
                 },
                 |c| {
                     // Party B (the "verifier").
-                    let mut triples: Vec<AndTriple<Verifier>> = vec![];
+                    let mut triples: Vec<AndTriple<PartyB>> = vec![];
                     generator_b.generate(COUNT, &mut triples, c, &mut verifier_rng)?;
                     Ok(())
                 },
@@ -182,13 +188,13 @@ fn bench_fix_and_triples(c: &mut Criterion<WallTime>) {
     let (triples_a, triples_b) = swanky_channel::local::local_channel_pair(
         |c| {
             // Party A (the "prover").
-            let mut triples: Vec<AndTriple<Prover>> = vec![];
+            let mut triples: Vec<AndTriple<PartyA>> = vec![];
             generator_a.generate(COUNT, &mut triples, c, &mut prover_rng)?;
             Ok(triples)
         },
         |c| {
             // Party B (the "verifier").
-            let mut triples: Vec<AndTriple<Verifier>> = vec![];
+            let mut triples: Vec<AndTriple<PartyB>> = vec![];
             generator_b.generate(COUNT, &mut triples, c, &mut verifier_rng)?;
             Ok(triples)
         },
@@ -198,14 +204,14 @@ fn bench_fix_and_triples(c: &mut Criterion<WallTime>) {
     let (shares_a, shares_b) = swanky_channel::local::local_channel_pair(
         |c| {
             // Party A (the "prover").
-            let mut authshares: Vec<AuthShare<Prover>> = vec![];
+            let mut authshares: Vec<AuthShare<PartyA>> = vec![];
             let mut generator: AuthShareGenerator<_> = AuthShareGenerator::new(c, &mut prover_rng)?;
             generator.generate(2 * COUNT, &mut authshares, c, &mut prover_rng)?;
             Ok(authshares)
         },
         |c| {
             // Party B (the "verifier").
-            let mut authshares: Vec<AuthShare<Verifier>> = vec![];
+            let mut authshares: Vec<AuthShare<PartyB>> = vec![];
             let mut generator: AuthShareGenerator<_> =
                 AuthShareGenerator::new(c, &mut verifier_rng)?;
             generator.generate(2 * COUNT, &mut authshares, c, &mut verifier_rng)?;

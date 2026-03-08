@@ -27,7 +27,7 @@ use swanky_error::{ErrorKind, WrapErr};
 use swanky_f_eq::EqualityFunctionality;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
-use swanky_party::{Party, WhichParty};
+use swanky_party2::{GenericParty, GenericWhichParty};
 use swanky_serialization::{CanonicalSerialize, SequenceDeserializer, SequenceSerializer};
 use vectoreyes::{SimdBase, U8x16};
 
@@ -35,7 +35,7 @@ use vectoreyes::{SimdBase, U8x16};
 ///
 /// See [`crate::leaky_and_triples`] for details.
 #[derive(Clone, Copy)]
-pub(crate) struct LeakyAndTriple<P: Party> {
+pub(crate) struct LeakyAndTriple<P: GenericParty> {
     /// The authenticated share $`\langle x \rangle`$.
     x: AuthShare<P>,
     /// The authenticated share $`\langle y \rangle`$.
@@ -45,7 +45,7 @@ pub(crate) struct LeakyAndTriple<P: Party> {
     z: AuthShare<P>,
 }
 
-impl<P: Party> LeakyAndTriple<P> {
+impl<P: GenericParty> LeakyAndTriple<P> {
     /// The authenticated share $`\langle x \rangle`$.
     pub(crate) fn x(&self) -> AuthShare<P> {
         self.x
@@ -64,28 +64,28 @@ impl<P: Party> LeakyAndTriple<P> {
 }
 
 /// A type for generating [`LeakyAndTriple`]s.
-pub(crate) struct LeakyAndTripleGenerator<P: Party> {
+pub(crate) struct LeakyAndTripleGenerator<P: GenericParty> {
     pub(crate) auth_share_generator: AuthShareGenerator<P>,
 }
 
-impl<P: Party> LeakyAndTripleGenerator<P> {
+impl<P: GenericParty> LeakyAndTripleGenerator<P> {
     /// Create a new [`LeakyAndTripleGenerator`].
     pub(crate) fn new<RNG: CryptoRng + Rng>(
         channel: &mut Channel,
         mut rng: RNG,
     ) -> swanky_error::Result<Self> {
         let delta = rng.r#gen::<F128b>();
-        // We require that for Party A (the Prover) `lsb(Δ) = 1`, and for Party
-        // B (the Verifier) `lsb(Δ) = 0`. So adjust `delta` as needed.
-        let delta = match P::WHICH {
-            WhichParty::Prover(_) => {
+        // We require that for Party A `lsb(Δ) = 1`, and for Party
+        // B `lsb(Δ) = 0`. So adjust `delta` as needed.
+        let delta = match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(_) => {
                 if lsb(delta) == F2::ZERO {
                     delta + F128b::ONE
                 } else {
                     delta
                 }
             }
-            WhichParty::Verifier(_) => {
+            GenericWhichParty::Party1(_) => {
                 if lsb(delta) == F2::ONE {
                     delta + F128b::ONE
                 } else {
@@ -107,11 +107,11 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
         channel: &mut Channel,
         rng: RNG,
     ) -> swanky_error::Result<Self> {
-        match P::WHICH {
-            WhichParty::Prover(_) => {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(_) => {
                 assert_eq!(lsb(F128b::from(delta)), F2::ONE)
             }
-            WhichParty::Verifier(_) => {
+            GenericWhichParty::Party1(_) => {
                 assert_eq!(lsb(F128b::from(delta)), F2::ZERO)
             }
         }
@@ -257,11 +257,11 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
             .zip(cs.iter())
             .zip(hashed_x_keys.iter())
         {
-            match P::WHICH {
-                WhichParty::Prover(_) => {
+            match P::GENERIC_WHICH {
+                GenericWhichParty::Party0(_) => {
                     send_g(x, *c, *hashed_x_key, channel)?;
                 }
-                WhichParty::Verifier(_) => {
+                GenericWhichParty::Party1(_) => {
                     receive_g_and_compute_s(x, z, *c, *hashed_x_key, channel)?;
                 }
             }
@@ -272,11 +272,11 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
             .zip(cs.iter())
             .zip(hashed_x_keys.iter())
         {
-            match P::WHICH {
-                WhichParty::Prover(_) => {
+            match P::GENERIC_WHICH {
+                GenericWhichParty::Party0(_) => {
                     receive_g_and_compute_s(x, z, *c, *hashed_x_key, channel)?;
                 }
-                WhichParty::Verifier(_) => {
+                GenericWhichParty::Party1(_) => {
                     send_g(x, *c, *hashed_x_key, channel)?;
                 }
             }
@@ -333,12 +333,12 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
 
         // Compute the correction bit `d` and output the updating triples using
         // the above functions.
-        match P::WHICH {
-            WhichParty::Prover(_) => {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(_) => {
                 send_lsb(channel)?;
                 receive_lsb(channel)?;
             }
-            WhichParty::Verifier(_) => {
+            GenericWhichParty::Party1(_) => {
                 receive_lsb(channel)?;
                 send_lsb(channel)?;
             }
@@ -515,11 +515,19 @@ fn lsb(input: F128b) -> F2 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::authshares::{PartyA, PartyB};
     use bytemuck::TransparentWrapper;
     use proptest::prelude::*;
     use rand::SeedableRng;
     use swanky_aes_rng::AesRng;
+    use swanky_party2::party_system;
+
+    party_system! {
+        mod ps {
+            PartyA,
+            PartyB,
+        }
+    }
+    use ps::{PartyA, PartyB};
 
     fn generators(
         mut rng_a: &mut AesRng,

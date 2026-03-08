@@ -2476,7 +2476,7 @@ dependencies = [
  "swanky-field-binary",
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",
- "swanky-party",
+ "swanky-party2",
  "swanky-serialization",
  "vectoreyes",
 ]
