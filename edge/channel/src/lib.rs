@@ -10,7 +10,6 @@ use std::io::{Read, Write};
 use bytemuck::TransparentWrapper;
 use generic_array::GenericArray;
 use swanky_error::{ErrorKind, WrapErr};
-use swanky_party::{Party, private::PartyPrivate};
 use swanky_party2::GenericParty;
 use swanky_serialization::CanonicalSerialize;
 
@@ -360,46 +359,7 @@ impl<'inner> Channel<'inner> {
         IoAdapter::wrap_mut(self)
     }
 
-    /// Turn a `PartyPrivate<P, T>` into a `T` by communicating it.
-    ///
-    /// If `P` can see its value, then send it over the wire and return it. Otherwise, read the
-    /// peer's value from over the wire and return that.
-    ///
-    /// # Example
-    /// ```
-    /// use swanky_channel::{Channel, local::local_channel_pair};
-    /// use swanky_party::{Party, Prover, Verifier, private::ProverPrivateCopy};
-    /// fn do_work<P: Party>(c: &mut Channel) -> swanky_error::Result<i32> {
-    ///     let x: ProverPrivateCopy<P, i32> = ProverPrivateCopy::new(4586);
-    ///     // Only the prover knows x.
-    ///     let x: i32 = c.communicate(x)?;
-    ///     // Now both parties know x.
-    ///     Ok(x)
-    /// }
-    /// let (a, b) = local_channel_pair(
-    ///     |c| do_work::<Prover>(c),
-    ///     |c| do_work::<Verifier>(c),
-    /// ).unwrap();
-    /// assert_eq!(a, b);
-    /// ```
-    #[inline]
-    pub fn communicate<P: Party, T: CanonicalSerialize>(
-        &mut self,
-        p: impl PartyPrivate<P, T>,
-    ) -> swanky_error::Result<T> {
-        match p.into_option() {
-            Some(t) => {
-                self.write(&t)?;
-                Ok(t)
-            }
-            None => self.read(),
-        }
-    }
-
     /// Turn a `swanky_party2::PartyPrivate<P, T>` into a `T` by communicating it.
-    ///
-    /// (The `2` in `communicate2` refers to `swanky_party2`, since `communicate()` refers to
-    /// `swanky_party`.)
     ///
     /// If `p` is private to `P`, then send it over the wire and return it. Otherwise, read the
     /// peer's value from over the wire and return that.
@@ -421,7 +381,7 @@ impl<'inner> Channel<'inner> {
     ///     // Only the sender knows x. We're party P. If P == Sender, then _we_ know x.
     ///     let x: PartyPrivateCopy<Sender, P, i32> = PartyPrivateCopy::new(4586);
     ///     // If we're the sender, send x to the receiver. If P == Receiver, then receive x.
-    ///     let x: i32 = c.communicate2(x)?;
+    ///     let x: i32 = c.communicate(x)?;
     ///     // Now both parties know x.
     ///     Ok(x)
     /// }
@@ -432,7 +392,7 @@ impl<'inner> Channel<'inner> {
     /// assert_eq!(a, b);
     /// ```
     #[inline]
-    pub fn communicate2<
+    pub fn communicate<
         PrivateTo: GenericParty<PartySystem = P::PartySystem>,
         P: GenericParty,
         T: CanonicalSerialize,
