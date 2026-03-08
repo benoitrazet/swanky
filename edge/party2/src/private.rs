@@ -546,4 +546,26 @@ private! {
     type PartyEitherCopy;
 }
 
+impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T: PartialEq> PartialEq
+    for PartyPrivate<PrivateTo, P, T>
+{
+    fn eq(&self, other: &Self) -> bool {
+        match const { private_which::<PrivateTo, P>() } {
+            PrivateWhich::Full(e) => self.as_ref().into_inner(e) == other.as_ref().into_inner(e),
+            PrivateWhich::Empty(_) => true,
+        }
+    }
+}
+
+impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T: Copy + PartialEq>
+    PartialEq for PartyPrivateCopy<PrivateTo, P, T>
+{
+    fn eq(&self, other: &Self) -> bool {
+        match const { private_which::<PrivateTo, P>() } {
+            PrivateWhich::Full(e) => self.into_inner(e) == other.into_inner(e),
+            PrivateWhich::Empty(_) => true,
+        }
+    }
+}
+
 mod copy_conversions;
