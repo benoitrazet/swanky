@@ -2,7 +2,6 @@ use arrayvec::ArrayVec;
 use bytemuck::TransparentWrapper;
 use generic_array::{GenericArray, typenum::Unsigned};
 use keyed_arena::{AllocationKey, KeyedArena};
-use party::{IS_PROVER, IS_VERIFIER, Party};
 use rand::prelude::Distribution;
 use rand::{CryptoRng, Rng, SeedableRng, distributions::Uniform};
 use std::{marker::PhantomData, ops::Deref};
@@ -15,7 +14,7 @@ use swanky_field::{Degree, DegreeModulo, FiniteField};
 use swanky_ot_alsz_kos::explicit_round::{
     KosReceiver, KosReceiverStage2, KosSender, KosSenderStage2,
 };
-use swanky_party as party;
+use swanky_party2::ty_eq::Witness;
 use swanky_serialization::CanonicalSerialize;
 use swanky_svole_wykw::ggm_utils::*;
 
@@ -27,6 +26,7 @@ use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16, U64x2};
 
 use crate::{
     mac::{Mac, MacTypes},
+    party::{self, Party},
     specialization::FiniteFieldSpecialization,
 };
 
@@ -160,7 +160,7 @@ impl<T: MacTypes> VoleSender<T> {
             .sps_base_voles()
             .iter()
             .copied()
-            .map(|mac| mac.prover_extract(IS_PROVER))
+            .map(|mac| mac.prover_extract(Witness::EQUAL_TYPES))
             .zip(alphas_and_betas.iter_mut())
             .zip(choices.chunks_exact_mut(T::LPN.log2m))
         {
@@ -259,7 +259,7 @@ impl<T: MacTypes> VoleSenderStep3<T> {
             .sps_base_voles()
             .iter()
             .copied()
-            .map(|mac| mac.prover_extract(IS_PROVER))
+            .map(|mac| mac.prover_extract(Witness::EQUAL_TYPES))
             .zip(alphas_and_betas.iter())
             .enumerate()
         {
@@ -299,7 +299,7 @@ impl<T: MacTypes> VoleSenderStep3<T> {
                     .sps_base_consistency()
                     .iter()
                     .copied()
-                    .map(|mac| mac.prover_extract(IS_PROVER)),
+                    .map(|mac| mac.prover_extract(Witness::EQUAL_TYPES)),
             ),
         ) {
             let fe: T::VF = *x_star - u;
@@ -437,7 +437,7 @@ impl<T: MacTypes> VoleReceiver<T> {
                 .wrap_err_with(ErrorKind::SerializationError, || {
                     "Failed to read field element.".to_string()
                 })?;
-            *gamma = v.tag(IS_VERIFIER) - a_prime * self.delta;
+            *gamma = v.tag(Witness::EQUAL_TYPES) - a_prime * self.delta;
         }
         assert_eq!(T::LPN.weight, lpn_params::LPN_EXTEND_PARAMS_WEIGHT);
         assert_eq!(T::LPN.log2m, lpn_params::LPN_EXTEND_PARAMS_LOG_M);
@@ -486,7 +486,11 @@ impl<T: MacTypes> VoleReceiver<T> {
         debug_assert_eq!(gammas.len() * m, result.len());
         debug_assert_eq!(result.len() % m, 0);
         for (gamma, results) in IntoIterator::into_iter(gammas).zip(result.chunks_exact(m)) {
-            let d = gamma - results.iter().map(|mac| mac.tag(IS_VERIFIER)).sum();
+            let d = gamma
+                - results
+                    .iter()
+                    .map(|mac| mac.tag(Witness::EQUAL_TYPES))
+                    .sum();
             outgoing_bytes[0..<T::TF as CanonicalSerialize>::ByteReprLen::USIZE]
                 .copy_from_slice(&d.to_bytes());
             outgoing_bytes =
@@ -556,7 +560,7 @@ impl<'a, T: MacTypes> VoleReceiverStep4<T> {
             .pows
             .iter()
             .zip(x_stars.iter().zip(base_voles.sps_base_consistency().iter()))
-            .map(|(pow, (x, y))| (y.tag(IS_VERIFIER) - *x * delta) * *pow)
+            .map(|(pow, (x, y))| (y.tag(Witness::EQUAL_TYPES) - *x * delta) * *pow)
             .sum();
         let vb: T::TF = T::S::spsvole_receiver_consistency_check_compute_vb(
             &mut rng_chi,

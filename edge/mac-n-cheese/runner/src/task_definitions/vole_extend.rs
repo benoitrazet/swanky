@@ -5,6 +5,7 @@ use keyed_arena::{KeyedArenaFromPool, KeyedArenaPool};
 use mac_n_cheese_ir::compilation_format::FieldMacType;
 use mac_n_cheese_vole::{
     mac::{Mac, MacTypes},
+    party::{Party, WhichParty},
     specialization::SmallBinaryFieldSpecialization,
     vole::{
         VoleReceiver, VoleReceiverStep4, VoleReceiverStep6, VoleSender, VoleSenderStep3,
@@ -12,7 +13,7 @@ use mac_n_cheese_vole::{
     },
 };
 use smallvec::SmallVec;
-use swanky_party::{Party, WhichParty, either::PartyEither};
+use swanky_party2::either::PartyEither;
 
 use crate::{
     alloc::TaskDataBuffer,
@@ -63,15 +64,12 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
         Ok(Self {
             initial: match P::WHICH {
                 WhichParty::Prover(e) => {
-                    PartyEither::prover_new(e, VoleSender::init(&mut ChannelAdapter(c), rng)?)
+                    PartyEither::new(e, VoleSender::init(&mut ChannelAdapter(c), rng)?)
                 }
                 WhichParty::Verifier(e) => {
-                    let alpha = vc.get::<T>().constant_context.verifier_into(e);
+                    let alpha = vc.get::<T>().constant_context.into_inner(e);
                     let delta = -alpha;
-                    PartyEither::verifier_new(
-                        e,
-                        VoleReceiver::init(&mut ChannelAdapter(c), rng, delta)?,
-                    )
+                    PartyEither::new(e, VoleReceiver::init(&mut ChannelAdapter(c), rng, delta)?)
                 }
             },
             // TODO: fill in these numbers.
@@ -122,7 +120,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                     .enumerate()
                 {
                     let selector = (u64::from(ctx.task_id) << 32) | (i as u64);
-                    states.push(self.initial.as_ref().prover_into(e).send(
+                    states.push(self.initial.as_ref().into_inner(e).send(
                         &keyed_arena,
                         selector,
                         ctx.rng,
@@ -131,7 +129,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                     )?);
                 }
                 debug_assert_eq!(states.len(), base_voles.len());
-                PartyEither::prover_new(e, ProverVoleStates::Stage1(states))
+                PartyEither::new(e, ProverVoleStates::Stage1(states))
             }
             WhichParty::Verifier(e) => {
                 let mut states = SmallVec::with_capacity(base_voles.len());
@@ -144,7 +142,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                     .enumerate()
                 {
                     let selector = (u64::from(ctx.task_id) << 32) | (i as u64);
-                    states.push(self.initial.as_ref().verifier_into(e).receive(
+                    states.push(self.initial.as_ref().into_inner(e).receive(
                         &keyed_arena,
                         selector,
                         ctx.rng,
@@ -155,7 +153,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                     )?);
                 }
                 debug_assert_eq!(states.len(), base_voles.len());
-                PartyEither::verifier_new(e, VerifierVoleStates::Stage1(states))
+                PartyEither::new(e, VerifierVoleStates::Stage1(states))
             }
         };
         Ok(TaskResult::NeedsCommunication(TaskContinuation {
@@ -180,7 +178,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
             states,
         } = *tc;
         Ok(match P::WHICH {
-            WhichParty::Prover(e) => match states.prover_into(e) {
+            WhichParty::Prover(e) => match states.into_inner(e) {
                 ProverVoleStates::Stage1(states) => {
                     let mut new_states = SmallVec::with_capacity(base_voles.len());
                     for ((((base_voles, incoming_data), outgoing_data), output_voles), state) in
@@ -193,7 +191,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                             .zip(states.into_iter())
                     {
                         new_states.push(state.stage2(
-                            self.initial.as_ref().prover_into(e),
+                            self.initial.as_ref().into_inner(e),
                             &keyed_arena,
                             Mac::cast_slice(e, TransparentWrapper::peel_slice(base_voles)),
                             Mac::cast_slice_mut(
@@ -208,7 +206,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                     TaskResult::NeedsCommunication(TaskContinuation {
                         keyed_arena,
                         output,
-                        states: PartyEither::prover_new(e, ProverVoleStates::Stage2(new_states)),
+                        states: PartyEither::new(e, ProverVoleStates::Stage2(new_states)),
                     })
                 }
                 ProverVoleStates::Stage2(states) => {
@@ -222,7 +220,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                             .zip(states.into_iter())
                     {
                         state.stage3(
-                            self.initial.as_ref().prover_into(e),
+                            self.initial.as_ref().into_inner(e),
                             &keyed_arena,
                             Mac::cast_slice(e, TransparentWrapper::peel_slice(base_voles)),
                             Mac::cast_slice_mut(
@@ -236,7 +234,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                     TaskResult::Finished(Arc::new(TaskOutput::new_with(output)))
                 }
             },
-            WhichParty::Verifier(e) => match states.verifier_into(e) {
+            WhichParty::Verifier(e) => match states.into_inner(e) {
                 VerifierVoleStates::Stage1(states) => {
                     let mut new_states = SmallVec::with_capacity(base_voles.len());
                     for ((((base_voles, incoming_data), outgoing_data), output_voles), state) in
@@ -249,7 +247,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                             .zip(states.into_iter())
                     {
                         new_states.push(state.stage2(
-                            self.initial.as_ref().verifier_into(e),
+                            self.initial.as_ref().into_inner(e),
                             &keyed_arena,
                             Mac::cast_slice(e, TransparentWrapper::peel_slice(base_voles)),
                             Mac::cast_slice_mut(
@@ -264,10 +262,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                     TaskResult::NeedsCommunication(TaskContinuation {
                         keyed_arena,
                         output,
-                        states: PartyEither::verifier_new(
-                            e,
-                            VerifierVoleStates::Stage2(new_states),
-                        ),
+                        states: PartyEither::new(e, VerifierVoleStates::Stage2(new_states)),
                     })
                 }
                 VerifierVoleStates::Stage2(states) => {
@@ -279,7 +274,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                         .zip(states.into_iter())
                     {
                         state.stage3(
-                            self.initial.as_ref().verifier_into(e),
+                            self.initial.as_ref().into_inner(e),
                             &keyed_arena,
                             Mac::cast_slice(e, TransparentWrapper::peel_slice(base_voles)),
                             Mac::cast_slice_mut(

@@ -12,14 +12,12 @@ use mac_n_cheese_ir::compilation_format::{
     AtomicGraphDegreeCount, Manifest, NumericalEnumType, PrivatesManifest, TaskId, TaskKind, Type,
     fb,
 };
+use mac_n_cheese_vole::party::{Party, Prover, WhichParty};
 use parking_lot::{Condvar, Mutex, RwLock};
 use rustc_hash::FxHashMap;
 use swanky_aes_rng::AesRng;
 use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
-use swanky_party::{
-    Party, WhichParty,
-    private::{PartyPrivate, ProverPrivate},
-};
+use swanky_party2::private::PartyPrivate;
 
 use crate::{
     alloc::OwnedAlignedBytes,
@@ -104,7 +102,7 @@ pub struct RunnerThread<P: Party> {
     manifest_owned: Arc<Manifest>,
     task_definitions: FxHashMap<NumericalEnumType, RwLock<ErasedTaskDefinition<P>>>,
     reactor: Arc<dyn Reactor<P>>,
-    privates_manifest: ProverPrivate<P, PrivatesManifest>,
+    privates_manifest: PartyPrivate<Prover, P, PrivatesManifest>,
     num_tasks_remaining: AtomicUsize,
     no_tasks_remain: Mutex<bool>,
     no_tasks_remain_waiter: Condvar,
@@ -205,7 +203,7 @@ impl<P: Party> RunnerThread<P> {
                 task_input: TaskInput {
                     challenge: None,
                     task_data: None,
-                    prover_private_data: ProverPrivate::new(None),
+                    prover_private_data: PartyPrivate::new(None),
                     task_dependencies,
                 },
                 step_number: 0,
@@ -398,7 +396,7 @@ pub fn run_proof_background<P: Party>(
     run_queue: RunQueue<P>,
     manifest_owned: Arc<Manifest>,
     reactor: Arc<dyn Reactor<P>>,
-    privates_manifest: ProverPrivate<P, PrivatesManifest>,
+    privates_manifest: PartyPrivate<Prover, P, PrivatesManifest>,
     dependent_counts: Vec<AtomicGraphDegreeCount>,
     dependency_counts: Vec<AtomicGraphDegreeCount>,
 ) -> swanky_error::Result<()> {

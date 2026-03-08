@@ -8,11 +8,11 @@ use std::{
 };
 
 use bufstream::BufStream;
-use party::{WhichParty, either::PartyEitherCopy};
+use mac_n_cheese_vole::party::{Party, WhichParty};
 use rand::RngCore;
 use rustls::{ClientConnection, ServerConnection, StreamOwned};
 use swanky_error::{ErrorKind, WrapErr};
-use swanky_party::{self as party, Party, either::PartyEither};
+use swanky_party2::either::{PartyEither, PartyEitherCopy};
 use vectoreyes::SimdBase;
 
 use crate::{MAC_N_CHEESE_RUNNER_VERSION, keys::Keys};
@@ -153,7 +153,7 @@ pub fn initiate_tls<P: Party>(
                 .wrap_err_with(ErrorKind::InitializationError, || {
                     "Failed to start new TLS connection.".to_string()
                 })?;
-            let mut root_conn = BufStream::new(PartyEither::prover_new(
+            let mut root_conn = BufStream::new(PartyEither::new(
                 e,
                 rustls::StreamOwned::new(tls_root_conn, root_conn),
             ));
@@ -287,14 +287,14 @@ pub fn initiate_tls<P: Party>(
             let mut root_conn = BufStream::with_capacities(
                 BUF_SIZE,
                 BUF_SIZE,
-                PartyEither::verifier_new(e, rustls::StreamOwned::new(tls_root_conn, root_conn)),
+                PartyEither::new(e, rustls::StreamOwned::new(tls_root_conn, root_conn)),
             );
             root_conn
                 .write_all(&MAC_N_CHEESE_RUNNER_VERSION.to_le_bytes())
                 .wrap_err_with(ErrorKind::NetworkError, || {
                     "Failed to write Mac'n'Cheese runner version bytes.".to_string()
                 })?;
-            let num_connections = num_connections.verifier_into(e);
+            let num_connections = num_connections.into_inner(e);
             root_conn
                 .write_all(&(num_connections as u64).to_le_bytes())
                 .wrap_err_with(ErrorKind::NetworkError, || {

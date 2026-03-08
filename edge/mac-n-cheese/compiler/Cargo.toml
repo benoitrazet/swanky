@@ -13,6 +13,7 @@ workspace = true
 [dependencies]
 mac-n-cheese-ir.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
+mac-n-cheese-vole.workspace = true
 vectoreyes.workspace = true
 rand.workspace = true
 rustc-hash.workspace = true
@@ -33,7 +34,7 @@ swanky-field.workspace = true
 swanky-field-binary.workspace = true
 swanky-field-f61p.workspace = true
 swanky-field-ff-primes.workspace = true
-swanky-party.workspace = true
+swanky-party2.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

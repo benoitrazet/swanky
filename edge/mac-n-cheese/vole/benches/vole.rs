@@ -10,7 +10,7 @@ use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, F56b, F63b};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::F128p;
-use swanky_party::{IS_PROVER, IS_VERIFIER};
+use swanky_party2::ty_eq::Witness;
 
 use mac_n_cheese_vole::{
     mac::Mac,
@@ -40,8 +40,8 @@ fn do_bench<
         let x = VF::random(&mut base_vole_rng);
         let beta = FE::random(&mut base_vole_rng);
         let tag = x * alpha + beta;
-        base_svoles_s.push(Mac::prover_new(IS_PROVER, x, beta));
-        base_svoles_r.push(Mac::verifier_new(IS_VERIFIER, tag));
+        base_svoles_s.push(Mac::prover_new(Witness::EQUAL_TYPES, x, beta));
+        base_svoles_r.push(Mac::verifier_new(Witness::EQUAL_TYPES, tag));
     }
     let sender = std::thread::spawn(move || {
         let mut rng = AesRng::from_seed(Block::from(456));
@@ -142,11 +142,11 @@ fn do_bench<
     assert_eq!(sender_voles.len(), receiver_voles.len());
     for (sv, tag) in sender_voles.iter().zip(receiver_voles.iter()) {
         let (x, beta) = (*sv).into();
-        assert_eq!(x * alpha + beta, tag.tag(IS_VERIFIER));
+        assert_eq!(x * alpha + beta, tag.tag(Witness::EQUAL_TYPES));
     }
     for (sv, tag) in sender_voles.iter().zip(receiver_voles.iter()) {
         let (x, beta) = (*sv).into();
-        assert_eq!(x * alpha + beta, tag.tag(IS_VERIFIER));
+        assert_eq!(x * alpha + beta, tag.tag(Witness::EQUAL_TYPES));
     }
     println!(
         "do_bench<{}, {}, {}> has sizes:\n{:#?}",

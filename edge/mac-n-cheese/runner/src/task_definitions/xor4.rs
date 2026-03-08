@@ -1,10 +1,9 @@
 use std::marker::PhantomData;
 
 use mac_n_cheese_ir::compilation_format::wire_format::Xor4PrototypeWireFormat;
-use mac_n_cheese_vole::specialization::SmallBinaryFieldSpecialization;
+use mac_n_cheese_vole::{party::Party, specialization::SmallBinaryFieldSpecialization};
 use swanky_field::IsSubFieldOf;
 use swanky_field_binary::{F2, SmallBinaryField};
-use swanky_party::Party;
 
 use crate::task_framework::{NoContinuation, TaskDefinition};
 

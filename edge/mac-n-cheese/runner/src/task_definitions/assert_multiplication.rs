@@ -7,17 +7,17 @@ use mac_n_cheese_ir::compilation_format::wire_format::{
     AssertMultiplyPrototypeNoSpecWireFormat, AssertMultiplyPrototypeSmallBinaryWireFormat,
 };
 use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
+use mac_n_cheese_vole::party::{Party, Prover, Verifier, WhichParty};
 use mac_n_cheese_vole::specialization::SmallBinaryFieldSpecialization;
 use parking_lot::Mutex;
-use party::either::PartyEitherCopy;
-use party::{IsParty, Party, WhichParty};
 use rand::SeedableRng;
 use swanky_aes_rng::AesRng;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
 use swanky_field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, SmallBinaryField};
-use swanky_party as party;
+use swanky_party2::either::PartyEitherCopy;
+use swanky_party2::ty_eq::{EqualityProposition, Witness};
 use swanky_serialization::CanonicalSerialize;
 
 use std::io::Read;
@@ -50,7 +50,7 @@ mod vope {
         a: T::TF,
         b: T::TF,
         voles: &[RandomMac<P, T>], // Size DegreeModulo<T::VF, T::TF>>
-        e: IsParty<P, party::Prover>,
+        e: Witness<impl EqualityProposition<P, Prover>>,
     ) -> VopeCommunication<T::TF> {
         assert_eq!(voles.len(), DegreeModulo::<T::VF, T::TF>::USIZE);
         let mut rnd0 = T::TF::ZERO;
@@ -66,7 +66,7 @@ mod vope {
         alpha: T::TF,
         t: T::TF,
         voles: &[RandomMac<P, T>], // Size DegreeModulo<T::VF, T::TF>>
-        e: IsParty<P, party::Verifier>,
+        e: Witness<impl EqualityProposition<P, Verifier>>,
         comms: VopeCommunication<T::TF>,
     ) -> swanky_error::Result<()> {
         assert_eq!(voles.len(), DegreeModulo::<T::VF, T::TF>::USIZE);
@@ -88,10 +88,14 @@ mod vope {
     #[cfg(test)]
     mod tests {
         use mac_n_cheese_ir::compilation_format::{FieldMacType, FieldTypeMacVisitor};
-        use mac_n_cheese_vole::{mac::Mac, specialization::FiniteFieldSpecialization};
-        use party::{IS_PROVER, IS_VERIFIER};
+        use mac_n_cheese_vole::{
+            mac::Mac,
+            party::{Prover, Verifier},
+            specialization::FiniteFieldSpecialization,
+        };
         use rand::SeedableRng;
         use swanky_aes_rng::AesRng;
+        use swanky_party2::ty_eq::Witness;
 
         use super::*;
 
@@ -104,19 +108,21 @@ mod vope {
                 let v = T::TF::random(&mut rng);
                 let t_right = u * alpha + v;
                 let t_wrong = T::TF::random(&mut rng);
-                let mut prover_voles: Vec<RandomMac<party::Prover, T>> = Vec::new();
-                let mut verifier_voles: Vec<RandomMac<party::Verifier, T>> = Vec::new();
+                let mut prover_voles: Vec<RandomMac<Prover, T>> = Vec::new();
+                let mut verifier_voles: Vec<RandomMac<Verifier, T>> = Vec::new();
                 for _ in 0..voles_needed::<T>() {
                     let x = T::VF::random(&mut rng);
                     let beta = T::TF::random(&mut rng);
                     let tag = x * alpha + beta;
-                    prover_voles.push(RandomMac(Mac::prover_new(IS_PROVER, x, beta)));
-                    verifier_voles.push(RandomMac(Mac::verifier_new(IS_VERIFIER, tag)));
+                    prover_voles.push(RandomMac(Mac::prover_new(Witness::EQUAL_TYPES, x, beta)));
+                    verifier_voles.push(RandomMac(Mac::verifier_new(Witness::EQUAL_TYPES, tag)));
                 }
-                let comms = vope_prover(u, v, &prover_voles, IS_PROVER);
-                vope_verifier(alpha, t_right, &verifier_voles, IS_VERIFIER, comms).unwrap();
+                let comms = vope_prover(u, v, &prover_voles, Witness::EQUAL_TYPES);
+                vope_verifier(alpha, t_right, &verifier_voles, Witness::EQUAL_TYPES, comms)
+                    .unwrap();
                 assert!(
-                    vope_verifier(alpha, t_wrong, &verifier_voles, IS_VERIFIER, comms).is_err()
+                    vope_verifier(alpha, t_wrong, &verifier_voles, Witness::EQUAL_TYPES, comms)
+                        .is_err()
                 );
             }
         }
@@ -155,7 +161,7 @@ impl<P: Party, FE: FiniteField> AssertMultiplyState<P, FE> {
                 let (a_x, a_beta) = a.prover_extract(e);
                 let (b_x, b_beta) = b.prover_extract(e);
                 let (_c_x, c_beta) = c.prover_extract(e);
-                Self(PartyEitherCopy::prover_new(
+                Self(PartyEitherCopy::new(
                     e,
                     (
                         a_beta * b_beta * challenge,
@@ -167,9 +173,9 @@ impl<P: Party, FE: FiniteField> AssertMultiplyState<P, FE> {
                 let a = a.tag(e);
                 let b = b.tag(e);
                 let c = c.tag(e);
-                Self(PartyEitherCopy::verifier_new(
+                Self(PartyEitherCopy::new(
                     e,
-                    (a * b - ctx.verifier_into(e) * c) * challenge,
+                    (a * b - ctx.into_inner(e) * c) * challenge,
                 ))
             }
         }
@@ -180,14 +186,14 @@ impl<P: Party, FE: FiniteField> AddAssign for AssertMultiplyState<P, FE> {
     fn add_assign(&mut self, rhs: Self) {
         match P::WHICH {
             WhichParty::Prover(e) => {
-                let (x, y) = self.0.as_mut().prover_into(e);
-                let (x2, y2) = rhs.0.prover_into(e);
+                let (x, y) = self.0.as_mut().into_inner(e);
+                let (x2, y2) = rhs.0.into_inner(e);
                 *x += x2;
                 *y += y2;
             }
             WhichParty::Verifier(e) => {
-                let dst = self.0.as_mut().verifier_into(e);
-                let new = rhs.0.verifier_into(e);
+                let dst = self.0.as_mut().into_inner(e);
+                let new = rhs.0.into_inner(e);
                 *dst += new;
             }
         }
@@ -197,59 +203,59 @@ impl<P: Party, FE: FiniteField> AddAssign for AssertMultiplyState<P, FE> {
 #[test]
 fn test_assert_multiply_state() {
     use mac_n_cheese_ir::compilation_format::FieldTypeMacVisitor;
+    use mac_n_cheese_vole::party::{Prover, Verifier};
     use mac_n_cheese_vole::specialization::FiniteFieldSpecialization;
-    use party::{IS_PROVER, IS_VERIFIER};
+    use swanky_party2::ty_eq::Witness;
     fn do_test<T: MacTypes>() {
         eprintln!("Testing {}", std::any::type_name::<T>());
         for i in 1_u128..=256 {
             let mut rng = AesRng::from_seed(swanky_block::Block::from(68569425 * i));
             let alpha = T::TF::random_nonzero(&mut rng);
             let challenge = T::TF::random_nonzero(&mut rng);
-            let mut prover_right_proof = AssertMultiplyState::<party::Prover, T::TF>::default();
-            let mut verifier_right_proof = AssertMultiplyState::<party::Verifier, T::TF>::default();
+            let mut prover_right_proof = AssertMultiplyState::<Prover, T::TF>::default();
+            let mut verifier_right_proof = AssertMultiplyState::<Verifier, T::TF>::default();
             for _ in 0..16 {
                 let x = T::VF::random(&mut rng);
                 let y = T::VF::random(&mut rng);
                 let z_right = x * y;
                 let x_prover =
-                    Mac::<party::Prover, T>::prover_new(IS_PROVER, x, T::TF::random(&mut rng));
+                    Mac::<Prover, T>::prover_new(Witness::EQUAL_TYPES, x, T::TF::random(&mut rng));
                 let y_prover =
-                    Mac::<party::Prover, T>::prover_new(IS_PROVER, y, T::TF::random(&mut rng));
-                let z_right_prover = Mac::<party::Prover, T>::prover_new(
-                    IS_PROVER,
+                    Mac::<Prover, T>::prover_new(Witness::EQUAL_TYPES, y, T::TF::random(&mut rng));
+                let z_right_prover = Mac::<Prover, T>::prover_new(
+                    Witness::EQUAL_TYPES,
                     z_right,
                     T::TF::random(&mut rng),
                 );
-                prover_right_proof +=
-                    AssertMultiplyState::<party::Prover, T::TF>::multiplication_proof::<T>(
-                        x_prover,
-                        y_prover,
-                        z_right_prover,
-                        &PartyEitherCopy::prover_new(IS_PROVER, ()),
-                        challenge,
-                    );
-                let x_verifier = Mac::<party::Verifier, T>::verifier_new(
-                    IS_VERIFIER,
-                    x * alpha + x_prover.beta().into_inner(IS_PROVER),
+                prover_right_proof += AssertMultiplyState::<Prover, T::TF>::multiplication_proof::<T>(
+                    x_prover,
+                    y_prover,
+                    z_right_prover,
+                    &PartyEitherCopy::new(Witness::EQUAL_TYPES, ()),
+                    challenge,
                 );
-                let y_verifier = Mac::<party::Verifier, T>::verifier_new(
-                    IS_VERIFIER,
-                    y * alpha + y_prover.beta().into_inner(IS_PROVER),
+                let x_verifier = Mac::<Verifier, T>::verifier_new(
+                    Witness::EQUAL_TYPES,
+                    x * alpha + x_prover.beta().into_inner(Witness::EQUAL_TYPES),
                 );
-                let z_right_verifier = Mac::<party::Verifier, T>::verifier_new(
-                    IS_VERIFIER,
-                    z_right * alpha + z_right_prover.beta().into_inner(IS_PROVER),
+                let y_verifier = Mac::<Verifier, T>::verifier_new(
+                    Witness::EQUAL_TYPES,
+                    y * alpha + y_prover.beta().into_inner(Witness::EQUAL_TYPES),
+                );
+                let z_right_verifier = Mac::<Verifier, T>::verifier_new(
+                    Witness::EQUAL_TYPES,
+                    z_right * alpha + z_right_prover.beta().into_inner(Witness::EQUAL_TYPES),
                 );
                 verifier_right_proof +=
-                    AssertMultiplyState::<party::Verifier, T::TF>::multiplication_proof::<T>(
+                    AssertMultiplyState::<Verifier, T::TF>::multiplication_proof::<T>(
                         x_verifier,
                         y_verifier,
                         z_right_verifier,
-                        &PartyEitherCopy::verifier_new(IS_VERIFIER, alpha),
+                        &PartyEitherCopy::new(Witness::EQUAL_TYPES, alpha),
                         challenge,
                     );
-                let prover_right_proof = prover_right_proof.0.prover_into(IS_PROVER);
-                let verifier_right_proof = verifier_right_proof.0.verifier_into(IS_VERIFIER);
+                let prover_right_proof = prover_right_proof.0.into_inner(Witness::EQUAL_TYPES);
+                let verifier_right_proof = verifier_right_proof.0.into_inner(Witness::EQUAL_TYPES);
                 assert_eq!(
                     prover_right_proof.0 + alpha * prover_right_proof.1,
                     verifier_right_proof
@@ -318,7 +324,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
         }
         match P::WHICH {
             WhichParty::Prover(e) => {
-                let (u, v) = acu.0.prover_into(e);
+                let (u, v) = acu.0.into_inner(e);
                 let [a, b] = vope::vope_prover(v, u, &self.voles, e);
                 conn.write_all(&a.to_bytes())
                     .wrap_err_with(ErrorKind::NetworkError, || {
@@ -330,7 +336,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
                     })?;
             }
             WhichParty::Verifier(e) => {
-                let alpha = self.ctx.verifier_into(e);
+                let alpha = self.ctx.into_inner(e);
                 let mut buf: GenericArray<u8, <T::TF as CanonicalSerialize>::ByteReprLen> =
                     Default::default();
                 conn.read_exact(&mut buf)
@@ -349,7 +355,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
                     .wrap_err_with(ErrorKind::SerializationError, || {
                         "Failed to deserialize field element.".to_string()
                     })?;
-                let t = acu.0.verifier_into(e);
+                let t = acu.0.into_inner(e);
                 vope::vope_verifier(alpha, t, &self.voles, e, [u, v])?;
             }
         }
@@ -443,10 +449,10 @@ where
         let mut rng = AesRng::from_seed(seed.into());
         let mut acu: PartyEitherCopy<P, (U64x2, U64x2), U64x2> = PartyEitherCopy::default();
         let alpha = match P::WHICH {
-            WhichParty::Prover(e) => PartyEitherCopy::prover_new(e, ()),
-            WhichParty::Verifier(e) => PartyEitherCopy::verifier_new(
+            WhichParty::Prover(e) => PartyEitherCopy::new::<Prover>(e, ()),
+            WhichParty::Verifier(e) => PartyEitherCopy::new(
                 e,
-                U64x2::from([TF::peel(self.unspecialized.ctx.verifier_into(e)), 0]),
+                U64x2::from([TF::peel(self.unspecialized.ctx.into_inner(e)), 0]),
             ),
         };
         let out = input.small_binary_mac_task::<3, 0, (F2, TF, SmallBinaryFieldSpecialization)>(
@@ -478,7 +484,7 @@ where
                                 let c_beta = c.shift_left::<1>().shift_right::<1>();
                                 let sum =
                                     a_beta.and_not(b_x_mask) ^ b_beta.and_not(a_x_mask) ^ c_beta;
-                                acu.as_mut().prover_into(e).1 ^= sum
+                                acu.as_mut().into_inner(e).1 ^= sum
                                     .carryless_mul::<false, false>(challenge)
                                     ^ sum.carryless_mul::<true, true>(challenge);
                                 let betas_product_0 = a_beta.carryless_mul::<false, false>(b_beta);
@@ -491,10 +497,10 @@ where
                                     betas_product.carryless_mul::<false, false>(challenge);
                                 let product_1 =
                                     betas_product.carryless_mul::<true, true>(challenge);
-                                acu.as_mut().prover_into(e).0 ^= product_0 ^ product_1;
+                                acu.as_mut().into_inner(e).0 ^= product_0 ^ product_1;
                             }
                             WhichParty::Verifier(e) => {
-                                let alpha = alpha.verifier_into(e);
+                                let alpha = alpha.into_inner(e);
                                 // a*b
                                 let ab0 = a.carryless_mul::<false, false>(b);
                                 let ab1 = a.carryless_mul::<true, true>(b);
@@ -507,9 +513,9 @@ where
                                     [sum0.unpack_hi(sum1)],
                                     [sum0.unpack_lo(sum1)],
                                 );
-                                *acu.as_mut().verifier_into(e) ^=
+                                *acu.as_mut().into_inner(e) ^=
                                     challenge.carryless_mul::<false, false>(reduced);
-                                *acu.as_mut().verifier_into(e) ^=
+                                *acu.as_mut().into_inner(e) ^=
                                     challenge.carryless_mul::<true, true>(reduced);
                             }
                         },
@@ -519,12 +525,10 @@ where
         )?;
         *self.unspecialized.state[ctx.thread_id].lock() += AssertMultiplyState(match P::WHICH {
             WhichParty::Prover(e) => {
-                let (a, b) = acu.prover_into(e);
-                PartyEitherCopy::prover_new(e, (TF::reduce(a), TF::reduce(b)))
+                let (a, b) = acu.into_inner(e);
+                PartyEitherCopy::new(e, (TF::reduce(a), TF::reduce(b)))
             }
-            WhichParty::Verifier(e) => {
-                PartyEitherCopy::verifier_new(e, TF::reduce(acu.verifier_into(e)))
-            }
+            WhichParty::Verifier(e) => PartyEitherCopy::new(e, TF::reduce(acu.into_inner(e))),
         });
         Ok(out)
     }
