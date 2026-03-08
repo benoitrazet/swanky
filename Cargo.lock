@@ -2497,7 +2497,7 @@ dependencies = [
  "swanky-f-rand",
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",
- "swanky-party",
+ "swanky-party2",
  "vectoreyes",
 ]
 
