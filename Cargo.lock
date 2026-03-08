@@ -2585,7 +2585,7 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-channel",
  "swanky-error",
- "swanky-party",
+ "swanky-party2",
 ]
 
 [[package]]
