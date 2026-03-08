@@ -30,7 +30,7 @@ use swanky_channel::Channel;
 use swanky_error::ErrorKind;
 #[cfg(test)]
 use swanky_malicious_hooks::{run_with_entry_point, test_entry_point};
-use swanky_party::Party;
+use swanky_party2::{GenericParty, GenericWhichParty};
 use swanky_serialization::CanonicalSerialize;
 use vectoreyes::U8x16;
 
@@ -45,7 +45,7 @@ mod entry_points {
 }
 
 /// Generate a random value of type `T`.
-pub fn random<P: Party, T, RNG: CryptoRng + Rng>(
+pub fn random<P: GenericParty, T, RNG: CryptoRng + Rng>(
     channel: &mut Channel,
     rng: &mut RNG,
 ) -> swanky_error::Result<T>
@@ -62,7 +62,7 @@ where
 }
 
 /// Generate a random seed (that is, a 128-bit value).
-pub fn random_seed<P: Party, RNG: CryptoRng + Rng>(
+pub fn random_seed<P: GenericParty, RNG: CryptoRng + Rng>(
     channel: &mut Channel,
     rng: &mut RNG,
 ) -> swanky_error::Result<U8x16> {
@@ -76,8 +76,8 @@ pub fn random_seed<P: Party, RNG: CryptoRng + Rng>(
     //    aborting if not.
     // 4. Both parties output `s₀ ⊕ s₁`.
     let seed_mine = rng.r#gen::<U8x16>();
-    let seed = match P::WHICH {
-        swanky_party::WhichParty::Prover(_) => {
+    let seed = match P::GENERIC_WHICH {
+        GenericWhichParty::Party0(_) => {
             let com = *blake3::hash(&seed_mine.to_bytes()).as_bytes();
             #[cfg(test)]
             let com = test_entry_point(com, &entry_points::PROVER_WRITE_COMMITMENT);
@@ -88,7 +88,7 @@ pub fn random_seed<P: Party, RNG: CryptoRng + Rng>(
             channel.write(&seed_mine)?;
             seed_mine ^ seed_theirs
         }
-        swanky_party::WhichParty::Verifier(_) => {
+        GenericWhichParty::Party1(_) => {
             let com = channel.read::<[u8; 32]>()?;
             channel.write(&seed_mine)?;
             let seed_theirs = channel.read::<U8x16>()?;
@@ -109,8 +109,16 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
     use swanky_aes_rng::AesRng;
-    use swanky_party::{Prover, Verifier};
+    use swanky_party2::party_system;
     use vectoreyes::{SimdBase, array_utils::ArrayUnrolledExt};
+
+    party_system! {
+        mod ps {
+            PartyA,
+            PartyB,
+        }
+    }
+    use ps::{PartyA, PartyB};
 
     proptest! {
         #[test]
@@ -119,8 +127,8 @@ mod tests {
             let mut rng_a = AesRng::from_seed(seed_a.into());
             let mut rng_b = AesRng::from_seed(seed_b.into());
             let (result_a, result_b) = swanky_channel::local::local_channel_pair(
-                |c| random_seed::<Prover, _>(c, &mut rng_a),
-                |c| random_seed::<Verifier, _>(c, &mut rng_b),
+                |c| random_seed::<PartyA, _>(c, &mut rng_a),
+                |c| random_seed::<PartyB, _>(c, &mut rng_b),
             )
             .unwrap();
             assert_eq!(result_a, result_b);
@@ -136,12 +144,12 @@ mod tests {
             let result = swanky_channel::local::local_channel_pair(
                 |c| {
                     run_with_entry_point(
-                        || random_seed::<Prover, _>(c, &mut rng_a),
+                        || random_seed::<PartyA, _>(c, &mut rng_a),
                         |old| old.array_map(|byte| !byte),
                         &entry_points::PROVER_WRITE_COMMITMENT
                     )
                 },
-                |c| random_seed::<Verifier, _>(c, &mut rng_b),
+                |c| random_seed::<PartyB, _>(c, &mut rng_b),
             );
             assert!(result.is_err());
         }
@@ -156,12 +164,12 @@ mod tests {
             let result = swanky_channel::local::local_channel_pair(
                 |c| {
                     run_with_entry_point(
-                        || random_seed::<Prover, _>(c, &mut rng_a),
+                        || random_seed::<PartyA, _>(c, &mut rng_a),
                         |old: U8x16| old.as_array().array_map(|byte| !byte).into(),
                         &entry_points::PROVER_WRITE_SEED,
                     )
                 },
-                |c| random_seed::<Verifier, _>(c, &mut rng_b),
+                |c| random_seed::<PartyB, _>(c, &mut rng_b),
             );
             assert!(result.is_err());
         }
@@ -174,8 +182,8 @@ mod tests {
             let mut rng_a = AesRng::from_seed(seed_a.into());
             let mut rng_b = AesRng::from_seed(seed_b.into());
             let (result_a, result_b) = swanky_channel::local::local_channel_pair(
-                |c| random::<Prover, i32, _>(c, &mut rng_a),
-                |c| random::<Verifier, i32, _>(c, &mut rng_b),
+                |c| random::<PartyA, i32, _>(c, &mut rng_a),
+                |c| random::<PartyB, i32, _>(c, &mut rng_b),
             )
             .unwrap();
             assert_eq!(result_a, result_b);
