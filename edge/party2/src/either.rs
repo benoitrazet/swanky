@@ -22,7 +22,10 @@ use crate::ty_eq::{EqualityProposition as EqProp, Witness, generics};
 use crate::{GenericParty, GenericWhichParty};
 use bytemuck::TransparentWrapper;
 use raw::{RawEither, bounds, either_type_substitution};
-use std::fmt::Debug;
+use std::{
+    fmt::Debug,
+    io::{Read, Write},
+};
 
 pub mod raw;
 
@@ -530,6 +533,31 @@ either! {
     /// }
     /// ```
     type PartyEitherCopy: Copy => bounds::Copy;
+}
+
+impl<P: GenericParty, W0: Write, W1: Write> Write for PartyEither<P, W0, W1> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(e) => self.as_mut().into_inner(e).write(buf),
+            GenericWhichParty::Party1(e) => self.as_mut().into_inner(e).write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(e) => self.as_mut().into_inner(e).flush(),
+            GenericWhichParty::Party1(e) => self.as_mut().into_inner(e).flush(),
+        }
+    }
+}
+
+impl<P: GenericParty, R0: Read, R1: Read> Read for PartyEither<P, R0, R1> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(e) => self.as_mut().into_inner(e).read(buf),
+            GenericWhichParty::Party1(e) => self.as_mut().into_inner(e).read(buf),
+        }
+    }
 }
 
 mod copy_conversions;
