@@ -391,6 +391,21 @@ macro_rules! private {
                     PrivateWhich::Empty(ev) => $PartyPrivate::empty(ev),
                 }
             }
+
+            /// Return the private value (if `self` is private to
+            /// `P`), or else run the given closure.
+            pub fn unwrap_or_else<F: FnOnce() -> T>(self, f: F) -> T {
+                match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(ev) => self.into_inner(ev),
+                    PrivateWhich::Empty(_) => f(),
+                }
+            }
+
+            /// Return the private value (if `self` is private to
+            /// `P`), or else return `None`.
+            pub fn into_option(self) -> Option<T> {
+                self.map(Some).unwrap_or_else(|| None)
+            }
         }
         impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T: Default $(+ $Copy)?>
             Default for $PartyPrivate<PrivateTo, P, T>
@@ -412,6 +427,17 @@ macro_rules! private {
                     PrivateWhich::Full(e) => writeln!(f, "{:?}", self.as_ref().into_inner(e)),
                     PrivateWhich::Empty(_) => writeln!(f, "{:?}", PrivateToOtherParty),
                 }
+            }
+        }
+        impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T $(: $Copy)?, E $(: $Copy)?> $PartyPrivate<PrivateTo, P, Result<T, E>> {
+            /// Convert a `PartyPrivate<PrivateTo, P, Result<T, E>>`
+            /// to a `Result<PartyPrivate<PrivateTo, P, T>, E>` in the
+            /// natural way.
+            pub fn lift_result(self) -> Result<$PartyPrivate<PrivateTo, P, T>, E> {
+                Ok(match const { private_which::<PrivateTo, P>() } {
+                    PrivateWhich::Full(e) => $PartyPrivate::new(self.into_inner(e)?),
+                    PrivateWhich::Empty(e) => $PartyPrivate::empty(e),
+                })
             }
         }
         unsafe impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T: Send $(+ $Copy)?>
