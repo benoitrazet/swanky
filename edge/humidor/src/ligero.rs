@@ -80,9 +80,9 @@ type HashOutput<T> = digest::Output<T>;
 #[cfg(test)]
 use proptest::{collection::vec as pvec, prelude::*, *};
 
-use crate::merkle;
 use crate::params::Params;
 use crate::util::*;
+use crate::{merkle, security_warning::warn_vulnerabilities};
 use simple_arith_circuit::{Circuit, Op};
 
 /// This is a marker trait consolidating the traits needed for a Ligero field.
@@ -587,6 +587,7 @@ impl<Field: FieldForLigero> Round1<Field> {
         num_shared_checks: usize,
         rng: &mut impl rand::Rng,
     ) -> Self {
+        warn_vulnerabilities();
         Round1 {
             r: Array1::from_shape_fn(4 * params.m, |_| Field::random(rng)),
             radd: Array1::from_shape_fn(params.m * params.l, |_| Field::random(rng)),
@@ -714,6 +715,8 @@ fn verify<Field: FieldForLigero, H: CryptoDigest>(
     r4: Round4<Field, H>,
 ) -> bool {
     use ndarray::s;
+
+    warn_vulnerabilities();
 
     let params = public.params;
 
@@ -972,6 +975,7 @@ pub mod interactive {
             w: &Vec<Field>,
             shared: Option<Range<usize>>,
         ) -> Self {
+            warn_vulnerabilities();
             Self {
                 secret: Secret::new(rng, c, w, shared),
             }
@@ -1155,6 +1159,7 @@ pub mod interactive {
     impl<Field: FieldForLigero, H: CryptoDigest> Verifier<Field, H> {
         /// Create a new verifier from a circuit.
         pub fn new(c: &Circuit<Field>, shared: Option<Range<usize>>) -> Self {
+            warn_vulnerabilities();
             Self {
                 phantom: std::marker::PhantomData,
 
@@ -1458,6 +1463,7 @@ pub mod noninteractive {
             witness: &Vec<Field>,
             shared: Option<Range<usize>>,
         ) -> Self {
+            warn_vulnerabilities();
             let mut hash = H::new();
             let bytes = bincode::serialize(&circuit).unwrap(); // XXX: unwrap
             hash.update(&bytes);
@@ -1545,6 +1551,7 @@ pub mod noninteractive {
     impl<Field: FieldForLigero, H: CryptoDigest> Verifier<Field, H> {
         /// Create a verifier out of a circuit.
         pub fn new(circuit: &Circuit<Field>, shared: Option<Range<usize>>) -> Self {
+            warn_vulnerabilities();
             let mut hash = H::new();
             let bytes = bincode::serialize(circuit).unwrap(); // XXX: unwrap
             hash.update(&bytes);
