@@ -9,8 +9,9 @@ use crate::{
     thread_spawner::ThreadSpawner,
 };
 use mac_n_cheese_ir::compilation_format::{Manifest, PrivateDataAddress, fb::DataChunkAddress};
+use mac_n_cheese_vole::party::{Party, Prover};
 use std::fs::File;
-use swanky_party::{Party, private::ProverPrivate};
+use swanky_party::private::PartyPrivate;
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct ReactorRequest {
@@ -57,7 +58,7 @@ pub trait Reactor<P: Party>: 'static + Send + Sync {
 pub fn new_reactor<P: Party>(
     ts: &mut ThreadSpawner,
     circuit_manifest: Arc<Manifest>,
-    private_data: ProverPrivate<P, File>,
+    private_data: PartyPrivate<Prover, P, File>,
     extra_connections: Vec<TcpStream>,
     run_queue: RunQueue<P>,
     keys: Keys<P>,

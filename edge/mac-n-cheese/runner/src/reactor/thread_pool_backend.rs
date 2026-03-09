@@ -13,12 +13,13 @@ use bytemuck::Zeroable;
 use mac_n_cheese_ir::compilation_format::{
     Manifest, PrivateDataAddress, TaskId, TaskPriority, fb::DataChunkAddress,
 };
+use mac_n_cheese_vole::party::{Party, Prover, WhichParty};
 use moka::sync::SegmentedCache;
 use parking_lot::Mutex;
 use rand::RngCore;
 use rustc_hash::FxHashMap;
 use swanky_error::{ErrorKind, WrapErr};
-use swanky_party::{Party, WhichParty, either::PartyEither, private::ProverPrivate};
+use swanky_party::{either::PartyEither, private::PartyPrivate};
 
 use crate::{
     alloc::{BytesFromDisk, OwnedAlignedBytes},
@@ -95,7 +96,7 @@ struct ThreadPoolReactor<P: Party> {
     // in topological order.
     outgoing_data: Queue<OutgoingData>,
     manifest: Arc<Manifest>,
-    privates_file: ProverPrivate<P, File>,
+    privates_file: PartyPrivate<Prover, P, File>,
     keys: Keys<P>,
     incoming_slots: Mutex<FxHashMap<TaskId, Arc<IncomingSlot<P>>>>,
     // This should be in topological order for the same reason that outgoing data should be.
@@ -268,7 +269,7 @@ impl<P: Party> ThreadPoolReactor<P> {
             WhichParty::Verifier(e) => {
                 let mut ctr = 0_u64;
                 while let Some((id, challenge)) =
-                    self.outgoing_challenges.as_ref().verifier_into(e).dequeue()
+                    self.outgoing_challenges.as_ref().into_inner(e).dequeue()
                 {
                     let span = event_log::SendingChallenge { task_id: id }.start();
                     let cd = ChallengeData {
@@ -465,7 +466,7 @@ impl<P: Party> Reactor<P> for ThreadPoolReactor<P> {
                     rand::thread_rng().fill_bytes(&mut challenge);
                     self.outgoing_challenges
                         .as_ref()
-                        .verifier_into(e)
+                        .into_inner(e)
                         .enqueue((task_id.task_id, challenge));
                     Some(challenge)
                 }
@@ -501,7 +502,7 @@ impl<P: Party> Reactor<P> for ThreadPoolReactor<P> {
         self.file_read_requests.close();
         self.outgoing_data.close();
         if let WhichParty::Verifier(e) = P::WHICH {
-            self.outgoing_challenges.as_ref().verifier_into(e).close();
+            self.outgoing_challenges.as_ref().into_inner(e).close();
         }
     }
 }
@@ -509,7 +510,7 @@ impl<P: Party> Reactor<P> for ThreadPoolReactor<P> {
 pub fn new_reactor<P: Party>(
     ts: &mut ThreadSpawner,
     circuit_manifest: Arc<Manifest>,
-    private_data: ProverPrivate<P, File>,
+    private_data: PartyPrivate<Prover, P, File>,
     mut extra_connections: Vec<TcpStream>,
     run_queue: RunQueue<P>,
     keys: Keys<P>,
@@ -526,8 +527,8 @@ pub fn new_reactor<P: Party>(
             Default::default(),
         )),
         outgoing_challenges: match P::WHICH {
-            WhichParty::Prover(e) => PartyEither::prover_new(e, ()),
-            WhichParty::Verifier(e) => PartyEither::verifier_new(e, Queue::unbounded(8192)),
+            WhichParty::Prover(e) => PartyEither::new(e, ()),
+            WhichParty::Verifier(e) => PartyEither::new(e, Queue::unbounded(8192)),
         },
         disk_cache: moka::sync::SegmentedCache::builder(4)
             .time_to_idle(TIME_TO_IDLE_DISK_CACHE)

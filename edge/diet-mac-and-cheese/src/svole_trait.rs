@@ -1,5 +1,7 @@
 //! Svole trait and common implementations.
 
+use crate::party::{Party, Verifier, WhichParty};
+
 use log::{debug, info};
 use std::any::type_name;
 use std::marker::PhantomData;
@@ -12,8 +14,10 @@ use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field::{FiniteField, IsSubFieldOf};
-use swanky_party::either::PartyEither;
-use swanky_party::{IsParty, Party, Verifier, WhichParty};
+use swanky_party::{
+    either::PartyEither,
+    ty_eq::{EqualityProposition, Witness},
+};
 use swanky_svole_wykw::{LpnParams, Receiver, Sender};
 
 /// Svole trait.
@@ -46,7 +50,7 @@ pub trait SvoleT<P: Party, V, T>: SvoleStopSignal {
     fn duplicate(&self) -> Self;
 
     /// Return the delta as a receiver.
-    fn delta(&self, ev: IsParty<P, Verifier>) -> T;
+    fn delta(&self, ev: Witness<impl EqualityProposition<P, Verifier>>) -> T;
 }
 
 /// This trait provides an interface function for sending stop signals.
@@ -98,7 +102,7 @@ where
     ) -> Result<Self> {
         Ok(match P::WHICH {
             WhichParty::Prover(ev) => Self(
-                PartyEither::prover_new(
+                PartyEither::new(
                     ev,
                     RcRefCell::new(
                         Sender::init(channel, rng, lpn_setup, lpn_extend)
@@ -110,7 +114,7 @@ where
                 PhantomData,
             ),
             WhichParty::Verifier(ev) => Self(
-                PartyEither::verifier_new(
+                PartyEither::new(
                     ev,
                     RcRefCell::new(
                         Receiver::init(channel, rng, lpn_setup, lpn_extend, delta)
@@ -135,9 +139,9 @@ where
             WhichParty::Prover(ev) => {
                 self.0
                     .as_mut()
-                    .prover_into(ev)
+                    .into_inner(ev)
                     .get_refmut()
-                    .send(channel, rng, out.as_mut().prover_into(ev))
+                    .send(channel, rng, out.as_mut().into_inner(ev))
                     .wrap_err_with(ErrorKind::OtherError, || {
                         "Failed to send VOLE extensions.".to_string()
                     })?;
@@ -146,9 +150,9 @@ where
                 let start = Instant::now();
                 self.0
                     .as_mut()
-                    .verifier_into(ev)
+                    .into_inner(ev)
                     .get_refmut()
-                    .receive(channel, rng, out.as_mut().verifier_into(ev))
+                    .receive(channel, rng, out.as_mut().into_inner(ev))
                     .wrap_err_with(ErrorKind::OtherError, || {
                         "Failed to receive VOLE extensions.".to_string()
                     })?;
@@ -167,8 +171,8 @@ where
         Svole(self.0.clone(), PhantomData)
     }
 
-    fn delta(&self, ev: IsParty<P, Verifier>) -> T {
-        self.0.as_ref().verifier_into(ev).get_refmut().delta()
+    fn delta(&self, ev: Witness<impl EqualityProposition<P, Verifier>>) -> T {
+        self.0.as_ref().into_inner(ev).get_refmut().delta()
     }
 }
 

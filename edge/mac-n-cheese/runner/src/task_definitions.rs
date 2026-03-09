@@ -1,10 +1,11 @@
 use std::marker::PhantomData;
 
 use mac_n_cheese_ir::compilation_format::{FieldMacType, FieldTypeMacVisitor, TaskKind};
-use mac_n_cheese_vole::{mac::MacTypes, specialization::SmallBinaryFieldSpecialization};
+use mac_n_cheese_vole::{
+    mac::MacTypes, party::Party, specialization::SmallBinaryFieldSpecialization,
+};
 use swanky_field::IsSubFieldOf;
 use swanky_field_binary::{F2, SmallBinaryField};
-use swanky_party::Party;
 
 use crate::{
     task_framework::TaskDefinition,

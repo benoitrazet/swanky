@@ -35,7 +35,7 @@ use swanky_authenticated_bits::{
     authshares::AuthShare,
 };
 use swanky_channel::Channel;
-use swanky_party::Party;
+use swanky_party::GenericParty;
 use vectoreyes::U8x16;
 
 /// Pre-process a circuit for authenticated garbling.
@@ -51,7 +51,7 @@ use vectoreyes::U8x16;
 /// Note that the fancy circuit passed to this function is generic in the size of the input,
 /// this is why we need to pass the input size separately. This fancy circuit is the same one that will
 /// be later used for garbling.
-pub fn f_preprocessing<P: Party, RNG: CryptoRng + Rng>(
+pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
     circuit: impl Fn(
         &mut CircuitAnalyzer,
         BinaryBundle<AnalyzerItem>,
@@ -91,7 +91,15 @@ mod tests {
     use super::*;
     use fancy_garbling::{BinaryGadgets, Fancy, FancyBinary, FancyReveal};
     use swanky_aes_rng::AesRng;
-    use swanky_authenticated_bits::authshares::{PartyA, PartyB};
+    use swanky_party::party_system;
+
+    party_system! {
+        mod ps {
+            PartyA,
+            PartyB,
+        }
+    }
+    use ps::{PartyA, PartyB};
 
     /// Garbler
     ///

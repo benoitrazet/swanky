@@ -5,7 +5,7 @@
 //! subroutine.
 //!
 //! ```
-//! # use swanky_party2::{*, private::*, either::*, party_map::*};
+//! # use swanky_party::{*, private::*, either::*, party_map::*};
 //! // We define parties for oblivious transfer.
 //! party_system! {
 //!     mod ot {
@@ -47,7 +47,7 @@
 //!
 //! `PartyMap<P, P0, P1> == P0` if `P` is `Party0`, and `P1`, otherwise.
 //! ```
-//! # use swanky_party2::{*, private::*, either::*, party_map::*};
+//! # use swanky_party::{*, private::*, either::*, party_map::*};
 //! # party_system! {
 //! #     mod ot {
 //! #         Sender,
@@ -75,7 +75,7 @@
 //!
 //!
 //! ```
-//! # use swanky_party2::{*, private::*, either::*, party_map::*};
+//! # use swanky_party::{*, private::*, either::*, party_map::*};
 //! # // We define parties for oblivious transfer.
 //! # party_system! {
 //! #     mod ot {
@@ -116,7 +116,7 @@
 //! For this, we have `map_evidence_party0` and `map_evidence_party1`:
 //!
 //! ```
-//! # use swanky_party2::{*, private::*, either::*, party_map::*};
+//! # use swanky_party::{*, private::*, either::*, party_map::*};
 //! # // We define parties for oblivious transfer.
 //! # party_system! {
 //! #     mod ot {
@@ -179,7 +179,7 @@ use crate::{
 /// doesn't need to match `P0` or `P1`'s.
 ///
 /// ```
-/// # use swanky_party2::{*, private::*, either::*, party_map::*};
+/// # use swanky_party::{*, private::*, either::*, party_map::*};
 /// // We define parties for oblivious transfer.
 /// party_system! {
 ///     mod ot {

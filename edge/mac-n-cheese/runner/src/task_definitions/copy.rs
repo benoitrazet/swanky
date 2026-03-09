@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use mac_n_cheese_ir::compilation_format::wire_format::CopyPrototypeWireFormat;
-use swanky_party::Party;
+use mac_n_cheese_vole::party::Party;
 
 use crate::task_framework::{NoContinuation, TaskDefinition};
 

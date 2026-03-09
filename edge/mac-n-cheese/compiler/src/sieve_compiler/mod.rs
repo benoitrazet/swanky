@@ -3,9 +3,10 @@ use std::{fs::File, path::PathBuf, time::Instant};
 use clap::{Args, Subcommand};
 use mac_n_cheese_ir::circuit_builder::build_privates;
 use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamKind, ValueStreamReader};
+use mac_n_cheese_vole::party::{Party, Prover, Verifier, WhichParty};
 use mac_n_cheese_wire_map::WireMap;
 use swanky_error::{ErrorKind, OptionExt, ResultExt};
-use swanky_party::{IS_VERIFIER, Party, WhichParty, private::ProverPrivate};
+use swanky_party::{private::PartyPrivate, ty_eq::Witness};
 
 use self::{
     circuit_ir::CircuitChunk,
@@ -174,7 +175,7 @@ fn sieve_compiler_main_party<
     VSR: ValueStreamReader + Send + 'static,
 >(
     args: &SieveArgs,
-    witness_path: ProverPrivate<P, &[PathBuf]>,
+    witness_path: PartyPrivate<Prover, P, &[PathBuf]>,
 ) -> swanky_error::Result<()> {
     let start = Instant::now();
     let witnesses = witness_path
@@ -183,13 +184,13 @@ fn sieve_compiler_main_party<
     let chunks = CircuitChunk::stream::<RR, VSR>(&args.relation, &args.public_inputs);
     match P::WHICH {
         WhichParty::Prover(_) => build_privates(args.out.with_extension("priv"), |pb| {
-            simple_writer::write_circuit(&args.out, chunks, witnesses, ProverPrivate::new(pb))
+            simple_writer::write_circuit(&args.out, chunks, witnesses, PartyPrivate::new(pb))
         }),
         WhichParty::Verifier(e) => simple_writer::write_circuit::<P, VSR>(
             &args.out,
             chunks,
-            ProverPrivate::empty(e),
-            ProverPrivate::empty(e),
+            PartyPrivate::empty(e),
+            PartyPrivate::empty(e),
         ),
     }
     .with_context(|| "circuit writing failed".to_string())?;
@@ -203,16 +204,17 @@ pub fn sieve_compiler_main(args: SieveArgs) -> swanky_error::Result<()> {
         .spawn::<_, swanky_error::Result<()>>(move || {
             match &args.command {
                 Command::CompileProver { witness } => {
-                    let witness_path: ProverPrivate<_, &[PathBuf]> = ProverPrivate::new(witness);
+                    let witness_path: PartyPrivate<Prover, _, &[PathBuf]> =
+                        PartyPrivate::new(witness);
                     if args.text {
                         sieve_compiler_main_party::<
-                            swanky_party::Prover,
+                            Prover,
                             mac_n_cheese_sieve_parser::text_parser::RelationReader<File>,
                             mac_n_cheese_sieve_parser::text_parser::ValueStreamReader<File>,
                         >(&args, witness_path)?;
                     } else {
                         sieve_compiler_main_party::<
-                            swanky_party::Prover,
+                            Prover,
                             mac_n_cheese_sieve_parser::fb_reader::RelationReader,
                             mac_n_cheese_sieve_parser::fb_reader::ValueStreamReader,
                         >(&args, witness_path)?;
@@ -221,16 +223,16 @@ pub fn sieve_compiler_main(args: SieveArgs) -> swanky_error::Result<()> {
                 Command::CompileVerifier => {
                     if args.text {
                         sieve_compiler_main_party::<
-                            swanky_party::Verifier,
+                            Verifier,
                             mac_n_cheese_sieve_parser::text_parser::RelationReader<File>,
                             mac_n_cheese_sieve_parser::text_parser::ValueStreamReader<File>,
-                        >(&args, ProverPrivate::empty(IS_VERIFIER))?
+                        >(&args, PartyPrivate::empty(Witness::EQUAL_TYPES))?
                     } else {
                         sieve_compiler_main_party::<
-                            swanky_party::Verifier,
+                            Verifier,
                             mac_n_cheese_sieve_parser::fb_reader::RelationReader,
                             mac_n_cheese_sieve_parser::fb_reader::ValueStreamReader,
-                        >(&args, ProverPrivate::empty(IS_VERIFIER))?
+                        >(&args, PartyPrivate::empty(Witness::EQUAL_TYPES))?
                     }
                 }
                 Command::PlaintextEvaluate { witness } => {

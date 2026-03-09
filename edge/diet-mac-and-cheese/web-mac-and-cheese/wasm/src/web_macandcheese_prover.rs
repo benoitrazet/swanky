@@ -2,6 +2,7 @@ use crate::js_channel::ShimChannel;
 use diet_mac_and_cheese::EvaluatorCirc;
 use diet_mac_and_cheese::LpnSize;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
+use diet_mac_and_cheese::party::Prover;
 use diet_mac_and_cheese::svole_trait::Svole;
 use log::Level;
 use log::info;
@@ -13,7 +14,6 @@ use std::panic;
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::TrackChannel;
 use swanky_field_binary::{F2, F40b};
-use swanky_party::Prover;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]

@@ -15,14 +15,14 @@ use mac_n_cheese_ir::compilation_format::fb::{self, DataChunkAddress};
 use mac_n_cheese_ir::compilation_format::{
     AtomicGraphDegreeCount, Manifest, Type, read_private_manifest,
 };
+use mac_n_cheese_vole::party::{Party, Prover, Verifier, WhichParty};
 use party::either::PartyEitherCopy;
-use party::private::{ProverPrivate, ProverPrivateCopy};
-use party::{IS_PROVER, IS_VERIFIER, WhichParty};
+use party::private::{PartyPrivate, PartyPrivateCopy};
+use party::ty_eq::Witness;
 use rand::SeedableRng;
 use swanky_aes_rng::AesRng;
 use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
 use swanky_party as party;
-use swanky_party::Party;
 use types::visit_type;
 
 use crate::runner::RunQueue;
@@ -125,7 +125,7 @@ fn read_atomic_graph_degree_counts(
 
 fn party_main<P: Party>(
     opt: &Opt,
-    private_data: ProverPrivateCopy<P, &Path>,
+    private_data: PartyPrivateCopy<Prover, P, &Path>,
     num_connections: PartyEitherCopy<P, (), usize>,
 ) -> swanky_error::Result<()> {
     let rng = AesRng::from_rng(rand::rngs::OsRng).unwrap();
@@ -138,7 +138,7 @@ fn party_main<P: Party>(
         .with_context(|| format!("Reading circuit {:?}", opt.circuit))?;
     let manifest = circuit_manifest.manifest();
     span.finish();
-    let mut private_file = ProverPrivate::from(private_data)
+    let mut private_file = PartyPrivate::from(private_data)
         .map(|path| {
             File::open(path).wrap_err_with(ErrorKind::FilesystemError, || {
                 format!("Opening private data {path:?}")
@@ -284,10 +284,10 @@ fn main() -> swanky_error::Result<()> {
             .with_context(|| format!("Opening event log at {log_path:?}"))?;
     }
     let party_main_result = match &opt.cmd {
-        Command::Prove { private_data } => party_main::<party::Prover>(
+        Command::Prove { private_data } => party_main::<Prover>(
             &opt,
-            ProverPrivateCopy::new(private_data),
-            PartyEitherCopy::prover_new(IS_PROVER, ()),
+            PartyPrivateCopy::new(private_data),
+            PartyEitherCopy::new(Witness::EQUAL_TYPES, ()),
         ),
         Command::Verify { num_connections } => {
             swanky_error::ensure!(
@@ -295,10 +295,10 @@ fn main() -> swanky_error::Result<()> {
                 ErrorKind::OtherError,
                 "there must be at least two connections"
             );
-            party_main::<party::Verifier>(
+            party_main::<Verifier>(
                 &opt,
-                ProverPrivateCopy::empty(IS_VERIFIER),
-                PartyEitherCopy::verifier_new(IS_VERIFIER, *num_connections),
+                PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
+                PartyEitherCopy::new(Witness::EQUAL_TYPES, *num_connections),
             )
         }
     };

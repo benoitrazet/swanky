@@ -7,7 +7,7 @@
 //! `PartyEither<P0, A, B>` is a `repr(transparent)` container holding type `A`, but
 //! `PartyEither<P0, A, B>` is not _the same type as_ `A`.
 //! ```
-//! # use swanky_party2::{party_system, either::PartyEither};
+//! # use swanky_party::{party_system, either::PartyEither};
 //! # use std::any::TypeId;
 //! party_system! {
 //!     mod ps {
@@ -29,7 +29,7 @@
 //! Unlike [`PartyEither`](crate::either::PartyEither), [`RawEither`] is _equal_ to its output
 //! type.
 //! ```
-//! # use swanky_party2::{party_system, either::raw::{bounds, RawEither}};
+//! # use swanky_party::{party_system, either::raw::{bounds, RawEither}};
 //! # use std::any::TypeId;
 //! # party_system! {
 //! #     mod ps {
@@ -71,7 +71,7 @@ use std::marker::PhantomData;
 /// respectively for `Party1`).
 ///
 /// ```
-/// # use swanky_party2::{party_system, either::raw::{RawEither, bounds}};
+/// # use swanky_party::{party_system, either::raw::{RawEither, bounds}};
 /// party_system! {
 ///     mod ps {
 ///         P0,
@@ -96,7 +96,7 @@ use std::marker::PhantomData;
 ///
 /// However, this only works if Rust _knows_ which party is in-use.
 /// ```compile_fail
-/// # use swanky_party2::{
+/// # use swanky_party::{
 /// #     party_system,
 /// #     either::raw::{RawEither, bounds},
 /// #     ty_eq::{Witness, EqualityProposition},
@@ -108,7 +108,7 @@ use std::marker::PhantomData;
 /// #     }
 /// # }
 /// # use ps::*;
-/// use swanky_party2::Party0;
+/// use swanky_party::Party0;
 /// fn construct_p0<P: Party>(
 ///     x: i32,
 ///     ev: Witness<impl EqualityProposition<P, Party0<P>>>,
@@ -122,7 +122,7 @@ use std::marker::PhantomData;
 /// its associated with. Thus, we can turn a `RawEither<bounds::Any, P0, i32, String>` (i.e. `i32`)
 /// into a `RawEither<bounds::Any, P, i32, String>`.
 /// ```
-/// # use swanky_party2::{
+/// # use swanky_party::{
 /// #     party_system,
 /// #     either::raw::{RawEither, bounds},
 /// #     ty_eq::{Witness, EqualityProposition},
@@ -134,8 +134,8 @@ use std::marker::PhantomData;
 /// #     }
 /// # }
 /// # use ps::*;
-/// # use swanky_party2::Party0;
-/// use swanky_party2::either::raw::{is_t0, is_t1};
+/// # use swanky_party::Party0;
+/// use swanky_party::either::raw::{is_t0, is_t1};
 /// fn construct_p0<P: Party>(
 ///     x: i32,
 ///     ev: Witness<impl EqualityProposition<P, Party0<P>>>,
@@ -181,7 +181,7 @@ pub type RawEither<Bound: EitherBound<T0, T1>, P: GenericParty, T0, T1> =
 ///
 /// # Example
 /// ```
-/// # use swanky_party2::{
+/// # use swanky_party::{
 /// #     party_system, GenericParty,
 /// #     either::raw::{RawEither, bounds, either_type_substitution},
 /// #     ty_eq::{Witness, EqualityProposition, generics, Generic},
@@ -247,7 +247,7 @@ pub const fn either_type_substitution<
 /// Given that `P` is party 0, conclude that `RawEither<T0, T1> == T0`
 ///
 /// ```
-/// # use swanky_party2::{
+/// # use swanky_party::{
 /// #     party_system, Party0,
 /// #     either::raw::{RawEither, bounds, is_t0},
 /// #     ty_eq::{Witness, EqualityProposition},
@@ -281,7 +281,7 @@ pub const fn is_t0<B: EitherBound<T0, T1>, P: GenericParty, T0, T1>(
 /// Given that `P` is party 1, conclude that `RawEither<T0, T1> == T1`
 ///
 /// ```
-/// # use swanky_party2::{
+/// # use swanky_party::{
 /// #     party_system, Party1,
 /// #     either::raw::{RawEither, bounds, is_t1},
 /// #     ty_eq::{Witness, EqualityProposition},
@@ -329,7 +329,7 @@ pub const fn is_t1<B: EitherBound<T0, T1>, P: GenericParty, T0, T1>(
 ///
 /// ## Example
 /// ```compile_fail
-/// # use swanky_party2::{party_system, either::raw::{bounds, RawEither}};
+/// # use swanky_party::{party_system, either::raw::{bounds, RawEither}};
 /// # use std::any::TypeId;
 /// party_system! {
 ///     mod ps {
@@ -345,7 +345,7 @@ pub const fn is_t1<B: EitherBound<T0, T1>, P: GenericParty, T0, T1>(
 /// }
 /// ```
 /// ```
-/// # use swanky_party2::{party_system, either::raw::{bounds, RawEither}};
+/// # use swanky_party::{party_system, either::raw::{bounds, RawEither}};
 /// # party_system! {
 /// #     mod ps {
 /// #         P0,
@@ -362,7 +362,7 @@ pub const fn is_t1<B: EitherBound<T0, T1>, P: GenericParty, T0, T1>(
 /// Even though Rust won't automatically figure out that `ex1`'s argument is `Copy` we can manually
 /// convert `RawEither`s between bounds (so long as `T0` and `T1` meet the bound).
 /// ```
-/// # use swanky_party2::{party_system, either::raw::{bounds, RawEither}};
+/// # use swanky_party::{party_system, either::raw::{bounds, RawEither}};
 /// # party_system! {
 /// #     mod ps {
 /// #         P0,
@@ -379,7 +379,7 @@ pub const fn is_t1<B: EitherBound<T0, T1>, P: GenericParty, T0, T1>(
 ///
 /// We can also use [`ty_eq`](crate::ty_eq) to perform more complicated conversions.
 /// ```
-/// # use swanky_party2::{party_system, either::raw::{bounds, RawEither}};
+/// # use swanky_party::{party_system, either::raw::{bounds, RawEither}};
 /// # party_system! {
 /// #     mod ps {
 /// #         P0,
@@ -387,7 +387,7 @@ pub const fn is_t1<B: EitherBound<T0, T1>, P: GenericParty, T0, T1>(
 /// #     }
 /// # }
 /// # use ps::*;
-/// use swanky_party2::ty_eq::{generics, IsSameType};
+/// use swanky_party::ty_eq::{generics, IsSameType};
 /// fn ex1_references<'a, P: Party, T0: Copy, T1: Copy>(
 ///     either: &'a RawEither<bounds::Any, P, T0, T1>,
 /// ) -> &'a RawEither<bounds::Copy, P, T0, T1>{

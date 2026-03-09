@@ -1320,6 +1320,7 @@ dependencies = [
  "flume",
  "mac-n-cheese-ir",
  "mac-n-cheese-sieve-parser",
+ "mac-n-cheese-vole",
  "mac-n-cheese-wire-map",
  "mimalloc",
  "num_cpus",
@@ -2537,7 +2538,6 @@ dependencies = [
  "proptest",
  "swanky-error",
  "swanky-party",
- "swanky-party2",
  "swanky-serialization",
 ]
 
@@ -2874,13 +2874,6 @@ dependencies = [
 
 [[package]]
 name = "swanky-party"
-version = "0.6.0"
-dependencies = [
- "bytemuck",
-]
-
-[[package]]
-name = "swanky-party2"
 version = "0.6.0"
 dependencies = [
  "bytemuck",
@@ -3337,7 +3330,6 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-channel-legacy",
  "swanky-field-binary",
- "swanky-party",
  "wasm-bindgen",
 ]
 
@@ -3358,7 +3350,6 @@ dependencies = [
  "swanky-channel-legacy",
  "swanky-error",
  "swanky-field-binary",
- "swanky-party",
  "tungstenite",
 ]
 

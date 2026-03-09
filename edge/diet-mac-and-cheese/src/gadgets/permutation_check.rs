@@ -143,10 +143,13 @@ mod tests {
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     use crate::{
-        DietMacAndCheese, backend_extfield::DietMacAndCheeseExtField, backend_trait::BackendT,
-        mac::Mac, svole_trait::Svole,
+        DietMacAndCheese,
+        backend_extfield::DietMacAndCheeseExtField,
+        backend_trait::BackendT,
+        mac::Mac,
+        party::{Prover, Verifier},
+        svole_trait::Svole,
     };
-    use swanky_party::{Prover, Verifier};
 
     use super::{permutation_check, permutation_check_binary};
 

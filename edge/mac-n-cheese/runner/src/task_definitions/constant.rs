@@ -1,8 +1,10 @@
 use mac_n_cheese_ir::compilation_format::FieldMacType;
-use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
+use mac_n_cheese_vole::{
+    mac::{Mac, MacConstantContext, MacTypes},
+    party::Party,
+};
 use std::{io::Cursor, ops::Deref, sync::Arc};
 use swanky_error::{ErrorKind, OptionExt, WrapErr};
-use swanky_party::Party;
 use swanky_serialization::{CanonicalSerialize, SequenceDeserializer};
 
 use crate::{

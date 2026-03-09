@@ -2,7 +2,7 @@
 ///
 /// # Example
 /// ```
-/// swanky_party2::party_system! {
+/// swanky_party::party_system! {
 ///     pub mod oblivious_transfer_parties {
 ///         /// This party gives out 2 values
 ///         Sender,
@@ -44,8 +44,8 @@ macro_rules! party_system {
                 "Party definitions for [`", stringify!($party0), "`] and ",
                 "[`", stringify!($party1), "`]"
             )]
-            use $crate::{self as swanky_party2};
-            use swanky_party2::{ty_eq::Witness};
+            use $crate::{self as swanky_party};
+            use swanky_party::{ty_eq::Witness};
             #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
             #[doc = concat!(
                 "Evidence that `P` is [`", stringify!($party0), "`] or ",
@@ -68,7 +68,7 @@ macro_rules! party_system {
             #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
             pub struct $party1;
             #[doc = concat!(
-                "A [`PartySystem`](swanky_party2::PartySystem) for ",
+                "A [`PartySystem`](swanky_party::PartySystem) for ",
                 stringify!($party0 and $party1),
             )]
             #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
@@ -79,7 +79,7 @@ macro_rules! party_system {
                 /// Unlike `GenericWhichParty`
                 #[doc = concat!(
                     "Which party is `Self`?\n\n",
-                    "Unlike [`GenericParty::GENERIC_WHICH`](swanky_party2::GenericParty::GENERIC_WHICH) ",
+                    "Unlike [`GenericParty::GENERIC_WHICH`](swanky_party::GenericParty::GENERIC_WHICH) ",
                     "This `WHICH` is of type [`WhichParty`], which uses enum variants: ",
                     "`", stringify!($party0), "` and ",
                     "`", stringify!($party1), "`, rather than generic names.",

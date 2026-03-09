@@ -3,7 +3,10 @@ use crate::{
     types::RandomMac,
 };
 use mac_n_cheese_ir::compilation_format::{FieldMacType, FieldTypeMacVisitor};
-use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
+use mac_n_cheese_vole::{
+    mac::{Mac, MacConstantContext, MacTypes},
+    party::{Party, WhichParty},
+};
 use std::{
     any::{Any, TypeId},
     io::{Read, Write},
@@ -12,7 +15,6 @@ use std::{
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, ResultExt, WrapErr};
-use swanky_party::{Party, WhichParty};
 use swanky_svole_wykw::base_svole::{Receiver as BaseReceiver, Sender as BaseSender};
 
 pub struct VoleContext<P: Party, T: MacTypes> {
@@ -66,9 +68,9 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
                 VoleContext {
                     base_voles: Default::default(),
                     constant_context: match P::WHICH {
-                        WhichParty::Prover(e) => MacConstantContext::prover_new(e, ()),
+                        WhichParty::Prover(e) => MacConstantContext::new(e, ()),
                         WhichParty::Verifier(e) => {
-                            MacConstantContext::verifier_new(e, TF::random_nonzero(self.rng))
+                            MacConstantContext::new(e, TF::random_nonzero(self.rng))
                         }
                     },
                 }
@@ -103,7 +105,7 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
                                 .copied()
                                 .map(|(x, beta)| RandomMac(Mac::prover_new(e, x, beta)))
                                 .collect(),
-                            constant_context: MacConstantContext::prover_new(e, ()),
+                            constant_context: MacConstantContext::new(e, ()),
                         }
                     }
                     WhichParty::Verifier(e) => {
@@ -132,7 +134,7 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
                                 .copied()
                                 .map(|tag| RandomMac(Mac::verifier_new(e, tag)))
                                 .collect(),
-                            constant_context: MacConstantContext::verifier_new(e, alpha),
+                            constant_context: MacConstantContext::new(e, alpha),
                         }
                     }
                 }
