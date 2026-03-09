@@ -12,7 +12,7 @@
 //! # Details
 //!
 //! [`AuthShare`]s are simply pairs of [`AuthBit`]s where each party plays the
-//! role of Party A  for one of the bits, and Party B for the other.
+//! role of the prover for one of the bits, and verifier for the other.
 //!
 //! # Example
 //!
@@ -32,7 +32,7 @@
 //! let nshares = 1000;
 //! let (bits_a, bits_b) = swanky_channel::local::local_channel_pair(
 //!     |c| {
-//!         // Party A.
+//!         // Party A (the prover).
 //!         let mut rng = swanky_aes_rng::AesRng::new();
 //!         let mut authshares: Vec<AuthShare<PartyA>> = vec![];
 //!         let mut bits: Vec<F2> = vec![];
@@ -42,7 +42,7 @@
 //!         Ok(bits)
 //!     },
 //!     |c| {
-//!         // Party B.
+//!         // Party B (the verifier).
 //!         let mut rng = swanky_aes_rng::AesRng::new();
 //!         let mut authshares: Vec<AuthShare<PartyB>> = vec![];
 //!         let mut bits: Vec<F2> = vec![];
@@ -87,8 +87,8 @@ pub struct AuthShare<P: GenericParty> {
 impl<P: GenericParty> AuthShare<P> {
     /// The given party's bit.
     ///
-    /// This corresponds to $`x_1`$ for Party A, and $`x_2`$
-    /// for Party B.
+    /// This corresponds to $`x_1`$ for Party A (the prover), and $`x_2`$
+    /// for Party B (the verifier).
     pub fn bit(self) -> F2 {
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(ev) => self
@@ -106,8 +106,8 @@ impl<P: GenericParty> AuthShare<P> {
 
     /// The given party's key.
     ///
-    /// This corresponds to $`K[x_2]`$ for Party A, and
-    /// $`K[x_1]`$ for Party B.
+    /// This corresponds to $`K[x_2]`$ for Party A (the prover), and
+    /// $`K[x_1]`$ for Party B (the verifier).
     pub fn key(self) -> U8x16 {
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(ev) => self

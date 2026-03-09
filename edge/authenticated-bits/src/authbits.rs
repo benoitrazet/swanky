@@ -11,20 +11,20 @@
 //! essentially, authenticated bits are _just_ the outputs of correlated
 //! oblivious transfer (called Δ-ROT in the paper).
 //!
-//! In more detail, to generate [`AuthBit`]s, Party A holds a vector of bits
-//! $`b_i`$ of length $`n`$, and Party B holds a long term key $`\Delta`$.
+//! In more detail, to generate [`AuthBit`]s, the prover holds a vector of bits
+//! $`b_i`$ of length $`n`$, and the verifier holds a long term key $`\Delta`$.
 //!
-//! The parties perform a Δ-ROT per bit so that Party A receives
-//! $`M_i := K_i \oplus b_i \Delta`$ and Party B receives $`K_i`$. In other
+//! The prover and verifier perform a Δ-ROT per bit so that the prover receives
+//! $`M_i := K_i \oplus b_i \Delta`$ and the verifier receives $`K_i`$. In other
 //! words:
 //!
-//! - If $`b_i = 1`$, Party A receives $`M_{i,1} := K_i \oplus \Delta`$.
-//! - If $`b_i = 0`$, Party A receives $`M_{i,0} := K_i`$.
+//! - If $`b_i = 1`$, the prover receives $`M_{i,1} := K_i \oplus \Delta`$.
+//! - If $`b_i = 0`$, the prover receives $`M_{i,0} := K_i`$.
 //!
-//! Party B receives both $`M_{i,0}`$ and $`M_{i,1}`$.
+//! The verifier receives both $`M_{i,0}`$ and $`M_{i,1}`$.
 //!
-//! To open an authenticated bit, Party A sends $`(b_i, M_i)`$ to
-//! Party B and Party B checks that $`M_i = K_i \oplus b \Delta`$.
+//! To open an authenticated bit, the prover sends $`(b_i, M_i)`$ to
+//! the verifier and the verifier checks that $`M_i = K_i \oplus b \Delta`$.
 //!
 //! # Example
 //!
@@ -40,29 +40,29 @@
 //! # use std::slice::Iter;
 //! # party_system! {
 //! #     mod ps {
-//! #         PartyA,
-//! #         PartyB,
+//! #         Prover,
+//! #         Verifier,
 //! #     }
 //! # }
-//! # use ps::{PartyA, PartyB};
+//! # use ps::{Prover, Verifier};
 //! # fn main() -> swanky_error::Result<()> {
-//! let (bits_party_a, bits_party_b) = swanky_channel::local::local_channel_pair(
+//! let (bits_prover, bits_verifier) = swanky_channel::local::local_channel_pair(
 //!     |c| {
-//!         // Party A.
+//!         // The prover.
 //!         let mut rng = swanky_aes_rng::AesRng::new();
 //!         let bits = rng.r#gen::<[F2; 10]>();
-//!         let mut authbits: Vec<AuthBit<PartyA>> = vec![];
+//!         let mut authbits: Vec<AuthBit<Prover>> = vec![];
 //!         let mut generator: AuthBitGenerator<_> = AuthBitGenerator::new(c, &mut rng)?;
 //!         generator.generate(PartyEither::new(Witness::EQUAL_TYPES, bits.iter().copied()), &mut authbits, c, &mut rng)?;
 //!         generator.open(&authbits, PartyPrivate::empty(Witness::EQUAL_TYPES), c)?;
 //!         Ok(bits.to_vec())
 //!     },
 //!     |c| {
-//!         // Party B.
+//!         // The verifier.
 //!         let mut rng = swanky_aes_rng::AesRng::new();
 //!         let count = 10;
 //!         let mut bits = vec![];
-//!         let mut authbits: Vec<AuthBit<PartyB>> = vec![];
+//!         let mut authbits: Vec<AuthBit<Verifier>> = vec![];
 //!         let mut generator: AuthBitGenerator<_> = AuthBitGenerator::new(c, &mut rng)?;
 //!         let input: PartyEither<_, Copied<Iter<'_, F2>>, _> = PartyEither::new(Witness::EQUAL_TYPES, count);
 //!         generator.generate(input, &mut authbits, c, &mut rng)?;
@@ -70,7 +70,7 @@
 //!         Ok(bits)
 //!     }
 //! )?;
-//! assert_eq!(bits_party_a, bits_party_b);
+//! assert_eq!(bits_prover, bits_verifier);
 //! # Ok(())
 //! # }
 //! ```
@@ -94,24 +94,24 @@ use swanky_party::{
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 use vectoreyes::U8x16;
 
-/// `Party0`'s part of the authentication bit.
+/// The prover's part of the authentication bit.
 ///
-/// `Party0` holds a bit that they wish to authenticate and receive a MAC
+/// The prover holds a bit that they wish to authenticate and receive a MAC
 /// which corresponds to that authentication.
 #[derive(Clone, Copy)]
-struct Party0AuthBit {
+struct ProverAuthBit {
     /// MAC authenticating the bit.
     mac: U8x16,
     /// The authenticated bit.
     bit: F2,
 }
-/// `Party1`'s part of the authentication bit.
+/// The verifier's part of the authentication bit.
 ///
-/// `Party1` holds a local `key` that verifies the integrity of `Party0`'s
+/// The verifier holds a local `key` that verifies the integrity of the prover's
 /// MAC.
 #[derive(Clone, Copy)]
-struct Party1AuthBit {
-    /// Key authenticating `Party0`'s MAC.
+struct VerifierAuthBit {
+    /// Key authenticating the prover's MAC.
     key: U8x16,
 }
 /// An authenticated bit.
@@ -119,36 +119,36 @@ struct Party1AuthBit {
 /// See [`crate::authbits`] for details. [`AuthBit`]s can be generated using
 /// [`AuthBitGenerator`].
 #[derive(Clone, Copy)]
-pub struct AuthBit<P: GenericParty>(PartyEitherCopy<P, Party0AuthBit, Party1AuthBit>);
+pub struct AuthBit<P: GenericParty>(PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>);
 
 impl<P: GenericParty> AuthBit<P> {
-    /// The [`Party0AuthBit`] component.
-    fn party0(self) -> PartyPrivateCopy<Party0<P>, P, Party0AuthBit> {
+    /// The [`ProverAuthBit`] component.
+    fn prover(self) -> PartyPrivateCopy<Party0<P>, P, ProverAuthBit> {
         self.0.into()
     }
-    /// The [`Party0AuthBit`] component as a mutable reference.
-    fn party0_mut(&mut self) -> PartyPrivate<Party0<P>, P, &mut Party0AuthBit> {
+    /// The [`ProverAuthBit`] component as a mutable reference.
+    fn prover_mut(&mut self) -> PartyPrivate<Party0<P>, P, &mut ProverAuthBit> {
         self.0.as_mut().into()
     }
-    /// The [`Party1AuthBit`] component.
-    fn party1(self) -> PartyPrivateCopy<Party1<P>, P, Party1AuthBit> {
+    /// The [`VerifierAuthBit`] component.
+    fn verifier(self) -> PartyPrivateCopy<Party1<P>, P, VerifierAuthBit> {
         self.0.into()
     }
-    /// The [`Party1AuthBit`] component as a mutable reference.
-    fn party1_mut(&mut self) -> PartyPrivate<Party1<P>, P, &mut Party1AuthBit> {
+    /// The [`VerifierAuthBit`] component as a mutable reference.
+    fn verifier_mut(&mut self) -> PartyPrivate<Party1<P>, P, &mut VerifierAuthBit> {
         self.0.as_mut().into()
     }
-    /// Output `Party1`'s key associated with this [`AuthBit`].
+    /// Output the verifier's key associated with this [`AuthBit`].
     pub fn key(&self) -> PartyPrivateCopy<Party1<P>, P, U8x16> {
-        self.party1().map(|vab| vab.key)
+        self.verifier().map(|vab| vab.key)
     }
-    /// Output the `Party0`'s MAC associated with this [`AuthBit`].
+    /// Output the prover's MAC associated with this [`AuthBit`].
     pub fn mac(&self) -> PartyPrivateCopy<Party0<P>, P, U8x16> {
-        self.party0().map(|vab| vab.mac)
+        self.prover().map(|vab| vab.mac)
     }
-    /// Output the `Party0`'s bit associated with this [`AuthBit`].
+    /// Output the prover's bit associated with this [`AuthBit`].
     pub fn bit(&self) -> PartyPrivateCopy<Party0<P>, P, F2> {
-        self.party0().map(|vab| vab.bit)
+        self.prover().map(|vab| vab.bit)
     }
 }
 
@@ -159,11 +159,11 @@ impl<P: GenericParty> core::ops::BitXor for AuthBit<P> {
     fn bitxor(self, rhs: Self) -> Self::Output {
         let pairs = self.0.zip(rhs.0);
         AuthBit(pairs.map(
-            |(lhs, rhs)| Party0AuthBit {
+            |(lhs, rhs)| ProverAuthBit {
                 mac: lhs.mac ^ rhs.mac,
                 bit: lhs.bit + rhs.bit,
             },
-            |(lhs, rhs)| Party1AuthBit {
+            |(lhs, rhs)| VerifierAuthBit {
                 key: lhs.key ^ rhs.key,
             },
         ))
@@ -174,11 +174,11 @@ impl<P: GenericParty> core::ops::BitXorAssign for AuthBit<P> {
     fn bitxor_assign(&mut self, rhs: Self) {
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(ev) => {
-                self.party0_mut().into_inner(ev).mac ^= rhs.party0().into_inner(ev).mac;
-                self.party0_mut().into_inner(ev).bit += rhs.party0().into_inner(ev).bit;
+                self.prover_mut().into_inner(ev).mac ^= rhs.prover().into_inner(ev).mac;
+                self.prover_mut().into_inner(ev).bit += rhs.prover().into_inner(ev).bit;
             }
             GenericWhichParty::Party1(ev) => {
-                self.party1_mut().into_inner(ev).key ^= rhs.party1().into_inner(ev).key;
+                self.verifier_mut().into_inner(ev).key ^= rhs.verifier().into_inner(ev).key;
             }
         }
         self.0.zip(rhs.0).map(
@@ -193,7 +193,7 @@ impl<P: GenericParty> core::ops::BitXorAssign for AuthBit<P> {
 
 /// A type for generating [`AuthBit`]s.
 ///
-/// For authenticated bit `Party1`, the generator contains the particular
+/// For authenticated bit _verifiers_, the generator contains the particular
 /// $`\Delta`$ value to verify against. This means that generated [`AuthBit`]s
 /// _must_ be opened using the same generator that generated them! Odd behavior
 /// may result if a different generator is used: when verifying one bits,
@@ -208,7 +208,7 @@ impl<P: GenericParty> core::ops::BitXorAssign for AuthBit<P> {
 /// which case the the type definition may have to change (in order to include
 /// any necessarily OT trait).
 pub struct AuthBitGenerator<P: GenericParty> {
-    /// `Party1`'s global $`\Delta`$.
+    /// The verifier's global $`\Delta`$.
     delta: PartyPrivateCopy<Party1<P>, P, U8x16>,
     /// The party-specific correlated OT instantiation.
     ot: PartyEither<P, kos::Receiver, kos::Sender>,
@@ -217,7 +217,7 @@ pub struct AuthBitGenerator<P: GenericParty> {
 impl<P: GenericParty> AuthBitGenerator<P> {
     /// Create a new [`AuthBitGenerator`].
     ///
-    /// `Party1`'s $`\Delta`$ value is randomly generated using `rng`.
+    /// The verifier's $`\Delta`$ value is randomly generated using `rng`.
     pub fn new<RNG>(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self>
     where
         RNG: CryptoRng + Rng,
@@ -296,7 +296,7 @@ impl<P: GenericParty> AuthBitGenerator<P> {
                 out.extend(bits.into_iter().zip(macs).map(|(bit, mac)| {
                     AuthBit(PartyEitherCopy::new(
                         e,
-                        Party0AuthBit {
+                        ProverAuthBit {
                             bit: bit.into(),
                             mac,
                         },
@@ -316,7 +316,7 @@ impl<P: GenericParty> AuthBitGenerator<P> {
                     })?;
                 out.extend(
                     keys.into_iter()
-                        .map(|key| AuthBit(PartyEitherCopy::new(e, Party1AuthBit { key }))),
+                        .map(|key| AuthBit(PartyEitherCopy::new(e, VerifierAuthBit { key }))),
                 );
 
                 Ok(())
@@ -326,7 +326,7 @@ impl<P: GenericParty> AuthBitGenerator<P> {
 
     /// Open the authenticated bits in `authbits`.
     ///
-    /// This corresponds to `Party0` sending $`(b, M)`$ to `Party1`, who
+    /// This corresponds to the prover sending $`(b, M)`$ to the verifier, who
     /// checks that $`K = M \oplus b \Delta`$. The resulting opened bits are
     /// [`Vec::push`]ed to `outputs`.
     ///
@@ -408,27 +408,27 @@ impl<P: GenericParty> AuthBitGenerator<P> {
         Ok(())
     }
 
-    /// `Party1`'s $`\Delta`$ value.
+    /// The verifier's $`\Delta`$ value.
     pub fn delta(&self) -> PartyPrivateCopy<Party1<P>, P, U8x16> {
         self.delta
     }
 
     /// Compute $`[b] \oplus c`$, where $`c`$ is a public constant.
     ///
-    /// This maps `Party0`'s values $`(b, M)`$ to $`(b \oplus c, M)`$,
-    /// and maps `Party1`'s value $`K`$ to $`K \oplus c \Delta`$.
+    /// This maps the prover's values $`(b, M)`$ to $`(b \oplus c, M)`$,
+    /// and maps the verifier's value $`K`$ to $`K \oplus c \Delta`$.
     pub fn xor_with_const(&self, authbit: AuthBit<P>, bit: F2) -> AuthBit<P> {
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(ev) => AuthBit(PartyEitherCopy::new(
                 ev,
-                Party0AuthBit {
+                ProverAuthBit {
                     mac: authbit.mac().into_inner(ev),
                     bit: authbit.bit().into_inner(ev) + bit,
                 },
             )),
             GenericWhichParty::Party1(ev) => AuthBit(PartyEitherCopy::new(
                 ev,
-                Party1AuthBit {
+                VerifierAuthBit {
                     key: authbit.key().into_inner(ev)
                         ^ U8x16::from(bit * F128b::from(self.delta().into_inner(ev))),
                 },
@@ -509,7 +509,7 @@ mod tests {
                     // Tamper the MAC of the first `AuthBit`.
                     outputs[0] = AuthBit(PartyEitherCopy::new(
                         Witness::EQUAL_TYPES,
-                        Party0AuthBit {
+                        ProverAuthBit {
                             bit: outputs[0].bit().into_inner(Witness::EQUAL_TYPES),
                             mac: rng_a.r#gen(),
                         },
@@ -531,7 +531,7 @@ mod tests {
                     // Tamper the key of the first `AuthBit`.
                     outputs[0] = AuthBit(PartyEitherCopy::new(
                         Witness::EQUAL_TYPES,
-                        Party1AuthBit { key: rng_b.r#gen() },
+                        VerifierAuthBit { key: rng_b.r#gen() },
                     ));
                 }
                 let mut output = vec![];
