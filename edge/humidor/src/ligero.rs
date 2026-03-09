@@ -129,6 +129,7 @@ impl<Field: FieldForLigero> Public<Field> {
     /// and an external proof system.
     #[allow(non_snake_case)]
     fn new(c: &Circuit<Field>, shared: Option<Range<usize>>) -> Self {
+        warn_vulnerabilities();
         // By the SZ Lemma, Pr[p(x) = q(x)] for monomials p and q and uniform x
         // chosen independently of p and q is 1/|F|, so one linear check should
         // give us 1/|F| soundness.
@@ -303,6 +304,8 @@ impl<Field: FieldForLigero, H: CryptoDigest> Secret<Field, H> {
         inp: &[Field],
         shared: Option<Range<usize>>,
     ) -> Self {
+        warn_vulnerabilities();
+
         debug_assert_eq!(c.ninputs(), inp.len());
 
         let public = Public::new(c, shared);
@@ -656,6 +659,8 @@ pub struct Round3<Field> {
 impl<Field: FieldForLigero> Round3<Field> {
     /// Pick Verifier's columns to view.
     fn new<R: Rng + CryptoRng>(params: &Params<Field>, rng: &mut R) -> Self {
+        warn_vulnerabilities();
+
         Round3 {
             phantom: std::marker::PhantomData,
 
