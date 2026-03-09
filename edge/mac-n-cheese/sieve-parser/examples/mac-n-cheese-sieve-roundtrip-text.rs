@@ -9,7 +9,9 @@ fn main() -> swanky_error::Result<()> {
     std::io::stdin()
         .lock()
         .read_to_end(&mut input)
-        .wrap_err(ErrorKind::OtherError, "Failed to read stdin.".to_string())?;
+        .wrap_err_with(ErrorKind::OtherError, || {
+            "Failed to read stdin.".to_string()
+        })?;
     let parser = mac_n_cheese_sieve_parser::text_parser::RelationReader::new(Cursor::new(input))?;
     println!("{}", parser.header());
     println!("@begin");

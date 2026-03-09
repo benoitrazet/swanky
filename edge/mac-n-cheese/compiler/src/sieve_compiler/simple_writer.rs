@@ -410,10 +410,10 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                     (cm.constant(self.cb, src)?, ProverPrivateCopy::new(src)),
                 )?,
                 FieldInstruction::AssertZero { src } => {
-                    let (src, src_value) = *wm.get(src).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {src}.".to_string(),
-                    )?;
+                    let (src, src_value) =
+                        *wm.get(src).wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {src}.")
+                        })?;
                     if let WhichParty::Prover(e) = P::WHICH {
                         swanky_error::ensure!(
                             src_value.into_inner(e) == FE::ZERO,
@@ -426,10 +426,9 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                 FieldInstruction::Copy { dst, src } => {
                     let src = *wm
                         .get(src)
-                        .wrap_err(
-                            ErrorKind::OtherError,
-                            "Failed to get wire {src}.".to_string(),
-                        )
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {src}.")
+                        })
                         .with_context(|| {
                             format!(
                                 "Copy to {dst} from {src} in {}",
@@ -441,20 +440,19 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                 FieldInstruction::Add { dst, left, right } => {
                     let (left, left_v) = *wm
                         .get(left)
-                        .wrap_err(
-                            ErrorKind::OtherError,
-                            "Failed to get wire {left}.".to_string(),
-                        )
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {left}.")
+                        })
                         .with_context(|| {
                             format!(
                                 "Add to {dst} from {left} in {}",
                                 std::any::type_name::<FE>()
                             )
                         })?;
-                    let (right, right_v) = *wm.get(right).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {right}.".to_string(),
-                    )?;
+                    let (right, right_v) =
+                        *wm.get(right).wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {right}.")
+                        })?;
                     put(
                         wm,
                         dst,
@@ -465,14 +463,14 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                     )?;
                 }
                 FieldInstruction::Mul { dst, left, right } => {
-                    let (left, left_v) = *wm.get(left).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {left}.".to_string(),
-                    )?;
-                    let (right, right_v) = *wm.get(right).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {right}.".to_string(),
-                    )?;
+                    let (left, left_v) =
+                        *wm.get(left).wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {left}.")
+                        })?;
+                    let (right, right_v) =
+                        *wm.get(right).wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {right}.")
+                        })?;
                     let (product, product_v) = mul(
                         self.cb,
                         self.vs,
@@ -484,10 +482,10 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                     put(wm, dst, (product, product_v))?;
                 }
                 FieldInstruction::AddConstant { dst, left, right } => {
-                    let (left, left_v) = *wm.get(left).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {left}.".to_string(),
-                    )?;
+                    let (left, left_v) =
+                        *wm.get(left).wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {left}.")
+                        })?;
                     let right_c = cm.constant(self.cb, right)?;
                     put(
                         wm,
@@ -499,10 +497,10 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                     )?;
                 }
                 FieldInstruction::MulConstant { dst, left, right } => {
-                    let (left, left_v) = *wm.get(left).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {left}.".to_string(),
-                    )?;
+                    let (left, left_v) =
+                        *wm.get(left).wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {left}.")
+                        })?;
                     put(
                         wm,
                         dst,
@@ -750,10 +748,11 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                 let mut cond_wires =
                                     Vec::with_capacity(cond_wire_range.len() as usize);
                                 for w in cond_wire_range.start..=cond_wire_range.inclusive_end {
-                                    cond_wires.push(*wm.get(w).wrap_err(
-                                        ErrorKind::OtherError,
-                                        "Failed to get wire {w}.".to_string(),
-                                    )?);
+                                    cond_wires.push(
+                                        *wm.get(w).wrap_err_with(ErrorKind::OtherError, || {
+                                            format!("Failed to get wire {w}.")
+                                        })?,
+                                    );
                                 }
 
                                 for i in 0..num_branches {
@@ -796,10 +795,11 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                 debug_assert_eq!(cond_wire_range.len(), 1);
 
                                 // c
-                                let (cond, cond_v) = *wm.get(cond_wire_range.start).wrap_err(
-                                    ErrorKind::OtherError,
-                                    format!("Failed to get wire {}.", cond_wire_range.start),
-                                )?;
+                                let (cond, cond_v) = *wm
+                                    .get(cond_wire_range.start)
+                                    .wrap_err_with(ErrorKind::OtherError, || {
+                                        format!("Failed to get wire {}.", cond_wire_range.start)
+                                    })?;
 
                                 for i in 0..num_branches {
                                     let i = to_fe(i)?;
@@ -897,19 +897,19 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                         ErrorKind::OtherError,
                                         "Mux has no input branches",
                                     )?)
-                                    .wrap_err(
-                                        ErrorKind::OtherError,
-                                        "Failed to get b_0_jth wire.".to_string(),
-                                    )?;
+                                    .wrap_err_with(ErrorKind::OtherError, || {
+                                        "Failed to get b_0_jth wire.".to_string()
+                                    })?;
 
                                 let (mut sum, mut sum_v) =
                                     mul(self.cb, self.vs, self.pb, cm, g_0, b_0_j)?;
 
                                 for (b_i_j, &g_i) in jth_branch_wires.zip(&g[1..]) {
-                                    let b_i_j = *wm.get(b_i_j).wrap_err(
-                                        ErrorKind::OtherError,
-                                        "Failed to get wire {b_i_j}.".to_string(),
-                                    )?;
+                                    let b_i_j = *wm
+                                        .get(b_i_j)
+                                        .wrap_err_with(ErrorKind::OtherError, || {
+                                            format!("Failed to get wire {b_i_j}.")
+                                        })?;
                                     let (prod, prod_v) =
                                         mul(self.cb, self.vs, self.pb, cm, g_i, b_i_j)?;
                                     sum = cm.linear(self.cb, sum, FE::ONE, prod, FE::ONE)?;

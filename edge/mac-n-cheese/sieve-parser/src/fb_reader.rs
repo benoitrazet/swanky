@@ -26,14 +26,14 @@ fn walk_inputs(paths: &[PathBuf]) -> swanky_error::Result<Vec<PathBuf>> {
             }
         }
         if input.is_dir() {
-            for item in std::fs::read_dir(input).wrap_err(
-                ErrorKind::FilesystemError,
-                format!("Unable to open directory {input:?}"),
-            )? {
-                let item = item.wrap_err(
-                    ErrorKind::FilesystemError,
-                    format!("Unable to access directory item"),
-                )?;
+            for item in std::fs::read_dir(input)
+                .wrap_err_with(ErrorKind::FilesystemError, || {
+                    format!("Unable to open directory {input:?}")
+                })?
+            {
+                let item = item.wrap_err_with(ErrorKind::FilesystemError, || {
+                    format!("Unable to access directory item")
+                })?;
                 visit(dst, &item.path())?;
             }
         } else {
@@ -68,39 +68,41 @@ impl MessageReader {
         while !self.paths.is_empty() || self.current_file.is_some() {
             match self.current_file.as_mut() {
                 Some(file) => {
-                    let pos = file.stream_position().wrap_err(
-                        ErrorKind::FilesystemError,
-                        "Unable to get file stream position.".to_string(),
-                    )?;
+                    let pos = file
+                        .stream_position()
+                        .wrap_err_with(ErrorKind::FilesystemError, || {
+                            "Unable to get file stream position.".to_string()
+                        })?;
                     // This isn't the most efficient way to check this, but it's easy!
                     // This gets called infrequently enough that we don't care.
                     if pos
-                        == file.seek(std::io::SeekFrom::End(0)).wrap_err(
-                            ErrorKind::FilesystemError,
-                            "Unable to seek to the end of a file.".to_string(),
-                        )?
+                        == file
+                            .seek(std::io::SeekFrom::End(0))
+                            .wrap_err_with(ErrorKind::FilesystemError, || {
+                                "Unable to seek to the end of a file.".to_string()
+                            })?
                     {
                         self.current_file = None;
                         continue;
                     }
-                    file.seek(std::io::SeekFrom::Start(pos)).wrap_err(
-                        ErrorKind::FilesystemError,
-                        "Unable to seek to {pos}.".to_string(),
-                    )?;
+                    file.seek(std::io::SeekFrom::Start(pos))
+                        .wrap_err_with(ErrorKind::FilesystemError, || {
+                            format!("Unable to seek to {pos}.")
+                        })?;
                     let (len, len_buf) = {
                         let mut len_buf = [0; 4];
-                        file.read_exact(&mut len_buf).wrap_err(
-                            ErrorKind::FilesystemError,
-                            "Failed to read flatbuffer length.".to_string(),
-                        )?;
+                        file.read_exact(&mut len_buf)
+                            .wrap_err_with(ErrorKind::FilesystemError, || {
+                                "Failed to read flatbuffer length.".to_string()
+                            })?;
                         (u32::from_le_bytes(len_buf) as usize, len_buf)
                     };
                     self.buf.resize(len + 4, 0);
                     self.buf[..4].copy_from_slice(&len_buf);
-                    file.read_exact(&mut self.buf[4..]).wrap_err(
-                        ErrorKind::FilesystemError,
-                        "Reading flatbuffer root message".to_string(),
-                    )?;
+                    file.read_exact(&mut self.buf[4..])
+                        .wrap_err_with(ErrorKind::FilesystemError, || {
+                            "Reading flatbuffer root message".to_string()
+                        })?;
                     return Ok(Some(
                         fb::size_prefixed_root_as_root_with_opts(
                             &flatbuffers::VerifierOptions {
@@ -109,19 +111,19 @@ impl MessageReader {
                             },
                             &self.buf,
                         )
-                        .wrap_err(
-                            ErrorKind::FilesystemError,
-                            "Failed to verify flatbuffer root buffer.".to_string(),
-                        )?,
+                        .wrap_err_with(ErrorKind::FilesystemError, || {
+                            "Failed to verify flatbuffer root buffer.".to_string()
+                        })?,
                     ));
                 }
                 _ => {
                     // If current_file is None, then paths can't be empty, by the above condition.
                     let path = self.paths.pop().unwrap();
-                    self.current_file = Some(File::open(&path).wrap_err(
-                        ErrorKind::FilesystemError,
-                        format!("Failed to open file {path:?}"),
-                    )?);
+                    self.current_file = Some(
+                        File::open(&path).wrap_err_with(ErrorKind::FilesystemError, || {
+                            format!("Failed to open file {path:?}")
+                        })?,
+                    );
                 }
             }
         }

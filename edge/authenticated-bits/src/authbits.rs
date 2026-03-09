@@ -242,20 +242,20 @@ impl<P: Party> AuthBitGenerator<P> {
                 delta: VerifierPrivateCopy::empty(e),
                 ot: PartyEither::prover_new(
                     e,
-                    kos::Receiver::init(channel, &mut rng).wrap_err(
-                        ErrorKind::InitializationError,
-                        "Failed to initialize KOS receiver.".to_string(),
-                    )?,
+                    kos::Receiver::init(channel, &mut rng)
+                        .wrap_err_with(ErrorKind::InitializationError, || {
+                            "Failed to initialize KOS receiver.".to_string()
+                        })?,
                 ),
             },
             WhichParty::Verifier(e) => AuthBitGenerator {
                 delta: VerifierPrivateCopy::new(delta.into_inner(e)),
                 ot: PartyEither::verifier_new(
                     e,
-                    kos::Sender::init(channel, &mut rng).wrap_err(
-                        ErrorKind::InitializationError,
-                        "Failed to initialize KOS sender.".to_string(),
-                    )?,
+                    kos::Sender::init(channel, &mut rng)
+                        .wrap_err_with(ErrorKind::InitializationError, || {
+                            "Failed to initialize KOS sender.".to_string()
+                        })?,
                 ),
             },
         };
@@ -284,10 +284,9 @@ impl<P: Party> AuthBitGenerator<P> {
                     .as_mut()
                     .prover_into(e)
                     .receive_correlated(&mut channel, &bits, rng)
-                    .wrap_err(
-                        ErrorKind::NetworkError,
-                        "Failed to receive correlated data.".to_string(),
-                    )?;
+                    .wrap_err_with(ErrorKind::NetworkError, || {
+                        "Failed to receive correlated data.".to_string()
+                    })?;
 
                 out.extend(bits.into_iter().zip(macs).map(|(bit, mac)| {
                     AuthBit(PartyEitherCopy::prover_new(
@@ -307,10 +306,9 @@ impl<P: Party> AuthBitGenerator<P> {
                     .as_mut()
                     .verifier_into(e)
                     .send_correlated(&mut channel, bits_in.verifier_into(e), delta, rng)
-                    .wrap_err(
-                        ErrorKind::NetworkError,
-                        "Failed to send correlated data.".to_string(),
-                    )?;
+                    .wrap_err_with(ErrorKind::NetworkError, || {
+                        "Failed to send correlated data.".to_string()
+                    })?;
                 out.extend(
                     keys.into_iter().map(|key| {
                         AuthBit(PartyEitherCopy::verifier_new(e, VerifierAuthBit { key }))
@@ -341,22 +339,22 @@ impl<P: Party> AuthBitGenerator<P> {
         match P::WHICH {
             WhichParty::Prover(e) => {
                 let mut bit_ser: F2BitSerializer =
-                    SequenceSerializer::new(&mut channel.as_std_io()).wrap_err(
-                        ErrorKind::InitializationError,
-                        "Failed to initialize sequence serializer.".to_string(),
-                    )?;
+                    SequenceSerializer::new(&mut channel.as_std_io())
+                        .wrap_err_with(ErrorKind::InitializationError, || {
+                            "Failed to initialize sequence serializer.".to_string()
+                        })?;
                 for b in authbits.iter() {
                     bit_ser
                         .write(channel.as_std_io(), b.bit().into_inner(e))
-                        .wrap_err(
-                            ErrorKind::SerializationError,
-                            "Failed to write serialized bits.".to_string(),
-                        )?;
+                        .wrap_err_with(ErrorKind::SerializationError, || {
+                            "Failed to write serialized bits.".to_string()
+                        })?;
                 }
-                bit_ser.finish(channel.as_std_io()).wrap_err(
-                    ErrorKind::SerializationError,
-                    "Failed to finish bit serialization.".to_string(),
-                )?;
+                bit_ser
+                    .finish(channel.as_std_io())
+                    .wrap_err_with(ErrorKind::SerializationError, || {
+                        "Failed to finish bit serialization.".to_string()
+                    })?;
 
                 for ab in authbits.iter() {
                     channel.write_bytes(ab.mac().into_inner(e).as_ref())?;
@@ -364,10 +362,9 @@ impl<P: Party> AuthBitGenerator<P> {
             }
             WhichParty::Verifier(e) => {
                 let mut bit_ser: F2BitDeserializer = SequenceDeserializer::new(channel.as_std_io())
-                    .wrap_err(
-                        ErrorKind::InitializationError,
-                        "Failed to create sequence deserializer.".to_string(),
-                    )?;
+                    .wrap_err_with(ErrorKind::InitializationError, || {
+                        "Failed to create sequence deserializer.".to_string()
+                    })?;
                 let bits_ = outputs.into_inner(e);
                 // We only want to validate the bits we added to the `outputs`
                 // vector, so we save the existing length so we can only
@@ -376,10 +373,13 @@ impl<P: Party> AuthBitGenerator<P> {
                 for _ in 0..authbits.len() {
                     // Optimistically add the opened bits to the output vector.
                     // We remove these added values below if validation fails.
-                    bits_.push(bit_ser.read(channel.as_std_io()).wrap_err(
-                        ErrorKind::SerializationError,
-                        "Failed to read serialized bits.".to_string(),
-                    )?);
+                    bits_.push(
+                        bit_ser
+                            .read(channel.as_std_io())
+                            .wrap_err_with(ErrorKind::SerializationError, || {
+                                "Failed to read serialized bits.".to_string()
+                            })?,
+                    );
                 }
                 let mut validation = true;
                 for (ab, bit) in authbits.iter().zip(bits_[outputs_initial_len..].iter()) {

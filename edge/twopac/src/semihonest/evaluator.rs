@@ -23,10 +23,10 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
 {
     /// Make a new `Evaluator`.
     pub fn new(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self> {
-        let ot = OT::init(channel, &mut rng).wrap_err(
-            ErrorKind::InitializationError,
-            "Failed to initialize OT.".to_string(),
-        )?;
+        let ot = OT::init(channel, &mut rng)
+            .wrap_err_with(ErrorKind::InitializationError, || {
+                "Failed to initialize OT.".to_string()
+            })?;
         let evaluator = Ev::new(channel)?;
         Ok(Self { evaluator, ot, rng })
     }
@@ -38,7 +38,7 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
     ) -> swanky_error::Result<Vec<Block>> {
         self.ot
             .receive(channel, inputs, &mut self.rng)
-            .wrap_err(ErrorKind::OtherError, "Failed to run OT.".to_string())
+            .wrap_err_with(ErrorKind::OtherError, || "Failed to run OT.".to_string())
     }
 }
 
@@ -78,10 +78,11 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
             }
             lens.push(len);
         }
-        let wires = self.run_ot(&bs, channel).wrap_err(
-            ErrorKind::OtherError,
-            "Failed to run oblivious transfer.".to_string(),
-        )?;
+        let wires = self
+            .run_ot(&bs, channel)
+            .wrap_err_with(ErrorKind::OtherError, || {
+                "Failed to run oblivious transfer.".to_string()
+            })?;
         let mut start = 0;
         Ok(lens
             .into_iter()

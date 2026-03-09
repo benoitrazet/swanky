@@ -34,10 +34,10 @@ where
         Self: Sized,
     {
         Ok(PsiGarbler {
-            gb: Garbler::<RNG, OtSender, WireMod2>::new(channel, RNG::from_seed(seed)).wrap_err(
-                ErrorKind::InitializationError,
-                "Failed to create garbler.".to_string(),
-            )?,
+            gb: Garbler::<RNG, OtSender, WireMod2>::new(channel, RNG::from_seed(seed))
+                .wrap_err_with(ErrorKind::InitializationError, || {
+                    "Failed to create garbler.".to_string()
+                })?,
             rng: RNG::from_seed(seed),
             _base_psi: PhantomData,
         })
