@@ -1,46 +1,167 @@
-/edge/bristol-fashion/ @isweet
-/edge/bristol-fashion @isweet
-/edge/diet-mac-and-cheese/ @benoit.razet @cphifer
-/edge/diet-mac-and-cheese @benoit.razet @cphifer
+[Core] @amaloz @cphifer @rissa
+/core/error
+/core/error/
 
-/edge/adversary/ @cphifer
+/core/vectoreyes
+/core/vectoreyes/
+
+[Edge]
 /edge/adversary @cphifer
-/edge/block/ @cphifer
+/edge/adversary/ @cphifer
+
+/edge/aes-hash @amaloz @rissa
+/edge/aes-hash/ @amaloz @rissa
+
+/edge/aes-rng @amaloz @rissa
+/edge/aes-rng/ @amaloz @rissa
+
+/edge/authenticated-bits @amaloz @rissa
+/edge/authenticated-bits/ @amaloz @rissa
+
+/edge/authenticated-garbling @amaloz @rissa
+/edge/authenticated-garbling/ @amaloz @rissa
+
+/edge/bit-matrix-transpose @amaloz @benoit.razet
+/edge/bit-matrix-transpose/ @amaloz @benoit.razet
+
 /edge/block @cphifer
-/edge/channel/ @marc
-/edge/channel @marc
-/edge/flatbuffer-build/ @marc
-/edge/flatbuffer-build @marc
-/edge/party/ @marc @cphifer
-/edge/party @marc @cphifer
-/edge/serialization/ @marc @cphifer
-/edge/serialization @marc @cphifer
-/edge/keyed_arena/ @marc
-/edge/keyed_arena @marc
+/edge/block/ @cphifer
 
-/core/vectoreyes/ @marc
-/core/vectoreyes @marc
+/edge/bristol-fashion @cphifer
+/edge/bristol-fashion/ @cphifer
 
-[Finite Fields] @marc @cphifer
-/edge/field/
-/edge/field
-/edge/field-binary/
-/edge/field-binary
-/edge/field-f61p/
-/edge/field-f61p
-/edge/field-ff-primes/
-/edge/field-ff-primes
-/edge/field-test/
-/edge/field-test
+/edge/bytearray-utils @cphifer
+/edge/bytearray-utils/ @cphifer
 
-[CI Infrastructure] @marc @cphifer
-/swanky
-/rust-toolchain
-/.gitlab-ci.yml
+/edge/channel @cphifer
+/edge/channel/ @cphifer
+
+/edge/channel-legacy @cphifer
+/edge/channel-legacy/ @cphifer
+
+/edge/cointoss @amaloz
+/edge/cointoss/ @amaloz
+
+/edge/deprecated-bitwise-utils @cphifer
+/edge/deprecated-bitwise-utils/ @cphifer
+
+/edge/diet-mac-and-cheese @benoit.razet @cphifer
+/edge/diet-mac-and-cheese/ @benoit.razet @cphifer
+
+/edge/f-eq @rissa
+/edge/f-eq/ @rissa
+
+/edge/f-rand @amaloz @rissa
+/edge/f-rand/ @amaloz @rissa
+
+/edge/fancy-garbling @amaloz @rissa
+/edge/fancy-garbling/ @amaloz @rissa
+
+/edge/field @cphifer
+/edge/field/ @cphifer
+
+/edge/field-binary @cphifer
+/edge/field-binary/ @cphifer
+
+/edge/field-f61p @cphifer
+/edge/field-f61p/ @cphifer
+
+/edge/field-ff-primes @cphifer
+/edge/field-ff-primes/ @cphifer
+
+/edge/field-fft @cphifer
+/edge/field-fft/ @cphifer
+
+/edge/field-test @cphifer
+/edge/field-test/ @cphifer
+
+/edge/flatbuffer-build @cphifer
+/edge/flatbuffer-build/ @cphifer
+
+/edge/garbled-nn @amaloz @rissa
+/edge/garbled-nn/ @amaloz @rissa
+
+/edge/humidor @hamlinb
+/edge/humidor/ @hamlinb
+
+/edge/inferno @amaloz
+/edge/inferno/ @amaloz
+
+/edge/keyed_arena @cphifer
+/edge/keyed_arena/ @cphifer
+
+/edge/mac-n-cheese @cphifer
+/edge/mac-n-cheese/ @cphifer
+
+/edge/malicious-hooks @amaloz @rissa
+/edge/malicious-hooks/ @amaloz @rissa
+
+/edge/ocelot-error @amaloz @rissa
+/edge/ocelot-error/ @amaloz @rissa
+
+/edge/oprf-kkrt @amaloz @rissa
+/edge/oprf-kkrt/ @amaloz @rissa
+
+/edge/oprf-kmprt @amaloz @rissa
+/edge/oprf-kmprt/ @amaloz @rissa
+
+/edge/oprf-traits @amaloz @rissa
+/edge/oprf-traits/ @amaloz @rissa
+
+/edge/ot-alsz-kos @amaloz @rissa
+/edge/ot-alsz-kos/ @amaloz @rissa
+
+/edge/ot-chou-orlandi @amaloz @rissa
+/edge/ot-chou-orlandi/ @amaloz @rissa
+
+/edge/ot-dummy @amaloz @rissa
+/edge/ot-dummy/ @amaloz @rissa
+
+/edge/ot-noar-pinkas @amaloz @rissa
+/edge/ot-noar-pinkas/ @amaloz @rissa
+
+/edge/ot-test @amaloz @rissa
+/edge/ot-test/ @amaloz @rissa
+
+/edge/ot-traits @amaloz @rissa
+/edge/ot-traits/ @amaloz @rissa
+
+/edge/party @cphifer
+/edge/party/ @cphifer
+
+/edge/polynomial @cphifer
+/edge/polynomial/ @cphifer
+
+/edge/popsicle @amaloz @rissa
+/edge/popsicle/ @amaloz @rissa
+
+/edge/schmivitz @benoit.razet @marcella
+/edge/schmivitz/ @benoit.razet @marcella
+
+/edge/serialization @cphifer
+/edge/serialization/ @cphifer
+
+/edge/simple-arith-circuit @amaloz @cphifer
+/edge/simple-arith-circuit/ @amaloz @cphifer
+
+/edge/svole-wykw @amaloz @benoit.razet
+/edge/svole-wykw/ @amaloz @benoit.razet
+
+/edge/twopac @amaloz @rissa
+/edge/twopac/ @amaloz @rissa
+
+/edge/zkv @amaloz
+/edge/zkv/ @amaloz
+
+[CI Infrastructure] @cphifer
 /.cargo
 /.cargo/
-/etc
-/etc/
+/.github
+/.github/
 /.gitlab
 /.gitlab/
-
+/.gitlab-ci.yml
+/etc/
+/etc
+/rust-toolchain
+/swanky
