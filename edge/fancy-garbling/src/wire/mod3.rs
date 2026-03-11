@@ -58,6 +58,87 @@ impl HasModulus for WireMod3 {
     }
 }
 
+impl core::ops::Add for WireMod3 {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let a1 = self.lsb;
+        let a2 = self.msb;
+        let b1 = rhs.lsb;
+        let b2 = rhs.msb;
+
+        let t = (a1 | b2) ^ (a2 | b1);
+        let c1 = (a2 | b2) ^ t;
+        let c2 = (a1 | b1) ^ t;
+        Self { lsb: c1, msb: c2 }
+    }
+}
+
+impl core::ops::AddAssign for WireMod3 {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs;
+    }
+}
+
+impl core::ops::Sub for WireMod3 {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self + -rhs
+    }
+}
+
+impl core::ops::SubAssign for WireMod3 {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = *self - rhs;
+    }
+}
+
+impl core::ops::Neg for WireMod3 {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        // Negation just involves swapping `lsb` and `msb`.
+        let mut output = self;
+        std::mem::swap(&mut output.lsb, &mut output.msb);
+        output
+    }
+}
+
+impl core::ops::Mul<u16> for WireMod3 {
+    type Output = Self;
+
+    fn mul(self, rhs: u16) -> Self::Output {
+        let c = rhs % 3;
+        match c {
+            0 => Self { msb: 0, lsb: 0 },
+            1 => self,
+            2 => Self {
+                msb: self.lsb,
+                lsb: self.msb,
+            },
+            _ => unreachable!("Due to initial `rhs % 3`"),
+        }
+    }
+}
+
+impl core::ops::MulAssign<u16> for WireMod3 {
+    fn mul_assign(&mut self, rhs: u16) {
+        let c = rhs % 3;
+        match c {
+            0 => {
+                self.msb = 0;
+                self.lsb = 0;
+            }
+            1 => {}
+            2 => {
+                std::mem::swap(&mut self.lsb, &mut self.msb);
+            }
+            _ => unreachable!("Due to initial `rhs % 3`"),
+        }
+    }
+}
+
 impl WireMod3 {
     /// We have to convert `block` into a valid `Mod3` encoding.
     ///
@@ -104,43 +185,6 @@ impl WireLabel for WireMod3 {
         let color = (((self.msb & 1) as u16) << 1) | ((self.lsb & 1) as u16);
         debug_assert_ne!(color, 3);
         color
-    }
-
-    fn plus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self {
-        let a1 = &mut self.lsb;
-        let a2 = &mut self.msb;
-        let b1 = other.lsb;
-        let b2 = other.msb;
-
-        let t = (*a1 | b2) ^ (*a2 | b1);
-        let c1 = (*a2 | b2) ^ t;
-        let c2 = (*a1 | b1) ^ t;
-        *a1 = c1;
-        *a2 = c2;
-        self
-    }
-
-    fn cmul_eq(&mut self, c: u16) -> &mut Self {
-        match c {
-            0 => {
-                self.msb = 0;
-                self.lsb = 0;
-            }
-            1 => {}
-            2 => {
-                std::mem::swap(&mut self.lsb, &mut self.msb);
-            }
-            c => {
-                self.cmul_eq(c % 3);
-            }
-        }
-        self
-    }
-
-    fn negate_eq(&mut self) -> &mut Self {
-        // Negation just involves swapping `lsb` and `msb`.
-        std::mem::swap(&mut self.lsb, &mut self.msb);
-        self
     }
 
     fn from_block(inp: Block, q: u16) -> Self {
