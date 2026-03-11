@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 //! Benchmark code of garbling / evaluating using Nigel's circuits.
 
 use criterion::{Criterion, criterion_group, criterion_main};
