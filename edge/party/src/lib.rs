@@ -1,13 +1,13 @@
 //! Support for types indexed by a _party_.
 //!
 //! This crate enables code de-duplication in the context of
-//! multi-party protocols.
+//! multi-party protocols, both generically and with respect to a
+//! specific _party system_ (that is, the pair of participants in a
+//! two-party protocol).
 //!
 //! Using the [`party_system`] macro, a [`PartySystem`] can be defined
 //! that uses names appropriate to the protocol context.
-//! A `PartySystem` is a set of two participants in a multi-party
-//! protocol operating opposite one another, such as `Alice` and `Bob`
-//! as defined below:
+//! The following defines the classic `Alice` and `Bob` `PartySystem`:
 //!
 //! ```
 //! use swanky_party::{party_system};
@@ -24,6 +24,19 @@
 //!
 //! - `ps::Party` can be used to implement functions and types that
 //!   are generic over the system's participants.
+//! - Given `P: ps::Party`, `P::WHICH` is a constant `ps::WhichParty`,
+//!   which is `ps::WhichParty::Alice(e)` when `P` is `Alice` (`e`
+//!   being _evidence_ of the type equality used to run code specific
+//!   to Alice).
+//!   Naturally, `ps::WhichParty::Bob(e)` gives evidence that `P` is
+//!   `Bob`.
+//!   These are all compatible with `GenericParty` and
+//!   `GenericWhichParty` by design.
+//!
+//! All party systems can be used with the following generic modules
+//! to accomplish a variety of tasks, from specifying party-private
+//! data to associating one party system with another:
+//!
 //! - [`either`] defines `PartyEither` and `PartyEitherCopy`.
 //!   In short, these types are `repr(transparent)` to one type or
 //!   another, dependent on context (i.e. which participant is running
@@ -83,6 +96,26 @@
 //! fn do_something_alice<P: Party>(info: Info<P>, ev: Witness<impl EqualityProposition<P, Alice>>) {
 //!     /* ... Things only Alice can do ... */
 //! }
+//! ```
+//!
+//! Sometimes, however, a protocol isn't related to a particular party
+//! system (see, for example,
+//! [`swanky_f_eq`](../swanky_f_eq/index.html)); in cases like this,
+//! the protocol can be defined over `P: GenericParty` so that it can
+//! be used with _any_ concrete `PartySystem`.
+//!
+//! The [`swanky_channel`](../swanky_channel/index.html)
+//! `communicate(...)` method is an example of this in practice:
+//!
+//! ```ignore
+//! pub fn communicate<
+//!     PrivateTo: GenericParty<PartySystem = P::PartySystem>,
+//!     P: GenericParty,
+//!     T: CanonicalSerialize,
+//! >(
+//!     &mut self,
+//!     p: swanky_party::private::PartyPrivateCopy<PrivateTo, P, T>,
+//! ) -> swanky_error::Result<T>
 //! ```
 #![deny(missing_docs)]
 
