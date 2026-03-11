@@ -452,7 +452,7 @@ mod tests {
             }
             let mut w = x.clone();
             let z = w.clone() + y.clone();
-            w = w + y;
+            w += y;
             assert_eq!(w, z);
 
             w = x.clone();
