@@ -100,7 +100,7 @@ where
     let mut acc = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8, channel)?; // multiplication extends the representation of the number
     let zero = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8, channel)?;
 
-    for (i, bit) in intersect_bitvec.into_iter().enumerate() {
+    for (i, bit) in intersect_bitvec.iter().enumerate() {
         let mux_a = f.bin_multiplex(bit, &zero, &payload_a[i], channel)?;
         let mux_b = f.bin_multiplex(bit, &zero, &payload_b[i], channel)?;
         let mul = f.bin_addition_no_carry(&mux_a, &mux_b, channel)?;

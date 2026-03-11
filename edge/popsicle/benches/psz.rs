@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 //! Private set intersection (PSZ) benchmarks using `criterion`.
 
 use criterion::{Criterion, criterion_group, criterion_main};
@@ -61,8 +60,8 @@ fn _bench_psz(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
 fn bench_psi(c: &mut Criterion) {
     c.bench_function("psi::PSZ (initialization)", move |bench| {
         bench.iter(|| {
-            let result = _bench_psz_init();
-            std::hint::black_box(result)
+            _bench_psz_init();
+            std::hint::black_box(())
         })
     });
     c.bench_function("psi::PSZ (n = 2^8)", move |bench| {

@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 //! Private set intersection (PSTY) benchmarks using `criterion`.
 
 use popsicle::psty::{Receiver, Sender};
@@ -36,7 +35,7 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
                 start.elapsed().unwrap().as_millis()
             );
             let start = SystemTime::now();
-            let _ = state.compute_intersection(channel, &mut rng).unwrap();
+            state.compute_intersection(channel, &mut rng).unwrap();
             println!(
                 "Sender :: intersection time: {} ms",
                 start.elapsed().unwrap().as_millis()

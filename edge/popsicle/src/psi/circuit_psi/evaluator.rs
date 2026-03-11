@@ -69,11 +69,13 @@ where
         channel: &mut Channel,
     ) -> swanky_error::Result<Intersection> {
         // (0)
-        if payloads.is_some() && primary_keys.len() != payloads.unwrap().len() {
+        if let Some(payloads) = payloads
+            && primary_keys.len() != payloads.len()
+        {
             swanky_error::bail!(
                 ErrorKind::OtherError,
                 "Failed to intersect due to incomplete payload set: (#payloads := {}) != (#primary keys := {})",
-                payloads.unwrap().len(),
+                payloads.len(),
                 primary_keys.len(),
             );
         }

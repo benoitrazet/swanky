@@ -46,7 +46,7 @@ impl Sender {
         let s_hat = self.0.conditional_secret_sharing(inputs, channels, rng)?;
 
         // conditional reconstruction
-        let points = inputs.iter().cloned().zip(s_hat.into_iter()).collect_vec();
+        let points = inputs.iter().cloned().zip(s_hat).collect_vec();
         self.0.opprf_senders[0].send(&mut channels[0].1, &points, inputs.len(), rng)?;
 
         Ok(())
@@ -81,7 +81,7 @@ impl Receiver {
 
         let intersection = inputs
             .iter()
-            .zip(s_hat.into_iter())
+            .zip(s_hat)
             .filter_map(|(x, s)| {
                 if s == Block512::default() {
                     Some(*x)
@@ -207,6 +207,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::needless_range_loop)]
     fn test_protocol() {
         let mut rng = AesRng::new();
 

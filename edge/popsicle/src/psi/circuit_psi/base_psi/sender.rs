@@ -29,9 +29,10 @@ pub struct OpprfSender {
 /// Specifically, the `SenderState` describes how the OPPRF is
 /// programmed by the `OpprfSender`:
 /// - `opprf_primary_keys_in` and `opprf_payloads_in` are the programmed
-/// inputs of the OPPRF.
+///   inputs of the OPPRF.
 /// - `opprf_primary_keys_out` and `opprf_payloads_out` are their respective
-/// programmed outputs.
+///   programmed outputs.
+///
 /// When the OPPRF is called on a programmed input, it returns a
 /// programmed output. When the OPPRF is called on any other value,
 /// it returns a value that is sampled uniformly random.
@@ -127,11 +128,11 @@ impl BasePsi for OpprfSender {
                 // Then place the item in that bin while keeping track
                 // of the index of the hash function used in the process
                 opprf_primary_keys_in[bin].push(*x ^ Block::from(h as u128));
-                if payloads.is_some() {
+                if let Some(payloads) = payloads {
                     // The payload values are masked before being sent out
                     // and placed in the same bin index as the primary key they
                     // are associated with.
-                    opprf_payloads_in[bin].push(payloads.unwrap()[i] ^ opprf_payloads_out[bin]);
+                    opprf_payloads_in[bin].push(payloads[i] ^ opprf_payloads_out[bin]);
                 }
                 bins.push(bin);
             }
