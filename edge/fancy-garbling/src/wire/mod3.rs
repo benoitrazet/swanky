@@ -76,14 +76,7 @@ impl core::ops::Add for WireMod3 {
 
 impl core::ops::AddAssign for WireMod3 {
     fn add_assign(&mut self, rhs: Self) {
-        let a1 = self.lsb;
-        let a2 = self.msb;
-        let b1 = rhs.lsb;
-        let b2 = rhs.msb;
-
-        let t = (a1 | b2) ^ (a2 | b1);
-        self.lsb = (a2 | b2) ^ t;
-        self.msb = (a1 | b1) ^ t;
+        *self = *self + rhs;
     }
 }
 
