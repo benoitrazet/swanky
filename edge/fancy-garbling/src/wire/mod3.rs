@@ -108,6 +108,7 @@ impl core::ops::Neg for WireMod3 {
 impl core::ops::Mul<u16> for WireMod3 {
     type Output = Self;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: u16) -> Self::Output {
         let c = rhs % 3;
         match c {
@@ -123,6 +124,7 @@ impl core::ops::Mul<u16> for WireMod3 {
 }
 
 impl core::ops::MulAssign<u16> for WireMod3 {
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn mul_assign(&mut self, rhs: u16) {
         let c = rhs % 3;
         match c {

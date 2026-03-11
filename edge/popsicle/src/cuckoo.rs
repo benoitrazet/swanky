@@ -188,7 +188,7 @@ mod tests {
         // each item in a cuckoo bin should also be in one of the table bins
         for (opt_item, bin) in cuckoo.items.iter().zip_eq(&table) {
             if let Some(item) = opt_item {
-                assert!(bin.iter().any(|bin_elem| *bin_elem == item.entry));
+                assert!(bin.contains(&item.entry));
             }
         }
     }

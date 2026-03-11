@@ -69,8 +69,7 @@ impl<'a, T> Allocation<'a, T> {
         }
     }
     fn num_bitmap_words(len: usize) -> usize {
-        // ceil(len/64)
-        (len + 64 - 1) / 64
+        len.div_ceil(64)
     }
     unsafe fn bitmap_word(&self, word_idx: usize) -> *mut u64 {
         debug_assert!(word_idx < Self::num_bitmap_words(self.full_len));

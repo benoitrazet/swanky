@@ -312,11 +312,7 @@ impl<T: Sync + Send + Copy> OwnedAligned<T> {
         let mut out = Self::with_capacity(n);
         unsafe {
             let capacity_bytes = out.inner.capacity_bytes;
-            std::ptr::write_bytes(
-                out.inner.contents.as_ptr(),
-                0,
-                usize::try_from(capacity_bytes).unwrap(),
-            );
+            std::ptr::write_bytes(out.inner.contents.as_ptr(), 0, capacity_bytes);
             out.set_len(n);
         }
         out

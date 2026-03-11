@@ -218,7 +218,7 @@ impl OutputMapping {
         wirelabels: &[Wire],
     ) -> swanky_error::Result<Vec<u16>> {
         let mut outputs = Vec::new();
-        for (i, wirelabel) in wirelabels.into_iter().enumerate() {
+        for (i, wirelabel) in wirelabels.iter().enumerate() {
             let q = wirelabel.modulus();
             let mut decoded = None;
             for k in 0..q {

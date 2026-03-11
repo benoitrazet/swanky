@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use fancy_garbling::{
     FancyInput, WireMod2,
     circuit::{BinaryCircuit as Circuit, EvaluableCircuit},

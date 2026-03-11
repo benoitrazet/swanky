@@ -77,7 +77,7 @@ fn test_borrow() {
 
 mod random_tests {
     use super::*;
-    fn check<T: std::fmt::Debug + Eq>(alloc: &mut Allocation<T>, canonical: &Vec<Option<T>>) {
+    fn check<T: std::fmt::Debug + Eq>(alloc: &mut Allocation<T>, canonical: &[Option<T>]) {
         assert_eq!(alloc.len(), canonical.len());
         for (i, expected) in canonical.iter().enumerate() {
             assert_eq!(alloc.get_mut(i).as_deref(), expected.as_ref());

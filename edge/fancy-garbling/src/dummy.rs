@@ -46,6 +46,12 @@ impl Dummy {
     }
 }
 
+impl Default for Dummy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FancyInput for Dummy {
     type Item = DummyVal;
 

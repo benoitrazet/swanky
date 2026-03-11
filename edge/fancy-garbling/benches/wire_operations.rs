@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{AllWire, util::RngExt};
 use std::time::Duration;

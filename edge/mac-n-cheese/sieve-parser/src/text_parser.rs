@@ -384,7 +384,7 @@ impl<T: Read + Seek> ParseState<T> {
     }
     fn u8(&mut self) -> swanky_error::Result<u8> {
         let out: U64 = self.parse_uint_generic()?;
-        let out: u64 = out.to_words()[0].into();
+        let out: u64 = out.to_words()[0];
         let out = out.try_into().wrap_err_with(ErrorKind::OtherError, || {
             "Value cannot be represented as a u8.".to_string()
         })?;
@@ -392,7 +392,7 @@ impl<T: Read + Seek> ParseState<T> {
     }
     fn u64(&mut self) -> swanky_error::Result<u64> {
         let out: U64 = self.parse_uint_generic()?;
-        Ok(out.to_words()[0].into())
+        Ok(out.to_words()[0])
     }
     fn bignum(&mut self) -> swanky_error::Result<Number> {
         let out: Number = self.parse_uint_generic()?;
@@ -402,7 +402,7 @@ impl<T: Read + Seek> ParseState<T> {
         matches!(ch, b'a'..=b'z' | b'A'..=b'Z' | b'_')
     }
     fn is_valid_token_char(ch: u8) -> bool {
-        Self::is_valid_token_start(ch) | matches!(ch, b'0'..=b'9')
+        Self::is_valid_token_start(ch) | ch.is_ascii_digit()
     }
     fn larrow(&mut self) -> swanky_error::Result<()> {
         self.expect_byte(b'<')?;
@@ -1155,6 +1155,7 @@ impl<T: Read + Seek> ValueStreamReader<T> {
     pub fn modulus(&self) -> &Number {
         &self.modulus
     }
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> swanky_error::Result<Option<Number>> {
         self.next_inner().with_context(|| {
             match self

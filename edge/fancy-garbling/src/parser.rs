@@ -190,8 +190,8 @@ mod tests {
             "10100001111101100010010110001100100001110111110101011111110011011000100101100100010010000100010100111000101111111100100100101100"
         );
         let mut key = vec![0u16; 128];
-        for i in 0..8 {
-            key[i] = 1;
+        for key_part in key.iter_mut().take(8) {
+            *key_part = 1;
         }
         let pt = vec![0u16; 128];
         let output = eval_plain(&circ, &pt, &key).unwrap();

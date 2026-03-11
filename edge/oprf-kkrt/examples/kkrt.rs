@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use std::time::SystemTime;
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;

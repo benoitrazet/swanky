@@ -84,12 +84,14 @@ impl<Field: FiniteField + FieldForFFT<2> + FieldForFFT<3>> PackedSecretSharingGe
         self.secret_count
     }
 
-    ///
+    /// Return the `m`-th principal root of unity in Zp, where `m =
+    /// secret_count + threshold + 1` must be a power of 2.
     pub fn omega_secrets(&self) -> Field {
         self.omega_secrets
     }
 
-    ///
+    /// Return the `n`-th principal root of unity in Zp, where `n =
+    /// share_count + 1` must be a power of 3.
     pub fn omega_shares(&self) -> Field {
         self.omega_shares
     }
@@ -155,7 +157,7 @@ impl<Field: FiniteField + FieldForFFT<2> + FieldForFFT<3>> PackedSecretSharingGe
         values
     }
 
-    fn evaluate_polynomial(&self, coefficients: &mut Vec<Field>) {
+    fn evaluate_polynomial(&self, coefficients: &mut [Field]) {
         debug_assert_eq!(coefficients.len(), self.share_count + 1);
         fft::fft3_in_place(coefficients, self.omega_shares)
     }

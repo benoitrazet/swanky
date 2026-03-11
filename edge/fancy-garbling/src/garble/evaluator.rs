@@ -64,11 +64,11 @@ impl<Wire: WireLabel> Evaluator<Wire> {
 impl<W: BinaryWireLabel> FancyBinary for Evaluator<W> {
     /// Negate is a noop for the evaluator
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        x.clone() + self.one
+        *x + self.one
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        x.clone() + y.clone()
+        *x + *y
     }
 
     fn and(

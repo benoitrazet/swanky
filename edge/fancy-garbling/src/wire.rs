@@ -433,6 +433,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::erasing_op)]
     fn arithmetic() {
         let mut rng = thread_rng();
         for _ in 0..1024 {

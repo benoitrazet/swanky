@@ -117,7 +117,7 @@ pub trait CrtGadgets:
         CrtBundle::new(
             x.wires()
                 .iter()
-                .zip(cs.into_iter())
+                .zip(cs)
                 .map(|(x, c)| self.cmul(x, c))
                 .collect::<Vec<Self::Item>>(),
         )
@@ -319,22 +319,20 @@ pub trait CrtGadgets:
         channel: &mut Channel,
     ) -> swanky_error::Result<CrtBundle<Self::Item>> {
         assert!(!xs.is_empty(), "`xs` cannot be empty");
-        xs.iter().skip(1).fold(Ok(xs[0].clone()), |x, y| {
-            x.map(|x| {
-                let pos = self.crt_lt(&x, y, accuracy, channel)?;
-                let neg = self.negate(&pos);
-                Ok(CrtBundle::new(
-                    x.wires()
-                        .iter()
-                        .zip(y.wires().iter())
-                        .map(|(x, y)| {
-                            let xp = self.mul(x, &neg, channel)?;
-                            let yp = self.mul(y, &pos, channel)?;
-                            Ok(self.add(&xp, &yp))
-                        })
-                        .collect::<swanky_error::Result<Vec<Self::Item>>>()?,
-                ))
-            })?
+        xs.iter().skip(1).try_fold(xs[0].clone(), |x, y| {
+            let pos = self.crt_lt(&x, y, accuracy, channel)?;
+            let neg = self.negate(&pos);
+            Ok(CrtBundle::new(
+                x.wires()
+                    .iter()
+                    .zip(y.wires().iter())
+                    .map(|(x, y)| {
+                        let xp = self.mul(x, &neg, channel)?;
+                        let yp = self.mul(y, &pos, channel)?;
+                        Ok(self.add(&xp, &yp))
+                    })
+                    .collect::<swanky_error::Result<Vec<Self::Item>>>()?,
+            ))
         })
     }
 
@@ -462,7 +460,7 @@ pub trait CrtGadgets:
         for i in 0..l {
             let b = 2u128.pow(l - i - 1);
             let mut pb = q_ / b;
-            if q_ % b == 0 {
+            if q_.is_multiple_of(b) {
                 pb -= 1;
             }
 

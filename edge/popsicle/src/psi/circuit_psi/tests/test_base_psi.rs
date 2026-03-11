@@ -31,8 +31,8 @@ mod tests {
                     Garbler::<AesRng, OtSender, WireMod2>::new(channel, rng.clone()).unwrap();
                 Ok(OpprfSender::base_psi(
                     &mut gb,
-                    &primary_keys,
-                    Some(&payloads),
+                    primary_keys,
+                    Some(payloads),
                     channel,
                     &mut rng,
                 ))
@@ -43,8 +43,8 @@ mod tests {
                     Evaluator::<AesRng, OtReceiver, WireMod2>::new(channel, rng.clone()).unwrap();
                 Ok(OpprfReceiver::base_psi(
                     &mut ev,
-                    &primary_keys,
-                    Some(&payloads),
+                    primary_keys,
+                    Some(payloads),
                     channel,
                     &mut rng,
                 ))
@@ -63,7 +63,7 @@ mod tests {
             let (result_sender, _) =
                 psty_base_psi(&primary_keys, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_sender.is_err(),
+                result_sender.is_ok(),
                 "PSTY's Base Psi failed on the sender side"
             );
         }
@@ -79,7 +79,7 @@ mod tests {
             let (result_sender, _) =
                 psty_base_psi(&primary_keys, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_sender.is_err(),
+                result_sender.is_ok(),
                 "PSTY's Base Psi failed on the sender side"
             );
         }
@@ -94,7 +94,7 @@ mod tests {
             let (result_sender, _) =
                 psty_base_psi(&primary_keys, &payloads, rng.r#gen(), DEFAULT_SEED);
             assert!(
-                !result_sender.is_err(),
+                result_sender.is_ok(),
                 "PSTY's Base Psi failed on the sender side"
             );
         }
@@ -109,7 +109,7 @@ mod tests {
             let (_, result_receiver) =
                 psty_base_psi(&primary_keys, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_receiver.is_err(),
+                result_receiver.is_ok(),
                 "PSTY's Base Psi failed on the receiver side"
             );
         }
@@ -125,7 +125,7 @@ mod tests {
             let (_, result_receiver) =
                 psty_base_psi(&primary_keys, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_receiver.is_err(),
+                result_receiver.is_ok(),
                 "PSTY's Base Psi failed on the receiver side"
             );
         }
@@ -140,7 +140,7 @@ mod tests {
             let (_, result_receiver) =
                 psty_base_psi(&primary_keys, &payloads, DEFAULT_SEED, rng.r#gen());
             assert!(
-                !result_receiver.is_err(),
+                result_receiver.is_ok(),
                 "PSTY's Base Psi failed on the receiver side"
             );
         }

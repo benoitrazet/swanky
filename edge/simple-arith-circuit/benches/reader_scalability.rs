@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use simple_arith_circuit::Circuit;
 use std::io::{BufWriter, Write};
 
@@ -9,7 +8,7 @@ fn bench_reader_scalability() {
     writeln!(tmp, "{gate_count} {wire_count}").unwrap();
     writeln!(tmp, "1 1").unwrap(); // number-of-input-values number-of-wires-each-input-value...
     writeln!(tmp, "1 1").unwrap(); // number-of-output-values number-of-wires-each-output-value...
-    writeln!(tmp, "").unwrap();
+    writeln!(tmp).unwrap();
     for i in 0..wire_count {
         writeln!(tmp, "1 1 {i} {} INV", i + 1).unwrap();
     }

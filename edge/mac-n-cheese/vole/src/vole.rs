@@ -51,7 +51,7 @@ fn make_ggm_seeds(lpn_seeds: &Aes128EncryptOnly) -> (Aes128EncryptOnly, Aes128En
 }
 
 fn lpn_rng_from_seed(selector: u64, lpn_seeds: &Aes128EncryptOnly) -> AesRng {
-    AesRng::from_seed(lpn_seeds.encrypt(U64x2::from([selector, 0]).into()).into())
+    AesRng::from_seed(lpn_seeds.encrypt(U64x2::from([selector, 0]).into()))
 }
 
 /// Generates powers of `FE::GENERATOR`.
@@ -291,7 +291,7 @@ impl<T: MacTypes> VoleSenderStep3<T> {
         let mut rng_chi = AesRng::from_seed(self.seed);
         let (mut va, x_stars) = T::S::spsvole_sender_compute_va(
             &mut rng_chi,
-            TransparentWrapper::peel_slice(TransparentWrapper::peel_slice(&result)),
+            TransparentWrapper::peel_slice(TransparentWrapper::peel_slice(result)),
         );
         for (pows, (x_star, (u, w))) in sender.pows.iter().zip(
             x_stars.iter().zip(
@@ -398,6 +398,7 @@ impl<T: MacTypes> VoleReceiver<T> {
             phantom: PhantomData,
         })
     }
+    #[allow(clippy::too_many_arguments)]
     pub fn receive(
         &self,
         arena: &KeyedArena,
@@ -509,7 +510,7 @@ pub struct VoleReceiverStep4<T: MacTypes> {
     selector: u64,
     phantom: PhantomData<T>,
 }
-impl<'a, T: MacTypes> VoleReceiverStep4<T> {
+impl<T: MacTypes> VoleReceiverStep4<T> {
     pub fn stage2(
         self,
         receiver: &VoleReceiver<T>,
@@ -565,7 +566,7 @@ impl<'a, T: MacTypes> VoleReceiverStep4<T> {
         let vb: T::TF = T::S::spsvole_receiver_consistency_check_compute_vb(
             &mut rng_chi,
             y,
-            TransparentWrapper::peel_slice(TransparentWrapper::peel_slice(&spsvole_result)),
+            TransparentWrapper::peel_slice(TransparentWrapper::peel_slice(spsvole_result)),
         );
         // Now run the eq protocol on vb
         let mut commitment = [0; 32];
@@ -585,7 +586,7 @@ pub struct VoleReceiverStep6<T: MacTypes> {
     selector: u64,
     phantom: PhantomData<T>,
 }
-impl<'a, T: MacTypes> VoleReceiverStep6<T> {
+impl<T: MacTypes> VoleReceiverStep6<T> {
     pub fn stage3(
         self,
         receiver: &VoleReceiver<T>,

@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use criterion::{Criterion, criterion_group, criterion_main};
 use rand::Rng;
 use std::hint::black_box;

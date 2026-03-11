@@ -33,7 +33,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel + DeserializeOwned> Garbler<RNG, 
         let f = std::fs::File::open(filename)?;
         let reader = std::io::BufReader::new(f);
         let deltas: HashMap<u16, Wire> = serde_json::from_reader(reader)?;
-        self.deltas.extend(deltas.into_iter());
+        self.deltas.extend(deltas);
         Ok(())
     }
 }
@@ -197,7 +197,7 @@ impl<RNG: RngCore + CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, 
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        x.clone() + y.clone()
+        *x + *y
     }
 
     /// We can negate by having garbler xor wire with Delta
@@ -205,7 +205,7 @@ impl<RNG: RngCore + CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, 
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        let zero = self.zero.clone();
+        let zero = self.zero;
         self.xor(&zero, x)
     }
 }
@@ -310,8 +310,8 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
             }
 
             let mut packed = 0;
-            for i in 0..qb as usize {
-                packed += minitable[i] << (16 * i);
+            for (i, item) in minitable.iter().enumerate().take(qb as usize) {
+                packed += item << (16 * i);
             }
             gate.push(Block::from(packed));
         } else {

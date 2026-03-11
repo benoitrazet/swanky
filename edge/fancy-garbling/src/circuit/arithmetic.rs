@@ -367,10 +367,10 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
         &mut self,
         xref: &CircuitRef,
         yref: &CircuitRef,
-        channel: &mut Channel,
+        _channel: &mut Channel,
     ) -> swanky_error::Result<CircuitRef> {
         if xref.modulus() < yref.modulus() {
-            return self.mul(yref, xref, channel);
+            return self.mul(yref, xref, _channel);
         }
 
         let gate = ArithmeticGate::Mul {

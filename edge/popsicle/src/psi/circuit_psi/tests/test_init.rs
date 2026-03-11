@@ -26,7 +26,7 @@ mod tests {
             .unwrap();
 
             assert!(
-                !receiver.is_err(),
+                receiver.is_ok(),
                 "PSTY Initialization failed on the receiver side"
             );
         }
@@ -48,7 +48,7 @@ mod tests {
             .unwrap();
 
             assert!(
-                !sender.is_err(),
+                sender.is_ok(),
                 "PSTY Initialization failed on the sender side"
             );
         }

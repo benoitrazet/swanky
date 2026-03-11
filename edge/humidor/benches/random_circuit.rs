@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use core::time::Duration;
 use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput};
 use criterion::{criterion_group, criterion_main};

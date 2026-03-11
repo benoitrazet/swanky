@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 //! Private set intersection (PSTY) benchmarks using `criterion`.
 
 use criterion::{Criterion, criterion_group, criterion_main};
@@ -25,10 +24,8 @@ fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
         .into_iter()
         .map(|item| {
             let value_bytes = item.to_le_bytes();
-            let mut res_block = [0 as u8; 64];
-            for i in 0..8 {
-                res_block[i] = value_bytes[i];
-            }
+            let mut res_block = [0_u8; 64];
+            res_block[..8].copy_from_slice(&value_bytes[..8]);
             Block512::from(res_block)
         })
         .collect()
@@ -58,14 +55,13 @@ fn bench_psty_payload(
     receiver_inputs: Vec<Vec<u8>>,
     payloads: Vec<Block512>,
     weights: Vec<Block512>,
-) -> () {
+) {
     swanky_channel::local::local_channel_pair(
         |channel| {
             let mut rng = AesRng::new();
             let mut psi = Sender::init(channel, &mut rng).unwrap();
             // For small to medium sized sets where batching can occur accross all bins
-            let _ = psi
-                .full_protocol(&sender_inputs, &weights, channel, &mut rng)
+            psi.full_protocol(&sender_inputs, &weights, channel, &mut rng)
                 .unwrap();
             Ok(())
         },
@@ -85,8 +81,8 @@ fn bench_psty_payload(
 fn bench_psi(c: &mut Criterion) {
     c.bench_function("psi::PSTY PAYLOAD (initialization)", move |bench| {
         bench.iter(|| {
-            let result = bench_psty_payload_init();
-            std::hint::black_box(result)
+            bench_psty_payload_init();
+            std::hint::black_box(())
         })
     });
     c.bench_function("psi::PSTY PAYLOAD (n = 2^8)", move |bench| {
@@ -94,8 +90,8 @@ fn bench_psi(c: &mut Criterion) {
         let rs = rand_vec_vec(1 << 8);
         let payload = int_vec_block512(rand_u64_vec(1 << 8, 1 << 30, &mut rng));
         bench.iter(|| {
-            let v = bench_psty_payload(rs.clone(), rs.clone(), payload.clone(), payload.clone());
-            std::hint::black_box(v)
+            bench_psty_payload(rs.clone(), rs.clone(), payload.clone(), payload.clone());
+            std::hint::black_box(())
         })
     });
     c.bench_function("psi::PSTY PAYLOAD (n = 2^12)", move |bench| {
@@ -103,8 +99,8 @@ fn bench_psi(c: &mut Criterion) {
         let rs = rand_vec_vec(1 << 12);
         let payload = int_vec_block512(rand_u64_vec(1 << 12, 1 << 30, &mut rng));
         bench.iter(|| {
-            let v = bench_psty_payload(rs.clone(), rs.clone(), payload.clone(), payload.clone());
-            std::hint::black_box(v)
+            bench_psty_payload(rs.clone(), rs.clone(), payload.clone(), payload.clone());
+            std::hint::black_box(())
         })
     });
 }

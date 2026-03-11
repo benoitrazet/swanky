@@ -48,6 +48,7 @@ pub(crate) fn round1<S: LinearSharing<F, N>, F: FiniteField, const N: usize>(
 }
 
 // This round is only run by the prover.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn round_compress_start<F: FiniteField, const N: usize>(
     round: Round<SecretSharing<F, N>>,
     k: usize,          // The compression factor.
