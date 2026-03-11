@@ -171,7 +171,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
     }
 
     fn cmul(&mut self, x: &Wire, c: u16) -> Wire {
-        x.cmul(c)
+        x.clone() * c
     }
 
     fn mul(&mut self, A: &Wire, B: &Wire, channel: &mut Channel) -> swanky_error::Result<Wire> {
@@ -221,7 +221,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
             B.color()
         };
 
-        let res = L + R + A.cmul(new_b_color);
+        let res = L + R + A.clone() * new_b_color;
         Ok(res)
     }
 

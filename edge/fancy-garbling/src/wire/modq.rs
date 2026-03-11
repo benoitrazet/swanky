@@ -137,6 +137,27 @@ impl core::ops::Neg for WireModQ {
     }
 }
 
+impl core::ops::Mul<u16> for WireModQ {
+    type Output = Self;
+
+    fn mul(self, rhs: u16) -> Self::Output {
+        let q = self.q;
+        let mut ds = self.ds.clone();
+        ds.iter_mut()
+            .for_each(|d| *d = (*d as u32 * rhs as u32 % q as u32) as u16);
+        Self { ds, q }
+    }
+}
+
+impl core::ops::MulAssign<u16> for WireModQ {
+    fn mul_assign(&mut self, rhs: u16) {
+        let q = self.q;
+        self.ds
+            .iter_mut()
+            .for_each(|d| *d = (*d as u32 * rhs as u32 % q as u32) as u16);
+    }
+}
+
 impl WireLabel for WireModQ {
     fn rand_delta<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
         if q < 2 {
@@ -165,14 +186,6 @@ impl WireLabel for WireModQ {
         let color = self.ds[0];
         debug_assert!(color < self.q);
         color
-    }
-
-    fn cmul_eq(&mut self, c: u16) -> &mut Self {
-        let q = self.q;
-        self.ds
-            .iter_mut()
-            .for_each(|d| *d = (*d as u32 * c as u32 % q as u32) as u16);
-        self
     }
 
     fn from_block(inp: Block, q: u16) -> Self {

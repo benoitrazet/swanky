@@ -57,6 +57,28 @@ impl core::ops::Neg for WireMod2 {
     }
 }
 
+impl core::ops::Mul<u16> for WireMod2 {
+    type Output = Self;
+
+    fn mul(self, rhs: u16) -> Self::Output {
+        if rhs & 1 == 0 {
+            Self {
+                val: Block::default(),
+            }
+        } else {
+            self
+        }
+    }
+}
+
+impl core::ops::MulAssign<u16> for WireMod2 {
+    fn mul_assign(&mut self, rhs: u16) {
+        if rhs & 1 == 0 {
+            self.val = Block::default();
+        }
+    }
+}
+
 impl ConditionallySelectable for WireMod2 {
     fn conditional_select(a: &Self, b: &Self, choice: subtle::Choice) -> Self {
         WireMod2::from_block(
@@ -92,13 +114,6 @@ impl WireLabel for WireMod2 {
     fn color(&self) -> u16 {
         // This extracts the least-significant bit of the U8x16.
         (self.val.extract::<0>() & 1) as u16
-    }
-
-    fn cmul_eq(&mut self, c: u16) -> &mut Self {
-        if c & 1 == 0 {
-            self.val = Block::default();
-        }
-        self
     }
 
     fn from_block(inp: Block, q: u16) -> Self {

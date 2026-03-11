@@ -29,11 +29,11 @@ impl BinaryWireLabel for WireMod2 {
 
         // X = H(A+aD) + arD such that a + A.color == 0
         let alpha = A.color(); // alpha = -A.color
-        let X1 = A.clone() + D.cmul(alpha);
+        let X1 = A.clone() + D.clone() * alpha;
 
         // Y = H(B + bD) + (b + r)A such that b + B.color == 0
         let beta = (q - B.color()) % q;
-        let Y1 = B.clone() + D.cmul(beta);
+        let Y1 = B.clone() + D.clone() * beta;
 
         let AD = A.clone() + D.clone();
         let BD = B.clone() + D.clone();
@@ -48,7 +48,7 @@ impl BinaryWireLabel for WireMod2 {
 
         let [hashA, hashB, hashX, hashY] = hash_wires([&newA, &B, &X1, &Y1], g);
 
-        let X = Self::hash_to_mod(hashX, q) + D.cmul(alpha * r % q);
+        let X = Self::hash_to_mod(hashX, q) + D.clone() * (alpha * r % q);
         let Y = Self::hash_to_mod(hashY, q);
 
         let gate0 = hashA
@@ -81,6 +81,6 @@ impl BinaryWireLabel for WireMod2 {
             2,
         );
 
-        L + R + A.cmul(B.color())
+        L + R + A.clone() * B.color()
     }
 }

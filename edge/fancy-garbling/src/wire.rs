@@ -44,6 +44,8 @@ pub trait WireLabel:
     + core::ops::Sub<Output = Self>
     + core::ops::SubAssign
     + core::ops::Neg<Output = Self>
+    + core::ops::Mul<u16, Output = Self>
+    + core::ops::MulAssign<u16>
 {
     /// The underlying digits encoded by the [`WireLabel`].
     fn digits(&self) -> Vec<u16>;
@@ -53,9 +55,6 @@ pub trait WireLabel:
 
     /// The color digit of the wire.
     fn color(&self) -> u16;
-
-    /// Multiplies the [`WireLabel`] by a constant `c mod q`.
-    fn cmul_eq(&mut self, c: u16) -> &mut Self;
 
     /// Converts a [`Block`] into its [`WireLabel`] representation, based on the
     /// modulus `q`.
@@ -112,18 +111,6 @@ pub trait WireLabel:
     fn hashback(&self, tweak: u128, q: u16) -> Self {
         let hash = self.hash(tweak);
         Self::hash_to_mod(hash, q)
-    }
-
-    /// Multiplies the [`WireLabel`] by a constant `c mod q`, consuming the
-    /// input.
-    fn cmul_mov(mut self, c: u16) -> Self {
-        self.cmul_eq(c);
-        self
-    }
-
-    /// Multiplies the [`WireLabel`] by a constant `c mod q`.
-    fn cmul(&self, c: u16) -> Self {
-        self.clone().cmul_mov(c)
     }
 
     /// Computes the hash of the [`WireLabel`].
@@ -207,6 +194,34 @@ impl core::ops::Neg for AllWire {
     }
 }
 
+impl core::ops::Mul<u16> for AllWire {
+    type Output = Self;
+
+    fn mul(self, rhs: u16) -> Self::Output {
+        match self {
+            Self::Mod2(x) => Self::Mod2(x * rhs),
+            Self::Mod3(x) => Self::Mod3(x * rhs),
+            Self::ModN(x) => Self::ModN(x * rhs),
+        }
+    }
+}
+
+impl core::ops::MulAssign<u16> for AllWire {
+    fn mul_assign(&mut self, rhs: u16) {
+        match self {
+            Self::Mod2(x) => {
+                *x *= rhs;
+            }
+            Self::Mod3(x) => {
+                *x *= rhs;
+            }
+            Self::ModN(x) => {
+                *x *= rhs;
+            }
+        };
+    }
+}
+
 impl WireLabel for AllWire {
     fn rand_delta<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self {
         match q {
@@ -237,20 +252,6 @@ impl WireLabel for AllWire {
             AllWire::Mod3(x) => x.color(),
             AllWire::ModN(x) => x.color(),
         }
-    }
-    fn cmul_eq(&mut self, c: u16) -> &mut Self {
-        match &mut *self {
-            AllWire::Mod2(x) => {
-                x.cmul_eq(c);
-            }
-            AllWire::Mod3(x) => {
-                x.cmul_eq(c);
-            }
-            AllWire::ModN(x) => {
-                x.cmul_eq(c);
-            }
-        };
-        self
     }
     fn from_block(inp: Block, q: u16) -> Self {
         match q {
@@ -438,10 +439,10 @@ mod tests {
             let q = rng.gen_modulus();
             let x = AllWire::rand(&mut rng, q);
             let y = AllWire::rand(&mut rng, q);
-            assert_eq!(x.cmul(0), AllWire::zero(q));
-            assert_eq!(x.cmul(q), AllWire::zero(q));
-            assert_eq!(x.clone() + x.clone(), x.cmul(2));
-            assert_eq!(x.clone() + x.clone() + x.clone(), x.cmul(3));
+            assert_eq!(x.clone() * 0, AllWire::zero(q));
+            assert_eq!(x.clone() * q, AllWire::zero(q));
+            assert_eq!(x.clone() + x.clone(), x.clone() * 2);
+            assert_eq!(x.clone() + x.clone() + x.clone(), x.clone() * 3);
             assert_eq!(-(-x.clone()), x);
             if q == 2 {
                 assert_eq!(x.clone() + y.clone(), x.clone() - y.clone());
@@ -455,7 +456,7 @@ mod tests {
             assert_eq!(w, z);
 
             w = x.clone();
-            w.cmul_eq(2);
+            w *= 2;
             assert_eq!(x.clone() + x.clone(), w);
 
             w = x.clone();

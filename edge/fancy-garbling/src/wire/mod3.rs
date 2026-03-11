@@ -112,6 +112,40 @@ impl core::ops::Neg for WireMod3 {
     }
 }
 
+impl core::ops::Mul<u16> for WireMod3 {
+    type Output = Self;
+
+    fn mul(self, rhs: u16) -> Self::Output {
+        let c = rhs % 3;
+        match c {
+            0 => Self { msb: 0, lsb: 0 },
+            1 => self,
+            2 => Self {
+                msb: self.lsb,
+                lsb: self.msb,
+            },
+            _ => unreachable!("Due to initial `rhs % 3`"),
+        }
+    }
+}
+
+impl core::ops::MulAssign<u16> for WireMod3 {
+    fn mul_assign(&mut self, rhs: u16) {
+        let c = rhs % 3;
+        match c {
+            0 => {
+                self.msb = 0;
+                self.lsb = 0;
+            }
+            1 => {}
+            2 => {
+                std::mem::swap(&mut self.lsb, &mut self.msb);
+            }
+            _ => unreachable!("Due to initial `rhs % 3`"),
+        }
+    }
+}
+
 impl WireMod3 {
     /// We have to convert `block` into a valid `Mod3` encoding.
     ///
@@ -158,23 +192,6 @@ impl WireLabel for WireMod3 {
         let color = (((self.msb & 1) as u16) << 1) | ((self.lsb & 1) as u16);
         debug_assert_ne!(color, 3);
         color
-    }
-
-    fn cmul_eq(&mut self, c: u16) -> &mut Self {
-        match c {
-            0 => {
-                self.msb = 0;
-                self.lsb = 0;
-            }
-            1 => {}
-            2 => {
-                std::mem::swap(&mut self.lsb, &mut self.msb);
-            }
-            c => {
-                self.cmul_eq(c % 3);
-            }
-        }
-        self
     }
 
     fn from_block(inp: Block, q: u16) -> Self {

@@ -59,7 +59,7 @@ impl<W: BinaryWireLabel> InputEncoder<W> {
                         .wires()
                         .iter()
                         .enumerate()
-                        .map(|(i, zero)| *zero + self.delta.cmul(1 & (bits >> i) as u16))
+                        .map(|(i, zero)| *zero + self.delta * (1 & (bits >> i) as u16))
                         .collect::<Vec<_>>(),
                 )
             })

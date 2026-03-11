@@ -163,7 +163,7 @@ impl<Wire: WireLabel> Encoder<Wire> {
             .zip(inputs)
             .map(|(zero, x)| {
                 let q = zero.modulus();
-                zero.clone() + self.deltas[&q].cmul(*x)
+                zero.clone() + self.deltas[&q].clone() * *x
             })
             .collect()
     }
@@ -180,7 +180,7 @@ impl<Wire: WireLabel> Encoder<Wire> {
             .zip(inputs)
             .map(|(zero, x)| {
                 let q = zero.modulus();
-                zero.clone() + self.deltas[&q].cmul(*x)
+                zero.clone() + self.deltas[&q].clone() * *x
             })
             .collect()
     }
@@ -199,7 +199,7 @@ impl OutputMapping {
             let q = zero.modulus();
             let mut wirelabels = Vec::with_capacity(q as usize);
             for k in 0..q {
-                let wirelabel = zero.clone() + deltas[&q].cmul(k);
+                let wirelabel = zero.clone() + deltas[&q].clone() * k;
                 let hashed = wirelabel.hash(output_tweak(i, k));
                 wirelabels.push(hashed);
             }
