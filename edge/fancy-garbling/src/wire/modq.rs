@@ -1,6 +1,6 @@
 use crate::{ArithmeticWire, HasModulus, WireLabel, util, wire::_unrank};
 use rand::{CryptoRng, Rng, RngCore};
-use swanky_block::Block;
+use vectoreyes::U8x16;
 
 /// Intermediate struct to deserialize WireModQ to
 ///
@@ -175,11 +175,11 @@ impl WireLabel for WireModQ {
         self.ds.clone()
     }
 
-    fn to_block(&self) -> Block {
+    fn to_block(&self) -> U8x16 {
         // This function converts a [`WireMod3`] into its [`Block`] representation.
         // The values stored in [`WireModQ`] are repacked depending on q
         // into a 128b value as a [`Block`].
-        Block::from(util::from_base_q(&self.ds, self.q))
+        util::from_base_q(&self.ds, self.q).into()
     }
 
     fn color(&self) -> u16 {
@@ -188,7 +188,7 @@ impl WireLabel for WireModQ {
         color
     }
 
-    fn from_block(inp: Block, q: u16) -> Self {
+    fn from_block(inp: U8x16, q: u16) -> Self {
         if q < 2 {
             panic!(
                 "[WireModQ::from_block] Modulus must be at least 2. Got {}",
@@ -236,7 +236,7 @@ impl WireLabel for WireModQ {
         Self { q, ds }
     }
 
-    fn hash_to_mod(hash: Block, q: u16) -> Self {
+    fn hash_to_mod(hash: U8x16, q: u16) -> Self {
         if q < 2 {
             panic!(
                 "[WireModQ::hash_to_mod] Modulus must be at least 2. Got {}",

@@ -1,5 +1,4 @@
-use std::marker::PhantomData;
-
+use super::security_warning::warn_proj;
 use crate::{
     AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyInput, HasModulus, WireMod2,
     check_binary,
@@ -9,11 +8,10 @@ use crate::{
     util::{output_tweak, tweak, tweak2},
     wire::WireLabel,
 };
-use swanky_block::Block;
+use std::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
-
-use super::security_warning::warn_proj;
+use vectoreyes::U8x16;
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
@@ -31,7 +29,7 @@ impl<Wire: WireLabel> Evaluator<Wire> {
     pub fn new(channel: &mut Channel) -> swanky_error::Result<Self> {
         // Receive the constant one wirelabel from the garbler. This is used to
         // make negation free.
-        let one = channel.read::<Block>()?;
+        let one = channel.read::<U8x16>()?;
         Ok(Evaluator {
             one: Wire::from_block(one, 2),
             current_gate: 0,
@@ -185,7 +183,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
         let mut gate = Vec::with_capacity(ngates);
         {
             for _ in 0..ngates {
-                let block = channel.read::<Block>()?;
+                let block = channel.read::<U8x16>()?;
                 gate.push(block);
             }
         }
@@ -236,7 +234,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
         let ngates = (x.modulus() - 1) as usize;
         let mut gate = Vec::with_capacity(ngates);
         for _ in 0..ngates {
-            let block = channel.read::<Block>()?;
+            let block = channel.read::<U8x16>()?;
             gate.push(block);
         }
         let t = tweak(self.current_gate());

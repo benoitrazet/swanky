@@ -10,7 +10,6 @@ use rand::{CryptoRng, RngCore};
 #[cfg(feature = "serde")]
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
-use swanky_block::Block;
 use swanky_channel::Channel;
 
 use super::security_warning::warn_proj;
@@ -285,7 +284,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         let Db = self.delta(qb);
 
         let r;
-        let mut gate = vec![Block::default(); q as usize + qb as usize - 2];
+        let mut gate = vec![Default::default(); q as usize + qb as usize - 2];
 
         // hack for unequal moduli
         if q != qb {
@@ -313,7 +312,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
             for (i, item) in minitable.iter().enumerate().take(qb as usize) {
                 packed += item << (16 * i);
             }
-            gate.push(Block::from(packed));
+            gate.push(packed.into());
         } else {
             r = B.color(); // secret value known only to the garbler (ev knows r+b)
         }
@@ -401,7 +400,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         let tt = tt.unwrap();
 
         let q_in = A.modulus();
-        let mut gate = vec![Block::default(); q_in as usize - 1];
+        let mut gate = vec![Default::default(); q_in as usize - 1];
 
         let tao = A.color();
         let g = tweak(self.current_gate());
@@ -424,7 +423,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
                     }
                     C_.to_block()
                 })
-                .collect::<Vec<Block>>()
+                .collect::<Vec<_>>()
         };
 
         let mut A_ = A.clone();

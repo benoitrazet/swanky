@@ -1,15 +1,13 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use fancy_garbling::{AllWire, util::RngExt};
+use fancy_garbling::{AllWire, WireLabel, util::RngExt};
 use std::time::Duration;
 use swanky_aes_rng::AesRng;
-use swanky_block::Block;
-
-use fancy_garbling::WireLabel;
+use vectoreyes::U8x16;
 
 fn bench_digits(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::digits ({})", p), move |b| {
         let rng = &mut rand::thread_rng();
-        let x = Block::from(rng.gen_u128());
+        let x = U8x16::from(rng.gen_u128());
         let w = AllWire::from_block(x, p);
         b.iter(|| {
             let digits = w.digits();

@@ -767,7 +767,6 @@ dependencies = [
  "swanky-adversary",
  "swanky-aes-hash",
  "swanky-aes-rng",
- "swanky-block",
  "swanky-channel",
  "swanky-error",
  "vectoreyes",
