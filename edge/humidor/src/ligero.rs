@@ -5,21 +5,21 @@
 //! 1. Create a circuit with a non-empty shared-witness range using the
 //!    `new_with_shared` constructor.
 //! 2. In the prover:
-//!     a. Create a prover with the `noninteractive::Prover` constructor.
-//!     b. Call the `shared_mask` method to retrieve the shared mask `m` and
-//!        commit to the shared witness `u` and the mask using the ZKP2
-//!        commitment (sending it to the verifier).
-//!     c. Run `make_proof_and_shared_check` using the ZKP2 commitment to
-//!        `(u,m)` to get the proof, matrix `A`, and vector `b`. Send the proof
-//!        to the verifier.
-//!     d. Prove that `A*u + m = b` in ZKP2.
+//!    1. Create a prover with the `noninteractive::Prover` constructor.
+//!    2. Call the `shared_mask` method to retrieve the shared mask `m` and
+//!       commit to the shared witness `u` and the mask using the ZKP2
+//!       commitment (sending it to the verifier).
+//!    3. Run `make_proof_and_shared_check` using the ZKP2 commitment to
+//!       `(u,m)` to get the proof, matrix `A`, and vector `b`. Send the proof
+//!       to the verifier.
+//!    4. Prove that `A*u + m = b` in ZKP2.
 //! 3. In the verifier:
-//!     a. Create a verifier with the `noninteractive::Verifier` constructor.
-//!     b. Get the proof from the prover.
-//!     c. Call `verify_with_shared` on the ZKP2 commitment to `(u,m)`, checking
-//!        whether the verifier accepts and retrieving the matrix `A` and the
-//!        vector `b`.
-//!     d. Verify that `A*u + m = b` in ZKP2.
+//!    1. Create a verifier with the `noninteractive::Verifier` constructor.
+//!    2. Get the proof from the prover.
+//!    3. Call `verify_with_shared` on the ZKP2 commitment to `(u,m)`, checking
+//!       whether the verifier accepts and retrieving the matrix `A` and the
+//!       vector `b`.
+//!    4. Verify that `A*u + m = b` in ZKP2.
 
 // A Note on Shared-Witness Checking
 // =================================
@@ -231,7 +231,7 @@ impl<Field: FieldForLigero> Public<Field> {
 
         self.shared_mask
             .clone()
-            .zip(rshared.rows().into_iter())
+            .zip(rshared.rows())
             .for_each(|(m_i, row_i)| {
                 self.shared.clone().zip(row_i).for_each(|(s_j, &r_ij)| {
                     self.Padd.add_triplet(m_i, s_j, r_ij);
@@ -528,6 +528,7 @@ proptest! {
 
 /// The theoretical proof size according to Section 5.3 of
 /// <https://dl.acm.org/doi/pdf/10.1145/3133956.3134104>
+#[allow(clippy::too_many_arguments)]
 pub fn expected_proof_size(
     sigma: usize,
     n: usize,
@@ -734,7 +735,7 @@ fn verify<Field: FieldForLigero, H: CryptoDigest>(
     let rz = params.fft3_rows(make_ra_Iml_Pa_neg(&params, &r1.rz, &public.Pz).view());
 
     let U = r4.U_lemma.columns.view();
-    let Uw = U.slice(s![0 * params.m..params.m, ..]);
+    let Uw = U.slice(s![0..params.m, ..]);
     let Ux = U.slice(s![params.m..2 * params.m, ..]);
     let Uy = U.slice(s![2 * params.m..3 * params.m, ..]);
     let Uz = U.slice(s![3 * params.m..4 * params.m, ..]);
@@ -977,7 +978,7 @@ pub mod interactive {
         pub fn new<R: Rng + CryptoRng>(
             rng: &mut R,
             c: &Circuit<Field>,
-            w: &Vec<Field>,
+            w: &[Field],
             shared: Option<Range<usize>>,
         ) -> Self {
             warn_vulnerabilities();
@@ -1427,26 +1428,26 @@ pub mod noninteractive {
         r2.p0
             .clone()
             .into_iter()
-            .for_each(|f| hash.update(&f.to_bytes()));
+            .for_each(|f| hash.update(f.to_bytes()));
         r2.qadd
             .clone()
             .into_iter()
-            .for_each(|f| hash.update(&f.to_bytes()));
+            .for_each(|f| hash.update(f.to_bytes()));
         r2.qx
             .clone()
             .into_iter()
-            .for_each(|f| hash.update(&f.to_bytes()));
+            .for_each(|f| hash.update(f.to_bytes()));
         r2.qy
             .clone()
             .into_iter()
-            .for_each(|f| hash.update(&f.to_bytes()));
+            .for_each(|f| hash.update(f.to_bytes()));
         r2.qz
             .clone()
             .into_iter()
-            .for_each(|f| hash.update(&f.to_bytes()));
+            .for_each(|f| hash.update(f.to_bytes()));
         r2.v.clone()
             .into_iter()
-            .for_each(|f| hash.update(&f.to_bytes()));
+            .for_each(|f| hash.update(f.to_bytes()));
 
         let digest = hash.finalize();
         let seed = Block::from(<[u8; 16]>::try_from(&digest[0..16]).unwrap());
@@ -1465,7 +1466,7 @@ pub mod noninteractive {
         pub fn new<R: Rng + CryptoRng>(
             rng: &mut R,
             circuit: &Circuit<Field>,
-            witness: &Vec<Field>,
+            witness: &[Field],
             shared: Option<Range<usize>>,
         ) -> Self {
             warn_vulnerabilities();

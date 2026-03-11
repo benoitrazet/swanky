@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use humidor::ligero::interactive;
 use rand::SeedableRng;
 use simple_arith_circuit::Circuit;
