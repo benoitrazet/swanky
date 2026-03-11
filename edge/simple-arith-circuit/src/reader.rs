@@ -346,19 +346,19 @@ impl Circuit<F2> {
         ops.push(Op::Constant(F2::ONE));
         cow += 1;
         assert_eq!(constant_wires_base + nconstants, cow);
-        for i in 1..=ngates {
-            let wire1 = gl[i].1[0];
+        for (i, gate) in gl.iter().enumerate().take(ngates + 1).skip(1) {
+            let wire1 = gate.1[0];
             let wk1 = wl[wire1].1;
-            let wire2 = gl[i].1[1];
+            let wire2 = gate.1[1];
             let wk2 = wl[wire2].1;
-            let wire3 = gl[i].1[2];
+            let wire3 = gate.1[2];
             let wk3 = wl[wire3].1;
             let trace_mapping2 = || {
                 if trace.mapping {
                     log::debug!(
                         "i: {}; gk: {:?}; wire1: {} {:?} [{}]; wire2: {} {:?} [{}]",
                         i,
-                        gl[i].0,
+                        gate.0,
                         wire1,
                         wk1,
                         wl[wire1].0,
@@ -373,7 +373,7 @@ impl Circuit<F2> {
                     log::debug!(
                         "i: {}; gk: {:?}; wire1: {} {:?} [{}]; wire2: {} {:?} [{}]; wire3: {} {:?} [{}]",
                         i,
-                        gl[i].0,
+                        gate.0,
                         wire1,
                         wk1,
                         wl[wire1].0,
@@ -386,7 +386,7 @@ impl Circuit<F2> {
                     );
                 };
             };
-            match gl[i].0 {
+            match gate.0 {
                 GateKind::And => {
                     trace_mapping3();
                     assert!(wire1 < tniw && wk1 == WireKind::Input || wk1 == WireKind::Output);
@@ -412,18 +412,13 @@ impl Circuit<F2> {
                     assert!(wk1 == WireKind::Input);
                     assert!(wk2 == WireKind::Output);
                     // Interpret input wire as a constant value.
-                    let cval;
-                    match wire1 {
-                        0 => {
-                            cval = F2::ZERO;
-                        }
-                        1 => {
-                            cval = F2::ONE;
-                        }
+                    let cval = match wire1 {
+                        0 => F2::ZERO,
+                        1 => F2::ONE,
                         _ => {
                             panic!("EQ not 0 or 1");
                         }
-                    }
+                    };
                     ops.push(Op::Constant(cval));
                     if wire2 >= nwires - tnow {
                         owl[tnow - (nwires - wire2)] = cow;
@@ -479,8 +474,8 @@ mod tests {
     fn bits_to_wires(bitstr: &[u8]) -> Vec<F2> {
         let nbits = bitstr.len();
         let mut wires = Vec::with_capacity(nbits);
-        for i in 0..nbits {
-            match &bitstr[i] {
+        for bit in bitstr.iter().take(nbits) {
+            match bit {
                 b'0' => wires.push(swanky_field_binary::F2::ZERO),
                 b'1' => wires.push(swanky_field_binary::F2::ONE),
                 _ => {
@@ -513,8 +508,8 @@ mod tests {
         let _ = circuit.eval(&wires_in, &mut eval_out);
         let eval_len = eval_out.len();
         let result = &eval_out[eval_len - nouts..];
-        for i in 0..nouts {
-            match bool::from(result[i]) {
+        for &bit in result.iter().take(nouts) {
+            match bool::from(bit) {
                 false => {
                     print!("0");
                 }
