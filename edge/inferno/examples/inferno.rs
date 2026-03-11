@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use clap::Parser;
 use inferno::Proof;
 use rand::SeedableRng;
@@ -62,13 +61,13 @@ fn prover<F: FiniteField>(args: Args) {
     if let Some(filename) = args.filename.as_ref() {
         log::info!("Writing proof to '{:?}'", filename);
         let mut file = std::fs::File::create(filename).unwrap();
-        file.write(&serialized).unwrap();
+        file.write_all(&serialized).unwrap();
 
         let serialized = bincode::serialize(&circuit).unwrap();
         let circuitfile = filename.with_extension("circuit");
         log::info!("Writing circuit to '{:?}", circuitfile);
         let mut file = std::fs::File::create(circuitfile).unwrap();
-        file.write(&serialized).unwrap();
+        file.write_all(&serialized).unwrap();
     }
 
     let time = std::time::Instant::now();

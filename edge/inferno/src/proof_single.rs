@@ -123,8 +123,8 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
     /// Verify the proof. This checks that:
     /// 1. The outputs of the MPC parties are correct.
     /// 2. The shares of the opened parties are correct. Checking this requires
-    /// re-running (most of) the protocol and validating that the trace of each
-    /// opened party is valid.
+    ///    re-running (most of) the protocol and validating that the trace of each
+    ///    opened party is valid.
     pub fn verify(
         &self,
         circuit: &Circuit<F::PrimeField>,
@@ -205,9 +205,10 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
 
 /// The output shares of the prover. This output contains four pieces of information:
 /// * `fs`, `gs`, and `h` correspond to the final dot product. For the proof to be valid
-/// it needs to hold that `dot(fs, gs) = h`.
+///   it needs to hold that `dot(fs, gs) = h`.
 /// * `output` corresponds to the output value. For the proof to be valid it must hold that
-/// `output = 1`.
+///   `output = 1`.
+///
 /// All four of these pieces are provided in shared form, as they correspond to the values of
 /// each party in the MPC computation.
 #[derive(Serialize, Deserialize)]

@@ -185,8 +185,8 @@ impl<F: FiniteField, const N: usize> std::ops::Add for CorrectionSharing<F, N> {
     #[inline]
     fn add(self, other: Self) -> Self {
         let mut shares = [F::ZERO; N];
-        for i in 0..N {
-            shares[i] = self.shares[i] + other.shares[i];
+        for (i, share) in shares.iter_mut().enumerate().take(N) {
+            *share = self.shares[i] + other.shares[i];
         }
         Self {
             shares,
@@ -201,8 +201,8 @@ impl<F: FiniteField, const N: usize> std::ops::Sub for CorrectionSharing<F, N> {
     #[inline]
     fn sub(self, other: Self) -> Self {
         let mut shares = [F::ZERO; N];
-        for i in 0..N {
-            shares[i] = self.shares[i] - other.shares[i];
+        for (i, share) in shares.iter_mut().enumerate().take(N) {
+            *share = self.shares[i] - other.shares[i];
         }
         Self {
             shares,
@@ -305,7 +305,7 @@ impl<'de, F: FiniteField, const N: usize> serde::Deserialize<'de> for Correction
                 let mut de = F::Deserializer::new(&mut cursor).map_err(Error::custom)?;
 
                 let mut shares = CorrectionSharing::<F, N>::default();
-                for (_i, share) in shares.shares.iter_mut().enumerate() {
+                for share in shares.shares.iter_mut() {
                     *share = de.read(&mut cursor).map_err(Error::custom)?;
                 }
                 shares.correction = de.read(&mut cursor).map_err(Error::custom)?;
