@@ -34,6 +34,20 @@ impl core::ops::AddAssign for WireMod2 {
     }
 }
 
+impl core::ops::Sub for WireMod2 {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self + -rhs
+    }
+}
+
+impl core::ops::SubAssign for WireMod2 {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = *self - rhs;
+    }
+}
+
 impl core::ops::Neg for WireMod2 {
     type Output = Self;
 

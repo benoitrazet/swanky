@@ -106,6 +106,20 @@ impl core::ops::AddAssign for WireModQ {
     }
 }
 
+impl core::ops::Sub for WireModQ {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self + -rhs
+    }
+}
+
+impl core::ops::SubAssign for WireModQ {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = self.clone() - rhs;
+    }
+}
+
 impl core::ops::Neg for WireModQ {
     type Output = Self;
 
