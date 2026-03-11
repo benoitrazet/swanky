@@ -36,7 +36,7 @@ pub trait ArithmeticWire: Clone {}
 ///
 /// At its core, a [`WireLabel`] is a way of encoding values, and operating on
 /// those encoded values.
-pub trait WireLabel: Clone + HasModulus {
+pub trait WireLabel: Clone + HasModulus + core::ops::Neg<Output = Self> {
     /// The underlying digits encoded by the [`WireLabel`].
     fn digits(&self) -> Vec<u16>;
 
@@ -54,9 +54,6 @@ pub trait WireLabel: Clone + HasModulus {
 
     /// Multiplies the [`WireLabel`] by a constant `c mod q`.
     fn cmul_eq(&mut self, c: u16) -> &mut Self;
-
-    /// Negates the [`WireLabel`].
-    fn negate_eq(&mut self) -> &mut Self;
 
     /// Converts a [`Block`] into its [`WireLabel`] representation, based on the
     /// modulus `q`.
@@ -115,12 +112,6 @@ pub trait WireLabel: Clone + HasModulus {
         Self::hash_to_mod(hash, q)
     }
 
-    /// Negates the [`WireLabel`], consuming the input.
-    fn negate_mov(mut self) -> Self {
-        self.negate_eq();
-        self
-    }
-
     /// Multiplies the [`WireLabel`] by a constant `c mod q`, consuming the
     /// input.
     fn cmul_mov(mut self, c: u16) -> Self {
@@ -150,11 +141,6 @@ pub trait WireLabel: Clone + HasModulus {
         self.clone().plus_mov(other)
     }
 
-    /// Negates the [`WireLabel`].
-    fn negate(&self) -> Self {
-        self.clone().negate_mov()
-    }
-
     /// Subtracts a [`WireLabel`] from this one, consuming the input.
     ///
     /// See the documentation of specific implementations for detailed
@@ -177,7 +163,7 @@ pub trait WireLabel: Clone + HasModulus {
     /// See the documentation of specific implementations for detailed
     /// restrictions on the types of the operands.
     fn minus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self {
-        self.plus_eq(&other.negate());
+        self.plus_eq(&-other.clone());
         self
     }
 
@@ -206,6 +192,18 @@ impl HasModulus for AllWire {
             AllWire::Mod2(x) => x.modulus(),
             AllWire::Mod3(x) => x.modulus(),
             AllWire::ModN(x) => x.modulus(),
+        }
+    }
+}
+
+impl core::ops::Neg for AllWire {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        match self {
+            Self::Mod2(x) => Self::Mod2(-x),
+            Self::Mod3(x) => Self::Mod3(-x),
+            Self::ModN(x) => Self::ModN(-x),
         }
     }
 }
@@ -273,20 +271,6 @@ impl WireLabel for AllWire {
             }
             AllWire::ModN(x) => {
                 x.cmul_eq(c);
-            }
-        };
-        self
-    }
-    fn negate_eq(&mut self) -> &mut Self {
-        match &mut *self {
-            AllWire::Mod2(x) => {
-                x.negate_eq();
-            }
-            AllWire::Mod3(x) => {
-                x.negate_eq();
-            }
-            AllWire::ModN(x) => {
-                x.negate_eq();
             }
         };
         self
@@ -429,11 +413,11 @@ mod tests {
         for _ in 0..1000 {
             let q = rng.gen_modulus();
             let x = AllWire::rand(rng, q);
-            let xneg = x.negate();
+            let xneg = -x.clone();
             if q != 2 {
                 assert!(x != xneg);
             }
-            let y = xneg.negate();
+            let y = -xneg;
             assert_eq!(x, y);
         }
     }
@@ -481,12 +465,12 @@ mod tests {
             assert_eq!(x.cmul(q), AllWire::zero(q));
             assert_eq!(x.plus(&x), x.cmul(2));
             assert_eq!(x.plus(&x).plus(&x), x.cmul(3));
-            assert_eq!(x.negate().negate(), x);
+            assert_eq!(-(-x.clone()), x);
             if q == 2 {
                 assert_eq!(x.plus(&y), x.minus(&y));
             } else {
-                assert_eq!(x.plus(&x.negate()), AllWire::zero(q), "q={}", q);
-                assert_eq!(x.minus(&y), x.plus(&y.negate()));
+                assert_eq!(x.plus(&-x.clone()), AllWire::zero(q), "q={}", q);
+                assert_eq!(x.minus(&y), x.plus(&-y.clone()));
             }
             let mut w = x.clone();
             let z = w.plus(&y);
@@ -498,8 +482,8 @@ mod tests {
             assert_eq!(x.plus(&x), w);
 
             w = x.clone();
-            w.negate_eq();
-            assert_eq!(x.negate(), w);
+            w = -w;
+            assert_eq!(-x, w);
         }
     }
 

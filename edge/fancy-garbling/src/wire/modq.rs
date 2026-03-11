@@ -73,6 +73,23 @@ impl HasModulus for WireModQ {
     }
 }
 
+impl core::ops::Neg for WireModQ {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        let q = self.q;
+        let mut ds = self.ds.clone();
+        ds.iter_mut().for_each(|d| {
+            if *d > 0 {
+                *d = q - *d;
+            } else {
+                *d = 0;
+            }
+        });
+        Self { q, ds }
+    }
+}
+
 impl WireLabel for WireModQ {
     fn rand_delta<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
         if q < 2 {
@@ -125,18 +142,6 @@ impl WireLabel for WireModQ {
         self.ds
             .iter_mut()
             .for_each(|d| *d = (*d as u32 * c as u32 % q as u32) as u16);
-        self
-    }
-
-    fn negate_eq(&mut self) -> &mut Self {
-        let q = self.q;
-        self.ds.iter_mut().for_each(|d| {
-            if *d > 0 {
-                *d = q - *d;
-            } else {
-                *d = 0;
-            }
-        });
         self
     }
 

@@ -58,6 +58,17 @@ impl HasModulus for WireMod3 {
     }
 }
 
+impl core::ops::Neg for WireMod3 {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        // Negation just involves swapping `lsb` and `msb`.
+        let mut output = self;
+        std::mem::swap(&mut output.lsb, &mut output.msb);
+        output
+    }
+}
+
 impl WireMod3 {
     /// We have to convert `block` into a valid `Mod3` encoding.
     ///
@@ -134,12 +145,6 @@ impl WireLabel for WireMod3 {
                 self.cmul_eq(c % 3);
             }
         }
-        self
-    }
-
-    fn negate_eq(&mut self) -> &mut Self {
-        // Negation just involves swapping `lsb` and `msb`.
-        std::mem::swap(&mut self.lsb, &mut self.msb);
         self
     }
 

@@ -18,6 +18,15 @@ pub struct WireMod2 {
     pub(crate) val: Block,
 }
 
+impl core::ops::Neg for WireMod2 {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        // Do nothing. Additive inverse is a no-op for mod 2.
+        self
+    }
+}
+
 impl ConditionallySelectable for WireMod2 {
     fn conditional_select(a: &Self, b: &Self, choice: subtle::Choice) -> Self {
         WireMod2::from_block(
@@ -64,11 +73,6 @@ impl WireLabel for WireMod2 {
         if c & 1 == 0 {
             self.val = Block::default();
         }
-        self
-    }
-
-    fn negate_eq(&mut self) -> &mut Self {
-        // Do nothing. Additive inverse is a no-op for mod 2.
         self
     }
 

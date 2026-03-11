@@ -118,18 +118,7 @@ fn bench_negate(c: &mut Criterion, p: u16) {
         let rng = &mut rand::thread_rng();
         let x = AllWire::rand(rng, p);
         b.iter(|| {
-            let z = x.negate();
-            std::hint::black_box(z);
-        });
-    });
-}
-
-fn bench_negate_eq(c: &mut Criterion, p: u16) {
-    c.bench_function(&format!("wire::negate_eq ({})", p), move |b| {
-        let rng = &mut rand::thread_rng();
-        let mut x = AllWire::rand(rng, p);
-        b.iter(|| {
-            let z = x.negate_eq();
+            let z = -x.clone();
             std::hint::black_box(z);
         });
     });
@@ -250,12 +239,6 @@ fn negate(c: &mut Criterion) {
     bench_negate(c, 5);
     bench_negate(c, 17);
 }
-fn negate_eq(c: &mut Criterion) {
-    bench_negate_eq(c, 2);
-    bench_negate_eq(c, 3);
-    bench_negate_eq(c, 5);
-    bench_negate_eq(c, 17);
-}
 fn hash(c: &mut Criterion) {
     bench_hash(c, 2);
     bench_hash(c, 3);
@@ -290,7 +273,7 @@ fn rand_delta(c: &mut Criterion) {
 criterion_group! {
     name = wire_benches;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = digits, unpack, pack, plus, plus_eq, minus, minus_eq, cmul, cmul_eq, negate, negate_eq, hash, hashback, zero, rand, rand_delta
+    targets = digits, unpack, pack, plus, plus_eq, minus, minus_eq, cmul, cmul_eq, negate, hash, hashback, zero, rand, rand_delta
 }
 
 criterion_main!(wire_benches);
