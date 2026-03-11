@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use rand::Rng;
 use std::time::SystemTime;
 use swanky_aes_rng::AesRng;
