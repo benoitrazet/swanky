@@ -106,6 +106,9 @@ pub struct WireSlice {
     ty_encoded: NumericalEnumType,
 }
 impl WireSlice {
+    pub fn is_empty(&self) -> bool {
+        self.range_end == self.range_start
+    }
     pub fn len(&self) -> WireSize {
         self.range_end - self.range_start
     }

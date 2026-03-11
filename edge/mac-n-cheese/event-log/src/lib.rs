@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use crossbeam_queue::SegQueue;
 use parking_lot::{Mutex, MutexGuard, RwLock};
 use serde::{Deserialize, Serialize};
@@ -215,7 +214,7 @@ pub mod internal {
         NotYetOpen,
         Open {
             system_start: Instant,
-            new_buffers: SegQueue<EventBuffer>,
+            new_buffers: Box<SegQueue<EventBuffer>>,
             writer: Mutex<EventLogWriter>,
         },
         Closed,
@@ -347,7 +346,7 @@ pub mod internal {
         let new_buffers = SegQueue::new();
         *gs = GlobalState::Open {
             system_start,
-            new_buffers,
+            new_buffers: Box::new(new_buffers),
             writer: Mutex::new(EventLogWriter {
                 dst,
                 sources: Vec::new(),
@@ -463,7 +462,6 @@ macro_rules! define_events {
     (@impl span $eventname:ident { $($argname:ident : $argty:ty),* }) => {
         impl $eventname {
             #[inline(always)]
-            #[must_use]
             pub fn start(&self) -> $crate::SpanFinishNotifier<TheStatics> {
                 let now = std::time::Instant::now();
                 const EVT: u32 = InternalEventId::$eventname as u32;

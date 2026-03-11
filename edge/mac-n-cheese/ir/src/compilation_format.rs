@@ -53,6 +53,7 @@ macro_rules! numerical_enum {
                 })*;
             const VARIANT_BITS: NumericalEnumType =
                 (NumericalEnumType::BITS - Self::NUM_VARIANTS.leading_zeros()) as NumericalEnumType;
+            #[allow(clippy::self_assignment)]
             const DATA_BITS: NumericalEnumType = {
                 let mut acu = 0;
                 $(

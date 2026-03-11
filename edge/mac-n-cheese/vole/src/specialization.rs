@@ -166,10 +166,7 @@ where
             };
             let indices = lpn_indices::matrix_entries_vectorized(lpn_rng);
             four_uws
-                .array_zip(indices.array_map(
-                    #[inline(always)]
-                    |x| <[U16x8; 2]>::from(x),
-                ))
+                .array_zip(indices.array_map(<[U16x8; 2]>::from))
                 .array_for_each(
                     #[inline(always)]
                     |(dst, [lo, hi])| {

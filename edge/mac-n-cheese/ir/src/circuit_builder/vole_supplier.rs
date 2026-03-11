@@ -79,7 +79,7 @@ impl VoleSupplier {
                         current_voles.push(new_vole);
                     } else {
                         let leftover = current_vole.slice(voles_needed_for_extend..);
-                        if leftover.len() > 0 {
+                        if !leftover.is_empty() {
                             leftovers.push(leftover);
                         }
                         *current_vole = cb
@@ -113,7 +113,7 @@ impl VoleSupplier {
             let to_take = leftover.len().min(count);
             self.output_buffer.push(leftover.slice(0..to_take));
             leftover = leftover.slice(to_take..);
-            if leftover.len() > 0 {
+            if !leftover.is_empty() {
                 vole_state.leftovers.push(leftover);
             }
             count -= to_take;

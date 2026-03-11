@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 #![deny(unused_must_use)]
 
 use std::fs::File;
@@ -101,7 +100,7 @@ fn read_atomic_graph_degree_counts(
 ) -> swanky_error::Result<Vec<AtomicGraphDegreeCount>> {
     let num_bytes = addr.length() as usize;
     swanky_error::ensure!(
-        num_bytes % std::mem::size_of::<AtomicGraphDegreeCount>() == 0,
+        num_bytes.is_multiple_of(std::mem::size_of::<AtomicGraphDegreeCount>()),
         ErrorKind::OtherError,
         "invalid atomic degree count data chunk"
     );

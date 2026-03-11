@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use std::{fs::File, path::PathBuf};
 
 use clap::{Parser, Subcommand};
@@ -142,8 +141,7 @@ fn generate_graphviz(circuit: File, mut out: File) -> swanky_error::Result<()> {
         })?;
     }
     // Check that the degrees match what's on disk.
-    let mut buf = Vec::new();
-    buf.resize(manifest.dependent_counts().length() as usize, 0);
+    let mut buf = vec![0; manifest.dependent_counts().length() as usize];
     circuit.read_data_chunk(manifest.dependent_counts(), &mut buf)?;
     let counts: &[GraphDegreeCount] = bytemuck::cast_slice(&buf);
     swanky_error::ensure!(

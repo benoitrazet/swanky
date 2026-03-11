@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use keyed_arena::KeyedArena;
 use rand::SeedableRng;
 use std::str::FromStr;
@@ -220,7 +219,7 @@ fn do_bench<
                 black_box(comms_4.as_mut_slice()),
             )
             .unwrap();
-        let receiver_voles = svole_receiver_stage3
+        svole_receiver_stage3
             .stage3(
                 &svole_receiver,
                 &arena,
@@ -229,7 +228,7 @@ fn do_bench<
                 black_box(comms_5.as_slice()),
             )
             .unwrap();
-        black_box(receiver_voles);
+        black_box(());
     }
     let elapsed = start.elapsed();
     let per_vole = elapsed / u32::try_from(n * sizes.voles_outputted).unwrap();

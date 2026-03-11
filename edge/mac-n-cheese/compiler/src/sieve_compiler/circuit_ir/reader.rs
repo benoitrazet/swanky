@@ -131,9 +131,9 @@ struct Visitor<S: InstructionSink> {
 }
 impl<S: InstructionSink> Visitor<S> {
     fn lookup_type(&self, ty: TypeId) -> swanky_error::Result<Type> {
-        usize::try_from(ty)
-            .ok()
-            .and_then(|ty| self.sink.types().get(ty))
+        self.sink
+            .types()
+            .get(usize::from(ty))
             .copied()
             .ok_or_swanky_error(ErrorKind::OtherError, &format!("invalid type id {ty}"))
     }
@@ -422,9 +422,11 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                 let input_sizes = vec![definition.cond_count]
                     .into_iter()
                     .chain(
-                        std::iter::repeat(definition.branch_sizes.iter().copied())
-                            .take(definition.num_branches)
-                            .flatten(),
+                        std::iter::repeat_n(
+                            definition.branch_sizes.iter().copied(),
+                            definition.num_branches,
+                        )
+                        .flatten(),
                     )
                     .collect::<Vec<_>>();
                 let in_ranges = make_ranges("input", &input_sizes, args)
@@ -646,7 +648,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                     ),
                 };
 
-                let cond_tc = inputs.get(0).ok_or_swanky_error(
+                let cond_tc = inputs.first().ok_or_swanky_error(
                     ErrorKind::UnsupportedError,
                     "mux requires an input wire range for the condition",
                 )?;
@@ -673,7 +675,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                 let num_ranges_per_branch = outputs.len();
 
                 swanky_error::ensure!(
-                    branch_inputs.len() % num_ranges_per_branch == 0,
+                    branch_inputs.len().is_multiple_of(num_ranges_per_branch),
                     ErrorKind::OtherError,
                     "The number of branch inputs must be a multiple of the number of output wire ranges"
                 );
@@ -933,9 +935,10 @@ struct GlobalSink<VSR: ValueStreamReader> {
 
 impl<VSR: ValueStreamReader> GlobalSink<VSR> {
     fn flush(&mut self) -> swanky_error::Result<()> {
-        if let Err(_) = self
+        if self
             .sender
             .send(Ok(std::mem::take(&mut self.current_chunk)))
+            .is_err()
         {
             swanky_error::bail!(
                 ErrorKind::OtherError,
@@ -987,10 +990,7 @@ impl<VSR: ValueStreamReader> InstructionSink for GlobalSink<VSR> {
         let id = self
             .functions
             .iter()
-            .filter(|(_, d)| match d {
-                Def::FunctionDefinition(_, _) => true,
-                _ => false,
-            })
+            .filter(|(_, d)| matches!(d, Def::FunctionDefinition(_, _)))
             .collect::<Vec<_>>()
             .len();
         let old = self.functions.insert(

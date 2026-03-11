@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use std::{hint::black_box, time::Instant};
 
 use mac_n_cheese_wire_map::WireMap;
@@ -17,7 +16,6 @@ fn main() {
     for base in bases {
         wm.alloc(base, len).unwrap();
     }
-    let len = len;
     for i in 0..len {
         for base in bases {
             wm.insert(base + i, black_box(base + i));
