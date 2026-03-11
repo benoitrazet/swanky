@@ -21,6 +21,7 @@ pub struct WireMod2 {
 impl core::ops::Add for WireMod2 {
     type Output = Self;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: Self) -> Self::Output {
         Self {
             val: self.val ^ rhs.val,
@@ -29,6 +30,7 @@ impl core::ops::Add for WireMod2 {
 }
 
 impl core::ops::AddAssign for WireMod2 {
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, rhs: Self) {
         self.val ^= rhs.val;
     }

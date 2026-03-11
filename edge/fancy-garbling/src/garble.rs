@@ -107,12 +107,7 @@ mod nonstreaming {
         garble_test_helper(|q, channel| {
             let mut b = CircuitBuilder::new();
             let x = b.evaluator_input(q);
-            let z;
-            if q > 2 {
-                z = b.cmul(&x, 2);
-            } else {
-                z = b.cmul(&x, 1);
-            }
+            let z = if q > 2 { b.cmul(&x, 2) } else { b.cmul(&x, 1) };
             b.output(&z, channel).unwrap();
             b.finish()
         });
@@ -380,7 +375,7 @@ mod streaming {
             streaming_test(
                 move |b, xs: &[AllWire], channel| fancy_addition(b, xs, channel),
                 move |b, xs: &[AllWire], channel| fancy_addition(b, xs, channel),
-                move |b, xs, channel| fancy_addition(b, xs, channel),
+                fancy_addition,
                 &[q, q],
             );
         }
@@ -403,7 +398,7 @@ mod streaming {
             streaming_test(
                 move |b, xs: &[AllWire], channel| fancy_subtraction(b, xs, channel),
                 move |b, xs: &[AllWire], channel| fancy_subtraction(b, xs, channel),
-                move |b, xs, channel| fancy_subtraction(b, xs, channel),
+                fancy_subtraction,
                 &[q, q],
             );
         }
@@ -426,7 +421,7 @@ mod streaming {
             streaming_test(
                 move |b, xs: &[AllWire], channel| fancy_multiplication(b, xs, channel),
                 move |b, xs: &[AllWire], channel| fancy_multiplication(b, xs, channel),
-                move |b, xs, channel| fancy_multiplication(b, xs, channel),
+                fancy_multiplication,
                 &[q, q],
             );
         }
@@ -449,7 +444,7 @@ mod streaming {
             streaming_test(
                 move |b, xs: &[AllWire], channel| fancy_cmul(b, xs, channel),
                 move |b, xs: &[AllWire], channel| fancy_cmul(b, xs, channel),
-                move |b, xs, channel| fancy_cmul(b, xs, channel),
+                fancy_cmul,
                 &[q],
             );
         }

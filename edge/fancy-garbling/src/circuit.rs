@@ -62,9 +62,7 @@ impl<C: EvaluableCircuit<Informer<Dummy>>> CircuitInfo for C {
                 .collect::<swanky_error::Result<Vec<DummyVal>>>()
         })?;
 
-        Channel::with(std::io::empty(), |c| {
-            Ok(self.eval(&mut informer, &gb, &ev, c)?)
-        })?;
+        Channel::with(std::io::empty(), |c| self.eval(&mut informer, &gb, &ev, c))?;
         println!("{}", informer.stats());
         Ok(())
     }
@@ -370,6 +368,12 @@ impl<Circuit: CircuitType> CircuitBuilder<Circuit> {
     /// Get a BinaryBundle for the evaluator with n bits.
     pub fn bin_evaluator_input(&mut self, nbits: usize) -> BinaryBundle<CircuitRef> {
         BinaryBundle::new(self.evaluator_inputs(&vec![2; nbits]))
+    }
+}
+
+impl<Circuit: CircuitType> Default for CircuitBuilder<Circuit> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

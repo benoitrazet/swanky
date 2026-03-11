@@ -68,7 +68,7 @@ pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16) {
 
 /// Convert `x` into base `q`, building a vector of length `n`.
 fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
-    let ms = std::iter::repeat(q).take(n).collect_vec();
+    let ms = std::iter::repeat_n(q, n).collect_vec();
     as_mixed_radix(x, &ms)
 }
 
@@ -187,7 +187,7 @@ pub fn factor(inp: u128) -> Vec<u16> {
     let mut fs = Vec::new();
     for &p in PRIMES.iter() {
         let q = p as u128;
-        if x % q == 0 {
+        if x.is_multiple_of(q) {
             fs.push(p);
             x /= q;
         }
@@ -269,7 +269,7 @@ pub const PRIMES: [u16; 29] = [
     101, 103, 107, 109,
 ];
 
-/// Primes skipping the modulus 2, which allows certain gadgets.
+// /// Primes skipping the modulus 2, which allows certain gadgets.
 // pub const PRIMES_SKIP_2: [u16; 29] = [
 //     3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97,
 //     101, 103, 107, 109, 113,
@@ -312,8 +312,8 @@ pub fn base_primes_with_width(nbits: u32, primes: &[u16]) -> Vec<u16> {
     ps
 }
 
-/// Generate a CRT modulus that support at least n-bit integers, using the built-in
-/// PRIMES_SKIP_2 (does not include 2 as a factor).
+// /// Generate a CRT modulus that support at least n-bit integers, using the built-in
+// /// PRIMES_SKIP_2 (does not include 2 as a factor).
 // pub fn modulus_with_width_skip2(nbits: u32) -> u128 {
 //     base_modulus_with_width(nbits, &PRIMES_SKIP_2)
 // }
@@ -323,7 +323,7 @@ pub fn product(xs: &[u16]) -> u128 {
     xs.iter().fold(1, |acc, &x| acc * x as u128)
 }
 
-/// Raise a u16 to a power mod some value.
+// /// Raise a u16 to a power mod some value.
 // pub fn powm(inp: u16, pow: u16, modulus: u16) -> u16 {
 //     let mut x = inp as u16;
 //     let mut z = 1;
