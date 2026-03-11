@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 //! This module implements a reader for "Bristol Fashion" circuit definition files.
 
 use std::io::BufRead;
@@ -173,7 +172,7 @@ impl<R: BufRead> Reader<R> {
             .ok_or_else(|| Error::ParseBristolError(msg.to_string()))?
             .parse::<u8>()?;
         Self::parsing_assert(x == 0 || x == 1, format!("expected 0 or 1, but got {}", x))?;
-        Ok(if x == 0 { false } else { true })
+        Ok(x != 0)
     }
 
     fn read_gate_kind<'a>(tokens: &mut SplitWhitespace<'a>) -> Result<&'a str, Error> {
@@ -248,7 +247,7 @@ impl<R: BufRead> Reader<R> {
         let a = Self::read_gate_input(tokens)?;
         let b = Self::read_gate_input(tokens)?;
         let out = Self::read_gate_output(tokens)?;
-        let _ = Self::read_eol(tokens)?;
+        Self::read_eol(tokens)?;
         Ok((a, b, out))
     }
 
@@ -265,7 +264,7 @@ impl<R: BufRead> Reader<R> {
         )?;
         let a = Self::read_gate_input(tokens)?;
         let out = Self::read_gate_output(tokens)?;
-        let _ = Self::read_eol(tokens)?;
+        Self::read_eol(tokens)?;
         Ok((a, out))
     }
 
@@ -282,7 +281,7 @@ impl<R: BufRead> Reader<R> {
         )?;
         let lit = Self::read_gate_input_lit(tokens)?;
         let out = Self::read_gate_output(tokens)?;
-        let _ = Self::read_eol(tokens)?;
+        Self::read_eol(tokens)?;
         Ok((lit, out))
     }
 
@@ -301,7 +300,7 @@ impl<R: BufRead> Reader<R> {
         let mut tokens = self.expect_line()?;
         let ngates = Self::read_ngates(&mut tokens)?;
         let nwires = Self::read_nwires(&mut tokens)?;
-        let _ = Self::read_eol(&mut tokens)?;
+        Self::read_eol(&mut tokens)?;
 
         // Read number of inputs and sizes from second line
         let mut tokens = self.expect_line()?;
@@ -311,7 +310,7 @@ impl<R: BufRead> Reader<R> {
             let input_size = Self::read_input_size(&mut tokens)?;
             input_sizes.push(input_size);
         }
-        let _ = Self::read_eol(&mut tokens)?;
+        Self::read_eol(&mut tokens)?;
 
         // Read number of outputs and sizes from third line
         let mut tokens = self.expect_line()?;
@@ -321,11 +320,11 @@ impl<R: BufRead> Reader<R> {
             let output_size = Self::read_output_size(&mut tokens)?;
             output_sizes.push(output_size);
         }
-        let _ = Self::read_eol(&mut tokens)?;
+        Self::read_eol(&mut tokens)?;
 
         // Skip an empty line
         let mut tokens = self.expect_line()?;
-        let _ = Self::read_eol(&mut tokens)?;
+        Self::read_eol(&mut tokens)?;
 
         // Read gates from remaining lines
         let mut gates: Vec<Gate> = Vec::with_capacity(usize::try_from(ngates).unwrap());
@@ -376,7 +375,7 @@ impl<R: BufRead> Reader<R> {
                     break;
                 }
                 Some(mut tokens) => {
-                    let _ = Self::read_eol(&mut tokens)?;
+                    Self::read_eol(&mut tokens)?;
                 }
             }
         }
