@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use std::io::{Read, Write};
 use std::{
     io::{BufReader, BufWriter},
