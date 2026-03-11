@@ -58,6 +58,35 @@ impl HasModulus for WireMod3 {
     }
 }
 
+impl core::ops::Add for WireMod3 {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let a1 = self.lsb;
+        let a2 = self.msb;
+        let b1 = rhs.lsb;
+        let b2 = rhs.msb;
+
+        let t = (a1 | b2) ^ (a2 | b1);
+        let c1 = (a2 | b2) ^ t;
+        let c2 = (a1 | b1) ^ t;
+        Self { lsb: c1, msb: c2 }
+    }
+}
+
+impl core::ops::AddAssign for WireMod3 {
+    fn add_assign(&mut self, rhs: Self) {
+        let a1 = self.lsb;
+        let a2 = self.msb;
+        let b1 = rhs.lsb;
+        let b2 = rhs.msb;
+
+        let t = (a1 | b2) ^ (a2 | b1);
+        self.lsb = (a2 | b2) ^ t;
+        self.msb = (a1 | b1) ^ t;
+    }
+}
+
 impl core::ops::Neg for WireMod3 {
     type Output = Self;
 
@@ -115,20 +144,6 @@ impl WireLabel for WireMod3 {
         let color = (((self.msb & 1) as u16) << 1) | ((self.lsb & 1) as u16);
         debug_assert_ne!(color, 3);
         color
-    }
-
-    fn plus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self {
-        let a1 = &mut self.lsb;
-        let a2 = &mut self.msb;
-        let b1 = other.lsb;
-        let b2 = other.msb;
-
-        let t = (*a1 | b2) ^ (*a2 | b1);
-        let c1 = (*a2 | b2) ^ t;
-        let c2 = (*a1 | b1) ^ t;
-        *a1 = c1;
-        *a2 = c2;
-        self
     }
 
     fn cmul_eq(&mut self, c: u16) -> &mut Self {

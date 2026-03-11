@@ -64,11 +64,11 @@ impl<Wire: WireLabel> Evaluator<Wire> {
 impl<W: BinaryWireLabel> FancyBinary for Evaluator<W> {
     /// Negate is a noop for the evaluator
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        x.plus(&self.one)
+        x.clone() + self.one
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        x.plus(y)
+        x.clone() + y.clone()
     }
 
     fn and(
@@ -125,7 +125,7 @@ impl FancyBinary for Evaluator<AllWire> {
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         check_binary!(x);
 
-        x.plus(&self.one)
+        x.clone() + self.one.clone()
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
@@ -162,7 +162,7 @@ impl FancyBinary for Evaluator<AllWire> {
 impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
     fn add(&mut self, x: &Wire, y: &Wire) -> Wire {
         assert_eq!(x.modulus(), y.modulus());
-        x.plus(y)
+        x.clone() + y.clone()
     }
 
     fn sub(&mut self, x: &Wire, y: &Wire) -> Wire {
@@ -221,7 +221,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
             B.color()
         };
 
-        let res = L.plus_mov(&R.plus_mov(&A.cmul(new_b_color)));
+        let res = L + R + A.cmul(new_b_color);
         Ok(res)
     }
 

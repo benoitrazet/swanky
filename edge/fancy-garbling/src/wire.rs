@@ -36,7 +36,13 @@ pub trait ArithmeticWire: Clone {}
 ///
 /// At its core, a [`WireLabel`] is a way of encoding values, and operating on
 /// those encoded values.
-pub trait WireLabel: Clone + HasModulus + core::ops::Neg<Output = Self> {
+pub trait WireLabel:
+    Clone
+    + HasModulus
+    + core::ops::Add<Output = Self>
+    + core::ops::AddAssign
+    + core::ops::Neg<Output = Self>
+{
     /// The underlying digits encoded by the [`WireLabel`].
     fn digits(&self) -> Vec<u16>;
 
@@ -45,12 +51,6 @@ pub trait WireLabel: Clone + HasModulus + core::ops::Neg<Output = Self> {
 
     /// The color digit of the wire.
     fn color(&self) -> u16;
-
-    /// Adds two [`WireLabel`]s together.
-    ///
-    /// See the documentation of specific implementations for detailed
-    /// restrictions on the types of the operands.
-    fn plus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self;
 
     /// Multiplies the [`WireLabel`] by a constant `c mod q`.
     fn cmul_eq(&mut self, c: u16) -> &mut Self;
@@ -124,23 +124,6 @@ pub trait WireLabel: Clone + HasModulus + core::ops::Neg<Output = Self> {
         self.clone().cmul_mov(c)
     }
 
-    /// Adds two [`WireLabel`]s together, consuming the input.
-    ///
-    /// See the documentation of specific implementations for detailed
-    /// restrictions on the types of the operands.
-    fn plus_mov(mut self, other: &Self) -> Self {
-        self.plus_eq(other);
-        self
-    }
-
-    /// Adds two [`WireLabel`]s together.
-    ///
-    /// See the documentation of specific implementations for detailed
-    /// restrictions on the types of the operands.
-    fn plus(&self, other: &Self) -> Self {
-        self.clone().plus_mov(other)
-    }
-
     /// Subtracts a [`WireLabel`] from this one, consuming the input.
     ///
     /// See the documentation of specific implementations for detailed
@@ -163,7 +146,7 @@ pub trait WireLabel: Clone + HasModulus + core::ops::Neg<Output = Self> {
     /// See the documentation of specific implementations for detailed
     /// restrictions on the types of the operands.
     fn minus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self {
-        self.plus_eq(&-other.clone());
+        *self = self.clone() + -other.clone();
         self
     }
 
@@ -192,6 +175,32 @@ impl HasModulus for AllWire {
             AllWire::Mod2(x) => x.modulus(),
             AllWire::Mod3(x) => x.modulus(),
             AllWire::ModN(x) => x.modulus(),
+        }
+    }
+}
+
+impl core::ops::Add for AllWire {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let (p, q) = (self.modulus(), rhs.modulus());
+        match (self, rhs) {
+            (Self::Mod2(x), Self::Mod2(y)) => Self::Mod2(x + y),
+            (Self::Mod3(x), Self::Mod3(y)) => Self::Mod3(x + y),
+            (Self::ModN(x), Self::ModN(y)) => Self::ModN(x + y),
+            _ => panic!("unequal moduli: {p} != {q}"),
+        }
+    }
+}
+
+impl core::ops::AddAssign for AllWire {
+    fn add_assign(&mut self, rhs: Self) {
+        let (p, q) = (self.modulus(), rhs.modulus());
+        match (self, rhs) {
+            (Self::Mod2(x), Self::Mod2(y)) => *x += y,
+            (Self::Mod3(x), Self::Mod3(y)) => *x += y,
+            (Self::ModN(x), Self::ModN(y)) => *x += y,
+            _ => panic!("unequal moduli: {p} != {q}"),
         }
     }
 }
@@ -239,28 +248,6 @@ impl WireLabel for AllWire {
             AllWire::ModN(x) => x.color(),
         }
     }
-    fn plus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self {
-        match (&mut *self, other) {
-            (AllWire::Mod2(x), AllWire::Mod2(y)) => {
-                x.plus_eq(y);
-            }
-            (AllWire::Mod3(x), AllWire::Mod3(y)) => {
-                x.plus_eq(y);
-            }
-            (AllWire::ModN(x), AllWire::ModN(y)) => {
-                x.plus_eq(y);
-            }
-            _ => {
-                panic!(
-                    "[AllWire::plus_eq] unequal moduli: {}, {}!",
-                    self.modulus(),
-                    other.modulus()
-                )
-            }
-        };
-        self
-    }
-
     fn cmul_eq(&mut self, c: u16) -> &mut Self {
         match &mut *self {
             AllWire::Mod2(x) => {
@@ -450,7 +437,7 @@ mod tests {
         for _ in 0..1000 {
             let q = rng.gen_modulus();
             let x = AllWire::rand(&mut rng, q);
-            assert_eq!(x.plus(&AllWire::zero(q)), x);
+            assert_eq!(x.clone() + AllWire::zero(q), x);
         }
     }
 
@@ -463,23 +450,23 @@ mod tests {
             let y = AllWire::rand(&mut rng, q);
             assert_eq!(x.cmul(0), AllWire::zero(q));
             assert_eq!(x.cmul(q), AllWire::zero(q));
-            assert_eq!(x.plus(&x), x.cmul(2));
-            assert_eq!(x.plus(&x).plus(&x), x.cmul(3));
+            assert_eq!(x.clone() + x.clone(), x.cmul(2));
+            assert_eq!(x.clone() + x.clone() + x.clone(), x.cmul(3));
             assert_eq!(-(-x.clone()), x);
             if q == 2 {
-                assert_eq!(x.plus(&y), x.minus(&y));
+                assert_eq!(x.clone() + y.clone(), x.minus(&y));
             } else {
-                assert_eq!(x.plus(&-x.clone()), AllWire::zero(q), "q={}", q);
-                assert_eq!(x.minus(&y), x.plus(&-y.clone()));
+                assert_eq!(x.clone() + -x.clone(), AllWire::zero(q), "q={}", q);
+                assert_eq!(x.minus(&y), x.clone() + -y.clone());
             }
             let mut w = x.clone();
-            let z = w.plus(&y);
-            w.plus_eq(&y);
+            let z = w.clone() + y.clone();
+            w = w + y;
             assert_eq!(w, z);
 
             w = x.clone();
             w.cmul_eq(2);
-            assert_eq!(x.plus(&x), w);
+            assert_eq!(x.clone() + x.clone(), w);
 
             w = x.clone();
             w = -w;

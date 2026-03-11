@@ -73,6 +73,39 @@ impl HasModulus for WireModQ {
     }
 }
 
+impl core::ops::Add for WireModQ {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        assert_eq!(self.q, rhs.q);
+
+        let mut xs = self.ds.clone();
+        let ys = &rhs.ds;
+        let q = self.q;
+
+        debug_assert_eq!(xs.len(), ys.len());
+        xs.iter_mut().zip(ys.iter()).for_each(|(x, &y)| {
+            let (zp, overflow) = (*x + y).overflowing_sub(q);
+            *x = if overflow { *x + y } else { zp }
+        });
+        Self { ds: xs, q }
+    }
+}
+
+impl core::ops::AddAssign for WireModQ {
+    fn add_assign(&mut self, rhs: Self) {
+        assert_eq!(self.q, rhs.q);
+
+        let q = self.q;
+
+        debug_assert_eq!(self.ds.len(), rhs.ds.len());
+        self.ds.iter_mut().zip(rhs.ds.iter()).for_each(|(x, &y)| {
+            let (zp, overflow) = (*x + y).overflowing_sub(q);
+            *x = if overflow { *x + y } else { zp }
+        });
+    }
+}
+
 impl core::ops::Neg for WireModQ {
     type Output = Self;
 
@@ -118,23 +151,6 @@ impl WireLabel for WireModQ {
         let color = self.ds[0];
         debug_assert!(color < self.q);
         color
-    }
-
-    fn plus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self {
-        let xs = &mut self.ds;
-        let ys = &other.ds;
-        let q = self.q;
-
-        // Assuming modulus has to be the same here
-        // Will enforce by type system
-        //debug_assert_eq!(, ymod);
-        debug_assert_eq!(xs.len(), ys.len());
-        xs.iter_mut().zip(ys.iter()).for_each(|(x, &y)| {
-            let (zp, overflow) = (*x + y).overflowing_sub(q);
-            *x = if overflow { *x + y } else { zp }
-        });
-
-        self
     }
 
     fn cmul_eq(&mut self, c: u16) -> &mut Self {

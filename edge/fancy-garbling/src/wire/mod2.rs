@@ -18,6 +18,22 @@ pub struct WireMod2 {
     pub(crate) val: Block,
 }
 
+impl core::ops::Add for WireMod2 {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            val: self.val ^ rhs.val,
+        }
+    }
+}
+
+impl core::ops::AddAssign for WireMod2 {
+    fn add_assign(&mut self, rhs: Self) {
+        self.val ^= rhs.val;
+    }
+}
+
 impl core::ops::Neg for WireMod2 {
     type Output = Self;
 
@@ -62,11 +78,6 @@ impl WireLabel for WireMod2 {
     fn color(&self) -> u16 {
         // This extracts the least-significant bit of the U8x16.
         (self.val.extract::<0>() & 1) as u16
-    }
-
-    fn plus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self {
-        self.val ^= other.val;
-        self
     }
 
     fn cmul_eq(&mut self, c: u16) -> &mut Self {
