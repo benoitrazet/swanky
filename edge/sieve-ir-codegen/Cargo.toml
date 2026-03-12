@@ -1,0 +1,30 @@
+[package]
+name = "swanky-sieve-ir-codegen"
+description = "A library providing macros to statically parse SIEVE IR zero-knowledge circuits."
+categories = ["cryptography"]
+keywords = [
+    "cryptography",
+    "zero-knowledge",
+]
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+crypto-bigint.workspace = true
+mac-n-cheese-sieve-parser.workspace = true
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
+swanky-error.workspace = true
+swanky-field.workspace = true
+swanky-field-binary.workspace = true
+swanky-serialization.workspace = true
+
+[lints]
+workspace = true

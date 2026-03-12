@@ -1,9 +1,7 @@
 use mac_n_cheese_sieve_parser::WireId;
 use swanky_error::{ErrorKind, bail};
 use swanky_field_binary::F2;
-
-use crate::circuit::{Circuit, CircuitMemory, GateM};
-use diet_mac_and_cheese::fields::SieveIrDeserialize;
+use swanky_sieve_ir_api::{CircuitResult, FieldBackend};
 
 /// A [`ProverPreparer`] allows the prover to prepare for VOLE-in-the-head by evaluating the
 /// circuit in the clear and determining the full extended witness.
@@ -19,9 +17,12 @@ use diet_mac_and_cheese::fields::SieveIrDeserialize;
 /// - there is more than one type ID used for any gate
 /// - any private input to the circuit is not in $`F2`$
 #[derive(Debug)]
-pub(crate) struct ProverPreparer {
-    /// Complete map of values on every wire in the circuit.
-    wire_values: CircuitMemory<F2>,
+pub(crate) struct ProverPreparer<'a> {
+    /// Private circuit inputs.
+    private_input: &'a [F2],
+
+    /// Current position for the next witness value.
+    priv_input_pos: u64,
 
     /// Set of wire values that correspond to elements in the extended witness.
     witness: Vec<F2>,
@@ -30,89 +31,75 @@ pub(crate) struct ProverPreparer {
     challenge_count: usize,
 }
 
-impl ProverPreparer {
-    pub(crate) fn new(max_wire_id: WireId) -> swanky_error::Result<Self> {
+impl<'a> ProverPreparer<'a> {
+    pub(crate) fn new(private_input: &'a [F2], max_wire_id: WireId) -> swanky_error::Result<Self> {
         Ok(Self {
-            wire_values: CircuitMemory::new(max_wire_id),
-            witness: Vec::default(),
+            private_input,
+            priv_input_pos: 0,
+            witness: Vec::with_capacity(max_wire_id as usize),
             challenge_count: 0,
         })
     }
-}
 
-impl ProverPreparer {
     #[cfg(test)]
     pub(crate) fn count(&self) -> usize {
         self.witness.len()
     }
 
-    /// Save a value in our wire map.
-    fn save_wire(&mut self, wid: WireId, value: F2) -> swanky_error::Result<()> {
-        // Assumption: Every wire ID will be assigned to exactly once, so if there's already a
-        // value associated with a wire ID, the circuit is malformed.
-        self.wire_values.insert(wid, value);
-        Ok(())
-    }
-
-    /// Get the witness, wire values, and number of challenges required.
+    /// Get the witness and number of challenges required.
     ///
     /// These values will be empty if the circuit has not yet been traversed.
-    pub(crate) fn into_parts(self) -> (Vec<F2>, CircuitMemory<F2>, usize) {
-        (self.witness, self.wire_values, self.challenge_count)
+    pub(crate) fn into_parts(self) -> (Vec<F2>, usize) {
+        (self.witness, self.challenge_count)
     }
+}
 
-    /// Execute a circuit.
-    pub(crate) fn execute(&mut self, circuit: &Circuit) -> swanky_error::Result<()> {
-        let mut priv_input_pos: usize = 0;
-        for g in circuit.gates.iter().cloned() {
-            match g {
-                GateM::Add(ty, dst, left, right) => {
-                    // Assumption: There is exactly one type ID for these circuits and it is F2.
-                    assert_eq!(ty, 0);
+// TODO: Generalize this for large primes.
+impl<'a> FieldBackend<F2> for ProverPreparer<'a> {
+    type Wire = F2;
 
-                    let sum = self.wire_values.get(&left) + self.wire_values.get(&right);
+    fn input_public(&mut self) -> CircuitResult<Self::Wire> {
+        bail!(
+            ErrorKind::OtherError,
+            "Invalid input: VOLE-in-the-head does not support gate public inputs"
+        );
+    }
+    fn input_private(&mut self) -> CircuitResult<Self::Wire> {
+        let f2 = self.private_input[self.priv_input_pos as usize];
+        self.priv_input_pos += 1;
 
-                    self.save_wire(dst, sum)?;
-                }
-                GateM::Mul(ty, dst, left, right) => {
-                    // Assumption: There is exactly one type ID for these circuits and it is F2.
-                    assert_eq!(ty, 0);
+        // TODO: Can we push all of the input witnesses up front?
+        self.witness.push(f2);
 
-                    self.challenge_count += 1;
+        Ok(f2)
+    }
+    fn add(&mut self, left: &Self::Wire, right: &Self::Wire) -> CircuitResult<Self::Wire> {
+        let sum = left + right;
 
-                    let product = self.wire_values.get(&left) * self.wire_values.get(&right);
+        Ok(sum)
+    }
+    fn addc(&mut self, left: &Self::Wire, right: F2) -> CircuitResult<Self::Wire> {
+        let sum = left + right;
 
-                    // Save product to the witness and associate it with its wire ID
-                    self.witness.push(product);
-                    self.save_wire(dst, product)?;
-                }
-                GateM::AddConstant(ty, dst, left, right) => {
-                    // Assumption: There is exactly one type ID for these circuits and it is F2.
-                    assert_eq!(ty, 0);
+        Ok(sum)
+    }
+    fn mul(&mut self, left: &Self::Wire, right: &Self::Wire) -> CircuitResult<Self::Wire> {
+        self.challenge_count += 1;
 
-                    let l_val = self.wire_values.get(&left);
-                    let sum = l_val + F2::from_number(&right)?;
+        let product = left * right;
 
-                    self.save_wire(dst, sum)?;
-                }
-                GateM::Witness(ty, dst) => {
-                    assert_eq!(ty, 0);
-                    for wid in dst.start..=dst.end {
-                        let f2 = circuit.private_inputs[priv_input_pos];
-                        priv_input_pos += 1;
-
-                        self.witness.push(f2);
-                        self.save_wire(wid, f2)?;
-                    }
-                }
-                _ => bail!(
-                    ErrorKind::UnsupportedError,
-                    "Invalid input: VOLE-in-the-head does not support gate {:?}",
-                    g
-                ),
-            }
-        }
-        Ok(())
+        // Save product to the witness.
+        self.witness.push(product);
+        Ok(product)
+    }
+    fn mulc(&mut self, _: &Self::Wire, _: F2) -> CircuitResult<Self::Wire> {
+        bail!(
+            ErrorKind::OtherError,
+            "Invalid input: VOLE-in-the-head does not support gate mulc"
+        );
+    }
+    fn assert_zero(&mut self, _: &Self::Wire) -> CircuitResult<()> {
+        todo!()
     }
 }
 
@@ -124,12 +111,13 @@ mod tests {
     use mac_n_cheese_sieve_parser::text_parser::RelationReader;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
+    use swanky_sieve_ir_api::CircuitExecuter;
 
     use crate::circuit::CircuitIngestor;
-    use crate::proof::prover_preparer::ProverPreparer;
+    use crate::proof::{Circuit, prover_preparer::ProverPreparer};
 
-    /// Take a string description of a circuit and parse it with the circuit preparer.
-    fn prepare_circuit(circuit: &str) -> swanky_error::Result<ProverPreparer> {
+    /// Take a string description of a circuit and parse it.
+    fn load_circuit(circuit: &str) -> swanky_error::Result<Circuit> {
         let rng = &mut thread_rng();
         // Generate a private input vector with 100 random inputs
         let random_private_inputs: Vec<F2> = (0..100).map(|_| F2::random(rng)).collect();
@@ -140,9 +128,16 @@ mod tests {
         reader.read(&mut circ)?;
 
         let circuit_loaded = circ.into_circuit();
+        Ok(circuit_loaded)
+    }
 
-        let mut counter: ProverPreparer = ProverPreparer::new(circuit_loaded.max_wire_id)?;
-        counter.execute(&circuit_loaded)?;
+    fn prepare_circuit<'a>(
+        circuit_loaded: &'a Circuit,
+    ) -> swanky_error::Result<ProverPreparer<'a>> {
+        let (circuit, private_input, max_wire_id) = circuit_loaded.to_interpreter();
+
+        let mut counter: ProverPreparer = ProverPreparer::new(private_input, max_wire_id)?;
+        circuit.execute(&mut counter)?;
         Ok(counter)
     }
 
@@ -156,7 +151,8 @@ mod tests {
               $1 <- @private(0);
               $2 <- @private(0);
             @end ";
-        let counter = prepare_circuit(private_input_only)?;
+        let circuit = load_circuit(private_input_only)?;
+        let counter = prepare_circuit(&circuit)?;
         assert_eq!(counter.count(), 3);
 
         let private_input_range = "version 2.0.0;
@@ -165,7 +161,8 @@ mod tests {
             @begin
               $0 ... $3 <- @private(0);
             @end";
-        let counter = prepare_circuit(private_input_range)?;
+        let circuit = load_circuit(private_input_range)?;
+        let counter = prepare_circuit(&circuit)?;
         assert_eq!(counter.count(), 4);
         Ok(())
     }
@@ -179,7 +176,8 @@ mod tests {
               $0 <- @private(0);
               $1 <- @mul(0: $0, $0);
             @end ";
-        let counter = prepare_circuit(one_mul)?;
+        let circuit = load_circuit(one_mul)?;
+        let counter = prepare_circuit(&circuit)?;
         assert_eq!(counter.count(), 2);
 
         let many_mul = "version 2.0.0;
@@ -194,7 +192,8 @@ mod tests {
               $5 <- @mul(0: $0, $4);
               $6 <- @mul(0: $0, $5);
             @end ";
-        let counter = prepare_circuit(many_mul)?;
+        let circuit = load_circuit(many_mul)?;
+        let counter = prepare_circuit(&circuit)?;
         assert_eq!(counter.count(), 7);
         Ok(())
     }
@@ -211,7 +210,8 @@ mod tests {
               $1 <- @mul(0: $0, $0);
               $2 <- @add(0: $0, $0);
             @end ";
-        let counter = prepare_circuit(one_mul)?;
+        let circuit = load_circuit(one_mul)?;
+        let counter = prepare_circuit(&circuit)?;
         assert_eq!(counter.count(), 2);
 
         let many_mul = "version 2.0.0;
@@ -227,29 +227,9 @@ mod tests {
               $5 <- @mul(0: $0, $4);
               $6 <- @mul(0: $0, $5);
             @end ";
-        let counter = prepare_circuit(many_mul)?;
+        let circuit = load_circuit(many_mul)?;
+        let counter = prepare_circuit(&circuit)?;
         assert_eq!(counter.count(), 7);
-        Ok(())
-    }
-
-    #[test]
-    fn add_gates_eval_correctly() -> swanky_error::Result<()> {
-        let one_add = "version 2.0.0;
-            circuit;
-            @type field 2;
-            @begin
-              $0 <- @private(0);
-              $1 <- @private(0);
-              $2 <- @add(0: $0, $1);
-            @end ";
-
-        // This evaluates on a random input; over time we'll check them all
-        let counter = prepare_circuit(one_add)?;
-        assert_eq!(
-            counter.wire_values.get(&0) + counter.wire_values.get(&1),
-            *counter.wire_values.get(&2)
-        );
-
         Ok(())
     }
 
@@ -265,10 +245,11 @@ mod tests {
             @end ";
 
         // This evaluates on a random input; over time we'll check them all
-        let counter = prepare_circuit(one_mul)?;
+        let circuit = load_circuit(one_mul)?;
+        let counter = prepare_circuit(&circuit)?;
         assert_eq!(
-            counter.wire_values.get(&0) * counter.wire_values.get(&1),
-            *counter.wire_values.get(&2)
+            counter.witness.first().unwrap() * counter.witness.get(1).unwrap(),
+            *counter.witness.get(2).unwrap()
         );
 
         Ok(())

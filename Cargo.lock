@@ -2205,7 +2205,6 @@ name = "schmivitz"
 version = "0.6.0"
 dependencies = [
  "aes",
- "blake3",
  "criterion",
  "diet-mac-and-cheese",
  "env_logger 0.11.9",
@@ -2223,6 +2222,8 @@ dependencies = [
  "swanky-field",
  "swanky-field-binary",
  "swanky-serialization",
+ "swanky-sieve-ir-api",
+ "swanky-sieve-ir-codegen",
  "tempfile",
 ]
 
@@ -2897,6 +2898,30 @@ dependencies = [
  "proptest",
  "serde",
  "vectoreyes",
+]
+
+[[package]]
+name = "swanky-sieve-ir-api"
+version = "0.6.0"
+dependencies = [
+ "swanky-error",
+ "swanky-field-binary",
+ "swanky-field-ff-primes",
+]
+
+[[package]]
+name = "swanky-sieve-ir-codegen"
+version = "0.6.0"
+dependencies = [
+ "crypto-bigint",
+ "mac-n-cheese-sieve-parser",
+ "proc-macro2",
+ "quote",
+ "swanky-error",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-serialization",
+ "syn 2.0.117",
 ]
 
 [[package]]

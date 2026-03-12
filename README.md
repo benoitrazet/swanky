@@ -29,7 +29,7 @@ have a lesser stability guarantee.
 - **`mac-n-cheese-inspector`**: A tool to inspect mac n'cheese IR files
 - **`mac-n-cheese-ir`**: The definition of the mac n'cheese IR
 - **`mac-n-cheese-runner`**: A tool to proof mac n'cheese IR files in zero-knowledge
-- **`mac-n-cheese-sieve-parser`**: A parser for SIEVE IR (a zero knoweldge proof circuit format)
+- **`mac-n-cheese-sieve-parser`**: A parser for SIEVE IR (a zero knowledge proof circuit format)
 - **`mac-n-cheese-vole`**: An implementation of Vector Oblivious Linear Evaluation
 - **`mac-n-cheese-wire-map`**: An implementation of a sparse array
 - **`popsicle`**: A library for private set intersection
@@ -71,6 +71,8 @@ have a lesser stability guarantee.
 - **`swanky-party`**: Support for types indexed by a party.
 - **`swanky-polynomial`**: Support for various representations of polynomials over finite fields
 - **`swanky-serialization`**: Traits and utilities for compact serialization into a canonical byte representation
+- **`swanky-sieve-ir-api`**: A library providing a Rust API for defining zero-knowledge circuits.
+- **`swanky-sieve-ir-codegen`**: A library providing macros to statically parse SIEVE IR zero-knowledge circuits.
 - **`swanky-svole-wykw`**: An implementation of the WYKW svole protocol
 - **`swanky-twopac`**: Two-party secure computation using garbled circuits.
 - **`web-mac-n-cheese-wasm`**: Web Mac'n'Cheese, the wasm part

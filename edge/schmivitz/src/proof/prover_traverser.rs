@@ -1,9 +1,9 @@
 use mac_n_cheese_sieve_parser::WireId;
-use swanky_error::{ErrorKind, Result, bail};
+use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
+use swanky_sieve_ir_api::{CircuitResult, FieldBackend};
 
-use crate::circuit::{Circuit, CircuitMemory, GateM};
 use crate::vole::RandomVoleP;
 
 /// A [`ProverTraverser`] allows the prover to execute the gate-by-gate evaluation portion of the
@@ -12,23 +12,16 @@ use crate::vole::RandomVoleP;
 /// The primary steps in circuit traversal include assigning VOLEs to each wire and
 /// computing the two aggregated values used in the proof.
 pub(crate) struct ProverTraverser<Vole> {
-    /// Map containing the full set of wire values for the entire circuit.
-    ///
-    /// Note: For the currently-accepted set of gates, it is actually only necessary for this to
-    /// contain the input wires for multiplication gates, but the current structure of the
-    /// [`ProverPreparer`](crate::proof::prover_preparer::ProverPreparer) will produce
-    /// the full set of wire values.
-    wire_values: CircuitMemory<F2>,
+    /// Current position for a fresh extended witness value.
+    wire_values_pos: WireId,
+
+    /// Map containing the wire values for the extended witness (private inputs and multiplication gates in the circuit).
+    extended_witness: Vec<F2>,
     /// Fiat-Shamir challenges. There should be one for each polynomial (e.g. non-linear gate).
     challenges: Vec<F128b>,
 
     /// Random VOLE values. There should be one for each extended witness value.
     voles: Vole,
-    /// Assignment of VOLE values to specific wires in the circuit.
-    ///
-    /// This is constructed during circuit traversal; it holds computed output VOLE values for
-    /// linear gates and assigned VOLE values (pulled out of `voles`) for non-linear gates.
-    assigned_voles: CircuitMemory<F128b>,
     /// Count of how many of the custom VOLEs have been assigned.
     vole_assignment_count: usize,
     /// Count of how many of the challenges have been assigned to polynomials (non-linear gates).
@@ -48,36 +41,35 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
     /// Create a new circuit traverser.
     ///
     /// Requirements on inputs:
-    /// - The `wire_values` must contain a corresponding value for the input and output wires on
+    /// - The `extended_witness` must contain a corresponding value for the input and output wires on
     ///   every non-linear gate;
     /// - The challenges must correspond to the number of polynomials. In this setting, that must
     ///   be no greater than the length of the extended witness (as defined by the [`RandomVole`]);
     /// - The [`RandomVole::extended_witness_length()`] must be large enough to have a VOLE
     ///   corresponding to every gate in the extended witness.
     pub(crate) fn new(
-        wire_values: CircuitMemory<F2>,
+        extended_witness: Vec<F2>,
         challenges: Vec<F128b>,
         voles: Vole,
     ) -> Result<Self> {
-        if wire_values.len() < challenges.len()
+        if extended_witness.len() < challenges.len()
             || voles.extended_witness_length() < challenges.len()
         {
             bail!(
                 ErrorKind::OtherError,
                 "Bad input: Length of challenges ({}), extended witness ({}), and VOLEs ({}) did not meet requirements",
                 challenges.len(),
-                wire_values.len(),
+                extended_witness.len(),
                 voles.extended_witness_length(),
             );
         }
 
-        let max_wire_id = wire_values.len() as u64;
         Ok(Self {
-            wire_values,
+            wire_values_pos: 0,
+            extended_witness,
             challenges,
 
             voles,
-            assigned_voles: CircuitMemory::new(max_wire_id),
             vole_assignment_count: 0,
             challenge_count: 0,
 
@@ -86,44 +78,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
         })
     }
 
-    /// Retrieve the wire value associated with the [`WireId`].
-    ///
-    /// It assumes the circuit is well-formed and the wire requested has been previously assigned.
-    fn wire_value(&self, wid: WireId) -> Result<F2> {
-        Ok(*self.wire_values.get(&wid))
-    }
-
-    /// Retrieve the VOLE value associated with the [`WireId`].
-    ///
-    /// It assumes the [`WireId`] has not been associated with a VOLE, either by assigning
-    /// a new VOLE to a non-linear gate with [`Self::assign_vole()`] or computing the appropriate
-    /// VOLE for a linear gate and assigning it via [`Self::save_computed_vole()`].
-    fn vole(&self, wid: WireId) -> Result<F128b> {
-        Ok(*self.assigned_voles.get(&wid))
-    }
-
-    /// Associates the given VOLE with the [`WireId`].
-    ///
-    /// This should be called with the destination [`WireId`] for each linear gate encountered.
-    /// The correct `vole` value is determined by the specific gate type; for example, the correct
-    /// VOLE for an addition gate is the sum of the VOLEs of the two input wires. This method
-    /// does not validate the correctness of the VOLE.
-    ///
-    /// This function assumes that the circuit is well-formed and that wire ID can be assigned in memory
-    /// and that is was not already assigned.
-    fn save_computed_vole(&mut self, wid: WireId, vole: F128b) -> Result<()> {
-        self.assigned_voles.insert(wid, vole);
-        Ok(())
-    }
-
-    /// Assigns an unused VOLE to the wire ID.
-    ///
-    /// This should be called with the destination [`WireId`] for each non-linear gate.
-    /// It should _not_ be used with linear gates! Use [`Self::save_computed_vole()`] to
-    /// assign a VOLE value to a linear gate.
-    ///
-    /// Fails if there aren't enough VOLEs or if the [`WireId`] is already assigned to a VOLE.
-    fn assign_vole(&mut self, wid: WireId) -> Result<()> {
+    fn next_vole(&mut self) -> Result<F128b> {
         let next_index = self.vole_assignment_count;
         self.vole_assignment_count += 1;
 
@@ -138,7 +93,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
             )
         }
 
-        self.save_computed_vole(wid, self.voles.vole_mask(next_index)?)
+        self.voles.vole_mask(next_index)
     }
 
     /// Retrieves the next unused challenge.
@@ -184,184 +139,80 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
         Ok((self.aggregate_degree_0, self.aggregate_degree_1, self.voles))
     }
 
-    /// Execute a circuit.
-    pub(crate) fn execute(&mut self, circ: &Circuit) -> Result<()> {
-        for g in circ.gates.iter().cloned() {
-            match g {
-                GateM::Add(ty, dst, left, right) => {
-                    // Assumption: There is exactly one type ID for these circuits and it is F2.
-                    assert_eq!(ty, 0);
+    /// Get the next extended witness value.
+    pub(crate) fn next_witness_value(&mut self) -> Result<F2> {
+        let wid = self.wire_values_pos;
+        self.wire_values_pos += 1;
 
-                    // Compute the correct VOLE for the output wire
-                    let sum_vole = self.vole(left)? + self.vole(right)?;
-                    self.save_computed_vole(dst, sum_vole)?;
-
-                    // Linear gates don't contribute to the aggregated values being computed
-                }
-                GateM::Mul(ty, dst, left, right) => {
-                    // Assumption: There is exactly one type ID for these circuits and it is F2.
-                    assert_eq!(ty, 0);
-
-                    // Assign a fresh VOLE to the output wire and get the corresponding challenge
-                    self.assign_vole(dst)?;
-                    let challenge = self.next_challenge()?;
-
-                    // Compute coefficient values `A_i1` and `A_i0` (respectively). These are derived from the
-                    // `c_i(X)` polynomial defined in the paper -- see Fig 7 and page 32-33 for details.
-                    let degree_0_coeff = self.vole(left)? * self.vole(right)?;
-                    let degree_1_coeff = self.wire_value(right)? * self.vole(left)?
-                        + self.wire_value(left)? * self.vole(right)?
-                        - self.vole(dst)?;
-
-                    self.aggregate_degree_0 += challenge * degree_0_coeff;
-                    self.aggregate_degree_1 += challenge * degree_1_coeff;
-                }
-                GateM::AddConstant(ty, dst, left, _right) => {
-                    // Assumption: There is exactly one type ID for these circuits and it is F2.
-                    assert_eq!(ty, 0);
-
-                    // Compute the correct VOLE for the output wire
-                    let sum_vole = self.vole(left)?;
-                    self.save_computed_vole(dst, sum_vole)?;
-
-                    // Linear gates don't contribute to the aggregated values being computed
-                }
-                GateM::Witness(ty, dst) => {
-                    // Assumption: There is exactly one type ID for these circuits and it is F2.
-                    assert_eq!(ty, 0);
-
-                    // Assign a fresh VOLE to each of the output wires
-                    for wid in dst.start..=dst.end {
-                        self.assign_vole(wid)?;
-                    }
-
-                    // Private input gates don't define a polynomial that would contribute to the aggregated
-                    // coefficients being computed
-                }
-                _ => bail!(
-                    ErrorKind::UnsupportedError,
-                    "Invalid input: VOLE-in-the-head does not support gate {:?}",
-                    g
-                ),
-            }
-        }
-
-        Ok(())
+        self.extended_witness
+            .get::<usize>(
+                wid.try_into()
+                    .map_err(|e| swanky_error!(ErrorKind::OtherError, "Conversion error: {e}"))?,
+            )
+            .ok_or_else(|| {
+                swanky_error!(
+                    ErrorKind::OtherError,
+                    "Internal invariant failed: expected a witness value for wire ID {}",
+                    wid
+                )
+            })
+            .copied()
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::iter::repeat_with;
-
-    use merlin::Transcript;
-    use rand::thread_rng;
-    use swanky_error::Result;
-    use swanky_field::FiniteRing;
-    use swanky_field_binary::{F2, F128b};
-
-    use super::ProverTraverser;
-    use crate::{
-        circuit::CircuitMemory,
-        vole::{RandomVoleP, insecure::InsecureVole},
-    };
-
-    fn dummy_traverser(len: usize) -> ProverTraverser<InsecureVole> {
-        let transcript = &mut Transcript::new(b"dummy for tests");
-        let rng = &mut thread_rng();
-        let secret: Vec<F2> = Vec::new();
-
-        let (voles, _) = InsecureVole::create(len, transcript, &secret, rng);
-        let challenges = repeat_with(|| F128b::random(rng)).take(len).collect();
-        let len_u64: u64 = len.try_into().unwrap();
-        ProverTraverser::new(CircuitMemory::new(len_u64 - 1), challenges, voles).unwrap()
+// TODO: Generalize this for large primes.
+impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
+    type Wire = (F2, F128b);
+    fn input_public(&mut self) -> CircuitResult<Self::Wire> {
+        todo!()
     }
+    fn input_private(&mut self) -> CircuitResult<Self::Wire> {
+        let f = self.next_witness_value()?;
+        let vole = self.next_vole()?;
 
-    #[test]
-    fn vole_assignment_works_as_expected() -> Result<()> {
-        let len = 20;
-        let mut traverser = dummy_traverser(len);
-        // Assume every gate is non-linear, for fun
-        let non_linear_gates: Vec<F2> = traverser.wire_values.get_memory().to_vec();
-
-        for (id, _) in non_linear_gates.iter().enumerate() {
-            let gate = id as u64;
-            // If the VOLE hasn't been assigned, you can't retrieve it
-            assert_eq!(traverser.vole(gate).unwrap(), F128b::ZERO);
-
-            // Request a VOLE to be assigned to the wire...
-            traverser.assign_vole(gate)?;
-
-            // ...and make sure the assignment is in order wrt the VOLE indexes (0, 1, 2...)
-            assert_eq!(traverser.vole_assignment_count, id + 1);
-
-            // Now you can retrieve the VOLE
-            assert!(traverser.vole(gate).is_ok());
-        }
-
-        // Can't assign more VOLEs than you have
-        assert!(traverser.assign_vole(len as u64).is_err());
-
-        Ok(())
+        // Private input gates don't define a polynomial that would contribute to the aggregated
+        // coefficients being computed
+        Ok((f, vole))
     }
+    fn add(&mut self, left: &Self::Wire, right: &Self::Wire) -> CircuitResult<Self::Wire> {
+        let res = left.0 + right.0;
 
-    #[test]
-    fn vole_computation_works_as_expected() -> Result<()> {
-        let rng = &mut thread_rng();
-        let len = 4;
-        let mut traverser = dummy_traverser(len);
+        // Compute the correct VOLE for the output wire
+        let sum_vole = left.1 + right.1;
 
-        // Assume every gate is linear, for fun
-        let linear_gates: Vec<F2> = traverser.wire_values.get_memory().to_vec();
-        for (id, _) in linear_gates.iter().enumerate() {
-            let wid = id as u64;
-            // If VOLEs haven't been computed, you can't retrieve them
-            assert_eq!(traverser.vole(wid).unwrap(), F128b::ZERO);
-
-            // "Compute" a VOLE for the gate...
-            let vole = F128b::random(rng);
-            traverser.save_computed_vole(wid, vole)?;
-
-            // ...and make sure they were assigned as expected
-            assert_eq!(traverser.vole(wid)?, vole)
-        }
-
-        Ok(())
+        // Linear gates don't contribute to the aggregated values being computed
+        Ok((res, sum_vole))
     }
+    fn addc(&mut self, left: &Self::Wire, right: F2) -> CircuitResult<Self::Wire> {
+        let res = left.0 + right;
 
-    #[test]
-    fn voles_cannot_be_assigned_and_computed() -> Result<()> {
-        let rng = &mut thread_rng();
-        let len = 4;
-        let mut traverser = dummy_traverser(len);
+        // Compute the correct VOLE for the output wire
+        let sum_vole = left.1;
 
-        // Assume every gate is linear, for fun
-        let linear_gates: Vec<F2> = traverser.wire_values.get_memory().to_vec();
-        for id in 0..2 {
-            let wid = id as u64;
-            // If VOLEs haven't been computed/assigned, you can't retrieve them
-            assert_eq!(traverser.vole(wid).unwrap(), F128b::ZERO);
+        // Linear gates don't contribute to the aggregated values being computed
+        Ok((res, sum_vole))
+    }
+    fn mul(&mut self, left: &Self::Wire, right: &Self::Wire) -> CircuitResult<Self::Wire> {
+        let f = self.next_witness_value()?;
 
-            // "Compute" a VOLE for the wire
-            let vole = F128b::random(rng);
-            traverser.save_computed_vole(wid, vole)?;
+        // Assign a fresh VOLE to the output wire and get the corresponding challenge
+        let vole = self.next_vole()?;
+        let challenge = self.next_challenge()?;
 
-            // The value stored is extremely unlikely to be zero
-            assert!(*traverser.assigned_voles.get(&wid) != F128b::ZERO);
-        }
+        // Compute coefficient values `A_i1` and `A_i0` (respectively). These are derived from the
+        // `c_i(X)` polynomial defined in the paper -- see Fig 7 and page 32-33 for details.
+        let degree_0_coeff = left.1 * right.1;
+        let degree_1_coeff = right.0 * left.1 + left.0 * right.1 - vole;
 
-        for id in 2..linear_gates.len() {
-            let wid = id as u64;
-            // If VOLEs haven't been computed/assigned, you can't retrieve them
-            assert_eq!(traverser.vole(wid).unwrap(), F128b::ZERO);
+        self.aggregate_degree_0 += challenge * degree_0_coeff;
+        self.aggregate_degree_1 += challenge * degree_1_coeff;
 
-            // Assign a new VOLE for the wire
-            traverser.assign_vole(wid)?;
-
-            // The value stored is extremely unlikely to be zero
-            assert!(*traverser.assigned_voles.get(&wid) != F128b::ZERO);
-        }
-
-        Ok(())
+        Ok((f, vole))
+    }
+    fn mulc(&mut self, _: &Self::Wire, _: F2) -> CircuitResult<Self::Wire> {
+        todo!()
+    }
+    fn assert_zero(&mut self, _: &Self::Wire) -> CircuitResult<()> {
+        todo!()
     }
 }

@@ -7,6 +7,7 @@
 //! Emmanuela Orsini, Lawrence Roy, and Peter Scholl. [Publicly Verifiable Zero-Knowledge and
 //! Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
 //!
+use mac_n_cheese_sieve_parser::WireId;
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
 use rayon::iter::*;
@@ -14,6 +15,7 @@ use std::{iter::zip, marker::PhantomData};
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b, F128b};
+use swanky_sieve_ir_api::CircuitExecuter;
 
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
@@ -68,9 +70,30 @@ where
     }
 
     /// Create a proof of knowledge of a witness that satisfies the given circuit.
-    pub fn prove<R>(circuit: &Circuit, transcript: &mut Transcript, rng: &mut R) -> Result<Self>
+    pub fn prove_with_circuit<R>(
+        circuit: &Circuit,
+        transcript: &mut Transcript,
+        rng: &mut R,
+    ) -> Result<Self>
     where
         R: CryptoRng + RngCore,
+    {
+        let (gates, private_input, max_wire_id) = circuit.to_interpreter();
+        Self::prove(gates, private_input, max_wire_id, transcript, rng)
+    }
+
+    /// Create a proof of knowledge of a witness that satisfies the given circuit.
+    pub fn prove<R, C>(
+        circuit: C,
+        private_input: &[F2],
+        max_wire_id: WireId,
+        transcript: &mut Transcript,
+        rng: &mut R,
+    ) -> Result<Self>
+    // TODO: Get rid of max_wire_id
+    where
+        R: CryptoRng + RngCore,
+        C: CircuitExecuter<F2>, // Can't do higher order trait bounds... See https://github.com/rust-lang/rust/issues/108185#issuecomment-2819123578
     {
         let t = std::time::Instant::now();
         let mut transcript = transcript::Transcript::from(transcript);
@@ -78,10 +101,10 @@ where
 
         // Evaluate the circuit in the clear to get the full witness and all wire values
         let t = std::time::Instant::now();
-        let mut circuit_preparer = ProverPreparer::new(circuit.max_wire_id)?;
-        circuit_preparer.execute(circuit)?;
+        let mut circuit_preparer = ProverPreparer::new(private_input, max_wire_id)?;
+        circuit.execute(&mut circuit_preparer)?;
 
-        let (witness, wire_values, polynomial_count) = circuit_preparer.into_parts();
+        let (witness, polynomial_count) = circuit_preparer.into_parts();
         log::info!("1: circuit preparer: {:?}", t.elapsed());
 
         let t = std::time::Instant::now();
@@ -95,8 +118,11 @@ where
 
         let t = std::time::Instant::now();
         // Commit to extended witness (`d` in the paper)
-        let witness_commitment: Vec<F2> = zip(witness, voles.witness_mask())
-            .map(|(w, u)| w - u)
+        let witness_commitment: Vec<F2> = voles
+            .witness_mask()
+            .iter()
+            .zip(witness.iter())
+            .map(|(u, w)| w - u)
             .collect();
         log::info!("3: witness_commitment: {:?}", t.elapsed());
 
@@ -113,9 +139,8 @@ where
         // Traverse circuit to compute the coefficients for the degree 0 and 1 terms for each
         // gate / polynomial (`A_i0` and `A_i1` in the paper) and start to aggregate these with
         // the challenges.
-        let mut circuit_traverser = ProverTraverser::new(wire_values, witness_challenges, voles)?;
-        circuit_traverser.execute(circuit)?;
-        // TODO: consider not returning the `voles` with `into_parts()`. This interface does not communicate that `voles` are only read but not modified by the circuit traverser
+        let mut circuit_traverser = ProverTraverser::new(witness, witness_challenges, voles)?;
+        circuit.execute(&mut circuit_traverser)?;
         let (degree_0_aggregation, degree_1_aggregation, voles) = circuit_traverser.into_parts()?;
 
         log::info!("4: circuit_traverser.into_parts: {:?}", t.elapsed());
@@ -164,10 +189,23 @@ where
         Ok(())
     }
 
+    /// Verify the proof for the given Circuit.
+    ///
+    pub fn verify_with_circuit(
+        &self,
+        circuit: &Circuit,
+        transcript: &mut Transcript,
+    ) -> Result<()> {
+        let (gates, _private_input, _max_wire_id) = circuit.to_interpreter();
+        self.verify(gates, transcript)
+    }
+
     /// Verify the proof.
     ///
-    pub fn verify(&self, circuit: &Circuit, transcript: &mut Transcript) -> Result<()>
-where {
+    pub fn verify<C>(&self, circuit: C, transcript: &mut Transcript) -> Result<()>
+    where
+        C: CircuitExecuter<F2>, // Can't do higher order trait bounds... See https://github.com/rust-lang/rust/issues/108185#issuecomment-2819123578
+    {
         let mut transcript = transcript::Transcript::from(transcript);
         transcript.append_public_values();
 
@@ -232,9 +270,8 @@ where {
             witness_challenges,
             reconstructed_voles.verifier_key(),
             masked_witnesses,
-            circuit.max_wire_id,
         )?;
-        verifier_traverser.execute(circuit)?;
+        circuit.execute(&mut verifier_traverser)?;
         let validation_aggregate = verifier_traverser.into_parts()?;
         log::info!("5: circuit traverser {:?}", t.elapsed());
 
@@ -321,7 +358,7 @@ mod tests {
         let circuit = load_circuit_prover(&mut circuit_cursor, &private_input_path)?;
         let rng = &mut thread_rng();
 
-        let proof = Proof::<InsecureVole, InsecureCommitments>::prove::<_>(
+        let proof = Proof::<InsecureVole, InsecureCommitments>::prove_with_circuit::<_>(
             &circuit,
             &mut transcript(),
             rng,
@@ -347,7 +384,11 @@ mod tests {
             @end";
 
         let (proof, mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes)?;
-        assert!(proof?.verify(&mini_circuit, &mut transcript()).is_ok());
+        assert!(
+            proof?
+                .verify_with_circuit(&mini_circuit, &mut transcript())
+                .is_ok()
+        );
 
         Ok(())
     }
@@ -383,7 +424,11 @@ mod tests {
             @end ";
 
         let (proof, small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes)?;
-        assert!(proof?.verify(&small_circuit, &mut transcript()).is_ok());
+        assert!(
+            proof?
+                .verify_with_circuit(&small_circuit, &mut transcript())
+                .is_ok()
+        );
 
         Ok(())
     }
@@ -408,7 +453,11 @@ mod tests {
         // If we use a different transcript to verify, it'll fail
         let transcript = &mut transcript();
         transcript.append_message(b"I am but a simple verifier", b"trying to be secure");
-        assert!(proof?.verify(&small_circuit, transcript).is_err());
+        assert!(
+            proof?
+                .verify_with_circuit(&small_circuit, transcript)
+                .is_err()
+        );
 
         Ok(())
     }
@@ -460,7 +509,7 @@ mod tests {
         let small_circuit = load_circuit_prover(small_circuit_text, &private_input_path)?;
         let rng = &mut thread_rng();
 
-        let proof = Proof::<InsecureVole, InsecureCommitments>::prove::<_>(
+        let proof = Proof::<InsecureVole, InsecureCommitments>::prove_with_circuit::<_>(
             &small_circuit,
             &mut transcript(),
             rng,
@@ -472,7 +521,7 @@ mod tests {
 
         assert!(
             too_many_challenges
-                .verify(&small_circuit, &mut transcript())
+                .verify_with_circuit(&small_circuit, &mut transcript())
                 .is_err()
         );
 
@@ -481,7 +530,7 @@ mod tests {
         too_few_challenges.polynomial_count += 1;
         assert!(
             too_few_challenges
-                .verify(&small_circuit, &mut transcript())
+                .verify_with_circuit(&small_circuit, &mut transcript())
                 .is_err()
         );
 

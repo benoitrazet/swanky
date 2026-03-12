@@ -9,6 +9,7 @@ mod test {
     };
     use std::sync::Once;
     use swanky_error::Result;
+    use swanky_sieve_ir_codegen::compile_sieve_ir_str;
 
     static DO_LOGGING: bool = false;
     static INIT: Once = Once::new();
@@ -36,7 +37,7 @@ mod test {
         let rng = &mut thread_rng();
 
         let t = std::time::Instant::now();
-        let t1 = Proof::prove::<_>(&circuit, &mut transcript(), rng);
+        let t1 = Proof::prove_with_circuit::<_>(&circuit, &mut transcript(), rng);
         log::info!("proof time: {:?}", t.elapsed());
         (t1, circuit)
     }
@@ -59,7 +60,63 @@ mod test {
         @end";
 
         let (proof, mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
-        let verif = proof?.verify(&mini_circuit, &mut transcript());
+        let verif = proof?.verify_with_circuit(&mini_circuit, &mut transcript());
+        assert!(verif.is_ok());
+
+        Ok(())
+    }
+
+    compile_sieve_ir_str!(
+        DoesntExplode,
+        "version 2.0.0;
+        circuit;
+        @type field 2;
+        @begin
+          $0 <- @private(0);
+          $1 <- @mul(0: $0, $0);
+          $2 <- @add(0: $0, $0);
+        @end
+    "
+    );
+
+    #[test]
+    fn prove_sieveir_codegen() -> Result<()> {
+        let mini_circuit_bytes = "version 2.0.0;
+        circuit;
+        @type field 2;
+        @begin
+          $0 <- @private(0);
+          $1 <- @mul(0: $0, $0);
+          $2 <- @add(0: $0, $0);
+        @end ";
+        let private_input_bytes = "version 2.0.0;
+        private_input;
+        @type field 2;
+        @begin
+            < 1 >;
+        @end";
+
+        let (proof, mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
+        let proof = proof.unwrap();
+        let verif = proof.verify_with_circuit(&mini_circuit, &mut transcript());
+        assert!(verif.is_ok());
+
+        // Verify the dynamic circuit with the compiled circuit.
+        let verif = proof.verify(DoesntExplode, &mut transcript());
+        assert!(verif.is_ok());
+
+        // Verify the compiled circuit with the dynamic circuit.
+        let rng = &mut thread_rng();
+        let max_wire_id = 2;
+        let proof = Proof::<VoleProver, VoleVerifier>::prove(
+            DoesntExplode,
+            &mini_circuit.private_inputs,
+            max_wire_id,
+            &mut transcript(),
+            rng,
+        )
+        .unwrap();
+        let verif = proof.verify_with_circuit(&mini_circuit, &mut transcript());
         assert!(verif.is_ok());
 
         Ok(())
@@ -88,7 +145,7 @@ mod test {
         @end ";
 
         let (proof, mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
-        let verif = proof?.verify(&mini_circuit, &mut transcript());
+        let verif = proof?.verify_with_circuit(&mini_circuit, &mut transcript());
         assert!(verif.is_ok());
 
         Ok(())
@@ -125,7 +182,11 @@ mod test {
         @end ";
 
         let (proof, small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes);
-        assert!(proof?.verify(&small_circuit, &mut transcript()).is_ok());
+        assert!(
+            proof?
+                .verify_with_circuit(&small_circuit, &mut transcript())
+                .is_ok()
+        );
 
         Ok(())
     }
@@ -145,7 +206,11 @@ mod test {
 
         let t = std::time::Instant::now();
         let rng = &mut thread_rng();
-        let proof = Proof::<VoleProver, VoleVerifier>::prove::<_>(&circuit, &mut transcript(), rng);
+        let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit::<_>(
+            &circuit,
+            &mut transcript(),
+            rng,
+        );
         log::info!("Elapsed prover   aes256: {:?}", t.elapsed());
 
         log::info!(
@@ -154,7 +219,7 @@ mod test {
         );
 
         let t = std::time::Instant::now();
-        let verif = proof?.verify(&circuit, &mut transcript());
+        let verif = proof?.verify_with_circuit(&circuit, &mut transcript());
         assert!(verif.is_ok());
         log::info!("Elapsed verifier aes256: {:?}", t.elapsed());
 
@@ -176,7 +241,11 @@ mod test {
 
         let t = std::time::Instant::now();
         let rng = &mut thread_rng();
-        let proof = Proof::<VoleProver, VoleVerifier>::prove::<_>(&circuit, &mut transcript(), rng);
+        let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit::<_>(
+            &circuit,
+            &mut transcript(),
+            rng,
+        );
         log::info!("Elapsed prover   sha256: {:?}", t.elapsed());
 
         log::info!(
@@ -185,7 +254,7 @@ mod test {
         );
 
         let t = std::time::Instant::now();
-        let verif = proof?.verify(&circuit, &mut transcript());
+        let verif = proof?.verify_with_circuit(&circuit, &mut transcript());
         assert!(verif.is_ok());
         log::info!("Elapsed verifier sha256: {:?}", t.elapsed());
 

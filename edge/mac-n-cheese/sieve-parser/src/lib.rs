@@ -3,7 +3,7 @@
 pub mod fb_reader;
 pub mod text_parser;
 
-use std::{io::Write, path::Path};
+use std::{io::Write, ops::RangeInclusive, path::Path};
 
 use crypto_bigint::{CheckedAdd, CheckedMul};
 
@@ -164,7 +164,7 @@ impl std::fmt::Display for Header {
 /// A range of wire values, as defined in the SIEVE IR spec.
 ///
 /// Note that this range is _inclusive_; iteration should use
-/// [`RangeInclusive`](std::ops::RangeInclusive) syntax to account for this.
+/// [`RangeInclusive`] syntax to account for this.
 #[derive(Debug, Clone, Copy)]
 pub struct WireRange {
     pub start: WireId,
@@ -192,6 +192,9 @@ impl WireRange {
         );
 
         Ok(self.start)
+    }
+    pub fn range(&self) -> RangeInclusive<WireId> {
+        self.start..=self.end
     }
 }
 
