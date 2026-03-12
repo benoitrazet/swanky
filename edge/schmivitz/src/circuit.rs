@@ -339,10 +339,10 @@ impl<'a> CircuitExecuter<F2> for CircuitInterpreter<'a> {
                     // Assumption: There is exactly one type ID for these circuits and it is F2.
                     assert_eq!(*ty, 0);
 
-                    let left = memory.get_result(left)?;
-                    let right = memory.get_result(right)?;
+                    let left = memory.get(left);
+                    let right = memory.get(right);
 
-                    let res = backend.add(left, right)?;
+                    let res = backend.add(&left, &right)?;
 
                     memory.insert(*dst, res);
                 }
@@ -350,10 +350,10 @@ impl<'a> CircuitExecuter<F2> for CircuitInterpreter<'a> {
                     // Assumption: There is exactly one type ID for these circuits and it is F2.
                     assert_eq!(*ty, 0);
 
-                    let left = memory.get_result(left)?;
-                    let right = memory.get_result(right)?;
+                    let left = memory.get(left);
+                    let right = memory.get(right);
 
-                    let res = backend.mul(left, right)?;
+                    let res = backend.mul(&left, &right)?;
 
                     memory.insert(*dst, res);
                 }
@@ -361,10 +361,10 @@ impl<'a> CircuitExecuter<F2> for CircuitInterpreter<'a> {
                     // Assumption: There is exactly one type ID for these circuits and it is F2.
                     assert_eq!(*ty, 0);
 
-                    let left = memory.get_result(left)?;
+                    let left = memory.get(left);
                     let right = F2::from_number(right)?;
 
-                    let res = backend.addc(left, right)?;
+                    let res = backend.addc(&left, right)?;
 
                     memory.insert(*dst, res);
                 }
@@ -506,14 +506,11 @@ impl<F: Default + Clone + Copy> CircuitMemory<F> {
     }
 
     /// Get from the memory the value stored at the memory indexed by wire id `wid`.
-    pub(crate) fn get_result(&self, wid: &WireId) -> swanky_error::Result<&F> {
-        let idx: usize = *wid as usize;
-        self.cont.get(idx).ok_or_else(|| {
-            swanky_error!(
-                ErrorKind::OtherError,
-                "Malformed circuit: used a wire that has not yet been defined"
-            )
-        })
+    ///
+    /// This function assumes that it is called on a memory associated with a well-formed circuit,
+    /// more specifically that the wire id has been previously set.
+    pub(crate) fn get(&self, wid: &WireId) -> F {
+        self.cont[*wid as usize]
     }
 }
 

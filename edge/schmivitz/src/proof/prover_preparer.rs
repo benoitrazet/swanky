@@ -134,10 +134,10 @@ mod tests {
     fn prepare_circuit<'a>(
         circuit_loaded: &'a Circuit,
     ) -> swanky_error::Result<ProverPreparer<'a>> {
-        let (gates, private_input, max_wire_id) = circuit_loaded.to_interpreter();
+        let (circuit, private_input, max_wire_id) = circuit_loaded.to_interpreter();
 
         let mut counter: ProverPreparer = ProverPreparer::new(private_input, max_wire_id)?;
-        gates.execute(&mut counter)?;
+        circuit.execute(&mut counter)?;
         Ok(counter)
     }
 
