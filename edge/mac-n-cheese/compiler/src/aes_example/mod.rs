@@ -71,8 +71,8 @@ fn parse_circuit() -> Circuit {
     let num_wires = usize::from_str(hdr[1]).unwrap();
     let mut bristol2wire = vec![None; num_wires];
     let mut circuit = Circuit::default();
-    for i in 0..NUM_INPUTS {
-        bristol2wire[i] = Some(circuit.add_wire(WireBody::Input(i)));
+    for (i, b2w) in bristol2wire.iter_mut().enumerate().take(NUM_INPUTS) {
+        *b2w = Some(circuit.add_wire(WireBody::Input(i)));
     }
     let _ = lines.next().unwrap(); // Skip number of input and output wires
     let mut buf = Vec::new();

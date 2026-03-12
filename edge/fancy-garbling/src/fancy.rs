@@ -85,7 +85,7 @@ pub trait FancyBinary: Fancy {
         assert!(!args.is_empty(), "`args` cannot be empty");
         args.iter()
             .skip(1)
-            .fold(Ok(args[0].clone()), |acc, x| self.and(&(acc?), x, channel))
+            .try_fold(args[0].clone(), |acc, x| self.and(&acc, x, channel))
     }
 
     /// Returns 1 if any wire equals 1.
@@ -100,7 +100,7 @@ pub trait FancyBinary: Fancy {
         assert!(!args.is_empty(), "`args` cannot be empty");
         args.iter()
             .skip(1)
-            .fold(Ok(args[0].clone()), |acc, x| self.or(&(acc?), x, channel))
+            .try_fold(args[0].clone(), |acc, x| self.or(&acc, x, channel))
     }
 
     /// XOR many wires together.

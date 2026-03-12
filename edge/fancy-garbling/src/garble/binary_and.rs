@@ -29,14 +29,14 @@ impl BinaryWireLabel for WireMod2 {
 
         // X = H(A+aD) + arD such that a + A.color == 0
         let alpha = A.color(); // alpha = -A.color
-        let X1 = A.plus(&D.cmul(alpha));
+        let X1 = *A + *D * alpha;
 
         // Y = H(B + bD) + (b + r)A such that b + B.color == 0
         let beta = (q - B.color()) % q;
-        let Y1 = B.plus(&D.cmul(beta));
+        let Y1 = *B + *D * beta;
 
-        let AD = A.plus(D);
-        let BD = B.plus(D);
+        let AD = *A + *D;
+        let BD = *B + *D;
 
         // idx is always boolean for binary gates, so it can be represented as a `u8`
         let a_selector = (A.color() as u8).into();
@@ -48,14 +48,14 @@ impl BinaryWireLabel for WireMod2 {
 
         let [hashA, hashB, hashX, hashY] = hash_wires([&newA, &B, &X1, &Y1], g);
 
-        let X = Self::hash_to_mod(hashX, q).plus_mov(&D.cmul(alpha * r % q));
+        let X = Self::hash_to_mod(hashX, q) + *D * (alpha * r % q);
         let Y = Self::hash_to_mod(hashY, q);
 
         let gate0 =
-            hashA ^ Block::conditional_select(&X.to_block(), &X.plus(D).to_block(), idx.into());
-        let gate1 = hashB ^ Y.plus(A).to_block();
+            hashA ^ Block::conditional_select(&X.to_block(), &(X + *D).to_block(), idx.into());
+        let gate1 = hashB ^ (Y + *A).to_block();
 
-        (gate0, gate1, X.plus_mov(&Y))
+        (gate0, gate1, X + Y)
     }
 
     fn evaluate_and_gate(
@@ -81,6 +81,6 @@ impl BinaryWireLabel for WireMod2 {
             2,
         );
 
-        L.plus_mov(&R.plus_mov(&A.cmul(B.color())))
+        L + R + *A * B.color()
     }
 }

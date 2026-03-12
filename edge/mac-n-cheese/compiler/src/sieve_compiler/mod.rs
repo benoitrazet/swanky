@@ -63,7 +63,11 @@ fn to_k_bits<FE: CompilerField>(x: usize, k: usize) -> swanky_error::Result<Vec<
 
     let mut quot = x;
     while quot != 0 {
-        bits.push(if quot % 2 == 0 { FE::ZERO } else { FE::ONE });
+        bits.push(if quot.is_multiple_of(2) {
+            FE::ZERO
+        } else {
+            FE::ONE
+        });
         quot /= 2;
     }
 
@@ -81,7 +85,11 @@ fn to_k_flipped_bits<FE: CompilerField>(x: usize, k: usize) -> swanky_error::Res
 
     let mut quot = x;
     while quot != 0 {
-        bits.push(if quot % 2 == 0 { FE::ONE } else { FE::ZERO });
+        bits.push(if quot.is_multiple_of(2) {
+            FE::ONE
+        } else {
+            FE::ZERO
+        });
         quot /= 2;
     }
 

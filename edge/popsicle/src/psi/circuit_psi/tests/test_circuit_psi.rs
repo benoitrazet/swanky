@@ -15,8 +15,8 @@ mod tests {
 
     // Computes the cardinality of the intersection in the clear
     pub fn cardinality_in_clear(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> usize {
-        let set_a: HashSet<Block> = HashSet::from_iter(u8_vec_block(&set_a, PRIMARY_KEY_SIZE));
-        let set_b: HashSet<Block> = HashSet::from_iter(u8_vec_block(&set_b, PRIMARY_KEY_SIZE));
+        let set_a: HashSet<Block> = HashSet::from_iter(u8_vec_block(set_a, PRIMARY_KEY_SIZE));
+        let set_b: HashSet<Block> = HashSet::from_iter(u8_vec_block(set_b, PRIMARY_KEY_SIZE));
 
         set_a.intersection(&set_b).count()
     }
@@ -30,8 +30,8 @@ mod tests {
         payload_a: &[u128],
         payload_b: &[u128],
     ) -> u128 {
-        let primary_keys_a: Vec<Block> = u8_vec_block(&primary_keys_a, PRIMARY_KEY_SIZE);
-        let primary_keys_b: Vec<Block> = u8_vec_block(&primary_keys_b, PRIMARY_KEY_SIZE);
+        let primary_keys_a: Vec<Block> = u8_vec_block(primary_keys_a, PRIMARY_KEY_SIZE);
+        let primary_keys_b: Vec<Block> = u8_vec_block(primary_keys_b, PRIMARY_KEY_SIZE);
 
         let mut acc = 0;
         for i in 0..primary_keys_a.len() {
@@ -51,7 +51,7 @@ mod tests {
     ) -> swanky_error::Result<u128> {
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let mut gb_psi: _ =
+                let mut gb_psi =
                     OpprfPsiGarbler::<AesRng>::new(channel, Block::from(seed_sx)).unwrap();
 
                 let intersection_results = gb_psi.intersect(set_a, channel).unwrap();
@@ -76,7 +76,7 @@ mod tests {
                 .unwrap();
                 let res_out = ev_psi
                     .ev
-                    .outputs(&res.wires().to_vec(), channel)
+                    .outputs(res.wires(), channel)
                     .unwrap()
                     .expect("evaluator should produce outputs");
                 Ok(utils::binary_to_u128(res_out))
@@ -96,7 +96,7 @@ mod tests {
     ) -> swanky_error::Result<u128> {
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let mut gb_psi: _ =
+                let mut gb_psi =
                     OpprfPsiGarbler::<AesRng>::new(channel, Block::from(seed_sx)).unwrap();
 
                 let intersection_results = gb_psi
@@ -129,7 +129,7 @@ mod tests {
                 .unwrap();
                 let res_out = ev_psi
                     .ev
-                    .outputs(&res.wires().to_vec(), channel)
+                    .outputs(res.wires(), channel)
                     .unwrap()
                     .expect("evaluator should produce outputs");
                 Ok(utils::binary_to_u128(res_out))

@@ -19,11 +19,11 @@ use crate::{
 
 fn walk_inputs(paths: &[PathBuf]) -> swanky_error::Result<Vec<PathBuf>> {
     fn visit(dst: &mut Vec<PathBuf>, input: &Path) -> swanky_error::Result<()> {
-        if let Some(name) = input.file_name() {
-            if name.to_string_lossy().starts_with('.') {
-                // Ignore hidden files
-                return Ok(());
-            }
+        if let Some(name) = input.file_name()
+            && name.to_string_lossy().starts_with('.')
+        {
+            // Ignore hidden files
+            return Ok(());
         }
         if input.is_dir() {
             for item in std::fs::read_dir(input)
@@ -32,7 +32,7 @@ fn walk_inputs(paths: &[PathBuf]) -> swanky_error::Result<Vec<PathBuf>> {
                 })?
             {
                 let item = item.wrap_err_with(ErrorKind::FilesystemError, || {
-                    format!("Unable to access directory item")
+                    "Unable to access directory item".to_string()
                 })?;
                 visit(dst, &item.path())?;
             }
@@ -202,12 +202,12 @@ impl RelationReader {
     ) -> swanky_error::Result<()> {
         if let Some(c) = gate.gate_as_gate_constant() {
             v.constant(
-                c.type_id().into(),
+                c.type_id(),
                 c.out_id(),
                 &bytes2number(c.constant().map(|x| x.bytes()).unwrap_or_default())?,
             )?;
         } else if let Some(x) = gate.gate_as_gate_assert_zero() {
-            v.assert_zero(x.type_id().into(), x.in_id())?;
+            v.assert_zero(x.type_id(), x.in_id())?;
         } else if let Some(x) = gate.gate_as_gate_copy() {
             func_in_buf.clear();
             for input in x.in_id().into_iter().flat_map(|x| x.iter()) {
@@ -241,34 +241,34 @@ impl RelationReader {
                 num_input_wires
             );
             v.copy(
-                x.type_id().into(),
+                x.type_id(),
                 WireRange {
                     start: x.out_id().unwrap().first_id(),
                     end: x.out_id().unwrap().last_id(),
                 },
-                &func_in_buf,
+                func_in_buf,
             )?;
         } else if let Some(x) = gate.gate_as_gate_add() {
-            v.add(x.type_id().into(), x.out_id(), x.left_id(), x.right_id())?;
+            v.add(x.type_id(), x.out_id(), x.left_id(), x.right_id())?;
         } else if let Some(x) = gate.gate_as_gate_mul() {
-            v.mul(x.type_id().into(), x.out_id(), x.left_id(), x.right_id())?;
+            v.mul(x.type_id(), x.out_id(), x.left_id(), x.right_id())?;
         } else if let Some(x) = gate.gate_as_gate_add_constant() {
             v.addc(
-                x.type_id().into(),
+                x.type_id(),
                 x.out_id(),
                 x.in_id(),
                 &bytes2number(x.constant().map(|x| x.bytes()).unwrap_or_default())?,
             )?;
         } else if let Some(x) = gate.gate_as_gate_mul_constant() {
             v.mulc(
-                x.type_id().into(),
+                x.type_id(),
                 x.out_id(),
                 x.in_id(),
                 &bytes2number(x.constant().map(|x| x.bytes()).unwrap_or_default())?,
             )?;
         } else if let Some(x) = gate.gate_as_gate_public() {
             v.public_input(
-                x.type_id().into(),
+                x.type_id(),
                 WireRange {
                     start: x
                         .out_id()
@@ -288,7 +288,7 @@ impl RelationReader {
             )?;
         } else if let Some(x) = gate.gate_as_gate_private() {
             v.private_input(
-                x.type_id().into(),
+                x.type_id(),
                 WireRange {
                     start: x
                         .out_id()
@@ -307,20 +307,20 @@ impl RelationReader {
                 },
             )?;
         } else if let Some(x) = gate.gate_as_gate_new() {
-            v.new(x.type_id().into(), x.first_id(), x.last_id())?;
+            v.new(x.type_id(), x.first_id(), x.last_id())?;
         } else if let Some(x) = gate.gate_as_gate_delete() {
-            v.delete(x.type_id().into(), x.first_id(), x.last_id())?;
+            v.delete(x.type_id(), x.first_id(), x.last_id())?;
         } else if let Some(x) = gate.gate_as_gate_convert() {
             v.convert(
                 TypedWireRange {
-                    ty: x.out_type_id().into(),
+                    ty: x.out_type_id(),
                     range: WireRange {
                         start: x.out_first_id(),
                         end: x.out_last_id(),
                     },
                 },
                 TypedWireRange {
-                    ty: x.in_type_id().into(),
+                    ty: x.in_type_id(),
                     range: WireRange {
                         start: x.in_first_id(),
                         end: x.in_last_id(),
@@ -443,11 +443,11 @@ impl super::RelationReader for RelationReader {
         for conv in relation.conversions().into_iter().flat_map(|x| x.iter()) {
             header.conversion.push(ConversionDescription {
                 output: TypedCount {
-                    ty: conv.output_count().type_id().into(),
+                    ty: conv.output_count().type_id(),
                     count: conv.output_count().count(),
                 },
                 input: TypedCount {
-                    ty: conv.input_count().type_id().into(),
+                    ty: conv.input_count().type_id(),
                     count: conv.input_count().count(),
                 },
             });
@@ -477,7 +477,7 @@ impl super::RelationReader for RelationReader {
                             .into_iter()
                             .flat_map(|x| x.iter())
                             .map(|count| TypedCount {
-                                ty: count.type_id().into(),
+                                ty: count.type_id(),
                                 count: count.count(),
                             }),
                     );
@@ -487,7 +487,7 @@ impl super::RelationReader for RelationReader {
                             .into_iter()
                             .flat_map(|x| x.iter())
                             .map(|count| TypedCount {
-                                ty: count.type_id().into(),
+                                ty: count.type_id(),
                                 count: count.count(),
                             }),
                     );
@@ -531,7 +531,7 @@ impl super::RelationReader for RelationReader {
                                 .into_iter()
                                 .flat_map(|x| x.iter())
                                 .map(|count| TypedCount {
-                                    ty: count.type_id().into(),
+                                    ty: count.type_id(),
                                     count: count.count(),
                                 }),
                         );
@@ -542,7 +542,7 @@ impl super::RelationReader for RelationReader {
                                 .into_iter()
                                 .flat_map(|x| x.iter())
                                 .map(|count| TypedCount {
-                                    ty: count.type_id().into(),
+                                    ty: count.type_id(),
                                     count: count.count(),
                                 }),
                         );

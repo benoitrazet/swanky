@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use std::{collections::BTreeMap, sync::atomic::AtomicU64};
 
 use allocation::Allocation;

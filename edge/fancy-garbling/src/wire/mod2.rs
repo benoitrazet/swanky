@@ -18,6 +18,69 @@ pub struct WireMod2 {
     pub(crate) val: Block,
 }
 
+impl core::ops::Add for WireMod2 {
+    type Output = Self;
+
+    #[allow(clippy::suspicious_arithmetic_impl)]
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            val: self.val ^ rhs.val,
+        }
+    }
+}
+
+impl core::ops::AddAssign for WireMod2 {
+    #[allow(clippy::suspicious_op_assign_impl)]
+    fn add_assign(&mut self, rhs: Self) {
+        self.val ^= rhs.val;
+    }
+}
+
+impl core::ops::Sub for WireMod2 {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self + -rhs
+    }
+}
+
+impl core::ops::SubAssign for WireMod2 {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = *self - rhs;
+    }
+}
+
+impl core::ops::Neg for WireMod2 {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        // Do nothing. Additive inverse is a no-op for mod 2.
+        self
+    }
+}
+
+impl core::ops::Mul<u16> for WireMod2 {
+    type Output = Self;
+
+    fn mul(self, rhs: u16) -> Self::Output {
+        if rhs & 1 == 0 {
+            Self {
+                val: Block::default(),
+            }
+        } else {
+            self
+        }
+    }
+}
+
+impl core::ops::MulAssign<u16> for WireMod2 {
+    fn mul_assign(&mut self, rhs: u16) {
+        if rhs & 1 == 0 {
+            self.val = Block::default();
+        }
+    }
+}
+
 impl ConditionallySelectable for WireMod2 {
     fn conditional_select(a: &Self, b: &Self, choice: subtle::Choice) -> Self {
         WireMod2::from_block(
@@ -53,23 +116,6 @@ impl WireLabel for WireMod2 {
     fn color(&self) -> u16 {
         // This extracts the least-significant bit of the U8x16.
         (self.val.extract::<0>() & 1) as u16
-    }
-
-    fn plus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self {
-        self.val ^= other.val;
-        self
-    }
-
-    fn cmul_eq(&mut self, c: u16) -> &mut Self {
-        if c & 1 == 0 {
-            self.val = Block::default();
-        }
-        self
-    }
-
-    fn negate_eq(&mut self) -> &mut Self {
-        // Do nothing. Additive inverse is a no-op for mod 2.
-        self
     }
 
     fn from_block(inp: Block, q: u16) -> Self {

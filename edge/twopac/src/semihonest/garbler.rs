@@ -52,8 +52,8 @@ impl<
         let inputs = (0..len)
             .map(|i| {
                 let zero = Wire::rand(&mut self.rng, q);
-                let one = zero.plus(delta);
-                wire = wire.plus(&zero.cmul(1 << i));
+                let one = zero.clone() + delta.clone();
+                wire += zero.clone() * (1 << i);
                 (zero.to_block(), one.to_block())
             })
             .collect::<Vec<(Block, Block)>>();

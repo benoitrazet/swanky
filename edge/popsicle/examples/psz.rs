@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use popsicle::psz::{Receiver, Sender};
 use std::time::SystemTime;
 use swanky_aes_rng::AesRng;

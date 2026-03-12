@@ -32,12 +32,12 @@ where
     let p0: Array1<_> = p
         .iter()
         .cloned()
-        .chain(std::iter::repeat(Field::ZERO).take(r_len - p.len()))
+        .chain(std::iter::repeat_n(Field::ZERO, r_len - p.len()))
         .collect();
     let q0: Array1<_> = q
         .iter()
         .cloned()
-        .chain(std::iter::repeat(Field::ZERO).take(r_len - q.len()))
+        .chain(std::iter::repeat_n(Field::ZERO, r_len - q.len()))
         .collect();
 
     p0 + q0
@@ -54,12 +54,12 @@ where
     let p0: Array1<_> = p
         .iter()
         .cloned()
-        .chain(std::iter::repeat(Field::ZERO).take(r_len - p.len()))
+        .chain(std::iter::repeat_n(Field::ZERO, r_len - p.len()))
         .collect();
     let q0: Array1<_> = q
         .iter()
         .cloned()
-        .chain(std::iter::repeat(Field::ZERO).take(r_len - q.len()))
+        .chain(std::iter::repeat_n(Field::ZERO, r_len - q.len()))
         .collect();
 
     p0 - q0

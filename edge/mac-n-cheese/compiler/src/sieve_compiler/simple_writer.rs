@@ -537,6 +537,7 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn eval<P: Party, VSR: ValueStreamReader>(
     cb: &mut CircuitBuilder,
     vs: &mut VoleSupplier,
@@ -620,10 +621,10 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                         num_wires,
                                         ..
                                     }) = self.counter_info
+                                        && field_type == FE::FIELD_TYPE
+                                        && i == num_env_for_field
                                     {
-                                        if field_type == FE::FIELD_TYPE && i == num_env_for_field {
-                                            input_pos += num_wires as u64
-                                        }
+                                        input_pos += num_wires as u64
                                     }
 
                                     let dst_start = input_pos;
@@ -643,37 +644,36 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                 num_wires,
                                 value,
                             }) = self.counter_info
+                                && field_type == FE::FIELD_TYPE
                             {
-                                if field_type == FE::FIELD_TYPE {
-                                    match FE::FIELD_TYPE {
-                                        FieldType::F2 => {
-                                            let value_le_bits = to_k_bits::<FE>(value, num_wires)?;
+                                match FE::FIELD_TYPE {
+                                    FieldType::F2 => {
+                                        let value_le_bits = to_k_bits::<FE>(value, num_wires)?;
 
-                                            let start = total_outputs + num_env_for_field as u64;
-                                            let inclusive_end = start + num_wires as u64 - 1;
-                                            out.alloc(start, inclusive_end)?;
+                                        let start = total_outputs + num_env_for_field as u64;
+                                        let inclusive_end = start + num_wires as u64 - 1;
+                                        out.alloc(start, inclusive_end)?;
 
-                                            for (w, &b) in (start..=inclusive_end)
-                                                .zip(value_le_bits.iter().rev())
-                                            {
-                                                let counter_b_v = PartyPrivateCopy::new(b);
-                                                let counter_b = cm.constant(self.cb, b)?;
+                                        for (w, &b) in
+                                            (start..=inclusive_end).zip(value_le_bits.iter().rev())
+                                        {
+                                            let counter_b_v = PartyPrivateCopy::new(b);
+                                            let counter_b = cm.constant(self.cb, b)?;
 
-                                                put(&mut out, w, (counter_b, counter_b_v))?;
-                                            }
+                                            put(&mut out, w, (counter_b, counter_b_v))?;
                                         }
-                                        _ => {
-                                            debug_assert_eq!(num_wires, 1);
+                                    }
+                                    _ => {
+                                        debug_assert_eq!(num_wires, 1);
 
-                                            let start = total_outputs + num_env_for_field as u64;
-                                            out.alloc(start, start)?;
+                                        let start = total_outputs + num_env_for_field as u64;
+                                        out.alloc(start, start)?;
 
-                                            let counter = to_fe(value)?;
-                                            let counter_v = PartyPrivateCopy::new(counter);
-                                            let counter = cm.constant(self.cb, counter)?;
+                                        let counter = to_fe(value)?;
+                                        let counter_v = PartyPrivateCopy::new(counter);
+                                        let counter = cm.constant(self.cb, counter)?;
 
-                                            put(&mut out, start, (counter, counter_v))?;
-                                        }
+                                        put(&mut out, start, (counter, counter_v))?;
                                     }
                                 }
                             }
@@ -772,7 +772,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                     }
 
                                     // Multiply the results
-                                    let &(mut g_i, mut g_i_v) = xors.get(0).ok_or_swanky_error(
+                                    let &(mut g_i, mut g_i_v) = xors.first().ok_or_swanky_error(
                                         ErrorKind::OtherError,
                                         "Mux condition empty",
                                     )?;
@@ -836,7 +836,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                         // For strict mode, assert sum(g_i) = 1
                         if let Permissiveness::Strict = self.permissiveness {
                             let &(mut sum, _) = g
-                                .get(0)
+                                .first()
                                 .ok_or_swanky_error(ErrorKind::OtherError, "Mux has no branches")?;
 
                             // sum(g_i)
@@ -885,7 +885,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                 debug_assert_eq!(jth_branch_wires.len(), num_branches);
 
                                 // The first product is computed outside the loop
-                                let &g_0 = g.get(0).ok_or_swanky_error(
+                                let &g_0 = g.first().ok_or_swanky_error(
                                     ErrorKind::OtherError,
                                     "Mux has no branches",
                                 )?;

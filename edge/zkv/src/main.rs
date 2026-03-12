@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use anyhow::{Error, Result};
 use clap::{Arg, ArgAction, ArgMatches, Command, arg};
 use inferno::Proof;
@@ -40,7 +39,7 @@ fn prover(circuit_path: &Path, witness: &str, eqcheck: &str, output: &Path) -> R
     let serialized = bincode::serialize(&proof)?;
     log::info!("Writing proof to {:?}", output);
     let mut file = File::create(output)?;
-    file.write(&serialized)?;
+    file.write_all(&serialized)?;
     Ok(())
 }
 
@@ -127,12 +126,12 @@ fn main() {
         .get_matches();
 
     fn set_logging(matches: &ArgMatches) {
-        if let Some(value) = matches.get_one::<bool>("logging") {
-            if *value {
-                env_logger::Builder::from_default_env()
-                    .filter_level(log::LevelFilter::Info)
-                    .init();
-            }
+        if let Some(value) = matches.get_one::<bool>("logging")
+            && *value
+        {
+            env_logger::Builder::from_default_env()
+                .filter_level(log::LevelFilter::Info)
+                .init();
         }
     }
 

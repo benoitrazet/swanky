@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 extern crate fancy_garbling;
 
 use fancy_garbling::{AllWire, WireLabel};

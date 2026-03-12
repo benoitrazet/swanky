@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 // Copyright (c) 2016 rust-threshold-secret-sharing developers
 //
 // Licensed under the Apache License, Version 2.0
@@ -99,7 +98,7 @@ mod cooley_tukey {
 
                     pair += jump;
                 }
-                factor = factor * factor_stride;
+                factor *= factor_stride;
             }
             depth += 1;
         }
@@ -133,7 +132,7 @@ mod cooley_tukey {
             .inverse();
         fft3(data, omega_inv);
         for x in data {
-            *x = *x * len_inv;
+            *x *= len_inv;
         }
     }
 
@@ -150,7 +149,7 @@ mod cooley_tukey {
     fn fft3_in_place_rearrange<Field: FieldForFFT<3>>(data: &mut [Field]) {
         let mut target = 0isize;
         let trigits_len = trigits_len(data.len() - 1);
-        let mut trigits: Vec<u8> = ::std::iter::repeat(0).take(trigits_len).collect();
+        let mut trigits: Vec<u8> = ::std::iter::repeat_n(0, trigits_len).collect();
         let powers: Vec<isize> = (0..trigits_len)
             .map(|x| 3isize.pow(x as u32))
             .rev()
@@ -196,7 +195,7 @@ mod cooley_tukey {
 
                     pair += jump;
                 }
-                factor = factor * factor_stride;
+                factor *= factor_stride;
             }
             step = jump;
         }
@@ -209,7 +208,7 @@ mod cooley_tukey {
 /// where `n` is the length of `a_coef` as well as a power of 2.
 /// The result will contain the same number of elements.
 pub fn fft2<Field: FieldForFFT<2>>(a_coef: &[Field], omega: Field) -> Vec<Field> {
-    let mut data: Vec<_> = a_coef.iter().cloned().collect();
+    let mut data: Vec<_> = a_coef.to_vec();
     cooley_tukey::fft2(&mut data, omega);
     data
 }
@@ -225,7 +224,7 @@ pub fn fft2_in_place<Field: FieldForFFT<2>>(a_coef: &mut [Field], omega: Field) 
 
 /// Inverse FFT for `fft2`.
 pub fn fft2_inverse<Field: FieldForFFT<2>>(a_point: &[Field], omega: Field) -> Vec<Field> {
-    let mut data: Vec<_> = a_point.iter().cloned().collect();
+    let mut data: Vec<_> = a_point.to_vec();
     cooley_tukey::fft2_inverse(&mut data, omega);
     data
 }
@@ -241,7 +240,7 @@ pub fn fft2_inverse_in_place<Field: FieldForFFT<2>>(a_point: &mut [Field], omega
 /// where `n` is the length of `a_coef` as well as a power of 3.
 /// The result will contain the same number of elements.
 pub fn fft3<Field: FieldForFFT<3>>(a_coef: &[Field], omega: Field) -> Vec<Field> {
-    let mut data: Vec<_> = a_coef.iter().cloned().collect();
+    let mut data: Vec<_> = a_coef.to_vec();
     cooley_tukey::fft3(&mut data, omega);
     data
 }
@@ -257,7 +256,7 @@ pub fn fft3_in_place<Field: FieldForFFT<3>>(a_coef: &mut [Field], omega: Field) 
 
 /// Inverse FFT for `fft3`.
 pub fn fft3_inverse<Field: FieldForFFT<3>>(a_point: &[Field], omega: Field) -> Vec<Field> {
-    let mut data = a_point.iter().cloned().collect::<Vec<_>>();
+    let mut data = a_point.to_vec();
     cooley_tukey::fft3_inverse(&mut data, omega);
     data
 }
@@ -289,14 +288,13 @@ where
         let yi = values[i];
         let mut num = Field::ONE;
         let mut denum = Field::ONE;
-        for j in 0..values.len() {
+        for (j, &point) in points.iter().enumerate().take(values.len()) {
             if j != i {
-                let xj = points[j];
-                num = num * xj;
-                denum = denum * (xj - xi);
+                num *= point;
+                denum *= point - xi;
             }
         }
-        acc = acc + yi * num * denum.inverse();
+        acc += yi * num * denum.inverse();
     }
     acc
 }

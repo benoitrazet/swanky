@@ -28,7 +28,8 @@ pub struct OpprfReceiver {
 /// queried by the `OpprfReceiver` and what output they receiver:
 /// - `opprf_primary_keys_in` and `opprf_payloads_in` input queries to the OPPRF.
 /// - `opprf_primary_keys_out` and `opprf_payloads_out` are the results of
-/// the OPPRF on those respective queries.
+///   the OPPRF on those respective queries.
+///
 /// When the OPPRF is called on a programmed input, it returns a
 /// programmed output. When the OPPRF is called on any other value,
 /// it returns a value that is sampled uniformly random. The OPPRF
@@ -117,8 +118,8 @@ impl BasePsi for OpprfReceiver {
         let opprf_primary_keys_in = cuckoo_place_ids(&cuckoo.items, rng);
 
         let mut opprf_payloads_in = vec![];
-        if payloads.is_some() {
-            opprf_payloads_in = cuckoo_place_payloads(&cuckoo.items, payloads.unwrap(), rng);
+        if let Some(payloads) = payloads {
+            opprf_payloads_in = cuckoo_place_payloads(&cuckoo.items, payloads, rng);
         }
         self.state = ReceiverState {
             opprf_primary_keys_in,

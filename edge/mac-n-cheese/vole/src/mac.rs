@@ -189,9 +189,9 @@ impl<T: MacTypes> From<(T::VF, T::TF)> for Mac<party::Prover, T> {
         Mac::prover_new(Witness::EQUAL_TYPES, value.0, value.1)
     }
 }
-impl<T: MacTypes> Into<(T::VF, T::TF)> for Mac<party::Prover, T> {
-    fn into(self) -> (T::VF, T::TF) {
-        self.prover_extract(Witness::EQUAL_TYPES)
+impl<T: MacTypes> From<Mac<party::Prover, T>> for (T::VF, T::TF) {
+    fn from(val: Mac<party::Prover, T>) -> Self {
+        val.prover_extract(Witness::EQUAL_TYPES)
     }
 }
 impl<P: Party, T: MacTypes> std::fmt::Debug for Mac<P, T> {

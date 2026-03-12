@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 #![deny(unused_must_use)]
 
 pub mod fb_reader;
@@ -21,10 +20,11 @@ pub enum PluginTypeArg {
 }
 
 impl PluginTypeArg {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> swanky_error::Result<Self> {
         if s.starts_with("0x") || s.starts_with("0X") {
             let mut out = Number::default();
-            for &byte in s[2..].as_bytes() {
+            for &byte in &s.as_bytes()[2..] {
                 out = Option::<_>::from(out.checked_mul(&Number::from_u8(16)))
                     .ok_or_swanky_error(ErrorKind::OtherError, "Number too big.")?;
                 let digit = if byte <= b'9' {
@@ -171,6 +171,10 @@ pub struct WireRange {
     pub end: WireId,
 }
 impl WireRange {
+    pub fn is_empty(&self) -> bool {
+        self.end < self.start
+    }
+
     pub fn len(&self) -> u64 {
         if self.end >= self.start {
             (self.end - self.start) + 1
@@ -213,6 +217,7 @@ pub enum ConversionSemantics {
 }
 
 pub trait FunctionBodyVisitor {
+    #[allow(clippy::new_ret_no_self, clippy::wrong_self_convention)]
     fn new(&mut self, ty: TypeId, first: WireId, last: WireId) -> swanky_error::Result<()>;
     fn delete(&mut self, ty: TypeId, first: WireId, last: WireId) -> swanky_error::Result<()>;
     fn add(
@@ -327,20 +332,16 @@ impl<T: Write> PrintingVisitor<T> {
 }
 impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
     fn new(&mut self, ty: TypeId, first: WireId, last: WireId) -> swanky_error::Result<()> {
-        Ok(
-            writeln!(self.0, "@new(0x{ty:x}:$0x{first:x}...$0x{last:x});")
-                .wrap_err_with(ErrorKind::OtherError, || {
-                    "Failed to write 'new' gate.".to_string()
-                })?,
-        )
+        writeln!(self.0, "@new(0x{ty:x}:$0x{first:x}...$0x{last:x});")
+            .wrap_err_with(ErrorKind::OtherError, || {
+                "Failed to write 'new' gate.".to_string()
+            })
     }
     fn delete(&mut self, ty: TypeId, first: WireId, last: WireId) -> swanky_error::Result<()> {
-        Ok(
-            writeln!(self.0, "@delete(0x{ty:x} : $0x{first:x}...$0x{last:x});")
-                .wrap_err_with(ErrorKind::OtherError, || {
-                    "Failed to write 'delete' gate.".to_string()
-                })?,
-        )
+        writeln!(self.0, "@delete(0x{ty:x} : $0x{first:x}...$0x{last:x});")
+            .wrap_err_with(ErrorKind::OtherError, || {
+                "Failed to write 'delete' gate.".to_string()
+            })
     }
     fn add(
         &mut self,
@@ -349,13 +350,13 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
         left: WireId,
         right: WireId,
     ) -> swanky_error::Result<()> {
-        Ok(writeln!(
+        writeln!(
             self.0,
             "$0x{dst:x} <- @add(0x{ty:x} : $0x{left:x}, $0x{right:x});"
         )
         .wrap_err_with(ErrorKind::OtherError, || {
             "Failed to write 'and' gate.".to_string()
-        })?)
+        })
     }
     fn mul(
         &mut self,
@@ -364,13 +365,13 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
         left: WireId,
         right: WireId,
     ) -> swanky_error::Result<()> {
-        Ok(writeln!(
+        writeln!(
             self.0,
             "$0x{dst:x} <- @mul(0x{ty:x} : $0x{left:x}, $0x{right:x});"
         )
         .wrap_err_with(ErrorKind::OtherError, || {
             "Failed to write 'mul' gate.".to_string()
-        })?)
+        })
     }
     fn addc(
         &mut self,
@@ -379,14 +380,14 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
         left: WireId,
         right: &Number,
     ) -> swanky_error::Result<()> {
-        Ok(writeln!(
+        writeln!(
             self.0,
             "$0x{dst:x} <- @addc(0x{ty:x} : $0x{left:x}, <{}>);",
             Self::hex(right),
         )
         .wrap_err_with(ErrorKind::OtherError, || {
             "Failed to write 'addc' gate.".to_string()
-        })?)
+        })
     }
     fn mulc(
         &mut self,
@@ -395,14 +396,14 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
         left: WireId,
         right: &Number,
     ) -> swanky_error::Result<()> {
-        Ok(writeln!(
+        writeln!(
             self.0,
             "$0x{dst:x} <- @mulc(0x{ty:x} : $0x{left:x}, <{}>);",
             Self::hex(right),
         )
         .wrap_err_with(ErrorKind::OtherError, || {
             "Failed to write 'mulc' gate.".to_string()
-        })?)
+        })
     }
     fn copy(&mut self, ty: TypeId, dst: WireRange, src: &[WireRange]) -> swanky_error::Result<()> {
         self.write_wire_ranges(&[dst])?;
@@ -410,39 +411,33 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
             "Failed to write 'copy' gate assignment / type.".to_string()
         })?;
         self.write_wire_ranges(src)?;
-        Ok(
-            writeln!(self.0, ";").wrap_err_with(ErrorKind::OtherError, || {
-                "Failed to write semicolon.".to_string()
-            })?,
-        )
+        writeln!(self.0, ";").wrap_err_with(ErrorKind::OtherError, || {
+            "Failed to write semicolon.".to_string()
+        })
     }
     fn constant(&mut self, ty: TypeId, dst: WireId, src: &Number) -> swanky_error::Result<()> {
-        Ok(
-            writeln!(self.0, "$0x{dst:x} <- 0x{ty:x} : <{}>;", Self::hex(src))
-                .wrap_err_with(ErrorKind::OtherError, || {
-                    "Failed to write constant.".to_string()
-                })?,
-        )
+        writeln!(self.0, "$0x{dst:x} <- 0x{ty:x} : <{}>;", Self::hex(src))
+            .wrap_err_with(ErrorKind::OtherError, || {
+                "Failed to write constant.".to_string()
+            })
     }
     fn public_input(&mut self, ty: TypeId, dst: WireRange) -> swanky_error::Result<()> {
         self.write_wire_ranges(&[dst])?;
-        Ok(writeln!(self.0, " <- @public(0x{ty:x});")
-            .wrap_err_with(ErrorKind::OtherError, || {
-                "Failed to write public input.".to_string()
-            })?)
+        writeln!(self.0, " <- @public(0x{ty:x});").wrap_err_with(ErrorKind::OtherError, || {
+            "Failed to write public input.".to_string()
+        })
     }
     fn private_input(&mut self, ty: TypeId, dst: WireRange) -> swanky_error::Result<()> {
         self.write_wire_ranges(&[dst])?;
-        Ok(writeln!(self.0, " <- @private(0x{ty:x});")
-            .wrap_err_with(ErrorKind::OtherError, || {
-                "Failed to write private input.".to_string()
-            })?)
+        writeln!(self.0, " <- @private(0x{ty:x});").wrap_err_with(ErrorKind::OtherError, || {
+            "Failed to write private input.".to_string()
+        })
     }
     fn assert_zero(&mut self, ty: TypeId, src: WireId) -> swanky_error::Result<()> {
-        Ok(writeln!(self.0, "@assert_zero(0x{ty:x} : $0x{src:x});")
+        writeln!(self.0, "@assert_zero(0x{ty:x} : $0x{src:x});")
             .wrap_err_with(ErrorKind::OtherError, || {
                 "Failed to write 'assert_zero' gate.".to_string()
-            })?)
+            })
     }
     fn convert(
         &mut self,

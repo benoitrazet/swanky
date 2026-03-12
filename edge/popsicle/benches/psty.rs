@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 //! Private set intersection (PSTY) benchmarks using `criterion`.
 
 use criterion::{Criterion, criterion_group, criterion_main};
@@ -32,7 +31,7 @@ fn bench_psty_init() {
     .unwrap();
 }
 
-fn bench_psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> () {
+fn bench_psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
     swanky_channel::local::local_channel_pair(
         |channel| {
             let mut rng = AesRng::new();
@@ -53,29 +52,29 @@ fn bench_psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> () {
 fn bench_psi(c: &mut Criterion) {
     c.bench_function("psi::PSTY (initialization)", move |bench| {
         bench.iter(|| {
-            let result = bench_psty_init();
-            std::hint::black_box(result)
+            bench_psty_init();
+            std::hint::black_box(())
         })
     });
     c.bench_function("psi::PSTY (n = 2^8)", move |bench| {
         let rs = rand_vec_vec(1 << 8);
         bench.iter(|| {
-            let v = bench_psty(rs.clone(), rs.clone());
-            std::hint::black_box(v)
+            bench_psty(rs.clone(), rs.clone());
+            std::hint::black_box(())
         })
     });
     c.bench_function("psi::PSTY (n = 2^12)", move |bench| {
         let rs = rand_vec_vec(1 << 12);
         bench.iter(|| {
-            let v = bench_psty(rs.clone(), rs.clone());
-            std::hint::black_box(v)
+            bench_psty(rs.clone(), rs.clone());
+            std::hint::black_box(())
         })
     });
     c.bench_function("psi::PSTY (n = 2^16)", move |bench| {
         let rs = rand_vec_vec(1 << 16);
         bench.iter(|| {
-            let v = bench_psty(rs.clone(), rs.clone());
-            std::hint::black_box(v)
+            bench_psty(rs.clone(), rs.clone());
+            std::hint::black_box(())
         })
     });
     // c.bench_function("psi::PSTY (n = 2^20)", move |bench| {

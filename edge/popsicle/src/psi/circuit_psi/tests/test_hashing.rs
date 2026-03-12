@@ -64,8 +64,8 @@ mod tests {
         // We need to unmask them to check that everything is fine.
         let mut sender_payloads: HashSet<Block512> = HashSet::new();
         for i in 0..sender_masks.len() {
-            for j in 0..sender_masked_payloads[i].len() {
-                sender_payloads.insert(sender_masked_payloads[i][j] ^ sender_masks[i]);
+            for &sender_masked_payload_block in sender_masked_payloads[i].iter() {
+                sender_payloads.insert(sender_masked_payload_block ^ sender_masks[i]);
             }
         }
 
@@ -89,7 +89,7 @@ mod tests {
             let (_, _, result_hash_sender, _) =
                 psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_hash_sender.is_err(),
+                result_hash_sender.is_ok(),
                 "PSTY Simple Hashing failed on the Sender side"
             );
         }
@@ -106,7 +106,7 @@ mod tests {
             let (_, _, result_hash_sender, _) =
                 psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_hash_sender.is_err(),
+                result_hash_sender.is_ok(),
                 "PSTY Simple Hashing failed on the Sender side"
             );
         }
@@ -122,7 +122,7 @@ mod tests {
             let (_, _, result_hash_sender, _) =
                 psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
             assert!(
-                !result_hash_sender.is_err(),
+                result_hash_sender.is_ok(),
                 "PSTY Simple Hashing failed on the Sender side"
             );
         }
@@ -139,7 +139,7 @@ mod tests {
             let (_, _, result_hash_sender, _) =
                 psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_hash_sender.is_err(),
+                result_hash_sender.is_ok(),
                 "PSTY Simple Hashing failed on the Sender side"
             );
         }
@@ -155,7 +155,7 @@ mod tests {
             let (_, _, result_hash_sender, _) =
                 psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
             assert!(
-                !result_hash_sender.is_err(),
+                result_hash_sender.is_ok(),
                 "PSTY Simple Hashing failed on the Sender side"
             );
         }
@@ -171,7 +171,7 @@ mod tests {
             let (_, _, _, result_hash_receiver) =
                 psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_hash_receiver.is_err(),
+                result_hash_receiver.is_ok(),
                 "PSTY Cuckoo Hashing failed on the Receiver side"
             );
         }
@@ -188,7 +188,7 @@ mod tests {
             let (_, _, _, result_hash_receiver) =
                 psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_hash_receiver.is_err(),
+                result_hash_receiver.is_ok(),
                 "PSTY Cuckoo Hashing failed on the Receiver side"
             );
         }
@@ -204,7 +204,7 @@ mod tests {
             let (_, _, _, result_hash_receiver) =
                 psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, rng.r#gen());
             assert!(
-                !result_hash_receiver.is_err(),
+                result_hash_receiver.is_ok(),
                 "PSTY Cuckoo Hashing failed on the Receiver side"
             );
         }

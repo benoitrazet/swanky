@@ -18,10 +18,7 @@ fn transform_random_into_arrays_of_size_ten_stored_as_a_vector(raw: [U16x8; 5]) 
     // Now we need to shuffle the groups of two values that we got from the community chest.
     // U16x16 doesn't have a shuffle function, but U32x8 does! We want to move groups of two values
     // around, anyway, so we can convert our values to U32x8 and then shuffle there.
-    let [a, b, c, d] = combined.array_map(
-        #[inline(always)]
-        |x| U32x8::from(x),
-    );
+    let [a, b, c, d] = combined.array_map(U32x8::from);
     // The shuffle will affect the 8 random values that are supposed to stay together, but that's
     // fine, since we don't care if we end up shuffling our random values.
     // We say that the upper 6 values (the last 3 values of the shuffle) should be ignored, so
@@ -34,10 +31,7 @@ fn transform_random_into_arrays_of_size_ten_stored_as_a_vector(raw: [U16x8; 5]) 
         c.shuffle::<0, 1, 3, 2>(),
         d.shuffle::<0, 1, 2, 3>(),
     ];
-    shuffled.array_map(
-        #[inline(always)]
-        |x| U16x16::from(x),
-    )
+    shuffled.array_map(U16x16::from)
 }
 #[test]
 fn test_transform_random_into_arrays_of_size_ten_stored_as_a_vector() {

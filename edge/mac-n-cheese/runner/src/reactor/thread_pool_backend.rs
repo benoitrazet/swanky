@@ -49,7 +49,7 @@ struct PublicReadRequest {
 impl std::cmp::Eq for PublicReadRequest {}
 impl std::cmp::PartialEq for PublicReadRequest {
     fn eq(&self, other: &Self) -> bool {
-        (&self.chunk.0) == (&other.chunk.0)
+        self.chunk.0 == other.chunk.0
     }
 }
 impl std::hash::Hash for PublicReadRequest {
@@ -373,27 +373,27 @@ impl<P: Party> ThreadPoolReactor<P> {
     }
     fn maybe_launch_incoming(&self, task_id: TaskId, slot: &mut Option<IncomingSlotData<P>>) {
         let data = slot.as_ref().unwrap();
-        if let Some(req) = &data.request {
-            if data.response.satisifies(&req.request) {
-                event_log::IncomingSlotsLock
-                    .lock(&self.incoming_slots)
-                    .remove(&task_id);
-                let data = std::mem::take(slot).unwrap();
-                let IncomingRequest {
-                    priority,
-                    request: req,
-                    cb,
-                } = data.request.unwrap();
-                let resp = data.response;
-                debug_assert_eq!(req.want_private_data.is_some(), resp.private_data.is_some());
-                debug_assert_eq!(req.want_task_data.is_some(), resp.task_data.is_some());
-                debug_assert_eq!(req.want_incoming_network, resp.incoming_bytes.is_some());
-                debug_assert_eq!(req.want_challenge, resp.challenge.is_some());
-                self.run_queue.enqueue(TaskQueueEntry {
-                    id: RunningTaskId { task_id, priority },
-                    metadata: Box::new((resp, cb)),
-                })
-            }
+        if let Some(req) = &data.request
+            && data.response.satisifies(&req.request)
+        {
+            event_log::IncomingSlotsLock
+                .lock(&self.incoming_slots)
+                .remove(&task_id);
+            let data = std::mem::take(slot).unwrap();
+            let IncomingRequest {
+                priority,
+                request: req,
+                cb,
+            } = data.request.unwrap();
+            let resp = data.response;
+            debug_assert_eq!(req.want_private_data.is_some(), resp.private_data.is_some());
+            debug_assert_eq!(req.want_task_data.is_some(), resp.task_data.is_some());
+            debug_assert_eq!(req.want_incoming_network, resp.incoming_bytes.is_some());
+            debug_assert_eq!(req.want_challenge, resp.challenge.is_some());
+            self.run_queue.enqueue(TaskQueueEntry {
+                id: RunningTaskId { task_id, priority },
+                metadata: Box::new((resp, cb)),
+            })
         }
     }
 }

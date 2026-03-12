@@ -74,7 +74,7 @@ mod vope {
         let rnd = voles
             .iter()
             .copied()
-            .zip(lifting_vector::<T>().into_iter())
+            .zip(lifting_vector::<T>())
             .map(|(v, entry)| v.0.tag(e) * entry)
             .sum::<T::TF>();
         swanky_error::ensure!(

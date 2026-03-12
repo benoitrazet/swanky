@@ -97,7 +97,7 @@ mod tests {
             let (_, _, result_opprf_sender, _) =
                 psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_opprf_sender.is_err(),
+                result_opprf_sender.is_ok(),
                 "PSTY OPPRF failed on the sender side for arbitrary sets"
             );
         }
@@ -112,7 +112,7 @@ mod tests {
             let (_, _, result_opprf_sender, _) =
                 psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_opprf_sender.is_err(),
+                result_opprf_sender.is_ok(),
                 "PSTY OPPRF failed on the sender side for arbitrary payloads"
             );
         }
@@ -127,7 +127,7 @@ mod tests {
             let (_, _, result_opprf_sender, _) =
                 psty_up_to_opprf(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
             assert!(
-                !result_opprf_sender.is_err(),
+                result_opprf_sender.is_ok(),
                 "PSTY OPPRF failed on the sender side for arbitrary sender seeds"
             );
         }
@@ -141,7 +141,7 @@ mod tests {
             let (_, _, _, result_opprf_receiver) =
                 psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_opprf_receiver.is_err(),
+                result_opprf_receiver.is_ok(),
                 "PSTY OPPRF failed on the receiver side for arbitrary set"
             );
         }
@@ -156,7 +156,7 @@ mod tests {
             let (_, _, _, result_opprf_receiver) =
                 psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_opprf_receiver.is_err(),
+                result_opprf_receiver.is_ok(),
                 "PSTY OPPRF failed on the receiver side for arbitrary set"
             );
         }
@@ -170,7 +170,7 @@ mod tests {
             let (_, _, _, result_opprf_receiver) =
                 psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, rng.r#gen());
             assert!(
-                !result_opprf_receiver.is_err(),
+                result_opprf_receiver.is_ok(),
                 "PSTY OPPRF failed on the receiver side for arbitrary set"
             );
         }

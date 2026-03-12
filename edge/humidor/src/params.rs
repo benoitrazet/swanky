@@ -21,12 +21,12 @@ use swanky_polynomial::Polynomial;
 /// errors, where e is a positive integer with e < d/4, d is the code distance,
 /// and n = 2^p:
 ///
-/// * Test-Interleaved:             (1 - e/n)^t + (e + 1)/|F|
-///                               = (1 - e/|F|)^p + (e + 1)/|F|
-/// * Test-Linear-Constraints:      ((e + k + l)/n)^t + 1/|F|
-///                               = ((e + k + l)/|F|)^p + 1/|F|
-/// * Test-Quadratic-Constraints:   ((e + 2k)/n)^t + 1/|F|
-///                               = ((e + 2k)/|F|)^p + 1/|F|
+/// * Test-Interleaved:
+///   (1 - e/n)^t + (e + 1)/|F| = (1 - e/|F|)^p + (e + 1)/|F|
+/// * Test-Linear-Constraints:
+///   ((e + k + l)/n)^t + 1/|F| = ((e + k + l)/|F|)^p + 1/|F|
+/// * Test-Quadratic-Constraints:
+///   ((e + 2k)/n)^t + 1/|F|    = ((e + 2k)/|F|)^p + 1/|F|
 ///
 /// I.e., we ensure soundness error is negligible in the field size.
 //
@@ -96,7 +96,7 @@ impl<Field: FieldForLigero> Params<Field> {
                     .map(|nexp| (nexp, 3usize.pow(nexp) - 1))
                     .find(|&(_, n)| n > k)?;
                 let l = k - t;
-                let m = (size + l - 1) / l;
+                let m = size.div_ceil(l);
 
                 let diff = (l as isize - (t * m) as isize).abs();
                 Some((diff, (kexp, nexp, k, l, n, m)))
@@ -417,12 +417,12 @@ impl<Field: FieldForLigero> Params<Field> {
 
         let mut p0 = p
             .iter()
-            .chain(std::iter::repeat(&Field::ZERO).take(max_deg - p_deg))
+            .chain(std::iter::repeat_n(&Field::ZERO, max_deg - p_deg))
             .cloned()
             .collect::<Array1<_>>();
         let mut q0 = q
             .iter()
-            .chain(std::iter::repeat(&Field::ZERO).take(max_deg - q_deg))
+            .chain(std::iter::repeat_n(&Field::ZERO, max_deg - q_deg))
             .cloned()
             .collect::<Array1<_>>();
 
@@ -519,7 +519,7 @@ proptest! {
     ) {
         let mut a = std::iter::once(TestField::ZERO)
             .chain(v)
-            .chain(std::iter::repeat(TestField::ZERO).take(p.k - len))
+            .chain(std::iter::repeat_n(TestField::ZERO, p.k - len))
             .collect::<Array1<_>>();
         prop_assert_eq!(a.len(), p.k + 1);
 
@@ -539,7 +539,7 @@ proptest! {
             .prop_flat_map(|(p, len)| (Just(p), Just(len), pvec(arb_test_field(), len)))
     ) {
         let mut a = v.into_iter()
-            .chain(std::iter::repeat(TestField::ZERO).take(p.k+1 - len))
+            .chain(std::iter::repeat_n(TestField::ZERO, p.k+1 - len))
             .collect::<Array1<_>>();
         prop_assert_eq!(a.len(), p.k + 1);
 
@@ -567,12 +567,12 @@ proptest! {
 
         let mut a1 = std::iter::once(TestField::ZERO)
             .chain(v1)
-            .chain(std::iter::repeat(TestField::ZERO).take(p.k - len))
+            .chain(std::iter::repeat_n(TestField::ZERO, p.k - len))
             .collect::<Array1<_>>();
         prop_assert_eq!(a1.len(), p.k + 1);
         let mut a2 = std::iter::once(TestField::ZERO)
             .chain(v2)
-            .chain(std::iter::repeat(TestField::ZERO).take(p.k - len))
+            .chain(std::iter::repeat_n(TestField::ZERO, p.k - len))
             .collect::<Array1<_>>();
         prop_assert_eq!(a2.len(), p.k + 1);
         let points = stack(Axis(0), &[a1.slice(s![1..=len]), a2.slice(s![1..=len])]).unwrap();
@@ -599,11 +599,11 @@ proptest! {
             ))
     ) {
         let mut a1 = v1.into_iter()
-            .chain(std::iter::repeat(TestField::ZERO).take(p.k+1 - len))
+            .chain(std::iter::repeat_n(TestField::ZERO, p.k+1 - len))
             .collect::<Array1<_>>();
         prop_assert_eq!(a1.len(), p.k + 1);
         let mut a2 = v2.into_iter()
-            .chain(std::iter::repeat(TestField::ZERO).take(p.k+1 - len))
+            .chain(std::iter::repeat_n(TestField::ZERO, p.k+1 - len))
             .collect::<Array1<_>>();
         prop_assert_eq!(a1.len(), p.k + 1);
         let coeffs = ndarray::stack(Axis(0), &[a1.view(), a2.view()]).unwrap();
@@ -627,7 +627,7 @@ proptest! {
     ) {
         let mut a = std::iter::once(TestField::ZERO)
             .chain(v)
-            .chain(std::iter::repeat(TestField::ZERO).take(p.n - len))
+            .chain(std::iter::repeat_n(TestField::ZERO, p.n - len))
             .collect::<Array1<_>>();
         prop_assert_eq!(a.len(), p.n + 1);
 
@@ -647,7 +647,7 @@ proptest! {
             .prop_flat_map(|(p, len)| (Just(p), Just(len), pvec(arb_test_field(), len)))
     ) {
         let mut a = v.into_iter()
-            .chain(std::iter::repeat(TestField::ZERO).take(p.n+1 - len))
+            .chain(std::iter::repeat_n(TestField::ZERO, p.n+1 - len))
             .collect::<Array1<_>>();
         prop_assert_eq!(a.len(), p.n + 1);
 
@@ -675,12 +675,12 @@ proptest! {
 
         let mut a1 = std::iter::once(TestField::ZERO)
             .chain(v1)
-            .chain(std::iter::repeat(TestField::ZERO).take(p.n - len))
+            .chain(std::iter::repeat_n(TestField::ZERO, p.n - len))
             .collect::<Array1<_>>();
         prop_assert_eq!(a1.len(), p.n + 1);
         let mut a2 = std::iter::once(TestField::ZERO)
             .chain(v2)
-            .chain(std::iter::repeat(TestField::ZERO).take(p.n - len))
+            .chain(std::iter::repeat_n(TestField::ZERO, p.n - len))
             .collect::<Array1<_>>();
         prop_assert_eq!(a2.len(), p.n + 1);
         let points = stack(Axis(0), &[a1.slice(s![1..=len]), a2.slice(s![1..=len])]).unwrap();
@@ -707,11 +707,11 @@ proptest! {
             ))
     ) {
         let mut a1 = v1.into_iter()
-            .chain(std::iter::repeat(TestField::ZERO).take(p.n+1 - len))
+            .chain(std::iter::repeat_n(TestField::ZERO, p.n+1 - len))
             .collect::<Array1<_>>();
         prop_assert_eq!(a1.len(), p.n + 1);
         let mut a2 = v2.into_iter()
-            .chain(std::iter::repeat(TestField::ZERO).take(p.n+1 - len))
+            .chain(std::iter::repeat_n(TestField::ZERO, p.n+1 - len))
             .collect::<Array1<_>>();
         prop_assert_eq!(a1.len(), p.n + 1);
         let coeffs = ndarray::stack(Axis(0), &[a1.view(), a2.view()]).unwrap();
@@ -818,13 +818,12 @@ proptest! {
         let v_coeffs = fft::fft2_inverse(
             &v,
             p.pss.omega_secrets,
-        ).iter().cloned().map(TestField::from)
-            .collect::<Array1<TestField>>();
+        ).iter().cloned().collect::<Array1<TestField>>();
 
-        for i in 0 .. v.len() {
+        for (i, &v_i) in v.iter().enumerate() {
             prop_assert_eq!(
                 p.peval2(v_coeffs.view(), i),
-                v[i]
+                v_i
             );
         }
     }
@@ -856,11 +855,10 @@ proptest! {
         let v_coeffs = fft::fft3_inverse(
             &v,
             p.pss.omega_shares,
-        ).iter().cloned().map(TestField::from)
-            .collect::<Array1<TestField>>();
+        ).iter().cloned().collect::<Array1<TestField>>();
 
-        for i in 0 .. v.len() {
-            prop_assert_eq!(p.peval3(v_coeffs.view(), i), v[i]);
+        for (i, &v_i) in v.iter().enumerate() {
+            prop_assert_eq!(p.peval3(v_coeffs.view(), i), v_i);
         }
     }
 

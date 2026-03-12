@@ -195,10 +195,10 @@ fn eval<VSR: ValueStreamReader>(
                                         num_wires,
                                         ..
                                     }) = self.counter_info
+                                        && field_type == FE::FIELD_TYPE
+                                        && i == num_env_for_field
                                     {
-                                        if field_type == FE::FIELD_TYPE && i == num_env_for_field {
-                                            input_pos += num_wires as u64
-                                        }
+                                        input_pos += num_wires as u64
                                     }
 
                                     let dst_start = input_pos;
@@ -218,32 +218,31 @@ fn eval<VSR: ValueStreamReader>(
                                 num_wires,
                                 value,
                             }) = self.counter_info
+                                && field_type == FE::FIELD_TYPE
                             {
-                                if field_type == FE::FIELD_TYPE {
-                                    match FE::FIELD_TYPE {
-                                        FieldType::F2 => {
-                                            let value_le_bits = to_k_bits::<FE>(value, num_wires)?;
+                                match FE::FIELD_TYPE {
+                                    FieldType::F2 => {
+                                        let value_le_bits = to_k_bits::<FE>(value, num_wires)?;
 
-                                            let start = total_outputs + num_env_for_field as u64;
-                                            let inclusive_end = start + num_wires as u64 - 1;
-                                            out.alloc(start, inclusive_end)?;
+                                        let start = total_outputs + num_env_for_field as u64;
+                                        let inclusive_end = start + num_wires as u64 - 1;
+                                        out.alloc(start, inclusive_end)?;
 
-                                            for (w, &b) in (start..=inclusive_end)
-                                                .zip(value_le_bits.iter().rev())
-                                            {
-                                                put(&mut out, w, b)?;
-                                            }
+                                        for (w, &b) in
+                                            (start..=inclusive_end).zip(value_le_bits.iter().rev())
+                                        {
+                                            put(&mut out, w, b)?;
                                         }
-                                        _ => {
-                                            debug_assert_eq!(num_wires, 1);
+                                    }
+                                    _ => {
+                                        debug_assert_eq!(num_wires, 1);
 
-                                            let start = total_outputs + num_env_for_field as u64;
-                                            out.alloc(start, start)?;
+                                        let start = total_outputs + num_env_for_field as u64;
+                                        out.alloc(start, start)?;
 
-                                            let counter = to_fe(value)?;
+                                        let counter = to_fe(value)?;
 
-                                            put(&mut out, start, counter)?;
-                                        }
+                                        put(&mut out, start, counter)?;
                                     }
                                 }
                             }
@@ -297,9 +296,9 @@ fn eval<VSR: ValueStreamReader>(
                         fn bits_to_usize(
                             bits: impl IntoIterator<Item = bool>,
                         ) -> swanky_error::Result<usize> {
-                            bits.into_iter().fold(Ok(0_usize), |acc, b| {
+                            bits.into_iter().try_fold(0_usize, |acc, b| {
                                 2_usize
-                                    .checked_mul(acc?)
+                                    .checked_mul(acc)
                                     .and_then(|x| x.checked_add(b.into()))
                                     .ok_or_swanky_error(
                                         ErrorKind::OtherError,
@@ -351,7 +350,7 @@ fn eval<VSR: ValueStreamReader>(
 
                         let branch_inputs = &self.in_ranges[1..];
                         let num_ranges_per_branch = self.out_ranges.len();
-                        debug_assert!(branch_inputs.len() % num_ranges_per_branch == 0);
+                        debug_assert!(branch_inputs.len().is_multiple_of(num_ranges_per_branch));
 
                         let num_branches = branch_inputs.len() / num_ranges_per_branch;
                         if cond >= num_branches {

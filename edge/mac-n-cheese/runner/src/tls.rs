@@ -301,7 +301,7 @@ pub fn initiate_tls<P: Party>(
                     "Failed to write number of connections.".to_string()
                 })?;
             let mut base_key = [0; 32];
-            rand::rngs::OsRng::default().fill_bytes(&mut base_key);
+            rand::rngs::OsRng.fill_bytes(&mut base_key);
             root_conn
                 .write_all(&base_key)
                 .wrap_err_with(ErrorKind::NetworkError, || {

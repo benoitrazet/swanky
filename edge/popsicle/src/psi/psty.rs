@@ -194,10 +194,10 @@ impl SenderState {
 
             let key = opprf_output.prefix(KEY_SIZE);
             let key: &Key<Aes256Gcm> = key.into();
-            let cipher = Aes256Gcm::new(&key);
+            let cipher = Aes256Gcm::new(key);
 
             let nonce = Nonce::from_slice(&nonce_bytes);
-            match cipher.decrypt(&nonce, ciphertext.as_ref()) {
+            match cipher.decrypt(nonce, ciphertext.as_ref()) {
                 Ok(dec) => {
                     let payload = dec.to_owned().split_off(PAD_LEN);
                     payloads.push(payload)
@@ -312,10 +312,10 @@ impl ReceiverState {
 
         let mut intersection = Vec::new();
         for (opt_item, in_intersection) in self.cuckoo.items.iter().zip_eq(mpc_outs.into_iter()) {
-            if let Some(item) = opt_item {
-                if in_intersection == 1_u16 {
-                    intersection.push(self.inputs[item.input_index].clone());
-                }
+            if let Some(item) = opt_item
+                && in_intersection == 1_u16
+            {
+                intersection.push(self.inputs[item.input_index].clone());
             }
         }
         Ok(intersection)
@@ -333,7 +333,7 @@ impl ReceiverState {
         let (mut ev, x, y) = self.compute_setup(channel, rng)?;
         let result = fancy_compute_cardinality(&mut ev, &x, &y, channel)?;
         let cardinality_outs = ev
-            .outputs(&result.wires(), channel)?
+            .outputs(result.wires(), channel)?
             .expect("evaluator should produce outputs");
 
         let mut cardinality = 0;
@@ -377,8 +377,8 @@ impl ReceiverState {
             rng.fill_bytes(&mut nonce_bytes);
             let nonce = Nonce::from_slice(&nonce_bytes);
 
-            let cipher = Aes256Gcm::new(&key);
-            let ciphertext = cipher.encrypt(&nonce, payload.as_ref()).map_err(|_| {
+            let cipher = Aes256Gcm::new(key);
+            let ciphertext = cipher.encrypt(nonce, payload.as_ref()).map_err(|_| {
                 swanky_error::Error::new(
                     ErrorKind::OtherError,
                     "Failed to encrypt payload.".to_string(),
@@ -386,7 +386,7 @@ impl ReceiverState {
                 )
             })?;
 
-            channel.write_bytes(&nonce)?;
+            channel.write_bytes(nonce)?;
             channel.write_bytes(&ciphertext)?;
         }
         Ok(())
@@ -549,12 +549,12 @@ mod tests {
         let sender_inputs: Vec<Vec<u8>> = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
         let mut receiver_inputs = sender_inputs.clone();
 
-        for i in 0..NUM_DIFF {
+        for receiver_input in receiver_inputs.iter_mut().take(NUM_DIFF) {
             // change the value of the first byte at that index,
             // if its above 0, set it to 0, otherwise set it to 1.
             // this ensures that
             // receiver_inputs[differing_index] != sender_inputs[differing_index]
-            receiver_inputs[i][0] = if receiver_inputs[i][0] > 0 { 0 } else { 1 };
+            receiver_input[0] = if receiver_input[0] > 0 { 0 } else { 1 };
         }
 
         let cardinality = psty_cardinality(sender_inputs, receiver_inputs);

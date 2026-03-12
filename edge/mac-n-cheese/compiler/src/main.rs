@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 #![deny(unused_must_use)]
 
 use clap::{Parser, Subcommand};

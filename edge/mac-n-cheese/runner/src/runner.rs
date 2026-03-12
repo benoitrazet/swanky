@@ -388,6 +388,7 @@ impl<P: Party> RunnerThread<P> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn run_proof_background<P: Party>(
     num_threads: usize,
     mut rng: AesRng,

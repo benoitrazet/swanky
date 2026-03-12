@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     AllWire, FancyArithmetic,
@@ -10,9 +9,9 @@ use std::time::Duration;
 use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
 
-fn bench_garble<F: 'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
+fn bench_garble<F>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
 where
-    F: Fn(u16) -> Circuit,
+    F: Fn(u16) -> Circuit + 'static,
 {
     c.bench_function(&format!("garbling::{}_gb ({})", name, q), move |bench| {
         let c = make_circuit(q);
@@ -23,9 +22,9 @@ where
     });
 }
 
-fn bench_eval<F: 'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
+fn bench_eval<F>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
 where
-    F: Fn(u16) -> Circuit,
+    F: Fn(u16) -> Circuit + 'static,
 {
     c.bench_function(&format!("garbling::{}_ev ({})", name, q), move |bench| {
         let mut rng = rand::thread_rng();
