@@ -52,8 +52,8 @@ impl BinaryWireLabel for WireMod2 {
         let Y = Self::hash_to_mod(hashY, q);
 
         let gate0 =
-            hashA ^ U8x16::conditional_select(&X.to_block(), &(X + *D).to_block(), idx.into());
-        let gate1 = hashB ^ (Y + *A).to_block();
+            hashA ^ U8x16::conditional_select(&X.to_repr(), &(X + *D).to_repr(), idx.into());
+        let gate1 = hashB ^ (Y + *A).to_repr();
 
         (gate0, gate1, X + Y)
     }
@@ -70,13 +70,13 @@ impl BinaryWireLabel for WireMod2 {
         let [hashA, hashB] = hash_wires([A, B], g);
 
         // garbler's half gate
-        let L = Self::from_block(
+        let L = Self::from_repr(
             U8x16::conditional_select(&hashA, &(hashA ^ *gate0), (A.color() as u8).into()),
             2,
         );
 
         // evaluator's half gate
-        let R = Self::from_block(
+        let R = Self::from_repr(
             U8x16::conditional_select(&hashB, &(hashB ^ *gate1), (B.color() as u8).into()),
             2,
         );

@@ -175,7 +175,7 @@ impl WireLabel for WireModQ {
         self.ds.clone()
     }
 
-    fn to_block(&self) -> U8x16 {
+    fn to_repr(&self) -> U8x16 {
         // This function converts a [`WireMod3`] into its [`Block`] representation.
         // The values stored in [`WireModQ`] are repacked depending on q
         // into a 128b value as a [`Block`].
@@ -188,7 +188,7 @@ impl WireLabel for WireModQ {
         color
     }
 
-    fn from_block(inp: U8x16, q: u16) -> Self {
+    fn from_repr(inp: U8x16, q: u16) -> Self {
         if q < 2 {
             panic!(
                 "[WireModQ::from_block] Modulus must be at least 2. Got {}",
@@ -243,7 +243,7 @@ impl WireLabel for WireModQ {
                 q
             );
         }
-        Self::from_block(hash, q)
+        Self::from_repr(hash, q)
     }
 }
 

@@ -82,8 +82,8 @@ impl core::ops::MulAssign<u16> for WireMod2 {
 
 impl ConditionallySelectable for WireMod2 {
     fn conditional_select(a: &Self, b: &Self, choice: subtle::Choice) -> Self {
-        WireMod2::from_block(
-            U8x16::conditional_select(&a.to_block(), &b.to_block(), choice),
+        WireMod2::from_repr(
+            U8x16::conditional_select(&a.to_repr(), &b.to_repr(), choice),
             2,
         )
     }
@@ -105,7 +105,7 @@ impl WireLabel for WireMod2 {
             .collect()
     }
 
-    fn to_block(&self) -> U8x16 {
+    fn to_repr(&self) -> U8x16 {
         // This function converts a [`WireMod2`] into its [`U8x16`] representation.
         // Since the value of a [`WireMod2`] is a 128b value, its directly returned
         // as a [`U8x16`].
@@ -117,7 +117,7 @@ impl WireLabel for WireMod2 {
         (self.val.extract::<0>() & 1) as u16
     }
 
-    fn from_block(inp: U8x16, q: u16) -> Self {
+    fn from_repr(inp: U8x16, q: u16) -> Self {
         // This function converts a Block into its WireLabel representation
         // by just setting the value of WireMod2 to the Block (i.e. the
         // wire's 128b value).
@@ -146,7 +146,7 @@ impl WireLabel for WireMod2 {
         if q != 2 {
             panic!("[WireMod2::hash_to_mod] Expected modulo 2. Got {}", q);
         }
-        Self::from_block(hash, q)
+        Self::from_repr(hash, q)
     }
 }
 

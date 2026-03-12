@@ -31,7 +31,7 @@ impl<Wire: WireLabel> Evaluator<Wire> {
         // make negation free.
         let one = channel.read::<U8x16>()?;
         Ok(Evaluator {
-            one: Wire::from_block(one, 2),
+            one: Wire::from_repr(one, 2),
             current_gate: 0,
             current_output: 0,
             _phantom: PhantomData,
@@ -55,7 +55,7 @@ impl<Wire: WireLabel> Evaluator<Wire> {
     /// Read a Wire from the reader.
     pub fn read_wire(&mut self, modulus: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
         let block = channel.read()?;
-        Ok(Wire::from_block(block, modulus))
+        Ok(Wire::from_repr(block, modulus))
     }
 }
 
@@ -102,7 +102,7 @@ impl<Wire: BinaryWireLabel> FancyInput for Evaluator<Wire> {
         (0..moduli.len())
             .map(|_| {
                 let block = channel.read()?;
-                Ok(Wire::from_block(block, 2))
+                Ok(Wire::from_repr(block, 2))
             })
             .collect()
     }
@@ -197,7 +197,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
             Wire::hash_to_mod(hashA, q)
         } else {
             let ct_left = gate[A.color() as usize - 1];
-            Wire::from_block(ct_left ^ hashA, q)
+            Wire::from_repr(ct_left ^ hashA, q)
         };
 
         // evaluator's half gate
@@ -205,7 +205,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
             Wire::hash_to_mod(hashB, q)
         } else {
             let ct_right = gate[(q + B.color()) as usize - 2];
-            Wire::from_block(ct_right ^ hashB, q)
+            Wire::from_repr(ct_right ^ hashB, q)
         };
 
         // hack for unequal mods
@@ -242,7 +242,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
             Ok(x.hashback(t, q))
         } else {
             let ct = gate[x.color() as usize - 1];
-            Ok(Wire::from_block(ct ^ x.hash(t), q))
+            Ok(Wire::from_repr(ct ^ x.hash(t), q))
         }
     }
 }

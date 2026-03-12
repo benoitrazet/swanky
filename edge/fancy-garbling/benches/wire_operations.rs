@@ -8,7 +8,7 @@ fn bench_digits(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::digits ({})", p), move |b| {
         let rng = &mut rand::thread_rng();
         let x = U8x16::from(rng.gen_u128());
-        let w = AllWire::from_block(x, p);
+        let w = AllWire::from_repr(x, p);
         b.iter(|| {
             let digits = w.digits();
             std::hint::black_box(digits);
@@ -21,7 +21,7 @@ fn bench_unpack(c: &mut Criterion, p: u16) {
         let rng = &mut rand::thread_rng();
         let x = rng.gen_usable_block(p);
         b.iter(|| {
-            let w = AllWire::from_block(x, p);
+            let w = AllWire::from_repr(x, p);
             std::hint::black_box(w);
         });
     });
@@ -32,7 +32,7 @@ fn bench_pack(c: &mut Criterion, p: u16) {
         let rng = &mut rand::thread_rng();
         let w = AllWire::rand(rng, p);
         b.iter(|| {
-            let x = w.to_block();
+            let x = w.to_repr();
             std::hint::black_box(x);
         });
     });

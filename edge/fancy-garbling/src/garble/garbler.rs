@@ -47,7 +47,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
         deltas.insert(2, delta);
         // Send the one wirelabel to the evaluator. This is used to make binary
         // negation free.
-        channel.write(&one.to_block())?;
+        channel.write(&one.to_repr())?;
         Ok(Garbler {
             zero,
             deltas,
@@ -91,7 +91,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
 
     /// Send a wire over the established channel.
     pub fn send_wire(&mut self, wire: &Wire, channel: &mut Channel) -> swanky_error::Result<()> {
-        channel.write(&wire.to_block())?;
+        channel.write(&wire.to_repr())?;
         Ok(())
     }
 
@@ -156,7 +156,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> FancyInput for Garbler<RNG, Wire
     ) -> swanky_error::Result<Vec<Self::Item>> {
         let (zero, encoded) = self.encode_many_wires(values, moduli);
         for wire in encoded {
-            channel.write(&wire.to_block())?;
+            channel.write(&wire.to_repr())?;
         }
         Ok(zero)
     }
@@ -336,10 +336,10 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         // precompute a lookup table of X.minus(&D_cmul[(a * r % q)])
         //                            = X.plus(&D_cmul[((q - (a * r % q)) % q)])
         let mut X_ = X.clone();
-        precomp.push(X_.to_block());
+        precomp.push(X_.to_repr());
         for _ in 1..q {
             X_ += D.clone();
-            precomp.push(X_.to_block());
+            precomp.push(X_.to_repr());
         }
 
         // We can vectorize the hashes here too, but then we need to precompute all `q` sums of A
@@ -362,10 +362,10 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         // precompute a lookup table of Y.minus(&A_cmul[((b+r) % q)])
         //                            = Y.plus(&A_cmul[((q - ((b+r) % q)) % q)])
         let mut Y_ = Y.clone();
-        precomp.push(Y_.to_block());
+        precomp.push(Y_.to_repr());
         for _ in 1..q {
             Y_ += A.clone();
-            precomp.push(Y_.to_block());
+            precomp.push(Y_.to_repr());
         }
 
         // Same note about vectorization as A
@@ -421,7 +421,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
                     if x > 0 {
                         C_ += Dout.clone();
                     }
-                    C_.to_block()
+                    C_.to_repr()
                 })
                 .collect::<Vec<_>>()
         };

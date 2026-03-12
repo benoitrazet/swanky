@@ -175,7 +175,7 @@ impl WireLabel for WireMod3 {
             .collect()
     }
 
-    fn to_block(&self) -> U8x16 {
+    fn to_repr(&self) -> U8x16 {
         // This function converts a [`WireMod3`] into its [`Block`] representation.
         // The two 64b values stored in [`WireMod3`], i.e. the lsb and msb, and packed
         // into a 128b value as a [`Block`].
@@ -188,7 +188,7 @@ impl WireLabel for WireMod3 {
         color
     }
 
-    fn from_block(inp: U8x16, q: u16) -> Self {
+    fn from_repr(inp: U8x16, q: u16) -> Self {
         if q != 3 {
             panic!("[WireMod3::from_block] Expected mod 3. Got mod {}", q)
         }
