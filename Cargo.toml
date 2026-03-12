@@ -29,6 +29,7 @@ members = [
   "edge/field-fft",
   "edge/field-test",
   "edge/flatbuffer-build",
+  "edge/garbled-nn",
   "edge/humidor",
   "edge/inferno",
   "edge/keyed_arena",
@@ -52,7 +53,6 @@ members = [
   "edge/ot-test",
   "edge/ot-traits",
   "edge/party",
-  "edge/party2",
   "edge/polynomial",
   "edge/popsicle",
   "edge/schmivitz",
@@ -120,6 +120,7 @@ swanky-field-fft = { path = "edge/field-fft" }
 swanky-field-test = { path = "edge/field-test" }
 swanky-flatbuffer-build = { path = "edge/flatbuffer-build" }
 swanky-malicious-hooks = { path = "edge/malicious-hooks" }
+swanky-garbled-nn = { path = "edge/garbled-nn" }
 swanky-ocelot-error = { path = "edge/ocelot-error" }
 swanky-oprf-kkrt = { path = "edge/oprf-kkrt" }
 swanky-oprf-kmprt = { path = "edge/oprf-kmprt" }
@@ -131,7 +132,6 @@ swanky-ot-noar-pinkas = { path = "edge/ot-noar-pinkas" }
 swanky-ot-test = { path = "edge/ot-test" }
 swanky-ot-traits = { path = "edge/ot-traits" }
 swanky-party = { path = "edge/party" }
-swanky-party2 = { path = "edge/party2" }
 swanky-polynomial = { path = "edge/polynomial" }
 swanky-serialization = { path = "edge/serialization" }
 swanky-sieve-ir-api = { path = "edge/sieve-ir-api" }
@@ -152,8 +152,8 @@ ff_codegen = { git = "https://github.com/GaloisInc/ff", rev = "c29da06f50c67fe9e
 # External Dependencies
 aes = "0.8.4"
 aes-gcm = "0.10.3"
-anyhow = "1.0.100"
-arc-swap = "1.8.0"
+anyhow = "1.0.102"
+arc-swap = "1.8.2"
 arrayvec = "0.7.6"
 bincode = "=1.3.3" # See https://sr.ht/~stygianentity/bincode/
 bitpacking = "0.9.3"
@@ -161,28 +161,28 @@ bitvec = { version = "1.0.1", features = ["alloc"] }
 # We disable avx512 since we typically run on skylake.
 blake3 = { version = "1.8.3", features = ["no_avx512"] }
 bufstream = "0.1.4"
-bumpalo = "3.19.1"
+bumpalo = "3.20.2"
 bumpalo-herd = "0.1.2"
-bytemuck = { version = "1.24.0", features = [
+bytemuck = { version = "1.25.0", features = [
   "derive",
   "min_const_generics",
   "extern_crate_alloc",
   "aarch64_simd",
 ] }
-bytes = "1.11.0"
-cc = "1.2.53"
+bytes = "1.11.1"
+cc = "1.2.56"
 ciborium = "0.2.2"
-clap = { version = "4.5.54", features = ["derive"] }
+clap = { version = "4.5.60", features = ["derive"] }
 console_error_panic_hook = "0.1.7"
 console_log = { version = "1.0", features = ["color"] }
-criterion = "0.8.1"
+criterion = "0.8.2"
 crossbeam = "0.8.4"
 crossbeam-queue = "0.3.12"
 crypto-bigint = { version = "0.6.1", features = ["hybrid-array"] }
 curve25519-dalek = { version = "4.1.3", features = ["rand_core"] }
 dhat = "0.3.3"
-digest = "0.10.7"
-env_logger = "0.11.8"
+digest = "=0.10.7" # See issue #364
+env_logger = "0.11.9"
 flatbuffers = "25.12.19" # Keep this version in sync with edge/flatbuffer-build/src/flatc-ver.txt
 flume = "0.12.0"
 generic-array = { version = "1.3.5", features = ["serde"] }
@@ -190,20 +190,20 @@ hex = "0.4.3"
 io-uring = "0.7.11"
 itertools = "0.14.0"
 jemallocator = "0.5.4"
-libc = "0.2.180"
+libc = "0.2.182"
 log = "0.4.29"
 lz4 = "1.28.1"
-memchr = "2.7.6"
-memmap2 = "0.9.9"
+memchr = "2.8.0"
+memmap2 = "0.9.10"
 merkle-cbt = "0.3.2"
 merlin = "3.0.0"
 mimalloc = { version = "0.1.48", default-features = false }
-moka = { version = "0.12.12", features = ["sync"] }
+moka = { version = "0.12.14", features = ["sync"] }
 ndarray = "=0.15.6" # See issue #123
 # Rather than enabling nix features on a per-crate basis (which could lead to issues where
 # compiling the whole workspace might succeed, but compiling an individual crate might fail),
 # we just enable all the features we need at the workspace root.
-nix = { version = "0.31.1", features = ["sched"] }
+nix = { version = "0.31.2", features = ["sched"] }
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
 num_cpus = "1.17.0"
@@ -214,15 +214,15 @@ proc-macro2 = "1.0.106"
 rand = "=0.8.5" # See issue #345
 rand_chacha = "=0.3.1" # See issue #345
 rand_core = "=0.6.4" # See issue #345
-proptest = "1.9.0"
-quick-xml = "0.39.0"
-quote = "1.0.43"
+proptest = "1.10.0"
+quick-xml = "0.39.2"
+quote = "1.0.45"
 rayon = "1.11.0"
-regex = "1.12.2"
+regex = "1.12.3"
 ring = "0.17.14"
 rpmalloc = "0.2.2"
 rustc-hash = "2.1.1"
-rustls = { version = "0.23.36", default-features = false, features = [
+rustls = { version = "0.23.37", default-features = false, features = [
   "std",
   "ring",
 ] }
@@ -236,7 +236,7 @@ smallvec = { version = "1.15.1", features = [
   "union",
   "const_new",
 ] }
-snafu = "0.8.9"
+snafu = "0.9.0"
 snmalloc-rs = { version = "0.3.8", default-features = false, features = [
   "build_cc",
   "usecxx17",
@@ -246,13 +246,13 @@ subtle = { version = "2.6.1", features = [
   "core_hint_black_box",
   "const-generics",
 ] }
-syn = { version = "2.0.114", features = ["full"] }
-tempfile = "3.24.0"
+syn = { version = "2.0.117", features = ["full"] }
+tempfile = "3.26.0"
 thiserror = "2.0.18"
-toml = "0.9.11"
+toml = "1.0.4"
 tungstenite = { version = "0.28.0", features = ["rustls"] }
 twox-hash = "2.1.2"
-wasm-bindgen = "0.2.108"
+wasm-bindgen = "0.2.114"
 zstd = "0.13.3"
 
 [profile.release]

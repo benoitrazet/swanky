@@ -1,5 +1,6 @@
 //! Multithreading Svole.
 
+use crate::party::{Party, Verifier, WhichParty};
 use crate::svole_trait::{SvoleStopSignal, SvoleT, field_name};
 use log::{debug, info};
 use std::cell::RefCell;
@@ -11,8 +12,10 @@ use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, ensure, swanky_error};
 use swanky_field::{FiniteField, IsSubFieldOf};
-use swanky_party::either::PartyEither;
-use swanky_party::{IsParty, Party, Verifier, WhichParty};
+use swanky_party::{
+    either::PartyEither,
+    ty_eq::{EqualityProposition, Witness},
+};
 use swanky_svole_wykw::{LpnParams, Receiver, Sender};
 
 const SLEEP_TIME: u64 = 1;
@@ -115,10 +118,9 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, 
                 // and start requesting a svole extension in the other thread, but
                 // the verifier does not receive the values because it's not flushed,
                 // hence it is a deadlock.
-                channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
+                channel.flush().wrap_err_with(ErrorKind::NetworkError, || {
+                    "Failed to flush channel.".to_string()
+                })?;
                 debug!("SLEEP! VoleInterface {:?}", T::default());
                 // exponential backoff sleep
                 std::thread::sleep(std::time::Duration::from_millis(sleep_time));
@@ -129,7 +131,7 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, 
         Ok(())
     }
 
-    fn delta(&self, _ev: IsParty<P, Verifier>) -> T {
+    fn delta(&self, _ev: Witness<impl EqualityProposition<P, Verifier>>) -> T {
         // Need to wait for delta to be available
         while (*self.delta.lock().unwrap()).is_none() {
             debug!(
@@ -159,26 +161,26 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
         delta: Option<T>,
     ) -> Result<Self> {
         let vole_comm = match P::WHICH {
-            WhichParty::Prover(ev) => PartyEither::prover_new(
+            WhichParty::Prover(ev) => PartyEither::new(
                 ev,
-                Sender::init(channel, rng, lpn_setup, lpn_extend).wrap_err(
-                    ErrorKind::InitializationError,
-                    "Failed to initialize SVOLE sender.".to_string(),
-                )?,
+                Sender::init(channel, rng, lpn_setup, lpn_extend)
+                    .wrap_err_with(ErrorKind::InitializationError, || {
+                        "Failed to initialize SVOLE sender.".to_string()
+                    })?,
             ),
-            WhichParty::Verifier(ev) => PartyEither::verifier_new(
+            WhichParty::Verifier(ev) => PartyEither::new(
                 ev,
-                Receiver::init(channel, rng, lpn_setup, lpn_extend, delta).wrap_err(
-                    ErrorKind::InitializationError,
-                    "Failed to initialize SVOLE receiver.".to_string(),
-                )?,
+                Receiver::init(channel, rng, lpn_setup, lpn_extend, delta)
+                    .wrap_err_with(ErrorKind::InitializationError, || {
+                        "Failed to initialize SVOLE receiver.".to_string()
+                    })?,
             ),
         };
 
         match P::WHICH {
             WhichParty::Prover(_) => debug!("INIT MultithreadedSender"),
             WhichParty::Verifier(ev) => {
-                svole_atomic.set_delta(vole_comm.as_ref().verifier_into(ev).delta());
+                svole_atomic.set_delta(vole_comm.as_ref().into_inner::<Verifier>(ev).delta());
                 debug!("DELTA is {:?}", svole_atomic.delta(ev));
                 debug!("INIT MultithreadedReceiver");
             }
@@ -222,7 +224,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
                         debug!("multithread prover extend");
                         self.vole_comm
                             .as_mut()
-                            .prover_into(ev)
+                            .into_inner(ev)
                             .send(
                                 channel,
                                 rng,
@@ -231,12 +233,11 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
                                     .lock()
                                     .unwrap()
                                     .as_mut()
-                                    .prover_into(ev),
+                                    .into_inner(ev),
                             )
-                            .wrap_err(
-                                ErrorKind::OtherError,
-                                "Failed to send VOLE extensions.".to_string(),
-                            )?;
+                            .wrap_err_with(ErrorKind::OtherError, || {
+                                "Failed to send VOLE extensions.".to_string()
+                            })?;
                         debug!("DONE multithread prover extend");
                     }
                     WhichParty::Verifier(ev) => {
@@ -245,7 +246,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
                         let start = Instant::now();
                         self.vole_comm
                             .as_mut()
-                            .verifier_into(ev)
+                            .into_inner(ev)
                             .receive::<_, V>(
                                 channel,
                                 rng,
@@ -254,12 +255,11 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
                                     .lock()
                                     .unwrap()
                                     .as_mut()
-                                    .verifier_into(ev),
+                                    .into_inner(ev),
                             )
-                            .wrap_err(
-                                ErrorKind::OtherError,
-                                "Failed to receive VOLE extensions.".to_string(),
-                            )?;
+                            .wrap_err_with(ErrorKind::OtherError, || {
+                                "Failed to receive VOLE extensions.".to_string()
+                            })?;
                         info!(
                             "SVOLE<{} {:?}>",
                             std::any::type_name::<T>().split("::").last().unwrap(),
@@ -420,7 +420,7 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomicRoun
         Ok(())
     }
 
-    fn delta(&self, ev: IsParty<P, Verifier>) -> T {
+    fn delta(&self, ev: Witness<impl EqualityProposition<P, Verifier>>) -> T {
         // It is the same delta for all the svoles in the round-robin,
         // so we can pick the current one.
         self.svoles[*self.current.borrow()].delta(ev)
@@ -431,6 +431,7 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomicRoun
 mod test {
     use super::SLEEP_TIME;
     use super::{SvoleAtomic, SvoleAtomicRoundRobin};
+    use crate::party::Verifier;
     use crate::svole_trait::SvoleT;
     use rand::Rng;
     use std::{
@@ -439,8 +440,7 @@ mod test {
     };
     use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
-    use swanky_party::either::PartyEither;
-    use swanky_party::{IS_VERIFIER, Verifier};
+    use swanky_party::{either::PartyEither, ty_eq::Witness};
 
     fn produce(s: &SvoleAtomic<Verifier, u32, u32>, v: u32) {
         loop {
@@ -450,7 +450,7 @@ mod test {
             let full = *s.full.lock().unwrap();
 
             if !full {
-                *s.voles.lock().unwrap() = PartyEither::verifier_new(IS_VERIFIER, vec![v, v + 1]);
+                *s.voles.lock().unwrap() = PartyEither::new(Witness::EQUAL_TYPES, vec![v, v + 1]);
                 *s.full.lock().unwrap() = true;
                 break;
             } else {
@@ -498,7 +498,7 @@ mod test {
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
         let mut v: Vec<u32> = vec![];
-        let mut out = PartyEither::verifier_new(IS_VERIFIER, &mut v);
+        let mut out = PartyEither::new(Witness::EQUAL_TYPES, &mut v);
         let mut i = 0;
         let mut other_rng = rand::thread_rng();
         for _ in 0..2 * how_many {
@@ -506,10 +506,16 @@ mod test {
             round_robin
                 .extend::<_>(&mut channel, &mut rng, &mut out)
                 .unwrap();
-            assert_eq!(out.as_ref().verifier_into(IS_VERIFIER)[0], i + CONST_42);
-            assert_eq!(out.as_ref().verifier_into(IS_VERIFIER)[1], i + CONST_42 + 1);
+            assert_eq!(
+                out.as_ref().into_inner(Witness::EQUAL_TYPES)[0],
+                i + CONST_42
+            );
+            assert_eq!(
+                out.as_ref().into_inner(Witness::EQUAL_TYPES)[1],
+                i + CONST_42 + 1
+            );
             i = (i + SHIFT) % (2 * SHIFT);
-            out.as_mut().verifier_into(IS_VERIFIER).clear();
+            out.as_mut().into_inner(Witness::EQUAL_TYPES).clear();
 
             std::thread::sleep(std::time::Duration::from_millis(random_millis));
         }

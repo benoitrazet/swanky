@@ -483,15 +483,14 @@ mod tests {
             @end ";
         let small_circuit_text = &mut Cursor::new(small_circuit_bytes.as_bytes());
 
-        let dir = tempdir().wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to create a temporary directory.".to_string(),
-        )?;
+        let dir = tempdir().wrap_err_with(ErrorKind::FilesystemError, || {
+            "Failed to create a temporary directory.".to_string()
+        })?;
         let private_input_path = dir.path().join("basic_happy_small_test_path");
-        let mut private_input = File::create(private_input_path.clone()).wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to create private input file.".to_string(),
-        )?;
+        let mut private_input = File::create(private_input_path.clone())
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to create private input file.".to_string()
+            })?;
         let private_input_bytes = "version 2.0.0;
             private_input;
             @type field 2;
@@ -502,10 +501,10 @@ mod tests {
                 < 0 >;
                 < 1 >;
             @end ";
-        writeln!(private_input, "{private_input_bytes}").wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to write private input bytes to file.".to_string(),
-        )?;
+        writeln!(private_input, "{private_input_bytes}")
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to write private input bytes to file.".to_string()
+            })?;
 
         let small_circuit = load_circuit_prover(small_circuit_text, &private_input_path)?;
         let rng = &mut thread_rng();

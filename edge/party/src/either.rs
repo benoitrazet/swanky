@@ -1,471 +1,590 @@
 //! Party-based type selection.
 //!
-//! This module implements the [`PartyEither`] type. For basic usage examples,
-//! see the [`crate`] documentation.
+//! This module implements the [`PartyEither`] (and
+//! [`PartyEitherCopy`]) types, which provide an efficient way to
+//! wrap data whose type is dependent on which participant in a
+//! protocol is running the code.
 //!
-//! Party-generic code will naturally involve some data that is prover-specific
-//! and some that is verifier-specific. The [`Party`] trait (and associated
-//! type reflection shenanigans) allow us to, at compile-time, decide between
-//! types based on whether a given `P: Party` is [`Prover`] or [`Verifier`].
+//! The type `PartyEither<P: GenericParty, T0, T1>` is
+//! `repr(transparent)` to `T0` if `P` is the system's `Party0`, and
+//! `repr(transparent)` to `T1` if `P` is the system's `Party1`.
+//! In practice, this means that `PartyEither` acts as a newtype
+//! wrapper for `T0` _or_ `T1`, depending on which protocol
+//! participant is executing.
 //!
-//! The type `PartyEither<Pa: Party, P, V>` represents this choice. If `Pa` is
-//! `Prover`, then this entire type effectively collapses to `P`. Likewise, if
-//! `Pa` is `Verifier`, the type collapses to `V`.
+//! See the [`crate`] documentation for basic usage examples in
+//! context.
 //!
-//! Due to some outstanding Rust issues, we provide a separate
-//! `PartyEitherCopy<Pa: Party, P: Copy, V: Copy>` type. Both types implement
-//! the same API, and conveniences are provided to convert between these types
-//! where appropriate.
-//!
-//! This is extremely general. For a particularly useful specialization for
-//! secure computation contexts, see [`private`].
+//! These types are based on [`RawEither`], which is _actually equal_
+//! to the underlying type; see [`raw`] for additional detail on this
+//! type, which is not needed in typical cases.
+use crate::ty_eq::{EqualityProposition as EqProp, Witness, generics};
+use crate::{GenericParty, GenericWhichParty};
+use bytemuck::TransparentWrapper;
+use raw::{RawEither, bounds, either_type_substitution};
+use std::{
+    fmt::Debug,
+    io::{Read, Write},
+};
 
-use std::io::{Read, Write};
+pub mod raw;
 
-use super::*;
-use crate::private::{ProverPrivate, ProverPrivateCopy, VerifierPrivate, VerifierPrivateCopy};
-
-pub(super) mod internal {
-    use super::*;
-    pub trait EitherStorageTrait<P, V> {
-        // These functions will panic if called on the wrong variant.
-        fn new_prover(p: P) -> Self;
-        fn into_prover(self) -> P;
-        fn ref_prover(&self) -> &P;
-        fn mut_prover(&mut self) -> &mut P;
-
-        fn new_verifier(v: V) -> Self;
-        fn into_verifier(self) -> V;
-        fn ref_verifier(&self) -> &V;
-        fn mut_verifier(&mut self) -> &mut V;
-    }
-
-    /// # Safety
-    /// If `Self == Prover`, `EitherStorage(Copy)<P, V>` must be `repr(transparent)` to `P`.
-    /// If `Self == Verifier`, `EitherStorage(Copy)<P, V> must be `repr(transparent)` to `V`.
-    pub unsafe trait PartyEitherInternal {
-        type EitherStorage<Prover, Verifier>: EitherStorageTrait<Prover, Verifier>;
-        type EitherStorageCopy<Prover: Copy, Verifier: Copy>: EitherStorageTrait<Prover, Verifier>
-            + Copy;
-    }
-    #[derive(Clone, Copy)]
-    #[repr(transparent)]
-    pub struct EitherStorage<Pa: Party, T>(T, PhantomData<Pa>);
-    impl<P, V> EitherStorageTrait<P, V> for EitherStorage<Prover, P> {
-        #[inline]
-        fn new_prover(p: P) -> Self {
-            EitherStorage(p, PhantomData)
-        }
-        #[inline]
-        fn into_prover(self) -> P {
-            self.0
-        }
-        #[inline]
-        fn ref_prover(&self) -> &P {
-            &self.0
-        }
-        #[inline]
-        fn mut_prover(&mut self) -> &mut P {
-            &mut self.0
-        }
-
-        #[cold]
-        fn new_verifier(_v: V) -> Self {
-            unreachable!()
-        }
-        #[cold]
-        fn into_verifier(self) -> V {
-            unreachable!()
-        }
-        #[cold]
-        fn ref_verifier(&self) -> &V {
-            unreachable!()
-        }
-        #[cold]
-        fn mut_verifier(&mut self) -> &mut V {
-            unreachable!()
-        }
-    }
-    impl<P, V> EitherStorageTrait<P, V> for EitherStorage<Verifier, V> {
-        #[cold]
-        fn new_prover(_p: P) -> Self {
-            unreachable!()
-        }
-        #[cold]
-        fn into_prover(self) -> P {
-            unreachable!()
-        }
-        #[cold]
-        fn ref_prover(&self) -> &P {
-            unreachable!()
-        }
-        #[cold]
-        fn mut_prover(&mut self) -> &mut P {
-            unreachable!()
-        }
-
-        #[inline]
-        fn new_verifier(v: V) -> Self {
-            EitherStorage(v, PhantomData)
-        }
-        #[inline]
-        fn into_verifier(self) -> V {
-            self.0
-        }
-        #[inline]
-        fn ref_verifier(&self) -> &V {
-            &self.0
-        }
-        #[inline]
-        fn mut_verifier(&mut self) -> &mut V {
-            &mut self.0
-        }
-    }
-}
-use internal::*;
-
-macro_rules! define_prover_either {
-    ($PartyEither:ident $(: $Copy:ident)? => $EitherStorage:ident) => {
-        /// A type that is `repr(transparent)` to `P` when `Pa = Prover` and
-        /// `repr(transparent)` to `V` when `Pa = Verifier`.
+macro_rules! either {
+    ($(
+        $(#[$meta:meta])*
+        type $PartyEither:ident$(: $Copy:ident)? => $bound:ty;
+    )*) => {$(
         #[repr(transparent)]
-        pub struct $PartyEither<Pa: Party, P $(: $Copy)?, V $(: $Copy)?> {
-            contents: Pa::$EitherStorage<P, V>,
-        }
-        impl<Pa: Party, P $(: $Copy)?, V $(: $Copy)?> $PartyEither<Pa, P, V> {
-            /// Given evidence that `Pa = Prover`, create a new
-            /// `PartyEither(Copy)` from a value of the prover-data type.
-            pub fn prover_new(_ev: IsParty<Pa, Prover>, x: P) -> Self {
-                Self { contents: Pa::$EitherStorage::<P, V>::new_prover(x) }
-            }
-
-            /// Given evidence that `Pa = Verifier`, create a new
-            /// `PartyEither(Copy)` from a value of the verifier-data type.
-            pub fn verifier_new(_ev: IsParty<Pa, Verifier>, x: V) -> Self {
-                Self { contents: Pa::$EitherStorage::<P, V>::new_verifier(x) }
-            }
-
-            /// Given evidence that `Pa = Prover`, cast to the underlying
-            /// prover-data type.
-            pub fn prover_into(self, _ev: IsParty<Pa, Prover>) -> P {
-                Pa::$EitherStorage::<P, V>::into_prover(self.contents)
-            }
-
-            /// Given evidence that `Pa = Verifier`, cast to the underlying
-            /// verifier-data type.
-            pub fn verifier_into(self, _ev: IsParty<Pa, Verifier>) -> V {
-                Pa::$EitherStorage::<P, V>::into_verifier(self.contents)
-            }
-
-            /// Convert from `PartyEither(Copy)<Pa, P, V>` to
-            /// `PartyEither(Copy)<Pa, &P, &V>`.
-            pub fn as_ref(&self) -> $PartyEither<Pa, &P, &V> {
-                match Pa::WHICH {
-                    WhichParty::Prover(e) =>
-                        $PartyEither::prover_new(e, Pa::$EitherStorage::<P, V>::ref_prover(&self.contents)),
-                    WhichParty::Verifier(e) =>
-                        $PartyEither::verifier_new(e, Pa::$EitherStorage::<P, V>::ref_verifier(&self.contents)),
-                }
-            }
-
-            /// Convert from `PartyEither(Copy)<Pa, P, V>` to
-            /// `PartyEither(Copy)<Pa, &mut P, &mut V>`.
-            pub fn as_mut(&mut self) -> PartyEither<Pa, &mut P, &mut V> {
-                match Pa::WHICH {
-                    WhichParty::Prover(e) =>
-                        PartyEither::prover_new(e, Pa::$EitherStorage::<P, V>::mut_prover(&mut self.contents)),
-                    WhichParty::Verifier(e) =>
-                        PartyEither::verifier_new(e, Pa::$EitherStorage::<P, V>::mut_verifier(&mut self.contents)),
-                }
-            }
-
-            /// Zip two `PartyEither(Copy)` in the natural way.
-            pub fn zip<
-                P2 $(: $Copy)?,
-                V2 $(: $Copy)?,
-            >(self, x: $PartyEither<Pa, P2, V2>) -> $PartyEither<Pa, (P, P2), (V, V2)> {
-                match Pa::WHICH {
-                    WhichParty::Prover(e) =>$PartyEither::prover_new(e, (
-                        self.prover_into(e),
-                        x.prover_into(e),
-                    )),
-                    WhichParty::Verifier(e) =>$PartyEither::verifier_new(e, (
-                        self.verifier_into(e),
-                        x.verifier_into(e),
-                    )),
-                }
-            }
-
-            /// Given a function for each of the prover- and verifier-data
-            /// types, map over a `PartyEither(Copy)` in the natural way.
+        #[derive(TransparentWrapper)]
+        #[doc=concat!(
+            "`", stringify!($PartyEither), "` is a wrapper type which is `repr(transparent)` to `T0` ",
+            "if `P == Party0`, else it's `repr(transparent)` to `T1`",
+            "\n\n"
+        )]
+        $(#[$meta])*
+        pub struct $PartyEither<P: GenericParty, T0$(: $Copy)?, T1$(: $Copy)?>(
+            RawEither<$bound, P, T0, T1>
+        );
+        impl<P: GenericParty, T0$(: $Copy)?, T1$(: $Copy)?> $PartyEither<P, T0, T1> {
+            /// Construct a new [`PartyEither`] containing `x`, given that `P == P2`
             ///
-            /// Note that only one of the provided functions will run for a
-            /// given call to `map`.
-            pub fn map<
-                P2 $(: $Copy)?,
-                V2 $(: $Copy)?,
-                PF: FnOnce(P) -> P2,
-                VF: FnOnce(V) -> V2,
-            >(self, pf: PF, vf: VF) -> $PartyEither<Pa, P2, V2> {
-                match Pa::WHICH {
-                    WhichParty::Prover(e) => $PartyEither::prover_new(e, pf(self.prover_into(e))),
-                    WhichParty::Verifier(e) => $PartyEither::verifier_new(e, vf(self.verifier_into(e))),
+            /// # Example
+            /// ```
+            /// # use swanky_party::{*, either::*, ty_eq::Witness};
+            /// party_system! {
+            ///     mod ps {
+            ///         Alice,
+            ///         Bob,
+            ///     }
+            /// }
+            /// use ps::*;
+            /// let alice_variant: PartyEither<Alice, String, i32> =
+            ///     PartyEither::new::<Alice>(Witness::EQUAL_TYPES, "Hello!".to_string());
+            /// let bob_variant: PartyEither<Bob, String, i32> =
+            ///     PartyEither::new::<Bob>(Witness::EQUAL_TYPES, 150);
+            /// fn make_either<P: Party>() -> PartyEither<P, String, i32> {
+            ///     match P::WHICH {
+            ///         WhichParty::Alice(e) =>
+            ///             PartyEither::new::<Alice>(e, "I'm alice!".to_string()),
+            ///         WhichParty::Bob(e) =>
+            ///             PartyEither::new::<Bob>(e, 143),
+            ///     }
+            /// }
+            /// ```
+            #[inline(always)]
+            pub fn new<P2: GenericParty>(
+                ev: Witness<impl EqProp<P, P2>>,
+                x: RawEither<$bound, P2, T0, T1>,
+            ) -> Self {
+                Self(
+                    ev.sym()
+                        .with_generic::<generics::RawEitherParty<$bound, T0, T1>, _, _>()
+                        .cast(x)
+                )
+            }
+            /// Extract the value of a [`PartyEither`], given that `P == P2`
+            ///
+            /// # Example
+            /// ```
+            /// # use swanky_party::{*, either::*, ty_eq::Witness};
+            /// party_system! {
+            ///     mod ps {
+            ///         Alice,
+            ///         Bob,
+            ///     }
+            /// }
+            /// use ps::*;
+            /// let alice_variant: PartyEither<Alice, String, i32> =
+            ///     PartyEither::new::<Alice>(Witness::EQUAL_TYPES, "Hello!".to_string());
+            /// assert_eq!(alice_variant.into_inner(Witness::EQUAL_TYPES), "Hello!".to_string());
+            /// let bob_variant: PartyEither<Bob, String, i32> =
+            ///     PartyEither::new::<Bob>(Witness::EQUAL_TYPES, 150);
+            /// assert_eq!(bob_variant.into_inner(Witness::EQUAL_TYPES), 150);
+            /// ```
+            /// ```
+            /// # use swanky_party::{*, either::*, ty_eq::Witness};
+            /// # party_system! {
+            /// #     mod ps {
+            /// #         Alice,
+            /// #         Bob,
+            /// #     }
+            /// # }
+            /// # use ps::*;
+            /// # let alice_variant: PartyEither<Alice, String, i32> =
+            /// #     PartyEither::new::<Alice>(Witness::EQUAL_TYPES, "Hello!".to_string());
+            /// # let bob_variant: PartyEither<Bob, String, i32> =
+            /// #     PartyEither::new::<Bob>(Witness::EQUAL_TYPES, 150);
+            /// fn format_either<P: Party>(x: PartyEither<P, String, i32>) -> String {
+            ///     match P::WHICH {
+            ///         WhichParty::Alice(e) =>
+            ///             format!("Alice says: {}", x.into_inner::<Alice>(e)),
+            ///         WhichParty::Bob(e) =>
+            ///             format!("Bob says: {}", x.into_inner::<Bob>(e)),
+            ///     }
+            /// }
+            /// assert_eq!(format_either(alice_variant), "Alice says: Hello!".to_string());
+            /// assert_eq!(format_either(bob_variant), "Bob says: 150".to_string());
+            /// ```
+            #[inline(always)]
+            pub fn into_inner<P2: GenericParty>(
+                self,
+                ev: Witness<impl EqProp<P, P2>>
+            ) -> RawEither<$bound, P2, T0, T1> {
+                ev.with_generic::<generics::RawEitherParty<$bound, T0, T1>, _, _>().cast(self.0)
+            }
+            /// Create a new [`PartyEither`] by running `map0` on the either contents if `P ==
+            /// Party0`, and running `map1` on the either contents, otherwise.
+            ///
+            /// ```
+            /// # use swanky_party::{*, either::*, ty_eq::Witness};
+            /// party_system! {
+            ///     mod ps {
+            ///         Alice,
+            ///         Bob,
+            ///     }
+            /// }
+            /// use ps::*;
+            /// let alice_variant: PartyEither<Alice, String, i32> =
+            ///     PartyEither::new::<Alice>(Witness::EQUAL_TYPES, "Hello!".to_string());
+            /// let bob_variant: PartyEither<Bob, String, i32> =
+            ///     PartyEither::new::<Bob>(Witness::EQUAL_TYPES, 150);
+            /// fn do_it<P: Party>(e: PartyEither<P, String, i32>) -> PartyEither<P, usize, i32> {
+            ///     e.map(|str| str.len(), |i| i * 2)
+            /// }
+            /// assert_eq!(do_it(alice_variant), PartyEither::new(Witness::EQUAL_TYPES, 6));
+            /// assert_eq!(do_it(bob_variant), PartyEither::new(Witness::EQUAL_TYPES, 300));
+            /// ```
+            #[inline(always)]
+            pub fn map<U0$(: $Copy)?, U1$(: $Copy)?>(
+                self,
+                map0: impl FnOnce(T0) -> U0,
+                map1: impl FnOnce(T1) -> U1,
+            ) -> $PartyEither<P, U0, U1> {
+                match P::GENERIC_WHICH {
+                    GenericWhichParty::Party0(ev) =>
+                        $PartyEither::new(ev, map0(self.into_inner(ev))),
+                    GenericWhichParty::Party1(ev) =>
+                        $PartyEither::new(ev, map1(self.into_inner(ev))),
+                }
+            }
+            /// Convert from `&PartyEither<P, A, B>` into `PartyEither<P, &A, &B>`
+            ///
+            /// This serves the same purpose as [`Option::as_ref`]
+            ///
+            /// This is frequently useful to _borrow_ the contents of a `PartyEither`.
+            /// ```compile_fail
+            /// # use swanky_party::{*, either::*, ty_eq::Witness};
+            /// party_system! {
+            ///     mod ps {
+            ///         Alice,
+            ///         Bob,
+            ///     }
+            /// }
+            /// use ps::*;
+            /// fn len<P: Party>(x: &PartyEither<P, String, Vec<u64>>) -> usize {
+            ///     // It's easier to write this with .map(), but it's more illustrative to write
+            ///     // this manually :)
+            ///     match P::WHICH {
+            ///         WhichParty::Alice(ev) => {
+            ///             // Rust is going to complain right here!
+            ///             // x is only have a _reference_ to a String, so we want a &String
+            ///             // to come out of it, not a String
+            ///             let alice: String = x.into_inner(ev);
+            ///             alice.len()
+            ///         }
+            ///         WhichParty::Bob(ev) => {
+            ///             // And we run into the same problem with bob
+            ///             let bob: Vec<u64> = x.into_inner(ev);
+            ///             bob.len()
+            ///         }
+            ///     }
+            /// }
+            /// ```
+            /// ```
+            /// # use swanky_party::{*, either::*, ty_eq::Witness};
+            /// # party_system! {
+            /// #     mod ps {
+            /// #         Alice,
+            /// #         Bob,
+            /// #     }
+            /// # }
+            /// # use ps::*;
+            /// fn len1<P: Party>(x: &PartyEither<P, String, Vec<u64>>) -> usize {
+            ///     // .as_ref() moves the references to the inside (it's now an either of
+            ///     // references)
+            ///     let x_ref: PartyEither<P, &String, &Vec<u64>> = x.as_ref();
+            ///     match P::WHICH {
+            ///         WhichParty::Alice(ev) => {
+            ///             // We've now fixed our reference issue!
+            ///             let alice: &String = x_ref.into_inner(ev);
+            ///             alice.len()
+            ///         }
+            ///         WhichParty::Bob(ev) => {
+            ///             let bob: &Vec<u64> = x_ref.into_inner(ev);
+            ///             bob.len()
+            ///         }
+            ///     }
+            /// }
+            /// // We don't actually need all these variables and type annotations
+            /// fn len2<P: Party>(x: &PartyEither<P, String, Vec<u64>>) -> usize {
+            ///     match P::WHICH {
+            ///         WhichParty::Alice(ev) => x.as_ref().into_inner(ev).len(),
+            ///         WhichParty::Bob(ev) => x.as_ref().into_inner(ev).len(),
+            ///     }
+            /// }
+            /// // And, if we use .map(), we don't even need a match statement
+            /// fn len3<P: Party>(x: &PartyEither<P, String, Vec<u64>>) -> usize {
+            ///     x.as_ref().map(|a| a.len(), |b| b.len()).into_inner_same()
+            /// }
+            /// ```
+            #[inline(always)]
+            pub fn as_ref<'a>(&'a self) -> $PartyEither<P, &'a T0, &'a T1> {
+                $PartyEither(const { either_type_substitution::<
+                    generics::Ref<'a>,
+                    $bound,
+                    $bound,
+                    P,
+                    T0,
+                    T1,
+                >() }.cast(&self.0))
+            }
+            /// Convert from `&mut PartyEither<P, A, B>` into
+            /// `PartyEither<P, &mut A, &mut B>`
+            ///
+            /// This serves the same purpose as [`Option::as_mut`]
+            ///
+            /// Otherwise functions much like [`PartyEither::as_ref`]
+            #[inline(always)]
+            pub fn as_mut<'a>(&'a mut self) -> PartyEither<P, &'a mut T0, &'a mut T1> {
+                PartyEither(const { either_type_substitution::<
+                    generics::RefMut<'a>,
+                    $bound,
+                    bounds::Any,
+                    P,
+                    T0,
+                    T1,
+                >() }.cast(&mut self.0))
+            }
+            /// Combine `self` with another `PartyEither` by zipping them
+            ///
+            /// Compare to [`Option::zip`]
+            ///
+            /// # Example
+            /// ```
+            /// # use swanky_party::{*, either::*, ty_eq::Witness};
+            /// party_system! {
+            ///     mod ps {
+            ///         Alice,
+            ///         Bob,
+            ///     }
+            /// }
+            /// use ps::*;
+            /// fn combine<P: Party>(
+            ///     a: PartyEither<P, String, u16>,
+            ///     b: PartyEither<P, std::net::Ipv4Addr, u128>
+            /// ) -> PartyEither<P, (String, std::net::Ipv4Addr), (u16, u128)> {
+            ///     a.zip(b)
+            /// }
+            /// assert_eq!(
+            ///     combine::<Alice>(
+            ///         PartyEither::new(Witness::EQUAL_TYPES, "Alice".to_string()),
+            ///         PartyEither::new(Witness::EQUAL_TYPES, std::net::Ipv4Addr::LOCALHOST),
+            ///     ).into_inner(Witness::EQUAL_TYPES),
+            ///     ("Alice".to_string(), std::net::Ipv4Addr::LOCALHOST),
+            /// );
+            /// assert_eq!(
+            ///     combine::<Bob>(
+            ///         PartyEither::new(Witness::EQUAL_TYPES, 1),
+            ///         PartyEither::new(Witness::EQUAL_TYPES, 2),
+            ///     ).into_inner(Witness::EQUAL_TYPES),
+            ///     (1, 2),
+            /// );
+            /// ```
+            #[inline(always)]
+            pub fn zip<
+                T0x$(: $Copy)?,
+                T1x$(: $Copy)?,
+            >(self, x: $PartyEither<P, T0x, T1x>) -> $PartyEither<P, (T0, T0x), (T1, T1x)> {
+                match P::GENERIC_WHICH {
+                    GenericWhichParty::Party0(ev) =>
+                        $PartyEither::new(ev, (self.into_inner(ev), x.into_inner(ev))),
+                    GenericWhichParty::Party1(ev) =>
+                        $PartyEither::new(ev, (self.into_inner(ev), x.into_inner(ev))),
+                }
+            }
+
+            /// Combine `self` with another `PartyEither` by zipping them with `map0`/`map1`
+            ///
+            /// Compare to [`Option::zip_with`]
+            ///
+            /// # Example
+            /// ```
+            /// # use swanky_party::{*, either::*, ty_eq::Witness};
+            /// party_system! {
+            ///     mod ps {
+            ///         Alice,
+            ///         Bob,
+            ///     }
+            /// }
+            /// use ps::*;
+            /// fn combine<P: Party>(
+            ///     a: PartyEither<P, String, u16>,
+            ///     b: PartyEither<P, std::net::Ipv4Addr, u128>
+            /// ) -> PartyEither<P, String, u128> {
+            ///     // Let's combine these eithers in an arbitrary way!
+            ///     a.zip_with(
+            ///         b,
+            ///         |a, b| format!("{a} with addr {b}"),
+            ///         |a, b| u128::from(a) + b,
+            ///     )
+            /// }
+            /// assert_eq!(
+            ///     combine::<Alice>(
+            ///         PartyEither::new(Witness::EQUAL_TYPES, "Alice".to_string()),
+            ///         PartyEither::new(Witness::EQUAL_TYPES, std::net::Ipv4Addr::LOCALHOST),
+            ///     ).into_inner(Witness::EQUAL_TYPES),
+            ///     "Alice with addr 127.0.0.1".to_string(),
+            /// );
+            /// assert_eq!(
+            ///     combine::<Bob>(
+            ///         PartyEither::new(Witness::EQUAL_TYPES, 1),
+            ///         PartyEither::new(Witness::EQUAL_TYPES, 2),
+            ///     ).into_inner(Witness::EQUAL_TYPES),
+            ///     3,
+            /// );
+            /// ```
+            #[inline(always)]
+            pub fn zip_with<
+                T0x$(: $Copy)?,
+                T1x$(: $Copy)?,
+                U0$(: $Copy)?,
+                U1$(: $Copy)?,
+            >(
+                self,
+                x: $PartyEither<P, T0x, T1x>,
+                map0: impl FnOnce(T0, T0x) -> U0,
+                map1: impl FnOnce(T1, T1x) -> U1,
+            ) -> $PartyEither<P, U0, U1> {
+                match P::GENERIC_WHICH {
+                    GenericWhichParty::Party0(ev) =>
+                        $PartyEither::new(ev, map0(self.into_inner(ev), x.into_inner(ev))),
+                    GenericWhichParty::Party1(ev) =>
+                        $PartyEither::new(ev, map1(self.into_inner(ev), x.into_inner(ev))),
                 }
             }
         }
-        unsafe impl<Pa: Party, P: Send $(+ $Copy)?, V: Send $(+ $Copy)?> Send for $PartyEither<Pa, P, V> {}
-        unsafe impl<Pa: Party, P: Sync $(+ $Copy)?, V: Sync $(+ $Copy)?> Sync for $PartyEither<Pa, P, V> {}
-        impl<Pa: Party, P: Default $(+ $Copy)?, V: Default $(+ $Copy)?> Default for $PartyEither<Pa, P, V> {
+
+        impl<'a, P: GenericParty, T0 $(: $Copy)?, T1 $(: $Copy)?> $PartyEither<P, &'a [T0], &'a [T1]> {
+            /// Convert a slice of `PartyEither` to a `PartyEither` of
+            /// slices.
+            pub fn pull_either_outside(slice: &'a [$PartyEither<P, T0, T1>]) -> Self {
+                match P::GENERIC_WHICH {
+                    GenericWhichParty::Party0(e) => {
+                        Self::new(e, unsafe {
+                            std::slice::from_raw_parts(
+                                slice.as_ptr() as *const T0,
+                                slice.len()
+                            )
+                        })
+                    }
+                    GenericWhichParty::Party1(e) => {
+                        Self::new(e, unsafe {
+                            std::slice::from_raw_parts(
+                                slice.as_ptr() as *const T1,
+                                slice.len()
+                            )
+                        })
+                    }
+                }
+            }
+        }
+
+        impl<P: GenericParty, T0: Default$(+ $Copy)?, T1: Default$(+ $Copy)?>
+            Default for $PartyEither<P, T0, T1>
+        {
+            #[inline(always)]
             fn default() -> Self {
-                match Pa::WHICH {
-                    WhichParty::Prover(e) => $PartyEither::prover_new(e, P::default()),
-                    WhichParty::Verifier(e) => $PartyEither::verifier_new(e, V::default()),
+                match P::GENERIC_WHICH {
+                    GenericWhichParty::Party0(ev) => Self::new(ev, T0::default()),
+                    GenericWhichParty::Party1(ev) => Self::new(ev, T1::default()),
                 }
             }
         }
-        unsafe impl<P $(: $Copy)?, V $(: $Copy)?> bytemuck::TransparentWrapper<P> for $PartyEither<Prover, P, V> {}
-        unsafe impl<P $(: $Copy)?, V $(: $Copy)?> bytemuck::TransparentWrapper<V> for $PartyEither<Verifier, P, V> {}
-        // TODO: I think we can do this without unsafe?
-        /*impl<'a, Pa: Party, P $(: $Copy)?, V $(: $Copy)?> From<&'a [$PartyEither<Pa, P, V>]> for $PartyEither<Pa, &'a [P], &'a [V]> {
-            fn from(slice: &'a [$PartyEither<Pa, P, V>]) -> Self {
-                match Pa::WHICH {
-                    WhichParty::Prover(e) => {
-                        Self::prover_new(e, unsafe {
-                            std::slice::from_raw_parts(
-                                slice.as_ptr() as *const P,
-                                slice.len()
-                            )
-                        })
-                    }
-                    WhichParty::Verifier(e) => {
-                        Self::verifier_new(e, unsafe {
-                            std::slice::from_raw_parts(
-                                slice.as_ptr() as *const V,
-                                slice.len()
-                            )
-                        })
-                    }
-                }
-            }
-        }*/
-        impl<'a, Pa: Party, P $(: $Copy)?, V $(: $Copy)?> $PartyEither<Pa, &'a [P], &'a [V]> {
-            /// Convert a slice of `PartyEither` to a `PartyEither` of slices.
-            pub fn pull_either_outside(slice: &'a [$PartyEither<Pa, P, V>]) -> Self {
-                match Pa::WHICH {
-                    WhichParty::Prover(e) => {
-                        Self::prover_new(e, unsafe {
-                            std::slice::from_raw_parts(
-                                slice.as_ptr() as *const P,
-                                slice.len()
-                            )
-                        })
-                    }
-                    WhichParty::Verifier(e) => {
-                        Self::verifier_new(e, unsafe {
-                            std::slice::from_raw_parts(
-                                slice.as_ptr() as *const V,
-                                slice.len()
-                            )
-                        })
-                    }
-                }
-            }
-
-            /// Convert a `PartyEither` of slices to a slice of `PartyEither`.
-            pub fn push_either_inside(self) -> &'a [$PartyEither<Pa, P, V>] {
-                match Pa::WHICH {
-                    WhichParty::Prover(e) => {
-                        let slice = self.prover_into(e);
-                        unsafe {
-                            std::slice::from_raw_parts(
-                                slice.as_ptr() as *const $PartyEither<Pa, P, V>,
-                                slice.len()
-                            )
-                        }
-                    }
-                    WhichParty::Verifier(e) => {
-                        let slice = self.verifier_into(e);
-                        unsafe {
-                            std::slice::from_raw_parts(
-                                slice.as_ptr() as *const $PartyEither<Pa, P, V>,
-                                slice.len()
-                            )
-                        }
-                    }
+        impl<P: GenericParty, T0: Debug$(+ $Copy)?, T1: Debug$(+ $Copy)?>
+            Debug for $PartyEither<P, T0, T1>
+        {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match P::GENERIC_WHICH {
+                    GenericWhichParty::Party0(ev) =>
+                        f.debug_tuple(std::any::type_name::<P>())
+                            .field(self.as_ref().into_inner(ev))
+                            .finish(),
+                    GenericWhichParty::Party1(ev) =>
+                        f.debug_tuple(std::any::type_name::<P>())
+                            .field(self.as_ref().into_inner(ev))
+                            .finish(),
                 }
             }
         }
-    };
-}
-
-define_prover_either!(PartyEither => EitherStorage);
-define_prover_either!(PartyEitherCopy: Copy => EitherStorageCopy);
-impl<Pa: Party, P: Copy, V: Copy> Copy for PartyEitherCopy<Pa, P, V> {}
-
-unsafe impl PartyEitherInternal for Prover {
-    type EitherStorage<P, V> = EitherStorage<Self, P>;
-    type EitherStorageCopy<P: Copy, V: Copy> = EitherStorage<Self, P>;
-}
-unsafe impl PartyEitherInternal for Verifier {
-    type EitherStorage<P, V> = EitherStorage<Self, V>;
-    type EitherStorageCopy<P: Copy, V: Copy> = EitherStorage<Self, V>;
-}
-
-// TODO: fix these impls
-impl<Pa: Party, P: Copy, V: Copy> PartyEither<Pa, P, V> {
-    /// Convert a `PartyEither` over `Copy` values to a `PartyEitherCopy`.
-    pub fn into_copy(self) -> PartyEitherCopy<Pa, P, V> {
-        match Pa::WHICH {
-            WhichParty::Prover(e) => PartyEitherCopy::prover_new(e, self.prover_into(e)),
-            WhichParty::Verifier(e) => PartyEitherCopy::verifier_new(e, self.verifier_into(e)),
-        }
-    }
-}
-impl<Pa: Party, P: Copy, V: Copy> From<PartyEither<Pa, P, V>> for PartyEitherCopy<Pa, P, V> {
-    fn from(x: PartyEither<Pa, P, V>) -> Self {
-        match Pa::WHICH {
-            WhichParty::Prover(e) => PartyEitherCopy::prover_new(e, x.prover_into(e)),
-            WhichParty::Verifier(e) => PartyEitherCopy::verifier_new(e, x.verifier_into(e)),
-        }
-    }
-}
-impl<Pa: Party, P: Copy, V: Copy> From<PartyEitherCopy<Pa, P, V>> for PartyEither<Pa, P, V> {
-    fn from(x: PartyEitherCopy<Pa, P, V>) -> Self {
-        match Pa::WHICH {
-            WhichParty::Prover(e) => PartyEither::prover_new(e, x.prover_into(e)),
-            WhichParty::Verifier(e) => PartyEither::verifier_new(e, x.verifier_into(e)),
-        }
-    }
-}
-
-impl<Pa: Party, P, V> PartyEither<Pa, P, V> {
-    /// Transform the [`PartyEither`] into a pair of [`ProverPrivate`]
-    /// and [`VerifierPrivate`].
-    pub fn into_privates(self) -> (ProverPrivate<Pa, P>, VerifierPrivate<Pa, V>) {
-        match Pa::WHICH {
-            WhichParty::Prover(ev_pr) => (
-                ProverPrivate::new(self.prover_into(ev_pr)),
-                VerifierPrivate::empty(ev_pr),
-            ),
-            WhichParty::Verifier(ev_vr) => (
-                ProverPrivate::empty(ev_vr),
-                VerifierPrivate::new(self.verifier_into(ev_vr)),
-            ),
-        }
-    }
-}
-
-impl<Pa: Party, P: Copy, V: Copy> PartyEitherCopy<Pa, P, V> {
-    /// Transform the [`PartyEitherCopy`] into a pair of [`ProverPrivateCopy`]
-    /// and [`VerifierPrivateCopy`].
-    pub fn into_privates(self) -> (ProverPrivateCopy<Pa, P>, VerifierPrivateCopy<Pa, V>) {
-        match Pa::WHICH {
-            WhichParty::Prover(ev_pr) => (
-                ProverPrivateCopy::new(self.prover_into(ev_pr)),
-                VerifierPrivateCopy::empty(ev_pr),
-            ),
-            WhichParty::Verifier(ev_vr) => (
-                ProverPrivateCopy::empty(ev_vr),
-                VerifierPrivateCopy::new(self.verifier_into(ev_vr)),
-            ),
-        }
-    }
-}
-
-unsafe impl<Pa: Party, P: Copy + Zeroable, V: Copy + Zeroable> Zeroable
-    for PartyEitherCopy<Pa, P, V>
-{
-}
-unsafe impl<Pa: Party, P: Copy + Pod, V: Copy + Pod> Pod for PartyEitherCopy<Pa, P, V> {}
-
-impl<'a, Pa: Party, P, V> PartyEither<Pa, &'a mut [P], &'a mut [V]> {
-    /// Convert a mutable slice of `PartyEither` to a `PartyEither` of mutable
-    /// slices.
-    pub fn pull_either_outside(slice: &'a mut [PartyEither<Pa, P, V>]) -> Self {
-        match Pa::WHICH {
-            WhichParty::Prover(e) => Self::prover_new(e, unsafe {
-                std::slice::from_raw_parts_mut(slice.as_ptr() as *mut P, slice.len())
-            }),
-            WhichParty::Verifier(e) => Self::verifier_new(e, unsafe {
-                std::slice::from_raw_parts_mut(slice.as_ptr() as *mut V, slice.len())
-            }),
-        }
-    }
-
-    // TODO: there ought to be a better way of doing this.
-    /// Convert a mutable slice of `PartyEitherCopy` to a `PartyEither` of
-    /// mutable slices.
-    pub fn pull_either_outside_copy(slice: &'a mut [PartyEitherCopy<Pa, P, V>]) -> Self
-    where
-        P: Copy,
-        V: Copy,
-    {
-        match Pa::WHICH {
-            WhichParty::Prover(e) => Self::prover_new(e, unsafe {
-                std::slice::from_raw_parts_mut(slice.as_ptr() as *mut P, slice.len())
-            }),
-            WhichParty::Verifier(e) => Self::verifier_new(e, unsafe {
-                std::slice::from_raw_parts_mut(slice.as_ptr() as *mut V, slice.len())
-            }),
-        }
-    }
-    /*pub fn push_either_inside(self) -> &'a mut [$PartyEither<Pa, P, V>] {
-        match Pa::WHICH {
-            WhichParty::Prover(e) => {
-                let slice = self.prover_into(e);
-                unsafe {
-                    std::slice::from_raw_parts(
-                        slice.as_ptr() as *const $PartyEither<Pa, P, V>,
-                        slice.len()
-                    )
-                }
-            }
-            WhichParty::Verifier(e) => {
-                let slice = self.verifier_into(e);
-                unsafe {
-                    std::slice::from_raw_parts(
-                        slice.as_ptr() as *const $PartyEither<Pa, P, V>,
-                        slice.len()
-                    )
+        impl<P: GenericParty, T$(: $Copy)?> $PartyEither<P, T, T> {
+            /// If both sides of the either have the same type, we can convert the either to that
+            /// type.
+            ///
+            /// # Example
+            /// ```
+            /// # use swanky_party::{*, either::*, ty_eq::Witness};
+            /// party_system! {
+            ///     mod ps {
+            ///         Alice,
+            ///         Bob,
+            ///     }
+            /// }
+            /// use ps::*;
+            /// let alice_variant: PartyEither<Alice, String, String> =
+            ///     PartyEither::new::<Alice>(Witness::EQUAL_TYPES, "Hello!".to_string());
+            /// let either: String = alice_variant.into_inner_same();
+            /// assert_eq!(either, "Hello!".to_string());
+            /// ```
+            #[inline(always)]
+            pub fn into_inner_same(self) -> T {
+                match P::GENERIC_WHICH {
+                    GenericWhichParty::Party0(ev) => self.into_inner(ev),
+                    GenericWhichParty::Party1(ev) => self.into_inner(ev),
                 }
             }
         }
-    }*/
+        impl<P: GenericParty, T0: PartialEq$(+ $Copy)?, T1: PartialEq$(+ $Copy)?>
+            PartialEq for $PartyEither<P, T0, T1>
+        {
+            #[inline(always)]
+            fn eq(&self, other: &Self) -> bool {
+                self.as_ref()
+                    .zip(other.as_ref())
+                    .map(|(a, b)| a.eq(b), |(a, b)| a.eq(b))
+                    .into_inner_same()
+            }
+        }
+        impl<P: GenericParty, T0: Eq$(+ $Copy)?, T1: Eq$(+ $Copy)?>
+            Eq for $PartyEither<P, T0, T1>
+        {}
+        unsafe impl<P: GenericParty, T0: Send$(+ $Copy)?, T1: Send$(+ $Copy)?>
+            Send for $PartyEither<P, T0, T1>
+        {}
+        unsafe impl<P: GenericParty, T0: Sync$(+ $Copy)?, T1: Sync$(+ $Copy)?>
+            Sync for $PartyEither<P, T0, T1>
+        {}
+        impl<'a, P: GenericParty, T0$(: $Copy)?, T1$(: $Copy)?>
+            From<&'a $PartyEither<P, T0, T1>> for $PartyEither<P, &'a T0, &'a T1>
+        {
+            #[inline(always)]
+            fn from(x: &'a $PartyEither<P, T0, T1>) -> Self {
+                x.as_ref()
+            }
+        }
+        impl<'a, P: GenericParty, T0$(: $Copy)?, T1$(: $Copy)?>
+            From<&'a mut $PartyEither<P, T0, T1>> for PartyEither<P, &'a mut T0, &'a mut T1>
+        {
+            #[inline(always)]
+            fn from(x: &'a mut $PartyEither<P, T0, T1>) -> Self {
+                x.as_mut()
+            }
+        }
+        impl<'a, P: GenericParty, T0$(: $Copy)?, T1$(: $Copy)?>
+            From<$PartyEither<P, &'a T0, &'a T1>> for &'a $PartyEither<P, T0, T1>
+        {
+            #[inline(always)]
+            fn from(x: $PartyEither<P, &'a T0, &'a T1>) -> Self {
+                TransparentWrapper::wrap_ref(const { either_type_substitution::<
+                    generics::Ref<'a>,
+                    $bound,
+                    $bound,
+                    P,
+                    T0,
+                    T1,
+                >().sym() }.cast(x.0))
+            }
+        }
+        impl<'a, P: GenericParty, T0$(: $Copy)?, T1$(: $Copy)?>
+            From<PartyEither<P, &'a mut T0, &'a mut T1>> for &'a mut $PartyEither<P, T0, T1>
+        {
+            #[inline(always)]
+            fn from(x: PartyEither<P, &'a mut T0, &'a mut T1>) -> Self {
+                TransparentWrapper::wrap_mut(const { either_type_substitution::<
+                    generics::RefMut<'a>,
+                    $bound,
+                    bounds::Any,
+                    P,
+                    T0,
+                    T1,
+                >().sym() }.cast(x.0))
+            }
+        }
+    )*};
 }
 
-impl<Pa: Party, P: Write, V: Write> Write for PartyEither<Pa, P, V> {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        match Pa::WHICH {
-            WhichParty::Prover(e) => self.as_mut().prover_into(e).write(buf),
-            WhichParty::Verifier(e) => self.as_mut().verifier_into(e).write(buf),
-        }
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        match Pa::WHICH {
-            WhichParty::Prover(e) => self.as_mut().prover_into(e).flush(),
-            WhichParty::Verifier(e) => self.as_mut().verifier_into(e).flush(),
-        }
+impl<P: GenericParty, T0: Copy, T1: Copy> Clone for PartyEitherCopy<P, T0, T1> {
+    #[inline(always)]
+    fn clone(&self) -> Self {
+        *self
     }
 }
+impl<P: GenericParty, T0: Copy, T1: Copy> Copy for PartyEitherCopy<P, T0, T1> {}
 
-impl<Pa: Party, P: Read, V: Read> Read for PartyEither<Pa, P, V> {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        match Pa::WHICH {
-            WhichParty::Prover(e) => self.as_mut().prover_into(e).read(buf),
-            WhichParty::Verifier(e) => self.as_mut().verifier_into(e).read(buf),
-        }
-    }
-}
-
-impl<Pa: Party, P: Clone, V: Clone> Clone for PartyEither<Pa, P, V> {
+impl<P: GenericParty, T0: Clone, T1: Clone> Clone for PartyEither<P, T0, T1> {
+    #[inline(always)]
     fn clone(&self) -> Self {
         self.as_ref().map(Clone::clone, Clone::clone)
     }
 }
 
-impl<Pa: Party, P: Copy, V: Copy> Clone for PartyEitherCopy<Pa, P, V> {
-    fn clone(&self) -> Self {
-        *self
+either! {
+    type PartyEither => bounds::Any;
+    /// # Copy
+    /// [`PartyEitherCopy`] is identical to [`PartyEither`] except that it implements [`Copy`] (and
+    /// correspondingly requires `T0` and `T1` to implement `Copy`, too).
+    ///
+    /// To convert between [`PartyEitherCopy`] and [`PartyEither`], you can use [`From::from`].
+    ///
+    /// ```
+    /// # use swanky_party::{*, either::*};
+    /// party_system! {
+    ///     mod ps {
+    ///         Alice,
+    ///         Bob,
+    ///     }
+    /// }
+    /// use ps::*;
+    /// fn convert<P: Party>(e: PartyEither<P, i32, bool>) -> PartyEitherCopy<P, i32, bool> {
+    ///     e.into()
+    /// }
+    /// ```
+    type PartyEitherCopy: Copy => bounds::Copy;
+}
+
+impl<P: GenericParty, W0: Write, W1: Write> Write for PartyEither<P, W0, W1> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(e) => self.as_mut().into_inner(e).write(buf),
+            GenericWhichParty::Party1(e) => self.as_mut().into_inner(e).write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(e) => self.as_mut().into_inner(e).flush(),
+            GenericWhichParty::Party1(e) => self.as_mut().into_inner(e).flush(),
+        }
     }
 }
+
+impl<P: GenericParty, R0: Read, R1: Read> Read for PartyEither<P, R0, R1> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(e) => self.as_mut().into_inner(e).read(buf),
+            GenericWhichParty::Party1(e) => self.as_mut().into_inner(e).read(buf),
+        }
+    }
+}
+
+mod copy_conversions;
+mod impls;

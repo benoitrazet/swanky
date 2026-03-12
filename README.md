@@ -56,6 +56,7 @@ have a lesser stability guarantee.
 - **`swanky-field-fft`**: FFT implementations for finite fields
 - **`swanky-field-test`**: Utilitites for testing correctness of finite field implementations
 - **`swanky-flatbuffer-build`**: Tooling to automate compiling flatbuffer schemas
+- **`swanky-garbled-nn`**: Garbled neural networks using `fancy-garbling`
 - **`swanky-malicious-hooks`**: Hooks for testing malicious behavior in various cryptographic protocols.
 - **`swanky-ocelot-error`**: [DEPRECATED] An error type used by crates formerly contained in ocelot
 - **`swanky-oprf-kkrt`**: An implementation of the kkrt OPRF protocol
@@ -68,7 +69,6 @@ have a lesser stability guarantee.
 - **`swanky-ot-test`**: Testing utilities for oblivious transfer protocols
 - **`swanky-ot-traits`**: Base traits for Obliivious Transfer protocols
 - **`swanky-party`**: Support for types indexed by a party.
-- **`swanky-party2`**: Support for types indexed by a party (version 2)
 - **`swanky-polynomial`**: Support for various representations of polynomials over finite fields
 - **`swanky-serialization`**: Traits and utilities for compact serialization into a canonical byte representation
 - **`swanky-sieve-ir-api`**: A library providing a Rust API for defining zero-knowledge circuits.

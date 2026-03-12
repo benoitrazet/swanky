@@ -13,6 +13,7 @@ workspace = true
 [dependencies]
 mac-n-cheese-ir.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
+mac-n-cheese-vole.workspace = true
 vectoreyes.workspace = true
 rand.workspace = true
 rustc-hash.workspace = true

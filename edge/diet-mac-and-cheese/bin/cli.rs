@@ -68,14 +68,15 @@ impl Config {
     pub fn from_toml_file(toml_file: &PathBuf) -> Result<Self> {
         let mut res = Config::default();
 
-        let toml_contents: Config = toml::from_str(&std::fs::read_to_string(toml_file).wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to read DMC config TOML to string.".to_string(),
-        )?)
-        .wrap_err(
-            ErrorKind::SerializationError,
-            "Failed to parse DMC config from TOML.".to_string(),
-        )?;
+        let toml_contents: Config = toml::from_str(
+            &std::fs::read_to_string(toml_file)
+                .wrap_err_with(ErrorKind::FilesystemError, || {
+                    "Failed to read DMC config TOML to string.".to_string()
+                })?,
+        )
+        .wrap_err_with(ErrorKind::SerializationError, || {
+            "Failed to parse DMC config from TOML.".to_string()
+        })?;
 
         if let Some(lpn) = toml_contents.lpn {
             res.lpn = Some(lpn)

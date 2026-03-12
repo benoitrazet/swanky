@@ -10,6 +10,7 @@ use mac_n_cheese_ir::compilation_format::{
 };
 use mac_n_cheese_vole::{
     mac::{Mac, MacTypes},
+    party::{Party, Prover, WhichParty},
     specialization::SmallBinaryFieldSpecialization,
 };
 use rustc_hash::FxHashMap;
@@ -19,9 +20,8 @@ use swanky_error::{ErrorKind, OptionExt, WrapErr};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, SmallBinaryField};
 use swanky_party::{
-    Party, WhichParty,
     either::PartyEither,
-    private::{ProverPrivate, ProverPrivateCopy},
+    private::{PartyPrivate, PartyPrivateCopy},
 };
 use swanky_serialization::{CanonicalSerialize, SequenceDeserializer, SequenceSerializer};
 use vectoreyes::{
@@ -100,7 +100,7 @@ pub type TaskDependencies<P> = FxHashMap<TaskId, Arc<TaskOutput<P>>>;
 pub struct TaskInput<P: Party> {
     pub challenge: Option<Challenge>,
     pub task_data: Option<BytesFromDisk>,
-    pub prover_private_data: ProverPrivate<P, Option<BytesFromDisk>>,
+    pub prover_private_data: PartyPrivate<Prover, P, Option<BytesFromDisk>>,
     // don't read this directly
     pub task_dependencies: TaskDependencies<P>,
 }
@@ -371,10 +371,14 @@ impl<P: Party> TaskInput<P> {
             ErrorKind::OtherError,
             "too many inputs"
         );
-        let num_lengths = U32x4::broadcast(input_sizes.len().try_into().wrap_err(
-            ErrorKind::OtherError,
-            "Failed to convert input_sizes to i32.".to_string(),
-        )?);
+        let num_lengths = U32x4::broadcast(
+            input_sizes
+                .len()
+                .try_into()
+                .wrap_err_with(ErrorKind::OtherError, || {
+                    "Failed to convert input_sizes to i32.".to_string()
+                })?,
+        );
         const ONES: U32x4 = U32x4::from_array([u32::MAX; 4]);
         for chunk in chunks {
             if !VERIFIED {
@@ -510,50 +514,50 @@ impl<'a, P: Party, FE: FiniteField> ProverPrivateFieldElementCommunicator<'a, P,
             content: match P::WHICH {
                 WhichParty::Prover(e) => {
                     let mut cursor = Cursor::new(outgoing);
-                    let s = FE::Serializer::new(&mut cursor).wrap_err(
-                        ErrorKind::InitializationError,
-                        "Failed to initialize field element serializer.".to_string(),
-                    )?;
-                    PartyEither::prover_new(e, (cursor, s))
+                    let s = FE::Serializer::new(&mut cursor)
+                        .wrap_err_with(ErrorKind::InitializationError, || {
+                            "Failed to initialize field element serializer.".to_string()
+                        })?;
+                    PartyEither::new(e, (cursor, s))
                 }
                 WhichParty::Verifier(e) => {
                     let mut cursor = Cursor::new(incoming);
-                    let d = FE::Deserializer::new(&mut cursor).wrap_err(
-                        ErrorKind::InitializationError,
-                        "Failed to initialize field element deserializer.".to_string(),
-                    )?;
-                    PartyEither::verifier_new(e, (cursor, d))
+                    let d = FE::Deserializer::new(&mut cursor)
+                        .wrap_err_with(ErrorKind::InitializationError, || {
+                            "Failed to initialize field element deserializer.".to_string()
+                        })?;
+                    PartyEither::new(e, (cursor, d))
                 }
             },
         })
     }
-    pub fn communicate(&mut self, x: ProverPrivateCopy<P, FE>) -> swanky_error::Result<FE> {
+    pub fn communicate(&mut self, x: PartyPrivateCopy<Prover, P, FE>) -> swanky_error::Result<FE> {
         Ok(match P::WHICH {
             WhichParty::Prover(e) => {
                 let x = x.into_inner(e);
-                let (cursor, s) = self.content.as_mut().prover_into(e);
-                s.write(cursor, x).wrap_err(
-                    ErrorKind::SerializationError,
-                    "Failed to serialize field element.".to_string(),
-                )?;
+                let (cursor, s) = self.content.as_mut().into_inner(e);
+                s.write(cursor, x)
+                    .wrap_err_with(ErrorKind::SerializationError, || {
+                        "Failed to serialize field element.".to_string()
+                    })?;
                 x
             }
             WhichParty::Verifier(e) => {
-                let (cursor, d) = self.content.as_mut().verifier_into(e);
-                d.read(cursor).wrap_err(
-                    ErrorKind::SerializationError,
-                    "Failed to deserialize field element.".to_string(),
-                )?
+                let (cursor, d) = self.content.as_mut().into_inner(e);
+                d.read(cursor)
+                    .wrap_err_with(ErrorKind::SerializationError, || {
+                        "Failed to deserialize field element.".to_string()
+                    })?
             }
         })
     }
     pub fn finish(self) -> swanky_error::Result<()> {
         if let WhichParty::Prover(e) = P::WHICH {
-            let (mut cursor, s) = self.content.prover_into(e);
-            s.finish(&mut cursor).wrap_err(
-                ErrorKind::SerializationError,
-                "Failed to finish serialization of field element.".to_string(),
-            )?;
+            let (mut cursor, s) = self.content.into_inner(e);
+            s.finish(&mut cursor)
+                .wrap_err_with(ErrorKind::SerializationError, || {
+                    "Failed to finish serialization of field element.".to_string()
+                })?;
         }
         Ok(())
     }

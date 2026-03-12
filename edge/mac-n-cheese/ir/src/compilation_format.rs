@@ -103,7 +103,7 @@ macro_rules! numerical_enum {
                         return Ok($name::$variant $(({
                             let data_bits = x & ((1 << Self::DATA_BITS) - 1);
                             let data = <$data>::try_from(data_bits)
-                                .wrap_err(ErrorKind::OtherError, format!(
+                                .wrap_err_with(ErrorKind::OtherError, || format!(
                                     "Parsing {} data for {}::{}",
                                     std::any::type_name::<$data>(),
                                     std::any::type_name::<$name>(),
@@ -428,7 +428,7 @@ impl fb::TaskPrototype<'_> {
     pub fn kind(&self) -> swanky_error::Result<TaskKind> {
         self.kind_encoding()
             .try_into()
-            .wrap_err(ErrorKind::OtherError, "Invalid task kind".to_string())
+            .wrap_err_with(ErrorKind::OtherError, || "Invalid task kind".to_string())
     }
 }
 
@@ -441,15 +441,15 @@ pub struct Manifest {
 }
 impl Manifest {
     pub fn read(mut f: File) -> swanky_error::Result<Self> {
-        f.seek(std::io::SeekFrom::End(-8 * 4)).wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to seek 32 bytes from end of file.".to_string(),
-        )?;
+        f.seek(std::io::SeekFrom::End(-8 * 4))
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to seek 32 bytes from end of file.".to_string()
+            })?;
         let mut footer = [0_u64; 4];
-        f.read_exact(bytemuck::bytes_of_mut(&mut footer)).wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to read footer bytes.".to_string(),
-        )?;
+        f.read_exact(bytemuck::bytes_of_mut(&mut footer))
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to read footer bytes.".to_string()
+            })?;
         let [
             manifest_start,
             manifest_decompressed_len,
@@ -461,36 +461,40 @@ impl Manifest {
             ErrorKind::OtherError,
             "Manifest has version {version}, not {MAC_N_CHEESE_VERSION}"
         );
-        let manifest_decompressed_len = usize::try_from(manifest_decompressed_len).wrap_err(
-            ErrorKind::OtherError,
-            "manifest size is too big for usize".to_string(),
-        )?;
-        f.seek(std::io::SeekFrom::Start(manifest_start)).wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to seek to manifest start.".to_string(),
-        )?;
-        let mut decompressor = lz4::Decoder::new(&mut f).wrap_err(
-            ErrorKind::InitializationError,
-            "Failed to initialize LZ4 decoder.".to_string(),
-        )?;
+        let manifest_decompressed_len = usize::try_from(manifest_decompressed_len)
+            .wrap_err_with(ErrorKind::OtherError, || {
+                "manifest size is too big for usize".to_string()
+            })?;
+        f.seek(std::io::SeekFrom::Start(manifest_start))
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to seek to manifest start.".to_string()
+            })?;
+        let mut decompressor = lz4::Decoder::new(&mut f)
+            .wrap_err_with(ErrorKind::InitializationError, || {
+                "Failed to initialize LZ4 decoder.".to_string()
+            })?;
         let mut buffer = vec![0; manifest_decompressed_len];
-        decompressor.read_exact(&mut buffer).wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to read decompressed manifest bytes.".to_string(),
-        )?;
-        let n = decompressor.read(&mut [0_u8]).wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to read byte from decompressor.".to_string(),
-        )?;
+        decompressor
+            .read_exact(&mut buffer)
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to read decompressed manifest bytes.".to_string()
+            })?;
+        let n = decompressor
+            .read(&mut [0_u8])
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to read byte from decompressor.".to_string()
+            })?;
         swanky_error::ensure!(n == 0, ErrorKind::OtherError, "Should have hit LZ4 EOF");
-        decompressor.finish().1.wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to finalize decompression.".to_string(),
-        )?;
-        let _validated_root = fb::root_as_manifest(&buffer).wrap_err(
-            ErrorKind::SerializationError,
-            "Failed to parse manifest root from flatbuffers.".to_string(),
-        )?;
+        decompressor
+            .finish()
+            .1
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to finalize decompression.".to_string()
+            })?;
+        let _validated_root = fb::root_as_manifest(&buffer)
+            .wrap_err_with(ErrorKind::SerializationError, || {
+                "Failed to parse manifest root from flatbuffers.".to_string()
+            })?;
         Ok(Self {
             hash: manifest_hash,
             buffer,
@@ -544,14 +548,13 @@ fn read_data_chunk(
         pos: start,
         end: start + u64::from(compressed_len),
     })
-    .wrap_err(
-        ErrorKind::InitializationError,
-        "Failed to initialize LZ4 decoder.".to_string(),
-    )?;
-    d.read_exact(dst).wrap_err(
-        ErrorKind::FilesystemError,
-        "Failed to read LZ4 bytes.".to_string(),
-    )?;
+    .wrap_err_with(ErrorKind::InitializationError, || {
+        "Failed to initialize LZ4 decoder.".to_string()
+    })?;
+    d.read_exact(dst)
+        .wrap_err_with(ErrorKind::FilesystemError, || {
+            "Failed to read LZ4 bytes.".to_string()
+        })?;
     Ok(())
 }
 
@@ -566,7 +569,9 @@ fn test_read_data_chunk() {
         buf_f.write_all(&vec![7; 745]).unwrap();
         let chunk = super::circuit_builder::write_data_chunk(&mut buf_f, |mut dcw| {
             dcw.write_all(&vec![15; size])
-                .wrap_err(ErrorKind::OtherError, "Failed to write bytes.".to_string())?;
+                .wrap_err_with(ErrorKind::OtherError, || {
+                    "Failed to write bytes.".to_string()
+                })?;
             Ok(())
         })
         .unwrap();
@@ -595,30 +600,30 @@ pub struct PrivateDataAddress {
 pub type PrivatesManifest = FxHashMap<TaskId, PrivateDataAddress>;
 pub fn read_private_manifest(f: &mut File) -> swanky_error::Result<PrivatesManifest> {
     let mut pos = 0_u64;
-    f.seek(std::io::SeekFrom::End(-8)).wrap_err(
-        ErrorKind::FilesystemError,
-        "Failed to seek to 8 bytes from end of file.".to_string(),
-    )?;
-    f.read_exact(bytemuck::bytes_of_mut(&mut pos)).wrap_err(
-        ErrorKind::FilesystemError,
-        "Failed to read position bytes.".to_string(),
-    )?;
-    f.seek(std::io::SeekFrom::Start(pos)).wrap_err(
-        ErrorKind::FilesystemError,
-        "Failed to seek to {pos}.".to_string(),
-    )?;
+    f.seek(std::io::SeekFrom::End(-8))
+        .wrap_err_with(ErrorKind::FilesystemError, || {
+            "Failed to seek to 8 bytes from end of file.".to_string()
+        })?;
+    f.read_exact(bytemuck::bytes_of_mut(&mut pos))
+        .wrap_err_with(ErrorKind::FilesystemError, || {
+            "Failed to read position bytes.".to_string()
+        })?;
+    f.seek(std::io::SeekFrom::Start(pos))
+        .wrap_err_with(ErrorKind::FilesystemError, || {
+            "Failed to seek to {pos}.".to_string()
+        })?;
     let mut count = 0_u32;
-    f.read_exact(bytemuck::bytes_of_mut(&mut count)).wrap_err(
-        ErrorKind::FilesystemError,
-        "Failed to read count bytes.".to_string(),
-    )?;
+    f.read_exact(bytemuck::bytes_of_mut(&mut count))
+        .wrap_err_with(ErrorKind::FilesystemError, || {
+            "Failed to read count bytes.".to_string()
+        })?;
     let mut out = FxHashMap::with_capacity_and_hasher(count as usize, Default::default());
     let mut entry = PrivatesManifestEntry::zeroed();
     for _ in 0..count {
-        f.read_exact(bytemuck::bytes_of_mut(&mut entry)).wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to read manifest entry bytes.".to_string(),
-        )?;
+        f.read_exact(bytemuck::bytes_of_mut(&mut entry))
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to read manifest entry bytes.".to_string()
+            })?;
         let old = out.insert(
             entry.task_id,
             PrivateDataAddress {

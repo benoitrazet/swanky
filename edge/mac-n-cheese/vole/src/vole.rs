@@ -2,7 +2,6 @@ use arrayvec::ArrayVec;
 use bytemuck::TransparentWrapper;
 use generic_array::{GenericArray, typenum::Unsigned};
 use keyed_arena::{AllocationKey, KeyedArena};
-use party::{IS_PROVER, IS_VERIFIER, Party};
 use rand::prelude::Distribution;
 use rand::{CryptoRng, Rng, SeedableRng, distributions::Uniform};
 use std::{marker::PhantomData, ops::Deref};
@@ -15,7 +14,7 @@ use swanky_field::{Degree, DegreeModulo, FiniteField};
 use swanky_ot_alsz_kos::explicit_round::{
     KosReceiver, KosReceiverStage2, KosSender, KosSenderStage2,
 };
-use swanky_party as party;
+use swanky_party::ty_eq::Witness;
 use swanky_serialization::CanonicalSerialize;
 use swanky_svole_wykw::ggm_utils::*;
 
@@ -27,6 +26,7 @@ use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16, U64x2};
 
 use crate::{
     mac::{Mac, MacTypes},
+    party::{self, Party},
     specialization::FiniteFieldSpecialization,
 };
 
@@ -118,15 +118,15 @@ impl<T: MacTypes> VoleSender<T> {
         rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
         let lpn_seeds = Aes128EncryptOnly::new_with_key(
-            swanky_cointoss::send(channel, &[rng.r#gen::<Block>()]).wrap_err(
-                ErrorKind::NetworkError,
-                "Failed to send seeds to AES key scheduler.".to_string(),
-            )?[0],
+            swanky_cointoss::send(channel, &[rng.r#gen::<Block>()])
+                .wrap_err_with(ErrorKind::NetworkError, || {
+                    "Failed to send seeds to AES key scheduler.".to_string()
+                })?[0],
         );
-        let ot = KosReceiver::init(channel, rng).wrap_err(
-            ErrorKind::InitializationError,
-            "Failed to initialize KOS OT receiver.".to_string(),
-        )?;
+        let ot = KosReceiver::init(channel, rng)
+            .wrap_err_with(ErrorKind::InitializationError, || {
+                "Failed to initialize KOS OT receiver.".to_string()
+            })?;
         let ggm_seeds = make_ggm_seeds(&lpn_seeds);
         Ok(VoleSender {
             lpn_seeds,
@@ -160,7 +160,7 @@ impl<T: MacTypes> VoleSender<T> {
             .sps_base_voles()
             .iter()
             .copied()
-            .map(|mac| mac.prover_extract(IS_PROVER))
+            .map(|mac| mac.prover_extract(Witness::EQUAL_TYPES))
             .zip(alphas_and_betas.iter_mut())
             .zip(choices.chunks_exact_mut(T::LPN.log2m))
         {
@@ -187,10 +187,9 @@ impl<T: MacTypes> VoleSender<T> {
         let ot_stage2 = self
             .ot
             .receive(arena, selector, choices, rng, outgoing_bytes)
-            .wrap_err(
-                ErrorKind::OtherError,
-                "Failed to receive receiver stage two.".to_string(),
-            )?;
+            .wrap_err_with(ErrorKind::OtherError, || {
+                "Failed to receive receiver stage two.".to_string()
+            })?;
         let mut commitment_key = [0; 32];
         rng.fill_bytes(&mut commitment_key);
         Ok(VoleSenderStep3 {
@@ -243,10 +242,9 @@ impl<T: MacTypes> VoleSenderStep3<T> {
                 &incoming_bytes[0..ot_bytes],
                 &mut outgoing_bytes[0..KosReceiverStage2::OUTGOING_BYTES],
             )
-            .wrap_err(
-                ErrorKind::OtherError,
-                "Failed to perform receiver stage two.".to_string(),
-            )?;
+            .wrap_err_with(ErrorKind::OtherError, || {
+                "Failed to perform receiver stage two.".to_string()
+            })?;
         incoming_bytes = &incoming_bytes[ot_bytes..];
         outgoing_bytes = &mut outgoing_bytes[KosReceiverStage2::OUTGOING_BYTES..];
         let nbits = T::LPN.log2m;
@@ -261,7 +259,7 @@ impl<T: MacTypes> VoleSenderStep3<T> {
             .sps_base_voles()
             .iter()
             .copied()
-            .map(|mac| mac.prover_extract(IS_PROVER))
+            .map(|mac| mac.prover_extract(Witness::EQUAL_TYPES))
             .zip(alphas_and_betas.iter())
             .enumerate()
         {
@@ -278,10 +276,10 @@ impl<T: MacTypes> VoleSenderStep3<T> {
                 &incoming_bytes[0..<T::TF as CanonicalSerialize>::ByteReprLen::USIZE],
             );
             incoming_bytes = &incoming_bytes[d.len()..];
-            let d: T::TF = T::TF::from_bytes(&d).wrap_err(
-                ErrorKind::SerializationError,
-                "Failed to read field element.".to_string(),
-            )?;
+            let d: T::TF = T::TF::from_bytes(&d)
+                .wrap_err_with(ErrorKind::SerializationError, || {
+                    "Failed to read field element.".to_string()
+                })?;
             // TODO: is alpha supposed to be private? If so there's a cache timing attack here.
             result[i * m + alpha] = (*beta, w - (d + sum)).into();
         }
@@ -301,7 +299,7 @@ impl<T: MacTypes> VoleSenderStep3<T> {
                     .sps_base_consistency()
                     .iter()
                     .copied()
-                    .map(|mac| mac.prover_extract(IS_PROVER)),
+                    .map(|mac| mac.prover_extract(Witness::EQUAL_TYPES)),
             ),
         ) {
             let fe: T::VF = *x_star - u;
@@ -381,15 +379,15 @@ impl<T: MacTypes> VoleReceiver<T> {
         delta: T::TF,
     ) -> swanky_error::Result<Self> {
         let lpn_seeds = Aes128EncryptOnly::new_with_key(
-            swanky_cointoss::receive(channel, &[rng.r#gen::<Block>()]).wrap_err(
-                ErrorKind::OtherError,
-                "Failed to receive seeds for AES key scheduler.".to_string(),
-            )?[0],
+            swanky_cointoss::receive(channel, &[rng.r#gen::<Block>()])
+                .wrap_err_with(ErrorKind::OtherError, || {
+                    "Failed to receive seeds for AES key scheduler.".to_string()
+                })?[0],
         );
-        let ot = KosSender::init(channel, rng).wrap_err(
-            ErrorKind::InitializationError,
-            "Failed to initialize KOS OT sender.".to_string(),
-        )?;
+        let ot = KosSender::init(channel, rng)
+            .wrap_err_with(ErrorKind::InitializationError, || {
+                "Failed to initialize KOS OT sender.".to_string()
+            })?;
         let ggm_seeds = make_ggm_seeds(&lpn_seeds);
         Ok(VoleReceiver {
             lpn_seeds,
@@ -435,11 +433,11 @@ impl<T: MacTypes> VoleReceiver<T> {
                 &incoming_bytes[0..<T::VF as CanonicalSerialize>::ByteReprLen::USIZE],
             );
             incoming_bytes = &incoming_bytes[<T::VF as CanonicalSerialize>::ByteReprLen::USIZE..];
-            let a_prime = T::VF::from_bytes(&bytes).wrap_err(
-                ErrorKind::SerializationError,
-                "Failed to read field element.".to_string(),
-            )?;
-            *gamma = v.tag(IS_VERIFIER) - a_prime * self.delta;
+            let a_prime = T::VF::from_bytes(&bytes)
+                .wrap_err_with(ErrorKind::SerializationError, || {
+                    "Failed to read field element.".to_string()
+                })?;
+            *gamma = v.tag(Witness::EQUAL_TYPES) - a_prime * self.delta;
         }
         assert_eq!(T::LPN.weight, lpn_params::LPN_EXTEND_PARAMS_WEIGHT);
         assert_eq!(T::LPN.log2m, lpn_params::LPN_EXTEND_PARAMS_LOG_M);
@@ -480,16 +478,19 @@ impl<T: MacTypes> VoleReceiver<T> {
                 incoming_bytes,
                 &mut outgoing_bytes[0..ot_outgoing_size],
             )
-            .wrap_err(
-                ErrorKind::OtherError,
-                "Failed to obliviously send stage two bytes.".to_string(),
-            )?;
+            .wrap_err_with(ErrorKind::OtherError, || {
+                "Failed to obliviously send stage two bytes.".to_string()
+            })?;
         outgoing_bytes = &mut outgoing_bytes[ot_outgoing_size..];
         // This is true by construction. But it's a good reminder of this property.
         debug_assert_eq!(gammas.len() * m, result.len());
         debug_assert_eq!(result.len() % m, 0);
         for (gamma, results) in IntoIterator::into_iter(gammas).zip(result.chunks_exact(m)) {
-            let d = gamma - results.iter().map(|mac| mac.tag(IS_VERIFIER)).sum();
+            let d = gamma
+                - results
+                    .iter()
+                    .map(|mac| mac.tag(Witness::EQUAL_TYPES))
+                    .sum();
             outgoing_bytes[0..<T::TF as CanonicalSerialize>::ByteReprLen::USIZE]
                 .copy_from_slice(&d.to_bytes());
             outgoing_bytes =
@@ -534,10 +535,9 @@ impl<'a, T: MacTypes> VoleReceiverStep4<T> {
         );
         self.ot_stage2
             .stage2(arena, &incoming_bytes[0..KosSenderStage2::INCOMING_BYTES])
-            .wrap_err(
-                ErrorKind::OtherError,
-                "Failed to run KOS sender stage two.".to_string(),
-            )?;
+            .wrap_err_with(ErrorKind::OtherError, || {
+                "Failed to run KOS sender stage two.".to_string()
+            })?;
         incoming_bytes = &incoming_bytes[KosSenderStage2::INCOMING_BYTES..];
         let mut x_stars: GenericArray<T::VF, DegreeModulo<T::VF, T::TF>> = Default::default();
         for x_star in x_stars.iter_mut() {
@@ -547,10 +547,10 @@ impl<'a, T: MacTypes> VoleReceiverStep4<T> {
                 &incoming_bytes[0..<T::VF as CanonicalSerialize>::ByteReprLen::USIZE],
             );
             incoming_bytes = &incoming_bytes[bytes.len()..];
-            *x_star = T::VF::from_bytes(&bytes).wrap_err(
-                ErrorKind::SerializationError,
-                "Failed to read field element.".to_string(),
-            )?;
+            *x_star = T::VF::from_bytes(&bytes)
+                .wrap_err_with(ErrorKind::SerializationError, || {
+                    "Failed to read field element.".to_string()
+                })?;
         }
         let delta = receiver.delta;
         let seed = *<&[u8; 16]>::try_from(&incoming_bytes[0..16]).unwrap();
@@ -560,7 +560,7 @@ impl<'a, T: MacTypes> VoleReceiverStep4<T> {
             .pows
             .iter()
             .zip(x_stars.iter().zip(base_voles.sps_base_consistency().iter()))
-            .map(|(pow, (x, y))| (y.tag(IS_VERIFIER) - *x * delta) * *pow)
+            .map(|(pow, (x, y))| (y.tag(Witness::EQUAL_TYPES) - *x * delta) * *pow)
             .sum();
         let vb: T::TF = T::S::spsvole_receiver_consistency_check_compute_vb(
             &mut rng_chi,

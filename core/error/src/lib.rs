@@ -301,11 +301,17 @@ use sealed::Sealed;
 /// of `swanky_error`.
 pub trait ResultExt<T>: Sealed {
     /// Provide additional context to the error value.
+    ///
+    /// Prefer [`ResultExt::with_context`], unless the `msg` value
+    /// already exists.
     fn context(self, msg: String) -> Result<T>;
 
     /// Provide additional context to the error value, evaluating the
     /// context lazily only once an error does occur.
-    fn with_context(self, msg: impl FnOnce() -> String) -> Result<T>;
+    ///
+    /// If the closure returns an already-constructed `String` value,
+    /// see [`ResultExt::context`].
+    fn with_context(self, f: impl FnOnce() -> String) -> Result<T>;
 }
 
 impl<T> ResultExt<T> for Result<T> {
@@ -314,8 +320,8 @@ impl<T> ResultExt<T> for Result<T> {
         self.map_err(|e| e.context(msg))
     }
     #[inline]
-    fn with_context(self, msg: impl FnOnce() -> String) -> Result<T> {
-        self.map_err(|e| e.context(msg()))
+    fn with_context(self, f: impl FnOnce() -> String) -> Result<T> {
+        self.map_err(|e| e.context(f()))
     }
 }
 
@@ -331,10 +337,16 @@ pub trait WrapErr: Sealed {
 
     /// Wrap the error value with a new [`Error`], using this error as
     /// its `source`.
+    ///
+    /// Prefer [`WrapErr::wrap_err_with`], unless the `msg` value
+    /// already exists.
     fn wrap_err(self, kind: ErrorKind, msg: String) -> Result<Self::Output>;
 
     /// Lazily wrap the error value with a new [`Error`], constructing
     /// the message only once an error does occur.
+    ///
+    /// If the closure returns an already-constructed `String` value,
+    /// see [`WrapErr::wrap_err`].
     fn wrap_err_with(self, kind: ErrorKind, f: impl FnOnce() -> String) -> Result<Self::Output>;
 }
 

@@ -44,10 +44,9 @@ impl<'a, 'b, 'c, VSR: ValueStreamReader> CompilerFieldVisitor<&'c FieldInstructi
             match insn {
                 FieldInstruction::Constant { dst, src } => put(wm, dst, src)?,
                 FieldInstruction::AssertZero { src } => {
-                    let src = *wm.get(src).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {src}.".to_string(),
-                    )?;
+                    let src = *wm.get(src).wrap_err_with(ErrorKind::OtherError, || {
+                        format!("Failed to get wire {src}.")
+                    })?;
                     swanky_error::ensure!(
                         src == FE::ZERO,
                         ErrorKind::OtherError,
@@ -57,10 +56,9 @@ impl<'a, 'b, 'c, VSR: ValueStreamReader> CompilerFieldVisitor<&'c FieldInstructi
                 FieldInstruction::Copy { dst, src } => {
                     let src = *wm
                         .get(src)
-                        .wrap_err(
-                            ErrorKind::OtherError,
-                            "Failed to get wire {src}.".to_string(),
-                        )
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {src}.")
+                        })
                         .with_context(|| {
                             format!(
                                 "Copy to {dst} from {src} in {}",
@@ -72,46 +70,40 @@ impl<'a, 'b, 'c, VSR: ValueStreamReader> CompilerFieldVisitor<&'c FieldInstructi
                 FieldInstruction::Add { dst, left, right } => {
                     let left = *wm
                         .get(left)
-                        .wrap_err(
-                            ErrorKind::OtherError,
-                            "Failed to get wire {left}.".to_string(),
-                        )
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {left}.")
+                        })
                         .with_context(|| {
                             format!(
                                 "Add to {dst} from {left} in {}",
                                 std::any::type_name::<FE>()
                             )
                         })?;
-                    let right = *wm.get(right).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {right}.".to_string(),
-                    )?;
+                    let right = *wm.get(right).wrap_err_with(ErrorKind::OtherError, || {
+                        format!("Failed to get wire {right}.")
+                    })?;
                     put(wm, dst, left + right)?;
                 }
                 FieldInstruction::Mul { dst, left, right } => {
                     self.muls_per_field[FE::FIELD_TYPE] += 1;
-                    let left = *wm.get(left).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {left}.".to_string(),
-                    )?;
-                    let right = *wm.get(right).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {right}.".to_string(),
-                    )?;
+                    let left = *wm.get(left).wrap_err_with(ErrorKind::OtherError, || {
+                        format!("Failed to get wire {left}.")
+                    })?;
+                    let right = *wm.get(right).wrap_err_with(ErrorKind::OtherError, || {
+                        format!("Failed to get wire {right}.")
+                    })?;
                     put(wm, dst, left * right)?;
                 }
                 FieldInstruction::AddConstant { dst, left, right } => {
-                    let left = *wm.get(left).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {left}.".to_string(),
-                    )?;
+                    let left = *wm.get(left).wrap_err_with(ErrorKind::OtherError, || {
+                        format!("Failed to get wire {left}.")
+                    })?;
                     put(wm, dst, left + right)?;
                 }
                 FieldInstruction::MulConstant { dst, left, right } => {
-                    let left = *wm.get(left).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {left}.".to_string(),
-                    )?;
+                    let left = *wm.get(left).wrap_err_with(ErrorKind::OtherError, || {
+                        format!("Failed to get wire {left}.")
+                    })?;
                     put(wm, dst, left * right)?;
                 }
                 FieldInstruction::GetPublicInput { dst } => {
@@ -325,10 +317,11 @@ fn eval<VSR: ValueStreamReader>(
                                     ..=cond_wire_range.inclusive_end)
                                     .rev()
                                     .map(|w| {
-                                        Ok(*wm.get(w).wrap_err(
-                                            ErrorKind::OtherError,
-                                            "Failed to get wire {w}.".to_string(),
-                                        )?)
+                                        Ok(*wm
+                                            .get(w)
+                                            .wrap_err_with(ErrorKind::OtherError, || {
+                                                format!("Failed to get wire {w}.")
+                                            })?)
                                     })
                                     .collect::<swanky_error::Result<Vec<_>>>()?;
 
@@ -339,10 +332,17 @@ fn eval<VSR: ValueStreamReader>(
                             _ => {
                                 debug_assert_eq!(cond_wire_range.len(), 1);
                                 bits_to_usize(
-                                    FE::bit_decomposition(wm.get(cond_wire_range.start).wrap_err(
-                                        ErrorKind::OtherError,
-                                        format!("Failed to get wire {}", cond_wire_range.start),
-                                    )?)
+                                    FE::bit_decomposition(
+                                        wm.get(cond_wire_range.start).wrap_err_with(
+                                            ErrorKind::OtherError,
+                                            || {
+                                                format!(
+                                                    "Failed to get wire {}",
+                                                    cond_wire_range.start
+                                                )
+                                            },
+                                        )?,
+                                    )
                                     .into_iter()
                                     .rev(),
                                 )?
@@ -378,10 +378,11 @@ fn eval<VSR: ValueStreamReader>(
                                 for (in_w, out_w) in (in_wr.start..=in_wr.inclusive_end)
                                     .zip(out_wr.start..=out_wr.inclusive_end)
                                 {
-                                    let src = *wm.get(in_w).wrap_err(
-                                        ErrorKind::OtherError,
-                                        "Failed to get wire {in_w}.".to_string(),
-                                    )?;
+                                    let src = *wm
+                                        .get(in_w)
+                                        .wrap_err_with(ErrorKind::OtherError, || {
+                                            format!("Failed to get wire {in_w}.")
+                                        })?;
                                     put(wm, out_w, src)?;
                                 }
                             }

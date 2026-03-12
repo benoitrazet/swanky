@@ -5,9 +5,9 @@ use std::marker::PhantomData;
 use mac_n_cheese_ir::compilation_format::wire_format::AssertZeroPrototypeWireFormat;
 use mac_n_cheese_vole::mac::Mac;
 use mac_n_cheese_vole::mac::MacTypes;
+use mac_n_cheese_vole::party::{Party, WhichParty};
 use parking_lot::Mutex;
 use swanky_error::{ErrorKind, WrapErr};
-use swanky_party::Party;
 use swanky_serialization::CanonicalSerialize;
 use vectoreyes::SimdBase;
 use vectoreyes::U8x32;
@@ -52,16 +52,17 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertZeroTask<P, T> {
             acu ^= *out.get_mut();
         }
         match P::WHICH {
-            swanky_party::WhichParty::Prover(_) => c.write_all(bytemuck::bytes_of(&acu)).wrap_err(
-                ErrorKind::NetworkError,
-                "Failed to write 'acu' bytes.".to_string(),
-            )?,
-            swanky_party::WhichParty::Verifier(_) => {
+            WhichParty::Prover(_) => c
+                .write_all(bytemuck::bytes_of(&acu))
+                .wrap_err_with(ErrorKind::NetworkError, || {
+                    "Failed to write 'acu' bytes.".to_string()
+                })?,
+            WhichParty::Verifier(_) => {
                 let mut got = U8x32::ZERO;
-                c.read_exact(bytemuck::bytes_of_mut(&mut got)).wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to read bytes from network.".to_string(),
-                )?;
+                c.read_exact(bytemuck::bytes_of_mut(&mut got))
+                    .wrap_err_with(ErrorKind::NetworkError, || {
+                        "Failed to read bytes from network.".to_string()
+                    })?;
                 swanky_error::ensure!(
                     got == acu,
                     ErrorKind::OtherError,
@@ -88,8 +89,8 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertZeroTask<P, T> {
             AssertZeroPrototypeWireFormat::default(),
             |[(mac, ())]| {
                 let fe = match P::WHICH {
-                    swanky_party::WhichParty::Prover(e) => mac.beta().into_inner(e),
-                    swanky_party::WhichParty::Verifier(e) => mac.tag(e),
+                    WhichParty::Prover(e) => mac.beta().into_inner(e),
+                    WhichParty::Verifier(e) => mac.tag(e),
                 };
                 h.update(&fe.to_bytes());
                 Ok([])

@@ -10,6 +10,7 @@ use crate::fields::SieveIrDeserialize;
 use crate::homcom::FCom;
 use crate::mac::{Mac, MacT};
 use crate::memory::Memory;
+use crate::party::{Party, Prover, WhichParty};
 use crate::plaintext::DietMacAndCheesePlaintext;
 use crate::plugins::{
     DisjunctionBody, PluginExecution, PluginType, Ram, RamArithV0, RamArithV1, RamBoolV0,
@@ -45,8 +46,10 @@ use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField, StatisticallySecur
 use swanky_field_binary::{F2, F40b};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F127p, F128p, F384p, F384q, Secp256k1, Secp256k1order};
-use swanky_party::private::{ProverPrivate, ProverPrivateCopy};
-use swanky_party::{IsParty, Party, Prover, WhichParty};
+use swanky_party::{
+    private::{PartyPrivate, PartyPrivateCopy},
+    ty_eq::{EqualityProposition, Witness},
+};
 use swanky_svole_wykw::LpnParams;
 
 // This file implements IR0+ support for diet-mac-n-cheese and is broken up into the following components:
@@ -208,10 +211,7 @@ impl<E> EdabitsMap<E> {
     }
 
     fn push_elem(&mut self, bit_width: usize, e: E) {
-        self.0
-            .entry(bit_width)
-            .and_modify(|v| v.push(e))
-            .or_default();
+        self.0.entry(bit_width).or_default().push(e);
     }
 
     fn get_edabits(&mut self, bit_width: usize) -> Option<&mut Vec<E>> {
@@ -436,7 +436,7 @@ impl<
             C: AbstractChannel + Clone,
             SvoleF: SvoleT<P, F, F>,
         >(
-            ev: IsParty<P, Prover>,
+            ev: Witness<impl EqualityProposition<P, Prover>>,
             dmc: &mut DietMacAndCheese<P, F, F, C, SvoleF>,
             wit_tape: I,
             inputs: &[<DietMacAndCheese<P, F, F, C, SvoleF> as BackendT>::Wire],
@@ -447,18 +447,18 @@ impl<
             debug_assert_eq!(cond, 1);
 
             // so the guard is the last input
-            let guard_val = inputs[inputs.len() - 1].value().into_inner(ev);
+            let guard_val = inputs[inputs.len() - 1].value().into_inner(ev.sym());
 
             // lookup the clause based on the guard
             let opt = *st
                 .clause_resolver
                 .as_ref()
-                .into_inner(ev)
+                .into_inner(ev.sym())
                 .get(&guard_val)
                 .expect("no clause guard is satisfied");
 
             st.dora
-                .mux(dmc, wit_tape, inputs, ProverPrivateCopy::new(opt))
+                .mux(dmc, wit_tape, inputs, PartyPrivateCopy::new(opt))
         }
 
         match self.dora_states.entry(disj.id()) {
@@ -475,15 +475,15 @@ impl<
                     &mut self.dmc,
                     iter::empty(),
                     inputs,
-                    ProverPrivateCopy::empty(ev),
+                    PartyPrivateCopy::empty(ev),
                 ),
             },
             Entry::Vacant(entry) => {
                 // compile disjunction to the field
                 let disjunction = Disjunction::compile(disj, disj.cond(), fun_store);
 
-                let mut resolver: ProverPrivate<P, HashMap<FP, _>> =
-                    ProverPrivate::new(Default::default());
+                let mut resolver: PartyPrivate<Prover, P, HashMap<FP, _>> =
+                    PartyPrivate::new(Default::default());
                 if let WhichParty::Prover(ev) = P::WHICH {
                     for (i, guard) in disj.guards().enumerate() {
                         let guard = FP::try_from_int(*guard).unwrap();
@@ -511,7 +511,7 @@ impl<
                         &mut self.dmc,
                         iter::empty(),
                         inputs,
-                        ProverPrivateCopy::empty(ev),
+                        PartyPrivateCopy::empty(ev),
                     ),
                 }
             }
@@ -544,7 +544,7 @@ impl<
                         &mut self.dmc.rng,
                         b2,
                     )?;
-                    v.push(Mac::new(ProverPrivateCopy::new(b2), mac));
+                    v.push(Mac::new(PartyPrivateCopy::new(b2), mac));
                 }
             }
             WhichParty::Verifier(ev) => {
@@ -582,8 +582,8 @@ impl<
     }
 
     fn assert_conv_from_bits(&mut self, x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire> {
-        let mut power_twos = ProverPrivateCopy::new(FE::ONE);
-        let mut recomposed_value = ProverPrivateCopy::new(FE::ZERO);
+        let mut power_twos: PartyPrivateCopy<Prover, _, _> = PartyPrivateCopy::new(FE::ONE);
+        let mut recomposed_value: PartyPrivateCopy<Prover, _, _> = PartyPrivateCopy::new(FE::ZERO);
 
         let mut bits = Vec::with_capacity(x.len());
 
@@ -688,10 +688,12 @@ impl<
                 )?;
             }
         }
-        self.dmc.channel.flush().wrap_err(
-            ErrorKind::OtherError,
-            "Error during channel flush (using legacy channel).".to_string(),
-        )?;
+        self.dmc
+            .channel
+            .flush()
+            .wrap_err_with(ErrorKind::OtherError, || {
+                "Error during channel flush (using legacy channel).".to_string()
+            })?;
         Ok(())
     }
 }
@@ -1213,10 +1215,13 @@ where
     ) -> Result<Vec<Mac<P, F2, F40b>>> {
         if *start != *end {
             if self.is_boolean {
-                let mut v = Vec::with_capacity((end + 1 - start).try_into().wrap_err(
-                    ErrorKind::OtherError,
-                    format!("{} + 1 - {} does not fit in a usize.", end, start),
-                )?);
+                let mut v = Vec::with_capacity(
+                    (end + 1 - start)
+                        .try_into()
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            format!("{} + 1 - {} does not fit in a usize.", end, start)
+                        })?,
+                );
                 for inp in *start..(*end + 1) {
                     let in_wire = self.memory.get(inp);
                     debug!("CONV GET {in_wire:?}");
@@ -1598,10 +1603,10 @@ impl<
                             "The v0 Boolean RAM type expects a number as its first parameter, but a string was found"
                         )
                     };
-                    let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to represent field ID as a u8.".to_string(),
-                    )?;
+                    let field_id = u8::try_from(number_to_u64(&field_id)?)
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            "Failed to represent field ID as a u8.".to_string()
+                        })?;
                     let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)?
                     else {
                         bail!(
@@ -1653,10 +1658,10 @@ impl<
                             "The Boolean RAM type expects a number as its first parameter, but a string was found"
                         )
                     };
-                    let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to represent field ID as a u8.".to_string(),
-                    )?;
+                    let field_id = u8::try_from(number_to_u64(&field_id)?)
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            "Failed to represent field ID as a u8.".to_string()
+                        })?;
                     let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)?
                     else {
                         bail!(
@@ -1712,10 +1717,10 @@ impl<
                             "The v0 arithmetic RAM type expects a number as its first parameter, but a string was found"
                         )
                     };
-                    let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to represent field ID as a u8.".to_string(),
-                    )?;
+                    let field_id = u8::try_from(number_to_u64(&field_id)?)
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            "Failed to represent field ID as a u8.".to_string()
+                        })?;
                     if let TypeSpecification::Plugin(_) = type_store.get(&field_id)? {
                         bail!(
                             ErrorKind::OtherError,
@@ -1761,10 +1766,10 @@ impl<
                             "The arithmetic RAM type expects a number as its first parameter, but a string was found"
                         )
                     };
-                    let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to represent field ID as a u8.".to_string(),
-                    )?;
+                    let field_id = u8::try_from(number_to_u64(&field_id)?)
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            "Failed to represent field ID as a u8.".to_string()
+                        })?;
                     if let TypeSpecification::Plugin(_) = type_store.get(&field_id)? {
                         bail!(
                             ErrorKind::OtherError,
@@ -2648,8 +2653,10 @@ impl<
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use super::EdabitsMap;
     use super::TypeStore;
     use crate::LpnSize;
+    use crate::party::{Prover, Verifier};
     use crate::svole_trait::Svole;
     use crate::{
         backend_multifield::EvaluatorCirc,
@@ -2676,7 +2683,6 @@ pub(crate) mod tests {
     use swanky_field_binary::F2;
     use swanky_field_f61p::F61p;
     use swanky_field_ff_primes::{F384p, F384q, Secp256k1, Secp256k1order};
-    use swanky_party::{Prover, Verifier};
 
     pub(crate) const FF0: u8 = 0;
     const FF1: u8 = 1;
@@ -2748,10 +2754,10 @@ pub(crate) mod tests {
         let wit_prover = witnesses;
         let type_store = TypeStore::try_from(fields.clone())?;
         let type_store_prover = type_store.clone();
-        let (sender, receiver) = UnixStream::pair().wrap_err(
-            ErrorKind::NetworkError,
-            "Failed to create Unix socket pair.".to_string(),
-        )?;
+        let (sender, receiver) = UnixStream::pair()
+            .wrap_err_with(ErrorKind::NetworkError, || {
+                "Failed to create Unix socket pair.".to_string()
+            })?;
         let handle: JoinHandle<swanky_error::Result<()>> = std::thread::spawn(move || {
             let rng = AesRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
@@ -3044,6 +3050,25 @@ pub(crate) mod tests {
         let witnesses = vec![vec![two::<F61p>()], vec![]];
 
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
+
+    #[test]
+    fn test_edabits_map_push_elem_inserts_first() {
+        let mut map = EdabitsMap::<u8>::new();
+
+        map.push_elem(5, 42);
+        {
+            let edabits = map.get_edabits(5).expect("missing entry for bit width 5");
+            assert_eq!(edabits.len(), 1);
+            assert_eq!(edabits[0], 42);
+        }
+
+        map.push_elem(5, 7);
+        {
+            let edabits = map.get_edabits(5).expect("missing entry for bit width 5");
+            assert_eq!(edabits.len(), 2);
+            assert_eq!(edabits[1], 7);
+        }
     }
 
     #[test]

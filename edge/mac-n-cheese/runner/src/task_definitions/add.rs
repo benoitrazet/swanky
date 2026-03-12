@@ -1,8 +1,10 @@
 use std::marker::PhantomData;
 
 use mac_n_cheese_ir::compilation_format::wire_format::XorPrototypeWireFormat;
-use mac_n_cheese_vole::mac::{Mac, MacTypes};
-use swanky_party::Party;
+use mac_n_cheese_vole::{
+    mac::{Mac, MacTypes},
+    party::Party,
+};
 
 use crate::task_framework::{NoContinuation, TaskDefinition};
 

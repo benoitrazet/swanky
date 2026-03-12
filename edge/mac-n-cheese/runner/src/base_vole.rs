@@ -3,7 +3,10 @@ use crate::{
     types::RandomMac,
 };
 use mac_n_cheese_ir::compilation_format::{FieldMacType, FieldTypeMacVisitor};
-use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
+use mac_n_cheese_vole::{
+    mac::{Mac, MacConstantContext, MacTypes},
+    party::{Party, WhichParty},
+};
 use std::{
     any::{Any, TypeId},
     io::{Read, Write},
@@ -12,7 +15,6 @@ use std::{
 use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, ResultExt, WrapErr};
-use swanky_party::{Party, WhichParty};
 use swanky_svole_wykw::base_svole::{Receiver as BaseReceiver, Sender as BaseSender};
 
 pub struct VoleContext<P: Party, T: MacTypes> {
@@ -66,9 +68,9 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
                 VoleContext {
                     base_voles: Default::default(),
                     constant_context: match P::WHICH {
-                        WhichParty::Prover(e) => MacConstantContext::prover_new(e, ()),
+                        WhichParty::Prover(e) => MacConstantContext::new(e, ()),
                         WhichParty::Verifier(e) => {
-                            MacConstantContext::verifier_new(e, TF::random_nonzero(self.rng))
+                            MacConstantContext::new(e, TF::random_nonzero(self.rng))
                         }
                     },
                 }
@@ -77,26 +79,22 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
                     WhichParty::Prover(e) => {
                         let mut base =
                             BaseSender::<TF>::init(&mut channel, Default::default(), self.rng)
-                                .wrap_err(
-                                    ErrorKind::InitializationError,
-                                    "Failed to initialize SVOLE sender.".to_string(),
-                                )
-                                .context("base sender init".to_string())?;
-                        channel.flush().wrap_err(
-                            ErrorKind::NetworkError,
-                            "Failed to flush SVOLE channel.".to_string(),
-                        )?;
+                                .wrap_err_with(ErrorKind::InitializationError, || {
+                                    "Failed to initialize SVOLE sender.".to_string()
+                                })
+                                .with_context(|| "base sender init".to_string())?;
+                        channel.flush().wrap_err_with(ErrorKind::NetworkError, || {
+                            "Failed to flush SVOLE channel.".to_string()
+                        })?;
                         let base_voles = base
                             .send(&mut channel, self.count, self.rng)
-                            .wrap_err(
-                                ErrorKind::OtherError,
-                                "Failed to send base VOLEs.".to_string(),
-                            )
-                            .context("base voles".to_string())?;
-                        channel.flush().wrap_err(
-                            ErrorKind::NetworkError,
-                            "Failed to flush SVOLE channel.".to_string(),
-                        )?;
+                            .wrap_err_with(ErrorKind::OtherError, || {
+                                "Failed to send base VOLEs.".to_string()
+                            })
+                            .with_context(|| "base voles".to_string())?;
+                        channel.flush().wrap_err_with(ErrorKind::NetworkError, || {
+                            "Failed to flush SVOLE channel.".to_string()
+                        })?;
                         // We need to convince Rust that (VF == TF::PrimeField). We roundtrip thru
                         // Any in order to do that.
                         let base_voles: &dyn Any = &base_voles;
@@ -107,32 +105,28 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
                                 .copied()
                                 .map(|(x, beta)| RandomMac(Mac::prover_new(e, x, beta)))
                                 .collect(),
-                            constant_context: MacConstantContext::prover_new(e, ()),
+                            constant_context: MacConstantContext::new(e, ()),
                         }
                     }
                     WhichParty::Verifier(e) => {
                         let mut base =
                             BaseReceiver::<TF>::init(&mut channel, Default::default(), self.rng)
-                                .wrap_err(
-                                    ErrorKind::InitializationError,
-                                    "Failed to initialize base VOLE receiver.".to_string(),
-                                )
-                                .context("base receiver init".to_string())?;
-                        channel.flush().wrap_err(
-                            ErrorKind::NetworkError,
-                            "Failed to flush VOLE channel.".to_string(),
-                        )?;
+                                .wrap_err_with(ErrorKind::InitializationError, || {
+                                    "Failed to initialize base VOLE receiver.".to_string()
+                                })
+                                .with_context(|| "base receiver init".to_string())?;
+                        channel.flush().wrap_err_with(ErrorKind::NetworkError, || {
+                            "Failed to flush VOLE channel.".to_string()
+                        })?;
                         let base_voles = base
                             .receive(&mut channel, self.count, self.rng)
-                            .wrap_err(
-                                ErrorKind::OtherError,
-                                "Failed to receive base VOLEs.".to_string(),
-                            )
-                            .context("base voles".to_string())?;
-                        channel.flush().wrap_err(
-                            ErrorKind::NetworkError,
-                            "Failed to flush VOLE channel.".to_string(),
-                        )?;
+                            .wrap_err_with(ErrorKind::OtherError, || {
+                                "Failed to receive base VOLEs.".to_string()
+                            })
+                            .with_context(|| "base voles".to_string())?;
+                        channel.flush().wrap_err_with(ErrorKind::NetworkError, || {
+                            "Failed to flush VOLE channel.".to_string()
+                        })?;
                         let alpha = -base.delta();
                         VoleContext {
                             base_voles: base_voles
@@ -140,7 +134,7 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
                                 .copied()
                                 .map(|tag| RandomMac(Mac::verifier_new(e, tag)))
                                 .collect(),
-                            constant_context: MacConstantContext::verifier_new(e, alpha),
+                            constant_context: MacConstantContext::new(e, alpha),
                         }
                     }
                 }

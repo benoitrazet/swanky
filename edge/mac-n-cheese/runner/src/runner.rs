@@ -12,14 +12,12 @@ use mac_n_cheese_ir::compilation_format::{
     AtomicGraphDegreeCount, Manifest, NumericalEnumType, PrivatesManifest, TaskId, TaskKind, Type,
     fb,
 };
+use mac_n_cheese_vole::party::{Party, Prover, WhichParty};
 use parking_lot::{Condvar, Mutex, RwLock};
 use rustc_hash::FxHashMap;
 use swanky_aes_rng::AesRng;
 use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
-use swanky_party::{
-    Party, WhichParty,
-    private::{PartyPrivate, ProverPrivate},
-};
+use swanky_party::private::PartyPrivate;
 
 use crate::{
     alloc::OwnedAlignedBytes,
@@ -104,7 +102,7 @@ pub struct RunnerThread<P: Party> {
     manifest_owned: Arc<Manifest>,
     task_definitions: FxHashMap<NumericalEnumType, RwLock<ErasedTaskDefinition<P>>>,
     reactor: Arc<dyn Reactor<P>>,
-    privates_manifest: ProverPrivate<P, PrivatesManifest>,
+    privates_manifest: PartyPrivate<Prover, P, PrivatesManifest>,
     num_tasks_remaining: AtomicUsize,
     no_tasks_remain: Mutex<bool>,
     no_tasks_remain_waiter: Condvar,
@@ -205,7 +203,7 @@ impl<P: Party> RunnerThread<P> {
                 task_input: TaskInput {
                     challenge: None,
                     task_data: None,
-                    prover_private_data: ProverPrivate::new(None),
+                    prover_private_data: PartyPrivate::new(None),
                     task_dependencies,
                 },
                 step_number: 0,
@@ -398,7 +396,7 @@ pub fn run_proof_background<P: Party>(
     run_queue: RunQueue<P>,
     manifest_owned: Arc<Manifest>,
     reactor: Arc<dyn Reactor<P>>,
-    privates_manifest: ProverPrivate<P, PrivatesManifest>,
+    privates_manifest: PartyPrivate<Prover, P, PrivatesManifest>,
     dependent_counts: Vec<AtomicGraphDegreeCount>,
     dependency_counts: Vec<AtomicGraphDegreeCount>,
 ) -> swanky_error::Result<()> {
@@ -426,7 +424,7 @@ pub fn run_proof_background<P: Party>(
         visit_task_definition::<P, V>(tk, V(&mut voles_needed));
     }
     let vole_contexts = base_vole::init_base_vole::<P, _>(&voles_needed, &mut rng, &mut root_conn)
-        .context("base vole".to_string())?;
+        .with_context(|| "base vole".to_string())?;
     span.finish();
     // initialize task kinds
     let mut task_definitions =
@@ -455,10 +453,11 @@ pub fn run_proof_background<P: Party>(
         let tk = TaskKind::try_from(tk_encoded)?;
         let etd =
             visit_task_definition::<P, V<'_, P>>(tk, V(vc, &mut rng, &mut root_conn, num_threads))?;
-        root_conn.flush().wrap_err(
-            ErrorKind::NetworkError,
-            "Failed to flush root network connection.".to_string(),
-        )?;
+        root_conn
+            .flush()
+            .wrap_err_with(ErrorKind::NetworkError, || {
+                "Failed to flush root network connection.".to_string()
+            })?;
         let old = task_definitions.insert(tk_encoded, RwLock::new(etd));
         swanky_error::ensure!(
             old.is_none(),
@@ -509,10 +508,11 @@ pub fn run_proof_background<P: Party>(
         runner_thread.reactor.close();
         runner_thread.run_queue.close();
         // TODO: parallelize the finalization.
-        root_conn.flush().wrap_err(
-            ErrorKind::NetworkError,
-            "Failed to flush root connection.".to_string(),
-        )?;
+        root_conn
+            .flush()
+            .wrap_err_with(ErrorKind::NetworkError, || {
+                "Failed to flush root connection.".to_string()
+            })?;
         for tk in manifest.task_kinds_used().iter() {
             let span = event_log::FinalizingTaskKind { task_kind: tk }.start();
             runner_thread.task_definitions[&tk]
@@ -521,10 +521,11 @@ pub fn run_proof_background<P: Party>(
                 .with_context(|| {
                     format!("Finalizing task {:?}", TaskKind::try_from(tk).unwrap())
                 })?;
-            root_conn.flush().wrap_err(
-                ErrorKind::NetworkError,
-                "Failed to flush root connection.".to_string(),
-            )?;
+            root_conn
+                .flush()
+                .wrap_err_with(ErrorKind::NetworkError, || {
+                    "Failed to flush root connection.".to_string()
+                })?;
             span.finish();
         }
         Ok(())

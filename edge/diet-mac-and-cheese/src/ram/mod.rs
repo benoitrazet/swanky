@@ -9,9 +9,10 @@ use swanky_channel_legacy::AbstractChannel;
 use swanky_error::Result;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F2;
-use swanky_party::Party;
 
-use crate::{DietMacAndCheese, backend_trait::BackendT, mac::Mac, svole_trait::SvoleT};
+use crate::{
+    DietMacAndCheese, backend_trait::BackendT, mac::Mac, party::Party, svole_trait::SvoleT,
+};
 
 const ARITHMETIC_CHALLENGE_SIZE: usize = 2;
 const BOOLEAN_CHALLENGE_SIZE: usize = 40;

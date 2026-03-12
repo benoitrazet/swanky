@@ -15,14 +15,14 @@ use mac_n_cheese_ir::compilation_format::fb::{self, DataChunkAddress};
 use mac_n_cheese_ir::compilation_format::{
     AtomicGraphDegreeCount, Manifest, Type, read_private_manifest,
 };
+use mac_n_cheese_vole::party::{Party, Prover, Verifier, WhichParty};
 use party::either::PartyEitherCopy;
-use party::private::{ProverPrivate, ProverPrivateCopy};
-use party::{IS_PROVER, IS_VERIFIER, WhichParty};
+use party::private::{PartyPrivate, PartyPrivateCopy};
+use party::ty_eq::Witness;
 use rand::SeedableRng;
 use swanky_aes_rng::AesRng;
 use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
 use swanky_party as party;
-use swanky_party::Party;
 use types::visit_type;
 
 use crate::runner::RunQueue;
@@ -125,25 +125,24 @@ fn read_atomic_graph_degree_counts(
 
 fn party_main<P: Party>(
     opt: &Opt,
-    private_data: ProverPrivateCopy<P, &Path>,
+    private_data: PartyPrivateCopy<Prover, P, &Path>,
     num_connections: PartyEitherCopy<P, (), usize>,
 ) -> swanky_error::Result<()> {
     let rng = AesRng::from_rng(rand::rngs::OsRng).unwrap();
-    let circuit_file = File::open(&opt.circuit).wrap_err(
-        ErrorKind::FilesystemError,
-        format!("Opening circuit {:?}", opt.circuit),
-    )?;
+    let circuit_file = File::open(&opt.circuit)
+        .wrap_err_with(ErrorKind::FilesystemError, || {
+            format!("Opening circuit {:?}", opt.circuit)
+        })?;
     let span = event_log::ReadingCircuit.start();
     let circuit_manifest = Manifest::read(circuit_file)
         .with_context(|| format!("Reading circuit {:?}", opt.circuit))?;
     let manifest = circuit_manifest.manifest();
     span.finish();
-    let mut private_file = ProverPrivate::from(private_data)
+    let mut private_file = PartyPrivate::from(private_data)
         .map(|path| {
-            File::open(path).wrap_err(
-                ErrorKind::FilesystemError,
-                format!("Opening private data {path:?}"),
-            )
+            File::open(path).wrap_err_with(ErrorKind::FilesystemError, || {
+                format!("Opening private data {path:?}")
+            })
         })
         .lift_result()?;
     let private_manifest = private_file
@@ -157,7 +156,7 @@ fn party_main<P: Party>(
         .lift_result()?;
     let dependent_counts =
         read_atomic_graph_degree_counts(&circuit_manifest, manifest.dependent_counts())
-            .context("Reading dependent counts".to_string())?;
+            .with_context(|| "Reading dependent counts".to_string())?;
     swanky_error::ensure!(
         dependent_counts.len() == manifest.tasks().len(),
         ErrorKind::OtherError,
@@ -165,13 +164,13 @@ fn party_main<P: Party>(
     );
     let dependency_counts =
         read_atomic_graph_degree_counts(&circuit_manifest, manifest.dependency_counts())
-            .context("Reading dependency counts".to_string())?;
+            .with_context(|| "Reading dependency counts".to_string())?;
     alloc::init_alloc_pool(&mut extract_allocation_sizes::<P>(
         manifest.allocation_sizes(),
     )?);
     let (keys, mut root_conn, extra_conns) =
         tls::initiate_tls::<P>(opt.address, &opt.root_cas, &opt.tls_cert, num_connections)
-            .context("initiating root tls connection".to_string())?;
+            .with_context(|| "initiating root tls connection".to_string())?;
     let start_time = Instant::now();
     event_log::ProofStart.submit();
     eprintln!("Starting proof!");
@@ -179,21 +178,22 @@ fn party_main<P: Party>(
         WhichParty::Prover(_) => {
             root_conn
                 .write_all(&circuit_manifest.hash().to_le_bytes())
-                .wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to write manifest hash.".to_string(),
-                )?;
-            root_conn.flush().wrap_err(
-                ErrorKind::NetworkError,
-                "Failed to flush root connection.".to_string(),
-            )?;
+                .wrap_err_with(ErrorKind::NetworkError, || {
+                    "Failed to write manifest hash.".to_string()
+                })?;
+            root_conn
+                .flush()
+                .wrap_err_with(ErrorKind::NetworkError, || {
+                    "Failed to flush root connection.".to_string()
+                })?;
         }
         WhichParty::Verifier(_) => {
             let mut buf = [0; 8];
-            root_conn.read_exact(&mut buf).wrap_err(
-                ErrorKind::NetworkError,
-                "Failed to read circuit hash.".to_string(),
-            )?;
+            root_conn
+                .read_exact(&mut buf)
+                .wrap_err_with(ErrorKind::NetworkError, || {
+                    "Failed to read circuit hash.".to_string()
+                })?;
             if u64::from_le_bytes(buf) != circuit_manifest.hash() {
                 eprintln!("WARNING: CIRCUIT HASH MISMATCH!");
             }
@@ -229,10 +229,10 @@ fn party_main<P: Party>(
     event_log::ProofFinish.submit();
     eprintln!("Proof finished in {proof_time:?}");
     if let Some(path) = &opt.write_run_time_to {
-        std::fs::write(path, proof_time.as_nanos().to_string().as_bytes()).wrap_err(
-            ErrorKind::FilesystemError,
-            format!("Failed to write proof time to {path:?}."),
-        )?;
+        std::fs::write(path, proof_time.as_nanos().to_string().as_bytes())
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                format!("Failed to write proof time to {path:?}.")
+            })?;
     }
     Ok(())
 }
@@ -244,10 +244,9 @@ fn extract_allocation_sizes<P: Party>(
     for sz in allocation_sizes.iter() {
         out.push(
             usize::try_from(sz.count())
-                .wrap_err(
-                    ErrorKind::OtherError,
-                    "Failed to represent allocation size as a usize.".to_string(),
-                )?
+                .wrap_err_with(ErrorKind::OtherError, || {
+                    "Failed to represent allocation size as a usize.".to_string()
+                })?
                 .checked_mul(if let Some(ty) = sz.type_() {
                     let ty = Type::try_from(ty.encoding())?;
                     struct V<P: Party>(PhantomData<P>);
@@ -285,10 +284,10 @@ fn main() -> swanky_error::Result<()> {
             .with_context(|| format!("Opening event log at {log_path:?}"))?;
     }
     let party_main_result = match &opt.cmd {
-        Command::Prove { private_data } => party_main::<party::Prover>(
+        Command::Prove { private_data } => party_main::<Prover>(
             &opt,
-            ProverPrivateCopy::new(private_data),
-            PartyEitherCopy::prover_new(IS_PROVER, ()),
+            PartyPrivateCopy::new(private_data),
+            PartyEitherCopy::new(Witness::EQUAL_TYPES, ()),
         ),
         Command::Verify { num_connections } => {
             swanky_error::ensure!(
@@ -296,15 +295,15 @@ fn main() -> swanky_error::Result<()> {
                 ErrorKind::OtherError,
                 "there must be at least two connections"
             );
-            party_main::<party::Verifier>(
+            party_main::<Verifier>(
                 &opt,
-                ProverPrivateCopy::empty(IS_VERIFIER),
-                PartyEitherCopy::verifier_new(IS_VERIFIER, *num_connections),
+                PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
+                PartyEitherCopy::new(Witness::EQUAL_TYPES, *num_connections),
             )
         }
     };
     let close_error_log_result = if opt.event_log.is_some() {
-        event_log::close_event_log().context("Closing event log".to_string())
+        event_log::close_event_log().with_context(|| "Closing event log".to_string())
     } else {
         Ok(())
     };

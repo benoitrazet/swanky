@@ -1,8 +1,10 @@
 use mac_n_cheese_ir::compilation_format::FieldMacType;
-use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
+use mac_n_cheese_vole::{
+    mac::{Mac, MacConstantContext, MacTypes},
+    party::Party,
+};
 use std::{io::Cursor, ops::Deref, sync::Arc};
 use swanky_error::{ErrorKind, OptionExt, WrapErr};
-use swanky_party::Party;
 use swanky_serialization::{CanonicalSerialize, SequenceDeserializer};
 
 use crate::{
@@ -59,17 +61,17 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for ConstantTask<P, T> {
             .count() as usize;
         let mut out = TaskDataBuffer::with_capacity(num_outputs);
         let mut cursor = Cursor::new(input.task_data().deref());
-        let mut de = <T::VF as CanonicalSerialize>::Deserializer::new(&mut cursor).wrap_err(
-            ErrorKind::SerializationError,
-            "Failed to initialize field element deserializer.".to_string(),
-        )?;
+        let mut de = <T::VF as CanonicalSerialize>::Deserializer::new(&mut cursor)
+            .wrap_err_with(ErrorKind::SerializationError, || {
+                "Failed to initialize field element deserializer.".to_string()
+            })?;
         for _ in 0..num_outputs {
             out.push(Mac::<P, T>::constant(
                 &self.constant_context,
-                de.read(&mut cursor).wrap_err(
-                    ErrorKind::SerializationError,
-                    "Failed to deserialize field element.".to_string(),
-                )?,
+                de.read(&mut cursor)
+                    .wrap_err_with(ErrorKind::SerializationError, || {
+                        "Failed to deserialize field element.".to_string()
+                    })?,
             ));
         }
         Ok(TaskResult::Finished(Arc::new(TaskOutput::new_with::<

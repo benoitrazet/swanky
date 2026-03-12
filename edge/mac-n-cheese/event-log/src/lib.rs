@@ -191,27 +191,23 @@ pub mod internal {
                 }
                 self.dst
                     .write_all(&(thread_id as u64).to_le_bytes())
-                    .wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to write thread ID to event log.".to_string(),
-                    )?;
+                    .wrap_err_with(ErrorKind::OtherError, || {
+                        "Failed to write thread ID to event log.".to_string()
+                    })?;
                 self.dst
                     .write_all(&(to_write.len() as u64).to_le_bytes())
-                    .wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to write data length to event log.".to_string(),
-                    )?;
+                    .wrap_err_with(ErrorKind::OtherError, || {
+                        "Failed to write data length to event log.".to_string()
+                    })?;
                 self.dst
                     .write_all(bytemuck::cast_slice(to_write))
-                    .wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to write data to event log.".to_string(),
-                    )?;
+                    .wrap_err_with(ErrorKind::OtherError, || {
+                        "Failed to write data to event log.".to_string()
+                    })?;
             }
-            self.dst.flush().wrap_err(
-                ErrorKind::OtherError,
-                "Failed to flush event log.".to_string(),
-            )?;
+            self.dst.flush().wrap_err_with(ErrorKind::OtherError, || {
+                "Failed to flush event log.".to_string()
+            })?;
             Ok(())
         }
     }
@@ -319,23 +315,21 @@ pub mod internal {
                     format!("Opening {:?} to create EventLog", dst)
                 })?,
             ))
-            .wrap_err(
-                ErrorKind::InitializationError,
-                "Failed to initialize LZ4".to_string(),
-            )?;
+            .wrap_err_with(ErrorKind::InitializationError, || {
+                "Failed to initialize LZ4".to_string()
+            })?;
         let mut metadata = Cursor::new(Vec::new());
         ciborium::ser::into_writer(schema, &mut metadata)
             .expect("serialization of event log description succeeds");
         let metadata = metadata.into_inner();
         dst.write_all(&(metadata.len() as u64).to_le_bytes())
-            .wrap_err(
-                ErrorKind::FilesystemError,
-                "Failed to write metadata length.".to_string(),
-            )?;
-        dst.write_all(&metadata).wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to write metadata.".to_string(),
-        )?;
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to write metadata length.".to_string()
+            })?;
+        dst.write_all(&metadata)
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to write metadata.".to_string()
+            })?;
         let system_start = Instant::now();
         dst.write_all(
             &(SystemTime::now()
@@ -344,14 +338,12 @@ pub mod internal {
                 .as_millis() as u64)
                 .to_le_bytes(),
         )
-        .wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to write event duration.".to_string(),
-        )?;
-        dst.flush().wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to flush destination buffer.".to_string(),
-        )?;
+        .wrap_err_with(ErrorKind::FilesystemError, || {
+            "Failed to write event duration.".to_string()
+        })?;
+        dst.flush().wrap_err_with(ErrorKind::FilesystemError, || {
+            "Failed to flush destination buffer.".to_string()
+        })?;
         let new_buffers = SegQueue::new();
         *gs = GlobalState::Open {
             system_start,
@@ -397,14 +389,18 @@ pub mod internal {
                 writer,
             } => {
                 let mut writer = writer.into_inner();
-                writer.flush(&new_buffers).wrap_err(
-                    ErrorKind::FilesystemError,
-                    "Failed final flush for event log".to_string(),
-                )?;
-                writer.dst.finish().1.wrap_err(
-                    ErrorKind::FilesystemError,
-                    "Failed to finalize event log lz4".to_string(),
-                )?;
+                writer
+                    .flush(&new_buffers)
+                    .wrap_err_with(ErrorKind::FilesystemError, || {
+                        "Failed final flush for event log".to_string()
+                    })?;
+                writer
+                    .dst
+                    .finish()
+                    .1
+                    .wrap_err_with(ErrorKind::FilesystemError, || {
+                        "Failed to finalize event log lz4".to_string()
+                    })?;
             }
             GlobalState::Closed => panic!("event log has already been closed"),
         }
@@ -626,34 +622,36 @@ impl EventLogReader {
                 format!("Failed to open {path:?}")
             })?,
         ))
-        .wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to open LZ4.".to_string(),
-        )?;
+        .wrap_err_with(ErrorKind::FilesystemError, || {
+            "Failed to open LZ4.".to_string()
+        })?;
         let mut u64_buf = [0; 8];
-        reader.read_exact(&mut u64_buf).wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to read first 8 bytes.".to_string(),
-        )?;
+        reader
+            .read_exact(&mut u64_buf)
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to read first 8 bytes.".to_string()
+            })?;
         let mut metadata_buf = vec![
             0;
-            usize::try_from(u64::from_le_bytes(u64_buf)).wrap_err(
-                ErrorKind::OtherError,
-                "Metadata buffer too big for usize".to_string()
-            )?
+            usize::try_from(u64::from_le_bytes(u64_buf))
+                .wrap_err_with(ErrorKind::OtherError, || {
+                    "Metadata buffer too big for usize".to_string()
+                })?
         ];
-        reader.read_exact(&mut metadata_buf).wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to read metadata.".to_string(),
-        )?;
-        let schema = ciborium::de::from_reader(Cursor::new(metadata_buf)).wrap_err(
-            ErrorKind::SerializationError,
-            "Unable to decode event buffer schema".to_string(),
-        )?;
-        reader.read_exact(&mut u64_buf).wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to read timestamp.".to_string(),
-        )?;
+        reader
+            .read_exact(&mut metadata_buf)
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to read metadata.".to_string()
+            })?;
+        let schema = ciborium::de::from_reader(Cursor::new(metadata_buf))
+            .wrap_err_with(ErrorKind::SerializationError, || {
+                "Unable to decode event buffer schema".to_string()
+            })?;
+        reader
+            .read_exact(&mut u64_buf)
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to read timestamp.".to_string()
+            })?;
         // This reads the unix timestamp in milliseconds when the event log was started. We're
         // ignoring this for now.
         Ok(EventLogReader {
@@ -679,43 +677,47 @@ impl EventLogReader {
             let thread_id = {
                 let mut buf = [0; 8];
                 // First do a single byte read, so that we can use read_exact most of the time.
-                if self.r.read(&mut buf[0..1]).wrap_err(
-                    ErrorKind::FilesystemError,
-                    "Failed to read a byte.".to_string(),
-                )? == 0
+                if self
+                    .r
+                    .read(&mut buf[0..1])
+                    .wrap_err_with(ErrorKind::FilesystemError, || {
+                        "Failed to read a byte.".to_string()
+                    })?
+                    == 0
                 {
                     // We've hit EOF
                     return Ok(None);
                 }
-                self.r.read_exact(&mut buf[1..]).wrap_err(
-                    ErrorKind::FilesystemError,
-                    "Failed to read remaining u64 bytes.".to_string(),
-                )?;
+                self.r
+                    .read_exact(&mut buf[1..])
+                    .wrap_err_with(ErrorKind::FilesystemError, || {
+                        "Failed to read remaining u64 bytes.".to_string()
+                    })?;
                 u64::from_le_bytes(buf)
             };
             let num_words = {
                 let mut buf = [0; 8];
-                self.r.read_exact(&mut buf).wrap_err(
-                    ErrorKind::FilesystemError,
-                    "Failed to read u64 bytes.".to_string(),
-                )?;
-                usize::try_from(u64::from_le_bytes(buf)).wrap_err(
-                    ErrorKind::OtherError,
-                    "Single thread chunk is too big for usize".to_string(),
-                )?
+                self.r
+                    .read_exact(&mut buf)
+                    .wrap_err_with(ErrorKind::FilesystemError, || {
+                        "Failed to read u64 bytes.".to_string()
+                    })?;
+                usize::try_from(u64::from_le_bytes(buf))
+                    .wrap_err_with(ErrorKind::OtherError, || {
+                        "Single thread chunk is too big for usize".to_string()
+                    })?
             };
             self.current_thread_buffer.resize(num_words, 0);
             self.r
                 .read_exact(bytemuck::cast_slice_mut(&mut self.current_thread_buffer))
-                .wrap_err(
-                    ErrorKind::FilesystemError,
-                    "Failed to read current thread data.".to_string(),
-                )?;
+                .wrap_err_with(ErrorKind::FilesystemError, || {
+                    "Failed to read current thread data.".to_string()
+                })?;
             self.current_thread = thread_id;
             self.current_thread_buffer_read_pos = 0;
             if self.last_event_timestamp.len()
                 <= usize::try_from(thread_id)
-                    .wrap_err(ErrorKind::OtherError, "Too many threads".to_string())?
+                    .wrap_err_with(ErrorKind::OtherError, || "Too many threads".to_string())?
             {
                 self.last_event_timestamp
                     .resize(thread_id as usize + 1, Duration::default());

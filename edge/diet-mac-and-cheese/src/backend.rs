@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use crate::backend_trait::BackendT;
 use crate::homcom::{BATCH_SIZE, FCom, MultCheckState, ZeroCheckState};
 use crate::mac::Mac;
+use crate::party::{Party, Prover, WhichParty};
 use crate::svole_trait::SvoleT;
 use crate::svole_trait::field_name;
 use log::{debug, info, warn};
@@ -10,8 +11,7 @@ use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_field::{FiniteField, IsSubFieldOf};
-use swanky_party::private::ProverPrivateCopy;
-use swanky_party::{Party, WhichParty};
+use swanky_party::private::PartyPrivateCopy;
 use swanky_svole_wykw::LpnParams;
 
 // Some design decisions:
@@ -228,10 +228,11 @@ where
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<DietMacAndCheese<P, T, T, C, VOLE2>> {
-        self.channel.flush().wrap_err(
-            ErrorKind::NetworkError,
-            "Failed to flush channel.".to_string(),
-        )?;
+        self.channel
+            .flush()
+            .wrap_err_with(ErrorKind::NetworkError, || {
+                "Failed to flush channel.".to_string()
+            })?;
         match P::WHICH {
             WhichParty::Prover(_) => DietMacAndCheese::<P, T, T, C, VOLE2>::init(
                 &mut self.channel,
@@ -251,7 +252,7 @@ where
         }
     }
 
-    fn input(&mut self, v: ProverPrivateCopy<P, V>) -> Result<Mac<P, V, T>> {
+    fn input(&mut self, v: PartyPrivateCopy<Prover, P, V>) -> Result<Mac<P, V, T>> {
         Ok(match P::WHICH {
             WhichParty::Prover(ev) => {
                 let tag =
@@ -268,10 +269,11 @@ where
 
     fn do_mult_check(&mut self) -> Result<usize> {
         debug!("do mult_check");
-        self.channel.flush().wrap_err(
-            ErrorKind::NetworkError,
-            "Failed to flush channel.".to_string(),
-        )?;
+        self.channel
+            .flush()
+            .wrap_err_with(ErrorKind::NetworkError, || {
+                "Failed to flush channel.".to_string()
+            })?;
         let count = self.fcom.quicksilver_finalize(
             &mut self.channel,
             &mut self.rng,
@@ -282,10 +284,11 @@ where
     }
 
     fn do_check_zero(&mut self) -> Result<usize> {
-        self.channel.flush().wrap_err(
-            ErrorKind::NetworkError,
-            "Failed to flush channel.".to_string(),
-        )?;
+        self.channel
+            .flush()
+            .wrap_err_with(ErrorKind::NetworkError, || {
+                "Failed to flush channel.".to_string()
+            })?;
         let count = self
             .zero_check_state
             .finalize(&mut self.channel, &mut self.rng)?;
@@ -360,29 +363,31 @@ where
     fn random(&mut self) -> Result<Self::FieldElement> {
         match P::WHICH {
             WhichParty::Prover(_) => {
-                self.channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
+                self.channel
+                    .flush()
+                    .wrap_err_with(ErrorKind::NetworkError, || {
+                        "Failed to flush channel.".to_string()
+                    })?;
                 let challenge = self
                     .channel
                     .read_serializable::<Self::FieldElement>()
-                    .wrap_err(
-                        ErrorKind::NetworkError,
-                        "Failed to read challenge data.".to_string(),
-                    )?;
+                    .wrap_err_with(ErrorKind::NetworkError, || {
+                        "Failed to read challenge data.".to_string()
+                    })?;
                 Ok(challenge)
             }
             WhichParty::Verifier(_) => {
                 let challenge = Self::FieldElement::random(&mut self.rng);
-                self.channel.write_serializable(&challenge).wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to write challenge data.".to_string(),
-                )?;
-                self.channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
+                self.channel
+                    .write_serializable(&challenge)
+                    .wrap_err_with(ErrorKind::NetworkError, || {
+                        "Failed to write challenge data.".to_string()
+                    })?;
+                self.channel
+                    .flush()
+                    .wrap_err_with(ErrorKind::NetworkError, || {
+                        "Failed to flush channel.".to_string()
+                    })?;
                 Ok(challenge)
             }
         }
@@ -417,9 +422,9 @@ where
                 let b_clr = b.value().into_inner(ev);
                 let product = a_clr * b_clr;
 
-                self.input(ProverPrivateCopy::new(product))?
+                self.input(PartyPrivateCopy::new(product))?
             }
-            WhichParty::Verifier(ev) => self.input(ProverPrivateCopy::empty(ev))?,
+            WhichParty::Verifier(ev) => self.input(PartyPrivateCopy::empty(ev))?,
         };
 
         self.mult_check_state
@@ -450,9 +455,9 @@ where
     fn input_public(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
         self.monitor.incr_monitor_instance();
         Ok(match P::WHICH {
-            WhichParty::Prover(_) => Mac::new(ProverPrivateCopy::new(val), T::ZERO),
+            WhichParty::Prover(_) => Mac::new(PartyPrivateCopy::new(val), T::ZERO),
             WhichParty::Verifier(ev) => Mac::new(
-                ProverPrivateCopy::empty(ev),
+                PartyPrivateCopy::empty(ev),
                 -val * self.fcom.get_delta().into_inner(ev),
             ),
         })
@@ -463,7 +468,7 @@ where
             WhichParty::Prover(_) => {
                 if let Some(val) = val {
                     self.monitor.incr_monitor_witness();
-                    self.input(ProverPrivateCopy::new(val))
+                    self.input(PartyPrivateCopy::new(val))
                 } else {
                     bail!(
                         ErrorKind::OtherError,
@@ -476,7 +481,7 @@ where
                     bail!(ErrorKind::OtherError, "Private input given to the verifier")
                 } else {
                     self.monitor.incr_monitor_witness();
-                    self.input(ProverPrivateCopy::empty(ev))
+                    self.input(PartyPrivateCopy::empty(ev))
                 }
             }
         }
@@ -484,10 +489,11 @@ where
 
     fn finalize(&mut self) -> Result<()> {
         debug!("finalize");
-        self.channel.flush().wrap_err(
-            ErrorKind::NetworkError,
-            "Failed to flush channel.".to_string(),
-        )?;
+        self.channel
+            .flush()
+            .wrap_err_with(ErrorKind::NetworkError, || {
+                "Failed to flush channel.".to_string()
+            })?;
         let zero_check_count = self.do_check_zero()?;
         let mult_check_count = self.do_mult_check()?;
         debug!("finalize: mult_check: {mult_check_count:?}, check_zero: {zero_check_count:?}");
@@ -498,6 +504,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::party::{Prover, Verifier};
     use crate::svole_trait::Svole;
     use crate::{backend::DietMacAndCheese, backend_trait::BackendT, mac::validate};
     use rand::SeedableRng;
@@ -510,7 +517,7 @@ mod tests {
     use swanky_field::{FiniteField, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b};
     use swanky_field_f61p::F61p;
-    use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier};
+    use swanky_party::ty_eq::Witness;
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     fn test<V: IsSubFieldOf<T>, T: FiniteField>()
@@ -551,7 +558,10 @@ mod tests {
             let two_priv = dmc.input_private(Some(two)).unwrap();
             let six = dmc.mul(&two_priv, &three_pub).unwrap();
             let twelve_priv = dmc.mul_constant(&six, two).unwrap();
-            assert_eq!(twelve_priv.value().into_inner(IS_PROVER), three * two * two);
+            assert_eq!(
+                twelve_priv.value().into_inner(Witness::EQUAL_TYPES),
+                three * two * two
+            );
             let n24_priv = dmc.mul(&twelve_priv, &two_priv).unwrap();
             let r_zero_priv = dmc
                 .add_constant(&n24_priv, -(three * two * two * two))
@@ -633,7 +643,7 @@ mod tests {
         validate(
             prover,
             verifier,
-            dmc.fcom.get_delta().into_inner(IS_VERIFIER),
+            dmc.fcom.get_delta().into_inner(Witness::EQUAL_TYPES),
         );
     }
 

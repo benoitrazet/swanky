@@ -2,12 +2,12 @@ use super::{Plugin, PluginExecution};
 use crate::backend_trait::BackendT;
 use crate::circuit_ir::{FunStore, TypeId, TypeSpecification, TypeStore, WireCount};
 use crate::memory::Memory;
+use crate::party::{Party, WhichParty};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
 use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure};
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
-use swanky_party::{Party, WhichParty};
 
 #[derive(Clone, Debug)]
 pub(crate) struct MuxV0 {
@@ -385,10 +385,11 @@ impl Plugin for MuxV0 {
         };
         Ok(PluginExecution::Mux(MuxVersion::MuxVerV0(MuxV0::new(
             type_id,
-            cond_num_wire.try_into().wrap_err(
-                ErrorKind::OtherError,
-                "Failed to represent cond_num_wire as a usize.".to_string(),
-            )?,
+            cond_num_wire
+                .try_into()
+                .wrap_err_with(ErrorKind::OtherError, || {
+                    "Failed to represent cond_num_wire as a usize.".to_string()
+                })?,
             selector_range,
             branch_shape,
             is_permissive,

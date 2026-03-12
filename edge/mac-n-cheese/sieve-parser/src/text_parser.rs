@@ -32,17 +32,20 @@ impl<T: Read + Seek> ParseState<T> {
     #[inline(never)]
     fn skip_comment_after_slash(&mut self) -> swanky_error::Result<()> {
         let mut buf = [0];
-        self.inner.read_exact(&mut buf).wrap_err(
-            ErrorKind::OtherError,
-            "Failed to read character after '/'".to_string(),
-        )?;
+        self.inner
+            .read_exact(&mut buf)
+            .wrap_err_with(ErrorKind::OtherError, || {
+                "Failed to read character after '/'".to_string()
+            })?;
         match buf[0] {
             b'*' => {
                 loop {
-                    let buf = self.inner.fill_buf().wrap_err(
-                        ErrorKind::FilesystemError,
-                        "Failed to fill buffer.".to_string(),
-                    )?;
+                    let buf = self
+                        .inner
+                        .fill_buf()
+                        .wrap_err_with(ErrorKind::FilesystemError, || {
+                            "Failed to fill buffer.".to_string()
+                        })?;
                     if buf.is_empty() {
                         // EOF
                         swanky_error::bail!(ErrorKind::OtherError, "Block comment never ended");
@@ -51,10 +54,11 @@ impl<T: Read + Seek> ParseState<T> {
                         // Consume through the *
                         self.inner.consume(idx + 1);
                         let mut buf = [0];
-                        self.inner.read_exact(&mut buf).wrap_err(
-                            ErrorKind::OtherError,
-                            "Looking for '/' after '*' to terminate block comment".to_string(),
-                        )?;
+                        self.inner
+                            .read_exact(&mut buf)
+                            .wrap_err_with(ErrorKind::OtherError, || {
+                                "Looking for '/' after '*' to terminate block comment".to_string()
+                            })?;
                         if buf[0] == b'/' {
                             return Ok(());
                         }
@@ -66,10 +70,12 @@ impl<T: Read + Seek> ParseState<T> {
                 }
             }
             b'/' => loop {
-                let buf = self.inner.fill_buf().wrap_err(
-                    ErrorKind::FilesystemError,
-                    "Failed to fill buffer.".to_string(),
-                )?;
+                let buf = self
+                    .inner
+                    .fill_buf()
+                    .wrap_err_with(ErrorKind::FilesystemError, || {
+                        "Failed to fill buffer.".to_string()
+                    })?;
                 if buf.is_empty() {
                     // EOF
                     return Ok(());
@@ -98,10 +104,12 @@ impl<T: Read + Seek> ParseState<T> {
         mut f: impl FnMut(u8) -> swanky_error::Result<bool>,
     ) -> swanky_error::Result<()> {
         loop {
-            let buf = self.inner.fill_buf().wrap_err(
-                ErrorKind::FilesystemError,
-                "Failed to fill buffer.".to_string(),
-            )?;
+            let buf = self
+                .inner
+                .fill_buf()
+                .wrap_err_with(ErrorKind::FilesystemError, || {
+                    "Failed to fill buffer.".to_string()
+                })?;
             if buf.is_empty() {
                 // EOF
                 return Ok(());
@@ -128,10 +136,9 @@ impl<T: Read + Seek> ParseState<T> {
             match self
                 .inner
                 .fill_buf()
-                .wrap_err(
-                    ErrorKind::FilesystemError,
-                    "Failed to fill buffer.".to_string(),
-                )?
+                .wrap_err_with(ErrorKind::FilesystemError, || {
+                    "Failed to fill buffer.".to_string()
+                })?
                 .first()
                 .copied()
             {
@@ -139,10 +146,11 @@ impl<T: Read + Seek> ParseState<T> {
                     // Currently, if we see a '/', then it must be the beginning of a comment. We
                     // don't see a '/' in any other circumstance.
                     // Consume through the slash.
-                    self.inner.read_exact(&mut [0]).wrap_err(
-                        ErrorKind::FilesystemError,
-                        "Failed to read '/'.".to_string(),
-                    )?;
+                    self.inner
+                        .read_exact(&mut [0])
+                        .wrap_err_with(ErrorKind::FilesystemError, || {
+                            "Failed to read '/'.".to_string()
+                        })?;
                     self.skip_comment_after_slash()?;
                 }
                 _ => {
@@ -164,7 +172,9 @@ impl<T: Read + Seek> ParseState<T> {
             ps: &mut ParseState<T>,
             dst: &mut Vec<u8>,
         ) -> swanky_error::Result<()> {
-            let byte = ps.consume_byte().context("Expected token.".to_string())?;
+            let byte = ps
+                .consume_byte()
+                .with_context(|| "Expected token.".to_string())?;
             swanky_error::ensure!(
                 ParseState::<T>::is_valid_token_start(byte),
                 ErrorKind::OtherError,
@@ -234,10 +244,11 @@ impl<T: Read + Seek> ParseState<T> {
     fn dots_real(&mut self) -> swanky_error::Result<()> {
         self.ws()?;
         let mut buf = [0; 3];
-        self.inner.read_exact(&mut buf).wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to read dots.".to_string(),
-        )?;
+        self.inner
+            .read_exact(&mut buf)
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to read dots.".to_string()
+            })?;
         swanky_error::ensure!(
             buf.as_slice() == b"...",
             ErrorKind::OtherError,
@@ -261,18 +272,19 @@ impl<T: Read + Seek> ParseState<T> {
         Ok(self
             .inner
             .fill_buf()
-            .wrap_err(
-                ErrorKind::FilesystemError,
-                "Failed to fill buffer.".to_string(),
-            )?
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to fill buffer.".to_string()
+            })?
             .first()
             .copied())
     }
     fn peek_n_exact(&mut self, n: usize) -> swanky_error::Result<Option<&[u8]>> {
-        let buf = self.inner.fill_buf().wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to fill buffer.".to_string(),
-        )?;
+        let buf = self
+            .inner
+            .fill_buf()
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to fill buffer.".to_string()
+            })?;
         if n > buf.len() {
             return Ok(None);
         }
@@ -285,18 +297,21 @@ impl<T: Read + Seek> ParseState<T> {
 
     fn peek_n_bytes(&mut self, n: usize) -> swanky_error::Result<&[u8]> {
         self.ws()?;
-        Ok(&self.inner.fill_buf().wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to fill buffer.".to_string(),
-        )?[..n])
+        Ok(&self
+            .inner
+            .fill_buf()
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to fill buffer.".to_string()
+            })?[..n])
     }
 
     fn consume_byte(&mut self) -> swanky_error::Result<u8> {
         let mut buf = [0];
-        self.inner.read_exact(&mut buf).wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to read byte.".to_string(),
-        )?;
+        self.inner
+            .read_exact(&mut buf)
+            .wrap_err_with(ErrorKind::FilesystemError, || {
+                "Failed to read byte.".to_string()
+            })?;
         Ok(buf[0])
     }
     fn number_format(&mut self) -> swanky_error::Result<NumberFormat> {
@@ -370,10 +385,9 @@ impl<T: Read + Seek> ParseState<T> {
     fn u8(&mut self) -> swanky_error::Result<u8> {
         let out: U64 = self.parse_uint_generic()?;
         let out: u64 = out.to_words()[0].into();
-        let out = out.try_into().wrap_err(
-            ErrorKind::OtherError,
-            "Value cannot be represented as a u8.".to_string(),
-        )?;
+        let out = out.try_into().wrap_err_with(ErrorKind::OtherError, || {
+            "Value cannot be represented as a u8.".to_string()
+        })?;
         Ok(out)
     }
     fn u64(&mut self) -> swanky_error::Result<u64> {
@@ -414,13 +428,12 @@ impl<T: Read + Seek> RelationReader<T> {
             ps,
         };
         out.parse_header()
-            .wrap_err(
-                ErrorKind::OtherError,
+            .wrap_err_with(ErrorKind::OtherError, || {
                 match out.ps.inner.stream_position() {
                     Ok(pos) => format!("Error occurred at byte position {pos}"),
                     Err(e) => format!("Unable to figure out where error occurred due to {e}"),
-                },
-            )
+                }
+            })
             .map(|_| out)
     }
     fn parse_header(&mut self) -> swanky_error::Result<()> {
@@ -582,7 +595,7 @@ impl<T: Read + Seek> RelationReader<T> {
             type_id = self
                 .ps
                 .u8()
-                .context("Parsing type id before wire".to_string())?;
+                .with_context(|| "Parsing type id before wire".to_string())?;
             self.ps.colon()?;
         }
         let wire_id = self.read_wire_id()?;
@@ -590,7 +603,7 @@ impl<T: Read + Seek> RelationReader<T> {
     }
     fn read_wire_id(&mut self) -> swanky_error::Result<WireId> {
         self.ps.dollar()?;
-        self.ps.u64().context("Parsing wire id".to_string())
+        self.ps.u64().with_context(|| "Parsing wire id".to_string())
     }
     fn read_new_or_delete_body(&mut self) -> swanky_error::Result<(TypeId, WireId, WireId)> {
         self.ps.expect_byte(b'(')?;
@@ -800,10 +813,10 @@ impl<T: Read + Seek> RelationReader<T> {
                             let ty = if peeked != b'<' && peeked != b'$' {
                                 // If we see neither a < or $, then assume that it's the type
                                 // number up first.
-                                let ty = self.ps.u8().context(
+                                let ty = self.ps.u8().with_context(|| {
                                     "Expecting type number following '<-' for constant or copy"
-                                        .to_string(),
-                                )?;
+                                        .to_string()
+                                })?;
                                 self.ps.colon()?;
                                 ty
                             } else {
@@ -847,7 +860,7 @@ impl<T: Read + Seek> RelationReader<T> {
                     let dst_type_id = self
                         .ps
                         .u8()
-                        .context("parsing type id of conversion destination".to_string())?;
+                        .with_context(|| "parsing type id of conversion destination".to_string())?;
                     self.ps.colon()?;
                     let dst = self.read_wire_range()?;
                     self.ps.larrow()?;
@@ -1053,10 +1066,11 @@ impl<T: Read + Seek> RelationReader<T> {
 }
 impl super::RelationReader for RelationReader<File> {
     fn open(path: &std::path::Path) -> swanky_error::Result<Self> {
-        Self::new(File::open(path).wrap_err(
-            ErrorKind::FilesystemError,
-            format!("Failed to open {path:?}."),
-        )?)
+        Self::new(
+            File::open(path).wrap_err_with(ErrorKind::FilesystemError, || {
+                format!("Failed to open {path:?}.")
+            })?,
+        )
     }
     fn read(self, rv: &mut impl RelationVisitor) -> swanky_error::Result<()> {
         <RelationReader<File>>::read(self, rv)
@@ -1159,10 +1173,9 @@ impl super::ValueStreamReader for ValueStreamReader<File> {
     fn open(kind: ValueStreamKind, path: &std::path::Path) -> swanky_error::Result<Self> {
         Self::new(
             kind,
-            File::open(path).wrap_err(
-                ErrorKind::FilesystemError,
-                format!("Failed to open {path:?}."),
-            )?,
+            File::open(path).wrap_err_with(ErrorKind::FilesystemError, || {
+                format!("Failed to open {path:?}.")
+            })?,
         )
     }
     fn modulus(&self) -> &Number {

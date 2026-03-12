@@ -5,6 +5,7 @@ use clap::Parser;
 use cli::Cli;
 use diet_mac_and_cheese::EvaluatorCirc;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
+use diet_mac_and_cheese::party::{Party, Prover, Verifier, WhichParty};
 use diet_mac_and_cheese::sieveir_reader_fbs::{InputFlatbuffers, read_types};
 use diet_mac_and_cheese::sieveir_reader_text::InputText;
 use diet_mac_and_cheese::svole_thread::SvoleAtomic;
@@ -23,7 +24,6 @@ use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::{Channel, SyncChannel};
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_field_binary::{F2, F40b};
-use swanky_party::{Party, Prover, Verifier, WhichParty};
 
 #[cfg(feature = "jemalloc")]
 use jemallocator::Jemalloc;
@@ -65,10 +65,10 @@ fn start_connection_verifier(addresses: &[String]) -> Result<Vec<TcpStream>> {
     let mut tcp_streams = vec![];
 
     for addr in addresses.iter() {
-        let listener = TcpListener::bind(addr.clone()).wrap_err(
-            ErrorKind::NetworkError,
-            format!("Failed to bind to {addr}."),
-        )?;
+        let listener = TcpListener::bind(addr.clone())
+            .wrap_err_with(ErrorKind::NetworkError, || {
+                format!("Failed to bind to {addr}.")
+            })?;
         match listener.accept() {
             Ok((stream, _addr)) => {
                 tcp_streams.push(stream);
@@ -253,10 +253,13 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
             let mut conns = start_connection_verifier(std::slice::from_ref(&args.connection_addr))?;
             let stream = conns.pop().unwrap();
 
-            let reader = BufReader::new(stream.try_clone().wrap_err(
-                ErrorKind::NetworkError,
-                "Failed to clone TCP stream for reader.".to_string(),
-            )?);
+            let reader = BufReader::new(
+                stream
+                    .try_clone()
+                    .wrap_err_with(ErrorKind::NetworkError, || {
+                        "Failed to clone TCP stream for reader.".to_string()
+                    })?,
+            );
             let writer = BufWriter::new(stream);
             let mut channel = Channel::new(reader, writer);
 
@@ -277,10 +280,10 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
 
             let start = Instant::now();
             if is_text {
-                let relation_file = File::open(relation_path).wrap_err(
-                    ErrorKind::FilesystemError,
-                    "Failed to open relation.".to_string(),
-                )?;
+                let relation_file = File::open(relation_path)
+                    .wrap_err_with(ErrorKind::FilesystemError, || {
+                        "Failed to open relation.".to_string()
+                    })?;
                 let relation_reader = BufReader::new(relation_file);
                 evaluator.evaluate_relation_text(relation_reader)?;
             } else {
@@ -294,10 +297,13 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
             let mut conns = start_connection_prover(std::slice::from_ref(&args.connection_addr))?;
             let stream = conns.pop().unwrap();
 
-            let reader = BufReader::new(stream.try_clone().wrap_err(
-                ErrorKind::NetworkError,
-                "Failed to clone TCP stream for reader.".to_string(),
-            )?);
+            let reader = BufReader::new(
+                stream
+                    .try_clone()
+                    .wrap_err_with(ErrorKind::NetworkError, || {
+                        "Failed to clone TCP stream for reader.".to_string()
+                    })?,
+            );
             let writer = BufWriter::new(stream);
             let mut channel = Channel::new(reader, writer);
 
@@ -317,10 +323,10 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
             if is_text {
-                let relation_file = File::open(relation_path).wrap_err(
-                    ErrorKind::FilesystemError,
-                    "Failed to open relation.".to_string(),
-                )?;
+                let relation_file = File::open(relation_path)
+                    .wrap_err_with(ErrorKind::FilesystemError, || {
+                        "Failed to open relation.".to_string()
+                    })?;
                 let relation_reader = BufReader::new(relation_file);
                 evaluator.evaluate_relation_text(relation_reader)?;
             } else {
@@ -395,10 +401,10 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
 
             let start = Instant::now();
             if is_text {
-                let relation_file = File::open(relation_path).wrap_err(
-                    ErrorKind::FilesystemError,
-                    "Failed to open relation.".to_string(),
-                )?;
+                let relation_file = File::open(relation_path)
+                    .wrap_err_with(ErrorKind::FilesystemError, || {
+                        "Failed to open relation.".to_string()
+                    })?;
                 let relation_reader = BufReader::new(relation_file);
                 evaluator.evaluate_relation_text(relation_reader)?;
             } else {
@@ -461,10 +467,10 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
 
             let start = Instant::now();
             if is_text {
-                let relation_file = File::open(relation_path).wrap_err(
-                    ErrorKind::FilesystemError,
-                    "Failed to open relation.".to_string(),
-                )?;
+                let relation_file = File::open(relation_path)
+                    .wrap_err_with(ErrorKind::FilesystemError, || {
+                        "Failed to open relation.".to_string()
+                    })?;
                 let relation_reader = BufReader::new(relation_file);
                 evaluator.evaluate_relation_text(relation_reader)?;
             } else {
@@ -515,10 +521,10 @@ fn run_plaintext(args: &Cli) -> Result<()> {
             let start = Instant::now();
 
             if args.text {
-                let relation_file = File::open(relation_path).wrap_err(
-                    ErrorKind::FilesystemError,
-                    "Failed to open relation.".to_string(),
-                )?;
+                let relation_file = File::open(relation_path)
+                    .wrap_err_with(ErrorKind::FilesystemError, || {
+                        "Failed to open relation.".to_string()
+                    })?;
                 let relation_reader = BufReader::new(relation_file);
                 evaluator.evaluate_relation_text(relation_reader)?;
             } else {

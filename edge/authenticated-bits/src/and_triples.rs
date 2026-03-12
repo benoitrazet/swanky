@@ -46,7 +46,9 @@ use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer};
-use swanky_party::{Party, WhichParty, either::PartyEither, private::VerifierPrivate};
+use swanky_party::{
+    GenericParty, GenericWhichParty, Party1, either::PartyEither, private::PartyPrivate,
+};
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 use vectoreyes::U8x16;
 
@@ -56,18 +58,18 @@ use vectoreyes::U8x16;
 /// [`AndTripleGenerator`].
 #[derive(Clone, Copy, TransparentWrapper)]
 #[repr(transparent)]
-pub struct AndTriple<P: Party>(
+pub struct AndTriple<P: GenericParty>(
     // A `LeakyAndTriple` is still an AND triple.
     LeakyAndTriple<P>,
 );
 
-impl<P: Party> From<LeakyAndTriple<P>> for AndTriple<P> {
+impl<P: GenericParty> From<LeakyAndTriple<P>> for AndTriple<P> {
     fn from(value: LeakyAndTriple<P>) -> Self {
         Self(value)
     }
 }
 
-impl<P: Party> AndTriple<P> {
+impl<P: GenericParty> AndTriple<P> {
     /// The authenticated share $`\langle x \rangle`$.
     pub fn x(&self) -> AuthShare<P> {
         self.0.x()
@@ -86,11 +88,11 @@ impl<P: Party> AndTriple<P> {
 }
 
 /// A type for generating [`AndTriple`]s.
-pub struct AndTripleGenerator<P: Party> {
+pub struct AndTripleGenerator<P: GenericParty> {
     leaky_generator: LeakyAndTripleGenerator<P>,
 }
 
-impl<P: Party> AndTripleGenerator<P> {
+impl<P: GenericParty> AndTripleGenerator<P> {
     /// Create a new [`AndTripleGenerator`].
     pub fn new<RNG: CryptoRng + Rng>(
         channel: &mut Channel,
@@ -231,24 +233,26 @@ impl<P: Party> AndTripleGenerator<P> {
         // Contains the intermediate bits `f` and `g` send by Party A.
         let mut intermediates = Cursor::new(vec![]);
         // Only Party B needs to serialize the intermediate values.
-        let mut vec_ser = VerifierPrivate::new(F2BitSerializer::new(&mut intermediates).wrap_err(
-            ErrorKind::InitializationError,
-            "Failed to initialize F2 bit serializer.".to_string(),
-        )?);
-        let mut serde = match P::WHICH {
-            WhichParty::Prover(ev) => PartyEither::prover_new(
+        let mut vec_ser: PartyPrivate<Party1<P>, _, _> = PartyPrivate::new(
+            F2BitSerializer::new(&mut intermediates)
+                .wrap_err_with(ErrorKind::InitializationError, || {
+                    "Failed to initialize F2 bit serializer.".to_string()
+                })?,
+        );
+        let mut serde: PartyEither<P, _, _> = match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(ev) => PartyEither::new(
                 ev,
-                F2BitSerializer::new(&mut channel).wrap_err(
-                    ErrorKind::InitializationError,
-                    "Failed to initialize F2 bit serializer.".to_string(),
-                )?,
+                F2BitSerializer::new(&mut channel)
+                    .wrap_err_with(ErrorKind::InitializationError, || {
+                        "Failed to initialize F2 bit serializer.".to_string()
+                    })?,
             ),
-            WhichParty::Verifier(ev) => PartyEither::verifier_new(
+            GenericWhichParty::Party1(ev) => PartyEither::new(
                 ev,
-                F2BitDeserializer::new(&mut channel).wrap_err(
-                    ErrorKind::InitializationError,
-                    "Failed to initialize F2 bit deserializer.".to_string(),
-                )?,
+                F2BitDeserializer::new(&mut channel)
+                    .wrap_err_with(ErrorKind::InitializationError, || {
+                        "Failed to initialize F2 bit deserializer.".to_string()
+                    })?,
             ),
         };
         // Round 1a: Party A --> Party B.
@@ -256,77 +260,91 @@ impl<P: Party> AndTripleGenerator<P> {
             // Compute Party A's openings of `f := ⟨a⟩ ⊕ ⟨x⟩` and `g := ⟨b⟩ ⊕ ⟨y⟩`.
             let f = *a ^ random.x();
             let g = *b ^ random.y();
-            match P::WHICH {
-                WhichParty::Prover(ev) => {
-                    let ser = serde.as_mut().prover_into(ev);
-                    ser.write(&mut channel, f.bit()).wrap_err(
-                        ErrorKind::NetworkError,
-                        "Failed to write opened bit f := ⟨a⟩ ⊕ ⟨x⟩.".to_string(),
-                    )?;
-                    ser.write(&mut channel, g.bit()).wrap_err(
-                        ErrorKind::NetworkError,
-                        "Failed to write opened bit g := ⟨b⟩ ⊕ ⟨y⟩.".to_string(),
-                    )?;
+            match P::GENERIC_WHICH {
+                GenericWhichParty::Party0(ev) => {
+                    let ser = serde.as_mut().into_inner(ev);
+                    ser.write(&mut channel, f.bit())
+                        .wrap_err_with(ErrorKind::NetworkError, || {
+                            "Failed to write opened bit f := ⟨a⟩ ⊕ ⟨x⟩.".to_string()
+                        })?;
+                    ser.write(&mut channel, g.bit())
+                        .wrap_err_with(ErrorKind::NetworkError, || {
+                            "Failed to write opened bit g := ⟨b⟩ ⊕ ⟨y⟩.".to_string()
+                        })?;
                 }
-                WhichParty::Verifier(ev) => {
-                    let de = serde.as_mut().verifier_into(ev);
+                GenericWhichParty::Party1(ev) => {
+                    let de = serde.as_mut().into_inner(ev);
                     let f1: F2 = de
                         .read(&mut channel)
-                        .wrap_err(ErrorKind::NetworkError, "Failed to read bit.".to_string())?;
+                        .wrap_err_with(ErrorKind::NetworkError, || {
+                            "Failed to read bit.".to_string()
+                        })?;
                     let g1: F2 = de
                         .read(&mut channel)
-                        .wrap_err(ErrorKind::NetworkError, "Failed to read bit.".to_string())?;
+                        .wrap_err_with(ErrorKind::NetworkError, || {
+                            "Failed to read bit.".to_string()
+                        })?;
                     // Store `f1` and `g1` to be used in Round 1b.
                     vec_ser
                         .as_mut()
                         .into_inner(ev)
                         .write(&mut intermediates, f1)
-                        .wrap_err(ErrorKind::NetworkError, "Failed to write bit.".to_string())?;
+                        .wrap_err_with(ErrorKind::NetworkError, || {
+                            "Failed to write bit.".to_string()
+                        })?;
                     vec_ser
                         .as_mut()
                         .into_inner(ev)
                         .write(&mut intermediates, g1)
-                        .wrap_err(ErrorKind::NetworkError, "Failed to write bit.".to_string())?;
+                        .wrap_err_with(ErrorKind::NetworkError, || {
+                            "Failed to write bit.".to_string()
+                        })?;
                 }
             };
         }
         // Finalize Round 1a.
-        match P::WHICH {
-            WhichParty::Prover(ev) => serde.prover_into(ev).finish(&mut channel).wrap_err(
-                ErrorKind::SerializationError,
-                "Failed to finalize bit serialization.".to_string(),
-            )?,
-            WhichParty::Verifier(ev) => {
-                vec_ser.into_inner(ev).finish(&mut intermediates).wrap_err(
-                    ErrorKind::SerializationError,
-                    "Failed to finalize bit serialization.".to_string(),
-                )?;
-                intermediates.rewind().wrap_err(
-                    ErrorKind::OtherError,
-                    "Failed to rewind cursor.".to_string(),
-                )?;
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(ev) => serde
+                .into_inner(ev)
+                .finish(&mut channel)
+                .wrap_err_with(ErrorKind::SerializationError, || {
+                    "Failed to finalize bit serialization.".to_string()
+                })?,
+            GenericWhichParty::Party1(ev) => {
+                vec_ser
+                    .into_inner(ev)
+                    .finish(&mut intermediates)
+                    .wrap_err_with(ErrorKind::SerializationError, || {
+                        "Failed to finalize bit serialization.".to_string()
+                    })?;
+                intermediates
+                    .rewind()
+                    .wrap_err_with(ErrorKind::OtherError, || {
+                        "Failed to rewind cursor.".to_string()
+                    })?;
             }
         }
         // Only Party B needs to deserialize the intermediate values.
-        let mut vec_de =
-            VerifierPrivate::new(F2BitDeserializer::new(&mut intermediates).wrap_err(
-                ErrorKind::InitializationError,
-                "Failed to initialize bit deserializer.".to_string(),
-            )?);
-        let mut serde = match P::WHICH {
-            WhichParty::Prover(ev) => PartyEither::prover_new(
+        let mut vec_de: PartyPrivate<Party1<P>, _, _> = PartyPrivate::new(
+            F2BitDeserializer::new(&mut intermediates)
+                .wrap_err_with(ErrorKind::InitializationError, || {
+                    "Failed to initialize bit deserializer.".to_string()
+                })?,
+        );
+        let mut serde: PartyEither<P, _, _> = match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(ev) => PartyEither::new(
                 ev,
-                F2BitDeserializer::new(&mut channel).wrap_err(
-                    ErrorKind::InitializationError,
-                    "Failed to initialize bit deserializer.".to_string(),
-                )?,
+                F2BitDeserializer::new(&mut channel)
+                    .wrap_err_with(ErrorKind::InitializationError, || {
+                        "Failed to initialize bit deserializer.".to_string()
+                    })?,
             ),
-            WhichParty::Verifier(ev) => PartyEither::verifier_new(
+            GenericWhichParty::Party1(ev) => PartyEither::new(
                 ev,
-                F2BitSerializer::new(&mut channel).wrap_err(
-                    ErrorKind::InitializationError,
-                    "Failed to initialize bit serializer.".to_string(),
-                )?,
+                F2BitSerializer::new(&mut channel)
+                    .wrap_err_with(ErrorKind::InitializationError, || {
+                        "Failed to initialize bit serializer.".to_string()
+                    })?,
             ),
         };
 
@@ -335,37 +353,49 @@ impl<P: Party> AndTripleGenerator<P> {
             // Compute openings of `f := ⟨a⟩ ⊕ ⟨x⟩` and `g := ⟨b⟩ ⊕ ⟨y⟩`.
             let f = *a ^ random.x();
             let g = *b ^ random.y();
-            let (f, g) = match P::WHICH {
-                WhichParty::Prover(ev) => {
-                    let de = serde.as_mut().prover_into(ev);
+            let (f, g) = match P::GENERIC_WHICH {
+                GenericWhichParty::Party0(ev) => {
+                    let de = serde.as_mut().into_inner(ev);
                     let f2: F2 = de
                         .read(&mut channel)
-                        .wrap_err(ErrorKind::NetworkError, "Failed to read bit.".to_string())?;
+                        .wrap_err_with(ErrorKind::NetworkError, || {
+                            "Failed to read bit.".to_string()
+                        })?;
                     let g2: F2 = de
                         .read(&mut channel)
-                        .wrap_err(ErrorKind::NetworkError, "Failed to read bit.".to_string())?;
+                        .wrap_err_with(ErrorKind::NetworkError, || {
+                            "Failed to read bit.".to_string()
+                        })?;
                     let f = f.bit() + f2;
                     let g = g.bit() + g2;
                     (f, g)
                 }
-                WhichParty::Verifier(ev) => {
-                    let ser = serde.as_mut().verifier_into(ev);
+                GenericWhichParty::Party1(ev) => {
+                    let ser = serde.as_mut().into_inner(ev);
                     ser.write(&mut channel, f.bit())
-                        .wrap_err(ErrorKind::NetworkError, "Failed to write bit.".to_string())?;
+                        .wrap_err_with(ErrorKind::NetworkError, || {
+                            "Failed to write bit.".to_string()
+                        })?;
                     ser.write(&mut channel, g.bit())
-                        .wrap_err(ErrorKind::NetworkError, "Failed to write bit.".to_string())?;
+                        .wrap_err_with(ErrorKind::NetworkError, || {
+                            "Failed to write bit.".to_string()
+                        })?;
                     let f = f.bit()
                         + vec_de
                             .as_mut()
                             .into_inner(ev)
                             .read(&mut intermediates)
-                            .wrap_err(ErrorKind::NetworkError, "Failed to read bit.".to_string())?;
+                            .wrap_err_with(ErrorKind::NetworkError, || {
+                                "Failed to read bit.".to_string()
+                            })?;
                     let g = g.bit()
                         + vec_de
                             .as_mut()
                             .into_inner(ev)
                             .read(&mut intermediates)
-                            .wrap_err(ErrorKind::NetworkError, "Failed to read bit.".to_string())?;
+                            .wrap_err_with(ErrorKind::NetworkError, || {
+                                "Failed to read bit.".to_string()
+                            })?;
                     (f, g)
                 }
             };
@@ -384,12 +414,14 @@ impl<P: Party> AndTripleGenerator<P> {
             outputs.push(c);
         }
         // Finalize Round 1b.
-        match P::WHICH {
-            WhichParty::Prover(_) => (),
-            WhichParty::Verifier(ev) => serde.verifier_into(ev).finish(&mut channel).wrap_err(
-                ErrorKind::SerializationError,
-                "Failed to finalize bit serialization.".to_string(),
-            )?,
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(_) => (),
+            GenericWhichParty::Party1(ev) => serde
+                .into_inner(ev)
+                .finish(&mut channel)
+                .wrap_err_with(ErrorKind::SerializationError, || {
+                    "Failed to finalize bit serialization.".to_string()
+                })?,
         }
         Ok(())
     }
@@ -413,9 +445,17 @@ impl<P: Party> AndTripleGenerator<P> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::authshares::{PartyA, PartyB};
     use proptest::prelude::*;
     use swanky_aes_rng::AesRng;
+    use swanky_party::party_system;
+
+    party_system! {
+        mod ps {
+            PartyA,
+            PartyB,
+        }
+    }
+    use ps::{PartyA, PartyB};
 
     fn generators(
         mut rng_a: &mut AesRng,

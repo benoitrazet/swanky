@@ -1,8 +1,7 @@
 use std::{marker::PhantomData, sync::Arc};
 
 use mac_n_cheese_ir::compilation_format::FieldMacType;
-use mac_n_cheese_vole::{mac::MacTypes, vole::VoleSizes};
-use swanky_party::Party;
+use mac_n_cheese_vole::{mac::MacTypes, party::Party, vole::VoleSizes};
 
 use crate::{
     alloc::TaskDataBuffer,

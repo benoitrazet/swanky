@@ -7,14 +7,12 @@ use mac_n_cheese_ir::circuit_builder::{
     vole_supplier::VoleSupplier,
 };
 use mac_n_cheese_sieve_parser::ValueStreamReader;
+use mac_n_cheese_vole::party::{Party, Prover, WhichParty};
 use mac_n_cheese_wire_map::WireMap;
 use rustc_hash::FxHashMap;
 use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
 use swanky_field_binary::F2;
-use swanky_party::{
-    Party, WhichParty,
-    private::{ProverPrivate, ProverPrivateCopy},
-};
+use swanky_party::private::{PartyPrivate, PartyPrivateCopy};
 
 use super::{
     Inputs,
@@ -115,7 +113,7 @@ impl Resolver {
 
 struct CircuitMaker<P: Party, FE: CompilerField> {
     fix_id: u32,
-    fix_data: Vec<ProverPrivateCopy<P, FE>>,
+    fix_data: Vec<PartyPrivateCopy<Prover, P, FE>>,
     constant_id: u32,
     constant_data: Vec<FE>,
     linear_id: u32,
@@ -166,7 +164,7 @@ impl<P: Party, FE: CompilerField> CircuitMaker<P, FE> {
         &mut self,
         cb: &mut CircuitBuilder,
         vs: &mut VoleSupplier,
-        pb: &mut ProverPrivate<P, &mut PrivateBuilder>,
+        pb: &mut PartyPrivate<Prover, P, &mut PrivateBuilder>,
     ) -> swanky_error::Result<()> {
         if self.fix_data.is_empty() {
             return Ok(());
@@ -194,8 +192,8 @@ impl<P: Party, FE: CompilerField> CircuitMaker<P, FE> {
         &mut self,
         cb: &mut CircuitBuilder,
         vs: &mut VoleSupplier,
-        pb: &mut ProverPrivate<P, &mut PrivateBuilder>,
-        x: ProverPrivateCopy<P, FE>,
+        pb: &mut PartyPrivate<Prover, P, &mut PrivateBuilder>,
+        x: PartyPrivateCopy<Prover, P, FE>,
     ) -> swanky_error::Result<WireRef> {
         let out = WireRef {
             which_task: self.fix_id,
@@ -364,16 +362,16 @@ impl<P: Party, FE: CompilerField> CircuitMaker<P, FE> {
 }
 
 field_generic_type!(CircuitMakerTy<P: Party, FE: CompilerField> => CircuitMaker<P, FE>);
-field_generic_type!(ValuedWire<P: Party, FE: CompilerField> => (WireRef, ProverPrivateCopy<P, FE>));
+field_generic_type!(ValuedWire<P: Party, FE: CompilerField> => (WireRef, PartyPrivateCopy<Prover, P, FE>));
 
 fn mul<P: Party, FE: CompilerField>(
     cb: &mut CircuitBuilder,
     vs: &mut VoleSupplier,
-    pb: &mut ProverPrivate<P, &mut PrivateBuilder>,
+    pb: &mut PartyPrivate<Prover, P, &mut PrivateBuilder>,
     cm: &mut CircuitMaker<P, FE>,
-    (left, left_v): (WireRef, ProverPrivateCopy<P, FE>),
-    (right, right_v): (WireRef, ProverPrivateCopy<P, FE>),
-) -> swanky_error::Result<(WireRef, ProverPrivateCopy<P, FE>)> {
+    (left, left_v): (WireRef, PartyPrivateCopy<Prover, P, FE>),
+    (right, right_v): (WireRef, PartyPrivateCopy<Prover, P, FE>),
+) -> swanky_error::Result<(WireRef, PartyPrivateCopy<Prover, P, FE>)> {
     let product_v = left_v.zip(right_v).map(|(a, b)| a * b);
     let product = cm.fix(cb, vs, pb, product_v)?;
     cm.assert_multiply(cb, left, right, product)?;
@@ -384,9 +382,9 @@ struct EvaluateFieldInstructions<'a, 'b, 'c, 'd, P: Party, VSR: ValueStreamReade
     wm: &'a mut FieldGenericProduct<WireMap<'b, ValuedWire<P>>>,
     cb: &'a mut CircuitBuilder<'c>,
     vs: &'a mut VoleSupplier,
-    pb: &'a mut ProverPrivate<P, &'d mut PrivateBuilder>,
+    pb: &'a mut PartyPrivate<Prover, P, &'d mut PrivateBuilder>,
     cm: &'a mut FieldGenericProduct<CircuitMakerTy<P>>,
-    witnesses: &'a mut ProverPrivate<P, Inputs<VSR>>,
+    witnesses: &'a mut PartyPrivate<Prover, P, Inputs<VSR>>,
     public_inputs: &'a mut FieldGenericProduct<std::vec::IntoIter<FieldGenericIdentity>>,
 }
 
@@ -407,13 +405,13 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                 FieldInstruction::Constant { dst, src } => put(
                     wm,
                     dst,
-                    (cm.constant(self.cb, src)?, ProverPrivateCopy::new(src)),
+                    (cm.constant(self.cb, src)?, PartyPrivateCopy::new(src)),
                 )?,
                 FieldInstruction::AssertZero { src } => {
-                    let (src, src_value) = *wm.get(src).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {src}.".to_string(),
-                    )?;
+                    let (src, src_value) =
+                        *wm.get(src).wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {src}.")
+                        })?;
                     if let WhichParty::Prover(e) = P::WHICH {
                         swanky_error::ensure!(
                             src_value.into_inner(e) == FE::ZERO,
@@ -426,10 +424,9 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                 FieldInstruction::Copy { dst, src } => {
                     let src = *wm
                         .get(src)
-                        .wrap_err(
-                            ErrorKind::OtherError,
-                            "Failed to get wire {src}.".to_string(),
-                        )
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {src}.")
+                        })
                         .with_context(|| {
                             format!(
                                 "Copy to {dst} from {src} in {}",
@@ -441,20 +438,19 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                 FieldInstruction::Add { dst, left, right } => {
                     let (left, left_v) = *wm
                         .get(left)
-                        .wrap_err(
-                            ErrorKind::OtherError,
-                            "Failed to get wire {left}.".to_string(),
-                        )
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {left}.")
+                        })
                         .with_context(|| {
                             format!(
                                 "Add to {dst} from {left} in {}",
                                 std::any::type_name::<FE>()
                             )
                         })?;
-                    let (right, right_v) = *wm.get(right).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {right}.".to_string(),
-                    )?;
+                    let (right, right_v) =
+                        *wm.get(right).wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {right}.")
+                        })?;
                     put(
                         wm,
                         dst,
@@ -465,14 +461,14 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                     )?;
                 }
                 FieldInstruction::Mul { dst, left, right } => {
-                    let (left, left_v) = *wm.get(left).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {left}.".to_string(),
-                    )?;
-                    let (right, right_v) = *wm.get(right).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {right}.".to_string(),
-                    )?;
+                    let (left, left_v) =
+                        *wm.get(left).wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {left}.")
+                        })?;
+                    let (right, right_v) =
+                        *wm.get(right).wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {right}.")
+                        })?;
                     let (product, product_v) = mul(
                         self.cb,
                         self.vs,
@@ -484,10 +480,10 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                     put(wm, dst, (product, product_v))?;
                 }
                 FieldInstruction::AddConstant { dst, left, right } => {
-                    let (left, left_v) = *wm.get(left).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {left}.".to_string(),
-                    )?;
+                    let (left, left_v) =
+                        *wm.get(left).wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {left}.")
+                        })?;
                     let right_c = cm.constant(self.cb, right)?;
                     put(
                         wm,
@@ -499,10 +495,10 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                     )?;
                 }
                 FieldInstruction::MulConstant { dst, left, right } => {
-                    let (left, left_v) = *wm.get(left).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to get wire {left}.".to_string(),
-                    )?;
+                    let (left, left_v) =
+                        *wm.get(left).wrap_err_with(ErrorKind::OtherError, || {
+                            format!("Failed to get wire {left}.")
+                        })?;
                     put(
                         wm,
                         dst,
@@ -519,12 +515,12 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                     put(
                         wm,
                         dst,
-                        (cm.constant(self.cb, c)?, ProverPrivateCopy::new(c)),
+                        (cm.constant(self.cb, c)?, PartyPrivateCopy::new(c)),
                     )?;
                 }
                 FieldInstruction::GetWitness { dst } => {
                     witness_buf.clear();
-                    let value = ProverPrivateCopy::from(
+                    let value = PartyPrivateCopy::from(
                         self.witnesses
                             .as_mut()
                             .map(|x| x.read_into(1, &mut witness_buf))
@@ -544,10 +540,10 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
 fn eval<P: Party, VSR: ValueStreamReader>(
     cb: &mut CircuitBuilder,
     vs: &mut VoleSupplier,
-    pb: &mut ProverPrivate<P, &mut PrivateBuilder>,
+    pb: &mut PartyPrivate<Prover, P, &mut PrivateBuilder>,
     wm: &mut FieldGenericProduct<WireMap<ValuedWire<P>>>,
     cm: &mut FieldGenericProduct<CircuitMakerTy<P>>,
-    witnesses: &mut ProverPrivate<P, Inputs<VSR>>,
+    witnesses: &mut PartyPrivate<Prover, P, Inputs<VSR>>,
     instructions: &[Instruction],
     public_inputs: &mut FieldGenericProduct<std::vec::IntoIter<FieldGenericIdentity>>,
     functions: &[Arc<FunctionDefinition>],
@@ -588,9 +584,10 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                         type Output = swanky_error::Result<WireMap<'b, ValuedWire<P>>>;
                         fn visit<FE: CompilerField>(
                             self,
-                            parent: &'b mut WireMap<'c, (WireRef, ProverPrivateCopy<P, FE>)>,
-                        ) -> swanky_error::Result<WireMap<'b, (WireRef, ProverPrivateCopy<P, FE>)>>
-                        {
+                            parent: &'b mut WireMap<'c, (WireRef, PartyPrivateCopy<Prover, P, FE>)>,
+                        ) -> swanky_error::Result<
+                            WireMap<'b, (WireRef, PartyPrivateCopy<Prover, P, FE>)>,
+                        > {
                             let cm = self.cm.as_mut().get::<FE>();
 
                             let in_ranges = &self.in_ranges[FE::FIELD_TYPE];
@@ -659,7 +656,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                             for (w, &b) in (start..=inclusive_end)
                                                 .zip(value_le_bits.iter().rev())
                                             {
-                                                let counter_b_v = ProverPrivateCopy::new(b);
+                                                let counter_b_v = PartyPrivateCopy::new(b);
                                                 let counter_b = cm.constant(self.cb, b)?;
 
                                                 put(&mut out, w, (counter_b, counter_b_v))?;
@@ -672,7 +669,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                             out.alloc(start, start)?;
 
                                             let counter = to_fe(value)?;
-                                            let counter_v = ProverPrivateCopy::new(counter);
+                                            let counter_v = PartyPrivateCopy::new(counter);
                                             let counter = cm.constant(self.cb, counter)?;
 
                                             put(&mut out, start, (counter, counter_v))?;
@@ -715,7 +712,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                     wm: &'a mut FieldGenericProduct<WireMap<'b, ValuedWire<P>>>,
                     cb: &'a mut CircuitBuilder<'c>,
                     vs: &'a mut VoleSupplier,
-                    pb: &'a mut ProverPrivate<P, &'d mut PrivateBuilder>,
+                    pb: &'a mut PartyPrivate<Prover, P, &'d mut PrivateBuilder>,
                     cm: &'a mut FieldGenericProduct<CircuitMakerTy<P>>,
                     permissiveness: &'a Permissiveness,
                     in_ranges: &'a Vec<WireRange>,
@@ -743,17 +740,18 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                         let num_branches = branch_inputs.len() / num_ranges_per_branch;
 
                         // Build one-hot selecting vector, convince verifier it's correct. F2 has special behavior.
-                        let mut g: Vec<(WireRef, ProverPrivateCopy<P, FE>)> =
+                        let mut g: Vec<(WireRef, PartyPrivateCopy<Prover, P, FE>)> =
                             Vec::with_capacity(num_branches);
                         match FE::FIELD_TYPE {
                             FieldType::F2 => {
                                 let mut cond_wires =
                                     Vec::with_capacity(cond_wire_range.len() as usize);
                                 for w in cond_wire_range.start..=cond_wire_range.inclusive_end {
-                                    cond_wires.push(*wm.get(w).wrap_err(
-                                        ErrorKind::OtherError,
-                                        "Failed to get wire {w}.".to_string(),
-                                    )?);
+                                    cond_wires.push(
+                                        *wm.get(w).wrap_err_with(ErrorKind::OtherError, || {
+                                            format!("Failed to get wire {w}.")
+                                        })?,
+                                    );
                                 }
 
                                 for i in 0..num_branches {
@@ -796,10 +794,11 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                 debug_assert_eq!(cond_wire_range.len(), 1);
 
                                 // c
-                                let (cond, cond_v) = *wm.get(cond_wire_range.start).wrap_err(
-                                    ErrorKind::OtherError,
-                                    format!("Failed to get wire {}.", cond_wire_range.start),
-                                )?;
+                                let (cond, cond_v) = *wm
+                                    .get(cond_wire_range.start)
+                                    .wrap_err_with(ErrorKind::OtherError, || {
+                                        format!("Failed to get wire {}.", cond_wire_range.start)
+                                    })?;
 
                                 for i in 0..num_branches {
                                     let i = to_fe(i)?;
@@ -897,19 +896,19 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                         ErrorKind::OtherError,
                                         "Mux has no input branches",
                                     )?)
-                                    .wrap_err(
-                                        ErrorKind::OtherError,
-                                        "Failed to get b_0_jth wire.".to_string(),
-                                    )?;
+                                    .wrap_err_with(ErrorKind::OtherError, || {
+                                        "Failed to get b_0_jth wire.".to_string()
+                                    })?;
 
                                 let (mut sum, mut sum_v) =
                                     mul(self.cb, self.vs, self.pb, cm, g_0, b_0_j)?;
 
                                 for (b_i_j, &g_i) in jth_branch_wires.zip(&g[1..]) {
-                                    let b_i_j = *wm.get(b_i_j).wrap_err(
-                                        ErrorKind::OtherError,
-                                        "Failed to get wire {b_i_j}.".to_string(),
-                                    )?;
+                                    let b_i_j = *wm
+                                        .get(b_i_j)
+                                        .wrap_err_with(ErrorKind::OtherError, || {
+                                            format!("Failed to get wire {b_i_j}.")
+                                        })?;
                                     let (prod, prod_v) =
                                         mul(self.cb, self.vs, self.pb, cm, g_i, b_i_j)?;
                                     sum = cm.linear(self.cb, sum, FE::ONE, prod, FE::ONE)?;
@@ -944,8 +943,8 @@ fn eval<P: Party, VSR: ValueStreamReader>(
 pub(super) fn write_circuit<P: Party, VSR: ValueStreamReader + Send + 'static>(
     dst: &Path,
     circuit_chunks: flume::Receiver<swanky_error::Result<CircuitChunk>>,
-    mut witness_reader: ProverPrivate<P, Inputs<VSR>>,
-    mut private_builder: ProverPrivate<P, &mut PrivateBuilder>,
+    mut witness_reader: PartyPrivate<Prover, P, Inputs<VSR>>,
+    mut private_builder: PartyPrivate<Prover, P, &mut PrivateBuilder>,
 ) -> swanky_error::Result<()> {
     build_circuit(dst, |cb| {
         let mut functions = Vec::new();
@@ -984,7 +983,7 @@ pub(super) fn write_circuit<P: Party, VSR: ValueStreamReader + Send + 'static>(
         }
         struct V<'a, 'b, 'c, P: Party> {
             cb: &'a mut CircuitBuilder<'c>,
-            pb: &'a mut ProverPrivate<P, &'b mut PrivateBuilder>,
+            pb: &'a mut PartyPrivate<Prover, P, &'b mut PrivateBuilder>,
             vs: &'a mut VoleSupplier,
             phantom: PhantomData<P>,
         }

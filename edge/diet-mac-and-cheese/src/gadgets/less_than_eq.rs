@@ -70,10 +70,14 @@ mod tests {
     use swanky_channel_legacy::Channel;
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F2, F40b};
-    use swanky_party::{Prover, Verifier};
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
-    use crate::{DietMacAndCheese, backend_trait::BackendT, svole_trait::Svole};
+    use crate::{
+        DietMacAndCheese,
+        backend_trait::BackendT,
+        party::{Prover, Verifier},
+        svole_trait::Svole,
+    };
 
     use super::less_than_eq_with_public;
 
