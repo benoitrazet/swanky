@@ -2921,7 +2921,7 @@ dependencies = [
  "swanky-field",
  "swanky-field-binary",
  "swanky-serialization",
- "syn 2.0.114",
+ "syn 2.0.117",
 ]
 
 [[package]]
