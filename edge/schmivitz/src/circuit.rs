@@ -380,8 +380,8 @@ impl<'a> CircuitExecuter<F2> for CircuitInterpreter<'a> {
                     // Assumption: There is exactly one type ID for these circuits and it is F2.
                     assert_eq!(*ty, 0);
 
-                    let src = memory.get_result(src)?;
-                    backend.assert_zero(src)?;
+                    let src = memory.get(src);
+                    backend.assert_zero(&src)?;
                 }
                 _ => bail!(
                     ErrorKind::OtherError,
