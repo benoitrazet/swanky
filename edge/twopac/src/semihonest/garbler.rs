@@ -54,7 +54,7 @@ impl<
                 let zero = Wire::rand(&mut self.rng, q);
                 let one = zero.clone() + delta.clone();
                 wire += zero.clone() * (1 << i);
-                (zero.to_block(), one.to_block())
+                (zero.to_repr(), one.to_repr())
             })
             .collect::<Vec<(Block, Block)>>();
         (wire, inputs)

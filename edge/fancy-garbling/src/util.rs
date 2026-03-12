@@ -2,11 +2,10 @@
 //!
 //! Note: all number representations in this library are little-endian.
 
+use crate::WireLabel;
 use itertools::Itertools;
 use std::collections::HashMap;
-use swanky_block::Block;
-
-use crate::WireLabel;
+use vectoreyes::U8x16;
 
 ////////////////////////////////////////////////////////////////////////////////
 // tweak functions for garbling
@@ -382,20 +381,20 @@ pub trait RngExt: rand::Rng + Sized {
         self.r#gen()
     }
     /// Randomly generate a `Block`.
-    fn gen_block(&mut self) -> Block {
+    fn gen_block(&mut self) -> U8x16 {
         self.r#gen()
     }
     /// Randomly generate a valid `Block`.
-    fn gen_usable_block(&mut self, modulus: u16) -> Block {
+    fn gen_usable_block(&mut self, modulus: u16) -> U8x16 {
         if is_power_of_2(modulus) {
             let nbits = (modulus - 1).count_ones();
             if 128 % nbits == 0 {
-                return Block::from(self.gen_u128());
+                return U8x16::from(self.gen_u128());
             }
         }
         let n = digits_per_u128(modulus);
         let max = (modulus as u128).pow(n as u32);
-        Block::from(self.gen_u128() % max)
+        U8x16::from(self.gen_u128() % max)
     }
     /// Randomly generate a prime (among the set of supported primes).
     fn gen_prime(&mut self) -> u16 {

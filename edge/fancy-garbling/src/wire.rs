@@ -8,8 +8,10 @@
 use crate::{fancy::HasModulus, util};
 use rand::{CryptoRng, Rng, RngCore};
 use swanky_aes_hash::TweakableCircularCorrelationRobustHash;
-use swanky_block::Block;
-use vectoreyes::array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize};
+use vectoreyes::{
+    U8x16,
+    array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
+};
 
 mod mod2;
 pub use mod2::WireMod2;
@@ -20,11 +22,11 @@ pub use modq::WireModQ;
 mod npaths_tab;
 
 /// Hash a batch of wires, using the same tweak for each wire.
-pub fn hash_wires<const Q: usize, W: WireLabel>(wires: [&W; Q], tweak: u128) -> [Block; Q]
+pub fn hash_wires<const Q: usize, W: WireLabel>(wires: [&W; Q], tweak: u128) -> [U8x16; Q]
 where
     ArrayUnrolledOps: UnrollableArraySize<Q>,
 {
-    let batch = wires.array_map(|x| x.to_block());
+    let batch = wires.array_map(|x| x.to_repr());
     TweakableCircularCorrelationRobustHash::fixed_key().hash_many(batch, tweak)
 }
 
@@ -50,19 +52,19 @@ pub trait WireLabel:
     /// The underlying digits encoded by the [`WireLabel`].
     fn digits(&self) -> Vec<u16>;
 
-    /// Converts a [`WireLabel`] into its [`Block`] representation.
-    fn to_block(&self) -> Block;
+    /// Converts a [`WireLabel`] into its [`U8x16`] representation.
+    fn to_repr(&self) -> U8x16;
 
     /// The color digit of the wire.
     fn color(&self) -> u16;
 
-    /// Converts a [`Block`] into its [`WireLabel`] representation, based on the
+    /// Converts a [`U8x16`] into its [`WireLabel`] representation, based on the
     /// modulus `q`.
     ///
     /// # Panics
     /// This panics if `q` does not align with the modulus supported by the
     /// [`WireLabel`].
-    fn from_block(inp: Block, q: u16) -> Self;
+    fn from_repr(inp: U8x16, q: u16) -> Self;
 
     /// The zero [`WireLabel`], based on the modulus `q`.
     ///
@@ -96,7 +98,7 @@ pub trait WireLabel:
     /// # Panics
     /// This panics if `q` does not align with the modulus supported by the
     /// [`WireLabel`].
-    fn hash_to_mod(hash: Block, q: u16) -> Self;
+    fn hash_to_mod(hash: U8x16, q: u16) -> Self;
 
     /// Computes the hash of this [`WireLabel`], converting the result back into
     /// a [`WireLabel`] based on the modulus `q`.
@@ -115,8 +117,8 @@ pub trait WireLabel:
 
     /// Computes the hash of the [`WireLabel`].
     #[inline(never)]
-    fn hash(&self, tweak: u128) -> Block {
-        TweakableCircularCorrelationRobustHash::fixed_key().hash(self.to_block(), tweak)
+    fn hash(&self, tweak: u128) -> U8x16 {
+        TweakableCircularCorrelationRobustHash::fixed_key().hash(self.to_repr(), tweak)
     }
 }
 
@@ -239,11 +241,11 @@ impl WireLabel for AllWire {
         }
     }
 
-    fn to_block(&self) -> Block {
+    fn to_repr(&self) -> U8x16 {
         match &self {
-            AllWire::Mod2(x) => x.to_block(),
-            AllWire::Mod3(x) => x.to_block(),
-            AllWire::ModN(x) => x.to_block(),
+            AllWire::Mod2(x) => x.to_repr(),
+            AllWire::Mod3(x) => x.to_repr(),
+            AllWire::ModN(x) => x.to_repr(),
         }
     }
     fn color(&self) -> u16 {
@@ -253,11 +255,11 @@ impl WireLabel for AllWire {
             AllWire::ModN(x) => x.color(),
         }
     }
-    fn from_block(inp: Block, q: u16) -> Self {
+    fn from_repr(inp: U8x16, q: u16) -> Self {
         match q {
-            2 => AllWire::Mod2(WireMod2::from_block(inp, q)),
-            3 => AllWire::Mod3(WireMod3::from_block(inp, q)),
-            _ => AllWire::ModN(WireModQ::from_block(inp, q)),
+            2 => AllWire::Mod2(WireMod2::from_repr(inp, q)),
+            3 => AllWire::Mod3(WireMod3::from_repr(inp, q)),
+            _ => AllWire::ModN(WireModQ::from_repr(inp, q)),
         }
     }
 
@@ -277,11 +279,11 @@ impl WireLabel for AllWire {
         }
     }
 
-    fn hash_to_mod(hash: Block, q: u16) -> Self {
+    fn hash_to_mod(hash: U8x16, q: u16) -> Self {
         if q == 3 {
             AllWire::Mod3(WireMod3::encode_block_mod3(hash))
         } else {
-            Self::from_block(hash, q)
+            Self::from_repr(hash, q)
         }
     }
 }
@@ -352,7 +354,7 @@ mod tests {
         for q in 2..256 {
             for _ in 0..1000 {
                 let w = AllWire::rand(rng, q);
-                assert_eq!(w, AllWire::from_block(w.to_block(), q));
+                assert_eq!(w, AllWire::from_repr(w.to_repr(), q));
             }
         }
     }
@@ -363,7 +365,7 @@ mod tests {
         for _ in 0..1000 {
             let q = 5 + (rng.gen_u16() % 110);
             let x = rng.gen_u128();
-            let w = AllWire::from_block(Block::from(x), q);
+            let w = AllWire::from_repr(U8x16::from(x), q);
             let should_be = util::as_base_q_u128(x, q);
             assert_eq!(w.digits(), should_be, "x={} q={}", x, q);
         }

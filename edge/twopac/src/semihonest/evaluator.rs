@@ -99,7 +99,7 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
 
 fn combine<Wire: WireLabel>(wires: &[Block], q: u16) -> Wire {
     wires.iter().enumerate().fold(Wire::zero(q), |acc, (i, w)| {
-        let w = Wire::from_block(*w, q);
+        let w = Wire::from_repr(*w, q);
         acc + w * (1 << i)
     })
 }

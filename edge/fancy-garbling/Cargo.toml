@@ -31,7 +31,6 @@ serde_json = { workspace = true, optional = true }
 swanky-adversary.workspace = true
 swanky-aes-hash.workspace = true
 swanky-aes-rng.workspace = true
-swanky-block.workspace = true
 swanky-channel.workspace = true
 swanky-error.workspace = true
 

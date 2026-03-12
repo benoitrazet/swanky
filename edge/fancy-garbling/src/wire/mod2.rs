@@ -1,8 +1,7 @@
 use crate::{HasModulus, WireLabel};
 use rand::{CryptoRng, Rng, RngCore};
 use subtle::ConditionallySelectable;
-use swanky_block::Block;
-use vectoreyes::SimdBase;
+use vectoreyes::{SimdBase, U8x16};
 
 impl HasModulus for WireMod2 {
     fn modulus(&self) -> u16 {
@@ -15,7 +14,7 @@ impl HasModulus for WireMod2 {
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct WireMod2 {
     /// A 128-bit value.
-    pub(crate) val: Block,
+    pub(crate) val: U8x16,
 }
 
 impl core::ops::Add for WireMod2 {
@@ -65,7 +64,7 @@ impl core::ops::Mul<u16> for WireMod2 {
     fn mul(self, rhs: u16) -> Self::Output {
         if rhs & 1 == 0 {
             Self {
-                val: Block::default(),
+                val: Default::default(),
             }
         } else {
             self
@@ -76,15 +75,15 @@ impl core::ops::Mul<u16> for WireMod2 {
 impl core::ops::MulAssign<u16> for WireMod2 {
     fn mul_assign(&mut self, rhs: u16) {
         if rhs & 1 == 0 {
-            self.val = Block::default();
+            self.val = Default::default();
         }
     }
 }
 
 impl ConditionallySelectable for WireMod2 {
     fn conditional_select(a: &Self, b: &Self, choice: subtle::Choice) -> Self {
-        WireMod2::from_block(
-            Block::conditional_select(&a.to_block(), &b.to_block(), choice),
+        WireMod2::from_repr(
+            U8x16::conditional_select(&a.to_repr(), &b.to_repr(), choice),
             2,
         )
     }
@@ -96,7 +95,7 @@ impl WireLabel for WireMod2 {
             panic!("[WireMod2::rand_delta] Expected modulo 2. Got {}", q);
         }
         let mut w = Self::rand(rng, q);
-        w.val |= Block::set_lo(1);
+        w.val |= U8x16::set_lo(1);
         w
     }
 
@@ -106,10 +105,10 @@ impl WireLabel for WireMod2 {
             .collect()
     }
 
-    fn to_block(&self) -> Block {
-        // This function converts a [`WireMod2`] into its [`Block`] representation.
+    fn to_repr(&self) -> U8x16 {
+        // This function converts a [`WireMod2`] into its [`U8x16`] representation.
         // Since the value of a [`WireMod2`] is a 128b value, its directly returned
-        // as a [`Block`].
+        // as a [`U8x16`].
         self.val
     }
 
@@ -118,7 +117,7 @@ impl WireLabel for WireMod2 {
         (self.val.extract::<0>() & 1) as u16
     }
 
-    fn from_block(inp: Block, q: u16) -> Self {
+    fn from_repr(inp: U8x16, q: u16) -> Self {
         // This function converts a Block into its WireLabel representation
         // by just setting the value of WireMod2 to the Block (i.e. the
         // wire's 128b value).
@@ -143,11 +142,11 @@ impl WireLabel for WireMod2 {
         Self { val: rng.r#gen() }
     }
 
-    fn hash_to_mod(hash: Block, q: u16) -> Self {
+    fn hash_to_mod(hash: U8x16, q: u16) -> Self {
         if q != 2 {
             panic!("[WireMod2::hash_to_mod] Expected modulo 2. Got {}", q);
         }
-        Self::from_block(hash, q)
+        Self::from_repr(hash, q)
     }
 }
 

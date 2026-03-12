@@ -23,8 +23,8 @@ mod nonstreaming {
     use itertools::Itertools;
     use rand::{SeedableRng, thread_rng};
     use swanky_aes_rng::AesRng;
-    use swanky_block::Block;
     use swanky_channel::Channel;
+    use vectoreyes::U8x16;
 
     // helper
     fn garble_test_helper<F>(f: F)
@@ -169,7 +169,7 @@ mod nonstreaming {
 
     #[test] // half_gate_unequal_mods
     fn half_gate_unequal_mods() {
-        let mut rng = AesRng::from_seed(Block::from(0_u128));
+        let mut rng = AesRng::from_seed(U8x16::from(0_u128));
         for q in 3..16 {
             let ymod = 2 + rng.gen_u16() % 6; // lower mod is capped at 8 for now
             println!("\nTESTING MOD q={} ymod={}", q, ymod);

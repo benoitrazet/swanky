@@ -10,9 +10,9 @@ use crate::{
 use itertools::Itertools;
 use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
-use swanky_block::Block;
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
+use vectoreyes::U8x16;
 
 /// A garbled circuit.
 ///
@@ -21,13 +21,13 @@ use swanky_error::ErrorKind;
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GarbledCircuit {
-    blocks: Vec<Block>,
+    blocks: Vec<U8x16>,
 }
 
 impl GarbledCircuit {
     /// Create a [`GarbledCircuit`] from a vector of garbled rows and constant
     /// wirelabels.
-    pub fn new(blocks: Vec<Block>) -> Self {
+    pub fn new(blocks: Vec<U8x16>) -> Self {
         GarbledCircuit { blocks }
     }
 
@@ -188,7 +188,7 @@ impl<Wire: WireLabel> Encoder<Wire> {
 
 /// A mapping of output wirelabels to their associated underlying values.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct OutputMapping(Vec<Vec<Block>>);
+pub struct OutputMapping(Vec<Vec<U8x16>>);
 
 impl OutputMapping {
     /// Construct a new [`OutputMapping`] from a set of zero wirelabels and
@@ -270,7 +270,7 @@ impl GarbledChannel {
     ///
     /// # Panics
     /// Panics if there is no valid writer for the [`GarbledChannel`].
-    pub fn finish_writing(self) -> Vec<Block> {
+    pub fn finish_writing(self) -> Vec<U8x16> {
         self.writer.unwrap().finish()
     }
 }
@@ -306,12 +306,12 @@ impl From<&GarbledCircuit> for GarbledChannel {
 /// Implementation of the `Read` trait for use by the `Evaluator`.
 #[derive(Debug)]
 struct GarbledReader {
-    blocks: Vec<Block>,
+    blocks: Vec<U8x16>,
     index: usize,
 }
 
 impl GarbledReader {
-    fn new(blocks: &[Block]) -> Self {
+    fn new(blocks: &[U8x16]) -> Self {
         Self {
             blocks: blocks.to_vec(),
             index: 0,
@@ -343,7 +343,7 @@ impl std::io::Read for GarbledReader {
 /// Implementation of the `Write` trait for use by `Garbler`.
 #[derive(Debug)]
 struct GarbledWriter {
-    blocks: Vec<Block>,
+    blocks: Vec<U8x16>,
 }
 
 impl GarbledWriter {
@@ -358,7 +358,7 @@ impl GarbledWriter {
     }
 
     /// Consume the [`GarbledWriter`], outputting the resulting garbled circuit.
-    fn finish(self) -> Vec<Block> {
+    fn finish(self) -> Vec<U8x16> {
         self.blocks
     }
 }
@@ -375,7 +375,7 @@ impl std::io::Write for GarbledWriter {
                     ));
                 }
             };
-            self.blocks.push(Block::from(bytes));
+            self.blocks.push(bytes.into());
         }
         Ok(buf.len())
     }

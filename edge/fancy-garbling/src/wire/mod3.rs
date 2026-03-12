@@ -1,9 +1,8 @@
-use rand::{CryptoRng, Rng, RngCore};
-use swanky_block::Block;
-
 #[cfg(feature = "serde")]
 use crate::errors::WireDeserializationError;
 use crate::{ArithmeticWire, HasModulus, WireLabel, wire::_unrank};
+use rand::{CryptoRng, Rng, RngCore};
+use vectoreyes::U8x16;
 
 /// Intermediate struct to deserialize WireMod3 to
 ///
@@ -146,7 +145,7 @@ impl WireMod3 {
     ///
     /// We do this by computing the `Mod3` digits using `_unrank`,
     /// and then map these to a `Mod3` encoding.
-    pub(crate) fn encode_block_mod3(block: Block) -> Self {
+    pub(crate) fn encode_block_mod3(block: U8x16) -> Self {
         let mut lsb = 0u64;
         let mut msb = 0u64;
         let mut ds = _unrank(u128::from(block), 3);
@@ -176,11 +175,11 @@ impl WireLabel for WireMod3 {
             .collect()
     }
 
-    fn to_block(&self) -> Block {
+    fn to_repr(&self) -> U8x16 {
         // This function converts a [`WireMod3`] into its [`Block`] representation.
         // The two 64b values stored in [`WireMod3`], i.e. the lsb and msb, and packed
         // into a 128b value as a [`Block`].
-        Block::from(((self.msb as u128) << 64) | (self.lsb as u128))
+        (((self.msb as u128) << 64) | (self.lsb as u128)).into()
     }
 
     fn color(&self) -> u16 {
@@ -189,7 +188,7 @@ impl WireLabel for WireMod3 {
         color
     }
 
-    fn from_block(inp: Block, q: u16) -> Self {
+    fn from_repr(inp: U8x16, q: u16) -> Self {
         if q != 3 {
             panic!("[WireMod3::from_block] Expected mod 3. Got mod {}", q)
         }
@@ -224,7 +223,7 @@ impl WireLabel for WireMod3 {
         Self { lsb, msb }
     }
 
-    fn hash_to_mod(hash: Block, q: u16) -> Self {
+    fn hash_to_mod(hash: U8x16, q: u16) -> Self {
         if q != 3 {
             panic!("[WireMod3::hash_to_mod] Expected mod 3. Got mod {}", q)
         }
