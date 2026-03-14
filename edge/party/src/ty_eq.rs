@@ -679,3 +679,94 @@ impl<T0: ?Sized, T1: ?Sized> EqualityProposition<T0, T1>
         unreachable!()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use proptest::proptest;
+
+    use super::generics::Ref;
+    use super::*;
+
+    fn convert<T>(t: T, w: Witness<impl EqualityProposition<T, i32>>) -> i32 {
+        w.cast(t)
+    }
+
+    fn convert_sym<T>(t: T, w: Witness<impl EqualityProposition<i32, T>>) -> i32 {
+        w.sym().cast(t)
+    }
+
+    fn convert_and_then<T0, T1>(
+        t: T0,
+        w0: Witness<impl EqualityProposition<T0, T1>>,
+        w1: Witness<impl EqualityProposition<T1, i32>>,
+    ) -> i32 {
+        w0.and_then(w1).cast(t)
+    }
+
+    fn as_ref<'a, T0: 'a, T1: 'a>(
+        w: Witness<impl EqualityProposition<T0, T1>>,
+    ) -> Witness<impl EqualityProposition<&'a T0, &'a T1>> {
+        w.with_generic::<Ref, _, _>()
+    }
+
+    enum Foo<A, B> {
+        A(A),
+        B(B),
+    }
+
+    fn disjunction<T0, T1>(
+        f: Foo<
+            Witness<impl EqualityProposition<T0, T1>>,
+            Witness<impl EqualityProposition<T0, T1>>,
+        >,
+    ) -> Witness<impl EqualityProposition<T0, T1>> {
+        match f {
+            Foo::A(a) => a.join_left().join(),
+            Foo::B(b) => b.join_right().join(),
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn trivial_cast_preserves_value(original: i32) {
+            assert_eq!(original, convert(original, Witness::default()));
+        }
+
+        #[test]
+        fn trivial_sym_cast_preserves_value(original: i32) {
+            assert_eq!(original, convert_sym(original, Witness::default()));
+        }
+
+        #[test]
+        fn trivial_and_then_cast_preserves_value(original: i32) {
+            assert_eq!(original, convert_and_then(original, Witness::default(), Witness::default()));
+        }
+
+        #[test]
+        fn trivial_with_generic_cast_preserves_value(original: i32) {
+            assert_eq!(&original, as_ref(Witness::default()).cast(&original));
+        }
+
+        #[test]
+        fn trivial_join_left_cast_preserves_value(original: i32) {
+            assert_eq!(
+                original,
+                disjunction(
+                    // Make values of type B impossible.
+                    Foo::<_, Witness<NotNeccessarilyTrueEqualityProposition>>::A(Witness::default()),
+                ).cast(original)
+            );
+        }
+
+        #[test]
+        fn trivial_join_right_cast_preserves_value(original: i32) {
+            assert_eq!(
+                original,
+                disjunction(
+                    // Make values of type A impossible.
+                    Foo::<Witness<NotNeccessarilyTrueEqualityProposition>, _>::B(Witness::default()),
+                ).cast(original)
+            );
+        }
+    }
+}
