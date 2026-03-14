@@ -234,7 +234,7 @@ pub trait PartySystem:
 }
 
 /// Which party is `P`? `Party0` or `Party1`
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum GenericWhichParty<P: GenericParty> {
     /// Evidence that `P` is `Party0`
     Party0(Witness<P::IsParty0>),
