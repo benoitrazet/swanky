@@ -505,3 +505,34 @@ define_bounds! {
             [T0: super::EqProp<A, B>, T1: super::EqProp<A, B>]
             [TOut: super::EqProp<A, B>];
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    party_system! {
+        mod ps {
+            PartyA,
+            PartyB,
+        }
+    }
+    use ps::{PartyA, PartyB};
+
+    fn raw_either_as_ref<P: GenericParty, T0, T1>(
+        either: &RawEither<bounds::Any, P, T0, T1>,
+    ) -> RawEither<bounds::Any, P, &T0, &T1> {
+        either_type_substitution::<generics::Ref, bounds::Any, bounds::Any, P, T0, T1>()
+            .cast(either)
+    }
+
+    #[test]
+    fn ref_either_type_substitution_cast() {
+        let re_a: RawEither<bounds::Any, PartyA, i32, String> = 17;
+        let re_a_ref = raw_either_as_ref::<PartyA, _, String>(&re_a);
+        assert_eq!(&re_a, re_a_ref);
+
+        let re_b: RawEither<bounds::Any, PartyB, i32, String> = "test".to_string();
+        let re_b_ref = raw_either_as_ref::<PartyB, i32, _>(&re_b);
+        assert_eq!(&re_b, re_b_ref);
+    }
+}
