@@ -124,10 +124,10 @@ macro_rules! party_system {
                     }
                 }
             }
-            impl<P: Party> Into<$crate::GenericWhichParty<P>> for WhichParty<P> {
+            impl<P: Party> From<WhichParty<P>> for $crate::GenericWhichParty<P> {
                 #[inline]
-                fn into(self) -> $crate::GenericWhichParty<P> {
-                    match self {
+                fn from(value: WhichParty<P>) -> $crate::GenericWhichParty<P> {
+                    match value {
                         WhichParty::$party0(ev) => $crate::GenericWhichParty::Party0(ev),
                         WhichParty::$party1(ev) => $crate::GenericWhichParty::Party1(ev),
                     }
