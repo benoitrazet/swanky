@@ -141,3 +141,38 @@ macro_rules! party_system {
 pub mod __macro_internal {
     pub use crate::either::raw::internal::{Party0Impl, Party1Impl};
 }
+
+#[cfg(test)]
+mod tests {
+    party_system! {
+        mod ps {
+            PartyA,
+            PartyB,
+        }
+    }
+    use ps::{PartyA, PartyB, WhichParty};
+
+    use crate::{GenericWhichParty, ty_eq::Witness};
+
+    #[test]
+    fn generic_to_concrete() {
+        let gwp: GenericWhichParty<PartyA> = GenericWhichParty::Party0(Witness::EQUAL_TYPES);
+        let wp = WhichParty::from(gwp);
+        assert_eq!(wp, WhichParty::PartyA(Witness::EQUAL_TYPES));
+
+        let gwp: GenericWhichParty<PartyB> = GenericWhichParty::Party1(Witness::EQUAL_TYPES);
+        let wp = WhichParty::from(gwp);
+        assert_eq!(wp, WhichParty::PartyB(Witness::EQUAL_TYPES));
+    }
+
+    #[test]
+    fn concrete_to_generic() {
+        let wp: WhichParty<PartyA> = WhichParty::PartyA(Witness::EQUAL_TYPES);
+        let gwp = GenericWhichParty::from(wp);
+        assert_eq!(gwp, GenericWhichParty::Party0(Witness::EQUAL_TYPES));
+
+        let wp: WhichParty<PartyB> = WhichParty::PartyB(Witness::EQUAL_TYPES);
+        let gwp = GenericWhichParty::from(wp);
+        assert_eq!(gwp, GenericWhichParty::Party1(Witness::EQUAL_TYPES));
+    }
+}
