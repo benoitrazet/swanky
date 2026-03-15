@@ -69,7 +69,7 @@
 //! type (at least, any type implementing `Generic`; see [`generics`]
 //! for a starting point for many common cases), and disjunctions
 //! (which is particularly useful when using `EqualityProposition`s
-//! and `Witness`es in enumerated types.
+//! and `Witness`es in enumerated types).
 //!
 //! Generics and disjunctions are somewhat more involved, so their
 //! introduction is left to the documentation of those respective
@@ -635,7 +635,7 @@ impl<T> IsSameType<T> for T {
     const WITNESS: Witness<Self::EqualityProposition> = Witness::EQUAL_TYPES;
 }
 
-/// An [`EqualityProposition`] which might not be true (but in practice isn't).
+/// An [`EqualityProposition`] which might not be true (and in practice isn't).
 ///
 /// This [`EqualityProposition`] is an uninhabited type, and it's impossible to get a witness for
 /// this proposition. Thus, we can use it in situations where an equality does not hold.
