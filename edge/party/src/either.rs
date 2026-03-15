@@ -588,3 +588,155 @@ impl<P: GenericParty, R0: Read, R1: Read> Read for PartyEither<P, R0, R1> {
 
 mod copy_conversions;
 mod impls;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    party_system! {
+        mod ps {
+            PartyA,
+            PartyB,
+        }
+    }
+    use ps::{PartyA, PartyB};
+
+    #[test]
+    fn zip_with_a() {
+        let pe1: PartyEither<PartyA, i32, &str> = PartyEither::new(Witness::EQUAL_TYPES, 17);
+        let pe2: PartyEither<PartyA, &str, i32> = PartyEither::new(Witness::EQUAL_TYPES, "test");
+        assert_eq!(
+            pe1.zip_with(pe2, |n, s| n as usize + s.len(), |_, _| unreachable!()),
+            PartyEither::new(Witness::EQUAL_TYPES, 21),
+        );
+    }
+
+    #[test]
+    fn zip_with_b() {
+        let pe1: PartyEither<PartyB, i32, &str> = PartyEither::new(Witness::EQUAL_TYPES, "test");
+        let pe2: PartyEither<PartyB, &str, i32> = PartyEither::new(Witness::EQUAL_TYPES, 17);
+        assert_eq!(
+            pe1.zip_with(pe2, |_, _| unreachable!(), |s, n| s.len() + n as usize),
+            PartyEither::new(Witness::EQUAL_TYPES, 21),
+        );
+    }
+
+    #[test]
+    fn pull_either_outside_a() {
+        let array_of_pe: [PartyEitherCopy<PartyA, i32, &str>; 3] = [
+            PartyEitherCopy::default(),
+            PartyEitherCopy::new(Witness::EQUAL_TYPES, 1),
+            PartyEitherCopy::new(Witness::EQUAL_TYPES, 2),
+        ];
+
+        let pe_of_slice = PartyEitherCopy::pull_either_outside(&array_of_pe);
+        assert_eq!(pe_of_slice.into_inner(Witness::EQUAL_TYPES), &[0, 1, 2]);
+    }
+
+    #[test]
+    fn pull_either_outside_b() {
+        let array_of_pe: [PartyEitherCopy<PartyB, i32, &str>; 3] = [
+            PartyEitherCopy::default(),
+            PartyEitherCopy::new(Witness::EQUAL_TYPES, "a"),
+            PartyEitherCopy::new(Witness::EQUAL_TYPES, "b"),
+        ];
+
+        let pe_of_slice = PartyEitherCopy::pull_either_outside(&array_of_pe);
+        assert_eq!(
+            pe_of_slice.into_inner(Witness::EQUAL_TYPES),
+            &["", "a", "b"]
+        );
+    }
+
+    #[test]
+    fn either_formatting() {
+        let pe_a: PartyEitherCopy<PartyA, i32, &str> =
+            PartyEitherCopy::new(Witness::EQUAL_TYPES, 17);
+        let pe_b: PartyEitherCopy<PartyB, i32, &str> =
+            PartyEitherCopy::new(Witness::EQUAL_TYPES, "test");
+
+        assert_eq!(
+            format!("{pe_a:?}"),
+            "swanky_party::either::tests::ps::PartyA(17)".to_string()
+        );
+        assert_eq!(
+            format!("{pe_b:?}"),
+            "swanky_party::either::tests::ps::PartyB(\"test\")".to_string()
+        );
+    }
+
+    #[test]
+    fn ref_either_to_either_ref() {
+        let pe: &PartyEitherCopy<PartyA, i32, &str> =
+            &PartyEitherCopy::new(Witness::EQUAL_TYPES, 17);
+        assert_eq!(
+            *PartyEitherCopy::<PartyA, &i32, &&str>::from(pe).into_inner(Witness::EQUAL_TYPES),
+            17
+        );
+    }
+
+    #[test]
+    #[allow(clippy::clone_on_copy)]
+    fn either_ref_to_ref_either() {
+        let pe: PartyEitherCopy<PartyA, &i32, &&str> =
+            PartyEitherCopy::new(Witness::EQUAL_TYPES, &17).clone();
+        assert_eq!(
+            <&PartyEitherCopy<PartyA, i32, &str>>::from(pe).into_inner(Witness::EQUAL_TYPES),
+            17
+        );
+    }
+
+    #[test]
+    fn mut_ref_either_to_either_mut_ref() {
+        let pe: &mut PartyEither<PartyA, i32, &str> =
+            &mut PartyEither::new(Witness::EQUAL_TYPES, 17);
+        *PartyEither::<PartyA, &mut i32, &mut &str>::from(&mut *pe)
+            .into_inner(Witness::EQUAL_TYPES) = 71;
+        assert_eq!(pe.clone().into_inner(Witness::EQUAL_TYPES), 71);
+    }
+
+    #[test]
+    fn either_mut_ref_to_mut_ref_either() {
+        let mut x = 17;
+        let pe: PartyEither<PartyA, &mut i32, &mut &str> =
+            PartyEither::new(Witness::EQUAL_TYPES, &mut x);
+        assert_eq!(
+            <&mut PartyEitherCopy<PartyA, i32, &str>>::from(pe).into_inner(Witness::EQUAL_TYPES),
+            17
+        );
+    }
+
+    #[test]
+    fn write_either() {
+        let mut pe: PartyEither<PartyA, Vec<u8>, Vec<u8>> =
+            PartyEither::new(Witness::EQUAL_TYPES, b"data: ".to_vec());
+
+        let _ = pe.write(b"17").unwrap();
+        pe.flush().unwrap();
+        assert_eq!(pe.into_inner(Witness::EQUAL_TYPES), b"data: 17".to_vec());
+
+        let mut pe: PartyEither<PartyB, Vec<u8>, Vec<u8>> =
+            PartyEither::new(Witness::EQUAL_TYPES, b"data: ".to_vec());
+
+        let _ = pe.write(b"17").unwrap();
+        pe.flush().unwrap();
+        assert_eq!(pe.into_inner(Witness::EQUAL_TYPES), b"data: 17".to_vec());
+    }
+
+    #[test]
+    fn read_either() {
+        let v = [0, 1, 2];
+        let mut pe: PartyEither<PartyA, &[u8], &[u8]> =
+            PartyEither::new(Witness::EQUAL_TYPES, &v[..]);
+        let mut out = [0; 3];
+        let _ = pe.read(&mut out).unwrap();
+        assert_eq!(out, [0, 1, 2]);
+
+        let v = [2, 1, 0];
+        let mut pe: PartyEither<PartyB, &[u8], &[u8]> =
+            PartyEither::new(Witness::EQUAL_TYPES, &v[..]);
+        let mut out = [0; 3];
+        let _ = pe.read(&mut out).unwrap();
+        assert_eq!(out, [2, 1, 0]);
+    }
+}
