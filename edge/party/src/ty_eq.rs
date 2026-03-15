@@ -1,7 +1,7 @@
 #![deny(unsafe_code)]
 //! Utilities for describing equalities between types.
 //!
-//! An important requirement of the `party2` core API is _low-cost
+//! An important requirement of the `party` core API is _low-cost
 //! abstraction_; that is, making your code generic over a
 //! [`crate::PartySystem`] should not incur any surprise memory or
 //! runtime costs.
