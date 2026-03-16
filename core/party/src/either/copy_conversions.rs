@@ -105,8 +105,6 @@ impl<'a, P: GenericParty, T0: Copy, T1: Copy> From<&'a mut PartyEither<P, T0, T1
     }
 }
 
-// TODO: we can do this for more containers.
-
 #[cfg(test)]
 mod tests {
     use crate::ty_eq::Witness;

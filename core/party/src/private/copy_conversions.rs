@@ -104,8 +104,6 @@ impl<'a, PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty,
     }
 }
 
-// TODO: we can do this for more containers.
-
 #[cfg(test)]
 #[allow(dead_code)]
 mod tests {
