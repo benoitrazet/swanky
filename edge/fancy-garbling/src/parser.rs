@@ -1,11 +1,9 @@
 //! Functions for parsing and running a circuit file based on the format given
 //! here: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
 
-use crate::{
-    circuit::{BinaryCircuit, BinaryGate, CircuitRef, CircuitType},
-    errors::CircuitParserError as Error,
-};
+use crate::circuit::{BinaryCircuit, BinaryGate, CircuitRef, CircuitType};
 use regex::{Captures, Regex};
+use std::io::{self, Error, ErrorKind};
 use std::str::FromStr;
 
 enum GateType {
@@ -13,24 +11,37 @@ enum GateType {
     XorGate,
 }
 
-fn cap2int(cap: &Captures, idx: usize) -> Result<usize, Error> {
-    let s = cap.get(idx).ok_or(Error::ParseIntError)?;
-    FromStr::from_str(s.as_str()).map_err(Error::from)
+fn cap2int(cap: &Captures, idx: usize) -> io::Result<usize> {
+    let s = cap.get(idx).ok_or_else(|| {
+        Error::new(
+            ErrorKind::InvalidData,
+            format!("Failed to match index '{idx}'"),
+        )
+    })?;
+    FromStr::from_str(s.as_str()).map_err(|e| Error::new(ErrorKind::InvalidData, e))
 }
 
-fn cap2typ(cap: &Captures, idx: usize) -> Result<GateType, Error> {
-    let s = cap.get(idx).ok_or(Error::ParseIntError)?;
+fn cap2typ(cap: &Captures, idx: usize) -> io::Result<GateType> {
+    let s = cap.get(idx).ok_or_else(|| {
+        Error::new(
+            ErrorKind::InvalidData,
+            format!("Failed to match index '{idx}'"),
+        )
+    })?;
     let s = s.as_str();
     match s {
         "AND" => Ok(GateType::AndGate),
         "XOR" => Ok(GateType::XorGate),
-        s => Err(Error::ParseGateError(s.to_string())),
+        s => Err(Error::new(
+            ErrorKind::InvalidData,
+            format!("Unknown gate type '{s}'"),
+        )),
     }
 }
 
-fn regex2captures<'t>(re: &Regex, line: &'t str) -> Result<Captures<'t>, Error> {
+fn regex2captures<'t>(re: &Regex, line: &'t str) -> io::Result<Captures<'t>> {
     re.captures(line)
-        .ok_or_else(|| Error::ParseLineError(line.to_string()))
+        .ok_or_else(|| Error::new(ErrorKind::InvalidData, "Failed to find match for regex"))
 }
 
 impl BinaryCircuit {
@@ -38,11 +49,11 @@ impl BinaryCircuit {
     /// format given here: <https://homes.esat.kuleuven.be/~nsmart/MPC/old-circuits.html>,
     /// (Bristol Format---the OLD format---not Bristol Fashion---the NEW format) otherwise
     /// a `CircuitParserError` is returned.
-    pub fn parse(mut reader: impl std::io::BufRead) -> Result<Self, Error> {
+    pub fn parse(mut reader: impl std::io::BufRead) -> io::Result<Self> {
         // Parse first line: ngates nwires\n
         let mut line = String::new();
         reader.read_line(&mut line)?;
-        let re = Regex::new(r"(\d+)\s+(\d+)")?;
+        let re = Regex::new(r"(\d+)\s+(\d+)").expect("regex should be valid");
         let cap = regex2captures(&re, &line)?;
         let ngates = cap2int(&cap, 1)?;
         let nwires = cap2int(&cap, 2)?;
@@ -50,7 +61,7 @@ impl BinaryCircuit {
         // Parse second line: n1 n2 n3\n
         let mut line = String::new();
         reader.read_line(&mut line)?;
-        let re = Regex::new(r"(\d+)\s+(\d+)\s+(\d+)")?;
+        let re = Regex::new(r"(\d+)\s+(\d+)\s+(\d+)").expect("regex should be valid");
         let cap = regex2captures(&re, &line)?;
         let n1 = cap2int(&cap, 1)?; // Number of garbler inputs
         let n2 = cap2int(&cap, 2)?; // Number of evaluator inputs
@@ -60,13 +71,13 @@ impl BinaryCircuit {
         let mut line = String::new();
         reader.read_line(&mut line)?;
         #[allow(clippy::trivial_regex)]
-        let re = Regex::new(r"\n")?;
+        let re = Regex::new(r"\n").expect("regex should be valid");
         let _ = regex2captures(&re, &line)?;
 
         let mut circ = Self::new(Some(ngates));
 
-        let re1 = Regex::new(r"1 1 (\d+) (\d+) INV")?;
-        let re2 = Regex::new(r"2 1 (\d+) (\d+) (\d+) ((AND|XOR))")?;
+        let re1 = Regex::new(r"1 1 (\d+) (\d+) INV").expect("regex should be valid");
+        let re2 = Regex::new(r"2 1 (\d+) (\d+) (\d+) ((AND|XOR))").expect("regex should be valid");
 
         let mut id = 0;
 
@@ -151,7 +162,7 @@ impl BinaryCircuit {
                 }
                 None => break,
                 _ => {
-                    return Err(Error::ParseLineError(line.to_string()));
+                    return Err(Error::new(ErrorKind::InvalidData, "Invalid wire value"));
                 }
             }
         }

@@ -16,13 +16,14 @@ struct UntrustedWireModQ {
 
 #[cfg(feature = "serde")]
 impl TryFrom<UntrustedWireModQ> for WireModQ {
-    type Error = crate::errors::WireDeserializationError;
+    type Error = std::io::Error;
 
     fn try_from(wire: UntrustedWireModQ) -> Result<Self, Self::Error> {
         // Modulus must be at least 2
         if wire.q < 2 {
-            return Err(Self::Error::InvalidWireModQ(
-                crate::errors::ModQDeserializationError::BadModulus(wire.q),
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Modulus must be at least two",
             ));
         }
 
@@ -30,19 +31,15 @@ impl TryFrom<UntrustedWireModQ> for WireModQ {
         let expected_len = crate::util::digits_per_u128(wire.q);
         let given_len = wire.ds.len();
         if given_len != expected_len {
-            return Err(Self::Error::InvalidWireModQ(
-                crate::errors::ModQDeserializationError::InvalidDigitsLength {
-                    got: given_len,
-                    needed: expected_len,
-                },
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("Invalid number of digits. Expected: {expected_len}. Got: {given_len}"),
             ));
         }
         if let Some(i) = wire.ds.iter().position(|&x| x >= wire.q) {
-            return Err(Self::Error::InvalidWireModQ(
-                crate::errors::ModQDeserializationError::DigitTooLarge {
-                    digit: wire.ds[i],
-                    modulus: wire.q,
-                },
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("Digit {i} is greater than the modulus"),
             ));
         }
         Ok(WireModQ {

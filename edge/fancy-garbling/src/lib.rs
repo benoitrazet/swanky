@@ -7,7 +7,6 @@ pub mod circuit;
 pub mod circuit_analyzer;
 pub mod classic;
 pub mod dummy;
-pub mod errors;
 mod fancy;
 mod garble;
 pub mod informer;
