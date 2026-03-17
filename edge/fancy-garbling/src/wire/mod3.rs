@@ -19,12 +19,11 @@ impl TryFrom<UntrustedWireMod3> for WireMod3 {
     type Error = swanky_error::Error;
 
     fn try_from(wire: UntrustedWireMod3) -> Result<Self, Self::Error> {
-        if wire.lsb & wire.msb != 0 {
-            return Err(swanky_error::swanky_error!(
-                swanky_error::ErrorKind::OtherError,
-                "Mod 3 wire is ill-formed",
-            ));
-        }
+        swanky_error::ensure!(
+            wire.lsb & wire.msb == 0,
+            swanky_error::ErrorKind::OtherError,
+            "Mod 3 wire is ill-formed",
+        );
         Ok(WireMod3 {
             lsb: wire.lsb,
             msb: wire.msb,
