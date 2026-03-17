@@ -16,13 +16,13 @@ struct UntrustedWireModQ {
 
 #[cfg(feature = "serde")]
 impl TryFrom<UntrustedWireModQ> for WireModQ {
-    type Error = std::io::Error;
+    type Error = swanky_error::Error;
 
     fn try_from(wire: UntrustedWireModQ) -> Result<Self, Self::Error> {
         // Modulus must be at least 2
         if wire.q < 2 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
+            return Err(swanky_error::swanky_error!(
+                swanky_error::ErrorKind::OtherError,
                 "Modulus must be at least two",
             ));
         }
@@ -31,15 +31,15 @@ impl TryFrom<UntrustedWireModQ> for WireModQ {
         let expected_len = crate::util::digits_per_u128(wire.q);
         let given_len = wire.ds.len();
         if given_len != expected_len {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!("Invalid number of digits. Expected: {expected_len}. Got: {given_len}"),
+            return Err(swanky_error::swanky_error!(
+                swanky_error::ErrorKind::OtherError,
+                "Invalid number of digits. Expected: {expected_len}. Got: {given_len}",
             ));
         }
         if let Some(i) = wire.ds.iter().position(|&x| x >= wire.q) {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!("Digit {i} is greater than the modulus"),
+            return Err(swanky_error::swanky_error!(
+                swanky_error::ErrorKind::OtherError,
+                "Digit {i} is greater than the modulus",
             ));
         }
         Ok(WireModQ {

@@ -16,12 +16,12 @@ struct UntrustedWireMod3 {
 
 #[cfg(feature = "serde")]
 impl TryFrom<UntrustedWireMod3> for WireMod3 {
-    type Error = std::io::Error;
+    type Error = swanky_error::Error;
 
     fn try_from(wire: UntrustedWireMod3) -> Result<Self, Self::Error> {
         if wire.lsb & wire.msb != 0 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
+            return Err(swanky_error::swanky_error!(
+                swanky_error::ErrorKind::OtherError,
                 "Mod 3 wire is ill-formed",
             ));
         }
