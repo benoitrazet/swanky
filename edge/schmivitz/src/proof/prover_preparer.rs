@@ -99,7 +99,8 @@ impl<'a> FieldBackend<F2> for ProverPreparer<'a> {
         );
     }
     fn assert_zero(&mut self, _: &Self::Wire) -> CircuitResult<()> {
-        todo!()
+        self.challenge_count += 1;
+        Ok(())
     }
 }
 

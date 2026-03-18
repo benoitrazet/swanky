@@ -349,8 +349,14 @@ impl FunctionBodyVisitor for Codegen {
         self.main.extend(statements);
         Ok(())
     }
-    fn assert_zero(&mut self, _ty: TypeId, _src: WireId) -> swanky_error::Result<()> {
-        panic!("assert_zero is not supported yet");
+    fn assert_zero(&mut self, ty: TypeId, src: WireId) -> swanky_error::Result<()> {
+        let fty = self.to_type_var(ty);
+        let src = self.to_wire_ident(src);
+
+        self.main.extend(quote! {
+            <B as swanky_sieve_ir_api::FieldBackend<#fty>>::assert_zero(backend, &#src)?;
+        });
+        Ok(())
     }
     fn convert(
         &mut self,

@@ -4,6 +4,8 @@ use swanky_field_binary::F2;
 use swanky_field_binary::F128b;
 use swanky_sieve_ir_api::{CircuitResult, FieldBackend};
 
+use crate::proof::ChiGenerator;
+
 /// A [`VerifierTraverser`] allows the verifier to execute the gate-by-gate evaluation portion of
 /// the VOLE-in-the-head verification protocol.
 ///
@@ -11,10 +13,8 @@ use swanky_sieve_ir_api::{CircuitResult, FieldBackend};
 /// wire (either using provided witnesses from the proof or evaluating expected witnesses for
 /// linear gates) and computing the aggregate value used to verify the proof.
 pub(crate) struct VerifierTraverser {
-    /// Fiat-Shamir challenges. There should be one for each polynomial (non-linear gate).
-    challenges: Vec<F128b>,
-    /// Number of challenges that have been assigned to a wire, so far.
-    challenge_count: usize,
+    /// Fiat-Shamir challenges as powers of chi. There should be one for each polynomial (e.g. non-linear gate) and assert zero.
+    chi_challenge: ChiGenerator,
 
     /// Verifier's chosen random VOLE key ($`\Delta`$ in the paper).
     verifier_key: F128b,
@@ -34,29 +34,26 @@ pub(crate) struct VerifierTraverser {
     /// After traversal, this should have the value
     /// $`\sum_{i \in [t]} \chi_i \cdot c_i(\Delta)`$.
     aggregate: F128b,
+
+    /// Partial aggregation of the assert zero check.
+    /// TODO: Add this to the specification and reference it.
+    aggregate_assert_zero: F128b,
 }
 
 impl VerifierTraverser {
     pub(crate) fn new(
-        challenges: Vec<F128b>,
+        chi_challenge: ChiGenerator,
         verifier_key: F128b,
         masked_witnesses: Vec<F128b>,
     ) -> Result<Self> {
-        if challenges.len() > masked_witnesses.len() {
-            bail!(
-                ErrorKind::OtherError,
-                "Bad input: There should be no more challenges ({}) than masked witnesses ({})",
-                challenges.len(),
-                masked_witnesses.len(),
-            );
-        }
+        // TODO: Add additional asserts here?
         Ok(Self {
-            challenges,
-            challenge_count: 0,
+            chi_challenge,
             verifier_key,
             masked_witnesses,
             assigned_witness_count: 0,
             aggregate: F128b::ZERO,
+            aggregate_assert_zero: F128b::ZERO,
         })
     }
 
@@ -86,36 +83,11 @@ impl VerifierTraverser {
         Ok(self.masked_witnesses[next_index])
     }
 
-    /// Retrieves the next unused challenge.
-    ///
-    /// Fails if there aren't enough challenges.
-    fn next_challenge(&mut self) -> Result<F128b> {
-        let next_index = self.challenge_count;
-        self.challenge_count += 1;
-        if next_index >= self.challenges.len() {
-            bail!(
-                ErrorKind::OtherError,
-                "Bad input: needed at least {} challenges, but only got {}",
-                self.challenge_count,
-                self.challenges.len()
-            )
-        }
-        Ok(self.challenges[next_index])
-    }
-
     /// Decomposes into the aggregate component (a partial construction of `c~`) that was built
     /// during full circuit traversal.
     ///
     /// This will fail if there were unused challenges or masked witnesses.
-    pub(crate) fn into_parts(self) -> Result<F128b> {
-        if self.challenge_count != self.challenges.len() {
-            bail!(
-                ErrorKind::OtherError,
-                "Proof contained more challenges than it needed! Had {}, used {}",
-                self.challenges.len(),
-                self.challenge_count
-            );
-        }
+    pub(crate) fn into_parts(self) -> Result<(F128b, F128b)> {
         if self.assigned_witness_count != self.masked_witnesses.len() {
             bail!(
                 ErrorKind::OtherError,
@@ -124,7 +96,7 @@ impl VerifierTraverser {
                 self.assigned_witness_count
             );
         }
-        Ok(self.aggregate)
+        Ok((self.aggregate, self.aggregate_assert_zero))
     }
 }
 
@@ -163,7 +135,7 @@ impl FieldBackend<F2> for VerifierTraverser {
     fn mul(&mut self, left: &Self::Wire, right: &Self::Wire) -> CircuitResult<Self::Wire> {
         // Assign the next masked witness to the destination wire
         let res = self.next_masked_witness()?;
-        let challenge = self.next_challenge()?;
+        let challenge = self.chi_challenge.next();
 
         // Compute the contibution to the aggregate: ci​(Δ) = q_left * ​q_right ​− q_dst * ​Δ
         let eval = left * right - (res * self.verifier_key);
@@ -175,7 +147,10 @@ impl FieldBackend<F2> for VerifierTraverser {
     fn mulc(&mut self, _lhs: &Self::Wire, _rhs: F2) -> CircuitResult<Self::Wire> {
         todo!();
     }
-    fn assert_zero(&mut self, _arg: &Self::Wire) -> CircuitResult<()> {
-        todo!();
+    fn assert_zero(&mut self, arg: &Self::Wire) -> CircuitResult<()> {
+        let challenge = self.chi_challenge.next();
+
+        self.aggregate_assert_zero += challenge * arg;
+        Ok(())
     }
 }
