@@ -15,7 +15,9 @@ fn cap2int(cap: &Captures, idx: usize) -> Result<usize> {
     let s = cap
         .get(idx)
         .ok_or_else(|| swanky_error!(ErrorKind::OtherError, "Failed to match index '{idx}'"))?;
-    FromStr::from_str(s.as_str()).map_err(|e| swanky_error!(ErrorKind::OtherError, "{e}"))
+    FromStr::from_str(s.as_str()).wrap_err_with(ErrorKind::OtherError, || {
+        "Failed to convert value to string".to_string()
+    })
 }
 
 fn cap2typ(cap: &Captures, idx: usize) -> Result<GateType> {
@@ -26,10 +28,7 @@ fn cap2typ(cap: &Captures, idx: usize) -> Result<GateType> {
     match s {
         "AND" => Ok(GateType::AndGate),
         "XOR" => Ok(GateType::XorGate),
-        s => Err(swanky_error!(
-            ErrorKind::OtherError,
-            "Unknown gate type '{s}'",
-        )),
+        s => swanky_error::bail!(ErrorKind::OtherError, "Unknown gate type '{s}'"),
     }
 }
 
@@ -163,7 +162,7 @@ impl BinaryCircuit {
                 }
                 None => break,
                 _ => {
-                    return Err(swanky_error!(ErrorKind::OtherError, "Invalid wire value"));
+                    swanky_error::bail!(ErrorKind::OtherError, "Invalid wire value");
                 }
             }
         }
