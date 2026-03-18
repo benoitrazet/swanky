@@ -1,5 +1,3 @@
-#[cfg(feature = "serde")]
-use crate::errors::WireDeserializationError;
 use crate::{ArithmeticWire, HasModulus, WireLabel, wire::_unrank};
 use rand::{CryptoRng, Rng, RngCore};
 use vectoreyes::U8x16;
@@ -18,12 +16,14 @@ struct UntrustedWireMod3 {
 
 #[cfg(feature = "serde")]
 impl TryFrom<UntrustedWireMod3> for WireMod3 {
-    type Error = WireDeserializationError;
+    type Error = swanky_error::Error;
 
     fn try_from(wire: UntrustedWireMod3) -> Result<Self, Self::Error> {
-        if wire.lsb & wire.msb != 0 {
-            return Err(Self::Error::InvalidWireMod3);
-        }
+        swanky_error::ensure!(
+            wire.lsb & wire.msb == 0,
+            swanky_error::ErrorKind::OtherError,
+            "Mod 3 wire is ill-formed",
+        );
         Ok(WireMod3 {
             lsb: wire.lsb,
             msb: wire.msb,

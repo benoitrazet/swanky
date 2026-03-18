@@ -16,34 +16,28 @@ struct UntrustedWireModQ {
 
 #[cfg(feature = "serde")]
 impl TryFrom<UntrustedWireModQ> for WireModQ {
-    type Error = crate::errors::WireDeserializationError;
+    type Error = swanky_error::Error;
 
     fn try_from(wire: UntrustedWireModQ) -> Result<Self, Self::Error> {
-        // Modulus must be at least 2
-        if wire.q < 2 {
-            return Err(Self::Error::InvalidWireModQ(
-                crate::errors::ModQDeserializationError::BadModulus(wire.q),
-            ));
-        }
+        swanky_error::ensure!(
+            wire.q >= 2,
+            swanky_error::ErrorKind::OtherError,
+            "Modulus must be at least two",
+        );
 
         // Check correct length and make sure all values are less than the modulus
         let expected_len = crate::util::digits_per_u128(wire.q);
         let given_len = wire.ds.len();
-        if given_len != expected_len {
-            return Err(Self::Error::InvalidWireModQ(
-                crate::errors::ModQDeserializationError::InvalidDigitsLength {
-                    got: given_len,
-                    needed: expected_len,
-                },
-            ));
-        }
+        swanky_error::ensure!(
+            given_len == expected_len,
+            swanky_error::ErrorKind::OtherError,
+            "Invalid number of digits. Expected: {expected_len}. Got: {given_len}"
+        );
         if let Some(i) = wire.ds.iter().position(|&x| x >= wire.q) {
-            return Err(Self::Error::InvalidWireModQ(
-                crate::errors::ModQDeserializationError::DigitTooLarge {
-                    digit: wire.ds[i],
-                    modulus: wire.q,
-                },
-            ));
+            swanky_error::bail!(
+                swanky_error::ErrorKind::OtherError,
+                "Digit {i} is greater than the modulus",
+            );
         }
         Ok(WireModQ {
             q: wire.q,
