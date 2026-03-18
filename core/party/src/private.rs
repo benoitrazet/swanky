@@ -595,3 +595,219 @@ impl<PrivateTo: GenericParty<PartySystem = P::PartySystem>, P: GenericParty, T: 
 }
 
 mod copy_conversions;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    party_system! {
+        mod ps {
+            PartyA,
+            PartyB,
+        }
+    }
+    use ps::{PartyA, PartyB};
+
+    #[test]
+    fn private_which_exhaustive() {
+        let w = private_which::<PartyA, PartyA>();
+        match w {
+            PrivateWhich::Full(e) => assert_eq!(e.cast(PartyA), PartyA),
+            PrivateWhich::Empty(_) => unreachable!(),
+        }
+
+        let w = private_which::<PartyB, PartyB>();
+        match w {
+            PrivateWhich::Full(e) => assert_eq!(e.cast(PartyB), PartyB),
+            PrivateWhich::Empty(_) => unreachable!(),
+        }
+
+        let w = private_which::<PartyB, PartyB>();
+        match w {
+            PrivateWhich::Full(e) => assert_eq!(e.cast(PartyB), PartyB),
+            PrivateWhich::Empty(_) => unreachable!(),
+        }
+
+        let w = private_which::<PartyA, PartyB>();
+        match w {
+            PrivateWhich::Full(_) => unreachable!(),
+            PrivateWhich::Empty(e) => assert_eq!(e.cast(PartyB), PartyB),
+        }
+
+        let w = private_which::<PartyB, PartyA>();
+        match w {
+            PrivateWhich::Full(_) => unreachable!(),
+            PrivateWhich::Empty(e) => assert_eq!(e.cast(PartyA), PartyA),
+        }
+    }
+
+    #[test]
+    fn as_mut_full() {
+        let p: &mut PartyPrivateCopy<PartyA, PartyA, _> = &mut PartyPrivateCopy::new(17);
+        *p.as_mut().unwrap_or_else(|| unreachable!()) = 71;
+        assert_eq!(p.unwrap_or_else(|| unreachable!()), 71);
+    }
+
+    #[test]
+    fn as_mut_empty() {
+        let p: &mut PartyPrivateCopy<PartyA, PartyB, i32> =
+            &mut PartyPrivateCopy::empty(Witness::EQUAL_TYPES);
+        let mut other = 0;
+        *p.as_mut().unwrap_or_else(|| &mut other) = 13;
+        assert_eq!(other, 13);
+    }
+
+    #[test]
+    fn zip_full() {
+        let p1: PartyPrivate<PartyA, PartyA, _> = PartyPrivate::new(17);
+        let p2: PartyPrivate<PartyA, PartyA, _> = PartyPrivate::new(17);
+        assert_eq!(p1.zip(p2), PartyPrivate::new((17, 17)));
+    }
+
+    #[test]
+    fn zip_empty() {
+        let p1: PartyPrivate<PartyA, PartyB, i32> = PartyPrivate::empty(Witness::EQUAL_TYPES);
+        let p2: PartyPrivate<PartyA, PartyB, i32> = PartyPrivate::empty(Witness::EQUAL_TYPES);
+        assert_eq!(p1.zip(p2), PartyPrivate::empty(Witness::EQUAL_TYPES));
+    }
+
+    #[test]
+    fn zip_with_full() {
+        let p1: PartyPrivateCopy<PartyA, PartyA, _> = PartyPrivateCopy::new(17);
+        let p2: PartyPrivateCopy<PartyA, PartyA, _> = PartyPrivateCopy::new(71);
+        let p3: PartyPrivateCopy<PartyA, PartyA, _> = PartyPrivateCopy::new(88);
+        assert_eq!(p1.zip_with(p2, |n1, n2| n1 + n2), p3);
+    }
+
+    #[test]
+    fn zip_with_empty() {
+        let p1: PartyPrivateCopy<PartyA, PartyB, _> = PartyPrivateCopy::new(17);
+        let p2: PartyPrivateCopy<PartyA, PartyB, _> = PartyPrivateCopy::new(71);
+        assert_eq!(
+            p1.zip_with(p2, |n1, n2| n1 + n2),
+            PartyPrivateCopy::empty(Witness::EQUAL_TYPES)
+        );
+    }
+
+    #[test]
+    fn into_option_full() {
+        assert!(
+            PartyPrivateCopy::<PartyA, PartyA, _>::new(17)
+                .into_option()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn into_option_empty() {
+        assert!(
+            PartyPrivateCopy::<PartyA, PartyB, _>::new(17)
+                .into_option()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn private_formatting() {
+        let p_full: PartyPrivateCopy<PartyA, PartyA, _> = PartyPrivateCopy::new(17);
+        let p_empty: PartyPrivateCopy<PartyA, PartyB, i32> = PartyPrivateCopy::default();
+
+        assert_eq!(format!("{p_full:?}"), "17\n".to_string());
+        assert_eq!(format!("{p_empty:?}"), "PrivateToOtherParty\n".to_string());
+    }
+
+    #[test]
+    fn lift_result_full() {
+        let p: PartyPrivateCopy<PartyA, PartyA, Result<i32, ()>> = PartyPrivateCopy::new(Ok(17));
+        assert!(p.lift_result().is_ok());
+
+        let p: PartyPrivateCopy<PartyA, PartyA, Result<i32, ()>> = PartyPrivateCopy::new(Err(()));
+        assert!(p.lift_result().is_err());
+    }
+
+    #[test]
+    fn lift_result_empty() {
+        let p: PartyPrivateCopy<PartyA, PartyB, Result<i32, ()>> = PartyPrivateCopy::new(Err(()));
+        assert!(p.lift_result().is_ok());
+    }
+
+    #[test]
+    fn ref_private_to_private_ref() {
+        let p: &PartyPrivateCopy<PartyA, PartyA, _> = &PartyPrivateCopy::new(17);
+        assert_eq!(
+            *PartyPrivateCopy::<PartyA, PartyA, &i32>::from(p).into_inner(Witness::EQUAL_TYPES),
+            17
+        );
+    }
+
+    #[test]
+    fn private_ref_to_ref_private() {
+        let p: PartyPrivateCopy<PartyA, PartyA, &i32> = PartyPrivateCopy::new(&17);
+        assert_eq!(
+            <&PartyPrivateCopy<PartyA, PartyA, i32>>::from(p).into_inner(Witness::EQUAL_TYPES),
+            17
+        );
+
+        let p: PartyPrivateCopy<PartyA, PartyB, &i32> =
+            PartyPrivateCopy::empty(Witness::EQUAL_TYPES);
+        assert_eq!(
+            <&PartyPrivateCopy<PartyA, PartyB, i32>>::from(p).unwrap_or_else(|| 17),
+            17
+        );
+    }
+
+    #[test]
+    fn mut_ref_private_to_private_mut_ref() {
+        let p: &mut PartyPrivate<PartyA, PartyA, _> = &mut PartyPrivate::new(17);
+        *PartyPrivate::<PartyA, PartyA, &mut i32>::from(&mut *p).into_inner(Witness::EQUAL_TYPES) =
+            71;
+        assert_eq!(p.clone().into_inner(Witness::EQUAL_TYPES), 71);
+    }
+
+    #[test]
+    fn private_mut_ref_to_mut_ref_private() {
+        let mut x = 17;
+        let p: PartyPrivate<PartyA, PartyA, &mut i32> = PartyPrivate::new(&mut x);
+        assert_eq!(
+            <&mut PartyPrivate<PartyA, PartyA, i32>>::from(p)
+                .clone()
+                .into_inner(Witness::EQUAL_TYPES),
+            17
+        );
+
+        let p: PartyPrivate<PartyA, PartyB, &mut i32> = PartyPrivate::empty(Witness::EQUAL_TYPES);
+        assert_eq!(
+            <&mut PartyPrivate<PartyA, PartyB, i32>>::from(p)
+                .clone()
+                .unwrap_or_else(|| 17),
+            17
+        );
+    }
+
+    #[test]
+    fn private_to_option() {
+        assert!(Option::<i32>::from(PartyPrivateCopy::<PartyA, PartyA, _>::new(17)).is_some());
+        assert!(Option::<i32>::from(PartyPrivateCopy::<PartyA, PartyB, _>::new(17)).is_none());
+    }
+
+    #[test]
+    fn party_either_to_private() {
+        let p: PartyEitherCopy<PartyA, i32, ()> = PartyEitherCopy::new(Witness::EQUAL_TYPES, 17);
+        assert_eq!(
+            PartyPrivateCopy::<PartyA, PartyA, i32>::from(p).unwrap_or_else(|| unreachable!()),
+            17
+        );
+
+        let p: PartyEitherCopy<PartyB, i32, ()> = PartyEitherCopy::new(Witness::EQUAL_TYPES, ());
+        assert_eq!(
+            PartyPrivateCopy::<PartyB, PartyB, ()>::from(p).unwrap_or_else(|| unreachable!()),
+            ()
+        );
+
+        let p: PartyEitherCopy<PartyB, i32, ()> = PartyEitherCopy::new(Witness::EQUAL_TYPES, ());
+        assert_eq!(
+            PartyPrivateCopy::<PartyA, PartyB, i32>::from(p).unwrap_or_else(|| 17),
+            17
+        );
+    }
+}

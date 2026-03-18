@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
   "core/error",
+  "core/party",
   "core/vectoreyes",
   "edge/adversary",
   "edge/aes-hash",
@@ -52,7 +53,6 @@ members = [
   "edge/ot-noar-pinkas",
   "edge/ot-test",
   "edge/ot-traits",
-  "edge/party",
   "edge/polynomial",
   "edge/popsicle",
   "edge/schmivitz",
@@ -131,7 +131,7 @@ swanky-ot-dummy = { path = "edge/ot-dummy" }
 swanky-ot-noar-pinkas = { path = "edge/ot-noar-pinkas" }
 swanky-ot-test = { path = "edge/ot-test" }
 swanky-ot-traits = { path = "edge/ot-traits" }
-swanky-party = { path = "edge/party" }
+swanky-party = { path = "core/party" }
 swanky-polynomial = { path = "edge/polynomial" }
 swanky-serialization = { path = "edge/serialization" }
 swanky-sieve-ir-api = { path = "edge/sieve-ir-api" }

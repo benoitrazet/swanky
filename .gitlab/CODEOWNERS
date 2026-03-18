@@ -2,6 +2,9 @@
 /core/error
 /core/error/
 
+/core/party
+/core/party/
+
 /core/vectoreyes
 /core/vectoreyes/
 
@@ -125,9 +128,6 @@
 
 /edge/ot-traits @amaloz @rissa
 /edge/ot-traits/ @amaloz @rissa
-
-/edge/party @cphifer
-/edge/party/ @cphifer
 
 /edge/polynomial @cphifer
 /edge/polynomial/ @cphifer

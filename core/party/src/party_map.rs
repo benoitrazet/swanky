@@ -252,3 +252,30 @@ pub const fn map_evidence_party1<
 ) -> Witness<impl EqualityProposition<PartyMap<P, P0, P1>, P1>> {
     is_t1::<bounds::GenericParty, _, _, _>(w).sym()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    party_system! {
+        mod ps {
+            PartyA,
+            PartyB,
+        }
+    }
+    use ps::{PartyA, PartyB};
+
+    #[test]
+    fn trivial_map_evidence_party0_cast() {
+        let w = Witness::EQUAL_TYPES;
+        let w_m = map_evidence_party0::<PartyA, PartyB, PartyA>(w);
+        assert_eq!(w_m.cast(PartyB), PartyB);
+    }
+
+    #[test]
+    fn trivial_map_evidence_party1_cast() {
+        let w = Witness::EQUAL_TYPES;
+        let w_m = map_evidence_party1::<PartyB, PartyB, PartyA>(w);
+        assert_eq!(w_m.cast(PartyA), PartyA);
+    }
+}

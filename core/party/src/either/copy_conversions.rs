@@ -105,4 +105,62 @@ impl<'a, P: GenericParty, T0: Copy, T1: Copy> From<&'a mut PartyEither<P, T0, T1
     }
 }
 
-// TODO: we can do this for more containers.
+#[cfg(test)]
+mod tests {
+    use crate::ty_eq::Witness;
+
+    use super::*;
+
+    party_system! {
+        mod ps {
+            PartyA,
+            PartyB,
+        }
+    }
+    use ps::PartyA;
+
+    #[test]
+    fn either_copy_to_either() {
+        let pe_copy: PartyEitherCopy<PartyA, i32, ()> =
+            PartyEitherCopy::new(Witness::EQUAL_TYPES, 17);
+        let pe = PartyEither::from(pe_copy);
+        assert_eq!(pe_copy.0, pe.0);
+    }
+
+    #[test]
+    fn either_copy_to_either_refs() {
+        let pe_copy: &PartyEitherCopy<PartyA, i32, ()> =
+            &PartyEitherCopy::new(Witness::EQUAL_TYPES, 17);
+        let pe = <&PartyEither<_, _, _>>::from(pe_copy);
+        assert_eq!(pe_copy.0, pe.0);
+    }
+
+    #[test]
+    fn either_copy_to_either_mut_refs() {
+        let pe_copy: &mut PartyEitherCopy<PartyA, i32, ()> =
+            &mut PartyEitherCopy::new(Witness::EQUAL_TYPES, 17);
+        let pe = <&mut PartyEither<_, _, _>>::from(pe_copy);
+        assert_eq!(pe.clone().into_inner(Witness::EQUAL_TYPES), 17);
+    }
+
+    #[test]
+    fn either_to_either_copy() {
+        let pe: PartyEither<PartyA, i32, ()> = PartyEither::new(Witness::EQUAL_TYPES, 17);
+        let pe_copy = PartyEitherCopy::from(pe.clone());
+        assert_eq!(pe.0, pe_copy.0);
+    }
+
+    #[test]
+    fn either_to_either_copy_refs() {
+        let pe: &PartyEither<PartyA, i32, ()> = &PartyEither::new(Witness::EQUAL_TYPES, 17);
+        let pe_copy = <&PartyEitherCopy<_, _, _>>::from(pe);
+        assert_eq!(pe.0, pe_copy.0);
+    }
+
+    #[test]
+    fn either_to_either_copy_mut_refs() {
+        let pe: &mut PartyEither<PartyA, i32, ()> = &mut PartyEither::new(Witness::EQUAL_TYPES, 17);
+        let pe_copy = <&mut PartyEitherCopy<_, _, _>>::from(pe);
+        assert_eq!(pe_copy.into_inner(Witness::EQUAL_TYPES), 17);
+    }
+}
