@@ -61,7 +61,9 @@ fn value_to_array3(v: &Value) -> Result<Array3<i64>> {
         (height, width, depth),
         data.into_iter().flatten().flatten().collect(),
     )
-    .map_err(|e| swanky_error!(ErrorKind::OtherError, "Cannot create array from vec: {e}"))
+    .wrap_err_with(ErrorKind::OtherError, || {
+        "Cannot create array from vec".to_string()
+    })
 }
 
 /// Read neural network tests from a directory.
@@ -92,12 +94,15 @@ pub fn read_tests(dir: &Path, num: Option<usize>) -> Result<Vec<Array3<i64>>> {
                 .wrap_err_with(ErrorKind::OtherError, || "Failed to read line".to_string())?
                 .split(",")
                 .map(|s| {
-                    s.parse::<i64>()
-                        .map_err(|e| swanky_error!(ErrorKind::OtherError, "{}", e.to_string()))
+                    s.parse::<i64>().wrap_err_with(ErrorKind::OtherError, || {
+                        "Failed to parse string as `i64`".to_string()
+                    })
                 })
                 .collect::<Result<Vec<_>>>()?;
             Array3::from_shape_vec((data.len(), 1, 1), data)
-                .map_err(|e| swanky_error!(ErrorKind::OtherError, "{}", e.to_string()))
+                .wrap_err_with(ErrorKind::OtherError, || {
+                    "Failed to convert `vec` to `Array3`".to_string()
+                })
         });
 
         if let Some(n) = num {
@@ -159,8 +164,9 @@ pub fn read_labels(dir: &Path) -> Result<Vec<Vec<i64>>> {
                     .wrap_err_with(ErrorKind::OtherError, || "Failed to read line".to_string())?
                     .split(",")
                     .map(|s| {
-                        s.parse::<i64>()
-                            .map_err(|e| swanky_error!(ErrorKind::OtherError, "{e}"))
+                        s.parse::<i64>().wrap_err_with(ErrorKind::OtherError, || {
+                            "Failed to covert string to `i64`".to_string()
+                        })
                     })
                     .collect();
                 line
