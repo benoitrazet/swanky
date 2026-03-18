@@ -55,17 +55,17 @@ impl std::fmt::Display for ActivationFunction {
 /// - relu => [`ActivationFunction::Relu`]
 /// - linear, softmax, identity, id => [`ActivationFunction::Identity`]
 impl TryFrom<&str> for ActivationFunction {
-    type Error = std::io::Error;
+    type Error = swanky_error::Error;
 
     fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
         match value {
             "tanh" | "hard_sigmoid" | "sign" => Ok(ActivationFunction::Sign),
             "relu" => Ok(ActivationFunction::Relu),
             "linear" | "softmax" | "identity" | "id" => Ok(ActivationFunction::Identity),
-            _ => Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "Input is either an invalid or unsupported activation function",
-            )),
+            _ => swanky_error::bail!(
+                ErrorKind::OtherError,
+                "Input is either an invalid or unsupported activation function"
+            ),
         }
     }
 }
