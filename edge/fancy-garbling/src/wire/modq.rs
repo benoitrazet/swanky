@@ -209,17 +209,7 @@ impl WireLabel for WireModQ {
         };
         Self { q, ds }
     }
-    /// Unpack the wire represented by a `Block` with modulus `q`. Assumes that
-    /// the block was constructed through the `AllWire` API.
-    fn zero(q: u16) -> Self {
-        if q < 2 {
-            panic!("[WireModQ::zero] Modulus must be at least 2. Got {}", q);
-        }
-        Self {
-            q,
-            ds: vec![0; util::digits_per_u128(q)],
-        }
-    }
+
     fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
         if q < 2 {
             panic!("[WireModQ::rand] Modulus must be at least 2. Got {}", q);

@@ -127,13 +127,6 @@ impl WireLabel for WireMod2 {
         Self { val: inp }
     }
 
-    fn zero(q: u16) -> Self {
-        if q != 2 {
-            panic!("[WireMod2::zero] Expected modulo 2. Got {}", q);
-        }
-        Self::default()
-    }
-
     fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
         if q != 2 {
             panic!("[WireMod2::rand] Expected modulo 2. Got {}", q);

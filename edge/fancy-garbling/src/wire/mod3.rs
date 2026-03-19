@@ -202,13 +202,6 @@ impl WireLabel for WireMod3 {
         Self { lsb, msb }
     }
 
-    fn zero(q: u16) -> Self {
-        if q != 3 {
-            panic!("[WireMod3::zero] Expected modulo 3. Got {}", q);
-        }
-        Self::default()
-    }
-
     fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
         if q != 3 {
             panic!("[WireMod3::rand] Expected mod 3. Got mod {}", q)

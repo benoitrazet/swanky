@@ -452,8 +452,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
     type Item = Wire;
 
     fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
-        let zero = Wire::rand(&mut self.rng, q);
-        let wire = zero.clone() + self.delta(q) * x;
+        let (zero, wire) = Wire::constant(x, q, &self.delta(q), &mut self.rng);
         self.send_wire(&wire, channel)?;
         Ok(zero)
     }
