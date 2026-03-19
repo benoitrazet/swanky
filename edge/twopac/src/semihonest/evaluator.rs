@@ -98,7 +98,7 @@ fn combine<Wire: WireLabel>(wires: &[Block], q: u16) -> Wire {
     let acc = Wire::from_repr(wires[0], q);
     wires[1..].iter().enumerate().fold(acc, |acc, (i, w)| {
         let w = Wire::from_repr(*w, q);
-        acc + w * (1 << i)
+        acc + w * (1 << (i + 1))
     })
 }
 
