@@ -1,5 +1,37 @@
 #![deny(missing_docs)]
-//! Serialization types for algebraic structures.
+//! Traits and types for _canonical serialization_ of data.
+//!
+//! A serialization method for values of type `T` is **canonical** if
+//! it is _deterministic_ (every `T` value always has the same
+//! serialization) and _stable_ (the serialization will not change
+//! across space or time, usually due to a combination of the
+//! already-canonical serializations of byte-based primitive types,
+//! and the additional mathematical structure we impose on those
+//! types).
+//!
+//! The [`CanonicalSerialize`] trait extends [`serde::Serialize`] and
+//! [`serde::de::DeserializeOwned`], requiring in addition methods to
+//! (de)serialize individual datum from/to bytes.
+//! Note that the [`derive_serde_via_canonical_serialize`] macro can
+//! be used to generate suitable implementations of the `serde` traits
+//! using the `CanonicalSerialize` implementation.
+//!
+//! A pair of associated types -- [`CanonicalSerialize::Serializer`]
+//! and [`CanonicalSerialize::Deserializer`] -- must also be defined
+//! when implementing the trait.
+//! This allows for more efficient implementations of batched element
+//! serialization, in some cases, as the (de)serialization can be
+//! _stateful_.
+//! To simply use the
+//! [`CanonicalSerialize::to_bytes`]/[`CanonicalSerialize::from_bytes`]
+//! methods you defined, see [`ByteElementSerializer`] and
+//! [`ByteElementDeserializer`].
+//!
+//! This crate provides implementations for all fixed-width integer
+//! types, `isize` and `usize`, `()`, [`vectoreyes`] vectors,
+//! [`GenericArray`], and `[T; N]` for `N <= 32` (a bound inherited
+//! from [`serde`]), and all `FiniteRing`s require `CanonicalSerialize`.
+//! See the field crates for details on these implementations.
 
 use generic_array::typenum::Unsigned;
 use generic_array::{ArrayLength, GenericArray};
