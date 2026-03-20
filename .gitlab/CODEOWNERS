@@ -1,4 +1,7 @@
 [Core] @amaloz @cphifer @rissa
+/core/adversary
+/core/adversary/
+
 /core/error
 /core/error/
 
@@ -9,9 +12,6 @@
 /core/vectoreyes/
 
 [Edge]
-/edge/adversary @cphifer
-/edge/adversary/ @cphifer
-
 /edge/aes-hash @amaloz @rissa
 /edge/aes-hash/ @amaloz @rissa
 
