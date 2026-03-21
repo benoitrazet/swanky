@@ -87,8 +87,8 @@ macro_rules! prime_field_using_ff {
         $(single_limb_modulus = $single_limb_modulus: expr)?
     ) => {
         mod $mod_name {
-            use swanky_field::{FiniteField, PrimeFiniteField, FiniteRing};
-            use swanky_serialization::{CanonicalSerialize, BiggerThanModulus};
+            use swanky_field::{BiggerThanModulus, FiniteField, PrimeFiniteField, FiniteRing};
+            use swanky_serialization::{CanonicalSerialize};
             use ff::{Field, PrimeField};
             use generic_array::{typenum::Unsigned, GenericArray};
             use rand_core::{RngCore, SeedableRng};
