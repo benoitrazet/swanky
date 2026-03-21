@@ -297,3 +297,24 @@ mod test {
         fn roundtrip_array_31 => any::<[[u16; 2]; 2]>(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_value_too_big_for_usize() {
+        assert_eq!(
+            "An integer could fit in a u64, but not in a usize".to_string(),
+            format!("{ValueTooBigForUsize}")
+        )
+    }
+
+    #[test]
+    fn display_value_too_big_for_isize() {
+        assert_eq!(
+            "An integer could fit in a i64, but not in a isize",
+            format!("{ValueTooBigForIsize}"),
+        )
+    }
+}

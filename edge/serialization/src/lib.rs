@@ -271,3 +271,42 @@ macro_rules! derive_serde_via_canonical_serialize {
         }
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use proptest::proptest;
+
+    proptest! {
+        #[test]
+        fn byte_element_sequence_serializer_size(n: usize) {
+            assert_eq!(ByteElementSerializer::<()>::serialized_size(n), 0)
+        }
+    }
+
+    #[test]
+    fn byte_element_sequence_serializer() {
+        let mut v = vec![];
+        let bes = ByteElementSerializer::<()>::new(&mut v);
+        assert!(bes.is_ok());
+
+        let mut bes = bes.unwrap();
+        let res = bes.write(&mut v, ());
+        assert!(res.is_ok());
+
+        let res = bes.finish(&mut v);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn byte_element_sequence_deserializer() {
+        let mut v: &[u8] = &[];
+        let res = ByteElementDeserializer::<()>::new(&mut v);
+        assert!(res.is_ok());
+
+        let mut bes = res.unwrap();
+        let res = bes.read(&mut v);
+        assert!(res.is_ok());
+    }
+}
