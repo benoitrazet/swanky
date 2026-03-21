@@ -60,8 +60,8 @@ pod_impl!(
     vectoreyes::U64x4,
 );
 
-/// A 64-bit integer could fit in a `u64`, but not necessarily in a `usize`,
-/// which is architecture dependent.
+/// A 64-bit integer could fit in a `u64`, but not necessarily in a
+/// `usize`, which is architecture dependent.
 #[derive(Debug, Clone, Copy)]
 pub struct ValueTooBigForUsize;
 impl std::fmt::Display for ValueTooBigForUsize {
@@ -91,8 +91,8 @@ impl CanonicalSerialize for usize {
     }
 }
 
-/// A 64-bit integer could fit in a `i64`, but not necessarily in a `isize`,
-/// which is architecture dependent.
+/// A 64-bit integer could fit in a `i64`, but not necessarily in a
+/// `isize`, which is architecture dependent.
 #[derive(Debug, Clone, Copy)]
 pub struct ValueTooBigForIsize;
 impl std::fmt::Display for ValueTooBigForIsize {
@@ -157,14 +157,17 @@ where
         let mut out: GenericArray<MaybeUninit<T>, N> = GenericArray::uninit();
         debug_assert!(remainder.is_empty());
         if bytes.is_empty() {
-            // We need to handle zero bytes separately. This only occurs if:
+            // We need to handle zero bytes separately. This only
+            // occurs if:
             debug_assert!(N::USIZE == 0 || <T::ByteReprLen as Unsigned>::USIZE == 0);
-            // In this case, chunks_from_slice() doesn't know how many chunks to create (because
-            // division by zero is undefined). In this instance, we just initialize all the members
+            // In this case, chunks_from_slice() doesn't know how many
+            // chunks to create (because division by zero is
+            // undefined).
+            // In this instance, we just initialize all the members
             // separately.
             //
-            // The bytes.is_empty() branch should be eliminated in release mode because byte.len()
-            // is a constant.
+            // The bytes.is_empty() branch should be eliminated in
+            // release mode because byte.len() is a constant.
             for dst in out.iter_mut() {
                 dst.write(T::from_bytes(&Default::default())?);
             }
@@ -185,8 +188,9 @@ where
     }
 }
 
-/// NOTE: because [`serde`] only `impl`s serialization for arrays up to 32 elements in length, and
-/// [`CanonicalSerialize`] requires [`Serialize`], we inherit this restriction.
+/// NOTE: because [`serde`] only `impl`s serialization for arrays up
+/// to 32 elements in length, and [`CanonicalSerialize`] requires
+/// [`Serialize`], we inherit this restriction.
 impl<T: CanonicalSerialize, const N: usize> CanonicalSerialize for [T; N]
 where
     Const<N>: ToUInt,

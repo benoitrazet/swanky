@@ -44,8 +44,8 @@ use std::{
 mod impls;
 pub use impls::{ValueTooBigForIsize, ValueTooBigForUsize};
 
-/// Types that implement this trait have a canonical serialization and a fixed
-/// serialization size.
+/// Types that implement this trait have a canonical serialization and
+/// a fixed serialization size.
 pub trait CanonicalSerialize: 'static + Copy + Serialize + DeserializeOwned {
     /// A way to serialize field elements of this type.
     ///
@@ -56,14 +56,16 @@ pub trait CanonicalSerialize: 'static + Copy + Serialize + DeserializeOwned {
     /// See [`SequenceSerializer`] for more info.
     type Deserializer: SequenceDeserializer<Self>;
 
-    /// The number of bytes in the byte representation for this element.
+    /// The number of bytes in the byte representation for this
+    /// element.
     type ByteReprLen: ArrayLength;
-    /// The error that can result from trying to decode an invalid byte sequence.
+    /// The error that can result from trying to decode an invalid
+    /// byte sequence.
     type FromBytesError: std::error::Error + Send + Sync + 'static;
     /// Deserialize an element from a byte array.
     ///
-    /// NOTE: for security purposes, this function will accept exactly one byte sequence for each
-    /// element.
+    /// NOTE: for security purposes, this function will accept exactly
+    /// one byte sequence for each element.
     fn from_bytes(
         bytes: &GenericArray<u8, Self::ByteReprLen>,
     ) -> Result<Self, Self::FromBytesError>;
@@ -75,14 +77,17 @@ pub trait CanonicalSerialize: 'static + Copy + Serialize + DeserializeOwned {
 
 /// A way to serialize a sequence of elements.
 ///
-/// The [`CanonicalSerialize::from_bytes`] and [`CanonicalSerialize::to_bytes`] methods for
-/// require that elements serialize and deserialize to the byte boundary.
-/// For algebraic structures like $`\texsf{GF}(2)`$ (the finite field of integers modulo 2), where
-/// each element can be represented in only one bit, using the `to_bytes` and `from_bytes`
-/// methods is 8x less efficient than just sending each bit of the elements.
+/// The [`CanonicalSerialize::from_bytes`] and
+/// [`CanonicalSerialize::to_bytes`] methods for require that elements
+/// serialize and deserialize to the byte boundary.
+/// For algebraic structures like $`\texsf{GF}(2)`$ (the finite field
+/// of integers modulo 2), where each element can be represented in
+/// only one bit, using the `to_bytes` and `from_bytes` methods is 8x
+/// less efficient than just sending each bit of the elements.
 ///
-/// To enable more efficient communication, we can use the [`SequenceSerializer`] and
-/// [`SequenceDeserializer`] types to enable _stateful_ serialization and deserialization.
+/// To enable more efficient communication, we can use the
+/// [`SequenceSerializer`] and [`SequenceDeserializer`] types to
+/// enable _stateful_ serialization and deserialization.
 pub trait SequenceSerializer<E>: Sized {
     /// The exact number of bytes that will be written if `n` elements are serialized.
     fn serialized_size(n: usize) -> usize;
@@ -105,7 +110,8 @@ pub trait SequenceDeserializer<E>: Sized {
     fn read<R: Read>(&mut self, src: &mut R) -> std::io::Result<E>;
 }
 
-/// An element serializer that uses the element's [`CanonicalSerialize::to_bytes`] method.
+/// An element serializer that uses the element's
+/// [`CanonicalSerialize::to_bytes`] method.
 pub struct ByteElementSerializer<E: CanonicalSerialize>(PhantomData<E>);
 impl<E: CanonicalSerialize> SequenceSerializer<E> for ByteElementSerializer<E> {
     fn serialized_size(n: usize) -> usize {
@@ -124,7 +130,8 @@ impl<E: CanonicalSerialize> SequenceSerializer<E> for ByteElementSerializer<E> {
     }
 }
 
-/// An element deserializer that uses the element's [`CanonicalSerialize::from_bytes`] method.
+/// An element deserializer that uses the element's
+/// [`CanonicalSerialize::from_bytes`] method.
 pub struct ByteElementDeserializer<E: CanonicalSerialize>(PhantomData<E>);
 impl<E: CanonicalSerialize> SequenceDeserializer<E> for ByteElementDeserializer<E> {
     fn new<R: Read>(_dst: &mut R) -> std::io::Result<Self> {
@@ -150,7 +157,8 @@ impl std::fmt::Display for BiggerThanModulus {
     }
 }
 
-/// An error with no inhabitants, for when an element cannot fail to deserialize.
+/// An error with no inhabitants, for when an element cannot fail to
+/// deserialize.
 #[derive(Clone, Copy, Debug)]
 pub enum BytesDeserializationCannotFail {}
 impl std::fmt::Display for BytesDeserializationCannotFail {
@@ -160,7 +168,8 @@ impl std::fmt::Display for BytesDeserializationCannotFail {
 }
 impl std::error::Error for BytesDeserializationCannotFail {}
 
-/// Provides `serde` serialize / deserialize functionality for vectors of elements.
+/// Provides `serde` serialize / deserialize functionality for vectors
+/// of elements.
 pub mod serde_vec {
     use super::*;
 
@@ -252,15 +261,18 @@ pub mod serde_vec {
     }
 }
 
-/// Dependent crates might not neccessarily depend on `serde`, themsevles.
-/// Nonetheless, macros written in _this_ crate need to be able to access `serde`, even when
-/// those macros are invoked from other crates. To solve this problem, we re-export the crate that
-/// our macros need.
+/// Dependent crates might not neccessarily depend on `serde`,
+/// themsevles.
+/// Nonetheless, macros written in _this_ crate need to be able to
+/// access `serde`, even when those macros are invoked from other
+/// crates.
+/// To solve this problem, we re-export the crate that our macros
+/// need.
 #[doc(hidden)]
 pub use serde as __serde_for_macro;
 
-/// Implement [`serde::Serialize`] and [`serde::Deserialize`] via an existing
-/// [`CanonicalSerialize`] implementation.
+/// Implement [`serde::Serialize`] and [`serde::Deserialize`] via an
+/// existing [`CanonicalSerialize`] implementation.
 ///
 /// # Example
 /// ```
