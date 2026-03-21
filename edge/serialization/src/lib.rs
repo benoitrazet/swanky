@@ -47,11 +47,11 @@ pub use impls::{ValueTooBigForIsize, ValueTooBigForUsize};
 /// Types that implement this trait have a canonical serialization and
 /// a fixed serialization size.
 pub trait CanonicalSerialize: 'static + Copy + Serialize + DeserializeOwned {
-    /// A way to serialize field elements of this type.
+    /// A way to serialize elements of this type.
     ///
     /// See [`SequenceSerializer`] for more info.
     type Serializer: SequenceSerializer<Self>;
-    /// A way to deserialize field elements of this type.
+    /// A way to deserialize elements of this type.
     ///
     /// See [`SequenceSerializer`] for more info.
     type Deserializer: SequenceDeserializer<Self>;
@@ -71,7 +71,8 @@ pub trait CanonicalSerialize: 'static + Copy + Serialize + DeserializeOwned {
     ) -> Result<Self, Self::FromBytesError>;
     /// Serialize an element into a byte array.
     ///
-    /// Consider using [`Self::Serializer`] if you need to serialize several field elements.
+    /// Consider using [`Self::Serializer`] if you need to serialize
+    /// several elements.
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen>;
 }
 
