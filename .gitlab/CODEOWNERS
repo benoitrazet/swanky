@@ -8,6 +8,9 @@
 /core/party
 /core/party/
 
+/core/serialization
+/core/serialization/
+
 /core/vectoreyes
 /core/vectoreyes/
 
@@ -137,9 +140,6 @@
 
 /edge/schmivitz @benoit.razet @marcella
 /edge/schmivitz/ @benoit.razet @marcella
-
-/edge/serialization @cphifer
-/edge/serialization/ @cphifer
 
 /edge/simple-arith-circuit @amaloz @cphifer
 /edge/simple-arith-circuit/ @amaloz @cphifer
