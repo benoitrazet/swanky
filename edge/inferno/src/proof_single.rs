@@ -16,7 +16,6 @@ use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_field::FiniteField;
 use swanky_field::FiniteRing;
-use swanky_serialization::serde_vec;
 
 /// The proof for a single execution of the protocol. `N` denotes
 /// the number of participants in the MPC.
@@ -292,10 +291,8 @@ pub(crate) struct OpenedPartiesShares<F: FiniteField, const N: usize> {
     // `Deserialize` on `[u128; N]` is problematic.
     seeds: Vec<u128>,
     // The correction values for the witness
-    #[serde(bound = "", with = "serde_vec")]
     witness: Vec<F::PrimeField>,
     // The correction values for the multiplication outputs
-    #[serde(bound = "", with = "serde_vec")]
     mults: Vec<F::PrimeField>,
     #[serde(bound = "")]
     hs: Vec<Vec<CorrectionSharing<F, N>>>,
