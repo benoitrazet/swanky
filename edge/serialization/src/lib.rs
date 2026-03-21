@@ -46,6 +46,8 @@ pub use impls::{ValueTooBigForIsize, ValueTooBigForUsize};
 
 /// Types that implement this trait have a canonical serialization and
 /// a fixed serialization size.
+///
+/// See the [`crate`] documentation for additional details.
 pub trait CanonicalSerialize: 'static + Copy + Serialize + DeserializeOwned {
     /// A way to serialize elements of this type.
     ///
@@ -101,6 +103,8 @@ pub trait SequenceSerializer<E>: Sized {
 }
 
 /// A way to deserialize a sequence of elements.
+///
+/// See [`SequenceSerializer`] for more information.
 pub trait SequenceDeserializer<E>: Sized {
     /// Construct a new deserializer
     fn new<R: Read>(dst: &mut R) -> std::io::Result<Self>;
