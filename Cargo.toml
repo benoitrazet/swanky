@@ -1,10 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
+  "core/adversary",
   "core/error",
   "core/party",
   "core/vectoreyes",
-  "edge/adversary",
   "edge/aes-hash",
   "edge/aes-rng",
   "edge/authenticated-bits",
@@ -97,7 +97,7 @@ mac-n-cheese-wire-map = { path = "edge/mac-n-cheese/wire-map" }
 popsicle = { path = "edge/popsicle" }
 schmivitz = { path = "edge/schmivitz" }
 simple-arith-circuit = { path = "edge/simple-arith-circuit" }
-swanky-adversary = { path = "edge/adversary" }
+swanky-adversary = { path = "core/adversary" }
 swanky-aes-hash = { path = "edge/aes-hash" }
 swanky-aes-rng = { path = "edge/aes-rng" }
 swanky-authenticated-bits = { path = "edge/authenticated-bits" }
