@@ -107,7 +107,7 @@ macro_rules! small_binary_field {
                 <generic_array::typenum::U7 as std::ops::Add<$num_bits>>::Output as
                 std::ops::Div<generic_array::typenum::U8>
             >::Output;
-            type FromBytesError = swanky_serialization::BiggerThanModulus;
+            type FromBytesError = swanky_field::BiggerThanModulus;
 
             #[inline]
             fn from_bytes(
@@ -119,7 +119,7 @@ macro_rules! small_binary_field {
                 if (raw >> <$num_bits as Unsigned>::U64) == 0 {
                     Ok($name(raw))
                 } else {
-                    Err(swanky_serialization::BiggerThanModulus)
+                    Err(swanky_field::BiggerThanModulus)
                 }
             }
 

@@ -4,6 +4,7 @@ members = [
   "core/adversary",
   "core/error",
   "core/party",
+  "core/serialization",
   "core/vectoreyes",
   "edge/aes-hash",
   "edge/aes-rng",
@@ -56,7 +57,6 @@ members = [
   "edge/polynomial",
   "edge/popsicle",
   "edge/schmivitz",
-  "edge/serialization",
   "edge/sieve-ir-api",
   "edge/sieve-ir-codegen",
   "edge/simple-arith-circuit",
@@ -133,7 +133,7 @@ swanky-ot-test = { path = "edge/ot-test" }
 swanky-ot-traits = { path = "edge/ot-traits" }
 swanky-party = { path = "core/party" }
 swanky-polynomial = { path = "edge/polynomial" }
-swanky-serialization = { path = "edge/serialization" }
+swanky-serialization = { path = "core/serialization" }
 swanky-sieve-ir-api = { path = "edge/sieve-ir-api" }
 swanky-sieve-ir-codegen = { path = "edge/sieve-ir-codegen" }
 swanky-svole-wykw = { path = "edge/svole-wykw" }
