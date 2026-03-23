@@ -1,5 +1,5 @@
 {}:
-let sources = import ../nix/sources.nix;
+let sources = import ./npins;
 in
 (import sources.nixpkgs)
 {
