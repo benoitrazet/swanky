@@ -1,0 +1,31 @@
+{
+  "pins": {
+    "nixpkgs": {
+      "type": "Git",
+      "repository": {
+        "type": "GitHub",
+        "owner": "NixOS",
+        "repo": "nixpkgs"
+      },
+      "branch": "nixos-25.05",
+      "submodules": false,
+      "revision": "ac62194c3917d5f474c1a844b6fd6da2db95077d",
+      "url": "https://github.com/NixOS/nixpkgs/archive/ac62194c3917d5f474c1a844b6fd6da2db95077d.tar.gz",
+      "hash": "0v6bd1xk8a2aal83karlvc853x44dg1n4nk08jg3dajqyy0s98np"
+    },
+    "rust-overlay": {
+      "type": "Git",
+      "repository": {
+        "type": "GitHub",
+        "owner": "oxalica",
+        "repo": "rust-overlay"
+      },
+      "branch": "master",
+      "submodules": false,
+      "revision": "c35dade1cfee9a17f46f429e2983841801461ac9",
+      "url": "https://github.com/oxalica/rust-overlay/archive/c35dade1cfee9a17f46f429e2983841801461ac9.tar.gz",
+      "hash": "1wf94pwk04lrzqyjvwvqhx91g089w5qgx61nllnhs81mpscy3p2g"
+    }
+  },
+  "version": 5
+}

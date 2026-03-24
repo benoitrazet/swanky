@@ -30,9 +30,9 @@ in
       py.xattr
     ]))
     cacert
-    niv
     nix
     nixpkgs-fmt
+    npins
     tree-sitter-grammars.tree-sitter-rust
   ] ++ (lib.lists.optional (!stdenv.isDarwin) mold-wrapped);
 }
