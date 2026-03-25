@@ -136,10 +136,6 @@ impl<'inner> Channel<'inner> {
     /// `with_sizes()` will flush any outgoing buffered data before
     /// returning.
     ///
-    /// The channel should be _moved_ into `inner`, to avoid dropping
-    /// a partial read buffer.
-    /// See [`std::io::BufReader::into_inner`] for more info.
-    ///
     /// # Example
     ///
     /// ```rust
