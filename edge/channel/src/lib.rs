@@ -192,7 +192,7 @@ impl<'inner> Channel<'inner> {
     /// (since the channel will automatically insert flushes as
     /// needed).
     ///
-    /// See the "Flushes" section in [`Channel`] for more information.
+    /// See the "Flushing" section in [`Channel`] for more information.
     #[inline]
     pub fn force_flush(&mut self) -> std::io::Result<()> {
         if !self.write_buffer.is_empty() {
