@@ -146,7 +146,6 @@ impl Write for LocalSocket {
 /// # Example
 ///
 /// ```
-/// use swanky_channel::Channel;
 /// let (a, b) = swanky_channel::local::local_channel_pair(
 ///     |c| {
 ///         let out = c.read::<i32>()?;
