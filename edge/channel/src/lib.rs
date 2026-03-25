@@ -1,8 +1,8 @@
-//! This crate contains the core types used for communication in
-//! Swanky.
+//! Core types used for communication in Swanky.
 //!
 //! [`Channel`] is the type that should be used for (most) network
 //! communications in Swanky.
+//!
 //! If you need to perform network communication for testing, see the
 //! [`local`] module.
 
@@ -18,8 +18,10 @@ use swanky_serialization::CanonicalSerialize;
 
 pub mod local;
 
-/// Rust doesn't support `(dyn Read + Write)`, so we make this trait,
-/// so we can write `dyn ReadWrite`, instead.
+/// Types that are both [`Read`] and [`Write`].
+///
+/// Rust doesn't support `(dyn Read + Write)`; this allows us to write
+/// `dyn ReadWrite` instead.
 trait ReadWrite: Read + Write {}
 impl<T: Read + Write + ?Sized> ReadWrite for T {}
 
