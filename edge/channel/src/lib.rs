@@ -79,7 +79,7 @@ impl Default for BufferSizes {
 /// to manually flush.
 ///
 /// A manual flush should only be _required_ when interleaving
-/// [`Channel`] operations with non-[`Channel`] operations.
+/// [`Channel`] IO operations with non-[`Channel`] IO operations.
 /// For example, it would be advisable to [`Channel::force_flush`]
 /// before reading user input from standard in.
 /// [`Channel`] can't flush for you, because it doesn't know that
