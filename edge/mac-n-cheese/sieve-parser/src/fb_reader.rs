@@ -133,7 +133,7 @@ impl MessageReader {
         match self.next_root()? {
             Some(root) => Ok(Some(root.message_as_relation().ok_or_swanky_error(
                 ErrorKind::OtherError,
-                &format!("wanted relation, got {:?}", root.message_type()),
+                format!("wanted relation, got {:?}", root.message_type()),
             )?)),
             _ => Ok(None),
         }

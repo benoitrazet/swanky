@@ -452,7 +452,7 @@ impl<'parent, T> WireMap<'parent, T> {
         }
         .ok_or_swanky_error(
             ErrorKind::OtherError,
-            &format!("{start}..={inclusive_end} could not be found (within a single allocation)"),
+            format!("{start}..={inclusive_end} could not be found (within a single allocation)"),
         )
     }
     fn ensure_no_conflict(

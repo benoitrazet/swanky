@@ -38,7 +38,7 @@ fn circuit_reader_thread<RR: RelationReader, VSR: ValueStreamReader>(
             mac_n_cheese_sieve_parser::Type::Field { modulus } => types.push(Type::Field(
                 FieldType::from_modulus(modulus).ok_or_swanky_error(
                     ErrorKind::UnsupportedError,
-                    &format!("Unknown modulus {modulus}"),
+                    format!("Unknown modulus {modulus}"),
                 )?,
             )),
             mac_n_cheese_sieve_parser::Type::ExtField { .. } => {
@@ -135,7 +135,7 @@ impl<S: InstructionSink> Visitor<S> {
             .types()
             .get(usize::from(ty))
             .copied()
-            .ok_or_swanky_error(ErrorKind::OtherError, &format!("invalid type id {ty}"))
+            .ok_or_swanky_error(ErrorKind::OtherError, format!("invalid type id {ty}"))
     }
     fn per_field<CFV>(&mut self, ty: TypeId, v: CFV) -> swanky_error::Result<()>
     where
@@ -333,7 +333,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
         let name_str = || String::from_utf8_lossy(name);
         let def = self.sink.functions().get(name).ok_or_swanky_error(
             ErrorKind::UnsupportedError,
-            &format!("Unknown function {:?}", name_str()),
+            format!("Unknown function {:?}", name_str()),
         )?;
         fn make_ranges(
             label: &str,

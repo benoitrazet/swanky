@@ -138,7 +138,7 @@ impl<VSR: ValueStreamReader> Inputs<VSR> {
             let rr = VSR::open(kind, path).with_context(|| format!("Opening {path:?}"))?;
             let ft = FieldType::from_modulus(rr.modulus()).ok_or_swanky_error(
                 ErrorKind::OtherError,
-                &format!("Unknown modulus {}", rr.modulus()),
+                format!("Unknown modulus {}", rr.modulus()),
             )?;
             swanky_error::ensure!(
                 out[ft].is_none(),
@@ -163,13 +163,13 @@ impl<VSR: ValueStreamReader> Inputs<VSR> {
         }
         let src = self.0[FE::FIELD_TYPE].as_mut().ok_or_swanky_error(
             ErrorKind::OtherError,
-            &format!("No {:?} inputs provided for {:?}", self.1, FE::FIELD_TYPE),
+            format!("No {:?} inputs provided for {:?}", self.1, FE::FIELD_TYPE),
         )?;
         dst.reserve(n);
         for _ in 0..n {
             let num = src.next()?.ok_or_swanky_error(
                 ErrorKind::OtherError,
-                &format!("Ran out of {:?} {:?} inputs", self.1, FE::FIELD_TYPE),
+                format!("Ran out of {:?} {:?} inputs", self.1, FE::FIELD_TYPE),
             )?;
             dst.push(FE::parse_sieve_value(&num)?);
         }
