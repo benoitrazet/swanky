@@ -98,7 +98,7 @@ impl Default for BufferSizes {
             // Upside of a larger value: Fewer system calls
             // Downside of a larger value: More memory consumption
             // The default Linux TCP receive window size (on systems I
-            // tested) is 128*1024
+            // tested) is 1024*128.
             // We set this to 1024*256 to give us some wiggle room
             // (due to the minimal downside).
             // This is also greater than the maximum TLS record size.
