@@ -274,7 +274,7 @@ impl CircuitBuilder<'_> {
                     circuit_builder_id: self.id,
                     prototype_id: TaskPrototypeId::try_from(self.task_prototypes.len()).wrap_err(
                         ErrorKind::OtherError,
-                        "Too many prototypes created! It number of prototypes overflowed!",
+                        "Too many prototypes created! The number of prototypes overflowed!",
                     )?,
                     single_array_inputs: Default::default(),
                     multi_array_inputs: Default::default(),
