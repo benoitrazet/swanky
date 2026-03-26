@@ -4,6 +4,10 @@
 
 # Invariant 1: All tests in `core` must pass
 cargo test \
+ --package swanky-adversary \
+ --package swanky-channel \
  --package swanky-error \
+ --package swanky-party \
+ --package swanky-serialization \
  --package vectoreyes \
  --lib
