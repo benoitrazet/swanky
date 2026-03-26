@@ -402,15 +402,13 @@ impl ValueParseableFiniteField for F2 {
 }
 impl ValueParseableFiniteField for F61p {
     fn parse_sieve_value(v: &Number) -> swanky_error::Result<Self> {
-        Self::try_from(num2u128(v)?).wrap_err_with(ErrorKind::OtherError, || {
-            "Failed to convert u128 to F61p.".to_string()
-        })
+        Self::try_from(num2u128(v)?)
+            .wrap_err(ErrorKind::OtherError, "Failed to convert u128 to F61p.")
     }
 }
 impl ValueParseableFiniteField for F128p {
     fn parse_sieve_value(v: &Number) -> swanky_error::Result<Self> {
-        Self::try_from(num2u128(v)?).wrap_err_with(ErrorKind::OtherError, || {
-            "Failed to convert u128 to F128p.".to_string()
-        })
+        Self::try_from(num2u128(v)?)
+            .wrap_err(ErrorKind::OtherError, "Failed to convert u128 to F128p.")
     }
 }

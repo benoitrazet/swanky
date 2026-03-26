@@ -38,7 +38,7 @@ fn circuit_reader_thread<RR: RelationReader, VSR: ValueStreamReader>(
             mac_n_cheese_sieve_parser::Type::Field { modulus } => types.push(Type::Field(
                 FieldType::from_modulus(modulus).ok_or_swanky_error(
                     ErrorKind::UnsupportedError,
-                    &format!("Unknown modulus {modulus}"),
+                    format!("Unknown modulus {modulus}"),
                 )?,
             )),
             mac_n_cheese_sieve_parser::Type::ExtField { .. } => {
@@ -135,7 +135,7 @@ impl<S: InstructionSink> Visitor<S> {
             .types()
             .get(usize::from(ty))
             .copied()
-            .ok_or_swanky_error(ErrorKind::OtherError, &format!("invalid type id {ty}"))
+            .ok_or_swanky_error(ErrorKind::OtherError, format!("invalid type id {ty}"))
     }
     fn per_field<CFV>(&mut self, ty: TypeId, v: CFV) -> swanky_error::Result<()>
     where
@@ -333,7 +333,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
         let name_str = || String::from_utf8_lossy(name);
         let def = self.sink.functions().get(name).ok_or_swanky_error(
             ErrorKind::UnsupportedError,
-            &format!("Unknown function {:?}", name_str()),
+            format!("Unknown function {:?}", name_str()),
         )?;
         fn make_ranges(
             label: &str,
@@ -563,9 +563,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
         for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> swanky_error::Result<()>,
     {
         let name = std::str::from_utf8(name)
-            .wrap_err_with(ErrorKind::SerializationError, || {
-                "Function name isn't UTF-8".to_string()
-            })?
+            .wrap_err(ErrorKind::SerializationError, "Function name isn't UTF-8")?
             .to_string();
         let sink = FunctionBuildingSink {
             types: self.sink.types(),
@@ -615,9 +613,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
         } = body;
 
         let name = std::str::from_utf8(name)
-            .wrap_err_with(ErrorKind::SerializationError, || {
-                "Function name isn't UTF-8".to_string()
-            })?
+            .wrap_err(ErrorKind::SerializationError, "Function name isn't UTF-8")?
             .to_string();
 
         match plugin_name.as_bytes() {
@@ -975,9 +971,8 @@ impl<VSR: ValueStreamReader> InstructionSink for GlobalSink<VSR> {
         field.visit(V(
             &mut self.public_inputs_reader,
             &mut self.current_chunk,
-            usize::try_from(count).wrap_err_with(ErrorKind::OtherError, || {
-                "{count} does not fit in a usize.".to_string()
-            })?,
+            usize::try_from(count)
+                .wrap_err(ErrorKind::OtherError, "{count} does not fit in a usize.")?,
         ))
     }
 

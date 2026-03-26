@@ -326,35 +326,35 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
             WhichParty::Prover(e) => {
                 let (u, v) = acu.0.into_inner(e);
                 let [a, b] = vope::vope_prover(v, u, &self.voles, e);
-                conn.write_all(&a.to_bytes())
-                    .wrap_err_with(ErrorKind::NetworkError, || {
-                        "Failed to write all 'a' bytes to network.".to_string()
-                    })?;
-                conn.write_all(&b.to_bytes())
-                    .wrap_err_with(ErrorKind::NetworkError, || {
-                        "Failed to write all 'b' bytes to network.".to_string()
-                    })?;
+                conn.write_all(&a.to_bytes()).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to write all 'a' bytes to network.",
+                )?;
+                conn.write_all(&b.to_bytes()).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to write all 'b' bytes to network.",
+                )?;
             }
             WhichParty::Verifier(e) => {
                 let alpha = self.ctx.into_inner(e);
                 let mut buf: GenericArray<u8, <T::TF as CanonicalSerialize>::ByteReprLen> =
                     Default::default();
-                conn.read_exact(&mut buf)
-                    .wrap_err_with(ErrorKind::NetworkError, || {
-                        "Failed to read 'u' bytes from network.".to_string()
-                    })?;
-                let u = T::TF::from_bytes(&buf)
-                    .wrap_err_with(ErrorKind::SerializationError, || {
-                        "Failed to deserialize field element.".to_string()
-                    })?;
-                conn.read_exact(&mut buf)
-                    .wrap_err_with(ErrorKind::NetworkError, || {
-                        "Failed to read 'v' bytes from network.".to_string()
-                    })?;
-                let v = T::TF::from_bytes(&buf)
-                    .wrap_err_with(ErrorKind::SerializationError, || {
-                        "Failed to deserialize field element.".to_string()
-                    })?;
+                conn.read_exact(&mut buf).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to read 'u' bytes from network.",
+                )?;
+                let u = T::TF::from_bytes(&buf).wrap_err(
+                    ErrorKind::SerializationError,
+                    "Failed to deserialize field element.",
+                )?;
+                conn.read_exact(&mut buf).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to read 'v' bytes from network.",
+                )?;
+                let v = T::TF::from_bytes(&buf).wrap_err(
+                    ErrorKind::SerializationError,
+                    "Failed to deserialize field element.",
+                )?;
                 let t = acu.0.into_inner(e);
                 vope::vope_verifier(alpha, t, &self.voles, e, [u, v])?;
             }

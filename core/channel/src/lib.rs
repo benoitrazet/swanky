@@ -225,11 +225,10 @@ impl<'inner> Channel<'inner> {
             inner: &mut inner,
         };
         let t = thunk(&mut channel)?;
-        channel
-            .force_flush()
-            .wrap_err_with(ErrorKind::NetworkError, || {
-                "Failed to force a channel to flush.".to_string()
-            })?;
+        channel.force_flush().wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to force a channel to flush.",
+        )?;
         Ok(t)
     }
 
@@ -306,10 +305,10 @@ impl<'inner> Channel<'inner> {
     /// ```
     #[inline]
     pub fn write_bytes(&mut self, bytes: &[u8]) -> swanky_error::Result<()> {
-        self.write_bytes_io(bytes)
-            .wrap_err_with(ErrorKind::NetworkError, || {
-                "Failed to write bytes to a channel.".to_string()
-            })
+        self.write_bytes_io(bytes).wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to write bytes to a channel.",
+        )
     }
     fn fill_read_buffer(&mut self) -> std::io::Result<()> {
         self.read_buffer_pos = 0;
@@ -382,10 +381,10 @@ impl<'inner> Channel<'inner> {
     /// ```
     #[inline]
     pub fn read_bytes(&mut self, dst: &mut [u8]) -> swanky_error::Result<()> {
-        self.read_bytes_io(dst)
-            .wrap_err_with(ErrorKind::NetworkError, || {
-                "Failed to read bytes from a channel.".to_string()
-            })
+        self.read_bytes_io(dst).wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to read bytes from a channel.",
+        )
     }
     /// Read a `T` and deserialize it.
     ///
@@ -402,9 +401,10 @@ impl<'inner> Channel<'inner> {
     pub fn read<T: CanonicalSerialize>(&mut self) -> swanky_error::Result<T> {
         let mut buf = GenericArray::<u8, T::ByteReprLen>::default();
         self.read_bytes(&mut buf)?;
-        T::from_bytes(&buf).wrap_err_with(ErrorKind::SerializationError, || {
-            "Failed to deserialize bytes read from a channel.".to_string()
-        })
+        T::from_bytes(&buf).wrap_err(
+            ErrorKind::SerializationError,
+            "Failed to deserialize bytes read from a channel.",
+        )
     }
     /// Serialize `t` and [`Self::write_bytes()`] it over the wire.
     ///
@@ -434,7 +434,7 @@ impl<'inner> Channel<'inner> {
     /// fn use_write(mut x: impl Write) -> swanky_error::Result<()> {
     ///     x.write_all(b"x").wrap_err(
     ///         ErrorKind::NetworkError,
-    ///         "Failed to write bytes to a channel.".to_string(),
+    ///         "Failed to write bytes to a channel.",
     ///     )?;
     ///     Ok(())
     /// }

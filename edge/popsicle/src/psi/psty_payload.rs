@@ -109,14 +109,14 @@ impl Sender {
         rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
         let key = channel.read::<Block>()?;
-        let opprf = KmprtSender::init(channel, rng)
-            .wrap_err_with(ErrorKind::InitializationError, || {
-                "Failed to initialize KMPRT OPPRF sender.".to_string()
-            })?;
-        let opprf_payload = KmprtSender::init(channel, rng)
-            .wrap_err_with(ErrorKind::InitializationError, || {
-                "Failed to initialize KMPRT OPPRF payload sender.".to_string()
-            })?;
+        let opprf = KmprtSender::init(channel, rng).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize KMPRT OPPRF sender.",
+        )?;
+        let opprf_payload = KmprtSender::init(channel, rng).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize KMPRT OPPRF payload sender.",
+        )?;
         Ok(Self {
             key,
             opprf,
@@ -356,14 +356,10 @@ impl Sender {
 
         self.opprf
             .send(channel, &points_id, nbins, rng)
-            .wrap_err_with(ErrorKind::OtherError, || {
-                "Failed to send OPPRF.".to_string()
-            })?;
+            .wrap_err(ErrorKind::OtherError, "Failed to send OPPRF.")?;
         self.opprf_payload
             .send(channel, &points_data, nbins, rng)
-            .wrap_err_with(ErrorKind::OtherError, || {
-                "Failed to send OPPRF payload.".to_string()
-            })?;
+            .wrap_err(ErrorKind::OtherError, "Failed to send OPPRF payload.")?;
         Ok(())
     }
 }
@@ -444,14 +440,14 @@ impl Receiver {
         let key = rng.r#gen();
         channel.write(&key)?;
 
-        let opprf = KmprtReceiver::init(channel, rng)
-            .wrap_err_with(ErrorKind::InitializationError, || {
-                "Failed to initialize KMPRT OPPRF receiver.".to_string()
-            })?;
-        let opprf_payload = KmprtReceiver::init(channel, rng)
-            .wrap_err_with(ErrorKind::InitializationError, || {
-                "Failed to initialize KMPRT OPPRF payload receiver.".to_string()
-            })?;
+        let opprf = KmprtReceiver::init(channel, rng).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize KMPRT OPPRF receiver.",
+        )?;
+        let opprf_payload = KmprtReceiver::init(channel, rng).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize KMPRT OPPRF payload receiver.",
+        )?;
         Ok(Self {
             key,
             opprf,
@@ -624,10 +620,10 @@ impl Receiver {
         rng: &mut RNG,
     ) -> swanky_error::Result<(Vec<Block>, Vec<Block512>)> {
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
-        let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)
-            .wrap_err_with(ErrorKind::InitializationError, || {
-                "Failed to create Cuckoo hash.".to_string()
-            })?;
+        let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to create Cuckoo hash.",
+        )?;
 
         channel.write(&0usize)?;
         channel.write(&0usize)?;
@@ -670,10 +666,10 @@ impl Receiver {
     ) -> swanky_error::Result<(Vec<Vec<Block>>, Vec<Vec<Block512>>, usize)> {
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
 
-        let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)
-            .wrap_err_with(ErrorKind::InitializationError, || {
-                "Failed to create Cuckoo hash.".to_string()
-            })?;
+        let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to create Cuckoo hash.",
+        )?;
         let cuckoo_large: Vec<&[Option<CuckooItem>]> = cuckoo.items.chunks(megasize).collect();
         let nmegabins = cuckoo_large.len();
 
@@ -720,15 +716,11 @@ impl Receiver {
         state.opprf_ids = self
             .opprf
             .receive(channel, &state.table, rng)
-            .wrap_err_with(ErrorKind::OtherError, || {
-                "Failed to receive OPPRF.".to_string()
-            })?;
+            .wrap_err(ErrorKind::OtherError, "Failed to receive OPPRF.")?;
         state.opprf_payloads = self
             .opprf_payload
             .receive(channel, &state.table, rng)
-            .wrap_err_with(ErrorKind::OtherError, || {
-                "Failed to receive OPPRF payloads.".to_string()
-            })?;
+            .wrap_err(ErrorKind::OtherError, "Failed to receive OPPRF payloads.")?;
         Ok(())
     }
 }

@@ -14,7 +14,8 @@
 
 use std::{
     backtrace::Backtrace,
-    fmt::{Debug, Display},
+    borrow::Cow,
+    fmt::{Arguments, Debug, Display},
 };
 
 macro_rules! error_kind {
@@ -71,12 +72,12 @@ error_kind! {
 struct ErrorInner {
     kind: ErrorKind,
     backtrace: Backtrace,
-    message: String,
-    context: Vec<String>,
+    message: Cow<'static, str>,
+    context: Vec<Cow<'static, str>>,
     source: Option<Box<dyn std::error::Error + Send + Sync + 'static>>,
 }
 
-fn pretty_context(context: &[String]) -> String {
+fn pretty_context(context: &[Cow<'static, str>]) -> String {
     let mut out = String::new();
 
     for (i, s) in context.iter().enumerate() {
@@ -145,14 +146,14 @@ impl Error {
     #[track_caller]
     pub fn new(
         kind: ErrorKind,
-        message: String,
+        message: impl Into<Cow<'static, str>>,
         source: Option<Box<dyn std::error::Error + Send + Sync + 'static>>,
     ) -> Self {
         Error {
             inner: Box::new(ErrorInner {
                 kind,
                 backtrace: Backtrace::capture(),
-                message,
+                message: message.into(),
                 context: Vec::new(),
                 source,
             }),
@@ -164,8 +165,8 @@ impl Error {
     /// It is atypical to use this method directly; see
     /// [`ResultExt`] which adds this functionality to [`Result<T>`]
     /// values.
-    pub fn context(mut self, context_message: String) -> Self {
-        self.inner.context.push(context_message);
+    pub fn context(mut self, context_message: impl Into<Cow<'static, str>>) -> Self {
+        self.inner.context.push(context_message.into());
         self
     }
 
@@ -238,9 +239,14 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// ```
 #[macro_export]
 macro_rules! ensure {
-    ($condition:expr, $kind:expr, $($msg:tt)*) => {
+    ($condition:expr, $kind:expr, $msg:literal $(,)?) => {
         if !$condition {
-            $crate::bail!($kind, $($msg)*)
+            $crate::bail!($kind, $msg)
+        }
+    };
+    ($condition:expr, $kind:expr, $fmt:expr, $($arg:tt)*) => {
+        if !$condition {
+            $crate::bail!($kind, $fmt, $($arg)*)
         }
     };
 }
@@ -261,9 +267,27 @@ macro_rules! ensure {
 /// ```
 #[macro_export]
 macro_rules! bail {
-    ($kind:expr, $($msg:tt)*) => {
-        return Err($crate::swanky_error!($kind, $($msg)*))
+    ($kind:expr, $msg:literal) => {
+        return Err($crate::swanky_error!($kind, $msg))
     };
+    ($kind:expr, $fmt:expr, $($arg:tt)*) => {
+        return Err($crate::swanky_error!($kind, $fmt, $($arg)*))
+    };
+}
+
+// Public to support macros; not intended for direct use.
+//
+// Helps our macros work correctly with both string literals and
+// format strings.
+#[inline]
+#[cold]
+#[doc(hidden)]
+pub fn format_err(kind: ErrorKind, args: Arguments) -> Error {
+    if let Some(message) = args.as_str() {
+        Error::new(kind, message, None)
+    } else {
+        Error::new(kind, std::fmt::format(args), None)
+    }
 }
 
 /// Construct an ad-hoc error from an [`ErrorKind`] and string/format
@@ -282,8 +306,11 @@ macro_rules! bail {
 /// ```
 #[macro_export]
 macro_rules! swanky_error {
-    ($kind:expr, $($msg:tt)*) => {
-        $crate::Error::new($kind, std::format!($($msg)*), None)
+    ($kind:expr, $msg:literal $(,)?) => {
+        $crate::format_err($kind, std::format_args!($msg))
+    };
+    ($kind:expr, $fmt:expr, $($arg:tt)*) => {
+        $crate::Error::new($kind, std::format!($fmt, $($arg)*), None)
     };
 }
 
@@ -304,23 +331,28 @@ pub trait ResultExt<T>: Sealed {
     ///
     /// Prefer [`ResultExt::with_context`], unless the `msg` value
     /// already exists.
-    fn context(self, msg: String) -> Result<T>;
+    fn context(self, msg: impl Into<Cow<'static, str>>) -> Result<T>;
 
     /// Provide additional context to the error value, evaluating the
     /// context lazily only once an error does occur.
     ///
     /// If the closure returns an already-constructed `String` value,
     /// see [`ResultExt::context`].
-    fn with_context(self, f: impl FnOnce() -> String) -> Result<T>;
+    fn with_context<S>(self, f: impl FnOnce() -> S) -> Result<T>
+    where
+        S: Into<Cow<'static, str>>;
 }
 
 impl<T> ResultExt<T> for Result<T> {
     #[inline]
-    fn context(self, msg: String) -> Result<T> {
+    fn context(self, msg: impl Into<Cow<'static, str>>) -> Result<T> {
         self.map_err(|e| e.context(msg))
     }
     #[inline]
-    fn with_context(self, f: impl FnOnce() -> String) -> Result<T> {
+    fn with_context<S>(self, f: impl FnOnce() -> S) -> Result<T>
+    where
+        S: Into<Cow<'static, str>>,
+    {
         self.map_err(|e| e.context(f()))
     }
 }
@@ -340,26 +372,31 @@ pub trait WrapErr: Sealed {
     ///
     /// Prefer [`WrapErr::wrap_err_with`], unless the `msg` value
     /// already exists.
-    fn wrap_err(self, kind: ErrorKind, msg: String) -> Result<Self::Output>;
+    fn wrap_err(self, kind: ErrorKind, msg: impl Into<Cow<'static, str>>) -> Result<Self::Output>;
 
     /// Lazily wrap the error value with a new [`Error`], constructing
     /// the message only once an error does occur.
     ///
     /// If the closure returns an already-constructed `String` value,
     /// see [`WrapErr::wrap_err`].
-    fn wrap_err_with(self, kind: ErrorKind, f: impl FnOnce() -> String) -> Result<Self::Output>;
+    fn wrap_err_with<S>(self, kind: ErrorKind, f: impl FnOnce() -> S) -> Result<Self::Output>
+    where
+        S: Into<Cow<'static, str>>;
 }
 
 impl<T, E: std::error::Error + Send + Sync + 'static> WrapErr for std::result::Result<T, E> {
     type Output = T;
 
     #[inline]
-    fn wrap_err(self, kind: ErrorKind, msg: String) -> Result<Self::Output> {
+    fn wrap_err(self, kind: ErrorKind, msg: impl Into<Cow<'static, str>>) -> Result<Self::Output> {
         self.map_err(|e| Error::new(kind, msg, Some(Box::new(e))))
     }
 
     #[inline]
-    fn wrap_err_with(self, kind: ErrorKind, f: impl FnOnce() -> String) -> Result<Self::Output> {
+    fn wrap_err_with<S>(self, kind: ErrorKind, f: impl FnOnce() -> S) -> Result<Self::Output>
+    where
+        S: Into<Cow<'static, str>>,
+    {
         self.map_err(|e| Error::new(kind, f(), Some(Box::new(e))))
     }
 }
@@ -372,16 +409,24 @@ impl<T, E: std::error::Error + Send + Sync + 'static> WrapErr for std::result::R
 pub trait OptionExt<T>: Sealed {
     /// Transform the [`Option<T>`] into a [`Result<T>`], mapping
     /// `Some(v)` to `Ok(v)` and `None` to a new [`Error`].
-    fn ok_or_swanky_error(self, kind: ErrorKind, message: &str) -> Result<T>;
+    fn ok_or_swanky_error(
+        self,
+        kind: ErrorKind,
+        message: impl Into<Cow<'static, str>>,
+    ) -> Result<T>;
 }
 
 impl<T> OptionExt<T> for Option<T> {
     #[inline]
     #[track_caller]
-    fn ok_or_swanky_error(self, kind: ErrorKind, message: &str) -> Result<T> {
+    fn ok_or_swanky_error(
+        self,
+        kind: ErrorKind,
+        message: impl Into<Cow<'static, str>>,
+    ) -> Result<T> {
         match self {
             Some(ok) => Ok(ok),
-            None => bail!(kind, "{}", message.to_string()),
+            None => Err(Error::new(kind, message, None)),
         }
     }
 }
@@ -407,7 +452,7 @@ fn test_error_sizes() {
 #[test]
 fn test_swanky_error() {
     let mut e = swanky_error!(ErrorKind::OtherError, "Message");
-    e = e.context("Context".to_string());
+    e = e.context("Context");
 
     assert_eq!(e.inner.kind, ErrorKind::OtherError);
     assert_eq!(e.inner.message, "Message");

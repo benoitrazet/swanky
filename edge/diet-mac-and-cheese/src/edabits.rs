@@ -394,9 +394,9 @@ impl<
         }
         // check all the multiplication in one batch
         if let WhichParty::Prover(_) = P::WHICH {
-            channel.flush().wrap_err_with(ErrorKind::NetworkError, || {
-                "Failed to flush channel.".to_string()
-            })?;
+            channel
+                .flush()
+                .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
         }
         self.fcom_f2
             .quicksilver_finalize(channel, rng, &mut mult_check_state)?;
@@ -704,25 +704,21 @@ impl<
         // step 3)
         let seed = match P::WHICH {
             WhichParty::Prover(_) => {
-                channel.flush().wrap_err_with(ErrorKind::NetworkError, || {
-                    "Failed to flush channel.".to_string()
-                })?;
+                channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                 channel
                     .read_block()
-                    .wrap_err_with(ErrorKind::NetworkError, || {
-                        "Failed to read seed block.".to_string()
-                    })?
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?
             }
             WhichParty::Verifier(_) => {
                 let seed = rng.r#gen::<Block>();
                 channel
                     .write_block(&seed)
-                    .wrap_err_with(ErrorKind::NetworkError, || {
-                        "Failed to write seed.".to_string()
-                    })?;
-                channel.flush().wrap_err_with(ErrorKind::NetworkError, || {
-                    "Failed to flush channel.".to_string()
-                })?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
+                channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                 seed
             }
         };
@@ -1020,19 +1016,15 @@ impl<
         let seed = match P::WHICH {
             WhichParty::Prover(_) => channel
                 .read_block()
-                .wrap_err_with(ErrorKind::NetworkError, || {
-                    "Failed to read seed block.".to_string()
-                })?,
+                .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?,
             WhichParty::Verifier(_) => {
                 let seed = rng.r#gen::<Block>();
                 channel
                     .write_block(&seed)
-                    .wrap_err_with(ErrorKind::NetworkError, || {
-                        "Failed to write seed.".to_string()
-                    })?;
-                channel.flush().wrap_err_with(ErrorKind::NetworkError, || {
-                    "Failed to flush channel.".to_string()
-                })?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
+                channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                 seed
             }
         };

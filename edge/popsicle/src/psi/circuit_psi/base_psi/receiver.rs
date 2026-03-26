@@ -66,19 +66,17 @@ impl BasePsi for OpprfReceiver {
         let key = rng.r#gen();
         channel.write(&key)?;
 
-        let opprf_primary_keys = KmprtReceiver::init(channel, rng)
-            .wrap_err_with(ErrorKind::InitializationError, || {
-                "Failed to initialize KMPRT receiver for primary keys.".to_string()
-            })?;
+        let opprf_primary_keys = KmprtReceiver::init(channel, rng).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize KMPRT receiver for primary keys.",
+        )?;
 
         let mut opprf_payload = None;
         if has_payload {
-            opprf_payload = Some(
-                KmprtReceiver::init(channel, rng)
-                    .wrap_err_with(ErrorKind::InitializationError, || {
-                        "Failed to initialize KMPRT receiver for payload.".to_string()
-                    })?,
-            );
+            opprf_payload = Some(KmprtReceiver::init(channel, rng).wrap_err(
+                ErrorKind::InitializationError,
+                "Failed to initialize KMPRT receiver for payload.",
+            )?);
         }
 
         Ok(Self {
@@ -144,18 +142,20 @@ impl BasePsi for OpprfReceiver {
         self.state.opprf_primary_keys_out = self
             .opprf_primary_keys
             .receive(channel, &self.state.opprf_primary_keys_in, rng)
-            .wrap_err_with(ErrorKind::OtherError, || {
-                "Failed to receive primary keys during exchange.".to_string()
-            })?;
+            .wrap_err(
+                ErrorKind::OtherError,
+                "Failed to receive primary keys during exchange.",
+            )?;
         if !self.state.opprf_payloads_in.is_empty() {
             self.state.opprf_payloads_out = self
                 .opprf_payload
                 .as_mut()
                 .unwrap()
                 .receive(channel, &self.state.opprf_primary_keys_in, rng)
-                .wrap_err_with(ErrorKind::OtherError, || {
-                    "Failed to receive payload during exchange.".to_string()
-                })?;
+                .wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to receive payload during exchange.",
+                )?;
         }
         Ok(())
     }

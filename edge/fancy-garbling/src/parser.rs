@@ -15,9 +15,8 @@ fn cap2int(cap: &Captures, idx: usize) -> Result<usize> {
     let s = cap
         .get(idx)
         .ok_or_else(|| swanky_error!(ErrorKind::OtherError, "Failed to match index '{idx}'"))?;
-    FromStr::from_str(s.as_str()).wrap_err_with(ErrorKind::OtherError, || {
-        "Failed to convert value to string".to_string()
-    })
+    FromStr::from_str(s.as_str())
+        .wrap_err(ErrorKind::OtherError, "Failed to convert value to string")
 }
 
 fn cap2typ(cap: &Captures, idx: usize) -> Result<GateType> {
@@ -47,7 +46,7 @@ impl BinaryCircuit {
         let mut line = String::new();
         reader
             .read_line(&mut line)
-            .wrap_err_with(ErrorKind::OtherError, || "Failed to read line".to_string())?;
+            .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
         let re = Regex::new(r"(\d+)\s+(\d+)").expect("regex should be valid");
         let cap = regex2captures(&re, &line)?;
         let ngates = cap2int(&cap, 1)?;
@@ -57,7 +56,7 @@ impl BinaryCircuit {
         let mut line = String::new();
         reader
             .read_line(&mut line)
-            .wrap_err_with(ErrorKind::OtherError, || "Failed to read line".to_string())?;
+            .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
         let re = Regex::new(r"(\d+)\s+(\d+)\s+(\d+)").expect("regex should be valid");
         let cap = regex2captures(&re, &line)?;
         let n1 = cap2int(&cap, 1)?; // Number of garbler inputs
@@ -68,7 +67,7 @@ impl BinaryCircuit {
         let mut line = String::new();
         reader
             .read_line(&mut line)
-            .wrap_err_with(ErrorKind::OtherError, || "Failed to read line".to_string())?;
+            .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
         #[allow(clippy::trivial_regex)]
         let re = Regex::new(r"\n").expect("regex should be valid");
         let _ = regex2captures(&re, &line)?;
@@ -111,8 +110,7 @@ impl BinaryCircuit {
             });
         }
         for line in reader.lines() {
-            let line =
-                line.wrap_err_with(ErrorKind::OtherError, || "Failed to read line".to_string())?;
+            let line = line.wrap_err(ErrorKind::OtherError, "Failed to read line")?;
             match line.chars().next() {
                 Some('1') => {
                     let cap = regex2captures(&re1, &line)?;

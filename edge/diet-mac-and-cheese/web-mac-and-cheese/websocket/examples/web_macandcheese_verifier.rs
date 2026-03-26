@@ -86,9 +86,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
 
     let start = Instant::now();
     let relation_file = File::open(relation.as_path())
-        .wrap_err_with(ErrorKind::FilesystemError, || {
-            "Failed to open relation.".to_string()
-        })?;
+        .wrap_err(ErrorKind::FilesystemError, "Failed to open relation.")?;
     let relation_reader = BufReader::new(relation_file);
     evaluator.evaluate_relation_text(relation_reader)?;
     info!("time circ exec: {:?}", start.elapsed());

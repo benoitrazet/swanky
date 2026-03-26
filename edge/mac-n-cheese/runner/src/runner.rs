@@ -425,7 +425,7 @@ pub fn run_proof_background<P: Party>(
         visit_task_definition::<P, V>(tk, V(&mut voles_needed));
     }
     let vole_contexts = base_vole::init_base_vole::<P, _>(&voles_needed, &mut rng, &mut root_conn)
-        .with_context(|| "base vole".to_string())?;
+        .context("base vole")?;
     span.finish();
     // initialize task kinds
     let mut task_definitions =
@@ -454,11 +454,10 @@ pub fn run_proof_background<P: Party>(
         let tk = TaskKind::try_from(tk_encoded)?;
         let etd =
             visit_task_definition::<P, V<'_, P>>(tk, V(vc, &mut rng, &mut root_conn, num_threads))?;
-        root_conn
-            .flush()
-            .wrap_err_with(ErrorKind::NetworkError, || {
-                "Failed to flush root network connection.".to_string()
-            })?;
+        root_conn.flush().wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to flush root network connection.",
+        )?;
         let old = task_definitions.insert(tk_encoded, RwLock::new(etd));
         swanky_error::ensure!(
             old.is_none(),
@@ -511,9 +510,7 @@ pub fn run_proof_background<P: Party>(
         // TODO: parallelize the finalization.
         root_conn
             .flush()
-            .wrap_err_with(ErrorKind::NetworkError, || {
-                "Failed to flush root connection.".to_string()
-            })?;
+            .wrap_err(ErrorKind::NetworkError, "Failed to flush root connection.")?;
         for tk in manifest.task_kinds_used().iter() {
             let span = event_log::FinalizingTaskKind { task_kind: tk }.start();
             runner_thread.task_definitions[&tk]
@@ -524,9 +521,7 @@ pub fn run_proof_background<P: Party>(
                 })?;
             root_conn
                 .flush()
-                .wrap_err_with(ErrorKind::NetworkError, || {
-                    "Failed to flush root connection.".to_string()
-                })?;
+                .wrap_err(ErrorKind::NetworkError, "Failed to flush root connection.")?;
             span.finish();
         }
         Ok(())

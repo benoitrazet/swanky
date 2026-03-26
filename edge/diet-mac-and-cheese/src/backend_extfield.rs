@@ -371,10 +371,10 @@ mod test {
 
     #[test]
     fn test_backend_ext_field() -> swanky_error::Result<()> {
-        let (sender, receiver) = UnixStream::pair()
-            .wrap_err_with(ErrorKind::NetworkError, || {
-                "Failed to create Unix socket pair.".to_string()
-            })?;
+        let (sender, receiver) = UnixStream::pair().wrap_err(
+            ErrorKind::NetworkError,
+            "Failed to create Unix socket pair.",
+        )?;
         let handle: JoinHandle<swanky_error::Result<()>> = std::thread::spawn(move || {
             let mut rng = AesRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());

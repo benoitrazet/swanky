@@ -31,9 +31,10 @@ fn walk_inputs(paths: &[PathBuf]) -> swanky_error::Result<Vec<PathBuf>> {
                     format!("Unable to open directory {input:?}")
                 })?
             {
-                let item = item.wrap_err_with(ErrorKind::FilesystemError, || {
-                    "Unable to access directory item".to_string()
-                })?;
+                let item = item.wrap_err(
+                    ErrorKind::FilesystemError,
+                    "Unable to access directory item",
+                )?;
                 visit(dst, &item.path())?;
             }
         } else {
@@ -68,19 +69,17 @@ impl MessageReader {
         while !self.paths.is_empty() || self.current_file.is_some() {
             match self.current_file.as_mut() {
                 Some(file) => {
-                    let pos = file
-                        .stream_position()
-                        .wrap_err_with(ErrorKind::FilesystemError, || {
-                            "Unable to get file stream position.".to_string()
-                        })?;
+                    let pos = file.stream_position().wrap_err(
+                        ErrorKind::FilesystemError,
+                        "Unable to get file stream position.",
+                    )?;
                     // This isn't the most efficient way to check this, but it's easy!
                     // This gets called infrequently enough that we don't care.
                     if pos
-                        == file
-                            .seek(std::io::SeekFrom::End(0))
-                            .wrap_err_with(ErrorKind::FilesystemError, || {
-                                "Unable to seek to the end of a file.".to_string()
-                            })?
+                        == file.seek(std::io::SeekFrom::End(0)).wrap_err(
+                            ErrorKind::FilesystemError,
+                            "Unable to seek to the end of a file.",
+                        )?
                     {
                         self.current_file = None;
                         continue;
@@ -91,18 +90,18 @@ impl MessageReader {
                         })?;
                     let (len, len_buf) = {
                         let mut len_buf = [0; 4];
-                        file.read_exact(&mut len_buf)
-                            .wrap_err_with(ErrorKind::FilesystemError, || {
-                                "Failed to read flatbuffer length.".to_string()
-                            })?;
+                        file.read_exact(&mut len_buf).wrap_err(
+                            ErrorKind::FilesystemError,
+                            "Failed to read flatbuffer length.",
+                        )?;
                         (u32::from_le_bytes(len_buf) as usize, len_buf)
                     };
                     self.buf.resize(len + 4, 0);
                     self.buf[..4].copy_from_slice(&len_buf);
-                    file.read_exact(&mut self.buf[4..])
-                        .wrap_err_with(ErrorKind::FilesystemError, || {
-                            "Reading flatbuffer root message".to_string()
-                        })?;
+                    file.read_exact(&mut self.buf[4..]).wrap_err(
+                        ErrorKind::FilesystemError,
+                        "Reading flatbuffer root message",
+                    )?;
                     return Ok(Some(
                         fb::size_prefixed_root_as_root_with_opts(
                             &flatbuffers::VerifierOptions {
@@ -111,9 +110,10 @@ impl MessageReader {
                             },
                             &self.buf,
                         )
-                        .wrap_err_with(ErrorKind::FilesystemError, || {
-                            "Failed to verify flatbuffer root buffer.".to_string()
-                        })?,
+                        .wrap_err(
+                            ErrorKind::FilesystemError,
+                            "Failed to verify flatbuffer root buffer.",
+                        )?,
                     ));
                 }
                 _ => {
@@ -133,7 +133,7 @@ impl MessageReader {
         match self.next_root()? {
             Some(root) => Ok(Some(root.message_as_relation().ok_or_swanky_error(
                 ErrorKind::OtherError,
-                &format!("wanted relation, got {:?}", root.message_type()),
+                format!("wanted relation, got {:?}", root.message_type()),
             )?)),
             _ => Ok(None),
         }

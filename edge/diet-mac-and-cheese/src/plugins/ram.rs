@@ -273,10 +273,10 @@ impl Plugin for RamBoolV0 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)
-                    .wrap_err_with(ErrorKind::OtherError, || {
-                        "Failed to represent field ID as a u8.".to_string()
-                    })?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.",
+                )?;
                 ensure!(
                     field_id == initial_value_type_id,
                     ErrorKind::OtherError,
@@ -392,10 +392,10 @@ impl Plugin for RamBoolV0 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)
-                    .wrap_err_with(ErrorKind::OtherError, || {
-                        "Failed to represent field ID as a u8.".to_string()
-                    })?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.",
+                )?;
 
                 let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)? else {
                     bail!(
@@ -551,10 +551,10 @@ impl Plugin for RamBoolV0 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)
-                    .wrap_err_with(ErrorKind::OtherError, || {
-                        "Failed to represent field ID as a u8.".to_string()
-                    })?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.",
+                )?;
 
                 let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)? else {
                     bail!(
@@ -767,10 +767,10 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)
-                    .wrap_err_with(ErrorKind::OtherError, || {
-                        "Failed to represent field ID as a u8.".to_string()
-                    })?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.",
+                )?;
                 ensure!(
                     field_id == initial_value_type_id,
                     ErrorKind::OtherError,
@@ -886,10 +886,10 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)
-                    .wrap_err_with(ErrorKind::OtherError, || {
-                        "Failed to represent field ID as a u8.".to_string()
-                    })?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.",
+                )?;
 
                 let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)? else {
                     bail!(
@@ -1045,10 +1045,10 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)
-                    .wrap_err_with(ErrorKind::OtherError, || {
-                        "Failed to represent field ID as a u8.".to_string()
-                    })?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.",
+                )?;
 
                 let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)? else {
                     bail!(
@@ -1260,10 +1260,10 @@ impl Plugin for RamArithV0 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)
-                    .wrap_err_with(ErrorKind::OtherError, || {
-                        "Failed to represent field ID as a u8.".to_string()
-                    })?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.",
+                )?;
                 ensure!(
                     field_id == initial_value_type_id,
                     ErrorKind::OtherError,
@@ -1346,10 +1346,10 @@ impl Plugin for RamArithV0 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)
-                    .wrap_err_with(ErrorKind::OtherError, || {
-                        "Failed to represent field ID as a u8.".to_string()
-                    })?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.",
+                )?;
 
                 let &TypeSpecification::Field(_) = type_store.get(&field_id)? else {
                     bail!(
@@ -1472,10 +1472,10 @@ impl Plugin for RamArithV0 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)
-                    .wrap_err_with(ErrorKind::OtherError, || {
-                        "Failed to represent field ID as a u8.".to_string()
-                    })?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.",
+                )?;
 
                 let &TypeSpecification::Field(_) = type_store.get(&field_id)? else {
                     bail!(
@@ -1654,10 +1654,10 @@ impl Plugin for RamArithV1 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)
-                    .wrap_err_with(ErrorKind::OtherError, || {
-                        "Failed to represent field ID as a u8.".to_string()
-                    })?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.",
+                )?;
                 ensure!(
                     field_id == initial_value_type_id,
                     ErrorKind::OtherError,
@@ -1740,10 +1740,10 @@ impl Plugin for RamArithV1 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)
-                    .wrap_err_with(ErrorKind::OtherError, || {
-                        "Failed to represent field ID as a u8.".to_string()
-                    })?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.",
+                )?;
 
                 let &TypeSpecification::Field(_) = type_store.get(&field_id)? else {
                     bail!(
@@ -1866,10 +1866,10 @@ impl Plugin for RamArithV1 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(number_to_u64(&field_id)?)
-                    .wrap_err_with(ErrorKind::OtherError, || {
-                        "Failed to represent field ID as a u8.".to_string()
-                    })?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to represent field ID as a u8.",
+                )?;
 
                 let &TypeSpecification::Field(_) = type_store.get(&field_id)? else {
                     bail!(

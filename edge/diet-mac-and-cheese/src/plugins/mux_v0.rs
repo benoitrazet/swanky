@@ -385,11 +385,10 @@ impl Plugin for MuxV0 {
         };
         Ok(PluginExecution::Mux(MuxVersion::MuxVerV0(MuxV0::new(
             type_id,
-            cond_num_wire
-                .try_into()
-                .wrap_err_with(ErrorKind::OtherError, || {
-                    "Failed to represent cond_num_wire as a usize.".to_string()
-                })?,
+            cond_num_wire.try_into().wrap_err(
+                ErrorKind::OtherError,
+                "Failed to represent cond_num_wire as a usize.",
+            )?,
             selector_range,
             branch_shape,
             is_permissive,

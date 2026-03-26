@@ -371,14 +371,10 @@ impl<P: Party> TaskInput<P> {
             ErrorKind::OtherError,
             "too many inputs"
         );
-        let num_lengths = U32x4::broadcast(
-            input_sizes
-                .len()
-                .try_into()
-                .wrap_err_with(ErrorKind::OtherError, || {
-                    "Failed to convert input_sizes to i32.".to_string()
-                })?,
-        );
+        let num_lengths = U32x4::broadcast(input_sizes.len().try_into().wrap_err(
+            ErrorKind::OtherError,
+            "Failed to convert input_sizes to i32.",
+        )?);
         const ONES: U32x4 = U32x4::from_array([u32::MAX; 4]);
         for chunk in chunks {
             if !VERIFIED {
@@ -514,18 +510,18 @@ impl<'a, P: Party, FE: FiniteField> ProverPrivateFieldElementCommunicator<'a, P,
             content: match P::WHICH {
                 WhichParty::Prover(e) => {
                     let mut cursor = Cursor::new(outgoing);
-                    let s = FE::Serializer::new(&mut cursor)
-                        .wrap_err_with(ErrorKind::InitializationError, || {
-                            "Failed to initialize field element serializer.".to_string()
-                        })?;
+                    let s = FE::Serializer::new(&mut cursor).wrap_err(
+                        ErrorKind::InitializationError,
+                        "Failed to initialize field element serializer.",
+                    )?;
                     PartyEither::new(e, (cursor, s))
                 }
                 WhichParty::Verifier(e) => {
                     let mut cursor = Cursor::new(incoming);
-                    let d = FE::Deserializer::new(&mut cursor)
-                        .wrap_err_with(ErrorKind::InitializationError, || {
-                            "Failed to initialize field element deserializer.".to_string()
-                        })?;
+                    let d = FE::Deserializer::new(&mut cursor).wrap_err(
+                        ErrorKind::InitializationError,
+                        "Failed to initialize field element deserializer.",
+                    )?;
                     PartyEither::new(e, (cursor, d))
                 }
             },
@@ -536,28 +532,28 @@ impl<'a, P: Party, FE: FiniteField> ProverPrivateFieldElementCommunicator<'a, P,
             WhichParty::Prover(e) => {
                 let x = x.into_inner(e);
                 let (cursor, s) = self.content.as_mut().into_inner(e);
-                s.write(cursor, x)
-                    .wrap_err_with(ErrorKind::SerializationError, || {
-                        "Failed to serialize field element.".to_string()
-                    })?;
+                s.write(cursor, x).wrap_err(
+                    ErrorKind::SerializationError,
+                    "Failed to serialize field element.",
+                )?;
                 x
             }
             WhichParty::Verifier(e) => {
                 let (cursor, d) = self.content.as_mut().into_inner(e);
-                d.read(cursor)
-                    .wrap_err_with(ErrorKind::SerializationError, || {
-                        "Failed to deserialize field element.".to_string()
-                    })?
+                d.read(cursor).wrap_err(
+                    ErrorKind::SerializationError,
+                    "Failed to deserialize field element.",
+                )?
             }
         })
     }
     pub fn finish(self) -> swanky_error::Result<()> {
         if let WhichParty::Prover(e) = P::WHICH {
             let (mut cursor, s) = self.content.into_inner(e);
-            s.finish(&mut cursor)
-                .wrap_err_with(ErrorKind::SerializationError, || {
-                    "Failed to finish serialization of field element.".to_string()
-                })?;
+            s.finish(&mut cursor).wrap_err(
+                ErrorKind::SerializationError,
+                "Failed to finish serialization of field element.",
+            )?;
         }
         Ok(())
     }

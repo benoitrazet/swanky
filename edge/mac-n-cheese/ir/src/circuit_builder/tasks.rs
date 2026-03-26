@@ -25,22 +25,22 @@ impl<'a> super::CircuitBuilder<'a> {
     ) -> swanky_error::Result<TaskPrototypeRef> {
         ty.assert_value_field_is::<FE>();
         self.register_prototype(|pb| {
-            let mut s = FE::Serializer::new(pb)
-                .wrap_err_with(ErrorKind::InitializationError, || {
-                    "Failed to initialize field element serializer.".to_string()
-                })?;
+            let mut s = FE::Serializer::new(pb).wrap_err(
+                ErrorKind::InitializationError,
+                "Failed to initialize field element serializer.",
+            )?;
             let mut n = 0_u32;
             for value in values {
                 n = n.checked_add(1).unwrap();
-                s.write(pb, value)
-                    .wrap_err_with(ErrorKind::SerializationError, || {
-                        "Failed to write byte of '{value}'.".to_string()
-                    })?;
+                s.write(pb, value).wrap_err(
+                    ErrorKind::SerializationError,
+                    "Failed to write byte of '{value}'.",
+                )?;
             }
-            s.finish(pb)
-                .wrap_err_with(ErrorKind::SerializationError, || {
-                    "Failed to finish field element serialization.".to_string()
-                })?;
+            s.finish(pb).wrap_err(
+                ErrorKind::SerializationError,
+                "Failed to finish field element serialization.",
+            )?;
             pb.output(Type::Mac(ty), n);
             Ok(TaskKind::Constant(ty))
         })

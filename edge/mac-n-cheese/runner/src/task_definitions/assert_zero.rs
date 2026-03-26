@@ -54,15 +54,13 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertZeroTask<P, T> {
         match P::WHICH {
             WhichParty::Prover(_) => c
                 .write_all(bytemuck::bytes_of(&acu))
-                .wrap_err_with(ErrorKind::NetworkError, || {
-                    "Failed to write 'acu' bytes.".to_string()
-                })?,
+                .wrap_err(ErrorKind::NetworkError, "Failed to write 'acu' bytes.")?,
             WhichParty::Verifier(_) => {
                 let mut got = U8x32::ZERO;
-                c.read_exact(bytemuck::bytes_of_mut(&mut got))
-                    .wrap_err_with(ErrorKind::NetworkError, || {
-                        "Failed to read bytes from network.".to_string()
-                    })?;
+                c.read_exact(bytemuck::bytes_of_mut(&mut got)).wrap_err(
+                    ErrorKind::NetworkError,
+                    "Failed to read bytes from network.",
+                )?;
                 swanky_error::ensure!(
                     got == acu,
                     ErrorKind::OtherError,

@@ -67,9 +67,10 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for FixTask<P, T> {
             .as_mut()
             .map(<T::VF as CanonicalSerialize>::Deserializer::new)
             .lift_result()
-            .wrap_err_with(ErrorKind::InitializationError, || {
-                "Failed to lift cursor to field element deserializer.".to_string()
-            })?;
+            .wrap_err(
+                ErrorKind::InitializationError,
+                "Failed to lift cursor to field element deserializer.",
+            )?;
         let num_out = ctx.task_prototype.outputs().get(0).count() as usize;
         let mut out = TaskDataBuffer::<Mac<P, T>>::with_capacity(num_out);
         let mut c = ProverPrivateFieldElementCommunicator::<P, T::VF>::new(
@@ -85,9 +86,10 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for FixTask<P, T> {
                 .zip(deserializer.as_mut())
                 .map(|(c, d)| d.read(c))
                 .lift_result()
-                .wrap_err_with(ErrorKind::SerializationError, || {
-                    "Failed to read private value.".to_string()
-                })?;
+                .wrap_err(
+                    ErrorKind::SerializationError,
+                    "Failed to read private value.",
+                )?;
             let adjustment = private_value
                 .zip(random_mac.0.mac_value().into())
                 .map(|(x, r)| r - x);

@@ -70,10 +70,10 @@ impl Sender {
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
-        let opprf = KmprtSender::init(channel, rng)
-            .wrap_err_with(ErrorKind::InitializationError, || {
-                "Failed to initialize KMPRT sender.".to_string()
-            })?;
+        let opprf = KmprtSender::init(channel, rng).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize KMPRT sender.",
+        )?;
         Ok(Self { opprf })
     }
 
@@ -120,9 +120,7 @@ impl Sender {
 
         self.opprf
             .send(channel, &points, nbins, rng)
-            .wrap_err_with(ErrorKind::OtherError, || {
-                "Failed to run PSI as sender.".to_string()
-            })?;
+            .wrap_err(ErrorKind::OtherError, "Failed to run PSI as sender.")?;
 
         Ok(SenderState { opprf_outputs: ts })
     }
@@ -139,9 +137,10 @@ impl SenderState {
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let mut gb = Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
-            .wrap_err_with(ErrorKind::InitializationError, || {
-            "Failed to initialize garbler during setup.".to_string()
-        })?;
+            .wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize garbler during setup.",
+        )?;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
         let mods = vec![2; my_input_bits.len()]; // all binary moduli
         let sender_inputs = gb.encode_many(&my_input_bits, &mods, channel)?;
@@ -215,10 +214,10 @@ impl Receiver {
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
-        let opprf = KmprtReceiver::init(channel, rng)
-            .wrap_err_with(ErrorKind::InitializationError, || {
-                "Failed to initialize KMPRT receiver.".to_string()
-            })?;
+        let opprf = KmprtReceiver::init(channel, rng).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize KMPRT receiver.",
+        )?;
         Ok(Self { opprf })
     }
 
@@ -231,10 +230,10 @@ impl Receiver {
     ) -> swanky_error::Result<ReceiverState> {
         let key = rng.r#gen();
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
-        let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES)
-            .wrap_err_with(ErrorKind::InitializationError, || {
-                "Failed to create new Cuckoo hash.".to_string()
-            })?;
+        let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to create new Cuckoo hash.",
+        )?;
 
         // Send cuckoo hash info to receiver.
         channel.write(&key)?;
@@ -254,9 +253,7 @@ impl Receiver {
         let opprf_outputs = self
             .opprf
             .receive(channel, &table, rng)
-            .wrap_err_with(ErrorKind::OtherError, || {
-                "Failed to receive OPPRF outputs.".to_string()
-            })?;
+            .wrap_err(ErrorKind::OtherError, "Failed to receive OPPRF outputs.")?;
 
         Ok(ReceiverState {
             opprf_outputs,
@@ -285,9 +282,10 @@ impl ReceiverState {
 
         let mut ev =
             Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
-                .wrap_err_with(ErrorKind::InitializationError, || {
-                    "Failed to initialize receiver during setup.".to_string()
-                })?;
+                .wrap_err(
+                    ErrorKind::InitializationError,
+                    "Failed to initialize receiver during setup.",
+                )?;
 
         let mods = vec![2; nbins * HASH_SIZE * 8];
         let sender_inputs = ev.receive_many(&mods, channel)?;
@@ -381,7 +379,7 @@ impl ReceiverState {
             let ciphertext = cipher.encrypt(nonce, payload.as_ref()).map_err(|_| {
                 swanky_error::Error::new(
                     ErrorKind::OtherError,
-                    "Failed to encrypt payload.".to_string(),
+                    "Failed to encrypt payload.",
                     None, // aes_gcm::Error does not implement std::error::Error
                 )
             })?;

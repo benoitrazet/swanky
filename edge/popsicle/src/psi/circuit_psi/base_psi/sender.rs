@@ -65,18 +65,16 @@ impl BasePsi for OpprfSender {
         // parties and allows them to hash the same inputs
         // to the same outputs.
         let key = channel.read()?;
-        let opprf_primary_keys = KmprtSender::init(channel, rng)
-            .wrap_err_with(ErrorKind::InitializationError, || {
-                "Failed to initialize KMPRT sender for primary keys.".to_string()
-            })?;
+        let opprf_primary_keys = KmprtSender::init(channel, rng).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize KMPRT sender for primary keys.",
+        )?;
         let mut opprf_payload = None;
         if has_payload {
-            opprf_payload = Some(
-                KmprtSender::init(channel, rng)
-                    .wrap_err_with(ErrorKind::InitializationError, || {
-                        "Failed to initialize KMPRT sender for payload.".to_string()
-                    })?,
-            );
+            opprf_payload = Some(KmprtSender::init(channel, rng).wrap_err(
+                ErrorKind::InitializationError,
+                "Failed to initialize KMPRT sender for payload.",
+            )?);
         }
 
         Ok(Self {
@@ -173,9 +171,10 @@ impl BasePsi for OpprfSender {
         );
         self.opprf_primary_keys
             .send(channel, &opprf_program, self.nbins.unwrap(), rng)
-            .wrap_err_with(ErrorKind::OtherError, || {
-                "Failed to send primary keys during exchange.".to_string()
-            })?;
+            .wrap_err(
+                ErrorKind::OtherError,
+                "Failed to send primary keys during exchange.",
+            )?;
         if !&self.state.opprf_payloads_in.is_empty() {
             let points_data = flatten_bins_payloads(
                 &self.state.opprf_primary_keys_in,
@@ -185,9 +184,10 @@ impl BasePsi for OpprfSender {
                 .as_mut()
                 .unwrap()
                 .send(channel, &points_data, self.nbins.unwrap(), rng)
-                .wrap_err_with(ErrorKind::OtherError, || {
-                    "Failed to send payload during exchange.".to_string()
-                })?;
+                .wrap_err(
+                    ErrorKind::OtherError,
+                    "Failed to send payload during exchange.",
+                )?;
         }
         Ok(())
     }
