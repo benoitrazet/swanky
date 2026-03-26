@@ -896,9 +896,10 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                         ErrorKind::OtherError,
                                         "Mux has no input branches",
                                     )?)
-                                    .wrap_err_with(ErrorKind::OtherError, || {
-                                        "Failed to get b_0_jth wire.".to_string()
-                                    })?;
+                                    .wrap_err(
+                                        ErrorKind::OtherError,
+                                        "Failed to get b_0_jth wire.",
+                                    )?;
 
                                 let (mut sum, mut sum_v) =
                                     mul(self.cb, self.vs, self.pb, cm, g_0, b_0_j)?;

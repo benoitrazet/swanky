@@ -113,9 +113,7 @@ pub mod simple {
             }
             self.pb
                 .write_all(&self.buf)
-                .wrap_err_with(ErrorKind::OtherError, || {
-                    "Failed to write bytes.".to_string()
-                })?;
+                .wrap_err(ErrorKind::OtherError, "Failed to write bytes.")?;
             Ok(())
         }
         /// Returns number of own wires
@@ -168,10 +166,10 @@ pub mod simple {
                     Ok(ReadWire {
                         which_input: u32::from_le_bytes(<[u8; 4]>::try_from(&arg[0..4]).unwrap()),
                         which_wire: u32::from_le_bytes(<[u8; 4]>::try_from(&arg[4..8]).unwrap()),
-                        data: T::from_bytes(GenericArray::from_slice(&arg[8..]))
-                            .wrap_err_with(ErrorKind::SerializationError, || {
-                                "Failed to decode data bytes.".to_string()
-                            })?,
+                        data: T::from_bytes(GenericArray::from_slice(&arg[8..])).wrap_err(
+                            ErrorKind::SerializationError,
+                            "Failed to decode data bytes.",
+                        )?,
                     })
                 });
             <[(); NARGS]>::array_generate(|_| ()).array_map_result(|_| iter.next().unwrap())
@@ -255,9 +253,7 @@ pub mod simd_batched {
             }
             self.pb
                 .write_all(bytemuck::cast_slice(buf))
-                .wrap_err_with(ErrorKind::OtherError, || {
-                    "Failed to write bytes.".to_string()
-                })?;
+                .wrap_err(ErrorKind::OtherError, "Failed to write bytes.")?;
             Ok(())
         }
         /// Returns number of own wires

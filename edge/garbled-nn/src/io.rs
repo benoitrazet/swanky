@@ -61,9 +61,7 @@ fn value_to_array3(v: &Value) -> Result<Array3<i64>> {
         (height, width, depth),
         data.into_iter().flatten().flatten().collect(),
     )
-    .wrap_err_with(ErrorKind::OtherError, || {
-        "Cannot create array from vec".to_string()
-    })
+    .wrap_err(ErrorKind::OtherError, "Cannot create array from vec")
 }
 
 /// Read neural network tests from a directory.
@@ -91,18 +89,15 @@ pub fn read_tests(dir: &Path, num: Option<usize>) -> Result<Vec<Array3<i64>>> {
         // Note: csv can be at most 1-dimensional, if each image gets its own line
         let iter = reader.lines().map(|line| {
             let data = line
-                .wrap_err_with(ErrorKind::OtherError, || "Failed to read line".to_string())?
+                .wrap_err(ErrorKind::OtherError, "Failed to read line")?
                 .split(",")
                 .map(|s| {
-                    s.parse::<i64>().wrap_err_with(ErrorKind::OtherError, || {
-                        "Failed to parse string as `i64`".to_string()
-                    })
+                    s.parse::<i64>()
+                        .wrap_err(ErrorKind::OtherError, "Failed to parse string as `i64`")
                 })
                 .collect::<Result<Vec<_>>>()?;
             Array3::from_shape_vec((data.len(), 1, 1), data)
-                .wrap_err_with(ErrorKind::OtherError, || {
-                    "Failed to convert `vec` to `Array3`".to_string()
-                })
+                .wrap_err(ErrorKind::OtherError, "Failed to convert `vec` to `Array3`")
         });
 
         if let Some(n) = num {
@@ -161,12 +156,11 @@ pub fn read_labels(dir: &Path) -> Result<Vec<Vec<i64>>> {
             .lines()
             .map(|line| {
                 let line: Result<Vec<_>> = line
-                    .wrap_err_with(ErrorKind::OtherError, || "Failed to read line".to_string())?
+                    .wrap_err(ErrorKind::OtherError, "Failed to read line")?
                     .split(",")
                     .map(|s| {
-                        s.parse::<i64>().wrap_err_with(ErrorKind::OtherError, || {
-                            "Failed to covert string to `i64`".to_string()
-                        })
+                        s.parse::<i64>()
+                            .wrap_err(ErrorKind::OtherError, "Failed to covert string to `i64`")
                     })
                     .collect();
                 line

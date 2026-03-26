@@ -67,7 +67,7 @@ fn read_size_prefix_in_vec(stream: &mut impl Read, buffer: &mut Vec<u8>) -> Resu
     buffer.resize(size, 0u8);
     stream
         .read_exact(&mut buffer[4..])
-        .wrap_err_with(ErrorKind::OtherError, || "Failed to read data.".to_string())?;
+        .wrap_err(ErrorKind::OtherError, "Failed to read data.")?;
     Ok(Some(()))
 }
 

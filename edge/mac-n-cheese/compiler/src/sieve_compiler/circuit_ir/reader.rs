@@ -563,9 +563,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
         for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> swanky_error::Result<()>,
     {
         let name = std::str::from_utf8(name)
-            .wrap_err_with(ErrorKind::SerializationError, || {
-                "Function name isn't UTF-8".to_string()
-            })?
+            .wrap_err(ErrorKind::SerializationError, "Function name isn't UTF-8")?
             .to_string();
         let sink = FunctionBuildingSink {
             types: self.sink.types(),
@@ -615,9 +613,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
         } = body;
 
         let name = std::str::from_utf8(name)
-            .wrap_err_with(ErrorKind::SerializationError, || {
-                "Function name isn't UTF-8".to_string()
-            })?
+            .wrap_err(ErrorKind::SerializationError, "Function name isn't UTF-8")?
             .to_string();
 
         match plugin_name.as_bytes() {
@@ -975,9 +971,8 @@ impl<VSR: ValueStreamReader> InstructionSink for GlobalSink<VSR> {
         field.visit(V(
             &mut self.public_inputs_reader,
             &mut self.current_chunk,
-            usize::try_from(count).wrap_err_with(ErrorKind::OtherError, || {
-                "{count} does not fit in a usize.".to_string()
-            })?,
+            usize::try_from(count)
+                .wrap_err(ErrorKind::OtherError, "{count} does not fit in a usize.")?,
         ))
     }
 

@@ -287,39 +287,35 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
         // Function for sending the LSB `d` of each party's share of `S`.
         let send_lsb = |channel: &mut Channel| -> swanky_error::Result<()> {
             let mut serializer: F2BitSerializer = SequenceSerializer::new(&mut channel.as_std_io())
-                .wrap_err_with(ErrorKind::InitializationError, || {
-                    "Failed to initialize bit sequence serializer.".to_string()
-                })?;
+                .wrap_err(
+                    ErrorKind::InitializationError,
+                    "Failed to initialize bit sequence serializer.",
+                )?;
             for s in ss.iter() {
                 let lsb_s_mine = lsb(*s);
                 serializer
                     .write(channel.as_std_io(), lsb_s_mine)
-                    .wrap_err_with(ErrorKind::NetworkError, || {
-                        "Failed to write LSB.".to_string()
-                    })?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write LSB.")?;
             }
-            serializer
-                .finish(channel.as_std_io())
-                .wrap_err_with(ErrorKind::SerializationError, || {
-                    "Failed to finalize bit serialization.".to_string()
-                })?;
+            serializer.finish(channel.as_std_io()).wrap_err(
+                ErrorKind::SerializationError,
+                "Failed to finalize bit serialization.",
+            )?;
             Ok(())
         };
         // Function for receiving the LSB of each party's share of `S`, sending
         // `L := S + dΔ` to `Feq`, and output the updated triple.
         let receive_lsb = |channel: &mut Channel| -> swanky_error::Result<()> {
             let mut deserializer: F2BitDeserializer =
-                SequenceDeserializer::new(&mut channel.as_std_io())
-                    .wrap_err_with(ErrorKind::InitializationError, || {
-                        "Failed to initialize bit sequence deserializer.".to_string()
-                    })?;
+                SequenceDeserializer::new(&mut channel.as_std_io()).wrap_err(
+                    ErrorKind::InitializationError,
+                    "Failed to initialize bit sequence deserializer.",
+                )?;
             for ((x, y, z), s) in shares.into_iter().tuples().zip(ss.iter()) {
                 let lsb_s_mine = lsb(*s);
                 let lsb_s_other = deserializer
                     .read(channel.as_std_io())
-                    .wrap_err_with(ErrorKind::NetworkError, || {
-                        "Failed to read LSB.".to_string()
-                    })?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read LSB.")?;
                 let d = lsb_s_mine + lsb_s_other;
                 // Send `L := S + dΔ` to `Feq`.
                 feq.input(U8x16::from(s + d * delta));

@@ -79,22 +79,21 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
                     WhichParty::Prover(e) => {
                         let mut base =
                             BaseSender::<TF>::init(&mut channel, Default::default(), self.rng)
-                                .wrap_err_with(ErrorKind::InitializationError, || {
-                                    "Failed to initialize SVOLE sender.".to_string()
-                                })
-                                .with_context(|| "base sender init".to_string())?;
-                        channel.flush().wrap_err_with(ErrorKind::NetworkError, || {
-                            "Failed to flush SVOLE channel.".to_string()
-                        })?;
+                                .wrap_err(
+                                    ErrorKind::InitializationError,
+                                    "Failed to initialize SVOLE sender.",
+                                )
+                                .context("base sender init")?;
+                        channel
+                            .flush()
+                            .wrap_err(ErrorKind::NetworkError, "Failed to flush SVOLE channel.")?;
                         let base_voles = base
                             .send(&mut channel, self.count, self.rng)
-                            .wrap_err_with(ErrorKind::OtherError, || {
-                                "Failed to send base VOLEs.".to_string()
-                            })
-                            .with_context(|| "base voles".to_string())?;
-                        channel.flush().wrap_err_with(ErrorKind::NetworkError, || {
-                            "Failed to flush SVOLE channel.".to_string()
-                        })?;
+                            .wrap_err(ErrorKind::OtherError, "Failed to send base VOLEs.")
+                            .context("base voles")?;
+                        channel
+                            .flush()
+                            .wrap_err(ErrorKind::NetworkError, "Failed to flush SVOLE channel.")?;
                         // We need to convince Rust that (VF == TF::PrimeField). We roundtrip thru
                         // Any in order to do that.
                         let base_voles: &dyn Any = &base_voles;
@@ -111,22 +110,21 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
                     WhichParty::Verifier(e) => {
                         let mut base =
                             BaseReceiver::<TF>::init(&mut channel, Default::default(), self.rng)
-                                .wrap_err_with(ErrorKind::InitializationError, || {
-                                    "Failed to initialize base VOLE receiver.".to_string()
-                                })
-                                .with_context(|| "base receiver init".to_string())?;
-                        channel.flush().wrap_err_with(ErrorKind::NetworkError, || {
-                            "Failed to flush VOLE channel.".to_string()
-                        })?;
+                                .wrap_err(
+                                    ErrorKind::InitializationError,
+                                    "Failed to initialize base VOLE receiver.",
+                                )
+                                .context("base receiver init")?;
+                        channel
+                            .flush()
+                            .wrap_err(ErrorKind::NetworkError, "Failed to flush VOLE channel.")?;
                         let base_voles = base
                             .receive(&mut channel, self.count, self.rng)
-                            .wrap_err_with(ErrorKind::OtherError, || {
-                                "Failed to receive base VOLEs.".to_string()
-                            })
-                            .with_context(|| "base voles".to_string())?;
-                        channel.flush().wrap_err_with(ErrorKind::NetworkError, || {
-                            "Failed to flush VOLE channel.".to_string()
-                        })?;
+                            .wrap_err(ErrorKind::OtherError, "Failed to receive base VOLEs.")
+                            .context("base voles")?;
+                        channel
+                            .flush()
+                            .wrap_err(ErrorKind::NetworkError, "Failed to flush VOLE channel.")?;
                         let alpha = -base.delta();
                         VoleContext {
                             base_voles: base_voles

@@ -104,12 +104,10 @@ where
             WhichParty::Prover(ev) => Self(
                 PartyEither::new(
                     ev,
-                    RcRefCell::new(
-                        Sender::init(channel, rng, lpn_setup, lpn_extend)
-                            .wrap_err_with(ErrorKind::InitializationError, || {
-                                "Failed to initialize VOLE sender.".to_string()
-                            })?,
-                    ),
+                    RcRefCell::new(Sender::init(channel, rng, lpn_setup, lpn_extend).wrap_err(
+                        ErrorKind::InitializationError,
+                        "Failed to initialize VOLE sender.",
+                    )?),
                 ),
                 PhantomData,
             ),
@@ -117,10 +115,10 @@ where
                 PartyEither::new(
                     ev,
                     RcRefCell::new(
-                        Receiver::init(channel, rng, lpn_setup, lpn_extend, delta)
-                            .wrap_err_with(ErrorKind::InitializationError, || {
-                                "Failed to initialize VOLE receiver.".to_string()
-                            })?,
+                        Receiver::init(channel, rng, lpn_setup, lpn_extend, delta).wrap_err(
+                            ErrorKind::InitializationError,
+                            "Failed to initialize VOLE receiver.",
+                        )?,
                     ),
                 ),
                 PhantomData,
@@ -142,9 +140,7 @@ where
                     .into_inner(ev)
                     .get_refmut()
                     .send(channel, rng, out.as_mut().into_inner(ev))
-                    .wrap_err_with(ErrorKind::OtherError, || {
-                        "Failed to send VOLE extensions.".to_string()
-                    })?;
+                    .wrap_err(ErrorKind::OtherError, "Failed to send VOLE extensions.")?;
             }
             WhichParty::Verifier(ev) => {
                 let start = Instant::now();
@@ -153,9 +149,7 @@ where
                     .into_inner(ev)
                     .get_refmut()
                     .receive(channel, rng, out.as_mut().into_inner(ev))
-                    .wrap_err_with(ErrorKind::OtherError, || {
-                        "Failed to receive VOLE extensions.".to_string()
-                    })?;
+                    .wrap_err(ErrorKind::OtherError, "Failed to receive VOLE extensions.")?;
                 info!(
                     "SVOLE<{},{} {:?}>",
                     field_name::<V>(),

@@ -452,7 +452,7 @@ fn test_error_sizes() {
 #[test]
 fn test_swanky_error() {
     let mut e = swanky_error!(ErrorKind::OtherError, "Message");
-    e = e.context("Context".to_string());
+    e = e.context("Context");
 
     assert_eq!(e.inner.kind, ErrorKind::OtherError);
     assert_eq!(e.inner.message, "Message");

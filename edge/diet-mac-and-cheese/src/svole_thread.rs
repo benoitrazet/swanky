@@ -118,9 +118,9 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, 
                 // and start requesting a svole extension in the other thread, but
                 // the verifier does not receive the values because it's not flushed,
                 // hence it is a deadlock.
-                channel.flush().wrap_err_with(ErrorKind::NetworkError, || {
-                    "Failed to flush channel.".to_string()
-                })?;
+                channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                 debug!("SLEEP! VoleInterface {:?}", T::default());
                 // exponential backoff sleep
                 std::thread::sleep(std::time::Duration::from_millis(sleep_time));
@@ -163,17 +163,17 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
         let vole_comm = match P::WHICH {
             WhichParty::Prover(ev) => PartyEither::new(
                 ev,
-                Sender::init(channel, rng, lpn_setup, lpn_extend)
-                    .wrap_err_with(ErrorKind::InitializationError, || {
-                        "Failed to initialize SVOLE sender.".to_string()
-                    })?,
+                Sender::init(channel, rng, lpn_setup, lpn_extend).wrap_err(
+                    ErrorKind::InitializationError,
+                    "Failed to initialize SVOLE sender.",
+                )?,
             ),
             WhichParty::Verifier(ev) => PartyEither::new(
                 ev,
-                Receiver::init(channel, rng, lpn_setup, lpn_extend, delta)
-                    .wrap_err_with(ErrorKind::InitializationError, || {
-                        "Failed to initialize SVOLE receiver.".to_string()
-                    })?,
+                Receiver::init(channel, rng, lpn_setup, lpn_extend, delta).wrap_err(
+                    ErrorKind::InitializationError,
+                    "Failed to initialize SVOLE receiver.",
+                )?,
             ),
         };
 
@@ -235,9 +235,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
                                     .as_mut()
                                     .into_inner(ev),
                             )
-                            .wrap_err_with(ErrorKind::OtherError, || {
-                                "Failed to send VOLE extensions.".to_string()
-                            })?;
+                            .wrap_err(ErrorKind::OtherError, "Failed to send VOLE extensions.")?;
                         debug!("DONE multithread prover extend");
                     }
                     WhichParty::Verifier(ev) => {
@@ -257,9 +255,10 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
                                     .as_mut()
                                     .into_inner(ev),
                             )
-                            .wrap_err_with(ErrorKind::OtherError, || {
-                                "Failed to receive VOLE extensions.".to_string()
-                            })?;
+                            .wrap_err(
+                                ErrorKind::OtherError,
+                                "Failed to receive VOLE extensions.",
+                            )?;
                         info!(
                             "SVOLE<{} {:?}>",
                             std::any::type_name::<T>().split("::").last().unwrap(),

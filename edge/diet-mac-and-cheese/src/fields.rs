@@ -190,9 +190,10 @@ macro_rules! impl_sieve_ir_deserialize_binary_ext_field {
                 let val = number_to_u64(val)?;
                 <$t>::from_bytes(GenericArray::from_slice(
                     &val.to_le_bytes()[0..<$t as CanonicalSerialize>::ByteReprLen::USIZE],
-                )).wrap_err_with(ErrorKind::SerializationError, || {
-                    "Failed to convert number to field element.".to_string()
-                })
+                )).wrap_err(
+                    ErrorKind::SerializationError,
+                    "Failed to convert number to field element."
+                )
             }
         }) *
     }
