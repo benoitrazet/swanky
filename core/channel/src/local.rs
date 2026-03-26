@@ -24,8 +24,10 @@ fn tcp_socketpair() -> swanky_error::Result<(std::net::TcpStream, std::net::TcpS
             "Failed to get local_addr().".to_string()
         })?;
     let thread = std::thread::spawn(move || std::net::TcpStream::connect_timeout(&addr, TIMEOUT));
-    // If something goes wrong, we don't want to hang forever. There doesn't seem to be an accept()
-    // timeout in Rust's standard library. We simulate one with sleeping and non-blocking IO.
+    // If something goes wrong, we don't want to hang forever.
+    // There doesn't seem to be an accept() timeout in Rust's standard
+    // library.
+    // We simulate one with sleeping and non-blocking IO.
     const SLEEP_STEP: Duration = Duration::from_micros(250);
     const NUM_STEPS: u128 = TIMEOUT.as_micros() / SLEEP_STEP.as_micros();
     server
@@ -78,10 +80,10 @@ fn tcp_socketpair() -> swanky_error::Result<(std::net::TcpStream, std::net::TcpS
     );
 }
 
-/// An intra-process socket
+/// An intra-process socket.
 ///
-/// Prefer using this type to an intra-process unix stream, since this type will work on targets
-/// which don't support unix sockets.
+/// Prefer using this type to an intra-process unix stream, since this
+/// type will work on targets which don't support unix sockets.
 pub struct LocalSocket {
     #[cfg(unix)]
     inner: std::os::unix::net::UnixStream,
@@ -91,10 +93,11 @@ pub struct LocalSocket {
 impl LocalSocket {
     /// Create a new `LocalSocket` pair.
     ///
-    /// Data written on one half of the pair will be read by the other side (and vice-versa; the
-    /// socket is full-duplex).
+    /// Data written on one half of the pair will be read by the other
+    /// side (and vice-versa; the socket is full-duplex).
     ///
     /// # Example
+    ///
     /// ```
     /// use std::io::{Read, Write};
     /// use swanky_channel::local::LocalSocket;
@@ -137,11 +140,12 @@ impl Write for LocalSocket {
     }
 }
 
-/// Run `side_f` and `side_g` in separate threads connected by a [`Channel`].
+/// Run `side_f` and `side_g` in separate threads connected by a
+/// [`Channel`].
 ///
 /// # Example
+///
 /// ```
-/// use swanky_channel::Channel;
 /// let (a, b) = swanky_channel::local::local_channel_pair(
 ///     |c| {
 ///         let out = c.read::<i32>()?;

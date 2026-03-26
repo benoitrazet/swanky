@@ -2,6 +2,9 @@
 /core/adversary
 /core/adversary/
 
+/core/channel
+/core/channel/
+
 /core/error
 /core/error/
 
@@ -38,9 +41,6 @@
 
 /edge/bytearray-utils @cphifer
 /edge/bytearray-utils/ @cphifer
-
-/edge/channel @cphifer
-/edge/channel/ @cphifer
 
 /edge/channel-legacy @cphifer
 /edge/channel-legacy/ @cphifer

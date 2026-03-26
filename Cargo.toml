@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
   "core/adversary",
+  "core/channel",
   "core/error",
   "core/party",
   "core/serialization",
@@ -14,7 +15,6 @@ members = [
   "edge/block",
   "edge/bristol-fashion",
   "edge/bytearray-utils",
-  "edge/channel",
   "edge/channel-legacy",
   "edge/cointoss",
   "edge/deprecated-bitwise-utils",
@@ -105,7 +105,7 @@ swanky-authenticated-garbling = { path = "edge/authenticated-garbling" }
 swanky-bit-matrix-transpose = { path = "edge/bit-matrix-transpose" }
 swanky-block = { path = "edge/block" }
 swanky-bytearray-utils = { path = "edge/bytearray-utils" }
-swanky-channel = { path = "edge/channel" }
+swanky-channel = { path = "core/channel" }
 swanky-channel-legacy = { path = "edge/channel-legacy" }
 swanky-cointoss = { path = "edge/cointoss" }
 swanky-deprecated-bitwise-utils = { path = "edge/deprecated-bitwise-utils" }

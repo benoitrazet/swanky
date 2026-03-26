@@ -1,7 +1,67 @@
-//! This crate contains the core types used for communication in Swanky.
+//! Core types used for communication in Swanky.
 //!
-//! [`Channel`] is the type that should be used for (most) network communications in Swanky. If you
-//! need to perform network communication for testing, see the [`local`] module.
+//! [`Channel`] is the type that should be used for (most) network
+//! communications in Swanky.
+//! It wraps an (ideally unbuffered) full-duplex connection (e.g. a
+//! `TcpStream`), providing buffering and automatic flushing.
+//!
+//! Channels are created and used via the [`Channel::with`] and
+//! [`Channel::with_sizes`] constructors.
+//! These methods take ownership of an existing full-duplex
+//! connection, construct the [`Channel`] value, and pass a mutable
+//! reference to a thunk/closure that involves calls to methods on the
+//! channel reference.
+//! At no point is the [`Channel`] value itself made accessible;
+//! `with` and `with_sizes` handle creating it, executing the thunk,
+//! and properly flushing/dropping the channel before returning the
+//! result of the communicating computation.
+//!
+//! In practice, this means:
+//!
+//! - 'Driver' code (evaluators/interpreters, applications, tests, and
+//!   benchmarks) uses [`Channel::with`] or [`Channel::with_sizes`] to
+//!   take over some full-duplex connection (like a `TcpStream`) and
+//!   passes a thunk to 'start' the actual communicating.
+//!   This thunk can directly interact with its `&mut Channel`
+//!   argument, or dispatch to other functions/methods that expect an
+//!   `&mut Channel`.
+//! - Library methods (e.g. components of protocol implementations)
+//!   that send/receive data take an `&mut Channel` parameter.
+//!   Like the thunk given to [`Channel::with`] /
+//!   [`Channel::with_sizes`], such methods can directly interact with
+//!   this parameter to read/write data, or pass it on to other
+//!   functions/methods.
+//!
+//! If you need to perform network communication for testing, see the
+//! [`local`] module.
+//! The functions here take _two_ thunks, creating a connected pair of
+//! [`Channel`] that execute their thunks in separate threads.
+//!
+//! A contrived example, using `local_channel_pair` rather than
+//! setting up our own full-duplex connection to demonstrate these
+//! concepts:
+//!
+//! ```
+//! use swanky_channel::{Channel, local::local_channel_pair};
+//! use swanky_error::Result;
+//!
+//! fn do_a_work(c: &mut Channel) -> Result<i32> {
+//!     c.write(&17)?;
+//!     c.read()
+//! }
+//!
+//! fn do_b_work(c: &mut Channel) -> Result<i32> {
+//!     let res = c.read()?;
+//!     c.write(&71)?;
+//!     Ok(res)
+//! }
+//!
+//! fn main() -> Result<()> {
+//!     let res = local_channel_pair(do_a_work, do_b_work)?;
+//!     assert_eq!(res, (71, 17));
+//!     Ok(())
+//! }
+//! ```
 
 #![deny(missing_docs)]
 
@@ -15,14 +75,17 @@ use swanky_serialization::CanonicalSerialize;
 
 pub mod local;
 
-/// Rust doesn't support `(dyn Read + Write)`, so we make this trait, so we can write `dyn
-/// ReadWrite`, instead.
+/// Types that are both [`Read`] and [`Write`].
+///
+/// Rust doesn't support `(dyn Read + Write)`; this allows us to write
+/// `dyn ReadWrite` instead.
 trait ReadWrite: Read + Write {}
 impl<T: Read + Write + ?Sized> ReadWrite for T {}
 
 /// The sizes of the read and write buffers for a [`Channel`].
 ///
-/// The struct is only intended to be used as an argument to [`Channel::with_sizes`].
+/// The struct is only intended to be used as an argument to
+/// [`Channel::with_sizes`].
 pub struct BufferSizes {
     /// Size (in bytes) of the read buffer.
     pub read: usize,
@@ -34,47 +97,64 @@ impl Default for BufferSizes {
         BufferSizes {
             // Upside of a larger value: Fewer system calls
             // Downside of a larger value: More memory consumption
-            // The default Linux TCP receive window size (on systems I tested) is 128*1024
-            // We set this to 1024*256 to give us some wiggle room (due to the minimal) downside.
+            // The default Linux TCP receive window size (on systems I
+            // tested) is 1024*128.
+            // We set this to 1024*256 to give us some wiggle room
+            // (due to the minimal downside).
             // This is also greater than the maximum TLS record size.
             read: 1024 * 256,
             // Upside of a larger value: Fewer system calls
             // Downsides of a larger value:
-            //      (1) More memory consumption. Memory is typically not a bottleneck, so this is
-            //          usually a non-issue.
-            //      (2) Lower concurrency with the peer. Any time between when a party performs a
-            //          write() and when the write buffer gets flushed is time that the peer can't
-            //          spend computing on the written data.
-            // To that end, the default write value is set so as to fill a single TLS record:
-            //   MAX_TLS_RECORD_SIZE - (SIZE_OF_TLS_MAC + SIZE_OF_TLS_13_RECORD_TYPE)
+            //      (1) More memory consumption.
+            //          Memory is typically not a bottleneck, so this
+            //          is usually a non-issue.
+            //      (2) Lower concurrency with the peer.
+            //          Any time between when a party performs a
+            //          write() and when the write buffer gets flushed
+            //          is time that the peer can't spend computing on
+            //          the written data.
+            // To that end, the default write value is set so as to
+            // fill a single TLS record:
+            //   MAX_TLS_RECORD_SIZE
+            // - (SIZE_OF_TLS_MAC + SIZE_OF_TLS_13_RECORD_TYPE)
             // = 2^14 - (16+1)
             write: (1 << 14) - (16 + 1),
         }
     }
 }
 
-/// A network channel wrapper
+/// A network channel wrapper.
 ///
-/// This wrapper provides buffering and automatic flushing of the channel.
+/// This wrapper provides buffering and automatic flushing of the
+/// channel.
 ///
 /// # Flushing
-/// [`Channel`] will automatically flush the write buffer before performing a read. As a result,
-/// users of the [`Channel`] API should almost never need to manually flush.
 ///
-/// A manual flush should only be _required_ when interleaving [`Channel`] operations with
-/// non-[`Channel`] operations. For example, it would be advisable to [`Channel::force_flush`] before reading
-/// user input from standard in. [`Channel`] can't flush for you, because it doesn't know that you're
-/// about to read from standard in!
+/// [`Channel`] will automatically flush the write buffer before
+/// performing a read.
+/// As a result, users of the [`Channel`] API should almost never need
+/// to manually flush.
+///
+/// A manual flush should only be _required_ when interleaving
+/// [`Channel`] IO operations with non-[`Channel`] IO operations.
+/// For example, it would be advisable to [`Channel::force_flush`]
+/// before reading user input from standard in.
+/// [`Channel`] can't flush for you, because it doesn't know that
+/// you're about to read from standard in!
 ///
 /// # Error Handling
-/// On error, [`Channel`] is left in an unknown state. For example, if a [`Channel`] wraps a
-/// `TcpStream`, and a [`Channel::write_bytes`] fails with an
-/// [`ETIMEDOUT`](https://man7.org/linux/man-pages/man7/tcp.7.html#ERRORS) error, due to the
-/// [Two Generals' Problem](https://en.wikipedia.org/wiki/Two_Generals%27_Problem), it's not
-/// possible to know whether or not the peer received the sent data.
 ///
-/// As a result, on channel error, the only safe remediation strategy is to drop (and close) the
-/// inner `Read + Write` type.
+/// On error, [`Channel`] is left in an unknown state.
+/// For example, if a [`Channel`] wraps a `TcpStream`, and a
+/// [`Channel::write_bytes`] fails with an
+/// [`ETIMEDOUT`](https://man7.org/linux/man-pages/man7/tcp.7.html#ERRORS)
+/// error, due to the [Two Generals'
+/// Problem](https://en.wikipedia.org/wiki/Two_Generals%27_Problem),
+/// it's not possible to know whether or not the peer received the
+/// sent data.
+///
+/// As a result, on channel error, the only safe remediation strategy
+/// is to drop (and close) the inner `Read + Write` type.
 pub struct Channel<'inner> {
     read_buffer: Vec<u8>,
     read_buffer_pos: usize,
@@ -84,10 +164,12 @@ pub struct Channel<'inner> {
 }
 
 impl<'inner> Channel<'inner> {
-    /// Construct a new [`Channel`] by wrapping the full-duplex connection, `inner`.
+    /// Construct a new [`Channel`] by wrapping the full-duplex
+    /// connection, `inner`.
     ///
-    /// This function is equivalent to calling [`Channel::with_sizes`] with the default
-    /// [`BufferSizes`]. See that function for more information.
+    /// This function is equivalent to calling [`Channel::with_sizes`]
+    /// with the default [`BufferSizes`].
+    /// See that function for more information.
     pub fn with<C, T, F>(inner: C, thunk: F) -> swanky_error::Result<T>
     where
         for<'a, 'b> F: FnOnce(&'a mut Channel<'b>) -> swanky_error::Result<T>,
@@ -96,20 +178,20 @@ impl<'inner> Channel<'inner> {
         Self::with_sizes(inner, BufferSizes::default(), thunk)
     }
 
-    /// Construct a new [`Channel`] by wrapping the full-duplex connection, `inner`.
+    /// Construct a new [`Channel`] by wrapping the full-duplex
+    /// connection, `inner`.
     ///
-    /// The fresh channel gets passed to `thunk`, and (barring any errors) the result of `thunk`
-    /// gets returned by `with_sizes()`.
+    /// The fresh channel gets passed to `thunk`, and (barring any
+    /// errors) the result of `thunk` gets returned by `with_sizes()`.
     ///
     /// # Buffering
     ///
-    /// Because [`Channel`] uses a buffer (of size `sizes`) internally, it's
-    /// preferable to pass an _unbuffered_ `inner` stream (such as a `TcpStream`).
+    /// Because [`Channel`] uses a buffer (of size `sizes`)
+    /// internally, it's preferable to pass an _unbuffered_ `inner`
+    /// stream (such as a `TcpStream`).
     ///
-    /// `with_sizes()` will flush any outgoing buffered data before returning.
-    ///
-    /// The channel should be _moved_ into `inner`, to avoid dropping a partial read buffer. See
-    /// [`std::io::BufReader::into_inner`] for more info.
+    /// `with_sizes()` will flush any outgoing buffered data before
+    /// returning.
     ///
     /// # Example
     ///
@@ -163,10 +245,11 @@ impl<'inner> Channel<'inner> {
     ///
     /// Write buffers and [`Write::flush()`] the underlying channel.
     ///
-    /// You shouldn't need to call this function in normal operation (since the channel will
-    /// automatically insert flushes as needed).
+    /// You shouldn't need to call this function in normal operation
+    /// (since the channel will automatically insert flushes as
+    /// needed).
     ///
-    /// See the "Flushes" section in [`Channel`] for more information.
+    /// See the "Flushing" section in [`Channel`] for more information.
     #[inline]
     pub fn force_flush(&mut self) -> std::io::Result<()> {
         if !self.write_buffer.is_empty() {
@@ -182,9 +265,11 @@ impl<'inner> Channel<'inner> {
         debug_assert!(self.write_buffer.is_empty());
         if bytes.len() > self.write_buffer.capacity() {
             self.inner.write_all(bytes)?;
-            // We flush here because we use the length of the write_buffer to indicate whether
-            // there are outstanding writes to flush. If we didn't flush here, then a long write
-            // followed by a read would deadlock.
+            // We flush here because we use the length of the
+            // write_buffer to indicate whether there are outstanding
+            // writes to flush.
+            // If we didn't flush here, then a long write followed by
+            // a read would deadlock.
             self.inner.flush()?;
         } else {
             self.write_buffer.extend_from_slice(bytes);
@@ -203,9 +288,11 @@ impl<'inner> Channel<'inner> {
     }
     /// Write all of `bytes` to the peer.
     ///
-    /// If this function succeeds, all bytes have been written to the peer.
+    /// If this function succeeds, all bytes have been written to the
+    /// peer.
     ///
     /// # Example
+    ///
     /// ```
     /// use swanky_channel::Channel;
     /// use swanky_error::{ErrorKind, WrapErr};
@@ -281,6 +368,7 @@ impl<'inner> Channel<'inner> {
     /// Read exactly `dst.len()` bytes from the peer into `dst`.
     ///
     /// # Example
+    ///
     /// ```
     /// use swanky_channel::Channel;
     /// use swanky_error::{ErrorKind, WrapErr};
@@ -302,6 +390,7 @@ impl<'inner> Channel<'inner> {
     /// Read a `T` and deserialize it.
     ///
     /// # Example
+    ///
     /// ```
     /// use swanky_channel::Channel;
     /// let (r, _) =
@@ -320,6 +409,7 @@ impl<'inner> Channel<'inner> {
     /// Serialize `t` and [`Self::write_bytes()`] it over the wire.
     ///
     /// # Example
+    ///
     /// ```
     /// use swanky_channel::Channel;
     /// let (r, _) =
@@ -332,10 +422,11 @@ impl<'inner> Channel<'inner> {
         self.write_bytes(&t.to_bytes())
     }
 
-    /// Return an [`IoAdapter`] for this channel which implements [`std::io::Read`] and
-    /// [`std::io::Write`].
+    /// Return an [`IoAdapter`] for this channel which implements
+    /// [`std::io::Read`] and [`std::io::Write`].
     ///
     /// # Example
+    ///
     /// ```
     /// use swanky_channel::Channel;
     /// use swanky_error::{ErrorKind, WrapErr};
@@ -359,12 +450,16 @@ impl<'inner> Channel<'inner> {
         IoAdapter::wrap_mut(self)
     }
 
-    /// Turn a `swanky_party::PartyPrivate<P, T>` into a `T` by communicating it.
+    /// Turn a `swanky_party::PartyPrivate<P, T>` into a `T` by
+    /// communicating it.
     ///
-    /// If `p` is private to `P`, then send it over the wire and return it. Otherwise, read the
-    /// peer's value from over the wire and return that.
+    /// If `p` is private to `P`, then send it over the wire and
+    /// return it.
+    /// Otherwise, read the peer's value from over the wire and return
+    /// that.
     ///
     /// # Example
+    ///
     /// ```
     /// use swanky_channel::{Channel, local::local_channel_pair};
     /// use swanky_party::{private::PartyPrivateCopy, party_system};
@@ -410,7 +505,8 @@ impl<'inner> Channel<'inner> {
     }
 }
 
-/// An adapter for [`Channel`] which implements [`std::io::Read`] and [`std::io::Write`].
+/// An adapter for [`Channel`] which implements [`std::io::Read`] and
+/// [`std::io::Write`].
 ///
 /// See [`Channel::as_std_io`] for more info.
 #[repr(transparent)]

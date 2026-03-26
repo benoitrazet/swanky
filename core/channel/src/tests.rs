@@ -145,3 +145,24 @@ fn io_adapter_read() {
         .unwrap();
     });
 }
+
+#[test]
+fn communicate() {
+    use swanky_party::private::PartyPrivateCopy;
+    swanky_party::party_system! {
+        mod ps {
+            A,
+            B,
+        }
+    }
+    use ps::{A, B, Party};
+
+    fn do_work<P: Party>(c: &mut Channel) -> swanky_error::Result<i32> {
+        let x: PartyPrivateCopy<A, P, i32> = PartyPrivateCopy::new(7117);
+        let x = c.communicate(x)?;
+        Ok(x)
+    }
+
+    let (a, b) = local_channel_pair(do_work::<A>, do_work::<B>).unwrap();
+    assert_eq!(a, b);
+}
