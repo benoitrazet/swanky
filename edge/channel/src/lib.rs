@@ -2,9 +2,66 @@
 //!
 //! [`Channel`] is the type that should be used for (most) network
 //! communications in Swanky.
+//! It wraps an (ideally unbuffered) full-duplex connection (e.g. a
+//! `TcpStream`), providing buffering and automatic flushing.
+//!
+//! Channels are created and used via the [`Channel::with`] and
+//! [`Channel::with_sizes`] constructors.
+//! These methods take ownership of an existing full-duplex
+//! connection, construct the [`Channel`] value, and pass a mutable
+//! reference to a thunk/closure that involves calls to methods on the
+//! channel reference.
+//! At no point is the [`Channel`] value itself made accessible;
+//! `with` and `with_sizes` handle creating it, executing the thunk,
+//! and properly flushing/dropping the channel before returning the
+//! result of the communicating computation.
+//!
+//! In practice, this means:
+//!
+//! - 'Driver' code (evaluators/interpreters, applications, tests, and
+//!   benchmarks) uses [`Channel::with`] or [`Channel::with_sizes`] to
+//!   take over some full-duplex connection (like a `TcpStream`) and
+//!   passes a thunk to 'start' the actual communicating.
+//!   This thunk can directly interact with its `&mut Channel`
+//!   argument, or dispatch to other functions/methods that expect an
+//!   `&mut Channel`.
+//! - Library methods (e.g. components of protocol implementations)
+//!   that send/receive data take an `&mut Channel` parameter.
+//!   Like the thunk given to [`Channel::with`] /
+//!   [`Channel::with_sizes`], such methods can directly interact with
+//!   this parameter to read/write data, or pass it on to other
+//!   functions/methods.
 //!
 //! If you need to perform network communication for testing, see the
 //! [`local`] module.
+//! The functions here take _two_ thunks, creating a connected pair of
+//! [`Channel`] that execute their thunks in separate threads.
+//!
+//! A contrived example, using `local_channel_pair` rather than
+//! setting up our own full-duplex connection to demonstrate these
+//! concepts:
+//!
+//! ```
+//! use swanky_channel::{Channel, local::local_channel_pair};
+//! use swanky_error::Result;
+//!
+//! fn do_a_work(c: &mut Channel) -> Result<i32> {
+//!     c.write(&17)?;
+//!     c.read()
+//! }
+//!
+//! fn do_b_work(c: &mut Channel) -> Result<i32> {
+//!     let res = c.read()?;
+//!     c.write(&71)?;
+//!     Ok(res)
+//! }
+//!
+//! fn main() -> Result<()> {
+//!     let res = local_channel_pair(do_a_work, do_b_work)?;
+//!     assert_eq!(res, (71, 17));
+//!     Ok(())
+//! }
+//! ```
 
 #![deny(missing_docs)]
 
