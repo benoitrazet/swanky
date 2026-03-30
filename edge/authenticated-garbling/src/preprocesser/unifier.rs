@@ -118,7 +118,6 @@ impl<P: GenericParty> HasModulus for CircuitExecutorItem<P> {
     }
 }
 
-
 impl<P: GenericParty> FancyBinary for CircuitExecutor<P> {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         match self {
@@ -166,7 +165,6 @@ impl<P: GenericParty> FancyBinary for CircuitExecutor<P> {
 
 impl<P: GenericParty> Fancy for CircuitExecutor<P> {
     type Item = CircuitExecutorItem<P>;
-
     fn receive_many(
         &mut self,
         _moduli: &[u16],

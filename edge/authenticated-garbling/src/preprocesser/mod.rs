@@ -25,6 +25,8 @@
 //! Garbling for Faster Secure Two-Party Computation".
 //! <https://eprint.iacr.org/2018/578.pdf>
 //!
+use std::collections::HashMap;
+
 use fancy_garbling::{
     BinaryBundle, BinaryGadgets,
     circuit_analyzer::{AnalyzerItem, CircuitAnalyzer},
@@ -38,8 +40,12 @@ use swanky_channel::Channel;
 use swanky_party::GenericParty;
 use vectoreyes::U8x16;
 
-pub mod wire;
 pub mod unifier;
+pub mod wire;
+use crate::preprocesser::{
+    unifier::{CircuitExecutor, CircuitExecutorItem},
+    wire::{IndexedWire, PreProcessedWire},
+};
 
 /// Pre-process a circuit for authenticated garbling.
 ///
@@ -55,40 +61,65 @@ pub mod unifier;
 /// this is why we need to pass the input size separately. This fancy circuit is the same one that will
 /// be later used for garbling.
 pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
-    circuit: impl Fn(
-        &mut CircuitAnalyzer,
-        BinaryBundle<AnalyzerItem>,
-        BinaryBundle<AnalyzerItem>,
+    circuit: &impl Fn(
+        &mut CircuitExecutor<P>,
+        BinaryBundle<CircuitExecutorItem<P>>,
+        BinaryBundle<CircuitExecutorItem<P>>,
         &mut Channel,
-    ) -> swanky_error::Result<BinaryBundle<AnalyzerItem>>,
+    ) -> swanky_error::Result<BinaryBundle<CircuitExecutorItem<P>>>,
     and_generator: &mut AndTripleGenerator<P>,
     input_size: usize,
     channel: &mut Channel,
     rng: &mut RNG,
-) -> swanky_error::Result<(Vec<AndTriple<P>>, Vec<AuthShare<P>>, U8x16)> {
-    let mut analyzer = CircuitAnalyzer::new();
-    let dummy_wires_self: BinaryBundle<AnalyzerItem> =
-        analyzer.bin_encode(0, input_size, channel).unwrap();
-    let dummy_wires_other: BinaryBundle<AnalyzerItem> =
-        analyzer.bin_receive(input_size, channel).unwrap();
+) -> swanky_error::Result<(
+    HashMap<usize, PreProcessedWire<P>>,
+    HashMap<usize, PreProcessedWire<P>>,
+    U8x16,
+)> {
+    // First Analyze the circuit gates by simulating both parties
+    let mut circuit_analyzer: CircuitExecutor<P> = CircuitExecutor::new_analyzer();
+    circuit_analyzer.mock_circuit(&circuit, input_size, channel)?;
 
-    circuit(&mut analyzer, dummy_wires_self, dummy_wires_other, channel)?;
+    let nands = circuit_analyzer.analyzer().nands();
+    let ninputs = circuit_analyzer.analyzer().ninputs();
+    let nconstants = circuit_analyzer.analyzer().nconstants();
 
-    let nands = analyzer.nands();
-    let mut and_shares = Vec::with_capacity(nands);
-    and_generator.generate(nands, &mut and_shares, channel, rng)?;
+    // Create as many random and triples as there are AND gates
+    let mut rand_and_triples = Vec::with_capacity(nands);
+    and_generator.generate(nands, &mut rand_and_triples, channel, rng)?;
 
-    let ninputs = analyzer.ninputs();
-    let mut auth_shares = Vec::with_capacity(nands + ninputs);
+    // Create as many authenticated shares as there are AND, Constant and Input gates.
+    let mut auth_shares = Vec::with_capacity(nands + ninputs + nconstants);
     and_generator.auth_share_generator_mut().generate(
-        // We need authenticated shares for both input labels
-        // and their zero wires.
-        nands + ninputs * 2,
+        nands + ninputs,
         &mut auth_shares,
         channel,
         rng,
     )?;
-    Ok((and_shares, auth_shares, and_generator.delta()))
+    let mut wire_preprocessor = CircuitExecutor::new_preprocessing_wires(auth_shares);
+    wire_preprocessor.mock_circuit(&circuit, input_size, channel)?;
+
+    let (left_wires, right_wires, indices) = wire_preprocessor.and_gate_input_shares();
+    let mut known_triples_out = Vec::with_capacity(rand_and_triples.len());
+    and_generator.to_known_triple(
+        &rand_and_triples,
+        &left_wires,
+        &right_wires,
+        &mut known_triples_out,
+        channel,
+    );
+
+    let mut known_triple_map = HashMap::new();
+    for (index, auth_share) in indices.iter().zip(known_triples_out) {
+        let wire = PreProcessedWire::new(*index, auth_share);
+        known_triple_map.insert(wire.into_index(), wire);
+    }
+
+    Ok((
+        wire_preprocessor.into_indexed_auth_shares(),
+        known_triple_map,
+        and_generator.delta(),
+    ))
 }
 
 #[cfg(test)]
@@ -135,7 +166,7 @@ mod tests {
                 let mut rng = SwankyRng::new();
                 let mut generator_and_triples = AndTripleGenerator::<Garbler>::new(c, &mut rng)?;
                 Ok(f_preprocessing(
-                    fancy_sum,
+                    &fancy_sum,
                     &mut generator_and_triples,
                     input_size,
                     c,
@@ -146,7 +177,7 @@ mod tests {
                 let mut rng = SwankyRng::new();
                 let mut generator_and_triples = AndTripleGenerator::<Evaluator>::new(c, &mut rng)?;
                 Ok(f_preprocessing(
-                    fancy_sum,
+                    &fancy_sum,
                     &mut generator_and_triples,
                     input_size,
                     c,
