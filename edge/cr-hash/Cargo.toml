@@ -19,5 +19,5 @@ proptest.workspace = true
 rand.workspace = true
 
 [[bench]]
-name = "hash_aes"
+name = "benches"
 harness = false

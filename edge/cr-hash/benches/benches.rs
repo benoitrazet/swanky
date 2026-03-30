@@ -26,8 +26,8 @@ fn bench_tccr_hash(c: &mut Criterion) {
 }
 
 criterion_group! {
-    name = aeshash;
+    name = benches;
     config = Criterion::default();
     targets = bench_cr_hash, bench_tccr_hash
 }
-criterion_main!(aeshash);
+criterion_main!(benches);
