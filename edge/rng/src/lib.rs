@@ -1,6 +1,5 @@
+//! Random number generator based on fixed-key AES.
 #![deny(missing_docs)]
-
-//! Fixed-key AES random number generator.
 
 use rand::{CryptoRng, Error, Rng, RngCore, SeedableRng};
 use rand_core::block::{BlockRng64, BlockRngCore};
@@ -12,7 +11,7 @@ use vectoreyes::{
 mod vectorized;
 pub use vectorized::UniformIntegersUnderBound;
 
-/// Implementation of a random number generator based on fixed-key AES.
+/// Random number generator based on fixed-key AES.
 ///
 /// This uses AES in a counter-mode-esque way, but with the counter always
 /// starting at zero. When used as a PRNG this is okay [TODO: citation?].
