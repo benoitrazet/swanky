@@ -765,9 +765,9 @@ dependencies = [
  "serde_json",
  "subtle",
  "swanky-adversary",
- "swanky-aes-hash",
  "swanky-aes-rng",
  "swanky-channel",
+ "swanky-cr-hash",
  "swanky-error",
  "vectoreyes",
 ]
@@ -1791,13 +1791,13 @@ dependencies = [
  "serde_json",
  "sha2",
  "swanky-adversary",
- "swanky-aes-hash",
  "swanky-aes-rng",
  "swanky-block",
  "swanky-bytearray-utils",
  "swanky-channel",
  "swanky-channel-legacy",
  "swanky-cointoss",
+ "swanky-cr-hash",
  "swanky-error",
  "swanky-ocelot-error",
  "swanky-oprf-kkrt",
@@ -2435,16 +2435,6 @@ name = "swanky-adversary"
 version = "0.6.0"
 
 [[package]]
-name = "swanky-aes-hash"
-version = "0.6.0"
-dependencies = [
- "criterion",
- "proptest",
- "rand 0.8.5",
- "vectoreyes",
-]
-
-[[package]]
 name = "swanky-aes-rng"
 version = "0.6.0"
 dependencies = [
@@ -2562,6 +2552,16 @@ dependencies = [
  "swanky-aes-rng",
  "swanky-block",
  "swanky-channel-legacy",
+]
+
+[[package]]
+name = "swanky-cr-hash"
+version = "0.6.0"
+dependencies = [
+ "criterion",
+ "proptest",
+ "rand 0.8.5",
+ "vectoreyes",
 ]
 
 [[package]]
@@ -2791,13 +2791,13 @@ dependencies = [
  "keyed_arena",
  "rand 0.8.5",
  "swanky-adversary",
- "swanky-aes-hash",
  "swanky-aes-rng",
  "swanky-bit-matrix-transpose",
  "swanky-block",
  "swanky-bytearray-utils",
  "swanky-channel-legacy",
  "swanky-cointoss",
+ "swanky-cr-hash",
  "swanky-deprecated-bitwise-utils",
  "swanky-ocelot-error",
  "swanky-ot-chou-orlandi",

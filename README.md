@@ -39,7 +39,6 @@ have a lesser stability guarantee.
 - **`popsicle`**: A library for private set intersection
 - **`schmivitz`**: A library for zero-knowledge protocols using VOLE-in-the-head
 - **`simple-arith-circuit`**: Simple arithmetic circuit library
-- **`swanky-aes-hash`**: Correlation-robust hashing based on fixed-key AES.
 - **`swanky-aes-rng`**: A random number generator based on AES-CTR.
 - **`swanky-authenticated-bits`**: Authenticated bits, shares, and AND triples
 - **`swanky-authenticated-garbling`**: Authenticated malicious garbling in the presence of a malicious garbler and evaluator
@@ -48,6 +47,7 @@ have a lesser stability guarantee.
 - **`swanky-bytearray-utils`**: Functions for working with bits and bytearrays.
 - **`swanky-channel-legacy`**: A (legacy) channel abstraction; use `swanky-channel` for new code!
 - **`swanky-cointoss`**: A simple coin-tossing protocol.
+- **`swanky-cr-hash`**: Correlation-robust hashing.
 - **`swanky-deprecated-bitwise-utils`**: [DEPRECATED] Old bitwise utilities from ocelot
 - **`swanky-f-eq`**: Two-party functionality for checking equality of inputs in an oblivious manner.
 - **`swanky-f-rand`**: Two-party functionality for generating unbiased random values.

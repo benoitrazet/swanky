@@ -5,11 +5,11 @@ use crate::alsz::{Receiver as AlszReceiver, Sender as AlszSender};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::io::ErrorKind;
 use swanky_adversary::{Malicious, SemiHonest};
-use swanky_aes_hash::TweakableCircularCorrelationRobustHash;
 use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cointoss;
+use swanky_cr_hash::TweakableCircularCorrelationRobustHash;
 use swanky_ocelot_error::Error;
 use swanky_ot_traits::{
     CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,

@@ -1,6 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use std::hint::black_box;
-use swanky_aes_hash::{CorrelationRobustHash, TweakableCircularCorrelationRobustHash};
+use swanky_cr_hash::{CorrelationRobustHash, TweakableCircularCorrelationRobustHash};
 
 fn bench_cr_hash(c: &mut Criterion) {
     c.bench_function("CorrelationRobustHash", |b| {
