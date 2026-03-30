@@ -146,7 +146,7 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
         log::debug!("Challenge: {:?}", challenge);
         // Compute the multiplication inputs from the reconstructed
         // witness and reconstructed multiplication outputs.
-        let (xs, ys) = circuit.eval_trace(&witness, &mults);
+        let (xs, ys, output) = circuit.eval_trace(&witness, &mults);
         // Now let's validate that these multiplication inputs are correct!
         // We do this by running the protocol on these reconstructed values
         // and seeing whether we get the correct result at the end.
@@ -197,7 +197,7 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
         // that they match the output shares.
         self.output.verify_last_round(round, id)?;
         // Finally, check that the output shares are valid.
-        self.output.verify()?;
+        self.output.verify(output, id)?;
         Ok(())
     }
 }
@@ -239,7 +239,12 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
     /// Verify that the prover output is valid. This involves the following checks:
     /// 1. The `output` shares reconstruct to `0`.
     /// 2. The `fs` and `gs` shares dot product to `h`.
-    pub fn verify(&self) -> anyhow::Result<()> {
+    /// 3. The output matches the computed output from circuit evaluation.
+    pub fn verify(
+        &self,
+        computed_output: CorrectionSharing<F::PrimeField, N>,
+        exclude: usize,
+    ) -> anyhow::Result<()> {
         let output = self.output.reconstruct();
         if output != <F::PrimeField as FiniteRing>::ZERO {
             return Err(anyhow!("Output not equal to zero"));
@@ -250,6 +255,9 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
         }
         if sum != self.h.reconstruct() {
             return Err(anyhow!("Dot product not equal to `h`"));
+        }
+        if !self.output.check_equality(&computed_output, exclude) {
+            return Err(anyhow!("Output shares not equal to computed output shares"));
         }
         Ok(())
     }
@@ -451,4 +459,40 @@ mod tests {
 
     test_serialization!(serialization_f128p, F128p);
     test_serialization!(test_serialization_f64b, F64b);
+
+    // See GitHub Issue #43.
+    //
+    // Thanks to @rot256 for pointing this out!
+    #[test]
+    fn poc_check_equality_ignores_correction() {
+        use simple_arith_circuit::{Circuit, Op};
+        use swanky_field::FiniteRing;
+        use swanky_field_ff_primes::F128p;
+
+        type F = F128p;
+
+        let mut rng = AesRng::new();
+
+        // unsat. circuit: output = 1 regardless of input.
+        let circuit: Circuit<F> = Circuit::new(1, 1, vec![Op::Constant(F::ONE)]);
+        let fake_witness = vec![F::random(&mut rng)];
+
+        // honest (unsat.) proof, internally consistent, but output.reconstruct() = 1.
+        let cache_p = crate::cache::Cache::new(&circuit, K, true);
+        let mut proof = ProofSingle::<F, N>::prove(&circuit, &fake_witness, K, &cache_p, &mut rng);
+
+        // Confirm the output is non-zero.
+        assert_ne!(proof.output.output.reconstruct(), F::ZERO);
+
+        // Confirm the proof fails to verify.
+        let cache_v = crate::cache::Cache::new(&circuit, K, false);
+        assert!(proof.verify(&circuit, K, &cache_v).is_err());
+
+        // set correction so output.reconstruct() = 0.
+        let share_sum: F = proof.output.output.shares.into_iter().sum();
+        proof.output.output.correction = F::ZERO - share_sum;
+
+        // Check that proof verification continues to fail.
+        assert!(proof.verify(&circuit, K, &cache_v).is_err());
+    }
 }

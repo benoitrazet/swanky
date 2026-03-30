@@ -18,7 +18,11 @@ pub(crate) trait CircuitEvaluator<F: FiniteField, const N: usize> {
         &self,
         inputs: &[CorrectionSharing<F, N>],
         mults: &[CorrectionSharing<F, N>],
-    ) -> (Vec<CorrectionSharing<F, N>>, Vec<CorrectionSharing<F, N>>);
+    ) -> (
+        Vec<CorrectionSharing<F, N>>,
+        Vec<CorrectionSharing<F, N>>,
+        CorrectionSharing<F, N>,
+    );
 }
 
 impl<F: FiniteField, const N: usize> CircuitEvaluator<F, N> for Circuit<F> {
@@ -69,12 +73,17 @@ impl<F: FiniteField, const N: usize> CircuitEvaluator<F, N> for Circuit<F> {
     }
 
     /// Evaluate an execution trace of the circuit, where `mults` denotes the sharings of multiplication
-    /// gate outputs. The output is sharings of the _inputs_ to the multiplication gates.
+    /// gate outputs. The output is sharings of the _inputs_ to the
+    /// multiplication gates, alongside a sharing of the output.
     fn eval_trace(
         &self,
         inputs: &[CorrectionSharing<F, N>],
         mults: &[CorrectionSharing<F, N>],
-    ) -> (Vec<CorrectionSharing<F, N>>, Vec<CorrectionSharing<F, N>>) {
+    ) -> (
+        Vec<CorrectionSharing<F, N>>,
+        Vec<CorrectionSharing<F, N>>,
+        CorrectionSharing<F, N>,
+    ) {
         assert_eq!(inputs.len(), self.ninputs());
         assert_eq!(mults.len(), self.nmuls());
 
@@ -106,6 +115,7 @@ impl<F: FiniteField, const N: usize> CircuitEvaluator<F, N> for Circuit<F> {
             };
             circuit.push(res);
         }
-        (xs, ys)
+        let output = circuit.last().unwrap();
+        (xs, ys, *output)
     }
 }
