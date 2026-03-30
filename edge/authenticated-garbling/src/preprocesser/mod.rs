@@ -38,6 +38,8 @@ use swanky_channel::Channel;
 use swanky_party::GenericParty;
 use vectoreyes::U8x16;
 
+pub mod wire;
+
 /// Pre-process a circuit for authenticated garbling.
 ///
 /// Authenticated garbling utilizes pre-computed [`AndTriple`]s and [`AuthShare`]s in its "online" portion.

@@ -87,6 +87,10 @@ impl CircuitAnalyzer {
     pub fn ninputs(&self) -> usize {
         self.ninputs
     }
+    /// Return the number of constant wires of the circuit
+    pub fn nconstants(&self) -> usize {
+        self.nconstants
+    }
 }
 
 impl FancyBinary for CircuitAnalyzer {
