@@ -46,15 +46,15 @@ impl<
 
     fn _evaluator_input(&mut self, delta: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
         let len = f32::from(q).log(2.0).ceil() as u16;
-        let mut wire = Wire::zero(q);
-        let inputs = (0..len)
-            .map(|i| {
-                let zero = Wire::rand(&mut self.rng, q);
-                let one = zero.clone() + delta.clone();
-                wire += zero.clone() * (1 << i);
-                (zero.to_repr(), one.to_repr())
-            })
-            .collect::<Vec<(Block, Block)>>();
+        let mut inputs = Vec::with_capacity(len as usize);
+        let (zero, one) = Wire::constant(1, q, delta, &mut self.rng);
+        let mut wire = zero.clone();
+        inputs.push((zero.to_repr(), one.to_repr()));
+        for i in 1..len {
+            let (zero, one) = Wire::constant(1, q, delta, &mut self.rng);
+            wire += zero.clone() * (1 << i);
+            inputs.push((zero.to_repr(), one.to_repr()))
+        }
         (wire, inputs)
     }
 }

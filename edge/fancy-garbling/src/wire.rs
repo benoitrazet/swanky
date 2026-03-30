@@ -66,16 +66,6 @@ pub trait WireLabel:
     /// [`WireLabel`].
     fn from_repr(inp: U8x16, q: u16) -> Self;
 
-    /// The zero [`WireLabel`], based on the modulus `q`.
-    ///
-    /// # Panics
-    /// This panics if `q` does not align with the modulus supported by the
-    /// [`WireLabel`].
-    // TODO: This is deceiving. It is _not_ a zero wirelabel as it is called in
-    // the literature, but rather simply a zero _value_. This could lead to bugs
-    // and should be changed!
-    fn zero(q: u16) -> Self;
-
     /// A random [`WireLabel`] `mod q`, with the first digit set to `1`.
     ///
     /// # Panics
@@ -116,9 +106,21 @@ pub trait WireLabel:
     }
 
     /// Computes the hash of the [`WireLabel`].
-    #[inline(never)]
     fn hash(&self, tweak: u128) -> U8x16 {
         TweakableCircularCorrelationRobustHash::fixed_key().hash(self.to_repr(), tweak)
+    }
+
+    /// Computes a [`WireLabel`] for `x % q`, returning both the zero
+    /// [`WireLabel`] as well as the [`WireLabel`] for `x % q`.
+    fn constant<RNG: CryptoRng + RngCore>(
+        x: u16,
+        q: u16,
+        delta: &Self,
+        rng: &mut RNG,
+    ) -> (Self, Self) {
+        let zero = Self::rand(rng, q);
+        let wire = zero.clone() + delta.clone() * x;
+        (zero, wire)
     }
 }
 
@@ -263,14 +265,6 @@ impl WireLabel for AllWire {
         }
     }
 
-    fn zero(q: u16) -> Self {
-        match q {
-            2 => AllWire::Mod2(WireMod2::zero(q)),
-            3 => AllWire::Mod3(WireMod3::zero(q)),
-            _ => AllWire::ModN(WireModQ::zero(q)),
-        }
-    }
-
     fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
         match q {
             2 => AllWire::Mod2(WireMod2::rand(rng, q)),
@@ -403,38 +397,6 @@ mod tests {
     }
 
     #[test]
-    fn zero() {
-        let mut rng = thread_rng();
-        for _ in 0..1000 {
-            let q = 3 + (rng.gen_u16() % 110);
-            let z = AllWire::zero(q);
-            let ds = z.digits();
-            assert_eq!(ds, vec![0; ds.len()], "q={}", q);
-        }
-    }
-
-    #[test]
-    fn subzero() {
-        let mut rng = thread_rng();
-        for _ in 0..1000 {
-            let q = rng.gen_modulus();
-            let x = AllWire::rand(&mut rng, q);
-            let z = AllWire::zero(q);
-            assert_eq!(x.clone() - x, z);
-        }
-    }
-
-    #[test]
-    fn pluszero() {
-        let mut rng = thread_rng();
-        for _ in 0..1000 {
-            let q = rng.gen_modulus();
-            let x = AllWire::rand(&mut rng, q);
-            assert_eq!(x.clone() + AllWire::zero(q), x);
-        }
-    }
-
-    #[test]
     #[allow(clippy::erasing_op)]
     fn arithmetic() {
         let mut rng = thread_rng();
@@ -442,15 +404,15 @@ mod tests {
             let q = rng.gen_modulus();
             let x = AllWire::rand(&mut rng, q);
             let y = AllWire::rand(&mut rng, q);
-            assert_eq!(x.clone() * 0, AllWire::zero(q));
-            assert_eq!(x.clone() * q, AllWire::zero(q));
+            assert_eq!(x.clone() * 0, x.clone() - x.clone());
+            assert_eq!(x.clone() * q, x.clone() - x.clone());
             assert_eq!(x.clone() + x.clone(), x.clone() * 2);
             assert_eq!(x.clone() + x.clone() + x.clone(), x.clone() * 3);
             assert_eq!(-(-x.clone()), x);
             if q == 2 {
                 assert_eq!(x.clone() + y.clone(), x.clone() - y.clone());
             } else {
-                assert_eq!(x.clone() + -x.clone(), AllWire::zero(q), "q={}", q);
+                assert_eq!(x.clone() + -x.clone(), x.clone() - x.clone());
                 assert_eq!(x.clone() + -y.clone(), x.clone() - y.clone());
             }
             let mut w = x.clone();
