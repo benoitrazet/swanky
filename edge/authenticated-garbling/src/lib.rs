@@ -4,7 +4,7 @@
 use swanky_party::party_system;
 pub mod evaluator;
 pub mod garbler;
-pub mod preprocess;
+pub mod preprocesser;
 pub mod wire;
 
 party_system! {
