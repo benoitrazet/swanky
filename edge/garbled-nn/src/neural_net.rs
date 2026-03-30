@@ -20,11 +20,11 @@ use std::{
     path::Path,
     time::{Duration, Instant},
 };
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, swanky_error};
 use swanky_ot_alsz_kos::alsz;
+use swanky_rng::AesRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 /// Input encoder for a garbled neural network.
@@ -1334,7 +1334,7 @@ mod tests {
     use fancy_garbling::WireMod2;
     use ndarray::Array3;
     use std::path::Path;
-    use swanky_aes_rng::AesRng;
+    use swanky_rng::AesRng;
 
     static DINN_30_DIR: &str = "neural_nets/DINN_30";
     static DINN_30_Bitwidths: [usize; 3] = [9; 3];

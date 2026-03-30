@@ -176,12 +176,12 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_field::FiniteField as FF;
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F2, F128b};
     use swanky_field_f61p::F61p;
+    use swanky_rng::AesRng;
 
     fn test_copee_<FE: FF>(len: usize) {
         let mut rng = AesRng::new();

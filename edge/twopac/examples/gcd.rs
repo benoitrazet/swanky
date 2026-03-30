@@ -7,9 +7,9 @@ use fancy_garbling::{
 };
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
-use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_rng::AesRng;
 
 use std::cmp::{Ordering, max};
 

@@ -8,7 +8,6 @@ use std::fmt::Debug;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, ensure, swanky_error};
 use swanky_field::{FiniteField, IsSubFieldOf};
@@ -16,6 +15,7 @@ use swanky_party::{
     either::PartyEither,
     ty_eq::{EqualityProposition, Witness},
 };
+use swanky_rng::AesRng;
 use swanky_svole_wykw::{LpnParams, Receiver, Sender};
 
 const SLEEP_TIME: u64 = 1;
@@ -437,9 +437,9 @@ mod test {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_party::{either::PartyEither, ty_eq::Witness};
+    use swanky_rng::AesRng;
 
     fn produce(s: &SvoleAtomic<Verifier, u32, u32>, v: u32) {
         loop {

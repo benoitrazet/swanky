@@ -6,8 +6,8 @@ use fancy_garbling::{
     util::RngExt,
 };
 use std::time::Duration;
-use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
+use swanky_rng::AesRng;
 
 fn bench_garble<F>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
 where

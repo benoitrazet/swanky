@@ -3,12 +3,12 @@ use std::slice::Iter;
 
 use criterion::{Criterion, criterion_group, criterion_main, measurement::WallTime};
 use rand::Rng;
-use swanky_aes_rng::AesRng;
 use swanky_authenticated_bits::and_triples::{AndTriple, AndTripleGenerator};
 use swanky_authenticated_bits::authbits::{AuthBit, AuthBitGenerator};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_field_binary::F2;
 use swanky_party::{either::PartyEither, party_system, private::PartyPrivate, ty_eq::Witness};
+use swanky_rng::AesRng;
 
 party_system! {
     mod ps {
@@ -31,8 +31,8 @@ fn authbit_generators(
 
 fn bench_auth_bits(c: &mut Criterion<WallTime>) {
     const COUNT: usize = 100_000;
-    let mut prover_rng = swanky_aes_rng::AesRng::new();
-    let mut verifier_rng = swanky_aes_rng::AesRng::new();
+    let mut prover_rng = swanky_rng::AesRng::new();
+    let mut verifier_rng = swanky_rng::AesRng::new();
     let bits: Vec<F2> = (0..COUNT).map(|_| prover_rng.r#gen::<F2>()).collect();
 
     let (mut generator_a, mut generator_b) = authbit_generators(&mut prover_rng, &mut verifier_rng);
@@ -67,8 +67,8 @@ fn bench_auth_bits(c: &mut Criterion<WallTime>) {
 
 fn bench_auth_bits_open(c: &mut Criterion<WallTime>) {
     const COUNT: usize = 100_000;
-    let mut prover_rng = swanky_aes_rng::AesRng::new();
-    let mut verifier_rng = swanky_aes_rng::AesRng::new();
+    let mut prover_rng = swanky_rng::AesRng::new();
+    let mut verifier_rng = swanky_rng::AesRng::new();
     let bits: Vec<F2> = (0..COUNT).map(|_| prover_rng.r#gen::<F2>()).collect();
 
     let (mut generator_a, mut generator_b) = authbit_generators(&mut prover_rng, &mut verifier_rng);
@@ -112,8 +112,8 @@ fn bench_auth_bits_open(c: &mut Criterion<WallTime>) {
 
 fn bench_auth_shares(c: &mut Criterion<WallTime>) {
     const COUNT: usize = 100_000;
-    let mut prover_rng = swanky_aes_rng::AesRng::new();
-    let mut verifier_rng = swanky_aes_rng::AesRng::new();
+    let mut prover_rng = swanky_rng::AesRng::new();
+    let mut verifier_rng = swanky_rng::AesRng::new();
 
     let (mut generator_a, mut generator_b) = swanky_channel::local::local_channel_pair(
         |c| AuthShareGenerator::new(c, &mut prover_rng),
@@ -144,8 +144,8 @@ fn bench_auth_shares(c: &mut Criterion<WallTime>) {
 
 fn bench_and_triples(c: &mut Criterion<WallTime>) {
     const COUNT: usize = 100_000;
-    let mut prover_rng = swanky_aes_rng::AesRng::new();
-    let mut verifier_rng = swanky_aes_rng::AesRng::new();
+    let mut prover_rng = swanky_rng::AesRng::new();
+    let mut verifier_rng = swanky_rng::AesRng::new();
 
     let (mut generator_a, mut generator_b) = swanky_channel::local::local_channel_pair(
         |c| AndTripleGenerator::new(c, &mut prover_rng),
@@ -176,8 +176,8 @@ fn bench_and_triples(c: &mut Criterion<WallTime>) {
 
 fn bench_fix_and_triples(c: &mut Criterion<WallTime>) {
     const COUNT: usize = 100_000;
-    let mut prover_rng = swanky_aes_rng::AesRng::new();
-    let mut verifier_rng = swanky_aes_rng::AesRng::new();
+    let mut prover_rng = swanky_rng::AesRng::new();
+    let mut verifier_rng = swanky_rng::AesRng::new();
 
     let (mut generator_a, mut generator_b) = swanky_channel::local::local_channel_pair(
         |c| AndTripleGenerator::new(c, &mut prover_rng),

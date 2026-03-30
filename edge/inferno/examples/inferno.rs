@@ -4,9 +4,9 @@ use rand::SeedableRng;
 use simple_arith_circuit::Circuit;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use swanky_aes_rng::AesRng;
 use swanky_field::FiniteField;
 use swanky_field_binary::F64b;
+use swanky_rng::AesRng;
 
 const N: usize = 16;
 const K: usize = 8;

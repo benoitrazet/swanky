@@ -41,7 +41,6 @@ use crate::{
 use bytemuck::TransparentWrapper;
 use rand::{CryptoRng, Rng, SeedableRng, seq::SliceRandom};
 use std::io::{Cursor, Seek};
-use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
@@ -49,6 +48,7 @@ use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer};
 use swanky_party::{
     GenericParty, GenericWhichParty, Party1, either::PartyEither, private::PartyPrivate,
 };
+use swanky_rng::AesRng;
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 use vectoreyes::U8x16;
 
@@ -416,8 +416,8 @@ impl<P: GenericParty> AndTripleGenerator<P> {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    use swanky_aes_rng::AesRng;
     use swanky_party::party_system;
+    use swanky_rng::AesRng;
 
     party_system! {
         mod ps {

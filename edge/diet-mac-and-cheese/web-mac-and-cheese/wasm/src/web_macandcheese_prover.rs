@@ -11,9 +11,9 @@ use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
 use std::collections::VecDeque;
 use std::io::Cursor;
 use std::panic;
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::TrackChannel;
 use swanky_field_binary::{F2, F40b};
+use swanky_rng::AesRng;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]

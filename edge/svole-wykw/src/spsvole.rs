@@ -10,7 +10,6 @@ use rand::{
     distributions::{Distribution, Uniform},
 };
 use swanky_adversary::Malicious;
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_bytearray_utils::unpack_bits;
 use swanky_channel_legacy::AbstractChannel;
@@ -18,6 +17,7 @@ use swanky_field::{Degree, FiniteField as FF, FiniteRing};
 use swanky_ocelot_error::Error;
 use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_rng::AesRng;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 pub(super) struct Sender<OT: OtReceiver + Malicious, FE: FF> {
@@ -367,11 +367,11 @@ mod test {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_field::{Degree, FiniteField as FF};
     use swanky_field_binary::{F40b, F128b};
     use swanky_field_f61p::F61p;
+    use swanky_rng::AesRng;
 
     fn test_spsvole_<FE: FF>(cols: usize, weight: usize) {
         let r = Degree::<FE>::USIZE;

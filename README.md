@@ -40,7 +40,6 @@ have a lesser stability guarantee.
 - **`schmivitz`**: A library for zero-knowledge protocols using VOLE-in-the-head
 - **`simple-arith-circuit`**: Simple arithmetic circuit library
 - **`swanky-aes-hash`**: Correlation-robust hashing based on fixed-key AES.
-- **`swanky-aes-rng`**: A random number generator based on AES-CTR.
 - **`swanky-authenticated-bits`**: Authenticated bits, shares, and AND triples
 - **`swanky-authenticated-garbling`**: Authenticated malicious garbling in the presence of a malicious garbler and evaluator
 - **`swanky-bit-matrix-transpose`**: Transpose a bit matrix
@@ -71,6 +70,7 @@ have a lesser stability guarantee.
 - **`swanky-ot-test`**: Testing utilities for oblivious transfer protocols
 - **`swanky-ot-traits`**: Base traits for Obliivious Transfer protocols
 - **`swanky-polynomial`**: Support for various representations of polynomials over finite fields
+- **`swanky-rng`**: A fast random number generator based on AES-CTR.
 - **`swanky-sieve-ir-api`**: A library providing a Rust API for defining zero-knowledge circuits.
 - **`swanky-sieve-ir-codegen`**: A library providing macros to statically parse SIEVE IR zero-knowledge circuits.
 - **`swanky-svole-wykw`**: An implementation of the WYKW svole protocol

@@ -1,5 +1,4 @@
 use std::iter;
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::Result;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
@@ -7,6 +6,7 @@ use swanky_party::{
     private::{PartyPrivate, PartyPrivateCopy},
     ty_eq::{EqualityProposition, Witness},
 };
+use swanky_rng::AesRng;
 
 use crate::{
     DietMacAndCheese,

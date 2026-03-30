@@ -1012,8 +1012,8 @@ mod tests {
     use crate::utils::rand_u64_vec;
     use rand::{prelude::SliceRandom, thread_rng};
     use std::collections::HashMap;
-    use swanky_aes_rng::AesRng;
     use swanky_block::Block512;
+    use swanky_rng::AesRng;
 
     const ITEM_SIZE: usize = 8;
 

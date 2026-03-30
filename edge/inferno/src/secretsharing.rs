@@ -492,11 +492,11 @@ impl<F: FiniteField, const N: usize> From<SecretSharing<F, N>> for CorrectionSha
 mod tests {
     use super::*;
     use rand::SeedableRng;
-    use swanky_aes_rng::AesRng;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
     use swanky_field_ff_primes::F128p;
     use swanky_polynomial::Polynomial;
+    use swanky_rng::AesRng;
 
     const N: usize = 16;
 

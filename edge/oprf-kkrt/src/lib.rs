@@ -11,13 +11,13 @@ use prc::PseudorandomCode;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
-use swanky_aes_rng::AesRng;
 use swanky_block::{Block, Block512};
 use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_ocelot_error::Error;
 use swanky_oprf_traits::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender};
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_rng::AesRng;
 
 /// KKRT oblivious PRF sender.
 pub struct Sender<OT: OtReceiver + SemiHonest = swanky_ot_alsz_kos::alsz::Receiver> {
@@ -219,8 +219,8 @@ mod tests {
         os::unix::net::UnixStream,
         sync::{Arc, Mutex},
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
+    use swanky_rng::AesRng;
 
     #[test]
     fn test_seed() {

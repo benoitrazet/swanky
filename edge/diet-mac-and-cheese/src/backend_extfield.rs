@@ -18,12 +18,12 @@ use crate::{
     svole_trait::SvoleT,
 };
 use generic_array::GenericArray;
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::Result;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F40b};
 use swanky_party::private::PartyPrivate;
+use swanky_rng::AesRng;
 
 pub(crate) struct DietMacAndCheeseExtField<
     P: Party,
@@ -363,10 +363,10 @@ mod test {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_error::{ErrorKind, WrapErr};
     use swanky_field_binary::{F2, F40b};
+    use swanky_rng::AesRng;
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     #[test]

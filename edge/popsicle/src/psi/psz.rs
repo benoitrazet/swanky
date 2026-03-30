@@ -282,8 +282,8 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
+    use swanky_rng::AesRng;
 
     const ITEM_SIZE: usize = 8;
     const SET_SIZE: usize = 1 << 16;

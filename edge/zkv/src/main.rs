@@ -5,9 +5,9 @@ use simple_arith_circuit::{Circuit, builder};
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use swanky_aes_rng::AesRng;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F64b};
+use swanky_rng::AesRng;
 
 const N: usize = 16; // Number of MPC parties
 const K: usize = 8; // Compression factor

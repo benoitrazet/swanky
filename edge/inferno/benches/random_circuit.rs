@@ -2,10 +2,10 @@ use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_ma
 use inferno::Proof;
 use std::hint::black_box;
 use std::time::Duration;
-use swanky_aes_rng::AesRng;
 use swanky_field::FiniteField;
 use swanky_field_binary::F64b;
 use swanky_field_ff_primes::F128p;
+use swanky_rng::AesRng;
 
 const N: usize = 16;
 

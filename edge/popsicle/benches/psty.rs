@@ -3,7 +3,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use popsicle::psty::{Receiver, Sender};
 use std::time::Duration;
-use swanky_aes_rng::AesRng;
+use swanky_rng::AesRng;
 
 const SIZE: usize = 15;
 

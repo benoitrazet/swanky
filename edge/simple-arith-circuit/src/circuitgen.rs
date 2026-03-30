@@ -242,8 +242,8 @@ pub fn arbitrary_zero_circuit<F: PrimeFiniteField>(
 mod tests {
     use super::*;
     use rand::SeedableRng;
-    use swanky_aes_rng::AesRng;
     use swanky_block::Block;
+    use swanky_rng::AesRng;
 
     type TestField = swanky_field_ff_primes::F2e19x3e26;
 

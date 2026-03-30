@@ -2,7 +2,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use rand::distributions::{Distribution, Uniform};
 use rand_core::RngCore;
 use std::hint::black_box;
-use swanky_aes_rng::{AesRng, UniformIntegersUnderBound};
+use swanky_rng::{AesRng, UniformIntegersUnderBound};
 
 mod measurement {
     use criterion::measurement::WallTime;

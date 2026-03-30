@@ -12,10 +12,10 @@ use blake3::Hash;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use simple_arith_circuit::Circuit;
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_field::FiniteField;
 use swanky_field::FiniteRing;
+use swanky_rng::AesRng;
 
 /// The proof for a single execution of the protocol. `N` denotes
 /// the number of participants in the MPC.

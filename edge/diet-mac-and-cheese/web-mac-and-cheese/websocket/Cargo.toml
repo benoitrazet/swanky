@@ -26,7 +26,7 @@ tungstenite.workspace = true
 
 diet-mac-and-cheese.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
-swanky-aes-rng.workspace = true
+swanky-rng.workspace = true
 swanky-channel-legacy.workspace = true
 swanky-error.workspace = true
 swanky-field-binary.workspace = true

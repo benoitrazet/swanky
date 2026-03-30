@@ -170,7 +170,7 @@ impl BinaryCircuit {
 
 #[cfg(test)]
 mod tests {
-    use swanky_aes_rng::AesRng;
+    use swanky_rng::AesRng;
 
     use crate::{
         WireMod2,

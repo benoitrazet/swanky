@@ -7,8 +7,8 @@ use std::{
     os::unix::net::UnixStream,
     time::Duration,
 };
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::Channel;
+use swanky_rng::AesRng;
 
 const SIZE: usize = 15;
 

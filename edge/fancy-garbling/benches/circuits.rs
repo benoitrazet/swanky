@@ -3,7 +3,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{AllWire, WireMod2, circuit::BinaryCircuit, classic::GarbledCircuit};
 use std::{fs::File, io::BufReader, time::Duration};
-use swanky_aes_rng::AesRng;
+use swanky_rng::AesRng;
 
 fn circuit(fname: &str) -> BinaryCircuit {
     // println!("{}", fname);

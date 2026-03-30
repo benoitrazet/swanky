@@ -5,7 +5,6 @@ use keyed_arena::{AllocationKey, KeyedArena};
 use rand::prelude::Distribution;
 use rand::{CryptoRng, Rng, SeedableRng, distributions::Uniform};
 use std::{marker::PhantomData, ops::Deref};
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, WrapErr};
@@ -15,6 +14,7 @@ use swanky_ot_alsz_kos::explicit_round::{
     KosReceiver, KosReceiverStage2, KosSender, KosSenderStage2,
 };
 use swanky_party::ty_eq::Witness;
+use swanky_rng::AesRng;
 use swanky_serialization::CanonicalSerialize;
 use swanky_svole_wykw::ggm_utils::*;
 

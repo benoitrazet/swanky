@@ -20,10 +20,10 @@ use std::marker::PhantomData;
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::time::Instant;
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::{Channel, SyncChannel};
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_field_binary::{F2, F40b};
+use swanky_rng::AesRng;
 
 #[cfg(feature = "jemalloc")]
 use jemallocator::Jemalloc;

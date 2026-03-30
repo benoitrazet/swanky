@@ -356,11 +356,11 @@ mod tests {
     };
     use mac_n_cheese_sieve_parser::Number;
     use rand::Rng;
-    use swanky_aes_rng::AesRng;
     use swanky_field::FiniteRing;
     use swanky_field::PrimeFiniteField;
     use swanky_field_f61p::F61p;
     use swanky_polynomial::Polynomial;
+    use swanky_rng::AesRng;
 
     fn convert_poly<F: PrimeFiniteField>(p: Polynomial<F>) -> Vec<Number> {
         let mut coeffs = p.coefficients;

@@ -12,9 +12,9 @@ use std::{
     io::{Read, Write},
     marker::PhantomData,
 };
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, ResultExt, WrapErr};
+use swanky_rng::AesRng;
 use swanky_svole_wykw::base_svole::{Receiver as BaseReceiver, Sender as BaseSender};
 
 pub struct VoleContext<P: Party, T: MacTypes> {

@@ -11,13 +11,13 @@ use mac_n_cheese_vole::party::{Party, Prover, Verifier, WhichParty};
 use mac_n_cheese_vole::specialization::SmallBinaryFieldSpecialization;
 use parking_lot::Mutex;
 use rand::SeedableRng;
-use swanky_aes_rng::AesRng;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
 use swanky_field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, SmallBinaryField};
 use swanky_party::either::PartyEitherCopy;
 use swanky_party::ty_eq::{EqualityProposition, Witness};
+use swanky_rng::AesRng;
 use swanky_serialization::CanonicalSerialize;
 
 use std::io::Read;
@@ -94,8 +94,8 @@ mod vope {
             specialization::FiniteFieldSpecialization,
         };
         use rand::SeedableRng;
-        use swanky_aes_rng::AesRng;
         use swanky_party::ty_eq::Witness;
+        use swanky_rng::AesRng;
 
         use super::*;
 
@@ -299,7 +299,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
 
     fn initialize(
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut swanky_aes_rng::AesRng,
+        _rng: &mut swanky_rng::AesRng,
         vc: crate::base_vole::VoleContexts<P>,
         num_runner_threads: usize,
     ) -> swanky_error::Result<Self> {
@@ -316,7 +316,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
     fn finalize(
         self,
         conn: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut swanky_aes_rng::AesRng,
+        _rng: &mut swanky_rng::AesRng,
     ) -> swanky_error::Result<()> {
         let mut acu = AssertMultiplyState::<P, T::TF>::default();
         for state in self.state.into_iter() {

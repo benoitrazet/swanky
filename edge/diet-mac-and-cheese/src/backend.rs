@@ -7,11 +7,11 @@ use crate::party::{Party, Prover, WhichParty};
 use crate::svole_trait::SvoleT;
 use crate::svole_trait::field_name;
 use log::{debug, info, warn};
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::private::PartyPrivateCopy;
+use swanky_rng::AesRng;
 use swanky_svole_wykw::LpnParams;
 
 // Some design decisions:
@@ -496,12 +496,12 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_field::{FiniteField, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b};
     use swanky_field_f61p::F61p;
     use swanky_party::ty_eq::Witness;
+    use swanky_rng::AesRng;
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     fn test<V: IsSubFieldOf<T>, T: FiniteField>()

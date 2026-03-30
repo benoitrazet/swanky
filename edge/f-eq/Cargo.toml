@@ -13,7 +13,7 @@ workspace = true
 [dependencies]
 swanky-party.workspace = true
 swanky-channel.workspace = true
-swanky-aes-rng.workspace = true
+swanky-rng.workspace = true
 swanky-error.workspace = true
 sha2.workspace = true
 rand.workspace = true

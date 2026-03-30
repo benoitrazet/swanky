@@ -1,5 +1,5 @@
-use swanky_aes_rng::AesRng;
 use swanky_field::FiniteField;
+use swanky_rng::AesRng;
 
 use crate::{
     cache::Cache,

@@ -6,10 +6,10 @@ use std::{
     os::unix::net::UnixStream,
     time::Duration,
 };
-use swanky_aes_rng::AesRng;
 use swanky_block::{Block, Block512};
 use swanky_channel_legacy::Channel;
 use swanky_oprf_traits::{Receiver as OprfReceiver, Sender as OprfSender};
+use swanky_rng::AesRng;
 
 type OpprfSender = swanky_oprf_kmprt::Sender;
 type OpprfReceiver = swanky_oprf_kmprt::Receiver;

@@ -9,8 +9,8 @@ mod tests {
     };
 
     use std::collections::HashSet;
-    use swanky_aes_rng::AesRng;
     use swanky_block::Block512;
+    use swanky_rng::AesRng;
 
     // Run the base psi up to the opprf exchange
     fn psty_up_to_opprf(

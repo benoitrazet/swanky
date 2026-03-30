@@ -2,8 +2,8 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::WireMod2;
 use ndarray::Array3;
 use std::{hint::black_box, path::Path, time::Duration};
-use swanky_aes_rng::AesRng;
 use swanky_garbled_nn::{NeuralNet, io::read_tests};
+use swanky_rng::AesRng;
 
 fn get_nn_and_test(dir: &Path) -> (NeuralNet, Array3<i64>) {
     // Set the base path to `$CARGO_MANIFEST_DIR` for CI.

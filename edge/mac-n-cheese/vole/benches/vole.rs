@@ -2,7 +2,6 @@ use keyed_arena::KeyedArena;
 use rand::SeedableRng;
 use std::str::FromStr;
 use std::{any::type_name, hint::black_box, time::Instant};
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{FiniteField, IsSubFieldOf};
@@ -10,6 +9,7 @@ use swanky_field_binary::{F2, F56b, F63b};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::F128p;
 use swanky_party::ty_eq::Witness;
+use swanky_rng::AesRng;
 
 use mac_n_cheese_vole::{
     mac::Mac,

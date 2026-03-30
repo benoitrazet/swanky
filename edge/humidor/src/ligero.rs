@@ -68,10 +68,10 @@ use ndarray::{Array1, Array2, ArrayView1, Axis, concatenate};
 use rand::{CryptoRng, Rng, SeedableRng};
 use sprs::{CsMat, TriMat};
 use std::ops::Range;
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_field::FiniteField;
 use swanky_field_fft::FieldForFFT;
+use swanky_rng::AesRng;
 #[cfg(test)]
 use swanky_serialization::CanonicalSerialize;
 

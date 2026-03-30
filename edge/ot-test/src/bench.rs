@@ -9,12 +9,12 @@ use std::{
 };
 
 use criterion::Criterion;
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::Channel;
 use swanky_ot_traits::{
     CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver, Sender,
 };
+use swanky_rng::AesRng;
 
 fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()

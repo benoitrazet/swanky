@@ -7,10 +7,10 @@ use super::{
 };
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
 use swanky_ocelot_error::Error;
+use swanky_rng::AesRng;
 
 /// The base VOLE sender
 pub struct Sender<FE: FF> {
@@ -137,11 +137,11 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_field::FiniteField as FF;
     use swanky_field_binary::{F40b, F128b};
     use swanky_field_f61p::F61p;
+    use swanky_rng::AesRng;
 
     fn test_base_svole<FE: FF>(len: usize) {
         let (sender, receiver) = UnixStream::pair().unwrap();

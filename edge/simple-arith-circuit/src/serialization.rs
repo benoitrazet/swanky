@@ -35,8 +35,8 @@ mod tests {
     use crate::{Circuit, circuitgen::random_circuit};
     use proptest::prelude::*;
     use rand::{SeedableRng, distributions::Uniform, prelude::Distribution};
-    use swanky_aes_rng::AesRng;
     use swanky_block::Block;
+    use swanky_rng::AesRng;
 
     fn any_seed() -> impl Strategy<Value = Block> {
         any::<u128>().prop_map(Block::from)

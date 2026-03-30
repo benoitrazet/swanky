@@ -4,9 +4,9 @@ use std::{
     os::unix::net::UnixStream,
     time::Instant,
 };
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field_binary::{F2, F40b};
+use swanky_rng::AesRng;
 use swanky_svole_wykw::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use swanky_svole_wykw::{Receiver, Sender};
 

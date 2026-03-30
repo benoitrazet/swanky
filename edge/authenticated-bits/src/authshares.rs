@@ -380,8 +380,8 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
     use rand::SeedableRng;
-    use swanky_aes_rng::AesRng;
     use swanky_party::party_system;
+    use swanky_rng::AesRng;
 
     party_system! {
         mod ps {

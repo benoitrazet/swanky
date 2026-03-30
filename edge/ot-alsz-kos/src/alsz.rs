@@ -7,7 +7,6 @@ use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
 use swanky_aes_hash::CorrelationRobustHash;
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
@@ -16,6 +15,7 @@ use swanky_ot_traits::{
     CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
     Receiver as OtReceiver, Sender as OtSender,
 };
+use swanky_rng::AesRng;
 
 /// Oblivious transfer sender.
 pub struct Sender<OT: OtReceiver<Msg = Block> + SemiHonest = swanky_ot_chou_orlandi::Receiver> {

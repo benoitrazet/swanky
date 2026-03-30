@@ -441,9 +441,9 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
     use rand::SeedableRng;
-    use swanky_aes_rng::AesRng;
     use swanky_field::FiniteRing;
     use swanky_party::{party_system, ty_eq::Witness};
+    use swanky_rng::AesRng;
 
     party_system! {
         mod ps {

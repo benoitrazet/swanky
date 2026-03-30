@@ -669,7 +669,6 @@ dependencies = [
  "rustc-hash 2.1.1",
  "serde",
  "subtle",
- "swanky-aes-rng",
  "swanky-block",
  "swanky-channel-legacy",
  "swanky-error",
@@ -680,6 +679,7 @@ dependencies = [
  "swanky-flatbuffer-build",
  "swanky-party",
  "swanky-polynomial",
+ "swanky-rng",
  "swanky-serialization",
  "swanky-svole-wykw",
  "toml",
@@ -766,9 +766,9 @@ dependencies = [
  "subtle",
  "swanky-adversary",
  "swanky-aes-hash",
- "swanky-aes-rng",
  "swanky-channel",
  "swanky-error",
+ "swanky-rng",
  "vectoreyes",
 ]
 
@@ -1035,12 +1035,12 @@ dependencies = [
  "simple-arith-circuit",
  "sprs",
  "subtle",
- "swanky-aes-rng",
  "swanky-block",
  "swanky-field",
  "swanky-field-ff-primes",
  "swanky-field-fft",
  "swanky-polynomial",
+ "swanky-rng",
  "swanky-serialization",
 ]
 
@@ -1091,12 +1091,12 @@ dependencies = [
  "serde_json",
  "simple-arith-circuit",
  "snafu",
- "swanky-aes-rng",
  "swanky-block",
  "swanky-field",
  "swanky-field-binary",
  "swanky-field-ff-primes",
  "swanky-polynomial",
+ "swanky-rng",
  "swanky-serialization",
 ]
 
@@ -1430,13 +1430,13 @@ dependencies = [
  "smallvec",
  "snmalloc-rs",
  "subtle",
- "swanky-aes-rng",
  "swanky-block",
  "swanky-channel-legacy",
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
  "swanky-party",
+ "swanky-rng",
  "swanky-serialization",
  "swanky-svole-wykw",
  "vectoreyes",
@@ -1467,7 +1467,6 @@ dependencies = [
  "keyed_arena",
  "mimalloc",
  "rand 0.8.5",
- "swanky-aes-rng",
  "swanky-block",
  "swanky-channel-legacy",
  "swanky-cointoss",
@@ -1478,6 +1477,7 @@ dependencies = [
  "swanky-field-ff-primes",
  "swanky-ot-alsz-kos",
  "swanky-party",
+ "swanky-rng",
  "swanky-serialization",
  "swanky-svole-wykw",
  "vectoreyes",
@@ -1792,7 +1792,6 @@ dependencies = [
  "sha2",
  "swanky-adversary",
  "swanky-aes-hash",
- "swanky-aes-rng",
  "swanky-block",
  "swanky-bytearray-utils",
  "swanky-channel",
@@ -1804,6 +1803,7 @@ dependencies = [
  "swanky-oprf-kmprt",
  "swanky-oprf-traits",
  "swanky-ot-alsz-kos",
+ "swanky-rng",
  "swanky-twopac",
  "vectoreyes",
 ]
@@ -2337,12 +2337,12 @@ dependencies = [
  "proptest",
  "rand 0.8.5",
  "serde",
- "swanky-aes-rng",
  "swanky-block",
  "swanky-field",
  "swanky-field-binary",
  "swanky-field-f61p",
  "swanky-field-ff-primes",
+ "swanky-rng",
  "tempfile",
 ]
 
@@ -2445,18 +2445,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-aes-rng"
-version = "0.6.0"
-dependencies = [
- "bytemuck",
- "criterion",
- "proptest",
- "rand 0.8.5",
- "rand_core 0.6.4",
- "vectoreyes",
-]
-
-[[package]]
 name = "swanky-authenticated-bits"
 version = "0.6.0"
 dependencies = [
@@ -2467,7 +2455,6 @@ dependencies = [
  "proptest",
  "rand 0.8.5",
  "swanky-adversary",
- "swanky-aes-rng",
  "swanky-channel",
  "swanky-cointoss",
  "swanky-error",
@@ -2478,6 +2465,7 @@ dependencies = [
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",
  "swanky-party",
+ "swanky-rng",
  "swanky-serialization",
  "vectoreyes",
 ]
@@ -2491,7 +2479,6 @@ dependencies = [
  "proptest",
  "rand 0.8.5",
  "swanky-adversary",
- "swanky-aes-rng",
  "swanky-authenticated-bits",
  "swanky-channel",
  "swanky-error",
@@ -2499,6 +2486,7 @@ dependencies = [
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",
  "swanky-party",
+ "swanky-rng",
  "vectoreyes",
 ]
 
@@ -2518,7 +2506,7 @@ dependencies = [
  "criterion",
  "rand 0.8.5",
  "serde",
- "swanky-aes-rng",
+ "swanky-rng",
  "vectoreyes",
 ]
 
@@ -2559,9 +2547,9 @@ version = "0.6.0"
 dependencies = [
  "rand 0.8.5",
  "rand_core 0.6.4",
- "swanky-aes-rng",
  "swanky-block",
  "swanky-channel-legacy",
+ "swanky-rng",
 ]
 
 [[package]]
@@ -2583,10 +2571,10 @@ dependencies = [
  "proptest",
  "rand 0.8.5",
  "sha2",
- "swanky-aes-rng",
  "swanky-channel",
  "swanky-error",
  "swanky-party",
+ "swanky-rng",
 ]
 
 [[package]]
@@ -2597,11 +2585,11 @@ dependencies = [
  "criterion",
  "proptest",
  "rand 0.8.5",
- "swanky-aes-rng",
  "swanky-channel",
  "swanky-error",
  "swanky-malicious-hooks",
  "swanky-party",
+ "swanky-rng",
  "swanky-serialization",
  "vectoreyes",
 ]
@@ -2716,11 +2704,11 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
- "swanky-aes-rng",
  "swanky-block",
  "swanky-channel",
  "swanky-error",
  "swanky-ot-alsz-kos",
+ "swanky-rng",
  "swanky-twopac",
 ]
 
@@ -2741,7 +2729,6 @@ version = "0.6.0"
 dependencies = [
  "rand 0.8.5",
  "swanky-adversary",
- "swanky-aes-rng",
  "swanky-bit-matrix-transpose",
  "swanky-block",
  "swanky-bytearray-utils",
@@ -2752,6 +2739,7 @@ dependencies = [
  "swanky-oprf-traits",
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",
+ "swanky-rng",
  "vectoreyes",
 ]
 
@@ -2763,12 +2751,12 @@ dependencies = [
  "proptest",
  "rand 0.8.5",
  "swanky-adversary",
- "swanky-aes-rng",
  "swanky-block",
  "swanky-channel-legacy",
  "swanky-ocelot-error",
  "swanky-oprf-kkrt",
  "swanky-oprf-traits",
+ "swanky-rng",
  "vectoreyes",
 ]
 
@@ -2792,7 +2780,6 @@ dependencies = [
  "rand 0.8.5",
  "swanky-adversary",
  "swanky-aes-hash",
- "swanky-aes-rng",
  "swanky-bit-matrix-transpose",
  "swanky-block",
  "swanky-bytearray-utils",
@@ -2803,6 +2790,7 @@ dependencies = [
  "swanky-ot-chou-orlandi",
  "swanky-ot-test",
  "swanky-ot-traits",
+ "swanky-rng",
  "vectoreyes",
 ]
 
@@ -2857,10 +2845,10 @@ version = "0.6.0"
 dependencies = [
  "criterion",
  "rand 0.8.5",
- "swanky-aes-rng",
  "swanky-block",
  "swanky-channel-legacy",
  "swanky-ot-traits",
+ "swanky-rng",
 ]
 
 [[package]]
@@ -2887,6 +2875,18 @@ dependencies = [
  "rand 0.8.5",
  "subtle",
  "swanky-field",
+]
+
+[[package]]
+name = "swanky-rng"
+version = "0.6.0"
+dependencies = [
+ "bytemuck",
+ "criterion",
+ "proptest",
+ "rand 0.8.5",
+ "rand_core 0.6.4",
+ "vectoreyes",
 ]
 
 [[package]]
@@ -2936,7 +2936,6 @@ dependencies = [
  "rand 0.8.5",
  "subtle",
  "swanky-adversary",
- "swanky-aes-rng",
  "swanky-block",
  "swanky-bytearray-utils",
  "swanky-channel-legacy",
@@ -2947,6 +2946,7 @@ dependencies = [
  "swanky-ocelot-error",
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",
+ "swanky-rng",
  "vectoreyes",
 ]
 
@@ -2960,7 +2960,6 @@ dependencies = [
  "itertools 0.14.0",
  "rand 0.8.5",
  "swanky-adversary",
- "swanky-aes-rng",
  "swanky-block",
  "swanky-channel",
  "swanky-error",
@@ -2968,6 +2967,7 @@ dependencies = [
  "swanky-ot-alsz-kos",
  "swanky-ot-chou-orlandi",
  "swanky-ot-traits",
+ "swanky-rng",
 ]
 
 [[package]]
@@ -3352,9 +3352,9 @@ dependencies = [
  "mac-n-cheese-sieve-parser",
  "pretty_env_logger",
  "rand 0.8.5",
- "swanky-aes-rng",
  "swanky-channel-legacy",
  "swanky-field-binary",
+ "swanky-rng",
  "wasm-bindgen",
 ]
 
@@ -3371,10 +3371,10 @@ dependencies = [
  "rand 0.8.5",
  "rustls",
  "rustls-pemfile",
- "swanky-aes-rng",
  "swanky-channel-legacy",
  "swanky-error",
  "swanky-field-binary",
+ "swanky-rng",
  "tungstenite",
 ]
 
@@ -3661,9 +3661,9 @@ dependencies = [
  "inferno",
  "log",
  "simple-arith-circuit",
- "swanky-aes-rng",
  "swanky-field",
  "swanky-field-binary",
+ "swanky-rng",
 ]
 
 [[package]]

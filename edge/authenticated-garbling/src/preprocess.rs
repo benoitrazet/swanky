@@ -90,8 +90,8 @@ pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
 mod tests {
     use super::*;
     use fancy_garbling::{BinaryGadgets, Fancy, FancyBinary, FancyReveal};
-    use swanky_aes_rng::AesRng;
     use swanky_party::party_system;
+    use swanky_rng::AesRng;
 
     party_system! {
         mod ps {

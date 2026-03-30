@@ -24,5 +24,5 @@ rand.workspace = true
 swanky-adversary.workspace = true
 swanky-deprecated-bitwise-utils.workspace = true
 swanky-bit-matrix-transpose.workspace = true
-swanky-aes-rng.workspace = true
+swanky-rng.workspace = true
 

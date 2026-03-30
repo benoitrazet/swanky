@@ -189,8 +189,8 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::SyncChannel;
+    use swanky_rng::AesRng;
 
     #[test]
     fn test_secret_sharing_of_zero() {

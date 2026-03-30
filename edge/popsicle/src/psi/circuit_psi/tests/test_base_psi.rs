@@ -10,9 +10,9 @@ mod tests {
     use fancy_garbling::WireMod2;
     use swanky_twopac::semihonest::{Evaluator, Garbler};
 
-    use swanky_aes_rng::AesRng;
     use swanky_block::Block512;
     use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
+    use swanky_rng::AesRng;
 
     // Run Base Psi
     fn psty_base_psi(

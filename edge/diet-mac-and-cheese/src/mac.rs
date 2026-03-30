@@ -209,10 +209,10 @@ pub(crate) fn validate<V: IsSubFieldOf<T>, T: FiniteField>(
 #[cfg(test)]
 mod tests {
     use generic_array::GenericArray;
-    use swanky_aes_rng::AesRng;
     use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b};
     use swanky_party::{private::PartyPrivateCopy, ty_eq::Witness};
+    use swanky_rng::AesRng;
 
     use crate::{
         mac::validate,

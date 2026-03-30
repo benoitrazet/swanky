@@ -12,11 +12,11 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::Channel;
 use swanky_field::FiniteField;
 use swanky_field_binary::F128b;
 use swanky_field_f61p::F61p;
+use swanky_rng::AesRng;
 
 // TODO: re-enable ggm_utils benchmarks once we've sorted out the private modules issue.
 /*#[path = "../src/svole/wykw/ggm_utils.rs"]

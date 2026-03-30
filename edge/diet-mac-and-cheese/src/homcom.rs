@@ -12,7 +12,6 @@ use crate::{
 use generic_array::GenericArray;
 use log::{debug, warn};
 use rand::{Rng, SeedableRng};
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure};
@@ -22,6 +21,7 @@ use swanky_party::{
     private::{PartyPrivate, PartyPrivateCopy},
     ty_eq::{EqualityProposition, Witness},
 };
+use swanky_rng::AesRng;
 use swanky_svole_wykw::LpnParams;
 
 // Size of batches for multiplication / assert-zero
@@ -779,7 +779,6 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::{AbstractChannel, Channel, SyncChannel};
     use swanky_field::{FiniteField, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b};
@@ -788,6 +787,7 @@ mod tests {
         private::{PartyPrivate, PartyPrivateCopy},
         ty_eq::Witness,
     };
+    use swanky_rng::AesRng;
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     fn test_fcom_random<V: IsSubFieldOf<T>, T: FiniteField>()

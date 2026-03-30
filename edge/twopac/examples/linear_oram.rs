@@ -6,9 +6,9 @@ use fancy_garbling::{
 };
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
-use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_rng::AesRng;
 
 /// A structure that contains both the garbler and the evaluators
 /// wires. This structure simplifies the API of the garbled circuit.

@@ -3,8 +3,8 @@ use fancy_garbling::{
     circuit::{BinaryCircuit as Circuit, EvaluableCircuit},
 };
 use std::{fs::File, io::BufReader, time::SystemTime};
-use swanky_aes_rng::AesRng;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_rng::AesRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 fn circuit(fname: &str) -> Circuit {

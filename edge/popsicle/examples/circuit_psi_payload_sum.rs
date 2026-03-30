@@ -5,8 +5,8 @@ use popsicle::circuit_psi::{
 
 use fancy_garbling::Fancy;
 use rand::Rng;
-use swanky_aes_rng::AesRng;
 use swanky_block::{Block, Block512};
+use swanky_rng::AesRng;
 const SET_SIZE: usize = 1 << 8;
 
 pub fn psty_payload_sum(

@@ -1,7 +1,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{AllWire, WireLabel, util::RngExt};
 use std::time::Duration;
-use swanky_aes_rng::AesRng;
+use swanky_rng::AesRng;
 use vectoreyes::U8x16;
 
 fn bench_digits(c: &mut Criterion, p: u16) {

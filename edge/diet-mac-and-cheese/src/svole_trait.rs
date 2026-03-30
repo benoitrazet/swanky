@@ -10,7 +10,6 @@ use std::{
     cell::{RefCell, RefMut},
     rc::Rc,
 };
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field::{FiniteField, IsSubFieldOf};
@@ -18,6 +17,7 @@ use swanky_party::{
     either::PartyEither,
     ty_eq::{EqualityProposition, Witness},
 };
+use swanky_rng::AesRng;
 use swanky_svole_wykw::{LpnParams, Receiver, Sender};
 
 /// Svole trait.

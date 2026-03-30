@@ -9,11 +9,11 @@ use rand::{
     distributions::{Distribution, Uniform},
 };
 use swanky_adversary::{Malicious, SemiHonest};
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{Degree, DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_ocelot_error::Error;
+use swanky_rng::AesRng;
 
 // LPN parameters used in the protocol. We use three stages, two sets of LPN
 // parameters for setup, and one set of LPN parameters for the extend phase.
@@ -522,11 +522,11 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_field::{FiniteField, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b, F128b};
     use swanky_field_f61p::F61p;
+    use swanky_rng::AesRng;
 
     fn test_lpn_svole_<V: IsSubFieldOf<T>, T: FiniteField>()
     where

@@ -7,10 +7,10 @@ use keyed_arena::{AllocationKey, BorrowedAllocation, KeyedArena};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::convert::TryInto;
 use swanky_aes_hash::TweakableCircularCorrelationRobustHash;
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_ocelot_error::Error;
+use swanky_rng::AesRng;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16, U64x2, array_utils::ArrayUnrolledExt};
 
 // TODO: alsz and kos should be based on this file?

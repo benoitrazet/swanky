@@ -1,6 +1,6 @@
 use popsicle::psty::{Receiver, Sender};
 use std::time::SystemTime;
-use swanky_aes_rng::AesRng;
+use swanky_rng::AesRng;
 
 const NBYTES: usize = 16;
 const NINPUTS: usize = 1000;

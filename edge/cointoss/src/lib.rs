@@ -6,9 +6,9 @@
 
 use rand_core::{RngCore, SeedableRng};
 
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_rng::AesRng;
 
 /// Errors produced by the coin tossing protocol.
 #[derive(Debug)]

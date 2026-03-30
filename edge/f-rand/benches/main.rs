@@ -1,6 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main, measurement::WallTime};
-use swanky_aes_rng::AesRng;
 use swanky_party::party_system;
+use swanky_rng::AesRng;
 
 party_system! {
     mod ps {

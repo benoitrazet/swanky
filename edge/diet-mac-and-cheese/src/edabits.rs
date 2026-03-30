@@ -10,7 +10,6 @@ use rand::{Rng, SeedableRng};
 use std::io::{BufReader, BufWriter};
 use std::net::TcpStream;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::{AbstractChannel, SyncChannel};
 use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure, swanky_error};
@@ -21,6 +20,7 @@ use swanky_party::{
     private::{PartyPrivate, PartyPrivateCopy},
     ty_eq::{EqualityProposition, Witness},
 };
+use swanky_rng::AesRng;
 
 /// Edabits struct
 #[derive(Clone)]
@@ -1096,7 +1096,6 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_field::FiniteField;
     use swanky_field::FiniteRing;
@@ -1107,6 +1106,7 @@ mod tests {
         private::{PartyPrivate, PartyPrivateCopy},
         ty_eq::Witness,
     };
+    use swanky_rng::AesRng;
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     const DEFAULT_NUM_BUCKET: usize = 5;

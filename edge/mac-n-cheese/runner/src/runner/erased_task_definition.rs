@@ -1,7 +1,7 @@
 use std::{any::Any, marker::PhantomData, sync::atomic::AtomicBool};
 
 use mac_n_cheese_vole::party::Party;
-use swanky_aes_rng::AesRng;
+use swanky_rng::AesRng;
 
 use crate::{
     alloc::{AlignedBytesMut, OwnedAlignedBytes},

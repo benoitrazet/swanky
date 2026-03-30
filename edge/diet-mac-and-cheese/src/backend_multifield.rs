@@ -39,7 +39,6 @@ use std::io::{Read, Seek};
 use std::iter;
 use std::marker::PhantomData;
 use std::path::PathBuf;
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, OptionExt, Result, WrapErr, bail, ensure};
 use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField, StatisticallySecureField};
@@ -50,6 +49,7 @@ use swanky_party::{
     private::{PartyPrivate, PartyPrivateCopy},
     ty_eq::{EqualityProposition, Witness},
 };
+use swanky_rng::AesRng;
 use swanky_svole_wykw::LpnParams;
 
 // This file implements IR0+ support for diet-mac-n-cheese and is broken up into the following components:
@@ -2673,7 +2673,6 @@ pub(crate) mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::{Channel, SyncChannel};
     use swanky_error::{ErrorKind, WrapErr};
     use swanky_field::FiniteRing;
@@ -2681,6 +2680,7 @@ pub(crate) mod tests {
     use swanky_field_binary::F2;
     use swanky_field_f61p::F61p;
     use swanky_field_ff_primes::{F384p, F384q, Secp256k1, Secp256k1order};
+    use swanky_rng::AesRng;
 
     pub(crate) const FF0: u8 = 0;
     const FF1: u8 = 1;

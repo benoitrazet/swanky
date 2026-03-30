@@ -1,7 +1,7 @@
 use popsicle::psz::{Receiver, Sender};
 use std::time::SystemTime;
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::track_unix_channel_pair;
+use swanky_rng::AesRng;
 
 const NBYTES: usize = 16;
 const NINPUTS: usize = 1 << 20;

@@ -2,8 +2,8 @@
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use popsicle::psty_payload::{Receiver, Sender};
-use swanky_aes_rng::AesRng;
 use swanky_block::Block512;
+use swanky_rng::AesRng;
 
 use rand::{CryptoRng, Rng};
 

@@ -25,12 +25,12 @@
 #![deny(missing_docs)]
 
 use rand::{CryptoRng, Rng, SeedableRng, distributions::Standard, prelude::Distribution};
-use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
 #[cfg(test)]
 use swanky_malicious_hooks::{run_with_entry_point, test_entry_point};
 use swanky_party::{GenericParty, GenericWhichParty};
+use swanky_rng::AesRng;
 use swanky_serialization::CanonicalSerialize;
 use vectoreyes::U8x16;
 
@@ -108,7 +108,6 @@ pub fn random_seed<P: GenericParty, RNG: CryptoRng + Rng>(
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    use swanky_aes_rng::AesRng;
     use swanky_party::party_system;
     use vectoreyes::{SimdBase, array_utils::ArrayUnrolledExt};
 

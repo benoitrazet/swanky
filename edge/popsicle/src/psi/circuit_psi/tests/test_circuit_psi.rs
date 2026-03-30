@@ -10,8 +10,8 @@ mod tests {
         *,
     };
     use std::collections::HashSet;
-    use swanky_aes_rng::AesRng;
     use swanky_block::Block;
+    use swanky_rng::AesRng;
 
     // Computes the cardinality of the intersection in the clear
     pub fn cardinality_in_clear(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> usize {
