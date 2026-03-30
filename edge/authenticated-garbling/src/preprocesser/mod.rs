@@ -39,6 +39,7 @@ use swanky_party::GenericParty;
 use vectoreyes::U8x16;
 
 pub mod wire;
+pub mod unifier;
 
 /// Pre-process a circuit for authenticated garbling.
 ///
