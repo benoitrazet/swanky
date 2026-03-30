@@ -11,7 +11,7 @@ mod tests {
     };
     use std::collections::HashSet;
     use swanky_block::Block;
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     // Computes the cardinality of the intersection in the clear
     pub fn cardinality_in_clear(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> usize {
@@ -52,7 +52,7 @@ mod tests {
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
                 let mut gb_psi =
-                    OpprfPsiGarbler::<AesRng>::new(channel, Block::from(seed_sx)).unwrap();
+                    OpprfPsiGarbler::<SwankyRng>::new(channel, Block::from(seed_sx)).unwrap();
 
                 let intersection_results = gb_psi.intersect(set_a, channel).unwrap();
                 let res = fancy_cardinality(
@@ -66,7 +66,7 @@ mod tests {
             },
             |channel| {
                 let mut ev_psi =
-                    OpprfPsiEvaluator::<AesRng>::new(channel, Block::from(seed_rx)).unwrap();
+                    OpprfPsiEvaluator::<SwankyRng>::new(channel, Block::from(seed_rx)).unwrap();
                 let intersection_results = ev_psi.intersect(set_b, channel).unwrap();
                 let res = fancy_cardinality(
                     &mut ev_psi.ev,
@@ -97,7 +97,7 @@ mod tests {
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
                 let mut gb_psi =
-                    OpprfPsiGarbler::<AesRng>::new(channel, Block::from(seed_sx)).unwrap();
+                    OpprfPsiGarbler::<SwankyRng>::new(channel, Block::from(seed_sx)).unwrap();
 
                 let intersection_results = gb_psi
                     .intersect_with_payloads(primary_keys_a, Some(payload_a), channel)
@@ -115,7 +115,7 @@ mod tests {
             },
             |channel| {
                 let mut ev_psi =
-                    OpprfPsiEvaluator::<AesRng>::new(channel, Block::from(seed_rx)).unwrap();
+                    OpprfPsiEvaluator::<SwankyRng>::new(channel, Block::from(seed_rx)).unwrap();
                 let intersection_results = ev_psi
                     .intersect_with_payloads(primary_keys_b, Some(payload_b), channel)
                     .unwrap();
@@ -142,7 +142,7 @@ mod tests {
     // Test the fancy cardinality of the intersection circuit
     // on the same set
     fn test_psty_circuit_cardinality_same_sets() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
         let cardinality = psty_cardinality(&set, &set, rng.r#gen(), rng.r#gen()).unwrap() as usize;
         assert!(
@@ -156,7 +156,7 @@ mod tests {
     // Test the fancy cardinality of the intersection circuit
     // on sets that are one item off
     fn test_psty_circuit_cardinality_one_off_sets() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
 
         let set_a = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
         let set_b = enum_ids(SET_SIZE, 1, PRIMARY_KEY_SIZE);
@@ -174,7 +174,7 @@ mod tests {
     // Test the fancy cardinality of the intersection circuit
     // on disjoints sets
     fn test_psty_circuit_cardinality_disjoint_sets() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
 
         let set_a = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
         let set_b = enum_ids(SET_SIZE, SET_SIZE as u64, PRIMARY_KEY_SIZE);
@@ -192,7 +192,7 @@ mod tests {
     // Test the fancy cardinality of the intersection circuit
     // on random sets
     fn test_psty_circuit_cardinality_random_sets() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
 
         let set_a = rand_u8_vec(SET_SIZE, 2u128.pow(PRIMARY_KEY_SIZE as u32 * 8), &mut rng);
         let set_b = rand_u8_vec(SET_SIZE, 2u128.pow(PRIMARY_KEY_SIZE as u32 * 8), &mut rng);
@@ -215,7 +215,7 @@ mod tests {
     // and sum random payloads together.
     // The payload sum should be the summation of all payloads in this case
     fn test_psty_circuit_payload_sum_same_keys_rand_payloads() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let primary_keys = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
         let payloads_a = rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng);
         let payloads_b = rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng);
@@ -245,7 +245,7 @@ mod tests {
     // This test checks that the circuit works when we intersect disjoint sets of primary_keys
     // the payload sum should be 0.
     fn test_psty_circuit_payload_sum_disjoint_primary_keys_rand_payloads() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let primary_keys_a = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
         let primary_keys_b = enum_ids(SET_SIZE, SET_SIZE as u64, PRIMARY_KEY_SIZE);
         let payloads_a = rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng);

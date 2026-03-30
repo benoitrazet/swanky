@@ -2,7 +2,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use rand::distributions::{Distribution, Uniform};
 use rand_core::RngCore;
 use std::hint::black_box;
-use swanky_rng::{AesRng, UniformIntegersUnderBound};
+use swanky_rng::{SwankyRng, UniformIntegersUnderBound};
 
 mod measurement {
     use criterion::measurement::WallTime;
@@ -17,7 +17,7 @@ use measurement::*;
 
 fn bench_aes_rand(c: &mut Criterion<Measurement>) {
     c.bench_function("AesRng::rand", |b| {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let mut x = (0..16 * 1024)
             .map(|_| rand::random::<u8>())
             .collect::<Vec<u8>>();
@@ -28,7 +28,7 @@ fn bench_aes_rand(c: &mut Criterion<Measurement>) {
 fn bench_aes_rand_int_108000(c: &mut Criterion<Measurement>) {
     const BOUND: u32 = 108000;
     c.bench_function("AesRng::rand 32 integers under 108000", |b| {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let dist = Uniform::new(0, BOUND);
         b.iter(|| {
             for _ in 0..32 {
@@ -39,7 +39,7 @@ fn bench_aes_rand_int_108000(c: &mut Criterion<Measurement>) {
     c.bench_function(
         "AesRng::uniform_integers_under_bound 32 integers under 108000",
         |b| {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let dist = UniformIntegersUnderBound::new(BOUND);
             b.iter(|| {
                 black_box(dist.sample(&mut rng));
@@ -52,7 +52,7 @@ fn bench_aes_rand_int_108000(c: &mut Criterion<Measurement>) {
 fn bench_aes_rand_int_126(c: &mut Criterion<Measurement>) {
     const BOUND: u32 = 126;
     c.bench_function("AesRng::rand 32 integers under 126", |b| {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let dist = Uniform::new(0, BOUND);
         b.iter(|| {
             for _ in 0..32 {
@@ -63,7 +63,7 @@ fn bench_aes_rand_int_126(c: &mut Criterion<Measurement>) {
     c.bench_function(
         "AesRng::uniform_integers_under_bound 32 integers under 126",
         |b| {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let dist = UniformIntegersUnderBound::new(BOUND);
             b.iter(|| {
                 black_box(dist.sample(&mut rng));

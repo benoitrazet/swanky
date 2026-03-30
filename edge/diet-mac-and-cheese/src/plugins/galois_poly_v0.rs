@@ -360,7 +360,7 @@ mod tests {
     use swanky_field::PrimeFiniteField;
     use swanky_field_f61p::F61p;
     use swanky_polynomial::Polynomial;
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     fn convert_poly<F: PrimeFiniteField>(p: Polynomial<F>) -> Vec<Number> {
         let mut coeffs = p.coefficients;
@@ -454,7 +454,7 @@ mod tests {
             ],
         ))));
 
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
 
         let (mut p0, mut p1, q) = get_product_triple::<_, F61p>(&mut rng, degree as usize);
         p0.append(&mut p1);
@@ -530,7 +530,7 @@ mod tests {
             ],
         ))));
 
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
 
         let (mut p0, mut p1, q) = get_shift_triple::<_, F61p>(&mut rng, degree as usize);
         p0.append(&mut p1);

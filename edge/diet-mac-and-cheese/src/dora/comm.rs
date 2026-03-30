@@ -6,7 +6,7 @@ use swanky_party::{
     private::{PartyPrivate, PartyPrivateCopy},
     ty_eq::{EqualityProposition, Witness},
 };
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 use crate::{
     DietMacAndCheese,
@@ -43,7 +43,7 @@ fn commit_vec<
 >(
     backend: &mut FCom<P, V, F, SvoleF>,
     channel: &mut C,
-    rng: &mut AesRng,
+    rng: &mut SwankyRng,
     sec: PartyPrivate<Prover, P, I>, // secret values
     len: usize,                      // padded length
 ) -> Result<impl Iterator<Item = Mac<P, V, F>> + use<P, V, F, C, I, SvoleF>>

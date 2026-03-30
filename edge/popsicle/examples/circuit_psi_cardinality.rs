@@ -5,15 +5,16 @@ use popsicle::circuit_psi::{
 use fancy_garbling::Fancy;
 use rand::Rng;
 use swanky_block::Block;
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 const SET_SIZE: usize = 1 << 8;
 
 pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {
     let (_, result) = swanky_channel::local::local_channel_pair(
         |channel| {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let mut gb_psi =
-                OpprfPsiGarbler::<AesRng>::new(channel, Block::from(rng.r#gen::<u128>())).unwrap();
+                OpprfPsiGarbler::<SwankyRng>::new(channel, Block::from(rng.r#gen::<u128>()))
+                    .unwrap();
 
             let intersection_results = gb_psi.intersect(set_a, channel).unwrap();
             let res = fancy_cardinality(
@@ -26,9 +27,9 @@ pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {
             Ok(())
         },
         |channel| {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let mut ev_psi =
-                OpprfPsiEvaluator::<AesRng>::new(channel, Block::from(rng.r#gen::<u128>()))
+                OpprfPsiEvaluator::<SwankyRng>::new(channel, Block::from(rng.r#gen::<u128>()))
                     .unwrap();
             let intersection_results = ev_psi.intersect(set_b, channel).unwrap();
             let res = fancy_cardinality(

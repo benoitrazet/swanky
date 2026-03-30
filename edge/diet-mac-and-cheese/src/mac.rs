@@ -212,7 +212,7 @@ mod tests {
     use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b};
     use swanky_party::{private::PartyPrivateCopy, ty_eq::Witness};
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     use crate::{
         mac::validate,
@@ -224,7 +224,7 @@ mod tests {
     fn generate<V: IsSubFieldOf<T>, T: FiniteField>(
         random: bool,
         delta: T,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> (Mac<Prover, V, T>, Mac<Verifier, V, T>) {
         let value = if random { V::random(rng) } else { V::ZERO };
         let vmac = T::random(rng);
@@ -236,7 +236,7 @@ mod tests {
 
     #[test]
     fn mac_lifting_works() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         for _ in 0..10 {
             let delta = F40b::random(&mut rng);
             let mut provers = GenericArray::default();

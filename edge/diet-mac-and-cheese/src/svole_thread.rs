@@ -15,7 +15,7 @@ use swanky_party::{
     either::PartyEither,
     ty_eq::{EqualityProposition, Witness},
 };
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 use swanky_svole_wykw::{LpnParams, Receiver, Sender};
 
 const SLEEP_TIME: u64 = 1;
@@ -73,7 +73,7 @@ impl<P: Party, V, T: Copy> SvoleStopSignal for SvoleAtomic<P, V, T> {
 impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, V, T> {
     fn init<C: AbstractChannel + Clone>(
         _channel: &mut C,
-        _rng: &mut AesRng,
+        _rng: &mut SwankyRng,
         _lpn_setup: LpnParams,
         _lpn_extend: LpnParams,
         _delta: Option<T>,
@@ -93,7 +93,7 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, 
     fn extend<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        _rng: &mut AesRng,
+        _rng: &mut SwankyRng,
         out: &mut PartyEither<P, &mut Vec<(V, T)>, &mut Vec<T>>,
     ) -> Result<()> {
         let mut sleep_time = SLEEP_TIME;
@@ -154,7 +154,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
     /// Initialize the functionality.
     pub fn init<C: AbstractChannel + Clone>(
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         mut svole_atomic: SvoleAtomic<P, V, T>,
@@ -196,7 +196,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
     pub fn run<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> Result<()>
     where
         // This constraint is necessary in order to use `wykw::sole::Sender::send`
@@ -362,7 +362,7 @@ where
                     field_name::<V>(),
                     field_name::<T>()
                 );
-                let mut rng2 = AesRng::new();
+                let mut rng2 = SwankyRng::new();
                 let mut svole = ThreadSvole::<P, V, T>::init(
                     &mut channel,
                     &mut rng2,
@@ -388,7 +388,7 @@ where
 impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomicRoundRobin<P, V, T> {
     fn init<C: AbstractChannel + Clone>(
         _channel: &mut C,
-        _rng: &mut AesRng,
+        _rng: &mut SwankyRng,
         _lpn_setup: LpnParams,
         _lpn_extend: LpnParams,
         _delta: Option<T>,
@@ -410,7 +410,7 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomicRoun
     fn extend<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         out: &mut PartyEither<P, &mut Vec<(V, T)>, &mut Vec<T>>,
     ) -> Result<()> {
         self.svoles[*self.current.borrow()].extend(channel, rng, out)?;
@@ -439,7 +439,7 @@ mod test {
     };
     use swanky_channel_legacy::Channel;
     use swanky_party::{either::PartyEither, ty_eq::Witness};
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     fn produce(s: &SvoleAtomic<Verifier, u32, u32>, v: u32) {
         loop {
@@ -491,7 +491,7 @@ mod test {
 
         let mut round_robin = SvoleAtomicRoundRobin::new(vec![t1_copy, t2_copy]).unwrap();
 
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let (sender, _receiver) = UnixStream::pair().unwrap();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);

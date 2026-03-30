@@ -9,7 +9,7 @@ use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 use swanky_channel::Channel;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 use std::cmp::{Ordering, max};
 
@@ -30,13 +30,13 @@ struct GCDInputs<F> {
 /// (2) The garbler then exchanges their wires obliviously with the evaluator.
 /// (3) The garbler and the evaluator then run the garbled circuit.
 /// (4) The garbler and the evaluator open the result of the computation.
-fn gb_gcd(rng: &mut AesRng, channel: &mut Channel, input: u128, upper_bound: u128) {
+fn gb_gcd(rng: &mut SwankyRng, channel: &mut Channel, input: u128, upper_bound: u128) {
     // (1)
-    let mut gb = Garbler::<AesRng, OtSender, AllWire>::new(channel, rng.clone()).unwrap();
+    let mut gb = Garbler::<SwankyRng, OtSender, AllWire>::new(channel, rng.clone()).unwrap();
     // (2)
     let circuit_wires = gb_set_fancy_inputs(&mut gb, input, channel);
     // (3)
-    let gcd = fancy_gcd::<Garbler<AesRng, OtSender, AllWire>>(
+    let gcd = fancy_gcd::<Garbler<SwankyRng, OtSender, AllWire>>(
         &mut gb,
         circuit_wires,
         upper_bound,
@@ -76,13 +76,13 @@ where
 /// (4) The evaluator and the garbler open the result of the computation.
 /// (5) The evaluator translates the binary output of the circuit into its decimal
 ///     representation.
-fn ev_gcd(rng: &mut AesRng, channel: &mut Channel, input: u128, upper_bound: u128) -> u128 {
+fn ev_gcd(rng: &mut SwankyRng, channel: &mut Channel, input: u128, upper_bound: u128) -> u128 {
     // (1)
-    let mut ev = Evaluator::<AesRng, OtReceiver, AllWire>::new(channel, rng.clone()).unwrap();
+    let mut ev = Evaluator::<SwankyRng, OtReceiver, AllWire>::new(channel, rng.clone()).unwrap();
     // (2)
     let circuit_wires = ev_set_fancy_inputs(&mut ev, input, channel);
     // (3)
-    let gcd = fancy_gcd::<Evaluator<AesRng, OtReceiver, AllWire>>(
+    let gcd = fancy_gcd::<Evaluator<SwankyRng, OtReceiver, AllWire>>(
         &mut ev,
         circuit_wires,
         upper_bound,
@@ -209,12 +209,12 @@ fn main() {
 
     let (_, result) = swanky_channel::local::local_channel_pair(
         |channel| {
-            let rng_gb = AesRng::new();
+            let rng_gb = SwankyRng::new();
             gb_gcd(&mut rng_gb.clone(), channel, gb_value, upper_bound);
             Ok(())
         },
         |channel| {
-            let rng_ev = AesRng::new();
+            let rng_ev = SwankyRng::new();
             let result = ev_gcd(&mut rng_ev.clone(), channel, ev_value, upper_bound);
             Ok(result)
         },

@@ -21,7 +21,7 @@ use party::ty_eq::Witness;
 use rand::SeedableRng;
 use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
 use swanky_party as party;
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 use types::visit_type;
 
 use crate::runner::RunQueue;
@@ -127,7 +127,7 @@ fn party_main<P: Party>(
     private_data: PartyPrivateCopy<Prover, P, &Path>,
     num_connections: PartyEitherCopy<P, (), usize>,
 ) -> swanky_error::Result<()> {
-    let rng = AesRng::from_rng(rand::rngs::OsRng).unwrap();
+    let rng = SwankyRng::from_rng(rand::rngs::OsRng).unwrap();
     let circuit_file = File::open(&opt.circuit)
         .wrap_err_with(ErrorKind::FilesystemError, || {
             format!("Opening circuit {:?}", opt.circuit)

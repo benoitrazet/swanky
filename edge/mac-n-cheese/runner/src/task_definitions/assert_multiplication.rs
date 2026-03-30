@@ -17,7 +17,7 @@ use swanky_field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, SmallBinaryField};
 use swanky_party::either::PartyEitherCopy;
 use swanky_party::ty_eq::{EqualityProposition, Witness};
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 use swanky_serialization::CanonicalSerialize;
 
 use std::io::Read;
@@ -95,14 +95,14 @@ mod vope {
         };
         use rand::SeedableRng;
         use swanky_party::ty_eq::Witness;
-        use swanky_rng::AesRng;
+        use swanky_rng::SwankyRng;
 
         use super::*;
 
         fn do_test<T: MacTypes>() {
             eprintln!("Testing {}", std::any::type_name::<T>());
             for i in 1_u128..=256 {
-                let mut rng = AesRng::from_seed(swanky_block::Block::from(85787 * i));
+                let mut rng = SwankyRng::from_seed(swanky_block::Block::from(85787 * i));
                 let alpha = T::TF::random_nonzero(&mut rng);
                 let u = T::TF::random(&mut rng);
                 let v = T::TF::random(&mut rng);
@@ -209,7 +209,7 @@ fn test_assert_multiply_state() {
     fn do_test<T: MacTypes>() {
         eprintln!("Testing {}", std::any::type_name::<T>());
         for i in 1_u128..=256 {
-            let mut rng = AesRng::from_seed(swanky_block::Block::from(68569425 * i));
+            let mut rng = SwankyRng::from_seed(swanky_block::Block::from(68569425 * i));
             let alpha = T::TF::random_nonzero(&mut rng);
             let challenge = T::TF::random_nonzero(&mut rng);
             let mut prover_right_proof = AssertMultiplyState::<Prover, T::TF>::default();
@@ -299,7 +299,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
 
     fn initialize(
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut swanky_rng::AesRng,
+        _rng: &mut swanky_rng::SwankyRng,
         vc: crate::base_vole::VoleContexts<P>,
         num_runner_threads: usize,
     ) -> swanky_error::Result<Self> {
@@ -316,7 +316,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
     fn finalize(
         self,
         conn: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut swanky_rng::AesRng,
+        _rng: &mut swanky_rng::SwankyRng,
     ) -> swanky_error::Result<()> {
         let mut acu = AssertMultiplyState::<P, T::TF>::default();
         for state in self.state.into_iter() {
@@ -371,7 +371,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
     ) -> swanky_error::Result<crate::task_framework::TaskResult<P, Self::TaskContinuation>> {
         let mut seed = [0; 16];
         seed.copy_from_slice(&input.challenge.unwrap()[0..16]);
-        let mut rng = AesRng::from_seed(seed.into());
+        let mut rng = SwankyRng::from_seed(seed.into());
         let mut acu = AssertMultiplyState::<P, T::TF>::default();
         let out = input.simple_wire_task::<3, 0, Mac<P, T>, _>(
             ctx,
@@ -419,7 +419,7 @@ where
 
     fn initialize(
         c: &mut crate::tls::TlsConnection<P>,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         vc: crate::base_vole::VoleContexts<P>,
         num_runner_threads: usize,
     ) -> swanky_error::Result<Self> {
@@ -432,7 +432,7 @@ where
     fn finalize(
         self,
         c: &mut crate::tls::TlsConnection<P>,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> swanky_error::Result<()> {
         self.unspecialized.finalize(c, rng)
     }
@@ -446,7 +446,7 @@ where
     ) -> swanky_error::Result<TaskResult<P, Self::TaskContinuation>> {
         let mut seed = [0; 16];
         seed.copy_from_slice(&input.challenge.unwrap()[0..16]);
-        let mut rng = AesRng::from_seed(seed.into());
+        let mut rng = SwankyRng::from_seed(seed.into());
         let mut acu: PartyEitherCopy<P, (U64x2, U64x2), U64x2> = PartyEitherCopy::default();
         let alpha = match P::WHICH {
             WhichParty::Prover(e) => PartyEitherCopy::new::<Prover>(e, ()),

@@ -5,7 +5,7 @@ use std::time::Duration;
 use swanky_field::FiniteField;
 use swanky_field_binary::F64b;
 use swanky_field_ff_primes::F128p;
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 const N: usize = 16;
 
@@ -23,14 +23,13 @@ fn bench_random_circuit<F: FiniteField>(c: &mut Criterion, group: &str) {
         group.bench_with_input(BenchmarkId::new(title, size), &size, |b, _| {
             b.iter_batched_ref(
                 || {
-                    let mut rng = AesRng::default();
+                    let mut rng = SwankyRng::default();
 
-                    let (circuit, witness) = simple_arith_circuit::circuitgen::mul_zero_circuit::<
-                        F::PrimeField,
-                        AesRng,
-                    >(
-                        input_size, circuit_size, &mut rng
-                    );
+                    let (circuit, witness) =
+                        simple_arith_circuit::circuitgen::mul_zero_circuit::<
+                            F::PrimeField,
+                            SwankyRng,
+                        >(input_size, circuit_size, &mut rng);
                     (rng, circuit, witness)
                 },
                 |(rng, circuit, witness)| {
@@ -44,14 +43,13 @@ fn bench_random_circuit<F: FiniteField>(c: &mut Criterion, group: &str) {
         group.bench_with_input(BenchmarkId::new(title, size), &size, |b, _| {
             b.iter_batched_ref(
                 || {
-                    let mut rng = AesRng::default();
+                    let mut rng = SwankyRng::default();
 
-                    let (circuit, witness) = simple_arith_circuit::circuitgen::mul_zero_circuit::<
-                        F::PrimeField,
-                        AesRng,
-                    >(
-                        input_size, circuit_size, &mut rng
-                    );
+                    let (circuit, witness) =
+                        simple_arith_circuit::circuitgen::mul_zero_circuit::<
+                            F::PrimeField,
+                            SwankyRng,
+                        >(input_size, circuit_size, &mut rng);
                     let proof = Proof::<F, N>::prove(&circuit, &witness, k, t, &mut rng);
                     (circuit, proof)
                 },

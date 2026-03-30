@@ -3,7 +3,7 @@ use fancy_garbling::WireMod2;
 use ndarray::Array3;
 use std::{hint::black_box, path::Path, time::Duration};
 use swanky_garbled_nn::{NeuralNet, io::read_tests};
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 fn get_nn_and_test(dir: &Path) -> (NeuralNet, Array3<i64>) {
     // Set the base path to `$CARGO_MANIFEST_DIR` for CI.
@@ -20,7 +20,7 @@ fn bench_garbling(c: &mut Criterion, dir: &Path, bitwidths: &[usize]) {
     c.bench_function(&format!("garbling::{dir:?}"), move |bench| {
         bench.iter(|| {
             let (encoder, gc, output_map) = nn
-                .gc_garble_boolean::<WireMod2, _>(bitwidths, false, AesRng::new())
+                .gc_garble_boolean::<WireMod2, _>(bitwidths, false, SwankyRng::new())
                 .unwrap();
             black_box(encoder);
             black_box(gc);
@@ -32,7 +32,7 @@ fn bench_garbling(c: &mut Criterion, dir: &Path, bitwidths: &[usize]) {
 fn bench_evaluation(c: &mut Criterion, dir: &Path, bitwidths: &[usize]) {
     let (nn, test) = get_nn_and_test(dir);
     let (encoder, gc, _) = nn
-        .gc_garble_boolean::<WireMod2, _>(bitwidths, false, AesRng::new())
+        .gc_garble_boolean::<WireMod2, _>(bitwidths, false, SwankyRng::new())
         .unwrap();
     let inputs = encoder.encode_inputs(&test, bitwidths[0]);
 

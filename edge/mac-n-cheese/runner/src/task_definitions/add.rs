@@ -19,7 +19,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AddTask<P, T> {
 
     fn initialize(
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut swanky_rng::AesRng,
+        _rng: &mut swanky_rng::SwankyRng,
         _vc: crate::base_vole::VoleContexts<P>,
         _num_runner_threads: usize,
     ) -> swanky_error::Result<Self> {
@@ -31,7 +31,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AddTask<P, T> {
     fn finalize(
         self,
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut swanky_rng::AesRng,
+        _rng: &mut swanky_rng::SwankyRng,
     ) -> swanky_error::Result<()> {
         Ok(())
     }

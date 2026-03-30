@@ -1,6 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main, measurement::WallTime};
 use swanky_party::party_system;
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 party_system! {
     mod ps {
@@ -12,8 +12,8 @@ use ps::{PartyA, PartyB};
 
 fn bench_random_seed(c: &mut Criterion<WallTime>) {
     const COUNT: usize = 1000;
-    let mut rng_a = AesRng::new();
-    let mut rng_b = AesRng::new();
+    let mut rng_a = SwankyRng::new();
+    let mut rng_b = SwankyRng::new();
     c.bench_function(&format!("random_seed::{COUNT}"), |b| {
         b.iter(|| {
             swanky_channel::local::local_channel_pair(

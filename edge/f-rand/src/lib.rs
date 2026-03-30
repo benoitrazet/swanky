@@ -30,7 +30,7 @@ use swanky_error::ErrorKind;
 #[cfg(test)]
 use swanky_malicious_hooks::{run_with_entry_point, test_entry_point};
 use swanky_party::{GenericParty, GenericWhichParty};
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 use swanky_serialization::CanonicalSerialize;
 use vectoreyes::U8x16;
 
@@ -57,7 +57,7 @@ where
     // 1. Run `random_seed` to generate a random seed.
     // 2. Use this to seed a RNG which we then use to generate a random `T`.
     let seed = random_seed::<P, _>(channel, rng)?;
-    let mut rng_new = AesRng::from_seed(seed);
+    let mut rng_new = SwankyRng::from_seed(seed);
     Ok(rng_new.r#gen::<T>())
 }
 
@@ -123,8 +123,8 @@ mod tests {
         #[test]
         fn random_seed_works(seed_a in any::<u128>(),
                              seed_b in any::<u128>()) {
-            let mut rng_a = AesRng::from_seed(seed_a.into());
-            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let mut rng_a = SwankyRng::from_seed(seed_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_b.into());
             let (result_a, result_b) = swanky_channel::local::local_channel_pair(
                 |c| random_seed::<PartyA, _>(c, &mut rng_a),
                 |c| random_seed::<PartyB, _>(c, &mut rng_b),
@@ -138,8 +138,8 @@ mod tests {
         #[test]
         fn bad_prover_commitment_fails(seed_a in any::<u128>(),
                                        seed_b in any::<u128>()) {
-            let mut rng_a = AesRng::from_seed(seed_a.into());
-            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let mut rng_a = SwankyRng::from_seed(seed_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_b.into());
             let result = swanky_channel::local::local_channel_pair(
                 |c| {
                     run_with_entry_point(
@@ -158,8 +158,8 @@ mod tests {
         #[test]
         fn bad_prover_decommitment_fails(seed_a in any::<u128>(),
                                          seed_b in any::<u128>()) {
-            let mut rng_a = AesRng::from_seed(seed_a.into());
-            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let mut rng_a = SwankyRng::from_seed(seed_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_b.into());
             let result = swanky_channel::local::local_channel_pair(
                 |c| {
                     run_with_entry_point(
@@ -178,8 +178,8 @@ mod tests {
         #[test]
         fn random_i32_works(seed_a in any::<u128>(),
                             seed_b in any::<u128>()) {
-            let mut rng_a = AesRng::from_seed(seed_a.into());
-            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let mut rng_a = SwankyRng::from_seed(seed_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_b.into());
             let (result_a, result_b) = swanky_channel::local::local_channel_pair(
                 |c| random::<PartyA, i32, _>(c, &mut rng_a),
                 |c| random::<PartyB, i32, _>(c, &mut rng_b),

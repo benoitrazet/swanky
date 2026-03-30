@@ -16,7 +16,7 @@ use swanky_channel_legacy::Channel;
 use swanky_field::FiniteField;
 use swanky_field_binary::F128b;
 use swanky_field_f61p::F61p;
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 // TODO: re-enable ggm_utils benchmarks once we've sorted out the private modules issue.
 /*#[path = "../src/svole/wykw/ggm_utils.rs"]
@@ -25,13 +25,13 @@ mod ggm_utils;*/
 fn svole_init<F: FiniteField>() -> (Arc<Mutex<Sender<F>>>, Arc<Mutex<Receiver<F>>>) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
         Sender::init(&mut channel, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap()
     });
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
@@ -56,7 +56,7 @@ fn bench_svole<F: FiniteField>(
     let (sender, receiver) = UnixStream::pair().unwrap();
     let vole_sender = vole_sender.clone();
     let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
@@ -65,7 +65,7 @@ fn bench_svole<F: FiniteField>(
         vole_sender.send(&mut channel, &mut rng, &mut out).unwrap();
         black_box(out);
     });
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
@@ -96,10 +96,10 @@ fn bench_svole_f61p(c: &mut Criterion) {
     });
 }
 fn bench_svole_init<F: FiniteField>() {
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);

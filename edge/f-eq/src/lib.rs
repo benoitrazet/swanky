@@ -121,7 +121,7 @@ mod tests {
     use proptest::test_runner::TestRunner;
     use rand::SeedableRng;
     use swanky_party::party_system;
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     party_system! {
         mod ps {
@@ -134,13 +134,13 @@ mod tests {
     fn check_equality(input_pr: &[u8], input_vr: &[u8]) -> swanky_error::Result<()> {
         swanky_channel::local::local_channel_pair(
             |c| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut f_eq = EqualityFunctionality::<PartyA>::new(&mut rng);
                 f_eq.input(input_pr);
                 f_eq.finalize(c)
             },
             |c| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut f_eq = EqualityFunctionality::<PartyB>::new(&mut rng);
                 f_eq.input(input_vr);
                 f_eq.finalize(c)
@@ -155,7 +155,7 @@ mod tests {
     ) -> swanky_error::Result<()> {
         swanky_channel::local::local_channel_pair(
             |c| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut f_eq = EqualityFunctionality::<PartyA>::new(&mut rng);
                 for input_pr in inputs_pr.iter() {
                     f_eq.input(input_pr);
@@ -163,7 +163,7 @@ mod tests {
                 f_eq.finalize(c)
             },
             |c| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut f_eq = EqualityFunctionality::<PartyB>::new(&mut rng);
                 for input_vr in inputs_vr.iter() {
                     f_eq.input(input_vr);
@@ -199,7 +199,7 @@ mod tests {
     proptest! {
         #[test]
         fn batched_same_inputs_work(ninputs in 1..10, seed in any::<u128>()) {
-            let mut rng = AesRng::from_seed(seed.into());
+            let mut rng = SwankyRng::from_seed(seed.into());
             let inputs: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.r#gen::<[u8; 32]>()).collect();
             let res = batched_check_equality(&inputs, &inputs);
             prop_assert!(res.is_ok());
@@ -208,7 +208,7 @@ mod tests {
     proptest! {
         #[test]
         fn batched_different_inputs_fail(ninputs in 1..10, seed in any::<u128>()) {
-            let mut rng = AesRng::from_seed(seed.into());
+            let mut rng = SwankyRng::from_seed(seed.into());
             let inputs_pr: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.r#gen::<[u8; 32]>()).collect();
             let inputs_vr: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.r#gen::<[u8; 32]>()).collect();
             let res = batched_check_equality(&inputs_pr, &inputs_vr);

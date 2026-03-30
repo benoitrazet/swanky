@@ -17,7 +17,7 @@ use swanky_field::{Degree, FiniteField as FF, FiniteRing};
 use swanky_ocelot_error::Error;
 use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 pub(super) struct Sender<OT: OtReceiver + Malicious, FE: FF> {
@@ -183,7 +183,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         let r = Degree::<FE>::USIZE;
         // Generate `chi`s from seed and send seed to receiver at the end.
         let seed = rng.r#gen::<Block>();
-        let mut rng_chi = AesRng::from_seed(seed);
+        let mut rng_chi = SwankyRng::from_seed(seed);
         let mut va = FE::ZERO;
         let mut x_stars = vec![FE::PrimeField::ZERO; r];
         for (u, w) in uws.iter().copied() {
@@ -323,7 +323,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
             .map(|(pow, (x, y))| (*y - x * self.delta) * *pow)
             .sum();
         let seed = channel.read_block()?;
-        let mut rng_chi = AesRng::from_seed(seed);
+        let mut rng_chi = SwankyRng::from_seed(seed);
         let mut vb = FE::ZERO;
         for v in vs.iter() {
             vb += *v * FE::random(&mut rng_chi);
@@ -371,14 +371,14 @@ mod test {
     use swanky_field::{Degree, FiniteField as FF};
     use swanky_field_binary::{F40b, F128b};
     use swanky_field_f61p::F61p;
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     fn test_spsvole_<FE: FF>(cols: usize, weight: usize) {
         let r = Degree::<FE>::USIZE;
         let n = cols / weight;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -390,7 +390,7 @@ mod test {
                 .send(&mut channel, n, &uw[0..weight + r], &mut rng)
                 .unwrap()
         });
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);

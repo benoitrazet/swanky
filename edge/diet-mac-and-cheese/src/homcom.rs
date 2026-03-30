@@ -21,7 +21,7 @@ use swanky_party::{
     private::{PartyPrivate, PartyPrivateCopy},
     ty_eq::{EqualityProposition, Witness},
 };
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 use swanky_svole_wykw::LpnParams;
 
 // Size of batches for multiplication / assert-zero
@@ -37,7 +37,7 @@ pub struct MultCheckState<P: Party, V: Copy, T: Copy> {
 
 impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
     /// Initialize the state.
-    pub(crate) fn init(rng: &mut AesRng) -> Result<Self> {
+    pub(crate) fn init(rng: &mut SwankyRng) -> Result<Self> {
         let chi = PartyPrivateCopy::new(T::random(rng));
 
         Ok(Self {
@@ -50,7 +50,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
     }
 
     /// Reset the state. Generates a new chi value (without communication).
-    fn reset(&mut self, rng: PartyPrivate<Verifier, P, &mut AesRng>) -> Result<()> {
+    fn reset(&mut self, rng: PartyPrivate<Verifier, P, &mut SwankyRng>) -> Result<()> {
         self.triples = Default::default();
         self.sum_b = PartyPrivateCopy::new(T::ZERO);
         self.chi = rng.map(|rng| T::random(rng)).into();
@@ -84,7 +84,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
         &mut self,
         mask: Mac<P, T, T>,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         delta: PartyPrivateCopy<Verifier, P, T>,
     ) -> Result<usize> {
         match P::WHICH {
@@ -209,14 +209,14 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
     pub(crate) fn finalize<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> Result<usize> {
         let mut rng = match P::WHICH {
             WhichParty::Prover(_) => {
                 let seed = channel
                     .read_block()
                     .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?;
-                AesRng::from_seed(seed)
+                SwankyRng::from_seed(seed)
             }
             WhichParty::Verifier(_) => {
                 let seed = rng.r#gen::<Block>();
@@ -226,7 +226,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
                 channel
                     .flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
-                AesRng::from_seed(seed)
+                SwankyRng::from_seed(seed)
             }
         };
 
@@ -288,7 +288,7 @@ where
     /// Initialize the commitment scheme.
     pub fn init<C: AbstractChannel + Clone>(
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self> {
@@ -324,7 +324,7 @@ where
 
     pub fn init_with_delta<C: AbstractChannel + Clone>(
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         delta: T,
@@ -362,7 +362,7 @@ where
     pub fn random<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> Result<Mac<P, V, T>> {
         match P::WHICH {
             WhichParty::Prover(ev) => match self.voles.as_mut().into_inner(ev).pop() {
@@ -398,7 +398,7 @@ where
         &mut self,
         ev: Witness<impl EqualityProposition<Prover, P>>,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         source: &[V],
     ) -> Result<Vec<T>> {
         debug!("input");
@@ -413,7 +413,7 @@ where
         &mut self,
         ev: Witness<impl EqualityProposition<Verifier, P>>,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         source: usize,
     ) -> Result<Vec<Mac<P, V, T>>> {
         debug!("input");
@@ -426,7 +426,7 @@ where
         &mut self,
         ev: Witness<impl EqualityProposition<Prover, P>>,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         source: &[V],
         out: &mut Vec<T>,
     ) -> Result<()> {
@@ -442,7 +442,7 @@ where
         &mut self,
         ev: Witness<impl EqualityProposition<Verifier, P>>,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         source: usize,
         out: &mut Vec<Mac<P, V, T>>,
     ) -> Result<()> {
@@ -464,7 +464,7 @@ where
         &mut self,
         ev: Witness<impl EqualityProposition<Prover, P>>,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         x: V,
     ) -> Result<T> {
         debug!("input1");
@@ -480,7 +480,7 @@ where
         &mut self,
         ev: Witness<impl EqualityProposition<Verifier, P>>,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> Result<Mac<P, V, T>> {
         debug!("input1");
         let r = self.random(channel, rng)?;
@@ -513,7 +513,7 @@ where
     pub fn check_zero<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         mac_batch: &[Mac<P, V, T>],
     ) -> Result<()> {
         debug!("check_zero");
@@ -532,7 +532,7 @@ where
                 seed
             }
         };
-        let mut rng = AesRng::from_seed(seed);
+        let mut rng = SwankyRng::from_seed(seed);
 
         let b = match P::WHICH {
             WhichParty::Prover(ev) => {
@@ -602,7 +602,7 @@ where
         }
 
         let seed = Block::from(<[u8; 16]>::try_from(&hasher.finalize().as_bytes()[0..16]).unwrap());
-        let mut rng = AesRng::from_seed(seed);
+        let mut rng = SwankyRng::from_seed(seed);
 
         match P::WHICH {
             WhichParty::Prover(_) => {
@@ -648,7 +648,7 @@ where
     pub fn quicksilver_check_multiply<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         triples: &[(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>)],
     ) -> Result<()> {
         match P::WHICH {
@@ -746,7 +746,7 @@ where
     pub fn quicksilver_finalize<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         state: &mut MultCheckState<P, V, T>,
     ) -> Result<usize> {
         debug!("FCom: quicksilver_finalize");
@@ -758,7 +758,7 @@ where
     pub fn gen_mask<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> Result<Mac<P, T, T>> {
         let mut macs = GenericArray::<_, DegreeModulo<V, T>>::default();
         for mac in macs.iter_mut() {
@@ -787,7 +787,7 @@ mod tests {
         private::{PartyPrivate, PartyPrivateCopy},
         ty_eq::Witness,
     };
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     fn test_fcom_random<V: IsSubFieldOf<T>, T: FiniteField>()
@@ -797,7 +797,7 @@ mod tests {
         let count = 100;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::from_seed(Default::default());
+            let mut rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -821,7 +821,7 @@ mod tests {
             .unwrap();
             v
         });
-        let mut rng = AesRng::from_seed(Default::default());
+        let mut rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -857,7 +857,7 @@ mod tests {
         let count = 200;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::from_seed(Default::default());
+            let mut rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -888,7 +888,7 @@ mod tests {
             .unwrap();
             v
         });
-        let mut rng = AesRng::from_seed(Default::default());
+        let mut rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -930,7 +930,7 @@ mod tests {
         let count = 50;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::from_seed(Default::default());
+            let mut rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -958,7 +958,7 @@ mod tests {
                 .unwrap();
             v
         });
-        let mut rng = AesRng::from_seed(Default::default());
+        let mut rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -992,7 +992,7 @@ mod tests {
         let count = 50;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::from_seed(Default::default());
+            let mut rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -1034,7 +1034,7 @@ mod tests {
                 assert!(r.is_err());
             }
         });
-        let mut rng = AesRng::from_seed(Default::default());
+        let mut rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -1084,7 +1084,7 @@ mod tests {
         let (sender, receiver) = UnixStream::pair().unwrap();
 
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::from_seed(Default::default());
+            let mut rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender_vole.try_clone().unwrap());
             let writer = BufWriter::new(sender_vole);
             let mut channel_vole = SyncChannel::new(reader, writer);
@@ -1105,7 +1105,7 @@ mod tests {
                 svole_prover.run(&mut channel_vole, &mut rng).unwrap();
             });
 
-            let mut rng = AesRng::from_seed(Default::default());
+            let mut rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -1129,7 +1129,7 @@ mod tests {
                 .unwrap();
             v
         });
-        let mut rng = AesRng::from_seed(Default::default());
+        let mut rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver_vole.try_clone().unwrap());
         let writer = BufWriter::new(receiver_vole);
         let mut channel_vole = SyncChannel::new(reader, writer);
@@ -1150,7 +1150,7 @@ mod tests {
             svole_receiver.run(&mut channel_vole, &mut rng).unwrap();
         });
 
-        let mut rng = AesRng::from_seed(Default::default());
+        let mut rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);

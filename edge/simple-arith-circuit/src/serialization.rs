@@ -36,7 +36,7 @@ mod tests {
     use proptest::prelude::*;
     use rand::{SeedableRng, distributions::Uniform, prelude::Distribution};
     use swanky_block::Block;
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     fn any_seed() -> impl Strategy<Value = Block> {
         any::<u128>().prop_map(Block::from)
@@ -47,7 +47,7 @@ mod tests {
             proptest! {
                 #[test]
                 fn $name(seed in any_seed()) {
-                    let mut rng = AesRng::from_seed(seed);
+                    let mut rng = SwankyRng::from_seed(seed);
                     let ninputs_range = Uniform::from(2..100);
                     let noutputs_range = Uniform::from(2..100);
                     let ngates_range = Uniform::from(200..2000);

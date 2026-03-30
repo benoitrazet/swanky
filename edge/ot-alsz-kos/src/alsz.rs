@@ -15,19 +15,19 @@ use swanky_ot_traits::{
     CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
     Receiver as OtReceiver, Sender as OtSender,
 };
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 /// Oblivious transfer sender.
 pub struct Sender<OT: OtReceiver<Msg = Block> + SemiHonest = swanky_ot_chou_orlandi::Receiver> {
     _ot: PhantomData<OT>,
     s: Vec<bool>,
     pub(super) s_: Block,
-    rngs: Vec<AesRng>,
+    rngs: Vec<SwankyRng>,
 }
 /// Oblivious transfer receiver.
 pub struct Receiver<OT: OtSender<Msg = Block> + SemiHonest = swanky_ot_chou_orlandi::Sender> {
     _ot: PhantomData<OT>,
-    rngs: Vec<(AesRng, AesRng)>,
+    rngs: Vec<(SwankyRng, SwankyRng)>,
 }
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> FixedKeyInitializer for Sender<OT> {
@@ -41,8 +41,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> FixedKeyInitializer for Sender<OT
         let ks = ot.receive(channel, &s, rng)?;
         let rngs = ks
             .into_iter()
-            .map(AesRng::from_seed)
-            .collect::<Vec<AesRng>>();
+            .map(SwankyRng::from_seed)
+            .collect::<Vec<SwankyRng>>();
         Ok(Self {
             _ot: PhantomData::<OT>,
             s,
@@ -215,8 +215,8 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
         ot.send(channel, &ks, rng)?;
         let rngs = ks
             .into_iter()
-            .map(|(k0, k1)| (AesRng::from_seed(k0), AesRng::from_seed(k1)))
-            .collect::<Vec<(AesRng, AesRng)>>();
+            .map(|(k0, k1)| (SwankyRng::from_seed(k0), SwankyRng::from_seed(k1)))
+            .collect::<Vec<(SwankyRng, SwankyRng)>>();
         Ok(Self {
             _ot: PhantomData::<OT>,
             rngs,

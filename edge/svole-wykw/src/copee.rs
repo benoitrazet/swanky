@@ -181,14 +181,14 @@ mod tests {
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F2, F128b};
     use swanky_field_f61p::F61p;
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     fn test_copee_<FE: FF>(len: usize) {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let input = FE::PrimeField::random(&mut rng);
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);

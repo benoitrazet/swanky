@@ -23,7 +23,7 @@ use std::time::Instant;
 use swanky_channel_legacy::{Channel, SyncChannel};
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_field_binary::{F2, F40b};
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 #[cfg(feature = "jemalloc")]
 use jemallocator::Jemalloc;
@@ -259,7 +259,7 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
             let mut channel = Channel::new(reader, writer);
 
             let start = Instant::now();
-            let rng = AesRng::new();
+            let rng = SwankyRng::new();
 
             let mut evaluator =
                 EvaluatorCirc::<Verifier, _, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
@@ -298,7 +298,7 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
             let mut channel = Channel::new(reader, writer);
 
             let start = Instant::now();
-            let rng = AesRng::new();
+            let rng = SwankyRng::new();
 
             let mut evaluator =
                 EvaluatorCirc::<Prover, _, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
@@ -359,7 +359,7 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
             let init_time = Instant::now();
             let total_time = Instant::now();
 
-            let rng = AesRng::new();
+            let rng = SwankyRng::new();
 
             let mut handles = vec![];
             let (mut evaluator, handles_f2) = EvaluatorCirc::<
@@ -423,7 +423,7 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
             let init_time = Instant::now();
             let total_time = Instant::now();
 
-            let rng = AesRng::new();
+            let rng = SwankyRng::new();
 
             let mut handles = vec![];
             let (mut evaluator, handles_f2) = EvaluatorCirc::<

@@ -20,7 +20,7 @@ use swanky_party::{
     private::{PartyPrivate, PartyPrivateCopy},
     ty_eq::{EqualityProposition, Witness},
 };
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 /// Edabits struct
 #[derive(Clone)]
@@ -79,7 +79,7 @@ fn power_two<FE: FiniteField>(m: usize) -> FE {
 
 // Permutation pseudorandomly generated following Fisher-Yates method
 // `https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle`
-fn generate_permutation<T: Clone>(rng: &mut AesRng, v: &mut [T]) {
+fn generate_permutation<T: Clone>(rng: &mut SwankyRng, v: &mut [T]) {
     let size = v.len();
     if size == 0 {
         return;
@@ -233,7 +233,7 @@ impl<
     fn bit_add_carry<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         x_batch: &[Edabits<P, FE>],
         y_batch: &[Edabits<P, FE>],
     ) -> Result<Vec<(Vec<Mac<P, F2, F40b>>, Mac<P, F2, F40b>)>> {
@@ -424,7 +424,7 @@ impl<
     pub fn random_edabits<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         nb_bits: usize,
         num: usize, // in the paper: NB + C
     ) -> Result<Vec<Edabits<P, FE>>> {
@@ -479,7 +479,7 @@ impl<
     fn random_dabits<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         num: usize,
     ) -> Result<Vec<Dabit<P, FE>>> {
         let mut dabit_vec = Vec::with_capacity(num);
@@ -522,7 +522,7 @@ impl<
     fn fdabit<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         dabits: &[Dabit<P, FE>],
     ) -> Result<()> {
         let s = FDABIT_SECURITY_PARAMETER;
@@ -722,7 +722,7 @@ impl<
                 seed
             }
         };
-        let mut e_rng = AesRng::from_seed(seed);
+        let mut e_rng = SwankyRng::from_seed(seed);
         let mut e = (0..s).map(|_| Vec::with_capacity(n)).collect::<Vec<_>>();
         for ek in e.iter_mut() {
             for _ in 0..n {
@@ -891,7 +891,7 @@ impl<
     fn conv_loop<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         edabits_vector: &[Edabits<P, FE>],
         r: &[Edabits<P, FE>],
         dabits: &[Dabit<P, FE>],
@@ -977,7 +977,7 @@ impl<
     pub fn conv<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         num_bucket: usize,
         num_cut: usize,
         edabits_vector: &[Edabits<P, FE>],
@@ -1028,7 +1028,7 @@ impl<
                 seed
             }
         };
-        let mut shuffle_rng = AesRng::from_seed(seed);
+        let mut shuffle_rng = SwankyRng::from_seed(seed);
 
         // step 4): shuffle edabits, dabits, and triples
         generate_permutation(&mut shuffle_rng, &mut r);
@@ -1106,7 +1106,7 @@ mod tests {
         private::{PartyPrivate, PartyPrivateCopy},
         ty_eq::Witness,
     };
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     const DEFAULT_NUM_BUCKET: usize = 5;
@@ -1117,7 +1117,7 @@ mod tests {
         let count = 100;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -1179,7 +1179,7 @@ mod tests {
             }
             res
         });
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -1249,7 +1249,7 @@ mod tests {
         let carry = F2::ONE;
 
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -1313,7 +1313,7 @@ mod tests {
                 .unwrap();
             (res, c)
         });
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -1373,7 +1373,7 @@ mod tests {
         let count = 5;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -1386,7 +1386,7 @@ mod tests {
             let dabits = fconv.random_dabits(&mut channel, &mut rng, count).unwrap();
             fconv.fdabit(&mut channel, &mut rng, &dabits).unwrap();
         });
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -1407,7 +1407,7 @@ mod tests {
         let (sender, receiver) = UnixStream::pair().unwrap();
 
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -1434,7 +1434,7 @@ mod tests {
                     .unwrap();
             }
         });
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);

@@ -14,7 +14,7 @@ use std::{
 };
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, ResultExt, WrapErr};
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 use swanky_svole_wykw::base_svole::{Receiver as BaseReceiver, Sender as BaseSender};
 
 pub struct VoleContext<P: Party, T: MacTypes> {
@@ -35,12 +35,12 @@ impl<P: Party> VoleContexts<P> {
 
 pub fn init_base_vole<P: Party, C: Read + Write>(
     gvn: &[GlobalVolesNeeded],
-    rng: &mut AesRng,
+    rng: &mut SwankyRng,
     conn: &mut C,
 ) -> swanky_error::Result<Vec<VoleContexts<P>>> {
     // TODO: we shouldn't service the entirety of these requests with base vole.
     struct V<'a, P: Party, C: Read + Write> {
-        rng: &'a mut AesRng,
+        rng: &'a mut SwankyRng,
         conn: &'a mut C,
         outs: &'a mut [SmallTypeMap<0>],
         gvn: &'a [GlobalVolesNeeded],

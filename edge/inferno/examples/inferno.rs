@@ -6,14 +6,14 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use swanky_field::FiniteField;
 use swanky_field_binary::F64b;
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 const N: usize = 16;
 const K: usize = 8;
 const T: usize = 40;
 
 fn circuitgen<F: FiniteField>(
-    rng: &mut AesRng,
+    rng: &mut SwankyRng,
     mults_only: bool,
     ninputs: usize,
     ngates: usize,
@@ -24,7 +24,7 @@ fn circuitgen<F: FiniteField>(
             ninputs,
             ngates,
         );
-        simple_arith_circuit::circuitgen::mul_zero_circuit::<F::PrimeField, AesRng>(
+        simple_arith_circuit::circuitgen::mul_zero_circuit::<F::PrimeField, SwankyRng>(
             ninputs, ngates, rng,
         )
     } else {
@@ -33,7 +33,7 @@ fn circuitgen<F: FiniteField>(
             ninputs,
             ngates
         );
-        simple_arith_circuit::circuitgen::random_zero_circuit::<F::PrimeField, AesRng>(
+        simple_arith_circuit::circuitgen::random_zero_circuit::<F::PrimeField, SwankyRng>(
             ninputs, ngates, rng,
         )
     };
@@ -41,7 +41,7 @@ fn circuitgen<F: FiniteField>(
 }
 
 fn prover<F: FiniteField>(args: Args) {
-    let mut rng = AesRng::from_entropy();
+    let mut rng = SwankyRng::from_entropy();
 
     let (circuit, witness) = circuitgen::<F>(&mut rng, args.mults_only, args.ninputs, args.ngates);
 

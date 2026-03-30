@@ -4,7 +4,7 @@ use criterion::{criterion_group, criterion_main};
 use humidor::ligero::noninteractive;
 use rand::SeedableRng;
 use simple_arith_circuit::circuitgen::random_zero_circuit;
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 type Hash = sha2::Sha256;
 type Field = swanky_field_ff_primes::F2e19x3e26;
@@ -25,7 +25,7 @@ pub fn bench_random_circuit_by_circuit_size(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("Prover", size), &size, |b, _| {
             b.iter_batched_ref(
                 || {
-                    let mut rng = AesRng::from_seed(Default::default());
+                    let mut rng = SwankyRng::from_seed(Default::default());
 
                     let (ckt, w) = random_zero_circuit(input_size, circuit_size, &mut rng);
 
@@ -43,7 +43,7 @@ pub fn bench_random_circuit_by_circuit_size(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("Verifier", size), &size, |b, _| {
             b.iter_batched(
                 || {
-                    let mut rng = AesRng::from_seed(Default::default());
+                    let mut rng = SwankyRng::from_seed(Default::default());
 
                     let (ckt, w) = random_zero_circuit(input_size, circuit_size, &mut rng);
 
@@ -76,7 +76,7 @@ pub fn bench_random_circuit_by_shared_size(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("Prover", size), &size, |b, _| {
             b.iter_batched_ref(
                 || {
-                    let mut rng = AesRng::from_seed(Default::default());
+                    let mut rng = SwankyRng::from_seed(Default::default());
 
                     let (ckt, w) = random_zero_circuit(input_size, circuit_size, &mut rng);
 
@@ -94,7 +94,7 @@ pub fn bench_random_circuit_by_shared_size(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("Verifier", size), &size, |b, _| {
             b.iter_batched(
                 || {
-                    let mut rng = AesRng::from_seed(Default::default());
+                    let mut rng = SwankyRng::from_seed(Default::default());
 
                     let (ckt, w) = random_zero_circuit(input_size, circuit_size, &mut rng);
 

@@ -6,7 +6,7 @@ use swanky_block::Block;
 use swanky_field::FiniteField;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F64b};
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 // The number of parties in the MPC
 const N: usize = 16;
@@ -18,7 +18,7 @@ const T: usize = 40;
 fn test<F: FiniteField>(
     circuit: Circuit<F::PrimeField>,
     witness: Vec<F::PrimeField>,
-    rng: &mut AesRng,
+    rng: &mut SwankyRng,
 ) {
     let proof = Proof::<F, N>::prove(&circuit, &witness, K, T, rng);
     let res = proof.verify(&circuit, K, T);
@@ -33,7 +33,7 @@ macro_rules! test_circuits {
     ($modname: ident, $field: ty) => {
         mod $modname {
             use super::*;
-            use swanky_rng::AesRng;
+            use swanky_rng::SwankyRng;
             use rand::SeedableRng;
             use rand::distributions::{Distribution, Uniform};
 
@@ -41,13 +41,13 @@ macro_rules! test_circuits {
                 #[test]
                 fn test_random_circuit(seed in any_seed()) {
                     // SimpleLogger::new().init().unwrap();
-                    let mut rng = AesRng::from_seed(seed);
+                    let mut rng = SwankyRng::from_seed(seed);
                     let input_range = Uniform::from(2..100);
                     let ninputs = input_range.sample(&mut rng);
                     let gate_range = Uniform::from(101..200);
                     let ngates = gate_range.sample(&mut rng);
                     let (circuit, witness) =
-                        simple_arith_circuit::circuitgen::random_zero_circuit::<<$field as FiniteField>::PrimeField, AesRng>(ninputs, ngates, &mut rng)
+                        simple_arith_circuit::circuitgen::random_zero_circuit::<<$field as FiniteField>::PrimeField, _>(ninputs, ngates, &mut rng)
                             ;
                     test::<$field>(circuit, witness, &mut rng);
                 }
@@ -57,13 +57,13 @@ macro_rules! test_circuits {
                 #[test]
                 fn test_and_circuit(seed in any_seed()) {
                     // SimpleLogger::new().init().unwrap();
-                    let mut rng = AesRng::from_seed(seed);
+                    let mut rng = SwankyRng::from_seed(seed);
                     let input_range = Uniform::from(2..100);
                     let ninputs = input_range.sample(&mut rng);
                     let gate_range = Uniform::from(101..200);
                     let ngates = gate_range.sample(&mut rng);
                     let (circuit, witness) =
-                        simple_arith_circuit::circuitgen::mul_zero_circuit::<<$field as FiniteField>::PrimeField, AesRng>(ninputs, ngates, &mut rng);
+                        simple_arith_circuit::circuitgen::mul_zero_circuit::<<$field as FiniteField>::PrimeField, _>(ninputs, ngates, &mut rng);
                     test::<$field>(circuit, witness, &mut rng);
                 }
             }
@@ -75,7 +75,7 @@ test_circuits!(test_circuits_f64b, F64b);
 
 #[test]
 fn test_bristol() {
-    let mut rng = AesRng::default();
+    let mut rng = SwankyRng::default();
     let base =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../simple-arith-circuit/circuits/bristol");
     for entry in base.read_dir().expect("directory should exist") {

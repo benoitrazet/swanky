@@ -23,7 +23,7 @@ mod nonstreaming {
     use itertools::Itertools;
     use rand::{SeedableRng, thread_rng};
     use swanky_channel::Channel;
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
     use vectoreyes::U8x16;
 
     // helper
@@ -36,7 +36,7 @@ mod nonstreaming {
             let q = rng.gen_prime();
             let c = Channel::with(std::io::empty(), |channel| Ok(f(q, channel))).unwrap();
             let (en, ev, output_mapping) =
-                GarbledCircuit::garble::<AllWire, _, _>(&c, AesRng::new()).unwrap();
+                GarbledCircuit::garble::<AllWire, _, _>(&c, SwankyRng::new()).unwrap();
             for _ in 0..16 {
                 let mut inps = Vec::new();
                 for i in 0..c.num_evaluator_inputs() {
@@ -169,7 +169,7 @@ mod nonstreaming {
 
     #[test] // half_gate_unequal_mods
     fn half_gate_unequal_mods() {
-        let mut rng = AesRng::from_seed(U8x16::from(0_u128));
+        let mut rng = SwankyRng::from_seed(U8x16::from(0_u128));
         for q in 3..16 {
             let ymod = 2 + rng.gen_u16() % 6; // lower mod is capped at 8 for now
             println!("\nTESTING MOD q={} ymod={}", q, ymod);
@@ -185,7 +185,8 @@ mod nonstreaming {
             })
             .unwrap();
 
-            let (en, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&c, AesRng::new()).unwrap();
+            let (en, ev, _) =
+                GarbledCircuit::garble::<AllWire, _, _>(&c, SwankyRng::new()).unwrap();
 
             for x in 0..q {
                 for y in 0..ymod {
@@ -218,7 +219,7 @@ mod nonstreaming {
         })
         .unwrap();
 
-        let (en, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&circ, AesRng::new()).unwrap();
+        let (en, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&circ, SwankyRng::new()).unwrap();
         println!("mods={:?} nargs={} size={}", mods, nargs, ev.size());
 
         let Q: u128 = mods.iter().map(|&q| q as u128).product();
@@ -252,7 +253,7 @@ mod nonstreaming {
             Ok(b.finish())
         })
         .unwrap();
-        let (_, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&circ, AesRng::new()).unwrap();
+        let (_, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&circ, SwankyRng::new()).unwrap();
 
         for _ in 0..64 {
             let outputs = eval_plain(&circ, &[], &[]).unwrap();
@@ -279,7 +280,7 @@ mod nonstreaming {
         })
         .unwrap();
 
-        let (en, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&circ, AesRng::new()).unwrap();
+        let (en, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&circ, SwankyRng::new()).unwrap();
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
@@ -303,7 +304,7 @@ mod streaming {
     use itertools::Itertools;
     use rand::thread_rng;
     use swanky_channel::Channel;
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     // helper - checks that Streaming evaluation of a fancy function equals Dummy
     // evaluation of the same function
@@ -314,14 +315,14 @@ mod streaming {
         input_mods: &[u16],
     ) where
         Wire: WireLabel,
-        FGB: FnMut(&mut Garbler<AesRng, Wire>, &[Wire], &mut Channel) -> Option<u16>
+        FGB: FnMut(&mut Garbler<SwankyRng, Wire>, &[Wire], &mut Channel) -> Option<u16>
             + Send
             + Sync
             + 'static,
         FEV: FnMut(&mut Evaluator<Wire>, &[Wire], &mut Channel) -> Option<u16> + Send,
         FDU: FnMut(&mut Dummy, &[DummyVal], &mut Channel) -> Option<u16>,
     {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let inputs = input_mods.iter().map(|q| rng.gen_u16() % q).collect_vec();
         let input_mods_ = input_mods.to_vec();
 
@@ -485,7 +486,7 @@ mod complex {
     use itertools::Itertools;
     use rand::thread_rng;
     use swanky_channel::Channel;
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     fn complex_gadget<F: FancyArithmetic + FancyBinary>(
         b: &mut F,
@@ -528,7 +529,7 @@ mod complex {
 
             let (_, result) = swanky_channel::local::local_channel_pair(
                 |channel| {
-                    let mut garbler = Garbler::<_, AllWire>::new(AesRng::new(), channel)?;
+                    let mut garbler = Garbler::<_, AllWire>::new(SwankyRng::new(), channel)?;
 
                     // encode input and send it to the evaluator
                     let mut gb_inp = Vec::with_capacity(N);

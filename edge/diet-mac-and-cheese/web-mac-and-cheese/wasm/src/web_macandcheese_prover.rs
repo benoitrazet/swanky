@@ -13,7 +13,7 @@ use std::io::Cursor;
 use std::panic;
 use swanky_channel_legacy::TrackChannel;
 use swanky_field_binary::{F2, F40b};
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -27,7 +27,7 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     // This sets the panic hook to the browser console
     panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    let rng = AesRng::new();
+    let rng = SwankyRng::new();
     let mut channel = TrackChannel::new(ShimChannel::new());
     let mut inputs = CircInputs::default();
 

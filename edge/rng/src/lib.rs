@@ -16,9 +16,9 @@ pub use vectorized::UniformIntegersUnderBound;
 /// This uses AES in a counter-mode-esque way, but with the counter always
 /// starting at zero. When used as a PRNG this is okay [TODO: citation?].
 #[derive(Clone, Debug)]
-pub struct AesRng(BlockRng64<AesRngCore>);
+pub struct SwankyRng(BlockRng64<AesRngCore>);
 
-impl RngCore for AesRng {
+impl RngCore for SwankyRng {
     #[inline]
     fn next_u32(&mut self) -> u32 {
         self.0.next_u32()
@@ -37,35 +37,35 @@ impl RngCore for AesRng {
     }
 }
 
-impl SeedableRng for AesRng {
+impl SeedableRng for SwankyRng {
     type Seed = <AesRngCore as SeedableRng>::Seed;
 
     #[inline]
     fn from_seed(seed: Self::Seed) -> Self {
-        AesRng(BlockRng64::<AesRngCore>::from_seed(seed))
+        SwankyRng(BlockRng64::<AesRngCore>::from_seed(seed))
     }
     #[inline]
     fn from_rng<R: RngCore>(rng: R) -> Result<Self, Error> {
-        BlockRng64::<AesRngCore>::from_rng(rng).map(AesRng)
+        BlockRng64::<AesRngCore>::from_rng(rng).map(SwankyRng)
     }
 }
 
-impl CryptoRng for AesRng {}
+impl CryptoRng for SwankyRng {}
 
-impl AesRng {
+impl SwankyRng {
     /// Create a new random number generator using a random seed from
     /// `rand::random`.
     #[inline]
     pub fn new() -> Self {
         let seed: U8x16 = rand::random();
-        AesRng::from_seed(seed)
+        SwankyRng::from_seed(seed)
     }
 
     /// Create a new RNG using a random seed from this one.
     #[inline]
     pub fn fork(&mut self) -> Self {
         let seed = self.r#gen::<U8x16>();
-        AesRng::from_seed(seed)
+        SwankyRng::from_seed(seed)
     }
 
     /// Generate random bits.
@@ -87,7 +87,7 @@ impl AesRng {
     }
 }
 
-impl Default for AesRng {
+impl Default for SwankyRng {
     #[inline]
     fn default() -> Self {
         Self::new()
@@ -145,10 +145,10 @@ impl SeedableRng for AesRngCore {
 
 impl CryptoRng for AesRngCore {}
 
-impl From<AesRngCore> for AesRng {
+impl From<AesRngCore> for SwankyRng {
     #[inline]
     fn from(core: AesRngCore) -> Self {
-        AesRng(BlockRng64::new(core))
+        SwankyRng(BlockRng64::new(core))
     }
 }
 
@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn test_generate() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let a = rng.r#gen::<[U8x16; 8]>();
         let b = rng.r#gen::<[U8x16; 8]>();
         assert_ne!(a, b);

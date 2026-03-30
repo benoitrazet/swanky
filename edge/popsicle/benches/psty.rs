@@ -3,7 +3,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use popsicle::psty::{Receiver, Sender};
 use std::time::Duration;
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 const SIZE: usize = 15;
 
@@ -18,12 +18,12 @@ fn rand_vec_vec(size: usize) -> Vec<Vec<u8>> {
 fn bench_psty_init() {
     swanky_channel::local::local_channel_pair(
         |channel| {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let _ = Sender::init(channel, &mut rng).unwrap();
             Ok(())
         },
         |channel| {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let _ = Receiver::init(channel, &mut rng).unwrap();
             Ok(())
         },
@@ -34,13 +34,13 @@ fn bench_psty_init() {
 fn bench_psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
     swanky_channel::local::local_channel_pair(
         |channel| {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let mut p1 = Sender::init(channel, &mut rng).unwrap();
             p1.send(&inputs1, channel, &mut rng).unwrap();
             Ok(())
         },
         |channel| {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let mut p2 = Receiver::init(channel, &mut rng).unwrap();
             p2.receive(&inputs2, channel, &mut rng).unwrap();
             Ok(())

@@ -26,7 +26,7 @@ use std::time::Instant;
 use swanky_channel_legacy::TrackChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::{F2, F40b};
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 use tungstenite::Message;
 use tungstenite::accept;
 use web_mac_n_cheese_websocket::channel_websocket::WsChannel;
@@ -69,7 +69,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
     let mut channel = TrackChannel::new(WsChannel::new(websocket));
 
     // MAC AND CHEESE STARTS
-    let rng = AesRng::new();
+    let rng = SwankyRng::new();
 
     let no_batching = false;
     let mut evaluator =

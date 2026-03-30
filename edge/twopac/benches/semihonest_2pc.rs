@@ -7,7 +7,7 @@ use fancy_garbling::{
 };
 use std::{fs::File, io::BufReader, time::Duration};
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 fn circuit(fname: &str) -> Circuit {
@@ -20,8 +20,8 @@ fn _bench_circuit(circ: &Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
     let n_ev_inputs = ev_inputs.len();
     swanky_channel::local::local_channel_pair(
         |channel| {
-            let rng = AesRng::new();
-            let mut gb = Garbler::<AesRng, OtSender, WireMod2>::new(channel, rng).unwrap();
+            let rng = SwankyRng::new();
+            let mut gb = Garbler::<SwankyRng, OtSender, WireMod2>::new(channel, rng).unwrap();
             let xs = gb
                 .encode_many(&gb_inputs, &vec![2; n_gb_inputs], channel)
                 .unwrap();
@@ -30,8 +30,8 @@ fn _bench_circuit(circ: &Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
             Ok(())
         },
         |channel| {
-            let rng = AesRng::new();
-            let mut ev = Evaluator::<AesRng, OtReceiver, WireMod2>::new(channel, rng).unwrap();
+            let rng = SwankyRng::new();
+            let mut ev = Evaluator::<SwankyRng, OtReceiver, WireMod2>::new(channel, rng).unwrap();
             let xs = ev.receive_many(&vec![2; n_gb_inputs], channel).unwrap();
             let ys = ev
                 .encode_many(&ev_inputs, &vec![2; n_ev_inputs], channel)

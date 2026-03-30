@@ -7,7 +7,7 @@ use fancy_garbling::{
 };
 use std::time::Duration;
 use swanky_channel::Channel;
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 fn bench_garble<F>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
 where
@@ -16,7 +16,7 @@ where
     c.bench_function(&format!("garbling::{}_gb ({})", name, q), move |bench| {
         let c = make_circuit(q);
         bench.iter(|| {
-            let gb = GarbledCircuit::garble::<AllWire, _, _>(&c, AesRng::new()).unwrap();
+            let gb = GarbledCircuit::garble::<AllWire, _, _>(&c, SwankyRng::new()).unwrap();
             std::hint::black_box(gb);
         });
     });
@@ -29,7 +29,7 @@ where
     c.bench_function(&format!("garbling::{}_ev ({})", name, q), move |bench| {
         let mut rng = rand::thread_rng();
         let c = make_circuit(q);
-        let (en, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&c, AesRng::new()).unwrap();
+        let (en, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&c, SwankyRng::new()).unwrap();
         let inps = (0..c.num_garbler_inputs())
             .map(|i| rng.gen_u16() % c.garbler_input_mod(i))
             .collect::<Vec<u16>>();

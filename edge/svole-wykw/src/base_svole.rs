@@ -10,7 +10,7 @@ use rand::{CryptoRng, Rng, SeedableRng};
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
 use swanky_ocelot_error::Error;
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 /// The base VOLE sender
 pub struct Sender<FE: FF> {
@@ -58,7 +58,7 @@ impl<FE: FF> Sender<FE> {
         }
         channel.flush()?;
         let seed = channel.read_block()?;
-        let mut rng_chi = AesRng::from_seed(seed);
+        let mut rng_chi = SwankyRng::from_seed(seed);
         for (u, w) in uws.iter().copied() {
             let chi = FE::random(&mut rng_chi);
             z += chi * w;
@@ -104,7 +104,7 @@ impl<FE: FF> Receiver<FE> {
         let r = Degree::<FE>::USIZE;
         let mut v: Vec<FE> = Vec::with_capacity(len);
         let seed = rng.r#gen();
-        let mut rng_chi = AesRng::from_seed(seed);
+        let mut rng_chi = SwankyRng::from_seed(seed);
         let mut y: FE = FE::ZERO;
         for _ in 0..len {
             v.push(self.copee.receive(channel)?);
@@ -141,12 +141,12 @@ mod tests {
     use swanky_field::FiniteField as FF;
     use swanky_field_binary::{F40b, F128b};
     use swanky_field_f61p::F61p;
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     fn test_base_svole<FE: FF>(len: usize) {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -154,7 +154,7 @@ mod tests {
             let mut vole = Sender::<FE>::init(&mut channel, pows, &mut rng).unwrap();
             vole.send(&mut channel, len, &mut rng).unwrap()
         });
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);

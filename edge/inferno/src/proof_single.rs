@@ -15,7 +15,7 @@ use simple_arith_circuit::Circuit;
 use swanky_block::Block;
 use swanky_field::FiniteField;
 use swanky_field::FiniteRing;
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 /// The proof for a single execution of the protocol. `N` denotes
 /// the number of participants in the MPC.
@@ -40,7 +40,7 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
         witness: &[F::PrimeField],
         compression_factor: usize,
         cache: &Cache<F>,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> Self {
         let nrounds = crate::utils::nrounds(circuit, compression_factor);
         let nmuls = circuit.nmuls();
@@ -53,7 +53,7 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
             .collect::<Vec<u128>>()
             .try_into()
             .unwrap(); // This `unwrap` will never fail.
-        let mut rngs = seeds.map(|seed| AesRng::from_seed(Block::from(seed)));
+        let mut rngs = seeds.map(|seed| SwankyRng::from_seed(Block::from(seed)));
 
         // Secret share the witness.
         let ws: Vec<SecretSharing<F::PrimeField, N>> = witness
@@ -345,32 +345,32 @@ impl<F: FiniteField, const N: usize> OpenedPartiesShares<F, N> {
         }
     }
 
-    pub fn reconstruct_rngs(&self) -> [AesRng; N] {
+    pub fn reconstruct_rngs(&self) -> [SwankyRng; N] {
         self.seeds
             .iter()
-            .map(|seed| AesRng::from_seed(Block::from(*seed)))
-            .collect::<Vec<AesRng>>()
+            .map(|seed| SwankyRng::from_seed(Block::from(*seed)))
+            .collect::<Vec<SwankyRng>>()
             .try_into()
             .unwrap() // This `unwrap` will never fail
     }
 
     pub fn reconstruct_witness(
         &self,
-        rngs: &mut [AesRng; N],
+        rngs: &mut [SwankyRng; N],
     ) -> Vec<CorrectionSharing<F::PrimeField, N>> {
         Self::reconstruct(&self.witness, rngs)
     }
 
     pub fn reconstruct_mults(
         &self,
-        rngs: &mut [AesRng; N],
+        rngs: &mut [SwankyRng; N],
     ) -> Vec<CorrectionSharing<F::PrimeField, N>> {
         Self::reconstruct(&self.mults, rngs)
     }
 
     fn reconstruct(
         corrections: &[F::PrimeField],
-        rngs: &mut [AesRng; N],
+        rngs: &mut [SwankyRng; N],
     ) -> Vec<CorrectionSharing<F::PrimeField, N>> {
         corrections
             .iter()
@@ -435,8 +435,8 @@ mod tests {
                 proptest! {
                 #[test]
                 fn serialize_bincode(seed in any_seed()) {
-                    let mut rng = AesRng::from_seed(seed);
-                    let (circuit, witness) = simple_arith_circuit::circuitgen::random_zero_circuit::<<$field as FiniteField>::PrimeField, AesRng>(10, 1000, &mut rng);
+                    let mut rng = SwankyRng::from_seed(seed);
+                    let (circuit, witness) = simple_arith_circuit::circuitgen::random_zero_circuit::<<$field as FiniteField>::PrimeField, SwankyRng>(10, 1000, &mut rng);
                     let cache = crate::cache::Cache::new(&circuit, K, true);
                     let proof = ProofSingle::<$field, N>::prove(&circuit, &witness, K, &cache, &mut rng);
                     let serialized = bincode::serialize(&proof).unwrap();

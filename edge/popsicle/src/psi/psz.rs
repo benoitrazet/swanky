@@ -283,26 +283,26 @@ mod tests {
         os::unix::net::UnixStream,
     };
     use swanky_channel_legacy::Channel;
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     const ITEM_SIZE: usize = 8;
     const SET_SIZE: usize = 1 << 16;
 
     #[test]
     fn test_psi_complete_intersection() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
         let receiver_inputs = sender_inputs.clone();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
             let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
             psi.send(&sender_inputs, &mut channel, &mut rng).unwrap();
         });
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -316,7 +316,7 @@ mod tests {
 
     #[test]
     fn test_payloads() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let (sender, receiver) = UnixStream::pair().unwrap();
 
         let intersection_size = SET_SIZE / 2;
@@ -330,7 +330,7 @@ mod tests {
 
         let thread_sender_inputs = sender_inputs.clone();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -339,7 +339,7 @@ mod tests {
                 .unwrap()
         });
 
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);

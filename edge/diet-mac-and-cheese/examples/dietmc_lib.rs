@@ -26,7 +26,7 @@ use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::{F2, F40b};
 use swanky_field_f61p::F61p;
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 fn field_to_number<F: FiniteField>(v: F) -> Number {
     // NOTE: We assume that `to_bytes()` converts a field value into a sequence of bytes in lower-endian.
@@ -115,7 +115,7 @@ fn main() -> Result<()> {
         let mut evaluator =
             EvaluatorCirc::<Verifier, _, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
                 &mut channel,
-                AesRng::new(),
+                SwankyRng::new(),
                 CircInputs::default(),
                 TypeStore::default(),
                 lpn_size,
@@ -125,7 +125,7 @@ fn main() -> Result<()> {
         println!("Load the F61p backend");
         evaluator.load_backend(
             &mut channel,
-            AesRng::new(),
+            SwankyRng::new(),
             std::any::TypeId::of::<F61p>(),
             ty as usize,
             lpn_size,
@@ -159,7 +159,7 @@ fn main() -> Result<()> {
         let mut evaluator =
             EvaluatorCirc::<Prover, _, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
                 &mut channel,
-                AesRng::new(),
+                SwankyRng::new(),
                 CircInputs::default(),
                 TypeStore::default(),
                 lpn_size,
@@ -169,7 +169,7 @@ fn main() -> Result<()> {
         println!("Load the F61p backend");
         evaluator.load_backend(
             &mut channel,
-            AesRng::new(),
+            SwankyRng::new(),
             std::any::TypeId::of::<F61p>(),
             ty as usize,
             lpn_size,

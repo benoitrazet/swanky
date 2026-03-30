@@ -91,7 +91,7 @@ mod tests {
     use super::*;
     use fancy_garbling::{BinaryGadgets, Fancy, FancyBinary, FancyReveal};
     use swanky_party::party_system;
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     party_system! {
         mod ps {
@@ -127,7 +127,7 @@ mod tests {
         let input_size = 400;
         let (_shares_gb, _shares_ev) = swanky_channel::local::local_channel_pair(
             |c| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut generator_and_triples = AndTripleGenerator::<Garbler>::new(c, &mut rng)?;
                 Ok(f_preprocessing(
                     fancy_sum,
@@ -138,7 +138,7 @@ mod tests {
                 ))
             },
             |c| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut generator_and_triples = AndTripleGenerator::<Evaluator>::new(c, &mut rng)?;
                 Ok(f_preprocessing(
                     fancy_sum,

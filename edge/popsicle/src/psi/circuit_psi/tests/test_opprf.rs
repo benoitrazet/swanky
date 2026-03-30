@@ -10,7 +10,7 @@ mod tests {
 
     use std::collections::HashSet;
     use swanky_block::Block512;
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     // Run the base psi up to the opprf exchange
     fn psty_up_to_opprf(
@@ -27,7 +27,7 @@ mod tests {
         let ((sender, result_opprf_sender), (receiver, result_opprf_receiver)) =
             swanky_channel::local::local_channel_pair(
                 |channel| {
-                    let mut rng = AesRng::seed_from_u64(seed_sx);
+                    let mut rng = SwankyRng::seed_from_u64(seed_sx);
                     let mut sender = OpprfSender::init(channel, &mut rng, true).unwrap();
                     let _ = sender.hash_data(set, Some(payloads), channel, &mut rng);
                     let result_opprf_sender = sender.opprf_exchange(channel, &mut rng);
@@ -35,7 +35,7 @@ mod tests {
                     Ok((sender, result_opprf_sender))
                 },
                 |channel| {
-                    let mut rng = AesRng::seed_from_u64(seed_rx);
+                    let mut rng = SwankyRng::seed_from_u64(seed_rx);
                     let mut receiver = OpprfReceiver::init(channel, &mut rng, true).unwrap();
                     let _ = receiver.hash_data(set, Some(payloads), channel, &mut rng);
                     let result_opprf_receiver = receiver.opprf_exchange(channel, &mut rng);
@@ -91,7 +91,7 @@ mod tests {
     #[test]
     fn test_psty_opprf_sender_succeeded_arbitrary_set() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = rand_u8_vec_unique(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, _, result_opprf_sender, _) =
@@ -105,7 +105,7 @@ mod tests {
     #[test]
     fn test_psty_opprf_sender_succeeded_arbitrary_payload() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
@@ -120,7 +120,7 @@ mod tests {
     #[test]
     fn test_psty_opprf_sender_succeeded_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
@@ -135,7 +135,7 @@ mod tests {
     #[test]
     fn test_psty_opprf_receiver_succeeded_arbitrary_set() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = rand_u8_vec_unique(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, _, _, result_opprf_receiver) =
@@ -149,7 +149,7 @@ mod tests {
     #[test]
     fn test_psty_opprf_receiver_succeeded_arbitrary_payloads() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn test_psty_opprf_receiver_succeeded_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, _, _, result_opprf_receiver) =
@@ -178,7 +178,7 @@ mod tests {
     #[test]
     fn test_psty_opprf_preserved_arbitrary_set() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = rand_u8_vec_unique(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
@@ -196,7 +196,7 @@ mod tests {
     #[test]
     fn test_psty_opprf_preserved_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
@@ -214,7 +214,7 @@ mod tests {
     #[test]
     fn test_psty_opprf_preserved_arbitrary_payloads() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
@@ -233,7 +233,7 @@ mod tests {
     #[test]
     fn test_psty_opprf_preserved_payloads_preserved_arbitrary_set() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = rand_u8_vec_unique(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
@@ -251,7 +251,7 @@ mod tests {
     #[test]
     fn test_psty_opprf_sender_payloads_preserved_arbitrary_payloads() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
@@ -270,7 +270,7 @@ mod tests {
     #[test]
     fn test_psty_opprf_sender_payloads_preserved_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
@@ -288,7 +288,7 @@ mod tests {
     #[test]
     fn test_psty_opprf_receiver_payloads_preserved_arbitrary_set() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = rand_u8_vec_unique(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
@@ -306,7 +306,7 @@ mod tests {
     #[test]
     fn test_psty_opprf_receiver_payloads_preserved_arbitrary_payloads() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = rand_u8_vec_unique(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
@@ -324,7 +324,7 @@ mod tests {
     #[test]
     fn test_psty_opprf_receiver_payloads_preserved_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =

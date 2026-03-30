@@ -400,12 +400,12 @@ mod tests {
         os::unix::net::UnixStream,
     };
     use swanky_channel_legacy::Channel;
-    use swanky_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     fn _test_opprf_points(ninputs: usize, npoints: usize, npoints_bound: usize) {
         assert!(ninputs <= npoints);
         assert!(npoints <= npoints_bound);
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let points = (0..npoints)
             .map(|_| (rng.r#gen::<Block>(), rng.r#gen()))
             .collect::<Vec<(Block, Block512)>>();
@@ -420,7 +420,7 @@ mod tests {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let points_ = points.clone();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -429,7 +429,7 @@ mod tests {
             oprf.send(&mut channel, &points_, ninputs, &mut rng)
                 .unwrap();
         });
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);

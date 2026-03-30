@@ -16,7 +16,7 @@ use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField};
 use swanky_field_binary::{F2, F40b};
 use swanky_party::private::PartyPrivateCopy;
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 // This file provides an implementation of the Plaintext backend.
 // `DietMacAndCheePlaintext<V,T>` is the main struct for this backend.
@@ -33,7 +33,7 @@ use swanky_rng::AesRng;
 
 pub(crate) struct DietMacAndCheesePlaintext<V: IsSubFieldOf<T>, T: FiniteField> {
     // The random generator is necessary for the random gate
-    rng: AesRng,
+    rng: SwankyRng,
     // This optional backend is for the extension field associated to the binary field.
     // It is necessary for lifting `F2` values to its tag extension field `F40b`.
     extfield_backend: Option<Box<DietMacAndCheesePlaintext<F40b, F40b>>>,

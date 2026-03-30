@@ -14,7 +14,7 @@ use swanky_ot_traits::{
     CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
     Receiver, Sender,
 };
-use swanky_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
@@ -35,7 +35,7 @@ pub fn test_otext<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Bloc
     let m1s_ = m1s.clone();
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
@@ -43,7 +43,7 @@ pub fn test_otext<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Bloc
         let ms = m0s.into_iter().zip(m1s).collect::<Vec<(Block, Block)>>();
         otext.send(&mut channel, &ms, &mut rng).unwrap();
     });
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
@@ -68,7 +68,7 @@ pub fn test_cotext<
     let out_ = out.clone();
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
@@ -78,7 +78,7 @@ pub fn test_cotext<
             .send_correlated(&mut channel, ninputs, delta, &mut rng)
             .unwrap();
     });
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
@@ -105,7 +105,7 @@ pub fn test_rotext<
     let out_ = out.clone();
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
@@ -113,7 +113,7 @@ pub fn test_rotext<
         let mut out = out.lock().unwrap();
         *out = otext.send_random(&mut channel, ninputs, &mut rng).unwrap();
     });
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
@@ -142,7 +142,7 @@ pub fn test_rotext_fixed_key<
     let key_ = key;
 
     let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
@@ -150,7 +150,7 @@ pub fn test_rotext_fixed_key<
         let mut out = out.lock().unwrap();
         *out = otext.send_random(&mut channel, ninputs, &mut rng).unwrap();
     });
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
