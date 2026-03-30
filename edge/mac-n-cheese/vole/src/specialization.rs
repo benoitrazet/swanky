@@ -347,7 +347,7 @@ where
     }
 
     /*fn copee_sender_128(
-        inputs_rng: &mut AesRng,
+        inputs_rng: &mut SwankyRng,
         copee: &mut CopeeSender<FE>,
         io: &mut impl Write,
         _s: &mut <<FE as FiniteField>::PrimeField as CanonicalSerialize>::Serializer,

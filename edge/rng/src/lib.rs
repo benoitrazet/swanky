@@ -16,7 +16,7 @@ pub use vectorized::UniformIntegersUnderBound;
 /// This uses AES in a counter-mode-esque way, but with the counter always
 /// starting at zero. When used as a PRNG this is okay [TODO: citation?].
 #[derive(Clone, Debug)]
-pub struct SwankyRng(BlockRng64<AesRngCore>);
+pub struct SwankyRng(BlockRng64<SwankyRngCore>);
 
 impl RngCore for SwankyRng {
     #[inline]
@@ -38,15 +38,15 @@ impl RngCore for SwankyRng {
 }
 
 impl SeedableRng for SwankyRng {
-    type Seed = <AesRngCore as SeedableRng>::Seed;
+    type Seed = <SwankyRngCore as SeedableRng>::Seed;
 
     #[inline]
     fn from_seed(seed: Self::Seed) -> Self {
-        SwankyRng(BlockRng64::<AesRngCore>::from_seed(seed))
+        SwankyRng(BlockRng64::<SwankyRngCore>::from_seed(seed))
     }
     #[inline]
     fn from_rng<R: RngCore>(rng: R) -> Result<Self, Error> {
-        BlockRng64::<AesRngCore>::from_rng(rng).map(SwankyRng)
+        BlockRng64::<SwankyRngCore>::from_rng(rng).map(SwankyRng)
     }
 }
 
@@ -94,15 +94,15 @@ impl Default for SwankyRng {
     }
 }
 
-/// The core of `AesRng`, used with `BlockRng`.
+/// The core of [`SwankyRng`], used with `BlockRng`.
 #[derive(Clone, Debug)]
-pub struct AesRngCore {
+pub struct SwankyRngCore {
     aes: Aes128EncryptOnly,
     // Overflowing a u64 would take well over 2^64 nanoseconds, which is over 500 years!
     counter: u64,
 }
 
-impl AesRngCore {
+impl SwankyRngCore {
     #[inline(always)]
     fn gen_rand_bits<const N: usize>(&mut self) -> [U8x16; N]
     where
@@ -120,7 +120,7 @@ impl AesRngCore {
     }
 }
 
-impl BlockRngCore for AesRngCore {
+impl BlockRngCore for SwankyRngCore {
     type Item = u64;
     type Results = [u64; Aes128EncryptOnly::BLOCK_COUNT_HINT * 2];
 
@@ -131,23 +131,23 @@ impl BlockRngCore for AesRngCore {
     }
 }
 
-impl SeedableRng for AesRngCore {
+impl SeedableRng for SwankyRngCore {
     type Seed = U8x16;
 
     #[inline]
     fn from_seed(seed: Self::Seed) -> Self {
-        AesRngCore {
+        SwankyRngCore {
             aes: Aes128EncryptOnly::new_with_key(seed),
             counter: 0,
         }
     }
 }
 
-impl CryptoRng for AesRngCore {}
+impl CryptoRng for SwankyRngCore {}
 
-impl From<AesRngCore> for SwankyRng {
+impl From<SwankyRngCore> for SwankyRng {
     #[inline]
-    fn from(core: AesRngCore) -> Self {
+    fn from(core: SwankyRngCore) -> Self {
         SwankyRng(BlockRng64::new(core))
     }
 }

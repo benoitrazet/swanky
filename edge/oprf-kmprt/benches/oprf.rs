@@ -169,13 +169,13 @@ fn bench_opprf(c: &mut Criterion) {
 //     c.bench_function("opprf::kmprt (t = 1, compute)", move |bench| {
 //         let (sender, receiver) = UnixStream::pair().unwrap();
 //         let handle = std::thread::spawn(move || {
-//             let mut rng = AesRng::new();
+//             let mut rng = SwankyRng::new();
 //             let reader = BufReader::new(receiver.try_clone().unwrap());
 //             let writer = BufWriter::new(receiver);
 //             let mut channel = Channel::new(reader, writer);
 //             let _ = OpprfSender::init(&mut channel, &mut rng).unwrap();
 //         });
-//         let mut rng = AesRng::new();
+//         let mut rng = SwankyRng::new();
 //         let reader = BufReader::new(sender.try_clone().unwrap());
 //         let writer = BufWriter::new(sender);
 //         let mut channel = Channel::new(reader, writer);

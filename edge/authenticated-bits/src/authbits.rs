@@ -49,7 +49,7 @@
 //! let (bits_prover, bits_verifier) = swanky_channel::local::local_channel_pair(
 //!     |c| {
 //!         // The prover.
-//!         let mut rng = swanky_aes_rng::AesRng::new();
+//!         let mut rng = swanky_rng::SwankyRng::new();
 //!         let bits = rng.r#gen::<[F2; 10]>();
 //!         let mut authbits: Vec<AuthBit<Prover>> = vec![];
 //!         let mut generator: AuthBitGenerator<_> = AuthBitGenerator::new(c, &mut rng)?;
@@ -59,7 +59,7 @@
 //!     },
 //!     |c| {
 //!         // The verifier.
-//!         let mut rng = swanky_aes_rng::AesRng::new();
+//!         let mut rng = swanky_rng::SwankyRng::new();
 //!         let count = 10;
 //!         let mut bits = vec![];
 //!         let mut authbits: Vec<AuthBit<Verifier>> = vec![];

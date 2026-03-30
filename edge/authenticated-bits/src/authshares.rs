@@ -33,7 +33,7 @@
 //! let (bits_a, bits_b) = swanky_channel::local::local_channel_pair(
 //!     |c| {
 //!         // Party A (the prover).
-//!         let mut rng = swanky_aes_rng::AesRng::new();
+//!         let mut rng = swanky_rng::SwankyRng::new();
 //!         let mut authshares: Vec<AuthShare<PartyA>> = vec![];
 //!         let mut bits: Vec<F2> = vec![];
 //!         let mut generator: AuthShareGenerator<_> = AuthShareGenerator::new(c, &mut rng)?;
@@ -43,7 +43,7 @@
 //!     },
 //!     |c| {
 //!         // Party B (the verifier).
-//!         let mut rng = swanky_aes_rng::AesRng::new();
+//!         let mut rng = swanky_rng::SwankyRng::new();
 //!         let mut authshares: Vec<AuthShare<PartyB>> = vec![];
 //!         let mut bits: Vec<F2> = vec![];
 //!         let mut generator: AuthShareGenerator<_> = AuthShareGenerator::new(c, &mut rng)?;
