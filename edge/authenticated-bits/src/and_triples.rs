@@ -170,8 +170,20 @@ impl<P: GenericParty> AndTripleGenerator<P> {
     ) -> swanky_error::Result<()> {
         // An AND triple is _also_ a leaky-AND triple (with no leak), so use
         // that `open` method here.
-        self.leaky_generator
-            .open(AndTriple::peel_slice(triples), channel)
+        AndTripleGenerator::open_with_delta(triples, self.delta(), channel)
+    }
+
+    /// Open the AND triples in `triples` using a supplied $`\Delta`$ value.
+    ///
+    /// This corresponds to opening each of the underlying authenticated shares.
+    pub fn open_with_delta(
+        triples: &[AndTriple<P>],
+        delta: U8x16,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<()> {
+        // An AND triple is _also_ a leaky-AND triple (with no leak), so use
+        // that `open` method here.
+        LeakyAndTripleGenerator::open_with_delta(AndTriple::peel_slice(triples), delta, channel)
     }
 
     /// Turn random AND triples into a "known" AND triples.
@@ -582,23 +594,15 @@ mod tests {
                 |channel| {
                     let mut shares: Vec<F2> = vec![];
                     let mut cs: Vec<F2> = vec![];
-                    generator_a
-                        .auth_share_generator()
-                        .open(&shares_a, &mut shares, channel)?;
-                    generator_a
-                        .auth_share_generator()
-                        .open(&cs_a, &mut cs, channel)?;
+                    generator_a.auth_share_generator().open(&shares_a, &mut shares, channel)?;
+                    generator_a.auth_share_generator().open(&cs_a, &mut cs, channel)?;
                     Ok((shares, cs))
                 },
                 |channel| {
                     let mut shares: Vec<F2> = vec![];
                     let mut cs: Vec<F2> = vec![];
-                    generator_b
-                        .auth_share_generator()
-                        .open(&shares_b, &mut shares, channel)?;
-                    generator_b
-                        .auth_share_generator()
-                        .open(&cs_b, &mut cs, channel)?;
+                    generator_b.auth_share_generator().open(&shares_b, &mut shares, channel)?;
+                    generator_b.auth_share_generator().open(&cs_b, &mut cs, channel)?;
                     Ok((shares, cs))
                 },
             )
