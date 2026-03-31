@@ -3654,13 +3654,13 @@ dependencies = [
 name = "zkv"
 version = "0.6.0"
 dependencies = [
- "anyhow",
  "bincode",
  "clap",
  "env_logger 0.11.9",
  "inferno",
  "log",
  "simple-arith-circuit",
+ "swanky-error",
  "swanky-field",
  "swanky-field-binary",
  "swanky-rng",
