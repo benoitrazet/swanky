@@ -35,7 +35,7 @@
 //! # use rand::Rng;
 //! # use swanky_authenticated_bits::authbits::{AuthBit, AuthBitGenerator};
 //! # use swanky_field_binary::F2;
-//! # use swanky_party::{party_system, either::PartyEither, private::PartyPrivate, ty_eq::Witness};
+//! # use swanky_party::{party_system, either::PartyEither, private::PartyPrivate, private::PartyPrivateCopy, ty_eq::Witness};
 //! # use std::iter::Copied;
 //! # use std::slice::Iter;
 //! # party_system! {
@@ -54,7 +54,7 @@
 //!         let mut authbits: Vec<AuthBit<Prover>> = vec![];
 //!         let mut generator: AuthBitGenerator<_> = AuthBitGenerator::new(c, &mut rng)?;
 //!         generator.generate(PartyEither::new(Witness::EQUAL_TYPES, bits.iter().copied()), &mut authbits, c, &mut rng)?;
-//!         generator.open(&authbits, PartyPrivate::empty(Witness::EQUAL_TYPES), c)?;
+//!         AuthBitGenerator::open(&authbits, PartyPrivateCopy::empty(Witness::EQUAL_TYPES), PartyPrivate::empty(Witness::EQUAL_TYPES), c)?;
 //!         Ok(bits.to_vec())
 //!     },
 //!     |c| {
@@ -66,7 +66,7 @@
 //!         let mut generator: AuthBitGenerator<_> = AuthBitGenerator::new(c, &mut rng)?;
 //!         let input: PartyEither<_, Copied<Iter<'_, F2>>, _> = PartyEither::new(Witness::EQUAL_TYPES, count);
 //!         generator.generate(input, &mut authbits, c, &mut rng)?;
-//!         generator.open(&authbits, PartyPrivate::new(&mut bits), c)?;
+//!         AuthBitGenerator::open(&authbits, generator.delta(), PartyPrivate::new(&mut bits), c)?;
 //!         Ok(bits)
 //!     }
 //! )?;
@@ -334,8 +334,8 @@ impl<P: GenericParty> AuthBitGenerator<P> {
     /// This method returns an error if any [`AuthBit`] fails validation.
     /// In this case, no opened bits are added to `outputs`.
     pub fn open(
-        &self,
         authbits: &[AuthBit<P>],
+        delta: PartyPrivateCopy<Party1<P>, P, U8x16>,
         outputs: PartyPrivate<Party1<P>, P, &mut Vec<F2>>,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
@@ -388,7 +388,7 @@ impl<P: GenericParty> AuthBitGenerator<P> {
 
                     validation &= mac
                         == if F2::ONE == *bit {
-                            ab.key().into_inner(e) ^ self.delta().into_inner(e)
+                            ab.key().into_inner(e) ^ delta.into_inner(e)
                         } else {
                             ab.key().into_inner(e)
                         };
@@ -512,8 +512,9 @@ mod tests {
                         },
                     ));
                 }
-                generator_a.open(
+                AuthBitGenerator::open(
                     &outputs,
+                    PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
                     channel_pr,
                 )?;
@@ -532,8 +533,12 @@ mod tests {
                     ));
                 }
                 let mut output = vec![];
-                let validation =
-                    generator_b.open(&outputs, PartyPrivate::new(&mut output), channel_vr);
+                let validation = AuthBitGenerator::open(
+                    &outputs,
+                    generator_b.delta(),
+                    PartyPrivate::new(&mut output),
+                    channel_vr,
+                );
                 // The generated bits should always be valid when no tampering happens.
                 if !tamper_mac && !tamper_key {
                     assert!(validation.is_ok());

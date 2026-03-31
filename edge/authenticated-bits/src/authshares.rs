@@ -38,7 +38,7 @@
 //!         let mut bits: Vec<F2> = vec![];
 //!         let mut generator: AuthShareGenerator<_> = AuthShareGenerator::new(c, &mut rng)?;
 //!         generator.generate(nshares, &mut authshares, c, &mut rng)?;
-//!         generator.open(&authshares, &mut bits, c)?;
+//!         AuthShareGenerator::open(&authshares, generator.delta(), &mut bits, c)?;
 //!         Ok(bits)
 //!     },
 //!     |c| {
@@ -48,7 +48,7 @@
 //!         let mut bits: Vec<F2> = vec![];
 //!         let mut generator: AuthShareGenerator<_> = AuthShareGenerator::new(c, &mut rng)?;
 //!         generator.generate(nshares, &mut authshares, c, &mut rng)?;
-//!         generator.open(&authshares, &mut bits, c)?;
+//!         AuthShareGenerator::open(&authshares, generator.delta(), &mut bits, c)?;
 //!         Ok(bits)
 //!     }
 //! )?;
@@ -266,8 +266,8 @@ impl<P: GenericParty> AuthShareGenerator<P> {
     /// authenticated shares. The resulting opened combined shares are
     /// [`Vec::push`]ed to `outputs`.
     pub fn open(
-        &self,
         shares: &[AuthShare<P>],
+        delta: U8x16,
         outputs: &mut Vec<F2>,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
@@ -281,19 +281,22 @@ impl<P: GenericParty> AuthShareGenerator<P> {
             .unzip();
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(ev) => {
-                let party_a = self.party_a.as_ref().into_inner(ev);
-                let party_b = self.party_b.as_ref().into_inner(ev);
-
                 let party_a_shares =
                     PartyEitherCopy::pull_either_outside(&party_a_shares).into_inner(ev);
-                party_a.open(
+                AuthBitGenerator::open(
                     party_a_shares,
+                    PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
                     channel,
                 )?;
                 let party_b_shares =
                     PartyEitherCopy::pull_either_outside(&party_b_shares).into_inner(ev);
-                party_b.open(party_b_shares, PartyPrivate::new(outputs), channel)?;
+                AuthBitGenerator::open(
+                    party_b_shares,
+                    PartyPrivateCopy::new(delta),
+                    PartyPrivate::new(outputs),
+                    channel,
+                )?;
                 for (bit_a, bit_b) in party_a_shares
                     .iter()
                     .zip(outputs[output_starting_len..].iter_mut())
@@ -302,16 +305,19 @@ impl<P: GenericParty> AuthShareGenerator<P> {
                 }
             }
             GenericWhichParty::Party1(ev) => {
-                let party_a = self.party_a.as_ref().into_inner(ev);
-                let party_b = self.party_b.as_ref().into_inner(ev);
-
                 let party_a_shares =
                     PartyEitherCopy::pull_either_outside(&party_a_shares).into_inner(ev);
-                party_a.open(party_a_shares, PartyPrivate::new(outputs), channel)?;
+                AuthBitGenerator::open(
+                    party_a_shares,
+                    PartyPrivateCopy::new(delta),
+                    PartyPrivate::new(outputs),
+                    channel,
+                )?;
                 let party_b_shares =
                     PartyEitherCopy::pull_either_outside(&party_b_shares).into_inner(ev);
-                party_b.open(
+                AuthBitGenerator::open(
                     party_b_shares,
+                    PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
                     channel,
                 )?;
@@ -430,12 +436,14 @@ mod tests {
         swanky_channel::local::local_channel_pair(
             |c| {
                 let mut outputs = vec![];
-                let result = generator_a.open(&output_a, &mut outputs, c);
+                let result =
+                    AuthShareGenerator::open(&output_a, generator_a.delta(), &mut outputs, c);
                 Ok((result.is_ok(), outputs))
             },
             |c| {
                 let mut outputs = vec![];
-                let result = generator_b.open(&output_b, &mut outputs, c);
+                let result =
+                    AuthShareGenerator::open(&output_b, generator_b.delta(), &mut outputs, c);
                 Ok((result.is_ok(), outputs))
             },
         )

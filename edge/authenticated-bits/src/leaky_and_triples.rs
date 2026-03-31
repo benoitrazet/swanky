@@ -347,8 +347,8 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
     ///
     /// This corresponds to opening each of the underlying authenticated shares.
     pub(crate) fn open(
-        &self,
         triples: &[LeakyAndTriple<P>],
+        delta: U8x16,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
         // Flatten triples into a vector of shares so we can call
@@ -358,7 +358,7 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
             .flat_map(|triple| [triple.x, triple.y, triple.z])
             .collect();
         let mut out = Vec::with_capacity(3 * triples.len());
-        self.auth_share_generator.open(&shares, &mut out, channel)?;
+        AuthShareGenerator::open(&shares, delta, &mut out, channel)?;
         // Confirm when testing that all the triples are indeed valid.
         #[cfg(test)]
         {
@@ -455,8 +455,7 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
 
         // Open the `⟨d⟩`s in one shot. This is much more efficient than opening
         // the `⟨d⟩`s on a per-bucket basis.
-        self.auth_share_generator
-            .open(&ds, &mut ds_opened, channel)?;
+        AuthShareGenerator::open(&ds, self.delta(), &mut ds_opened, channel)?;
 
         for (bucket, ds_opened) in leaky_ands
             .chunks_exact(bucket_size)
@@ -569,11 +568,11 @@ mod tests {
     ) -> (bool, bool) {
         swanky_channel::local::local_channel_pair(
             |c| {
-                let result = generator_a.open(&output_a, c);
+                let result = LeakyAndTripleGenerator::open(&output_a, generator_a.delta(), c);
                 Ok(result.is_ok())
             },
             |c| {
-                let result = generator_b.open(&output_b, c);
+                let result = LeakyAndTripleGenerator::open(&output_b, generator_b.delta(), c);
                 Ok(result.is_ok())
             },
         )
@@ -613,14 +612,14 @@ mod tests {
                 |channel| {
                     let mut out = vec![];
                     generator_a.combine(&triples_a, &mut out, bucket_size, channel).unwrap();
-                    let result = generator_a.open(AndTriple::peel_slice(&out), channel);
+                    let result = LeakyAndTripleGenerator::open(AndTriple::peel_slice(&out), generator_a.delta(), channel);
                     assert!(result.is_ok());
                     Ok(())
                 },
                 |channel| {
                     let mut out = vec![];
                     generator_b.combine(&triples_b, &mut out, bucket_size, channel).unwrap();
-                    let result = generator_b.open(AndTriple::peel_slice(&out), channel);
+                    let result = LeakyAndTripleGenerator::open(AndTriple::peel_slice(&out), generator_b.delta(), channel);
                     assert!(result.is_ok());
                     Ok(())
                 },

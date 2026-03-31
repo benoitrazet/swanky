@@ -7,6 +7,7 @@ use swanky_authenticated_bits::and_triples::{AndTriple, AndTripleGenerator};
 use swanky_authenticated_bits::authbits::{AuthBit, AuthBitGenerator};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_field_binary::F2;
+use swanky_party::private::PartyPrivateCopy;
 use swanky_party::{either::PartyEither, party_system, private::PartyPrivate, ty_eq::Witness};
 use swanky_rng::SwankyRng;
 
@@ -99,10 +100,22 @@ fn bench_auth_bits_open(c: &mut Criterion<WallTime>) {
     c.bench_function(&format!("open_authbits::{COUNT}"), |b| {
         b.iter(|| {
             swanky_channel::local::local_channel_pair(
-                |c| generator_a.open(&authbits_a, PartyPrivate::empty(Witness::EQUAL_TYPES), c),
+                |c| {
+                    AuthBitGenerator::open(
+                        &authbits_a,
+                        PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
+                        PartyPrivate::empty(Witness::EQUAL_TYPES),
+                        c,
+                    )
+                },
                 |c| {
                     let mut outputs = Vec::with_capacity(COUNT);
-                    generator_b.open(&authbits_b, PartyPrivate::new(&mut outputs), c)
+                    AuthBitGenerator::open(
+                        &authbits_b,
+                        generator_b.delta(),
+                        PartyPrivate::new(&mut outputs),
+                        c,
+                    )
                 },
             )
             .unwrap();
