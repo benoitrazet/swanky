@@ -5,9 +5,9 @@ use simple_arith_circuit::{Circuit, builder};
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use swanky_aes_rng::AesRng;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F64b};
+use swanky_rng::SwankyRng;
 
 const N: usize = 16; // Number of MPC parties
 const K: usize = 8; // Compression factor
@@ -27,7 +27,7 @@ fn string_to_f2(s: &str) -> Result<Vec<F2>, Error> {
 }
 
 fn prover(circuit_path: &Path, witness: &str, eqcheck: &str, output: &Path) -> Result<()> {
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let witness = string_to_f2(witness)?;
     let eqcheck = string_to_f2(eqcheck)?;
     log::info!("Reading circuit from {:?}", circuit_path);

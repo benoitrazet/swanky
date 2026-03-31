@@ -21,6 +21,6 @@ log.workspace = true
 env_logger.workspace = true
 inferno.workspace = true
 simple-arith-circuit.workspace = true
-swanky-aes-rng.workspace = true
+swanky-rng.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true

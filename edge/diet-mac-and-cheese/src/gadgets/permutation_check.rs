@@ -135,11 +135,11 @@ mod tests {
     };
 
     use rand::{Rng, seq::SliceRandom};
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_field::{FiniteField, FiniteRing};
     use swanky_field_binary::{F2, F40b};
     use swanky_field_f61p::F61p;
+    use swanky_rng::SwankyRng;
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     use crate::{
@@ -154,7 +154,7 @@ mod tests {
     use super::{permutation_check, permutation_check_binary};
 
     fn test_permutation<F: FiniteField>(ntuples: usize, tuple_size: usize, is_good: bool) {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let mut values: Vec<Vec<F>> = (0..ntuples)
             .map(|_| (0..tuple_size).map(|_| F::random(&mut rng)).collect())
             .collect();
@@ -171,7 +171,7 @@ mod tests {
 
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let rng = AesRng::new();
+            let rng = SwankyRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -208,7 +208,7 @@ mod tests {
             }
         });
 
-        let rng = AesRng::new();
+        let rng = SwankyRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -249,7 +249,7 @@ mod tests {
     }
 
     fn test_permutation_binary(ntuples: usize, tuple_size: usize, is_good: bool) {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let mut values: Vec<Vec<F2>> = (0..ntuples)
             .map(|_| (0..tuple_size).map(|_| F2::random(&mut rng)).collect())
             .collect();
@@ -265,7 +265,7 @@ mod tests {
 
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let rng = AesRng::new();
+            let rng = SwankyRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -316,7 +316,7 @@ mod tests {
             }
         });
 
-        let rng = AesRng::new();
+        let rng = SwankyRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);

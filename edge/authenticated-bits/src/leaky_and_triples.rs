@@ -514,8 +514,8 @@ mod tests {
     use bytemuck::TransparentWrapper;
     use proptest::prelude::*;
     use rand::SeedableRng;
-    use swanky_aes_rng::AesRng;
     use swanky_party::party_system;
+    use swanky_rng::SwankyRng;
 
     party_system! {
         mod ps {
@@ -526,8 +526,8 @@ mod tests {
     use ps::{PartyA, PartyB};
 
     fn generators(
-        mut rng_a: &mut AesRng,
-        mut rng_b: &mut AesRng,
+        mut rng_a: &mut SwankyRng,
+        mut rng_b: &mut SwankyRng,
     ) -> (
         LeakyAndTripleGenerator<PartyA>,
         LeakyAndTripleGenerator<PartyB>,
@@ -543,8 +543,8 @@ mod tests {
         ntriples: usize,
         generator_a: &mut LeakyAndTripleGenerator<PartyA>,
         generator_b: &mut LeakyAndTripleGenerator<PartyB>,
-        mut rng_a: &mut AesRng,
-        mut rng_b: &mut AesRng,
+        mut rng_a: &mut SwankyRng,
+        mut rng_b: &mut SwankyRng,
     ) -> (Vec<LeakyAndTriple<PartyA>>, Vec<LeakyAndTriple<PartyB>>) {
         swanky_channel::local::local_channel_pair(
             |c| {
@@ -586,8 +586,8 @@ mod tests {
         fn honest_generation_works(ntriples in 1..10000usize,
                                    seed_a in any::<u128>(),
                                    seed_b in any::<u128>()) {
-            let mut rng_a = AesRng::from_seed(seed_a.into());
-            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let mut rng_a = SwankyRng::from_seed(seed_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_b.into());
             let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
             let (triples_a, triples_b) = generate_triples(ntriples, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
             let (validation_a, validation_b) =
@@ -605,8 +605,8 @@ mod tests {
                          seed_b in any::<u128>()) {
             let bucket_size = 5;
             let nleaky = ntriples * bucket_size;
-            let mut rng_a = AesRng::from_seed(seed_a.into());
-            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let mut rng_a = SwankyRng::from_seed(seed_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_b.into());
             let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
             let (triples_a, triples_b) = generate_triples(nleaky, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
             swanky_channel::local::local_channel_pair(

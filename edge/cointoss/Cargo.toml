@@ -13,6 +13,6 @@ workspace = true
 [dependencies]
 rand.workspace = true
 rand_core.workspace = true
-swanky-aes-rng.workspace = true
+swanky-rng.workspace = true
 swanky-block.workspace = true
 swanky-channel-legacy.workspace = true

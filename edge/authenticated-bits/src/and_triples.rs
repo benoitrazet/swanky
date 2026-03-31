@@ -41,7 +41,6 @@ use crate::{
 use bytemuck::TransparentWrapper;
 use rand::{CryptoRng, Rng, SeedableRng, seq::SliceRandom};
 use std::io::{Cursor, Seek};
-use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
@@ -49,6 +48,7 @@ use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer};
 use swanky_party::{
     GenericParty, GenericWhichParty, Party1, either::PartyEither, private::PartyPrivate,
 };
+use swanky_rng::SwankyRng;
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 use vectoreyes::U8x16;
 
@@ -152,7 +152,7 @@ impl<P: GenericParty> AndTripleGenerator<P> {
         // generated leaky AND triples.
         let random = swanky_f_rand::random_seed::<P, _>(channel, rng)?;
         // Do the permutation.
-        let mut shuffle_rng = AesRng::from_seed(random);
+        let mut shuffle_rng = SwankyRng::from_seed(random);
         leaky_ands.shuffle(&mut shuffle_rng);
         // Bucket the leaky AND triples and combine them into (non-leaky) AND triples.
         self.leaky_generator
@@ -416,8 +416,8 @@ impl<P: GenericParty> AndTripleGenerator<P> {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    use swanky_aes_rng::AesRng;
     use swanky_party::party_system;
+    use swanky_rng::SwankyRng;
 
     party_system! {
         mod ps {
@@ -428,8 +428,8 @@ mod tests {
     use ps::{PartyA, PartyB};
 
     fn generators(
-        mut rng_a: &mut AesRng,
-        mut rng_b: &mut AesRng,
+        mut rng_a: &mut SwankyRng,
+        mut rng_b: &mut SwankyRng,
     ) -> (AndTripleGenerator<PartyA>, AndTripleGenerator<PartyB>) {
         swanky_channel::local::local_channel_pair(
             |c| AndTripleGenerator::<PartyA>::new(c, &mut rng_a),
@@ -442,8 +442,8 @@ mod tests {
         ntriples: usize,
         generator_a: &mut AndTripleGenerator<PartyA>,
         generator_b: &mut AndTripleGenerator<PartyB>,
-        mut rng_a: &mut AesRng,
-        mut rng_b: &mut AesRng,
+        mut rng_a: &mut SwankyRng,
+        mut rng_b: &mut SwankyRng,
     ) -> (Vec<AndTriple<PartyA>>, Vec<AndTriple<PartyB>>) {
         swanky_channel::local::local_channel_pair(
             |c| {
@@ -464,8 +464,8 @@ mod tests {
         nshares: usize,
         generator_a: &mut AndTripleGenerator<PartyA>,
         generator_b: &mut AndTripleGenerator<PartyB>,
-        mut rng_a: &mut AesRng,
-        mut rng_b: &mut AesRng,
+        mut rng_a: &mut SwankyRng,
+        mut rng_b: &mut SwankyRng,
     ) -> (Vec<AuthShare<PartyA>>, Vec<AuthShare<PartyB>>) {
         swanky_channel::local::local_channel_pair(
             |c| {
@@ -517,8 +517,8 @@ mod tests {
         fn honest_generation_works(ntriples in 320..1000usize,
                                    seed_a in any::<u128>(),
                                    seed_b in any::<u128>()) {
-            let mut rng_a = AesRng::from_seed(seed_a.into());
-            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let mut rng_a = SwankyRng::from_seed(seed_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_b.into());
             let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
             let (triples_a, triples_b) = generate_triples(ntriples, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
             let (validation_a, validation_b) =
@@ -534,8 +534,8 @@ mod tests {
         fn fixing_and_triples_works(ntriples in 320..1000usize,
                                     seed_a in any::<u128>(),
                                     seed_b in any::<u128>()) {
-            let mut rng_a = AesRng::from_seed(seed_a.into());
-            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let mut rng_a = SwankyRng::from_seed(seed_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_b.into());
             let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
             let (triples_a, triples_b) = generate_triples(
                 ntriples,

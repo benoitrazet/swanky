@@ -1,6 +1,5 @@
+//! Random number generator based on fixed-key AES.
 #![deny(missing_docs)]
-
-//! Fixed-key AES random number generator.
 
 use rand::{CryptoRng, Error, Rng, RngCore, SeedableRng};
 use rand_core::block::{BlockRng64, BlockRngCore};
@@ -12,14 +11,14 @@ use vectoreyes::{
 mod vectorized;
 pub use vectorized::UniformIntegersUnderBound;
 
-/// Implementation of a random number generator based on fixed-key AES.
+/// Random number generator based on fixed-key AES.
 ///
 /// This uses AES in a counter-mode-esque way, but with the counter always
 /// starting at zero. When used as a PRNG this is okay [TODO: citation?].
 #[derive(Clone, Debug)]
-pub struct AesRng(BlockRng64<AesRngCore>);
+pub struct SwankyRng(BlockRng64<SwankyRngCore>);
 
-impl RngCore for AesRng {
+impl RngCore for SwankyRng {
     #[inline]
     fn next_u32(&mut self) -> u32 {
         self.0.next_u32()
@@ -38,35 +37,35 @@ impl RngCore for AesRng {
     }
 }
 
-impl SeedableRng for AesRng {
-    type Seed = <AesRngCore as SeedableRng>::Seed;
+impl SeedableRng for SwankyRng {
+    type Seed = <SwankyRngCore as SeedableRng>::Seed;
 
     #[inline]
     fn from_seed(seed: Self::Seed) -> Self {
-        AesRng(BlockRng64::<AesRngCore>::from_seed(seed))
+        SwankyRng(BlockRng64::<SwankyRngCore>::from_seed(seed))
     }
     #[inline]
     fn from_rng<R: RngCore>(rng: R) -> Result<Self, Error> {
-        BlockRng64::<AesRngCore>::from_rng(rng).map(AesRng)
+        BlockRng64::<SwankyRngCore>::from_rng(rng).map(SwankyRng)
     }
 }
 
-impl CryptoRng for AesRng {}
+impl CryptoRng for SwankyRng {}
 
-impl AesRng {
+impl SwankyRng {
     /// Create a new random number generator using a random seed from
     /// `rand::random`.
     #[inline]
     pub fn new() -> Self {
         let seed: U8x16 = rand::random();
-        AesRng::from_seed(seed)
+        SwankyRng::from_seed(seed)
     }
 
     /// Create a new RNG using a random seed from this one.
     #[inline]
     pub fn fork(&mut self) -> Self {
         let seed = self.r#gen::<U8x16>();
-        AesRng::from_seed(seed)
+        SwankyRng::from_seed(seed)
     }
 
     /// Generate random bits.
@@ -88,22 +87,22 @@ impl AesRng {
     }
 }
 
-impl Default for AesRng {
+impl Default for SwankyRng {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// The core of `AesRng`, used with `BlockRng`.
+/// The core of [`SwankyRng`], used with `BlockRng`.
 #[derive(Clone, Debug)]
-pub struct AesRngCore {
+pub struct SwankyRngCore {
     aes: Aes128EncryptOnly,
     // Overflowing a u64 would take well over 2^64 nanoseconds, which is over 500 years!
     counter: u64,
 }
 
-impl AesRngCore {
+impl SwankyRngCore {
     #[inline(always)]
     fn gen_rand_bits<const N: usize>(&mut self) -> [U8x16; N]
     where
@@ -121,7 +120,7 @@ impl AesRngCore {
     }
 }
 
-impl BlockRngCore for AesRngCore {
+impl BlockRngCore for SwankyRngCore {
     type Item = u64;
     type Results = [u64; Aes128EncryptOnly::BLOCK_COUNT_HINT * 2];
 
@@ -132,24 +131,24 @@ impl BlockRngCore for AesRngCore {
     }
 }
 
-impl SeedableRng for AesRngCore {
+impl SeedableRng for SwankyRngCore {
     type Seed = U8x16;
 
     #[inline]
     fn from_seed(seed: Self::Seed) -> Self {
-        AesRngCore {
+        SwankyRngCore {
             aes: Aes128EncryptOnly::new_with_key(seed),
             counter: 0,
         }
     }
 }
 
-impl CryptoRng for AesRngCore {}
+impl CryptoRng for SwankyRngCore {}
 
-impl From<AesRngCore> for AesRng {
+impl From<SwankyRngCore> for SwankyRng {
     #[inline]
-    fn from(core: AesRngCore) -> Self {
-        AesRng(BlockRng64::new(core))
+    fn from(core: SwankyRngCore) -> Self {
+        SwankyRng(BlockRng64::new(core))
     }
 }
 
@@ -160,7 +159,7 @@ mod tests {
 
     #[test]
     fn test_generate() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let a = rng.r#gen::<[U8x16; 8]>();
         let b = rng.r#gen::<[U8x16; 8]>();
         assert_ne!(a, b);

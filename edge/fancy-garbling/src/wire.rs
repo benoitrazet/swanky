@@ -7,7 +7,7 @@
 
 use crate::{fancy::HasModulus, util};
 use rand::{CryptoRng, Rng, RngCore};
-use swanky_aes_hash::TweakableCircularCorrelationRobustHash;
+use swanky_cr_hash::TweakableCircularCorrelationRobustHash;
 use vectoreyes::{
     U8x16,
     array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},

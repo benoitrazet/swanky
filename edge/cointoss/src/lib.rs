@@ -6,9 +6,9 @@
 
 use rand_core::{RngCore, SeedableRng};
 
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_rng::SwankyRng;
 
 /// Errors produced by the coin tossing protocol.
 #[derive(Debug)]
@@ -46,7 +46,7 @@ impl std::fmt::Display for Error {
 pub fn send<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<Vec<Block>, Error> {
     let mut out = Vec::with_capacity(seeds.len());
     for seed in seeds.iter() {
-        let mut rng = AesRng::from_seed(*seed);
+        let mut rng = SwankyRng::from_seed(*seed);
         let mut com = Block::default();
         rng.fill_bytes(com.as_mut());
         channel.write_block(&com)?;
@@ -78,7 +78,7 @@ pub fn receive<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<V
     channel.flush()?;
     for (seed, com) in seeds.iter().zip(coms.into_iter()) {
         let seed_ = channel.read_block()?;
-        let mut rng_ = AesRng::from_seed(seed_);
+        let mut rng_ = SwankyRng::from_seed(seed_);
         let mut check = Block::default();
         rng_.fill_bytes(check.as_mut());
         if check != com {

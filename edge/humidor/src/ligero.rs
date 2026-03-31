@@ -68,10 +68,10 @@ use ndarray::{Array1, Array2, ArrayView1, Axis, concatenate};
 use rand::{CryptoRng, Rng, SeedableRng};
 use sprs::{CsMat, TriMat};
 use std::ops::Range;
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_field::FiniteField;
 use swanky_field_fft::FieldForFFT;
+use swanky_rng::SwankyRng;
 #[cfg(test)]
 use swanky_serialization::CanonicalSerialize;
 
@@ -399,7 +399,7 @@ impl Arbitrary for Secret<TestField, TestHash> {
             proptest::array::uniform16(0u8..),
         )
             .prop_map(|(ckt, inp, seed)| {
-                let mut rng = AesRng::from_seed(Block::from(seed));
+                let mut rng = SwankyRng::from_seed(Block::from(seed));
                 Secret::new(&mut rng, &ckt, &inp, None)
             })
             .boxed()
@@ -440,7 +440,7 @@ proptest! {
         }),
         seed: [u8;16],
     ) {
-        let mut rng = AesRng::from_seed(Block::from(seed));
+        let mut rng = SwankyRng::from_seed(Block::from(seed));
         let s = Secret::<_, TestHash>::new(&mut rng, &c, &i, None);
         let mut wires = Vec::new();
         let output = c.eval(&i, &mut wires)[0];
@@ -463,7 +463,7 @@ proptest! {
         rshared_vec in pvec(arb_test_field(), 10),
         seed: [u8;16],
     ) {
-        let mut rng = AesRng::from_seed(Block::from(seed));
+        let mut rng = SwankyRng::from_seed(Block::from(seed));
         let mut s: Secret<_, sha2::Sha256> = Secret::new(&mut rng, &c, &i, Some(0..10));
         let mut wires = Vec::new();
         let output = c.eval(&i, &mut wires)[0];
@@ -487,7 +487,7 @@ proptest! {
         (c, i) in simple_arith_circuit::circuitgen::arbitrary_zero_circuit::<TestField>(20, 50),
         seed: [u8;16],
     ) {
-        let mut rng = AesRng::from_seed(Block::from(seed));
+        let mut rng = SwankyRng::from_seed(Block::from(seed));
         let s: Secret<_, sha2::Sha256> = Secret::new(&mut rng, &c, &i, None);
         let mut wires = Vec::new();
         let output = c.eval(&i, &mut wires)[0];
@@ -510,7 +510,7 @@ proptest! {
         rshared_vec in pvec(arb_test_field(), 10),
         seed: [u8;16],
     ) {
-        let mut rng = AesRng::from_seed(Block::from(seed));
+        let mut rng = SwankyRng::from_seed(Block::from(seed));
         let mut s: Secret<_, sha2::Sha256> = Secret::new(&mut rng, &c, &i, Some(0..10));
         let mut wires = Vec::new();
         let output = c.eval(&i, &mut wires)[0];
@@ -1251,7 +1251,7 @@ pub mod interactive {
 
     #[test]
     fn test_small() {
-        let mut rng = AesRng::from_entropy();
+        let mut rng = SwankyRng::from_entropy();
         let (ckt, w) = simple_arith_circuit::circuitgen::simple_test_circuit::<TestField>();
 
         let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
@@ -1276,7 +1276,7 @@ pub mod interactive {
             }),
             seed: [u8;16],
         ) {
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = SwankyRng::from_seed(Block::from(seed));
             let mut wires = Vec::new();
             let output = ckt.eval(&w, &mut wires)[0];
             let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
@@ -1299,7 +1299,7 @@ pub mod interactive {
             (ckt, w) in simple_arith_circuit::circuitgen::arbitrary_zero_circuit::<TestField>(20, 50),
             seed: [u8;16],
         ) {
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = SwankyRng::from_seed(Block::from(seed));
 
             let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
             let mut v = Verifier::new(&ckt, None);
@@ -1324,7 +1324,7 @@ pub mod interactive {
             }),
             seed: [u8;16],
         ) {
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = SwankyRng::from_seed(Block::from(seed));
             let mut wires = Vec::new();
             let output = ckt.eval(&w, &mut wires)[0];
             let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, Some(0..10));
@@ -1348,7 +1348,7 @@ pub mod interactive {
                 .prop_flat_map(|(ckt, w)| (Just(ckt), Just(w))),
             seed: [u8;16],
         ) {
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = SwankyRng::from_seed(Block::from(seed));
             let mut p = Prover::<TestField, TestHash>::new(&mut rng, &ckt, &w, Some(0..10));
             let mut v = Verifier::new(&ckt, Some(0..10));
 
@@ -1411,7 +1411,7 @@ pub mod noninteractive {
                 params,
                 num_shared_elems,
                 num_shared_checks,
-                &mut AesRng::from_seed(seed),
+                &mut SwankyRng::from_seed(seed),
             ),
             digest,
         )
@@ -1452,7 +1452,7 @@ pub mod noninteractive {
         let digest = hash.finalize();
         let seed = Block::from(<[u8; 16]>::try_from(&digest[0..16]).unwrap());
 
-        Round3::new(params, &mut AesRng::from_seed(seed))
+        Round3::new(params, &mut SwankyRng::from_seed(seed))
     }
 
     /// Non-interactive Ligero prover.
@@ -1623,7 +1623,7 @@ pub mod noninteractive {
 
     #[test]
     fn test_small() {
-        let mut rng = AesRng::from_entropy();
+        let mut rng = SwankyRng::from_entropy();
         let (ckt, w) = simple_arith_circuit::circuitgen::simple_test_circuit::<TestField>();
 
         let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
@@ -1643,7 +1643,7 @@ pub mod noninteractive {
             }),
             seed: [u8; 16],
         ) {
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = SwankyRng::from_seed(Block::from(seed));
             let mut wires = Vec::new();
             let output = ckt.eval(&w, &mut wires)[0];
             let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
@@ -1661,7 +1661,7 @@ pub mod noninteractive {
             (ckt, w) in simple_arith_circuit::circuitgen::arbitrary_zero_circuit::<TestField>(20, 50),
             seed: [u8; 16],
         ) {
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = SwankyRng::from_seed(Block::from(seed));
 
             let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
             let mut v = Verifier::new(&ckt, None);
@@ -1683,7 +1683,7 @@ pub mod noninteractive {
         ) {
             use sha2::Sha256;
 
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = SwankyRng::from_seed(Block::from(seed));
             let mut wires = Vec::new();
             let output = ckt.eval(&w, &mut wires)[0];
             let mut p = <Prover<_, Sha256>>::new(&mut rng, &ckt, &w, Some(0..10));
@@ -1711,7 +1711,7 @@ pub mod noninteractive {
         ) {
             use sha2::Sha256;
 
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = SwankyRng::from_seed(Block::from(seed));
             let mut p = Prover::<_,TestHash>::new(&mut rng, &ckt, &w, Some(0..10));
             let mut v = Verifier::new(&ckt, Some(0..10));
 

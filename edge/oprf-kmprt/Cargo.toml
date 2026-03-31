@@ -22,7 +22,7 @@ vectoreyes.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
-swanky-aes-rng.workspace = true
+swanky-rng.workspace = true
 proptest.workspace = true
 
 [[bench]]

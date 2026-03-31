@@ -1,6 +1,6 @@
 [package]
-name = "swanky-aes-hash"
-description = "Correlation-robust hashing based on fixed-key AES."
+name = "swanky-rng"
+description = "A fast random number generator based on AES-CTR."
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,12 +12,14 @@ workspace = true
 
 [dependencies]
 vectoreyes.workspace = true
+rand.workspace = true
+rand_core.workspace = true
+bytemuck.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
 proptest.workspace = true
-rand.workspace = true
 
 [[bench]]
-name = "hash_aes"
+name = "benches"
 harness = false

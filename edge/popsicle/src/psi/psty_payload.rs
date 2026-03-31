@@ -1012,8 +1012,8 @@ mod tests {
     use crate::utils::rand_u64_vec;
     use rand::{prelude::SliceRandom, thread_rng};
     use std::collections::HashMap;
-    use swanky_aes_rng::AesRng;
     use swanky_block::Block512;
+    use swanky_rng::SwankyRng;
 
     const ITEM_SIZE: usize = 8;
 
@@ -1071,7 +1071,7 @@ mod tests {
         let weight_max: u64 = 10000;
         let payload_max: u64 = 10000;
 
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
 
         let sender_inputs = enum_ids_shuffled(set_size_sx, ITEM_SIZE);
         let receiver_inputs = enum_ids_shuffled(set_size_rx, ITEM_SIZE);
@@ -1087,7 +1087,7 @@ mod tests {
 
         let (_, weighted_mean) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut psi = Sender::init(channel, &mut rng).unwrap();
                 // For small to medium sized sets where batching can occur accross all bins
                 psi.full_protocol(&sender_inputs, &weights, channel, &mut rng)
@@ -1095,7 +1095,7 @@ mod tests {
                 Ok(())
             },
             |channel| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut psi = Receiver::init(channel, &mut rng).unwrap();
                 // For small to medium sized sets where batching can occur accross all bins
                 let weighted_mean = psi

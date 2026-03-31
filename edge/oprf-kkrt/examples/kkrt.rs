@@ -1,9 +1,9 @@
 use std::time::SystemTime;
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::track_unix_channel_pair;
 use swanky_oprf_kkrt::{Receiver as KkrtReceiver, Sender as KkrtSender};
 use swanky_oprf_traits::{Receiver as _, Sender as _};
+use swanky_rng::SwankyRng;
 
 fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
@@ -14,7 +14,7 @@ fn _test_oprf(n: usize) {
     let (mut sender, mut receiver) = track_unix_channel_pair();
     let total = SystemTime::now();
     let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let start = SystemTime::now();
         let mut oprf: KkrtSender = KkrtSender::init(&mut sender, &mut rng).unwrap();
         println!(
@@ -37,7 +37,7 @@ fn _test_oprf(n: usize) {
             sender.kilobits_written() / 1000.0
         );
     });
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let start = SystemTime::now();
     let mut oprf: KkrtReceiver = KkrtReceiver::init(&mut receiver, &mut rng).unwrap();
     println!(

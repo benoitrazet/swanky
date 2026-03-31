@@ -1,7 +1,7 @@
 use humidor::ligero::noninteractive;
 use rand::SeedableRng;
 use simple_arith_circuit::Circuit;
-use swanky_aes_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 type Hash = sha2::Sha256;
 type Field = swanky_field_ff_primes::F2e19x3e26;
@@ -21,7 +21,7 @@ fn main() {
     );
     println!("---");
 
-    let mut rng = AesRng::from_entropy();
+    let mut rng = SwankyRng::from_entropy();
     let (ckt, inp): (Circuit<Field>, _) =
         simple_arith_circuit::circuitgen::random_zero_circuit(input_size, circuit_size, &mut rng);
 

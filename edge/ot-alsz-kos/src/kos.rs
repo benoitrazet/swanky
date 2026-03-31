@@ -5,16 +5,16 @@ use crate::alsz::{Receiver as AlszReceiver, Sender as AlszSender};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::io::ErrorKind;
 use swanky_adversary::{Malicious, SemiHonest};
-use swanky_aes_hash::TweakableCircularCorrelationRobustHash;
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cointoss;
+use swanky_cr_hash::TweakableCircularCorrelationRobustHash;
 use swanky_ocelot_error::Error;
 use swanky_ot_traits::{
     CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
     Receiver as OtReceiver, Sender as OtSender,
 };
+use swanky_rng::SwankyRng;
 
 // The statistical security parameter.
 const SSP: usize = 40;
@@ -47,7 +47,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
         let mut seed = Block::default();
         rng.fill_bytes(seed.as_mut());
         let seed = swanky_cointoss::send(channel, &[seed])?;
-        let mut rng = AesRng::from_seed(seed[0]);
+        let mut rng = SwankyRng::from_seed(seed[0]);
         let mut check = (Block::default(), Block::default());
         let mut chi = Block::default();
         for j in 0..ncols {
@@ -196,7 +196,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
         let mut seed = Block::default();
         rng.fill_bytes(seed.as_mut());
         let seed = swanky_cointoss::receive(channel, &[seed])?;
-        let mut rng = AesRng::from_seed(seed[0]);
+        let mut rng = SwankyRng::from_seed(seed[0]);
         let mut x = Block::default();
         let mut t = (Block::default(), Block::default());
         let r_ = swanky_deprecated_bitwise_utils::u8vec_to_boolvec(&r);

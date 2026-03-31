@@ -467,7 +467,7 @@ impl SemiHonest for Receiver {}
 mod tests {
     use super::*;
     use crate::utils::rand_vec_vec;
-    use swanky_aes_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     const ITEM_SIZE: usize = 8;
     const SET_SIZE: usize = 1 << 6;
@@ -476,7 +476,7 @@ mod tests {
     fn psty_cardinality(sender_inputs: Vec<Vec<u8>>, receiver_inputs: Vec<Vec<u8>>) -> usize {
         let (_, output) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut psi = Sender::init(channel, &mut rng).unwrap();
 
                 let state = psi.send(&sender_inputs, channel, &mut rng).unwrap();
@@ -484,7 +484,7 @@ mod tests {
                 Ok(())
             },
             |channel| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut psi = Receiver::init(channel, &mut rng).unwrap();
 
                 let state = psi.receive(&receiver_inputs, channel, &mut rng).unwrap();
@@ -497,7 +497,7 @@ mod tests {
 
     #[test]
     fn psty_test_cardinality_same_sets() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
 
         let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
         let receiver_inputs = sender_inputs.clone();
@@ -529,7 +529,7 @@ mod tests {
     #[test]
     fn psty_test_cardinality_subsets_different_set_size() {
         if SET_SIZE >= NUM_DIFF {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let sender_inputs: Vec<Vec<u8>> = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
             let mut receiver_inputs = vec![vec![0; ITEM_SIZE]; SET_SIZE - NUM_DIFF];
             receiver_inputs.clone_from_slice(&sender_inputs[NUM_DIFF..]);
@@ -543,7 +543,7 @@ mod tests {
     #[test]
     // test fancy cardinality for sets that only differ in a few elements
     fn psty_test_cardinality_few_elements_diff() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let sender_inputs: Vec<Vec<u8>> = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
         let mut receiver_inputs = sender_inputs.clone();
 
@@ -561,7 +561,7 @@ mod tests {
 
     #[test]
     fn psty_test_cardinality_random_sets() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
 
         let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
         let receiver_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
@@ -586,20 +586,20 @@ mod tests {
     #[test]
     fn payloads() {
         let payload_size = 16;
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
         let receiver_inputs = sender_inputs.clone();
         let payloads = rand_vec_vec(SET_SIZE, payload_size, &mut rng);
 
         let (received_payloads, _) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut psi = Sender::init(channel, &mut rng).unwrap();
                 let state = psi.send(&sender_inputs, channel, &mut rng).unwrap();
                 Ok(state.receive_payloads(payload_size, channel).unwrap())
             },
             |channel| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut psi = Receiver::init(channel, &mut rng).unwrap();
 
                 let state = psi.receive(&receiver_inputs, channel, &mut rng).unwrap();
