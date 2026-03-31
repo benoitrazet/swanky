@@ -6,11 +6,11 @@
 use keyed_arena::{AllocationKey, BorrowedAllocation, KeyedArena};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::convert::TryInto;
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cr_hash::TweakableCircularCorrelationRobustHash;
 use swanky_ocelot_error::Error;
+use swanky_rng::SwankyRng;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16, U64x2, array_utils::ArrayUnrolledExt};
 
 // TODO: alsz and kos should be based on this file?
@@ -342,7 +342,7 @@ impl KosSenderStage2 {
                 "KosSenderStage2 reciever lied in cointoss".to_string(),
             ));
         }
-        let mut rng = AesRng::from_seed(Block::from(self.our_seed) ^ Block::from(incoming_seed));
+        let mut rng = SwankyRng::from_seed(Block::from(self.our_seed) ^ Block::from(incoming_seed));
         let mut check = (Block::default(), Block::default());
         let mut chi = Block::default();
         let qs = arena.borrow_mut(self.qs);
@@ -489,7 +489,7 @@ impl KosReceiverStage2 {
         }
         let their_seed: [u8; 16] = incoming[0..16].try_into().unwrap();
         incoming = &incoming[16..];
-        let mut rng = AesRng::from_seed(Block::from(their_seed) ^ self.our_seed);
+        let mut rng = SwankyRng::from_seed(Block::from(their_seed) ^ self.our_seed);
         let out = arena.alloc_slice_fill_with(choices.len(), |j| {
             let b = choices[j];
             let t = &ts[j * 16..(j + 1) * 16];
@@ -533,7 +533,7 @@ fn test_kos_ot() {
     use swanky_channel_legacy::Channel;
     let (a, b) = UnixStream::pair().unwrap();
     let sender = std::thread::spawn(move || {
-        let mut rng = AesRng::from_seed(Block::from(456));
+        let mut rng = SwankyRng::from_seed(Block::from(456));
         let mut channel = Channel::new(
             BufReader::new(a.try_clone().unwrap()),
             BufWriter::new(a.try_clone().unwrap()),
@@ -543,7 +543,7 @@ fn test_kos_ot() {
         out
     });
     let receiver = {
-        let mut rng = AesRng::from_seed(Block::from(864));
+        let mut rng = SwankyRng::from_seed(Block::from(864));
         let mut channel = Channel::new(
             BufReader::new(b.try_clone().unwrap()),
             BufWriter::new(b.try_clone().unwrap()),
@@ -563,7 +563,7 @@ fn test_kos_ot() {
                 &arena,
                 selector,
                 arena.alloc_slice_fill_with(choices.len(), |i| choices[i]),
-                &mut AesRng::from_seed(Block::from(12)),
+                &mut SwankyRng::from_seed(Block::from(12)),
                 &mut receiver_initial_outgoing,
             )
             .unwrap();
@@ -573,7 +573,7 @@ fn test_kos_ot() {
                 &arena,
                 selector,
                 &inputs,
-                &mut AesRng::from_seed(Block::from(85412)),
+                &mut SwankyRng::from_seed(Block::from(85412)),
                 &receiver_initial_outgoing,
                 &mut sender_outgoing_bytes,
             )
@@ -606,7 +606,7 @@ fn test_kos_ot() {
         100000002,
     );
     for (i, len) in [32, 33, 65, 65, 5873, 8582].iter().copied().enumerate() {
-        let mut rng = AesRng::from_seed(Block::from(u128::from((i as u64) + 25903468354)));
+        let mut rng = SwankyRng::from_seed(Block::from(u128::from((i as u64) + 25903468354)));
         let choices = (0..len).map(|_| rng.r#gen::<bool>()).collect();
         let inputs = (0..len)
             .map(|_| (rng.r#gen::<Block>(), rng.r#gen::<Block>()))

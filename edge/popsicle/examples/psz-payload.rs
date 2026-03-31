@@ -1,7 +1,7 @@
 use popsicle::psz::{Receiver, Sender};
 use std::time::SystemTime;
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::track_unix_channel_pair;
+use swanky_rng::SwankyRng;
 
 const NBYTES: usize = 16;
 const NINPUTS: usize = 1 << 20;
@@ -19,7 +19,7 @@ fn psz_payload(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
     let (mut tx, mut rx) = track_unix_channel_pair();
     let total = SystemTime::now();
     std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
 
         let start = SystemTime::now();
         let mut sender = Sender::init(&mut tx, &mut rng).unwrap();
@@ -43,7 +43,7 @@ fn psz_payload(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
         );
     });
 
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
 
     let start = SystemTime::now();
     let mut receiver = Receiver::init(&mut rx, &mut rng).unwrap();

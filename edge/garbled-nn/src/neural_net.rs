@@ -20,11 +20,11 @@ use std::{
     path::Path,
     time::{Duration, Instant},
 };
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, swanky_error};
 use swanky_ot_alsz_kos::alsz;
+use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 /// Input encoder for a garbled neural network.
@@ -949,7 +949,7 @@ impl NeuralNet {
         let (_, outputs) = swanky_channel::local::local_channel_pair(
             |channel| {
                 let mut garbler: Garbler<_, alsz::Sender, WireMod2> =
-                    Garbler::new(channel, AesRng::new())?;
+                    Garbler::new(channel, SwankyRng::new())?;
                 let inputs =
                     NeuralNet::encode_input_boolean(&mut garbler, input, bitwidths[0], channel)?;
                 let outputs = self.eval_boolean(
@@ -966,8 +966,8 @@ impl NeuralNet {
                 Ok(())
             },
             |channel| {
-                let mut evaluator: Evaluator<AesRng, alsz::Receiver, WireMod2> =
-                    Evaluator::new(channel, AesRng::new())?;
+                let mut evaluator: Evaluator<SwankyRng, alsz::Receiver, WireMod2> =
+                    Evaluator::new(channel, SwankyRng::new())?;
                 let inputs =
                     NeuralNet::receive_input_boolean(&mut evaluator, input, bitwidths[0], channel)?;
                 let outputs = self.eval_boolean(
@@ -1003,7 +1003,7 @@ impl NeuralNet {
         let (_, outputs) = swanky_channel::local::local_channel_pair(
             |channel| {
                 let mut gb: Garbler<_, alsz::Sender, AllWire> =
-                    Garbler::new(channel, AesRng::new())?;
+                    Garbler::new(channel, SwankyRng::new())?;
                 let inps = NeuralNet::encode_input_arith(
                     &mut gb,
                     input,
@@ -1030,8 +1030,8 @@ impl NeuralNet {
                 Ok(())
             },
             |channel| {
-                let mut ev: Evaluator<AesRng, alsz::Receiver, AllWire> =
-                    Evaluator::new(channel, AesRng::new())?;
+                let mut ev: Evaluator<SwankyRng, alsz::Receiver, AllWire> =
+                    Evaluator::new(channel, SwankyRng::new())?;
                 let inps = NeuralNet::receive_input_arith(
                     &mut ev,
                     input,
@@ -1334,7 +1334,7 @@ mod tests {
     use fancy_garbling::WireMod2;
     use ndarray::Array3;
     use std::path::Path;
-    use swanky_aes_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     static DINN_30_DIR: &str = "neural_nets/DINN_30";
     static DINN_30_Bitwidths: [usize; 3] = [9; 3];
@@ -1386,7 +1386,7 @@ mod tests {
     fn garbling_works_for_model(dir: &str, bitwidths: &[usize]) {
         let (nn, test) = get_nn_and_test(Path::new(dir));
         let (encoder, gc, output_map) = nn
-            .gc_garble_boolean::<WireMod2, _>(bitwidths, false, AesRng::new())
+            .gc_garble_boolean::<WireMod2, _>(bitwidths, false, SwankyRng::new())
             .unwrap();
         // Extract the wirelabels associated with our input of interest.
         let inputs = encoder.encode_inputs(&test, bitwidths[0]);

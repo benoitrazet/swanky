@@ -9,12 +9,12 @@ use std::{
 };
 
 use criterion::Criterion;
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::Channel;
 use swanky_ot_traits::{
     CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver, Sender,
 };
+use swanky_rng::SwankyRng;
 
 fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
@@ -29,14 +29,14 @@ fn bench_block_ot_inner<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg 
 ) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
         let mut ot = OTSender::init(&mut channel, &mut rng).unwrap();
         ot.send(&mut channel, &ms, &mut rng).unwrap();
     });
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
@@ -76,7 +76,7 @@ fn bench_block_cot_inner<
     let m = bs.len();
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
@@ -84,7 +84,7 @@ fn bench_block_cot_inner<
         ot.send_correlated(&mut channel, m, delta, &mut rng)
             .unwrap();
     });
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
@@ -121,14 +121,14 @@ fn bench_block_rot_inner<
     let (sender, receiver) = UnixStream::pair().unwrap();
     let m = bs.len();
     let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
         let mut ot = OTSender::init(&mut channel, &mut rng).unwrap();
         ot.send_random(&mut channel, m, &mut rng).unwrap();
     });
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);

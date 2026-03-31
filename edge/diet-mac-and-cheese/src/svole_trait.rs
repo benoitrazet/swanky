@@ -10,7 +10,6 @@ use std::{
     cell::{RefCell, RefMut},
     rc::Rc,
 };
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field::{FiniteField, IsSubFieldOf};
@@ -18,6 +17,7 @@ use swanky_party::{
     either::PartyEither,
     ty_eq::{EqualityProposition, Witness},
 };
+use swanky_rng::SwankyRng;
 use swanky_svole_wykw::{LpnParams, Receiver, Sender};
 
 /// Svole trait.
@@ -30,7 +30,7 @@ pub trait SvoleT<P: Party, V, T>: SvoleStopSignal {
     /// Initialize with delta when provided.
     fn init<C: AbstractChannel + Clone>(
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         delta: Option<T>,
@@ -42,7 +42,7 @@ pub trait SvoleT<P: Party, V, T>: SvoleStopSignal {
     fn extend<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         out: &mut PartyEither<P, &mut Vec<(V, T)>, &mut Vec<T>>,
     ) -> Result<()>;
 
@@ -95,7 +95,7 @@ where
 {
     fn init<C: AbstractChannel + Clone>(
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         delta: Option<T>,
@@ -129,7 +129,7 @@ where
     fn extend<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         out: &mut PartyEither<P, &mut Vec<(V, T)>, &mut Vec<T>>,
     ) -> Result<()> {
         debug!("extend");

@@ -6,9 +6,9 @@ fn test_arithmetic_ram() {
     };
 
     use rand::SeedableRng;
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_field_f61p::F61p;
+    use swanky_rng::SwankyRng;
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     use crate::{
@@ -26,7 +26,7 @@ fn test_arithmetic_ram() {
     let (sender, receiver) = UnixStream::pair().unwrap();
 
     let handle = std::thread::spawn(move || {
-        let rng = AesRng::from_seed(Default::default());
+        let rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
@@ -57,7 +57,7 @@ fn test_arithmetic_ram() {
     });
 
     {
-        let rng = AesRng::from_seed(Default::default());
+        let rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -93,10 +93,10 @@ fn test_boolean_ram() {
     };
 
     use rand::SeedableRng;
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F2, F40b};
+    use swanky_rng::SwankyRng;
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     use crate::{
@@ -114,7 +114,7 @@ fn test_boolean_ram() {
     let (sender, receiver) = UnixStream::pair().unwrap();
 
     let handle = std::thread::spawn(move || {
-        let rng = AesRng::from_seed(Default::default());
+        let rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
@@ -155,7 +155,7 @@ fn test_boolean_ram() {
     });
 
     {
-        let rng = AesRng::from_seed(Default::default());
+        let rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);

@@ -242,8 +242,8 @@ pub fn arbitrary_zero_circuit<F: PrimeFiniteField>(
 mod tests {
     use super::*;
     use rand::SeedableRng;
-    use swanky_aes_rng::AesRng;
     use swanky_block::Block;
+    use swanky_rng::SwankyRng;
 
     type TestField = swanky_field_ff_primes::F2e19x3e26;
 
@@ -254,7 +254,7 @@ mod tests {
     proptest! {
         #[test]
         fn test_random_zero_circuit(seed in any_seed()) {
-            let mut rng = AesRng::from_seed(seed);
+            let mut rng = SwankyRng::from_seed(seed);
             let size = Uniform::from(3..1000);
             let ninputs = size.sample(&mut rng);
             let ngates = size.sample(&mut rng);
@@ -269,7 +269,7 @@ mod tests {
     proptest! {
         #[test]
         fn test_random_binary_zero_circuit(seed in any_seed()) {
-            let mut rng = AesRng::from_seed(seed);
+            let mut rng = SwankyRng::from_seed(seed);
             let inputsize = Uniform::from(2..100);
             let outputsize = Uniform::from(1..100);
             let gatesize = Uniform::from(200..1000);

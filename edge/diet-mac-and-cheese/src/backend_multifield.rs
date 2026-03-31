@@ -39,7 +39,6 @@ use std::io::{Read, Seek};
 use std::iter;
 use std::marker::PhantomData;
 use std::path::PathBuf;
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, OptionExt, Result, WrapErr, bail, ensure};
 use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField, StatisticallySecureField};
@@ -50,6 +49,7 @@ use swanky_party::{
     private::{PartyPrivate, PartyPrivateCopy},
     ty_eq::{EqualityProposition, Witness},
 };
+use swanky_rng::SwankyRng;
 use swanky_svole_wykw::LpnParams;
 
 // This file implements IR0+ support for diet-mac-n-cheese and is broken up into the following components:
@@ -249,7 +249,7 @@ impl<
 {
     pub fn init(
         channel: &mut C,
-        mut rng: AesRng,
+        mut rng: SwankyRng,
         fcom_f2: &FCom<P, F2, F40b, SvoleF2>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -282,7 +282,7 @@ impl<
 
     pub fn init_with_svole(
         channel: &mut C,
-        mut rng: AesRng,
+        mut rng: SwankyRng,
         fcom_f2: &FCom<P, F2, F40b, SvoleF2>,
         svole2: SvoleFE,
         no_batching: bool,
@@ -1358,7 +1358,7 @@ pub struct EvaluatorCirc<
     fcom_f2_ext: Option<FCom<P, F40b, F40b, SvoleF2Ext>>,
     type_store: TypeStore,
     eval: Vec<Box<dyn EvaluatorT<P>>>,
-    rng: AesRng,
+    rng: SwankyRng,
     multithreaded_voles: Vec<Box<dyn SvoleStopSignal>>,
     // Helper array used in `callframe_start` to avoid allocating a new array everytime the function is called.
     // This is an optimization.
@@ -1378,7 +1378,7 @@ impl<
 {
     /// Initialize a new (single-threaded) `EvaluatorCirc`.
     ///
-    /// This requires an [`AbstractChannel`] and an [`AesRng`] to initialize the
+    /// This requires an [`AbstractChannel`] and a [`SwankyRng`] to initialize the
     /// homomorphic commitment scheme for [`F2`] and its extension field
     /// [`F40b`]. This is suboptimal; ideally, these protocols would only start
     /// in circuits where they are strictly required (i.e., Boolean circuits or
@@ -1393,7 +1393,7 @@ impl<
     /// evaluation, see [`Self::new_multithreaded`].
     pub fn new(
         channel: &mut C,
-        mut rng: AesRng,
+        mut rng: SwankyRng,
         inputs: CircInputs,
         type_store: TypeStore,
         lpn_size: LpnSize,
@@ -1446,7 +1446,7 @@ impl<
             fcom_f2_ext: None,
             type_store,
             eval: Vec::new(),
-            rng: AesRng::new(),
+            rng: SwankyRng::new(),
             multithreaded_voles: vec![],
             helper_callframe_arr: [0; 256],
             no_batching: false, // unused
@@ -1466,7 +1466,7 @@ impl<
     pub fn new_multithreaded<C2: AbstractChannel + Clone + 'static + Send, I>(
         channels_vole: &mut I,
         threads_per_field: usize,
-        mut rng: AesRng,
+        mut rng: SwankyRng,
         inputs: CircInputs,
         type_store: TypeStore,
         no_batching: bool,
@@ -1800,7 +1800,7 @@ impl<
     fn load_backend_fe<FE: PrimeFiniteField + StatisticallySecureField + SieveIrDeserialize>(
         &mut self,
         channel: &mut C,
-        rng: AesRng,
+        rng: SwankyRng,
         idx: usize,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -1836,7 +1836,7 @@ impl<
     pub fn load_backend(
         &mut self,
         channel: &mut C,
-        rng: AesRng,
+        rng: SwankyRng,
         field: std::any::TypeId,
         idx: usize,
         lpn_size: LpnSize,
@@ -2002,7 +2002,7 @@ impl<
     fn load_backend_multithreaded_f2(
         &mut self,
         channel: &mut C,
-        rng: AesRng,
+        rng: SwankyRng,
         _idx: usize,
     ) -> Result<()> {
         info!("loading field F2");
@@ -2032,7 +2032,7 @@ impl<
         channel: &mut C,
         channels_vole: &mut I,
         threads_per_field: usize,
-        mut rng: AesRng,
+        mut rng: SwankyRng,
         idx: usize,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -2084,7 +2084,7 @@ impl<
         channel: &mut C,
         channels_vole: &mut I,
         threads_per_field: usize,
-        rng: AesRng,
+        rng: SwankyRng,
         field: std::any::TypeId,
         idx: usize,
         lpn_size: LpnSize,
@@ -2673,7 +2673,6 @@ pub(crate) mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::{Channel, SyncChannel};
     use swanky_error::{ErrorKind, WrapErr};
     use swanky_field::FiniteRing;
@@ -2681,6 +2680,7 @@ pub(crate) mod tests {
     use swanky_field_binary::F2;
     use swanky_field_f61p::F61p;
     use swanky_field_ff_primes::{F384p, F384q, Secp256k1, Secp256k1order};
+    use swanky_rng::SwankyRng;
 
     pub(crate) const FF0: u8 = 0;
     const FF1: u8 = 1;
@@ -2757,7 +2757,7 @@ pub(crate) mod tests {
             "Failed to create Unix socket pair.",
         )?;
         let handle: JoinHandle<swanky_error::Result<()>> = std::thread::spawn(move || {
-            let rng = AesRng::from_seed(Default::default());
+            let rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -2785,7 +2785,7 @@ pub(crate) mod tests {
             swanky_error::Result::Ok(())
         });
 
-        let rng = AesRng::from_seed(Default::default());
+        let rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);

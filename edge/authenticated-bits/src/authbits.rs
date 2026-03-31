@@ -49,7 +49,7 @@
 //! let (bits_prover, bits_verifier) = swanky_channel::local::local_channel_pair(
 //!     |c| {
 //!         // The prover.
-//!         let mut rng = swanky_aes_rng::AesRng::new();
+//!         let mut rng = swanky_rng::SwankyRng::new();
 //!         let bits = rng.r#gen::<[F2; 10]>();
 //!         let mut authbits: Vec<AuthBit<Prover>> = vec![];
 //!         let mut generator: AuthBitGenerator<_> = AuthBitGenerator::new(c, &mut rng)?;
@@ -59,7 +59,7 @@
 //!     },
 //!     |c| {
 //!         // The verifier.
-//!         let mut rng = swanky_aes_rng::AesRng::new();
+//!         let mut rng = swanky_rng::SwankyRng::new();
 //!         let count = 10;
 //!         let mut bits = vec![];
 //!         let mut authbits: Vec<AuthBit<Verifier>> = vec![];
@@ -441,9 +441,9 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
     use rand::SeedableRng;
-    use swanky_aes_rng::AesRng;
     use swanky_field::FiniteRing;
     use swanky_party::{party_system, ty_eq::Witness};
+    use swanky_rng::SwankyRng;
 
     party_system! {
         mod ps {
@@ -454,8 +454,8 @@ mod tests {
     use ps::{PartyA, PartyB};
 
     fn generators(
-        mut rng_a: &mut AesRng,
-        mut rng_b: &mut AesRng,
+        mut rng_a: &mut SwankyRng,
+        mut rng_b: &mut SwankyRng,
     ) -> (AuthBitGenerator<PartyA>, AuthBitGenerator<PartyB>) {
         swanky_channel::local::local_channel_pair(
             |c| AuthBitGenerator::<PartyA>::new(c, &mut rng_a),
@@ -491,8 +491,8 @@ mod tests {
         bits_in: &[F2],
         generator_a: &mut AuthBitGenerator<PartyA>,
         generator_b: &mut AuthBitGenerator<PartyB>,
-        mut rng_a: &mut AesRng,
-        mut rng_b: &mut AesRng,
+        mut rng_a: &mut SwankyRng,
+        mut rng_b: &mut SwankyRng,
         tamper_mac: bool,
         tamper_key: bool,
     ) -> (Vec<AuthBit<PartyA>>, Vec<AuthBit<PartyB>>) {
@@ -553,8 +553,8 @@ mod tests {
                                 public_bits in proptest::collection::vec(any::<bool>(), 1..1000),
                                 seed_party_a in any::<u128>(),
                                 seed_party_b in any::<u128>()) {
-            let mut rng_a = AesRng::from_seed(seed_party_a.into());
-            let mut rng_b = AesRng::from_seed(seed_party_b.into());
+            let mut rng_a = SwankyRng::from_seed(seed_party_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
             let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
             let public_bits: Vec<F2> = public_bits.into_iter().map(F2::from).collect();
             let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
@@ -588,8 +588,8 @@ mod tests {
         fn honest_generation_works(bits in proptest::collection::vec(any::<bool>(), 1..1000),
                                    seed_party_a in any::<u128>(),
                                    seed_party_b in any::<u128>()) {
-            let mut rng_a = AesRng::from_seed(seed_party_a.into());
-            let mut rng_b = AesRng::from_seed(seed_party_b.into());
+            let mut rng_a = SwankyRng::from_seed(seed_party_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
             let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
             let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
             let (output_a, output_b) = generate(&bits, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b, false, false);
@@ -608,8 +608,8 @@ mod tests {
         fn tampered_mac_fails(bits in proptest::collection::vec(any::<bool>(), 1..1000),
                               seed_party_a in any::<u128>(),
                               seed_party_b in any::<u128>()) {
-            let mut rng_a = AesRng::from_seed(seed_party_a.into());
-            let mut rng_b = AesRng::from_seed(seed_party_b.into());
+            let mut rng_a = SwankyRng::from_seed(seed_party_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
             let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
             let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
             let (output_a, output_b) = generate(&bits, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b, true, false);
@@ -628,8 +628,8 @@ mod tests {
         fn tampered_key_fails(bits in proptest::collection::vec(any::<bool>(), 1..1000),
                               seed_party_a in any::<u128>(),
                               seed_party_b in any::<u128>()) {
-            let mut rng_a = AesRng::from_seed(seed_party_a.into());
-            let mut rng_b = AesRng::from_seed(seed_party_b.into());
+            let mut rng_a = SwankyRng::from_seed(seed_party_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
             let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
             let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
             let (output_a, output_b) = generate(&bits, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b, false, true);
@@ -649,8 +649,8 @@ mod tests {
                                 delta in any::<u128>(),
                                 seed_party_a in any::<u128>(),
                                 seed_party_b in any::<u128>()) {
-            let mut rng_a = AesRng::from_seed(seed_party_a.into());
-            let mut rng_b = AesRng::from_seed(seed_party_b.into());
+            let mut rng_a = SwankyRng::from_seed(seed_party_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
             let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
             let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
             let (output_a, output_b) = generate(&bits, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b, false, true);
@@ -669,8 +669,8 @@ mod tests {
         fn bitxor_works(nbits in 320..1000,
                         seed_party_a in any::<u128>(),
                         seed_party_b in any::<u128>()) {
-            let mut rng_a = AesRng::from_seed(seed_party_a.into());
-            let mut rng_b = AesRng::from_seed(seed_party_b.into());
+            let mut rng_a = SwankyRng::from_seed(seed_party_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
             let bits1: Vec<_> = (0..nbits).map(|_| rng_a.r#gen::<F2>()).collect();
             let bits2: Vec<_> = (0..nbits).map(|_| rng_a.r#gen::<F2>()).collect();
             let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);

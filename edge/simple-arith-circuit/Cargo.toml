@@ -20,7 +20,7 @@ rand.workspace = true
 serde = { workspace = true, features = ["derive"], optional = true }
 proptest = { workspace = true, optional = true }
 log.workspace = true
-swanky-aes-rng.workspace = true
+swanky-rng.workspace = true
 swanky-block.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true

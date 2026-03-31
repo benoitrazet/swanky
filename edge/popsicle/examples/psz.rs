@@ -1,7 +1,7 @@
 use popsicle::psz::{Receiver, Sender};
 use std::time::SystemTime;
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::track_unix_channel_pair;
+use swanky_rng::SwankyRng;
 
 const NBYTES: usize = 16;
 const NINPUTS: usize = 1 << 20;
@@ -20,7 +20,7 @@ fn psi(ninputs: usize, nbytes: usize) {
     let receiver_inputs = sender_inputs.clone();
     let total = SystemTime::now();
     let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let start = SystemTime::now();
         let mut psi = Sender::init(&mut tx, &mut rng).unwrap();
         println!(
@@ -42,7 +42,7 @@ fn psi(ninputs: usize, nbytes: usize) {
             tx.kilobits_written() / 1000.0
         );
     });
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let start = SystemTime::now();
     let mut psi = Receiver::init(&mut rx, &mut rng).unwrap();
     println!(

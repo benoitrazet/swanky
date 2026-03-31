@@ -189,12 +189,12 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::SyncChannel;
+    use swanky_rng::SwankyRng;
 
     #[test]
     fn test_secret_sharing_of_zero() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let nparties = (rng.r#gen::<usize>() % 98) + 2;
         let shares = secret_sharing_of_zero(nparties, &mut rng);
         assert!(shares.len() == nparties);
@@ -209,7 +209,7 @@ mod tests {
     #[test]
     #[allow(clippy::needless_range_loop)]
     fn test_protocol() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
 
         let nparties = 3;
         let set_size = 1 << 6;
@@ -251,7 +251,7 @@ mod tests {
             let pid = i + 1;
             let my_set = set1.clone();
             std::thread::spawn(move || {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut sender = Sender::init(pid, &mut channels, &mut rng).unwrap();
                 sender.send(&my_set, &mut channels, &mut rng).unwrap();
             });
