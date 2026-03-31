@@ -2559,6 +2559,8 @@ dependencies = [
  "swanky-channel",
  "swanky-error",
  "swanky-f-rand",
+ "swanky-field",
+ "swanky-field-binary",
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",
  "swanky-party",

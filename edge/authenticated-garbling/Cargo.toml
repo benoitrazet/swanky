@@ -13,6 +13,8 @@ workspace = true
 [dependencies]
 fancy-garbling.workspace = true
 swanky-authenticated-bits.workspace = true
+swanky-field.workspace = true
+swanky-field-binary.workspace = true
 swanky-f-rand.workspace = true
 swanky-channel.workspace = true
 swanky-block.workspace = true

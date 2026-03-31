@@ -35,6 +35,19 @@ impl From<F2> for bool {
     }
 }
 
+impl From<u16> for F2 {
+    #[inline(always)]
+    fn from(x: u16) -> Self {
+        F2(x as u8)
+    }
+}
+impl From<F2> for u16 {
+    #[inline(always)]
+    fn from(x: F2) -> Self {
+        x.0.into()
+    }
+}
+
 impl ConstantTimeEq for F2 {
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)
