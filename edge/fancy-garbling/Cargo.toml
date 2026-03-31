@@ -29,7 +29,7 @@ subtle.workspace = true
 serde = { workspace = true, features = ["derive"], optional = true }
 serde_json = { workspace = true, optional = true }
 swanky-adversary.workspace = true
-swanky-aes-hash.workspace = true
+swanky-cr-hash.workspace = true
 swanky-channel.workspace = true
 swanky-error.workspace = true
 

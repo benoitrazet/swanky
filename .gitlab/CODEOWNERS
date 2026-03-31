@@ -18,9 +18,6 @@
 /core/vectoreyes/
 
 [Edge]
-/edge/aes-hash @amaloz @rissa
-/edge/aes-hash/ @amaloz @rissa
-
 /edge/authenticated-bits @amaloz @rissa
 /edge/authenticated-bits/ @amaloz @rissa
 
@@ -44,6 +41,9 @@
 
 /edge/cointoss @amaloz
 /edge/cointoss/ @amaloz
+
+/edge/cr-hash @amaloz @rissa
+/edge/cr-hash/ @amaloz @rissa
 
 /edge/deprecated-bitwise-utils @cphifer
 /edge/deprecated-bitwise-utils/ @cphifer

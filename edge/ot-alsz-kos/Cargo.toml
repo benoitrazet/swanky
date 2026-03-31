@@ -15,7 +15,7 @@ swanky-ot-traits.workspace = true
 swanky-block.workspace = true
 rand.workspace = true
 swanky-ocelot-error.workspace = true
-swanky-aes-hash.workspace = true
+swanky-cr-hash.workspace = true
 swanky-rng.workspace = true
 swanky-channel-legacy.workspace = true
 swanky-bytearray-utils.workspace = true
@@ -36,4 +36,3 @@ criterion.workspace = true
 [[bench]]
 name = "ot"
 harness = false
-

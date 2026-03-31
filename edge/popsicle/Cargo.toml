@@ -31,7 +31,7 @@ fancy-garbling = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 swanky-adversary.workspace = true
-swanky-aes-hash.workspace = true
+swanky-cr-hash.workspace = true
 swanky-rng.workspace = true
 swanky-block.workspace = true
 swanky-bytearray-utils.workspace = true

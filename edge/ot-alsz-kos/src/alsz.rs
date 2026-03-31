@@ -6,10 +6,10 @@
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
-use swanky_aes_hash::CorrelationRobustHash;
 use swanky_block::Block;
 use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_cr_hash::CorrelationRobustHash;
 use swanky_ocelot_error::Error;
 use swanky_ot_traits::{
     CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
