@@ -4,9 +4,9 @@ use std::{
     os::unix::net::UnixStream,
     time::Instant,
 };
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field_binary::{F2, F40b};
+use swanky_rng::SwankyRng;
 use swanky_svole_wykw::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use swanky_svole_wykw::{Receiver, Sender};
 
@@ -74,7 +74,7 @@ type VReceiver = Receiver<F40b>;
 fn run() {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let mut channel =
             OurTrackChannel::new(sender.try_clone().unwrap(), sender.try_clone().unwrap());
         let start = Instant::now();
@@ -94,7 +94,7 @@ fn run() {
         vole.duplicate(&mut channel, &mut rng).unwrap();
         println!("Send time (duplicate): {:?}", start.elapsed());
     });
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let mut channel =
         OurTrackChannel::new(receiver.try_clone().unwrap(), receiver.try_clone().unwrap());
     let start = Instant::now();

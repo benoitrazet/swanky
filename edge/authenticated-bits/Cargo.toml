@@ -23,7 +23,7 @@ swanky-f-rand.workspace = true
 swanky-field-binary.workspace = true
 swanky-field.workspace = true
 swanky-serialization.workspace = true
-swanky-aes-rng.workspace = true
+swanky-rng.workspace = true
 vectoreyes.workspace = true
 
 blake3.workspace = true

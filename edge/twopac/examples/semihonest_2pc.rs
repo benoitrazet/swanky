@@ -3,8 +3,8 @@ use fancy_garbling::{
     circuit::{BinaryCircuit as Circuit, EvaluableCircuit},
 };
 use std::{fs::File, io::BufReader, time::SystemTime};
-use swanky_aes_rng::AesRng;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 fn circuit(fname: &str) -> Circuit {
@@ -20,9 +20,9 @@ fn run_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
     let total = SystemTime::now();
     swanky_channel::local::local_channel_pair(
         |channel| {
-            let rng = AesRng::new();
+            let rng = SwankyRng::new();
             let start = SystemTime::now();
-            let mut gb = Garbler::<AesRng, OtSender, WireMod2>::new(channel, rng).unwrap();
+            let mut gb = Garbler::<SwankyRng, OtSender, WireMod2>::new(channel, rng).unwrap();
             println!(
                 "Garbler :: Initialization: {} ms",
                 start.elapsed().unwrap().as_millis()
@@ -45,9 +45,9 @@ fn run_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
             Ok(())
         },
         |channel| {
-            let rng = AesRng::new();
+            let rng = SwankyRng::new();
             let start = SystemTime::now();
-            let mut ev = Evaluator::<AesRng, OtReceiver, WireMod2>::new(channel, rng).unwrap();
+            let mut ev = Evaluator::<SwankyRng, OtReceiver, WireMod2>::new(channel, rng).unwrap();
             println!(
                 "Evaluator :: Initialization: {} ms",
                 start.elapsed().unwrap().as_millis()

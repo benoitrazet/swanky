@@ -1,6 +1,6 @@
 [package]
-name = "swanky-aes-rng"
-description = "A random number generator based on AES-CTR."
+name = "swanky-rng"
+description = "A fast random number generator based on AES-CTR."
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -21,5 +21,5 @@ criterion.workspace = true
 proptest.workspace = true
 
 [[bench]]
-name = "rand_aes"
+name = "benches"
 harness = false

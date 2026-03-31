@@ -13,7 +13,7 @@ workspace = true
 [dependencies]
 fancy-garbling.workspace = true
 swanky-adversary.workspace = true
-swanky-aes-rng.workspace = true
+swanky-rng.workspace = true
 swanky-block.workspace = true
 swanky-channel.workspace = true
 swanky-error.workspace = true

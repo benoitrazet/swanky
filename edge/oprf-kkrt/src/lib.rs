@@ -11,13 +11,13 @@ use prc::PseudorandomCode;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
-use swanky_aes_rng::AesRng;
 use swanky_block::{Block, Block512};
 use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_ocelot_error::Error;
 use swanky_oprf_traits::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender};
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_rng::SwankyRng;
 
 /// KKRT oblivious PRF sender.
 pub struct Sender<OT: OtReceiver + SemiHonest = swanky_ot_alsz_kos::alsz::Receiver> {
@@ -25,7 +25,7 @@ pub struct Sender<OT: OtReceiver + SemiHonest = swanky_ot_alsz_kos::alsz::Receiv
     s: Vec<bool>,
     s_: [u8; 64],
     code: PseudorandomCode,
-    rngs: Vec<AesRng>,
+    rngs: Vec<SwankyRng>,
 }
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> ObliviousPrf for Sender<OT> {
@@ -50,8 +50,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
         let ks = ot.receive(channel, &s, rng)?;
         let rngs = ks
             .into_iter()
-            .map(AesRng::from_seed)
-            .collect::<Vec<AesRng>>();
+            .map(SwankyRng::from_seed)
+            .collect::<Vec<SwankyRng>>();
         Ok(Self {
             _ot: PhantomData::<OT>,
             s,
@@ -125,7 +125,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
 pub struct Receiver<OT: OtSender + SemiHonest = swanky_ot_alsz_kos::alsz::Sender> {
     _ot: PhantomData<OT>,
     code: PseudorandomCode,
-    rngs: Vec<(AesRng, AesRng)>,
+    rngs: Vec<(SwankyRng, SwankyRng)>,
 }
 
 impl<OT: OtSender<Msg = Block> + SemiHonest> ObliviousPrf for Receiver<OT> {
@@ -154,8 +154,8 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
         ot.send(channel, &ks, rng)?;
         let rngs = ks
             .into_iter()
-            .map(|(k0, k1)| (AesRng::from_seed(k0), AesRng::from_seed(k1)))
-            .collect::<Vec<(AesRng, AesRng)>>();
+            .map(|(k0, k1)| (SwankyRng::from_seed(k0), SwankyRng::from_seed(k1)))
+            .collect::<Vec<(SwankyRng, SwankyRng)>>();
         Ok(Self {
             _ot: PhantomData::<OT>,
             code,
@@ -219,12 +219,12 @@ mod tests {
         os::unix::net::UnixStream,
         sync::{Arc, Mutex},
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
+    use swanky_rng::SwankyRng;
 
     #[test]
     fn test_seed() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let mut input = [0u8; 64];
         rng.fill_bytes(&mut input);
         let seed = Block512::from(input);
@@ -242,7 +242,7 @@ mod tests {
         let results_ = results.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -256,7 +256,7 @@ mod tests {
                 .map(|(inp, seed)| oprf.compute(seed, *inp))
                 .collect::<Vec<Block512>>();
         });
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);

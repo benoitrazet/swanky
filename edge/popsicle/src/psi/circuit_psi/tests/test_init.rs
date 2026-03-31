@@ -6,19 +6,19 @@ mod tests {
         base_psi::{BasePsi, receiver::OpprfReceiver, sender::OpprfSender},
         tests::*,
     };
-    use swanky_aes_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     #[test]
     fn test_psty_init_receiver_succeeded() {
         for _ in 0..TEST_TRIALS {
             let (_, receiver) = swanky_channel::local::local_channel_pair(
                 |channel| {
-                    let mut rng = AesRng::new();
+                    let mut rng = SwankyRng::new();
                     let _ = OpprfSender::init(channel, &mut rng, true);
                     Ok(())
                 },
                 |channel| {
-                    let mut rng = AesRng::new();
+                    let mut rng = SwankyRng::new();
                     let receiver = OpprfReceiver::init(channel, &mut rng, true);
                     Ok(receiver)
                 },
@@ -36,11 +36,11 @@ mod tests {
         for _ in 0..TEST_TRIALS {
             let (sender, _) = swanky_channel::local::local_channel_pair(
                 |channel| {
-                    let mut rng = AesRng::new();
+                    let mut rng = SwankyRng::new();
                     Ok(OpprfSender::init(channel, &mut rng, true))
                 },
                 |channel| {
-                    let mut rng = AesRng::new();
+                    let mut rng = SwankyRng::new();
                     let _ = OpprfReceiver::init(channel, &mut rng, true);
                     Ok(())
                 },

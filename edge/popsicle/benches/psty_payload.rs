@@ -2,8 +2,8 @@
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use popsicle::psty_payload::{Receiver, Sender};
-use swanky_aes_rng::AesRng;
 use swanky_block::Block512;
+use swanky_rng::SwankyRng;
 
 use rand::{CryptoRng, Rng};
 
@@ -37,12 +37,12 @@ fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> 
 fn bench_psty_payload_init() {
     swanky_channel::local::local_channel_pair(
         |channel| {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let _ = Sender::init(channel, &mut rng).unwrap();
             Ok(())
         },
         |channel| {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let _ = Receiver::init(channel, &mut rng).unwrap();
             Ok(())
         },
@@ -58,7 +58,7 @@ fn bench_psty_payload(
 ) {
     swanky_channel::local::local_channel_pair(
         |channel| {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let mut psi = Sender::init(channel, &mut rng).unwrap();
             // For small to medium sized sets where batching can occur accross all bins
             psi.full_protocol(&sender_inputs, &weights, channel, &mut rng)
@@ -66,7 +66,7 @@ fn bench_psty_payload(
             Ok(())
         },
         |channel| {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let mut psi = Receiver::init(channel, &mut rng).unwrap();
             // For small to medium sized sets where batching can occur accross all bins
             let _ = psi
@@ -86,7 +86,7 @@ fn bench_psi(c: &mut Criterion) {
         })
     });
     c.bench_function("psi::PSTY PAYLOAD (n = 2^8)", move |bench| {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let rs = rand_vec_vec(1 << 8);
         let payload = int_vec_block512(rand_u64_vec(1 << 8, 1 << 30, &mut rng));
         bench.iter(|| {
@@ -95,7 +95,7 @@ fn bench_psi(c: &mut Criterion) {
         })
     });
     c.bench_function("psi::PSTY PAYLOAD (n = 2^12)", move |bench| {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let rs = rand_vec_vec(1 << 12);
         let payload = int_vec_block512(rand_u64_vec(1 << 12, 1 << 30, &mut rng));
         bench.iter(|| {

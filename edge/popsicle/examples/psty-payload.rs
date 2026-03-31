@@ -1,6 +1,6 @@
 use popsicle::psty::{Receiver, Sender};
 use std::time::SystemTime;
-use swanky_aes_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 const NBYTES: usize = 16;
 const NINPUTS: usize = 1000;
@@ -19,7 +19,7 @@ fn psty_payload(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>, payloads: Vec<Vec<
     let total = SystemTime::now();
     let _ = swanky_channel::local::local_channel_pair(
         |channel| {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
 
             let start = SystemTime::now();
             let mut sender = Sender::init(channel, &mut rng).unwrap();
@@ -42,7 +42,7 @@ fn psty_payload(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>, payloads: Vec<Vec<
             Ok(())
         },
         |channel| {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
 
             let start = SystemTime::now();
             let mut receiver = Receiver::init(channel, &mut rng).unwrap();

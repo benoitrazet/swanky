@@ -1,8 +1,8 @@
 use rand::Rng;
 use std::time::SystemTime;
-use swanky_aes_rng::AesRng;
 use swanky_block::{Block, Block512};
 use swanky_channel_legacy::track_unix_channel_pair;
+use swanky_rng::SwankyRng;
 
 fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
@@ -11,14 +11,14 @@ fn rand_block_vec(size: usize) -> Vec<Block> {
 fn run(ninputs: usize, npoints: usize) {
     println!("npoints = {}, ninputs = {}", npoints, ninputs);
     let inputs = rand_block_vec(ninputs);
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let points = (0..npoints)
         .map(|_| (rng.r#gen(), rng.r#gen()))
         .collect::<Vec<(Block, Block512)>>();
     let (mut sender, mut receiver) = track_unix_channel_pair();
     let total = SystemTime::now();
     let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let start = SystemTime::now();
         let mut oprf: swanky_oprf_kmprt::Sender =
             swanky_oprf_kmprt::Sender::init(&mut sender, &mut rng).unwrap();
@@ -41,7 +41,7 @@ fn run(ninputs: usize, npoints: usize) {
             sender.kilobits_written() / 1000.0
         );
     });
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let start = SystemTime::now();
     let mut oprf: swanky_oprf_kmprt::Receiver =
         swanky_oprf_kmprt::Receiver::init(&mut receiver, &mut rng).unwrap();

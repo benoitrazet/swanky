@@ -18,7 +18,7 @@ swanky-channel.workspace = true
 swanky-party.workspace = true
 swanky-ot-traits.workspace = true
 swanky-adversary.workspace = true
-swanky-aes-rng.workspace = true
+swanky-rng.workspace = true
 swanky-error.workspace = true
 swanky-ot-alsz-kos.workspace = true
 

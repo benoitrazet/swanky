@@ -18,12 +18,12 @@ use crate::{
     svole_trait::SvoleT,
 };
 use generic_array::GenericArray;
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::Result;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F40b};
 use swanky_party::private::PartyPrivate;
+use swanky_rng::SwankyRng;
 
 pub(crate) struct DietMacAndCheeseExtField<
     P: Party,
@@ -52,7 +52,7 @@ where
 {
     pub(crate) fn init_with_fcom(
         channel: &mut C,
-        rng: AesRng,
+        rng: SwankyRng,
         fcom: &FCom<P, F2, T, SVOLE1>,
         fcom_ext: &FCom<P, T, T, SVOLE2>,
         no_batching: bool,
@@ -363,10 +363,10 @@ mod test {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_error::{ErrorKind, WrapErr};
     use swanky_field_binary::{F2, F40b};
+    use swanky_rng::SwankyRng;
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     #[test]
@@ -376,7 +376,7 @@ mod test {
             "Failed to create Unix socket pair.",
         )?;
         let handle: JoinHandle<swanky_error::Result<()>> = std::thread::spawn(move || {
-            let mut rng = AesRng::from_seed(Default::default());
+            let mut rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -407,7 +407,7 @@ mod test {
             swanky_error::Result::Ok(())
         });
 
-        let mut rng = AesRng::from_seed(Default::default());
+        let mut rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);

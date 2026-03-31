@@ -30,11 +30,11 @@ serde = { workspace = true, features = ["derive"], optional = true }
 serde_json = { workspace = true, optional = true }
 swanky-adversary.workspace = true
 swanky-aes-hash.workspace = true
-swanky-aes-rng.workspace = true
 swanky-channel.workspace = true
 swanky-error.workspace = true
 
 [dev-dependencies]
+swanky-rng.workspace = true
 criterion.workspace = true
 
 [[bin]]

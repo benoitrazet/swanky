@@ -1,7 +1,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{AllWire, WireLabel, util::RngExt};
 use std::time::Duration;
-use swanky_aes_rng::AesRng;
+use swanky_rng::SwankyRng;
 use vectoreyes::U8x16;
 
 fn bench_digits(c: &mut Criterion, p: u16) {
@@ -111,7 +111,7 @@ fn bench_hashback(c: &mut Criterion, q: u16) {
 
 fn bench_rand(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::rand ({})", p), move |b| {
-        let rng = &mut AesRng::new();
+        let rng = &mut SwankyRng::new();
         b.iter(|| {
             let z = AllWire::rand(rng, p);
             std::hint::black_box(z);
@@ -121,7 +121,7 @@ fn bench_rand(c: &mut Criterion, p: u16) {
 
 fn bench_rand_delta(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::rand_delta ({})", p), move |b| {
-        let rng = &mut AesRng::new();
+        let rng = &mut SwankyRng::new();
         b.iter(|| {
             let z = AllWire::rand_delta(rng, p);
             std::hint::black_box(z);

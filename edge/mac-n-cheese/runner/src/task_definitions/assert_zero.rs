@@ -28,7 +28,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertZeroTask<P, T> {
 
     fn initialize(
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut swanky_aes_rng::AesRng,
+        _rng: &mut swanky_rng::SwankyRng,
         _vc: crate::base_vole::VoleContexts<P>,
         num_runner_threads: usize,
     ) -> swanky_error::Result<Self> {
@@ -45,7 +45,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertZeroTask<P, T> {
     fn finalize(
         mut self,
         c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut swanky_aes_rng::AesRng,
+        _rng: &mut swanky_rng::SwankyRng,
     ) -> swanky_error::Result<()> {
         let mut acu = U8x32::ZERO;
         for out in self.hash_outputs.iter_mut() {

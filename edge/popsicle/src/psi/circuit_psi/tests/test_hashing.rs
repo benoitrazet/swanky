@@ -8,8 +8,8 @@ mod tests {
         *,
     };
     use std::collections::HashSet;
-    use swanky_aes_rng::AesRng;
     use swanky_block::Block512;
+    use swanky_rng::SwankyRng;
 
     // Run the base psi up to hashing
     fn psty_up_to_hashing(
@@ -26,14 +26,14 @@ mod tests {
         let ((sender, result_hash_sender), (receiver, result_hash_receiver)) =
             swanky_channel::local::local_channel_pair(
                 |channel| {
-                    let mut rng = AesRng::seed_from_u64(seed_sx);
+                    let mut rng = SwankyRng::seed_from_u64(seed_sx);
                     let mut sender = OpprfSender::init(channel, &mut rng, true).unwrap();
                     let result_hash_sender =
                         sender.hash_data(set, Some(payloads), channel, &mut rng);
                     Ok((sender, result_hash_sender))
                 },
                 |channel| {
-                    let mut rng = AesRng::seed_from_u64(seed_rx);
+                    let mut rng = SwankyRng::seed_from_u64(seed_rx);
                     let mut receiver = OpprfReceiver::init(channel, &mut rng, true).unwrap();
                     let result_hash_receiver =
                         receiver.hash_data(set, Some(payloads), channel, &mut rng);
@@ -83,7 +83,7 @@ mod tests {
     // set is arbitrary
     fn test_psty_hashing_simple_sender_succeed_arbitrary_set() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = rand_u8_vec(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, _, result_hash_sender, _) =
@@ -99,7 +99,7 @@ mod tests {
     // payloads are arbitrary
     fn test_psty_hashing_simple_sender_succeed_arbitrary_payload() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
@@ -116,7 +116,7 @@ mod tests {
     // payloads are arbitrary
     fn test_psty_hashing_simple_sender_succeed_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, _, result_hash_sender, _) =
@@ -132,7 +132,7 @@ mod tests {
     // payloads are arbitrary
     fn test_psty_hashing_simple_sender_succeeded_arbitrary_payload() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
@@ -149,7 +149,7 @@ mod tests {
     // sx seed is arbitrary
     fn test_psty_hashing_simple_sender_succeeded_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, _, result_hash_sender, _) =
@@ -165,7 +165,7 @@ mod tests {
     // when set is arbitrary
     fn test_psty_hashing_cuckoo_receiver_succeeded_arbitrary_set() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = rand_u8_vec(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, _, _, result_hash_receiver) =
@@ -181,7 +181,7 @@ mod tests {
     // when payloads are arbitrary
     fn test_psty_hashing_cuckoo_receiver_succeeded_arbitrary_payloads() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
@@ -198,7 +198,7 @@ mod tests {
     // when rx seed is arbitrary
     fn test_psty_hashing_cuckoo_receiver_succeeded_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, _, _, result_hash_receiver) =
@@ -213,7 +213,7 @@ mod tests {
     // Test that Simple Hashing preserved the original payloads
     fn test_psty_hashing_simple_sender_payloads_preserved_arbitrary_payloads() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
@@ -234,7 +234,7 @@ mod tests {
     // Test that Simple Hashing preserved the original payloads
     fn test_psty_hashing_simple_sender_payloads_preserved_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
@@ -254,7 +254,7 @@ mod tests {
     // Test that Cuckoo Hashing preserved the original payloads
     fn test_psty_hashing_cuckoo_receiver_payloads_preserved_arbitrary_payloads() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
@@ -275,7 +275,7 @@ mod tests {
     // Test that Simple Hashing preserved the original payloads
     fn test_psty_hashing_cuckoo_receiver_payloads_preserved_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
@@ -294,7 +294,7 @@ mod tests {
     // Test that the Sender's payload and set hash tables have the same size
     fn test_psty_hashing_sizes_simple_sender_payload_set_same() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, _, _, _) = psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
@@ -310,7 +310,7 @@ mod tests {
     // Test that the Sender's payload and set hash tables have the same size
     fn test_psty_hashing_sizes_simple_sender_payload_in_out_same() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, _, _, _) = psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
@@ -326,7 +326,7 @@ mod tests {
     // Test that the Sender's payload and set hash tables have the same size
     fn test_psty_hashing_sizes_simple_sender_set_in_out_same() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, _, _, _) = psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
@@ -343,7 +343,7 @@ mod tests {
     // Test that the Sender's payload and set hash tables have the same size
     fn test_psty_hashing_sizes_receiver_cuckoo_payload_in_out_same() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, receiver, _, _) =
@@ -361,7 +361,7 @@ mod tests {
     // Test that the Sender's payload and set hash tables have the same size
     fn test_psty_hashing_sizes_sender_receiver_set_tables_same() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =

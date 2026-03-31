@@ -198,10 +198,10 @@ mod tests {
     };
     use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
     use rand::seq::SliceRandom;
-    use swanky_aes_rng::AesRng;
     use swanky_field::PrimeFiniteField;
     use swanky_field_binary::F2;
     use swanky_field_f61p::F61p;
+    use swanky_rng::SwankyRng;
 
     fn create_gates(ntuples: u64, tuple_size: u64, modulus: Number) -> (FunStore, Vec<GateM>) {
         let total = ntuples * tuple_size;
@@ -244,7 +244,7 @@ mod tests {
         let fields = vec![modulus];
         let (fun_store, gates) = create_gates(ntuples, tuple_size, modulus);
 
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let mut v: Vec<Vec<Number>> = (0..ntuples)
             .map(|_| {
                 (0..tuple_size)
@@ -278,7 +278,7 @@ mod tests {
         let fields = vec![modulus];
         let (fun_store, gates) = create_gates(ntuples, tuple_size, modulus);
 
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let mut v: Vec<Vec<F>> = (0..ntuples)
             .map(|_| (0..tuple_size).map(|_| F::random(&mut rng)).collect())
             .collect();

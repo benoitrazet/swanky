@@ -7,11 +7,11 @@ use crate::party::{Party, Prover, WhichParty};
 use crate::svole_trait::SvoleT;
 use crate::svole_trait::field_name;
 use log::{debug, info, warn};
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::private::PartyPrivateCopy;
+use swanky_rng::SwankyRng;
 use swanky_svole_wykw::LpnParams;
 
 // Some design decisions:
@@ -139,7 +139,7 @@ pub struct DietMacAndCheese<
 {
     pub(crate) fcom: FCom<P, V, T, SVOLE>,
     pub(crate) channel: C,
-    pub(crate) rng: AesRng,
+    pub(crate) rng: SwankyRng,
     mult_check_state: MultCheckState<P, V, T>,
     zero_check_state: ZeroCheckState<P, V, T>,
     no_batching: bool,
@@ -159,7 +159,7 @@ where
     /// Initialize by providing a channel, a random generator, and a pair of LPN parameters as defined by SVOLE.
     pub fn init(
         channel: &mut C,
-        mut rng: AesRng,
+        mut rng: SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         no_batching: bool,
@@ -180,7 +180,7 @@ where
     /// Initialize by providing a reference to an FCom.
     pub(crate) fn init_with_fcom(
         channel: &mut C,
-        mut rng: AesRng,
+        mut rng: SwankyRng,
         fcom: &FCom<P, V, T, SVOLE>,
         no_batching: bool,
     ) -> Result<Self> {
@@ -200,7 +200,7 @@ where
     #[cfg(test)]
     fn init_with_delta(
         channel: &mut C,
-        mut rng: AesRng,
+        mut rng: SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         no_batching: bool,
@@ -496,12 +496,12 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_field::{FiniteField, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b};
     use swanky_field_f61p::F61p;
     use swanky_party::ty_eq::Witness;
+    use swanky_rng::SwankyRng;
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     fn test<V: IsSubFieldOf<T>, T: FiniteField>()
@@ -510,7 +510,7 @@ mod tests {
     {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let rng = AesRng::from_seed(Default::default());
+            let rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -556,7 +556,7 @@ mod tests {
             assert!(dmc.finalize().is_err());
         });
 
-        let rng = AesRng::from_seed(Default::default());
+        let rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -593,7 +593,7 @@ mod tests {
     {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let rng = AesRng::from_seed(Default::default());
+            let rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -610,7 +610,7 @@ mod tests {
             challenge
         });
 
-        let rng = AesRng::from_seed(Default::default());
+        let rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);

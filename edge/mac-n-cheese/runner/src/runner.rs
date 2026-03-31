@@ -15,9 +15,9 @@ use mac_n_cheese_ir::compilation_format::{
 use mac_n_cheese_vole::party::{Party, Prover, WhichParty};
 use parking_lot::{Condvar, Mutex, RwLock};
 use rustc_hash::FxHashMap;
-use swanky_aes_rng::AesRng;
 use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
 use swanky_party::private::PartyPrivate;
+use swanky_rng::SwankyRng;
 
 use crate::{
     alloc::OwnedAlignedBytes,
@@ -94,7 +94,7 @@ impl CommunicatonSizes {
 pub struct PerRunnerThread {
     thread_idx: usize,
     arena: Bump,
-    rng: AesRng,
+    rng: SwankyRng,
 }
 
 pub struct RunnerThread<P: Party> {
@@ -110,7 +110,7 @@ pub struct RunnerThread<P: Party> {
     task_outputs: LimitedUseArcs<TaskOutput<P>>,
 }
 impl<P: Party> RunnerThread<P> {
-    fn run(&self, thread_idx: usize, rng: AesRng) -> swanky_error::Result<()> {
+    fn run(&self, thread_idx: usize, rng: SwankyRng) -> swanky_error::Result<()> {
         let mut per_runner_thread = PerRunnerThread {
             thread_idx,
             arena: Bump::with_capacity(1024 * 1024 * 2),
@@ -391,7 +391,7 @@ impl<P: Party> RunnerThread<P> {
 #[allow(clippy::too_many_arguments)]
 pub fn run_proof_background<P: Party>(
     num_threads: usize,
-    mut rng: AesRng,
+    mut rng: SwankyRng,
     ts: &mut ThreadSpawner,
     mut root_conn: TlsConnection<P>,
     run_queue: RunQueue<P>,
@@ -438,7 +438,7 @@ pub fn run_proof_background<P: Party>(
     {
         struct V<'a, P: Party>(
             VoleContexts<P>,
-            &'a mut AesRng,
+            &'a mut SwankyRng,
             &'a mut TlsConnection<P>,
             usize,
         );

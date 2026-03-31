@@ -52,11 +52,11 @@ pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use swanky_aes_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     #[test]
     fn test_compress_and_hash_inputs() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let key = rng.r#gen::<Block>();
         let inputs = rand_vec_vec(13, 16, &mut rng);
         let _ = compress_and_hash_inputs(&inputs, key);
