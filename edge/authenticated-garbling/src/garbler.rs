@@ -1,4 +1,5 @@
 //! Garbler in Authenticated Garbling
+use crate::mux;
 use crate::preprocesser::unifier::{CircuitExecutor, CircuitExecutorItem};
 use crate::preprocesser::{f_preprocessing, wire::PreProcessedWire};
 use crate::ps::PartyGarbler;
@@ -12,7 +13,7 @@ use std::collections::HashMap;
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
-use swanky_field_binary::F2;
+use swanky_field_binary::{F2, F128b};
 
 type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 
@@ -57,6 +58,10 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// Returns the [`AuthShare`] associated with the current wire
     fn get_current_wire_share(&mut self, index: usize) -> AuthShare<PartyGarbler> {
         self.preprocessed_wires_map[&index].into_auth_share()
+    }
+    /// Returns the [`AuthShare`] associated with the current wire
+    fn get_current_wire_triple(&mut self, index: usize) -> AuthShare<PartyGarbler> {
+        self.known_triples_map[&index].into_auth_share()
     }
     /// Pre-process the passed circuit
     pub fn preprocess_circuit(
@@ -188,21 +193,91 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     }
 }
 
+
 impl<RNG> FancyBinary for Garbler<RNG>
 where
     RNG: RngCore + CryptoRng,
 {
     fn and(
         &mut self,
-        A: &Self::Item,
-        B: &Self::Item,
+        la0: &Self::Item,
+        lb0: &Self::Item,
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item> {
-        todo!()
+        // This index is called γ in the paper
+        let index = self.current_wire_index();
+        // This is the share for wire label L_{γ,0}
+        let lc0_share = self.get_current_wire_share(index);
+        // This is the and triple share for wire label L_{γ,0}
+        let lc0_triple = self.get_current_wire_triple(index);
+
+        // Compute l1 from l0 for both inputs
+        //
+        // This wire label is L_{α,1} = L_{α,0} + Δ
+        let la1 = la0.wire_label() + self.delta(2);
+        // This wire label is L_{β,1} = L_{β,0} + Δ
+        let lb1 = lb0.wire_label() + self.delta(2);
+
+        // Hash l0 and l1 from both inputs and use the current index as a tweak
+        //
+        // This is H(L_{α,0}, γ) in the paper
+        let h_la0 = la0.wire_label().hash(index as u128);
+        // This is H(L_{β,0}, γ) in the paper
+        let h_lb0 = lb0.wire_label().hash(index as u128);
+        // This is H(L_{α,1}, γ) in the paper
+        let h_la1 = la1.hash(index as u128);
+        // This is H(L_{β,1}, γ) in the paper
+        let h_lb1 = lb1.hash(index as u128);
+
+        // Extract the share keys for the inputs, the current gate share, and the and triple
+        // This is K[s_α] in the paper
+        let key_a = la0.auth_share().key();
+        // This is K[s_β] in the paper
+        let key_b = lb0.auth_share().key();
+        // This is K[s_γ] in the paper
+        let key_c = lc0_share.key();
+        // This is K[s*_γ] in the paper
+        let key_c_triple = lc0_triple.key();
+
+        // Compute Δ_rα := Δ x r_α: if r_α is 0, then this value is 0, otherwise its Δ
+        let delta_bit_a = mux(la0.auth_share().bit(), 0.into(), self.delta(2).to_repr());
+        // Compute Δ_rβ := Δ x r_β: if r_β is 0, then this value is 0, otherwise its Δ
+        let delta_bit_b = mux(lb0.auth_share().bit(), 0.into(), self.delta(2).to_repr());
+        // Compute Δ_rγ := Δ x r_γ: if r_γ is 0, then this value is 0, otherwise its Δ
+        let delta_bit_c = mux(lc0_share.bit(), 0.into(), self.delta(2).to_repr());
+        // Compute Δ_r*γ := Δ x r*_γ: if r*_γ is 0, then this value is 0, otherwise its Δ
+        let delta_bit_c_triple = mux(lc0_triple.bit(), 0.into(), self.delta(2).to_repr());
+
+        // Gate_{γ,0} = H(L_{α,0}, γ) + H(L_{α,1}, γ) + K[s_β] + Δ_rβ
+        let gate0 = h_la0 + h_la1 + key_b + delta_bit_b;
+        // Gate_{γ,1} = H(L_{β,0}, γ) + H(L_{β,1}, γ) + K[s_α] + Δ_rα + L_{α,0}
+        let gate1 = h_lb0 + h_lb1 + key_a + delta_bit_a + la0.wire_label().to_repr();
+        // L_{γ,0} = H(L_{α,0}, γ) + H(L_{β,0}, γ) + K[s_γ] + Δ_rγ + K[s*_γ] + Δ_r*γ
+        let lc0 = h_la0 + h_lb0 + key_c + delta_bit_c + key_c_triple + delta_bit_c_triple;
+        // b_γ = lsb(L_{γ,0})
+        let bit_c = F128b::from(lc0).lsb();
+
+        channel.write(&gate0)?;
+        channel.write(&gate1)?;
+        channel.write(&bit_c)?;
+
+        Ok(AuthenticatedWireMod2 {
+            wire_label: WireMod2::from_repr(lc0, 2),
+            auth_share: lc0_share,
+            index,
+        })
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        todo!()
+        let index = self.current_wire_index();
+        AuthenticatedWireMod2 {
+            // L_{γ,0} = L_{α,0} + L_{β,0}
+            wire_label: x.wire_label() + y.wire_label(),
+            // TODO: This is already computed in preprocessing, maybe re-use it?
+            //       although i am not sure if the storage is worth it.
+            auth_share: x.auth_share() ^ y.auth_share(),
+            index,
+        }
     }
 
     /// We can negate by having garbler xor wire with Delta
@@ -210,7 +285,15 @@ where
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        todo!()
+        AuthenticatedWireMod2 {
+            // Negation of a wire is just a matter of adding Δ
+            wire_label: x.wire_label() + self.delta(2),
+            // The authenticated share is not affected by negation
+            auth_share: x.auth_share(),
+            // The index of the wire does not change, this is consistent
+            // with how this wire is assigned an index in preprocessing.
+            index: x.index(),
+        }
     }
 }
 
@@ -267,11 +350,35 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
     ) -> swanky_error::Result<Vec<Self::Item>> {
         unimplemented!("Garbler cannot receive values")
     }
-    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<AuthenticatedWire> {
-        todo!()
+    fn constant(
+        &mut self,
+        x: u16,
+        _q: u16,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<AuthenticatedWire> {
+        // We haven't implemented a way to take advantage of constant wires
+        // in FancyBinary. So they need to be treated as input wires.
+        let zero = WireMod2::rand(&mut self.rng, 2);
+        let index = self.current_wire_index();
+        // Constant wires get their own dedicated authenticated share just like
+        // an input wire.
+        let auth_share = self.get_current_wire_share(index);
+        let wire = zero + self.delta(2) * x;
+        // Send the correct wire label to the evaluator
+        channel.write(&wire.to_repr())?;
+        // Store the authenticate wire as the zero wire label and the authenticated share.
+        Ok(AuthenticatedWireMod2 {
+            wire_label: zero,
+            auth_share,
+            index,
+        })
     }
 
-    fn output(&mut self, X: &AuthenticatedWire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
+    fn output(
+        &mut self,
+        X: &AuthenticatedWire,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Option<u16>> {
         todo!()
     }
 }
