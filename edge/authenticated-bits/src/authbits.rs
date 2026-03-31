@@ -35,7 +35,7 @@
 //! # use rand::Rng;
 //! # use swanky_authenticated_bits::authbits::{AuthBit, AuthBitGenerator};
 //! # use swanky_field_binary::F2;
-//! # use swanky_party::{party_system, either::PartyEither, private::PartyPrivate, private::PartyPrivateCopy, ty_eq::Witness};
+//! # use swanky_party::{party_system, either::PartyEither, private::PartyPrivate, ty_eq::Witness};
 //! # use std::iter::Copied;
 //! # use std::slice::Iter;
 //! # party_system! {
@@ -54,7 +54,7 @@
 //!         let mut authbits: Vec<AuthBit<Prover>> = vec![];
 //!         let mut generator: AuthBitGenerator<_> = AuthBitGenerator::new(c, &mut rng)?;
 //!         generator.generate(PartyEither::new(Witness::EQUAL_TYPES, bits.iter().copied()), &mut authbits, c, &mut rng)?;
-//!         AuthBitGenerator::open(&authbits, PartyPrivateCopy::empty(Witness::EQUAL_TYPES), PartyPrivate::empty(Witness::EQUAL_TYPES), c)?;
+//!         generator.open(&authbits, PartyPrivate::empty(Witness::EQUAL_TYPES), c)?;
 //!         Ok(bits.to_vec())
 //!     },
 //!     |c| {
@@ -66,7 +66,7 @@
 //!         let mut generator: AuthBitGenerator<_> = AuthBitGenerator::new(c, &mut rng)?;
 //!         let input: PartyEither<_, Copied<Iter<'_, F2>>, _> = PartyEither::new(Witness::EQUAL_TYPES, count);
 //!         generator.generate(input, &mut authbits, c, &mut rng)?;
-//!         AuthBitGenerator::open(&authbits, generator.delta(), PartyPrivate::new(&mut bits), c)?;
+//!         generator.open(&authbits, PartyPrivate::new(&mut bits), c)?;
 //!         Ok(bits)
 //!     }
 //! )?;
@@ -334,6 +334,23 @@ impl<P: GenericParty> AuthBitGenerator<P> {
     /// This method returns an error if any [`AuthBit`] fails validation.
     /// In this case, no opened bits are added to `outputs`.
     pub fn open(
+        &self,
+        authbits: &[AuthBit<P>],
+        outputs: PartyPrivate<Party1<P>, P, &mut Vec<F2>>,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<()> {
+        AuthBitGenerator::open_with_delta(authbits, self.delta(), outputs, channel)
+    }
+
+    /// Open the authenticated bits in `authbits` using a supplied $`\Delta`$ value.
+    ///
+    /// See [`AuthBitGenerator::open`] for details.
+    ///
+    /// # Errors
+    ///
+    /// This method returns an error if any [`AuthBit`] fails validation.
+    /// In this case, no opened bits are added to `outputs`.
+    pub fn open_with_delta(
         authbits: &[AuthBit<P>],
         delta: PartyPrivateCopy<Party1<P>, P, U8x16>,
         outputs: PartyPrivate<Party1<P>, P, &mut Vec<F2>>,
@@ -512,9 +529,8 @@ mod tests {
                         },
                     ));
                 }
-                AuthBitGenerator::open(
+                generator_a.open(
                     &outputs,
-                    PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
                     channel_pr,
                 )?;
@@ -533,12 +549,8 @@ mod tests {
                     ));
                 }
                 let mut output = vec![];
-                let validation = AuthBitGenerator::open(
-                    &outputs,
-                    generator_b.delta(),
-                    PartyPrivate::new(&mut output),
-                    channel_vr,
-                );
+                let validation =
+                    generator_b.open(&outputs, PartyPrivate::new(&mut output), channel_vr);
                 // The generated bits should always be valid when no tampering happens.
                 if !tamper_mac && !tamper_key {
                     assert!(validation.is_ok());

@@ -343,10 +343,10 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
         feq.finalize(channel)
     }
 
-    /// Open the (leaky) AND triples in `triples`.
+    /// Open the (leaky) AND triples in `triples` using a supplied $`\Delta`$ value.
     ///
     /// This corresponds to opening each of the underlying authenticated shares.
-    pub(crate) fn open(
+    pub(crate) fn open_with_delta(
         triples: &[LeakyAndTriple<P>],
         delta: U8x16,
         channel: &mut Channel,
@@ -358,7 +358,7 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
             .flat_map(|triple| [triple.x, triple.y, triple.z])
             .collect();
         let mut out = Vec::with_capacity(3 * triples.len());
-        AuthShareGenerator::open(&shares, delta, &mut out, channel)?;
+        AuthShareGenerator::open_with_delta(&shares, delta, &mut out, channel)?;
         // Confirm when testing that all the triples are indeed valid.
         #[cfg(test)]
         {
@@ -455,7 +455,7 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
 
         // Open the `⟨d⟩`s in one shot. This is much more efficient than opening
         // the `⟨d⟩`s on a per-bucket basis.
-        AuthShareGenerator::open(&ds, self.delta(), &mut ds_opened, channel)?;
+        AuthShareGenerator::open_with_delta(&ds, self.delta(), &mut ds_opened, channel)?;
 
         for (bucket, ds_opened) in leaky_ands
             .chunks_exact(bucket_size)
@@ -568,11 +568,13 @@ mod tests {
     ) -> (bool, bool) {
         swanky_channel::local::local_channel_pair(
             |c| {
-                let result = LeakyAndTripleGenerator::open(&output_a, generator_a.delta(), c);
+                let result =
+                    LeakyAndTripleGenerator::open_with_delta(&output_a, generator_a.delta(), c);
                 Ok(result.is_ok())
             },
             |c| {
-                let result = LeakyAndTripleGenerator::open(&output_b, generator_b.delta(), c);
+                let result =
+                    LeakyAndTripleGenerator::open_with_delta(&output_b, generator_b.delta(), c);
                 Ok(result.is_ok())
             },
         )
@@ -612,14 +614,14 @@ mod tests {
                 |channel| {
                     let mut out = vec![];
                     generator_a.combine(&triples_a, &mut out, bucket_size, channel).unwrap();
-                    let result = LeakyAndTripleGenerator::open(AndTriple::peel_slice(&out), generator_a.delta(), channel);
+                    let result = LeakyAndTripleGenerator::open_with_delta(AndTriple::peel_slice(&out), generator_a.delta(), channel);
                     assert!(result.is_ok());
                     Ok(())
                 },
                 |channel| {
                     let mut out = vec![];
                     generator_b.combine(&triples_b, &mut out, bucket_size, channel).unwrap();
-                    let result = LeakyAndTripleGenerator::open(AndTriple::peel_slice(&out), generator_b.delta(), channel);
+                    let result = LeakyAndTripleGenerator::open_with_delta(AndTriple::peel_slice(&out), generator_b.delta(), channel);
                     assert!(result.is_ok());
                     Ok(())
                 },

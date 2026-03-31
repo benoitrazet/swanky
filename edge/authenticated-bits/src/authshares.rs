@@ -38,7 +38,7 @@
 //!         let mut bits: Vec<F2> = vec![];
 //!         let mut generator: AuthShareGenerator<_> = AuthShareGenerator::new(c, &mut rng)?;
 //!         generator.generate(nshares, &mut authshares, c, &mut rng)?;
-//!         AuthShareGenerator::open(&authshares, generator.delta(), &mut bits, c)?;
+//!         generator.open(&authshares, &mut bits, c)?;
 //!         Ok(bits)
 //!     },
 //!     |c| {
@@ -48,7 +48,7 @@
 //!         let mut bits: Vec<F2> = vec![];
 //!         let mut generator: AuthShareGenerator<_> = AuthShareGenerator::new(c, &mut rng)?;
 //!         generator.generate(nshares, &mut authshares, c, &mut rng)?;
-//!         AuthShareGenerator::open(&authshares, generator.delta(), &mut bits, c)?;
+//!         generator.open(&authshares, &mut bits, c)?;
 //!         Ok(bits)
 //!     }
 //! )?;
@@ -266,6 +266,19 @@ impl<P: GenericParty> AuthShareGenerator<P> {
     /// authenticated shares. The resulting opened combined shares are
     /// [`Vec::push`]ed to `outputs`.
     pub fn open(
+        &self,
+        shares: &[AuthShare<P>],
+        outputs: &mut Vec<F2>,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<()> {
+        AuthShareGenerator::open_with_delta(shares, self.delta(), outputs, channel)
+    }
+
+    /// Open the authenticated shares in `shares` using a supplied $`\Delta`$
+    /// value.
+    ///
+    /// See [`AuthShareGenerator::open`] for details.
+    pub fn open_with_delta(
         shares: &[AuthShare<P>],
         delta: U8x16,
         outputs: &mut Vec<F2>,
@@ -283,7 +296,7 @@ impl<P: GenericParty> AuthShareGenerator<P> {
             GenericWhichParty::Party0(ev) => {
                 let party_a_shares =
                     PartyEitherCopy::pull_either_outside(&party_a_shares).into_inner(ev);
-                AuthBitGenerator::open(
+                AuthBitGenerator::open_with_delta(
                     party_a_shares,
                     PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
@@ -291,7 +304,7 @@ impl<P: GenericParty> AuthShareGenerator<P> {
                 )?;
                 let party_b_shares =
                     PartyEitherCopy::pull_either_outside(&party_b_shares).into_inner(ev);
-                AuthBitGenerator::open(
+                AuthBitGenerator::open_with_delta(
                     party_b_shares,
                     PartyPrivateCopy::new(delta),
                     PartyPrivate::new(outputs),
@@ -307,7 +320,7 @@ impl<P: GenericParty> AuthShareGenerator<P> {
             GenericWhichParty::Party1(ev) => {
                 let party_a_shares =
                     PartyEitherCopy::pull_either_outside(&party_a_shares).into_inner(ev);
-                AuthBitGenerator::open(
+                AuthBitGenerator::open_with_delta(
                     party_a_shares,
                     PartyPrivateCopy::new(delta),
                     PartyPrivate::new(outputs),
@@ -315,7 +328,7 @@ impl<P: GenericParty> AuthShareGenerator<P> {
                 )?;
                 let party_b_shares =
                     PartyEitherCopy::pull_either_outside(&party_b_shares).into_inner(ev);
-                AuthBitGenerator::open(
+                AuthBitGenerator::open_with_delta(
                     party_b_shares,
                     PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
@@ -436,14 +449,12 @@ mod tests {
         swanky_channel::local::local_channel_pair(
             |c| {
                 let mut outputs = vec![];
-                let result =
-                    AuthShareGenerator::open(&output_a, generator_a.delta(), &mut outputs, c);
+                let result = generator_a.open(&output_a, &mut outputs, c);
                 Ok((result.is_ok(), outputs))
             },
             |c| {
                 let mut outputs = vec![];
-                let result =
-                    AuthShareGenerator::open(&output_b, generator_b.delta(), &mut outputs, c);
+                let result = generator_b.open(&output_b, &mut outputs, c);
                 Ok((result.is_ok(), outputs))
             },
         )
