@@ -471,7 +471,7 @@ mod tests {
 
         type F = F128p;
 
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
 
         // unsat. circuit: output = 1 regardless of input.
         let circuit: Circuit<F> = Circuit::new(1, 1, vec![Op::Constant(F::ONE)]);
