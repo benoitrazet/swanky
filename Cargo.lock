@@ -1075,7 +1075,6 @@ dependencies = [
 name = "inferno"
 version = "0.6.0"
 dependencies = [
- "anyhow",
  "bincode",
  "blake3",
  "clap",
@@ -1092,6 +1091,7 @@ dependencies = [
  "simple-arith-circuit",
  "snafu",
  "swanky-block",
+ "swanky-error",
  "swanky-field",
  "swanky-field-binary",
  "swanky-field-ff-primes",
