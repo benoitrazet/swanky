@@ -74,7 +74,6 @@ pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
 ) -> swanky_error::Result<(
     HashMap<usize, PreProcessedWire<P>>,
     HashMap<usize, PreProcessedWire<P>>,
-    U8x16,
 )> {
     // First Analyze the circuit gates by simulating both parties
     let mut circuit_analyzer: CircuitExecutor<P> = CircuitExecutor::new_analyzer();
@@ -118,7 +117,6 @@ pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
     Ok((
         wire_preprocessor.into_indexed_auth_shares(),
         known_triple_map,
-        and_generator.delta(),
     ))
 }
 

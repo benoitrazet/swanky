@@ -1,46 +1,37 @@
 //! Garbler in Authenticated Garbling
+use crate::preprocesser::unifier::{CircuitExecutor, CircuitExecutorItem};
+use crate::preprocesser::{f_preprocessing, wire::PreProcessedWire};
+use crate::ps::PartyGarbler;
 use crate::wire::AuthenticatedWireMod2;
-use fancy_garbling::WireMod2;
-use crate::{preprocesser::f_preprocessing, ps::PartyGarbler};
 use fancy_garbling::{
-    AllWire, BinaryBundle, Fancy, FancyBinary, HasModulus, WireLabel, check_binary,
-    util::u128_to_bits,
+    BinaryBundle, Fancy, FancyBinary,WireLabel, WireMod2, util::u128_to_bits,
 };
 use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
+use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_channel::Channel;
-use vectoreyes::{SimdBase, U8x16};
 
 type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler<RNG> {
     deltas: HashMap<u16, WireMod2>, // map from modulus to associated delta wire-label.
-    current_output: usize,
-    current_gate: usize,
-    zero_input_wires: Vec<AuthenticatedWireMod2<PartyGarbler>>,
-    authenticated_wires: Vec<AuthenticatedWireMod2<PartyGarbler>>,
+    current_wire_index: usize,
+    preprocessed_wires_map: HashMap<usize, PreProcessedWire<PartyGarbler>>,
+    known_triples_map: HashMap<usize, PreProcessedWire<PartyGarbler>>,
     rng: RNG,
 }
 
-impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
+impl<RNG: CryptoRng + RngCore + Clone> Garbler<RNG> {
     /// Create a new garbler.
-    pub fn new(rng: RNG) -> Self {
-        Garbler {
+    pub fn new(rng: RNG, channel: &mut Channel) -> swanky_error::Result<Self> {
+        Ok(Garbler {
             deltas: HashMap::new(),
-            current_gate: 0,
-            current_output: 0,
-            zero_input_wires: Vec::new(),
-            authenticated_wires: Vec::new(),
+            preprocessed_wires_map: HashMap::new(),
+            known_triples_map: HashMap::new(),
+            current_wire_index: 0,
             rng,
-        }
-    }
-
-    /// The current non-free gate index of the garbling computation
-    fn current_gate(&mut self) -> usize {
-        let current = self.current_gate;
-        self.current_gate += 1;
-        current
+        })
     }
 
     /// Create a delta if it has not been created yet for this modulus, otherwise just
@@ -55,10 +46,35 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     }
 
     /// The current output index of the garbling computation.
-    fn current_output(&mut self) -> usize {
-        let current = self.current_output;
-        self.current_output += 1;
+    fn current_wire_index(&mut self) -> usize {
+        let current = self.current_wire_index;
+        self.current_wire_index += 1;
         current
+    }
+    /// Pre-process the passed circuit
+    pub fn preprocess_circuit(
+        &mut self,
+        circuit: &impl Fn(
+            &mut CircuitExecutor<PartyGarbler>,
+            BinaryBundle<CircuitExecutorItem<PartyGarbler>>,
+            BinaryBundle<CircuitExecutorItem<PartyGarbler>>,
+            &mut Channel,
+        )
+            -> swanky_error::Result<BinaryBundle<CircuitExecutorItem<PartyGarbler>>>,
+        input_size: usize,
+        channel: &mut Channel,
+        mut rng: &mut RNG,
+    ) -> swanky_error::Result<()> {
+        let mut and_generator = AndTripleGenerator::new(channel, &mut self.rng)?;
+        let (preprocessed_wires_map, known_triples_map) =
+            f_preprocessing(&circuit, &mut and_generator, input_size, channel, rng)?;
+        self.preprocessed_wires_map = preprocessed_wires_map;
+        self.known_triples_map = known_triples_map;
+        self.deltas.extend(HashMap::from([(
+            2,
+            WireLabel::from_repr(and_generator.delta(), 2),
+        )]));
+        Ok(())
     }
 
     /// Get the deltas, consuming the Garbler.
