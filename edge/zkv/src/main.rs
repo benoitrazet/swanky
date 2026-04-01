@@ -39,17 +39,17 @@ fn prover(circuit_path: &Path, witness: &str, eqcheck: &str, output: &Path) -> R
     log::info!("Building proof");
     let proof = Proof::<F64b, N>::prove(&circuit, &witness, K, T, &mut rng);
     log::info!("Serializing proof");
-    let serialized = bincode::serialize(&proof).wrap_err_with(
+    let serialized = bincode::serialize(&proof).wrap_err(
         ErrorKind::SerializationError,
-        || "Failed to serialize proof",
+        "Failed to serialize proof",
     )?;
     log::info!("Writing proof to {:?}", output);
     let mut file = File::create(output).wrap_err_with(ErrorKind::FilesystemError, || {
         format!("Failed to create file '{output:?}'")
     })?;
-    file.write_all(&serialized).wrap_err_with(
+    file.write_all(&serialized).wrap_err(
         ErrorKind::FilesystemError,
-        || "Failed to write proof to disk",
+        "Failed to write proof to disk",
     )?;
     Ok(())
 }
@@ -66,14 +66,14 @@ fn verifier(circuit_path: &Path, proof_path: &Path, eqcheck: &str) -> Result<()>
     let file = File::open(proof_path).wrap_err_with(ErrorKind::FilesystemError, || {
         format!("Failed to open file '{proof_path:?}'")
     })?;
-    let proof: Proof<F64b, N> = bincode::deserialize_from(file).wrap_err_with(
+    let proof: Proof<F64b, N> = bincode::deserialize_from(file).wrap_err(
         ErrorKind::SerializationError,
-        || "Failed to deserialize proof",
+        "Failed to deserialize proof",
     )?;
     log::info!("Verifying proof");
     proof
         .verify(&circuit, K, T)
-        .map_err(|e| swanky_error!(ErrorKind::OtherError, "Failed to verify circuit: {e}"))?;
+        .wrap_err(ErrorKind::OtherError, "Failed to verify circuit")?;
     print!("Verification succeeded!");
     Ok(())
 }
