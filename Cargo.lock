@@ -274,7 +274,7 @@ dependencies = [
 name = "bristol-fashion"
 version = "0.6.0"
 dependencies = [
- "thiserror",
+ "swanky-error",
 ]
 
 [[package]]
