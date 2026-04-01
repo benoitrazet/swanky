@@ -431,7 +431,10 @@ where
         }
     }
     for extra in 0..3 {
+        use rand::{Rng, SeedableRng};
+
         let mut rng = SwankyRng::new();
+        let seed = rng.r#gen();
         let mut src_base_voles = Vec::with_capacity(1 << 16);
         for _ in 0..1 << 16 {
             src_base_voles.push(rng.next_u64());
@@ -443,9 +446,13 @@ where
         }
         let mut expected_out = dst.clone();
         let mut actual_out = dst.clone();
-        simple_lpn(&mut rng.clone(), &src_base_voles, &mut expected_out);
+        simple_lpn(
+            &mut SwankyRng::from_seed(seed),
+            &src_base_voles,
+            &mut expected_out,
+        );
         <SmallBinaryFieldSpecialization as FiniteFieldSpecialization<F2, FE>>::lpn_sender(
-            &mut rng.clone(),
+            &mut SwankyRng::from_seed(seed),
             &src_base_voles,
             &mut actual_out,
         );

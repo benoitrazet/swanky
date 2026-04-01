@@ -22,9 +22,9 @@ struct SUMInputs<F> {
 /// (2) The garbler then exchanges their wires obliviously with the evaluator.
 /// (3) The garbler and the evaluator then run the garbled circuit.
 /// (4) The garbler and the evaluator open the result of the computation.
-fn gb_sum(rng: &mut SwankyRng, channel: &mut Channel, input: u128) {
+fn gb_sum(rng: SwankyRng, channel: &mut Channel, input: u128) {
     // (1)
-    let mut gb = Garbler::<SwankyRng, OtSender, AllWire>::new(channel, rng.clone()).unwrap();
+    let mut gb = Garbler::<SwankyRng, OtSender, AllWire>::new(channel, rng).unwrap();
     // (2)
     let circuit_wires = gb_set_fancy_inputs(&mut gb, input, channel);
     // (3)
@@ -59,9 +59,9 @@ where
 /// (4) The evaluator and the garbler open the result of the computation.
 /// (5) The evaluator translates the binary output of the circuit into its decimal
 ///     representation.
-fn ev_sum(rng: &mut SwankyRng, channel: &mut Channel, input: u128) -> u128 {
+fn ev_sum(rng: SwankyRng, channel: &mut Channel, input: u128) -> u128 {
     // (1)
-    let mut ev = Evaluator::<SwankyRng, OtReceiver, AllWire>::new(channel, rng.clone()).unwrap();
+    let mut ev = Evaluator::<SwankyRng, OtReceiver, AllWire>::new(channel, rng).unwrap();
     // (2)
     let circuit_wires = ev_set_fancy_inputs(&mut ev, input, channel);
     // (3)
@@ -144,12 +144,12 @@ fn main() {
     let (_, result) = swanky_channel::local::local_channel_pair(
         |channel| {
             let rng_gb = SwankyRng::new();
-            gb_sum(&mut rng_gb.clone(), channel, gb_value);
+            gb_sum(rng_gb, channel, gb_value);
             Ok(())
         },
         |channel| {
             let rng_ev = SwankyRng::new();
-            let result = ev_sum(&mut rng_ev.clone(), channel, ev_value);
+            let result = ev_sum(rng_ev, channel, ev_value);
             Ok(result)
         },
     )

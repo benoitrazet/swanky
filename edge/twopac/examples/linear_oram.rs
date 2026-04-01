@@ -21,9 +21,9 @@ struct ORAMInputs<F> {
 /// (2) The garbler then exchanges their wires obliviously with the evaluator.
 /// (3) The garbler and the evaluator then run the garbled circuit.
 /// (4) The garbler and the evaluator open the result of the computation.
-fn gb_linear_oram(rng: &mut SwankyRng, channel: &mut Channel, inputs: &[u128]) {
+fn gb_linear_oram(rng: SwankyRng, channel: &mut Channel, inputs: &[u128]) {
     // (1)
-    let mut gb = Garbler::<SwankyRng, OtSender, AllWire>::new(channel, rng.clone()).unwrap();
+    let mut gb = Garbler::<SwankyRng, OtSender, AllWire>::new(channel, rng).unwrap();
     // The size of the RAM is assumed to be public. The garbler sends their number of
     // of input wires. We note that every element of the RAM has a fixed size of 128 bits.
     let _ = channel.write(&inputs.len());
@@ -59,9 +59,9 @@ where
 /// (4) The evaluator and the garbler open the result of the computation.
 /// (5) The evaluator translates the binary output of the circuit into its decimal
 ///     representation.
-fn ev_linear_oram(rng: &mut SwankyRng, channel: &mut Channel, input: u128) -> u128 {
+fn ev_linear_oram(rng: SwankyRng, channel: &mut Channel, input: u128) -> u128 {
     // (1)
-    let mut ev = Evaluator::<SwankyRng, OtReceiver, AllWire>::new(channel, rng.clone()).unwrap();
+    let mut ev = Evaluator::<SwankyRng, OtReceiver, AllWire>::new(channel, rng).unwrap();
     let ram_size = channel.read::<usize>().unwrap();
     // (2)
     let circuit_wires = ev_set_fancy_inputs(&mut ev, input, ram_size, channel);
@@ -159,13 +159,13 @@ fn main() {
 
     let (_, result) = swanky_channel::local::local_channel_pair(
         |channel| {
-            let mut rng_gb = SwankyRng::new();
-            gb_linear_oram(&mut rng_gb, channel, &gb_ram);
+            let rng_gb = SwankyRng::new();
+            gb_linear_oram(rng_gb, channel, &gb_ram);
             Ok(())
         },
         |channel| {
             let rng_ev = SwankyRng::new();
-            let result = ev_linear_oram(&mut rng_ev.clone(), channel, ev_index);
+            let result = ev_linear_oram(rng_ev, channel, ev_index);
             Ok(result)
         },
     )
