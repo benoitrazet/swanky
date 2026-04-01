@@ -136,7 +136,7 @@ impl<R: BufRead> Reader<R> {
         let n = self
             .reader
             .read_line(&mut self.line)
-            .wrap_err_with(ErrorKind::OtherError, || "failed to read next line")?;
+            .wrap_err(ErrorKind::OtherError, "failed to read next line")?;
         self.row += 1;
         Ok(if n != 0 {
             Some(self.line.split_whitespace())
@@ -156,7 +156,7 @@ impl<R: BufRead> Reader<R> {
             .next()
             .ok_or_else(|| swanky_error!(ErrorKind::OtherError, "no next token: {msg}"))?
             .parse::<u64>()
-            .wrap_err_with(ErrorKind::OtherError, || "unable to parse string as u64")
+            .wrap_err(ErrorKind::OtherError, "unable to parse string as u64")
     }
 
     fn read_bool(tokens: &mut SplitWhitespace, msg: &str) -> Result<bool> {
@@ -164,7 +164,7 @@ impl<R: BufRead> Reader<R> {
             .next()
             .ok_or_else(|| swanky_error!(ErrorKind::OtherError, "no next token: {msg}"))?
             .parse::<u8>()
-            .wrap_err_with(ErrorKind::OtherError, || "unable to parse string as u8")?;
+            .wrap_err(ErrorKind::OtherError, "unable to parse string as u8")?;
         ensure!(
             x == 0 || x == 1,
             ErrorKind::OtherError,
