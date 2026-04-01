@@ -2,7 +2,7 @@
 
 use crate::{
     FancyArithmetic, FancyBinary,
-    fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
+    fancy::{Fancy, FancyInput, HasModulus},
 };
 use std::collections::{HashMap, HashSet};
 use swanky_channel::Channel;
@@ -328,11 +328,5 @@ impl<F: Fancy> Fancy for Informer<F> {
         let result = self.underlying.output(x, channel)?;
         self.stats.outputs.push(x.modulus());
         Ok(result)
-    }
-}
-
-impl<F: Fancy + FancyReveal> FancyReveal for Informer<F> {
-    fn reveal(&mut self, x: &Self::Item, channel: &mut Channel) -> swanky_error::Result<u16> {
-        self.underlying.reveal(x, channel)
     }
 }

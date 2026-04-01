@@ -2,7 +2,7 @@ use super::security_warning::warn_proj;
 use crate::{
     AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyInput, HasModulus, WireMod2,
     check_binary,
-    fancy::{Fancy, FancyReveal},
+    fancy::Fancy,
     garble::binary_and::BinaryWireLabel,
     hash_wires,
     util::{output_tweak, tweak, tweak2},
@@ -105,16 +105,6 @@ impl<Wire: BinaryWireLabel> FancyInput for Evaluator<Wire> {
                 Ok(Wire::from_repr(block, 2))
             })
             .collect()
-    }
-}
-
-impl<Wire: WireLabel> FancyReveal for Evaluator<Wire> {
-    fn reveal(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<u16> {
-        let val = self
-            .output(x, channel)?
-            .expect("Evaluator always outputs Some(u16)");
-        channel.write(&val)?;
-        Ok(val)
     }
 }
 

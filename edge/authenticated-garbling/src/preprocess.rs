@@ -89,7 +89,7 @@ pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fancy_garbling::{BinaryGadgets, Fancy, FancyBinary, FancyReveal};
+    use fancy_garbling::{BinaryGadgets, Fancy, FancyBinary};
     use swanky_party::party_system;
     use swanky_rng::SwankyRng;
 
@@ -118,7 +118,7 @@ mod tests {
         channel: &mut Channel,
     ) -> swanky_error::Result<BinaryBundle<F::Item>>
     where
-        F: FancyReveal + Fancy + BinaryGadgets + FancyBinary,
+        F: Fancy + BinaryGadgets + FancyBinary,
     {
         f.bin_addition_no_carry(&garbler_wires, &evaluator_wires, channel)
     }

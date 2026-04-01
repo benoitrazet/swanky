@@ -8,7 +8,7 @@ use swanky_error::ErrorKind;
 
 use crate::{
     FancyArithmetic, FancyBinary, check_binary,
-    fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
+    fancy::{Fancy, FancyInput, HasModulus},
 };
 
 /// Simple struct that performs the fancy computation over `u16`.
@@ -192,12 +192,6 @@ impl Fancy for Dummy {
 
     fn output(&mut self, x: &DummyVal, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
         Ok(Some(x.val))
-    }
-}
-
-impl FancyReveal for Dummy {
-    fn reveal(&mut self, x: &DummyVal, _: &mut Channel) -> swanky_error::Result<u16> {
-        Ok(x.val)
     }
 }
 

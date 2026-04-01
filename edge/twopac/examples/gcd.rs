@@ -2,8 +2,7 @@
 //! using fancy-garbling.
 
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyInput,
-    FancyReveal, util,
+    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyInput, util,
 };
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
@@ -123,7 +122,7 @@ fn fancy_gcd<F>(
     channel: &mut Channel,
 ) -> swanky_error::Result<BinaryBundle<F::Item>>
 where
-    F: FancyReveal + Fancy + BinaryGadgets + FancyBinary + FancyArithmetic,
+    F: Fancy + BinaryGadgets + FancyBinary + FancyArithmetic,
 {
     let mut a: BinaryBundle<_> = wire_inputs.garbler_wires;
     let mut b: BinaryBundle<_> = wire_inputs.evaluator_wires;
