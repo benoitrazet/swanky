@@ -31,6 +31,19 @@ def lint_pre_push_hook(ctx: click.Context) -> LintResult:
         if "path" in params and "core" in params["path"]
     }
 
+    # Get core crates according to pre-push hook
+    pre_push_hook_path = ROOT / "etc" / "hooks" / "pre-push"
+    pre_push_hook = pre_push_hook_path.read_text()
+    lines = [line.strip() for line in pre_push_hook.split("\n")]
+
+    assert "# BEGIN CORE CRATES" in lines
+    assert "# END CORE CRATES" in lines
+
+    begin_idx = lines.index("# BEGIN CORE CRATES")
+    end_idx = lines.index("# END CORE CRATES")
+
+    tested_core_crates = set(lines[begin_idx + 1 : end_idx])
+
     if any_errors:
         return LintResult.FAILURE
     else:
