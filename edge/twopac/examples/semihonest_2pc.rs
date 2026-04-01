@@ -28,16 +28,17 @@ fn run_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
                 start.elapsed().unwrap().as_millis()
             );
             let start = SystemTime::now();
-            let xs = gb
+            let mut xs = gb
                 .encode_many(&gb_inputs, &vec![2; n_gb_inputs], channel)
                 .unwrap();
             let ys = gb.receive_many(&vec![2; n_ev_inputs], channel).unwrap();
+            xs.extend(ys);
             println!(
                 "Garbler :: Encoding inputs: {} ms",
                 start.elapsed().unwrap().as_millis()
             );
             let start = SystemTime::now();
-            circ_.eval(&mut gb, &xs, &ys, channel).unwrap();
+            circ_.eval(&mut gb, &xs, channel).unwrap();
             println!(
                 "Garbler :: Circuit garbling: {} ms",
                 start.elapsed().unwrap().as_millis()
@@ -53,16 +54,17 @@ fn run_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
                 start.elapsed().unwrap().as_millis()
             );
             let start = SystemTime::now();
-            let xs = ev.receive_many(&vec![2; n_gb_inputs], channel).unwrap();
+            let mut xs = ev.receive_many(&vec![2; n_gb_inputs], channel).unwrap();
             let ys = ev
                 .encode_many(&ev_inputs, &vec![2; n_ev_inputs], channel)
                 .unwrap();
+            xs.extend(ys);
             println!(
                 "Evaluator :: Encoding inputs: {} ms",
                 start.elapsed().unwrap().as_millis()
             );
             let start = SystemTime::now();
-            circ.eval(&mut ev, &xs, &ys, channel).unwrap();
+            circ.eval(&mut ev, &xs, channel).unwrap();
             println!(
                 "Evaluator :: Circuit evaluation: {} ms",
                 start.elapsed().unwrap().as_millis()

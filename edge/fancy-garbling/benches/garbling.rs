@@ -30,12 +30,12 @@ where
         let mut rng = rand::thread_rng();
         let c = make_circuit(q);
         let (en, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&c, SwankyRng::new()).unwrap();
-        let inps = (0..c.num_garbler_inputs())
-            .map(|i| rng.gen_u16() % c.garbler_input_mod(i))
+        let inps = (0..c.num_inputs())
+            .map(|i| rng.gen_u16() % c.input_mod(i))
             .collect::<Vec<u16>>();
-        let xs = en.encode_garbler_inputs(&inps);
+        let xs = en.encode_inputs(&inps);
         bench.iter(|| {
-            let ys = ev.eval(&c, &xs, &[]).unwrap();
+            let ys = ev.eval(&c, &xs).unwrap();
             std::hint::black_box(ys);
         });
     });
@@ -45,7 +45,7 @@ fn proj(q: u16) -> Circuit {
     Channel::with(std::io::empty(), |channel| {
         let tt = (0..q).map(|i| (i + 1) % q).collect::<Vec<u16>>();
         let mut b = CircuitBuilder::new();
-        let x = b.garbler_input(q);
+        let x = b.input(q);
         for _ in 0..1000 {
             let _ = b.proj(&x, q, Some(tt.clone()), channel).unwrap();
         }
@@ -57,7 +57,7 @@ fn proj(q: u16) -> Circuit {
 fn mul(q: u16) -> Circuit {
     Channel::with(std::io::empty(), |channel| {
         let mut b = CircuitBuilder::new();
-        let x = b.garbler_input(q);
+        let x = b.input(q);
         for _ in 0..1000 {
             let _ = b.mul(&x, &x, channel).unwrap();
         }

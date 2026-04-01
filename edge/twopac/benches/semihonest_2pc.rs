@@ -22,21 +22,23 @@ fn _bench_circuit(circ: &Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
         |channel| {
             let rng = SwankyRng::new();
             let mut gb = Garbler::<SwankyRng, OtSender, WireMod2>::new(channel, rng).unwrap();
-            let xs = gb
+            let mut xs = gb
                 .encode_many(&gb_inputs, &vec![2; n_gb_inputs], channel)
                 .unwrap();
             let ys = gb.receive_many(&vec![2; n_ev_inputs], channel).unwrap();
-            circ_.eval(&mut gb, &xs, &ys, channel).unwrap();
+            xs.extend(ys);
+            circ_.eval(&mut gb, &xs, channel).unwrap();
             Ok(())
         },
         |channel| {
             let rng = SwankyRng::new();
             let mut ev = Evaluator::<SwankyRng, OtReceiver, WireMod2>::new(channel, rng).unwrap();
-            let xs = ev.receive_many(&vec![2; n_gb_inputs], channel).unwrap();
+            let mut xs = ev.receive_many(&vec![2; n_gb_inputs], channel).unwrap();
             let ys = ev
                 .encode_many(&ev_inputs, &vec![2; n_ev_inputs], channel)
                 .unwrap();
-            circ.eval(&mut ev, &xs, &ys, channel).unwrap();
+            xs.extend(ys);
+            circ.eval(&mut ev, &xs, channel).unwrap();
             Ok(())
         },
     )
