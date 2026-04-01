@@ -7,12 +7,12 @@ use crate::{
     round::{Round, round_compress_finish, round_compress_start, round1},
     secretsharing::{CorrectionSharing, LinearSharing, SecretSharing},
 };
-use anyhow::anyhow;
 use blake3::Hash;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use simple_arith_circuit::Circuit;
 use swanky_block::Block;
+use swanky_error::{ErrorKind, Result, ensure};
 use swanky_field::FiniteField;
 use swanky_field::FiniteRing;
 use swanky_rng::SwankyRng;
@@ -129,7 +129,7 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
         circuit: &Circuit<F::PrimeField>,
         compression_factor: usize,
         cache: &Cache<F>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let nrounds = crate::utils::nrounds(circuit, compression_factor);
         let mut hashers = Hashers::<N>::new();
 
@@ -244,21 +244,22 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
         &self,
         computed_output: CorrectionSharing<F::PrimeField, N>,
         exclude: usize,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let output = self.output.reconstruct();
-        if output != <F::PrimeField as FiniteRing>::ZERO {
-            return Err(anyhow!("Output not equal to zero"));
-        }
+        ensure!(
+            output == <F::PrimeField as FiniteRing>::ZERO,
+            ErrorKind::OtherError,
+            "Output not equal to zero"
+        );
         let mut sum = F::ZERO;
         for (f, g) in self.fs.iter().zip(self.gs.iter()) {
             sum += f.reconstruct() * g.reconstruct();
         }
-        if sum != self.h.reconstruct() {
-            return Err(anyhow!("Dot product not equal to `h`"));
-        }
-        if !self.output.check_equality(&computed_output, exclude) {
-            return Err(anyhow!("Output shares not equal to computed output shares"));
-        }
+        ensure!(
+            self.output.check_equality(&computed_output, exclude),
+            ErrorKind::OtherError,
+            "Output shares not equal to computed output shares"
+        );
         Ok(())
     }
 
@@ -271,21 +272,27 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
         &self,
         round: Round<CorrectionSharing<F, N>>,
         exclude: usize,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         assert!(exclude < N);
         for (f, f_) in self.fs.iter().zip(round.xs.iter()) {
-            if !f.check_equality(f_, exclude) {
-                return Err(anyhow!("`f` shares not equal"));
-            }
+            ensure!(
+                f.check_equality(f_, exclude),
+                ErrorKind::OtherError,
+                "`f` shares not equal"
+            );
         }
         for (g, g_) in self.gs.iter().zip(round.ys.iter()) {
-            if !g.check_equality(g_, exclude) {
-                return Err(anyhow!("`g` shares not equal"));
-            }
+            ensure!(
+                g.check_equality(g_, exclude),
+                ErrorKind::OtherError,
+                "`g` shares not equal"
+            );
         }
-        if !self.h.check_equality(&round.z.unwrap(), exclude) {
-            return Err(anyhow!("`h` shares not equal"));
-        }
+        ensure!(
+            self.h.check_equality(&round.z.unwrap(), exclude),
+            ErrorKind::OtherError,
+            "`h` shares not equal"
+        );
         Ok(())
     }
 }
@@ -410,12 +417,13 @@ impl UnopenedParty {
         }
     }
 
-    pub fn verify_id(&self, id: usize) -> anyhow::Result<()> {
-        if id == self.id {
-            Ok(())
-        } else {
-            Err(anyhow!("Incorrect party ID encountered"))
-        }
+    pub fn verify_id(&self, id: usize) -> Result<()> {
+        ensure!(
+            id == self.id,
+            ErrorKind::OtherError,
+            "Incorrect party ID encountered"
+        );
+        Ok(())
     }
 }
 

@@ -339,6 +339,23 @@ impl<P: GenericParty> AuthBitGenerator<P> {
         outputs: PartyPrivate<Party1<P>, P, &mut Vec<F2>>,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
+        AuthBitGenerator::open_with_delta(authbits, self.delta(), outputs, channel)
+    }
+
+    /// Open the authenticated bits in `authbits` using a supplied $`\Delta`$ value.
+    ///
+    /// See [`AuthBitGenerator::open`] for details.
+    ///
+    /// # Errors
+    ///
+    /// This method returns an error if any [`AuthBit`] fails validation.
+    /// In this case, no opened bits are added to `outputs`.
+    pub fn open_with_delta(
+        authbits: &[AuthBit<P>],
+        delta: PartyPrivateCopy<Party1<P>, P, U8x16>,
+        outputs: PartyPrivate<Party1<P>, P, &mut Vec<F2>>,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<()> {
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(e) => {
                 let mut bit_ser: F2BitSerializer =
@@ -388,7 +405,7 @@ impl<P: GenericParty> AuthBitGenerator<P> {
 
                     validation &= mac
                         == if F2::ONE == *bit {
-                            ab.key().into_inner(e) ^ self.delta().into_inner(e)
+                            ab.key().into_inner(e) ^ delta.into_inner(e)
                         } else {
                             ab.key().into_inner(e)
                         };

@@ -274,7 +274,7 @@ dependencies = [
 name = "bristol-fashion"
 version = "0.6.0"
 dependencies = [
- "thiserror",
+ "swanky-error",
 ]
 
 [[package]]
@@ -1075,7 +1075,6 @@ dependencies = [
 name = "inferno"
 version = "0.6.0"
 dependencies = [
- "anyhow",
  "bincode",
  "blake3",
  "clap",
@@ -1092,6 +1091,7 @@ dependencies = [
  "simple-arith-circuit",
  "snafu",
  "swanky-block",
+ "swanky-error",
  "swanky-field",
  "swanky-field-binary",
  "swanky-field-ff-primes",
@@ -3654,13 +3654,13 @@ dependencies = [
 name = "zkv"
 version = "0.6.0"
 dependencies = [
- "anyhow",
  "bincode",
  "clap",
  "env_logger 0.11.9",
  "inferno",
  "log",
  "simple-arith-circuit",
+ "swanky-error",
  "swanky-field",
  "swanky-field-binary",
  "swanky-rng",

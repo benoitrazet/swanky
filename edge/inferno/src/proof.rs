@@ -11,9 +11,9 @@
 
 use crate::cache::Cache;
 use crate::proof_single::ProofSingle;
-use anyhow::anyhow;
 use rayon::prelude::*;
 use simple_arith_circuit::Circuit;
+use swanky_error::{ErrorKind, Result, bail, ensure};
 use swanky_field::FiniteField;
 use swanky_rng::SwankyRng;
 
@@ -77,21 +77,23 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
         circuit: &Circuit<F::PrimeField>,
         compression_factor: usize,
         repetitions: usize,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         assert!(N.is_power_of_two() && N <= 256);
         assert_eq!(circuit.noutputs(), 1);
-        if !crate::utils::validate_parameters::<F>(N, compression_factor, repetitions) {
-            return Err(anyhow!(
-                "Invalid parameters: ({N}, {compression_factor}, {repetitions}) do not match acceptable settings"
-            ));
-        }
+        ensure!(
+            crate::utils::validate_parameters::<F>(N, compression_factor, repetitions),
+            ErrorKind::OtherError,
+            "Invalid parameters: ({N}, {compression_factor}, {repetitions}) do not match acceptable settings"
+        );
         let time = std::time::Instant::now();
         let cache = Cache::new(circuit, compression_factor, false);
-        if self.proofs.len() != repetitions {
-            return Err(anyhow!("Invalid number of repetitions"));
-        }
+        ensure!(
+            self.proofs.len() == repetitions,
+            ErrorKind::OtherError,
+            "Invalid number of repetitions"
+        );
         // Use `rayon` to parallelize the MPC-in-the-head repetitions.
-        let results: Vec<anyhow::Result<()>> = self
+        let results: Vec<Result<()>> = self
             .proofs
             .par_iter()
             .enumerate()
@@ -99,7 +101,7 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
                 let time_ = std::time::Instant::now();
                 log::debug!("Checking proof #{}", i + 1);
                 if let Err(e) = proof.verify(circuit, compression_factor, &cache) {
-                    return Err(anyhow!("Proof #{} failed: {}", i + 1, e));
+                    bail!(ErrorKind::OtherError, "Proof #{} failed: {}", i + 1, e);
                 }
                 log::debug!("Verifying proof #{} succeeded.", i + 1);
                 log::info!("Proof #{} verification time: {:?}", i + 1, time_.elapsed());

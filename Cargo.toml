@@ -152,7 +152,6 @@ ff_codegen = { git = "https://github.com/GaloisInc/ff", rev = "c29da06f50c67fe9e
 # External Dependencies
 aes = "0.8.4"
 aes-gcm = "0.10.3"
-anyhow = "1.0.102"
 arc-swap = "1.8.2"
 arrayvec = "0.7.6"
 bincode = "=1.3.3" # See https://sr.ht/~stygianentity/bincode/
@@ -248,7 +247,6 @@ subtle = { version = "2.6.1", features = [
 ] }
 syn = { version = "2.0.117", features = ["full"] }
 tempfile = "3.26.0"
-thiserror = "2.0.18"
 toml = "1.0.4"
 tungstenite = { version = "0.28.0", features = ["rustls"] }
 twox-hash = "2.1.2"
