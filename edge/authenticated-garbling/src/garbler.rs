@@ -28,7 +28,7 @@ pub struct Garbler<RNG> {
 
 impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// Create a new garbler.
-    pub fn new(rng: RNG, channel: &mut Channel) -> swanky_error::Result<Self> {
+    pub fn new(rng: RNG) -> swanky_error::Result<Self> {
         Ok(Garbler {
             deltas: HashMap::new(),
             preprocessed_wires_map: HashMap::new(),
@@ -42,10 +42,10 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// return the existing one.
     pub fn delta(&mut self, q: u16) -> WireMod2 {
         if let Some(delta) = self.deltas.get(&q) {
-            return delta.clone();
+            return *delta;
         }
         let w = WireMod2::rand_delta(&mut self.rng, q);
-        self.deltas.insert(q, w.clone());
+        self.deltas.insert(q, w);
         w
     }
 
@@ -75,11 +75,15 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             -> swanky_error::Result<BinaryBundle<CircuitExecutorItem<PartyGarbler>>>,
         input_size: usize,
         channel: &mut Channel,
-        mut rng: &mut RNG,
     ) -> swanky_error::Result<()> {
         let mut and_generator = AndTripleGenerator::new(channel, &mut self.rng)?;
-        let (preprocessed_wires_map, known_triples_map) =
-            f_preprocessing(&circuit, &mut and_generator, input_size, channel, rng)?;
+        let (preprocessed_wires_map, known_triples_map) = f_preprocessing(
+            &circuit,
+            &mut and_generator,
+            input_size,
+            channel,
+            &mut self.rng,
+        )?;
         self.preprocessed_wires_map = preprocessed_wires_map;
         self.known_triples_map = known_triples_map;
         self.deltas.extend(HashMap::from([(
@@ -130,7 +134,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         zero: WireMod2,
     ) -> swanky_error::Result<WireMod2> {
         let delta = self.delta(2);
-        let enc = zero.clone() + delta * u16::from(masked_val);
+        let enc = zero + delta * u16::from(masked_val);
         Ok(enc)
     }
     /// Encode many wire labels based on the masked values
@@ -376,7 +380,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
 
     fn output(
         &mut self,
-        X: &AuthenticatedWire,
+        x: &AuthenticatedWire,
         channel: &mut Channel,
     ) -> swanky_error::Result<Option<u16>> {
         todo!()

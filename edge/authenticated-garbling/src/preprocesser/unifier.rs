@@ -42,7 +42,6 @@ impl<P: GenericParty> CircuitExecutor<P> {
         }
     }
     /// Returns the [`AuthShare`] associated with the input wires of AND gates in the underlying [`WirePreProcessor`].
-
     pub fn and_gate_input_shares(&self) -> (Vec<AuthShare<P>>, Vec<AuthShare<P>>, Vec<usize>) {
         self.to_wire_preprocessor().clone().and_gate_input_shares()
     }

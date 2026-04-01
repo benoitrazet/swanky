@@ -27,18 +27,11 @@
 //!
 use std::collections::HashMap;
 
-use fancy_garbling::{
-    BinaryBundle, BinaryGadgets,
-    circuit_analyzer::{AnalyzerItem, CircuitAnalyzer},
-};
+use fancy_garbling::BinaryBundle;
 use rand::{CryptoRng, Rng};
-use swanky_authenticated_bits::{
-    and_triples::{AndTriple, AndTripleGenerator},
-    authshares::AuthShare,
-};
+use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_channel::Channel;
 use swanky_party::GenericParty;
-use vectoreyes::U8x16;
 
 pub mod unifier;
 pub mod wire;
@@ -106,12 +99,12 @@ pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
         &right_wires,
         &mut known_triples_out,
         channel,
-    );
+    )?;
 
     let mut known_triple_map = HashMap::new();
     for (index, auth_share) in indices.iter().zip(known_triples_out) {
         let wire = PreProcessedWire::new(*index, auth_share);
-        known_triple_map.insert(wire.into_index(), wire);
+        known_triple_map.insert(wire.to_index(), wire);
     }
 
     Ok((

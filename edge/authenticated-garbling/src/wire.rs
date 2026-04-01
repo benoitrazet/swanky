@@ -1,13 +1,8 @@
 //! Authenticated Wires
 
 use fancy_garbling::{HasModulus, WireMod2};
-use swanky_authenticated_bits::{
-    and_triples::{AndTriple, AndTripleGenerator},
-    authshares::{AuthShare, AuthShareGenerator},
-};
-use swanky_channel::Channel;
+use swanky_authenticated_bits::authshares::AuthShare;
 use swanky_party::GenericParty;
-use vectoreyes::U8x16;
 
 /// The [`AuthenticatedWireMod2`] structure extends a [`WireMod2`] to include the wire's
 /// authenticated [`AndTriple`], authenticated [`AuthShare`], and the wire's current index.
