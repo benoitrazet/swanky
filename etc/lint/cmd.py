@@ -7,6 +7,7 @@ from core.vectoreyes.cmd import generate as vectoreyes_generate
 from etc.fmt import fmt
 from etc.lint import LintResult
 from etc.lint import flatbuffers as lint_flatbuffers
+from etc.lint import git_hooks as lint_git_hooks
 from etc.lint import gitlab as lint_gitlab
 from etc.lint import rust as lint_rust
 from etc.lint.mypy import mypy as lint_mypy
@@ -44,6 +45,7 @@ LINTS: List[Callable[[click.Context], LintResult]] = [
     existing_command_as_lint(
         "Run ./swanky readme gen-crate-list --check", readme_gen_crate_list, check=True
     ),
+    lint_git_hooks.lint_pre_push_hook,
     lint_gitlab.lint_codeowners_file,
     lint_rust.require_deny_missing_docs,
     lint_mypy,
