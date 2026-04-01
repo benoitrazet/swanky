@@ -44,6 +44,15 @@ def lint_pre_push_hook(ctx: click.Context) -> LintResult:
 
     tested_core_crates = set(lines[begin_idx + 1 : end_idx])
 
+    # Compute and report any untested core crates
+    untested_core_crates = actual_core_crates - tested_core_crates
+
+    if untested_core_crates:
+        any_errors = True
+        rich.print(
+            f"[bold red]Error:[/bold red] Some core crates are untested by the pre-push hook: {untested_core_crates}"
+        )
+
     if any_errors:
         return LintResult.FAILURE
     else:
