@@ -443,9 +443,9 @@ where
         }
         let mut expected_out = dst.clone();
         let mut actual_out = dst.clone();
-        simple_lpn(&mut rng.clone(), &src_base_voles, &mut expected_out);
+        simple_lpn(&mut rng, &src_base_voles, &mut expected_out);
         <SmallBinaryFieldSpecialization as FiniteFieldSpecialization<F2, FE>>::lpn_sender(
-            &mut rng.clone(),
+            &mut rng,
             &src_base_voles,
             &mut actual_out,
         );

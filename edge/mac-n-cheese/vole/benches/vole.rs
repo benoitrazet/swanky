@@ -71,9 +71,9 @@ fn do_bench<
     let selector = 43;
     let mut arena = KeyedArena::with_capacity(256_000, 16);
     let sender_rng_initial = SwankyRng::from_seed(Block::from(3485));
-    let mut sender_rng = sender_rng_initial.clone();
+    let mut sender_rng = sender_rng_initial;
     let receiver_rng_initial = SwankyRng::from_seed(Block::from(12359));
-    let mut receiver_rng = receiver_rng_initial.clone();
+    let mut receiver_rng = receiver_rng_initial;
     let svole_sender_stage2 = svole_sender
         .send(
             &arena,
@@ -158,12 +158,11 @@ fn do_bench<
     let start = Instant::now();
     for _ in 0..n {
         arena.reset();
-        let mut rng = sender_rng_initial.clone();
         let svole_sender_stage2 = svole_sender
             .send(
                 &arena,
                 selector,
-                &mut rng,
+                &mut sender_rng,
                 black_box(&base_svoles_s),
                 black_box(comms_1.as_mut_slice()),
             )
@@ -197,12 +196,11 @@ fn do_bench<
     let start = Instant::now();
     for _ in 0..n {
         arena.reset();
-        let mut rng = receiver_rng_initial.clone();
         let svole_receiver_stage2 = svole_receiver
             .receive(
                 &arena,
                 selector,
-                &mut rng,
+                &mut receiver_rng,
                 black_box(&base_svoles_r),
                 &mut receiver_voles,
                 black_box(comms_1.as_slice()),
