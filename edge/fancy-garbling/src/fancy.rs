@@ -4,6 +4,7 @@
 //! create projections.
 
 use itertools::Itertools;
+use swanky_channel::Channel;
 
 mod binary;
 mod bundle;
@@ -18,6 +19,44 @@ pub use input::FancyInput;
 pub trait HasModulus {
     /// The modulus of the wire.
     fn modulus(&self) -> u16;
+}
+
+/// DSL for the basic computations supported by `fancy-garbling`.
+///
+/// Primarily used as a supertrait for `FancyBinary` and `FancyArithmetic`,
+/// which indicate computation supported by the DSL.
+pub trait Fancy {
+    /// The underlying wire datatype created by an object implementing `Fancy`.
+    type Item: Clone + HasModulus;
+
+    /// Create a constant `x` with modulus `q`.
+    fn constant(
+        &mut self,
+        x: u16,
+        q: u16,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Self::Item>;
+
+    /// Process this wire as output. Some `Fancy` implementers don't actually *return*
+    /// output, but they need to be involved in the process, so they can return `None`.
+    fn output(
+        &mut self,
+        x: &Self::Item,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Option<u16>>;
+
+    /// Output a slice of wires.
+    fn outputs(
+        &mut self,
+        xs: &[Self::Item],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Option<Vec<u16>>> {
+        let mut zs = Vec::with_capacity(xs.len());
+        for x in xs.iter() {
+            zs.push(self.output(x, channel)?);
+        }
+        Ok(zs.into_iter().collect())
+    }
 }
 
 /// Fancy DSL providing binary operations
@@ -142,44 +181,6 @@ pub trait FancyBinary: Fancy {
     }
 }
 
-/// DSL for the basic computations supported by `fancy-garbling`.
-///
-/// Primarily used as a supertrait for `FancyBinary` and `FancyArithmetic`,
-/// which indicate computation supported by the DSL.
-pub trait Fancy {
-    /// The underlying wire datatype created by an object implementing `Fancy`.
-    type Item: Clone + HasModulus;
-
-    /// Create a constant `x` with modulus `q`.
-    fn constant(
-        &mut self,
-        x: u16,
-        q: u16,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item>;
-
-    /// Process this wire as output. Some `Fancy` implementers don't actually *return*
-    /// output, but they need to be involved in the process, so they can return `None`.
-    fn output(
-        &mut self,
-        x: &Self::Item,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Option<u16>>;
-
-    /// Output a slice of wires.
-    fn outputs(
-        &mut self,
-        xs: &[Self::Item],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Option<Vec<u16>>> {
-        let mut zs = Vec::with_capacity(xs.len());
-        for x in xs.iter() {
-            zs.push(self.output(x, channel)?);
-        }
-        Ok(zs.into_iter().collect())
-    }
-}
-
 /// DSL for arithmetic computation.
 pub trait FancyArithmetic: Fancy {
     /// Add `x` and `y`.
@@ -260,4 +261,3 @@ macro_rules! check_binary {
 }
 
 pub(crate) use check_binary;
-use swanky_channel::Channel;
