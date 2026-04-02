@@ -39,7 +39,7 @@ fn gb_linear_oram(rng: SwankyRng, channel: &mut Channel, inputs: &[u128]) {
 /// The garbler's wire exchange method
 fn gb_set_fancy_inputs<F>(gb: &mut F, inputs: &[u128], channel: &mut Channel) -> ORAMInputs<F::Item>
 where
-    F: Fancy<Item = AllWire>,
+    F: Fancy<Item = AllWire> + BinaryGadgets,
 {
     // The number of bits needed to represent a single input value
     let nbits = 128;
@@ -87,7 +87,7 @@ fn ev_set_fancy_inputs<F>(
     channel: &mut Channel,
 ) -> ORAMInputs<F::Item>
 where
-    F: Fancy<Item = AllWire>,
+    F: Fancy<Item = AllWire> + BinaryGadgets,
 {
     // The number of bits needed to represent a single input value
     let nbits = 128;

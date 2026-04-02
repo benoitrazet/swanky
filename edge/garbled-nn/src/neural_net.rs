@@ -3,8 +3,8 @@ use crate::{
     util,
 };
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryWireLabel, CrtBundle, CrtProjGadgets, Fancy, FancyArithmetic,
-    FancyBinary, HasModulus, WireMod2,
+    AllWire, BinaryBundle, BinaryGadgets, BinaryWireLabel, CrtBundle, CrtGadgets, CrtProjGadgets,
+    Fancy, FancyArithmetic, FancyBinary, HasModulus, WireMod2,
     classic::{GarbledChannel, GarbledCircuit},
     dummy::Dummy,
     informer::Informer,
@@ -182,7 +182,7 @@ impl NeuralNet {
     }
 
     /// Encode an input so it can be evaluated by a boolean [`NeuralNet`].
-    pub fn encode_input_boolean<W: HasModulus + Clone, F: Fancy<Item = W>>(
+    pub fn encode_input_boolean<W: HasModulus + Clone, F: Fancy<Item = W> + BinaryGadgets>(
         f: &mut F,
         input: &Array3<i64>,
         first_layer_bitwidth: usize,
@@ -198,7 +198,7 @@ impl NeuralNet {
     }
 
     /// Receive an input so it can be evaluated by a boolean [`NeuralNet`].
-    pub fn receive_input_boolean<W: HasModulus + Clone, F: Fancy<Item = W>>(
+    pub fn receive_input_boolean<W: HasModulus + Clone, F: Fancy<Item = W> + BinaryGadgets>(
         f: &mut F,
         input: &Array3<i64>,
         first_layer_bitwidth: usize,
@@ -211,7 +211,7 @@ impl NeuralNet {
     }
 
     /// Encode an input so it can be evaluated by an arithmetic [`NeuralNet`].
-    pub fn encode_input_arith<W: HasModulus + Clone, F: Fancy<Item = W>>(
+    pub fn encode_input_arith<W: HasModulus + Clone, F: Fancy<Item = W> + CrtGadgets>(
         f: &mut F,
         input: &Array3<i64>,
         modulus: u128,
@@ -224,7 +224,7 @@ impl NeuralNet {
     }
 
     /// Receive an input so it can be evaluated by an arithmetic [`NeuralNet`].
-    pub fn receive_input_arith<W: HasModulus + Clone, F: Fancy<Item = W>>(
+    pub fn receive_input_arith<W: HasModulus + Clone, F: Fancy<Item = W> + CrtGadgets>(
         f: &mut F,
         input: &Array3<i64>,
         modulus: u128,

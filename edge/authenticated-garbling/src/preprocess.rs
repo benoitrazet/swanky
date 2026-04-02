@@ -26,7 +26,7 @@
 //! <https://eprint.iacr.org/2018/578.pdf>
 //!
 use fancy_garbling::{
-    BinaryBundle, Fancy,
+    BinaryBundle, BinaryGadgets,
     circuit_analyzer::{AnalyzerItem, CircuitAnalyzer},
 };
 use rand::{CryptoRng, Rng};

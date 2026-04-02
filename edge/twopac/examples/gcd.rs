@@ -48,7 +48,7 @@ fn gb_gcd(rng: SwankyRng, channel: &mut Channel, input: u128, upper_bound: u128)
 /// The garbler's wire exchange method
 fn gb_set_fancy_inputs<F>(gb: &mut F, input: u128, channel: &mut Channel) -> GCDInputs<F::Item>
 where
-    F: Fancy<Item = AllWire>,
+    F: Fancy<Item = AllWire> + BinaryGadgets,
 {
     // The number of bits needed to represent a single input, in this case a u128
     let nbits = 128;
@@ -99,7 +99,7 @@ fn ev_gcd(rng: SwankyRng, channel: &mut Channel, input: u128, upper_bound: u128)
 }
 fn ev_set_fancy_inputs<F>(ev: &mut F, input: u128, channel: &mut Channel) -> GCDInputs<F::Item>
 where
-    F: Fancy<Item = AllWire>,
+    F: Fancy<Item = AllWire> + BinaryGadgets,
 {
     // The number of bits needed to represent a single input, in this case a u128
     let nbits = 128;

@@ -51,6 +51,74 @@ impl<F: FancyArithmetic + FancyBinary> CrtGadgets for F {}
 pub trait CrtGadgets:
     FancyArithmetic + FancyBinary + ArithmeticBundleGadgets + BundleGadgets
 {
+    /// Encode a CRT input bundle.
+    fn crt_encode(
+        &mut self,
+        value: u128,
+        modulus: u128,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
+        let qs = util::factor(modulus);
+        let xs = util::crt(value, &qs);
+        self.encode_bundle(&xs, &qs, channel).map(CrtBundle::from)
+    }
+
+    /// Receive an CRT input bundle.
+    fn crt_receive(
+        &mut self,
+        modulus: u128,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
+        let qs = util::factor(modulus);
+        self.receive_bundle(&qs, channel).map(CrtBundle::from)
+    }
+
+    /// Encode many CRT input bundles.
+    fn crt_encode_many(
+        &mut self,
+        values: &[u128],
+        modulus: u128,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<CrtBundle<Self::Item>>> {
+        let mods = util::factor(modulus);
+        let nmods = mods.len();
+        let xs = values
+            .iter()
+            .flat_map(|x| util::crt(*x, &mods))
+            .collect_vec();
+        let qs = itertools::repeat_n(mods, values.len())
+            .flatten()
+            .collect_vec();
+        let mut wires = self.encode_many(&xs, &qs, channel)?;
+        let buns = (0..values.len())
+            .map(|_| {
+                let ws = wires.drain(0..nmods).collect_vec();
+                CrtBundle::new(ws)
+            })
+            .collect_vec();
+        Ok(buns)
+    }
+
+    /// Receive many CRT input bundles.
+    fn crt_receive_many(
+        &mut self,
+        n: usize,
+        modulus: u128,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<CrtBundle<Self::Item>>> {
+        let mods = util::factor(modulus);
+        let nmods = mods.len();
+        let qs = itertools::repeat_n(mods, n).flatten().collect_vec();
+        let mut wires = self.receive_many(&qs, channel)?;
+        let buns = (0..n)
+            .map(|_| {
+                let ws = wires.drain(0..nmods).collect_vec();
+                CrtBundle::new(ws)
+            })
+            .collect_vec();
+        Ok(buns)
+    }
+
     /// Creates a bundle of constant wires for the CRT representation of `x` under
     /// composite modulus `q`.
     fn crt_constant_bundle(
