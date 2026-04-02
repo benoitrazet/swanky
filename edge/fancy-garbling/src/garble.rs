@@ -14,7 +14,7 @@ pub use binary_and::BinaryWireLabel;
 #[cfg(test)]
 mod nonstreaming {
     use crate::{
-        AllWire, FancyArithmetic, FancyBinary,
+        AllWire, FancyArithmetic, FancyBinary, FancyProj,
         circuit::{ArithmeticCircuit, CircuitBuilder, CircuitType, eval_plain},
         classic::GarbledCircuit,
         fancy::{ArithmeticBundleGadgets, Bundle, BundleGadgets, Fancy},
@@ -297,7 +297,7 @@ mod nonstreaming {
 #[cfg(test)]
 mod streaming {
     use crate::{
-        AllWire, Evaluator, Fancy, FancyArithmetic, Garbler, WireLabel,
+        AllWire, Evaluator, Fancy, FancyArithmetic, FancyProj, Garbler, WireLabel,
         dummy::{Dummy, DummyVal},
         util::RngExt,
     };
@@ -453,7 +453,7 @@ mod streaming {
 
     #[test]
     fn proj() {
-        fn fancy_projection<F: FancyArithmetic>(
+        fn fancy_projection<F: FancyArithmetic + FancyProj>(
             b: &mut F,
             xs: &[F::Item],
             q: u16,
@@ -480,15 +480,15 @@ mod streaming {
 #[cfg(test)]
 mod complex {
     use crate::{
-        AllWire, CrtBundle, CrtGadgets, Evaluator, Fancy, FancyArithmetic, FancyBinary, Garbler,
-        dummy::Dummy, util::RngExt,
+        AllWire, CrtBundle, CrtGadgets, Evaluator, Fancy, FancyArithmetic, FancyBinary, FancyProj,
+        Garbler, dummy::Dummy, util::RngExt,
     };
     use itertools::Itertools;
     use rand::thread_rng;
     use swanky_channel::Channel;
     use swanky_rng::SwankyRng;
 
-    fn complex_gadget<F: FancyArithmetic + FancyBinary>(
+    fn complex_gadget<F: FancyArithmetic + FancyBinary + FancyProj>(
         b: &mut F,
         xs: &[CrtBundle<F::Item>],
         channel: &mut Channel,

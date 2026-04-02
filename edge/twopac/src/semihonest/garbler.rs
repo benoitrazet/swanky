@@ -1,6 +1,6 @@
 use fancy_garbling::{
-    AllWire, ArithmeticWire, Fancy, FancyArithmetic, FancyBinary, Garbler as Gb, WireLabel,
-    WireMod2,
+    AllWire, ArithmeticWire, Fancy, FancyArithmetic, FancyBinary, FancyProj, Garbler as Gb,
+    WireLabel, WireMod2,
 };
 use rand::{CryptoRng, Rng, SeedableRng};
 use swanky_adversary::SemiHonest;
@@ -127,7 +127,14 @@ impl<
     ) -> swanky_error::Result<Self::Item> {
         self.garbler.mul(x, y, channel)
     }
+}
 
+impl<
+    RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+    OT: OtSender<Msg = Block> + SemiHonest,
+    Wire: WireLabel + ArithmeticWire,
+> FancyProj for Garbler<RNG, OT, Wire>
+{
     fn proj(
         &mut self,
         x: &Wire,

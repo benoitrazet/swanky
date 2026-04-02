@@ -1,6 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
-    AllWire, FancyArithmetic,
+    AllWire, FancyArithmetic, FancyProj,
     circuit::{ArithmeticCircuit as Circuit, CircuitBuilder, CircuitType},
     classic::GarbledCircuit,
     util::RngExt,

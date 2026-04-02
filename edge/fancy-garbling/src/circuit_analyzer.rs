@@ -1,7 +1,7 @@
 //! Fancy object to profile a fancy circuit and compute stats such as the multiplicative depth
 //! or the number of boolean and arithmetic gates in a circuit.
 use crate::{
-    FancyArithmetic, FancyBinary,
+    FancyArithmetic, FancyBinary, FancyProj,
     fancy::{Fancy, HasModulus},
 };
 use std::cmp::max;
@@ -186,7 +186,9 @@ impl FancyArithmetic for CircuitAnalyzer {
             depth: max(x.depth, y.depth) + 1,
         })
     }
+}
 
+impl FancyProj for CircuitAnalyzer {
     fn proj(
         &mut self,
         _x: &Self::Item,

@@ -3,6 +3,7 @@
 //! An implementer must be able to create inputs, constants, do modular arithmetic, and
 //! create projections.
 
+use crate::util;
 use itertools::Itertools;
 use swanky_channel::Channel;
 
@@ -431,6 +432,26 @@ pub trait FancyArithmetic: Fancy {
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item>;
 
+    ////////////////////////////////////////////////////////////////////////////////
+    // Functions built on top of arithmetic fancy operations.
+
+    /// Sum up a slice of wires.
+    ///
+    /// # Panics
+    /// Panics if `args.len() < 2`.
+    fn add_many(&mut self, args: &[Self::Item]) -> Self::Item {
+        assert!(args.len() >= 2, "`args.len()` must be two or more");
+        let mut z = args[0].clone();
+        for x in args.iter().skip(1) {
+            z = self.add(&z, x);
+        }
+        z
+    }
+}
+
+/// Fancy DSL providing projection gates, and associated methods that utilize
+/// projection gates.
+pub trait FancyProj: Fancy {
     /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
     ///
     /// Optional `tt` is useful for hiding the gate from the evaluator.
@@ -448,21 +469,6 @@ pub trait FancyArithmetic: Fancy {
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item>;
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // Functions built on top of arithmetic fancy operations.
-
-    /// Sum up a slice of wires.
-    ///
-    /// # Panics
-    /// Panics if `args.len() < 2`.
-    fn add_many(&mut self, args: &[Self::Item]) -> Self::Item {
-        assert!(args.len() >= 2, "`args.len()` must be two or more");
-        let mut z = args[0].clone();
-        for x in args.iter().skip(1) {
-            z = self.add(&z, x);
-        }
-        z
-    }
     /// Change the modulus of `x` to `to_modulus` using a projection gate.
     fn mod_change(
         &mut self,
@@ -486,5 +492,3 @@ macro_rules! check_binary {
 }
 
 pub(crate) use check_binary;
-
-use crate::util;

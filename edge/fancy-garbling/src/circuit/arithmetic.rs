@@ -1,5 +1,5 @@
 use crate::{
-    FancyArithmetic, FancyBinary, HasModulus, check_binary,
+    FancyArithmetic, FancyBinary, FancyProj, HasModulus, check_binary,
     circuit::{CircuitBuilder, CircuitRef, CircuitType, EvaluableCircuit},
 };
 use swanky_channel::Channel;
@@ -117,7 +117,7 @@ impl std::fmt::Display for ArithmeticGate {
     }
 }
 
-impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
+impl<F: FancyArithmetic + FancyProj> EvaluableCircuit<F> for ArithmeticCircuit {
     fn eval_to_wirelabels(
         &self,
         f: &mut F,
@@ -306,6 +306,28 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
         )
     }
 
+    fn mul(
+        &mut self,
+        xref: &CircuitRef,
+        yref: &CircuitRef,
+        _channel: &mut Channel,
+    ) -> swanky_error::Result<CircuitRef> {
+        if xref.modulus() < yref.modulus() {
+            return self.mul(yref, xref, _channel);
+        }
+
+        let gate = ArithmeticGate::Mul {
+            xref: *xref,
+            yref: *yref,
+            id: self.get_next_ciphertext_id(),
+            out: None,
+        };
+
+        Ok(self.gate(gate, xref.modulus()))
+    }
+}
+
+impl FancyProj for CircuitBuilder<ArithmeticCircuit> {
     fn proj(
         &mut self,
         xref: &CircuitRef,
@@ -330,25 +352,5 @@ impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
             out: None,
         };
         Ok(self.gate(gate, output_modulus))
-    }
-
-    fn mul(
-        &mut self,
-        xref: &CircuitRef,
-        yref: &CircuitRef,
-        _channel: &mut Channel,
-    ) -> swanky_error::Result<CircuitRef> {
-        if xref.modulus() < yref.modulus() {
-            return self.mul(yref, xref, _channel);
-        }
-
-        let gate = ArithmeticGate::Mul {
-            xref: *xref,
-            yref: *yref,
-            id: self.get_next_ciphertext_id(),
-            out: None,
-        };
-
-        Ok(self.gate(gate, xref.modulus()))
     }
 }

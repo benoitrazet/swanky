@@ -1,5 +1,5 @@
 use crate::{
-    FancyArithmetic, FancyBinary,
+    FancyArithmetic, FancyBinary, FancyProj,
     fancy::{Fancy, HasModulus},
 };
 use itertools::Itertools;
@@ -100,12 +100,12 @@ impl<W: Clone + HasModulus> Index<usize> for Bundle<W> {
 }
 
 impl<F: Fancy> BundleGadgets for F {}
-impl<F: FancyArithmetic> ArithmeticBundleGadgets for F {}
+impl<F: FancyArithmetic + FancyProj> ArithmeticBundleGadgets for F {}
 impl<F: FancyBinary> BinaryBundleGadgets for F {}
 
 /// Arithmetic operations on wire bundles, extending the capability of `FancyArithmetic` operating
 /// on individual wires.
-pub trait ArithmeticBundleGadgets: FancyArithmetic {
+pub trait ArithmeticBundleGadgets: FancyArithmetic + FancyProj {
     /// Add two wire bundles pairwise, zipping addition.
     ///
     /// In CRT this is plain addition. In binary this is xor.

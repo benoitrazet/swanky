@@ -324,7 +324,7 @@ impl<Circuit: CircuitType> Default for CircuitBuilder<Circuit> {
 #[cfg(test)]
 mod plaintext {
     use super::*;
-    use crate::{FancyArithmetic, FancyBinary, util::RngExt};
+    use crate::{FancyArithmetic, FancyBinary, FancyProj, util::RngExt};
     use itertools::Itertools;
     use rand::thread_rng;
 
