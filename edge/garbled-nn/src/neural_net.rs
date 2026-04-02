@@ -3,7 +3,7 @@ use crate::{
     util,
 };
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryWireLabel, CrtBundle, CrtGadgets, Fancy, FancyArithmetic,
+    AllWire, BinaryBundle, BinaryWireLabel, CrtBundle, CrtProjGadgets, Fancy, FancyArithmetic,
     FancyBinary, HasModulus, WireMod2,
     classic::{GarbledChannel, GarbledCircuit},
     dummy::Dummy,
@@ -301,7 +301,7 @@ impl NeuralNet {
     ) -> Result<Vec<CrtBundle<W>>>
     where
         W: HasModulus + Clone,
-        F: Fancy<Item = W> + FancyArithmetic<Item = W> + CrtGadgets<Item = W>,
+        F: Fancy<Item = W> + FancyArithmetic<Item = W> + CrtProjGadgets<Item = W>,
     {
         assert_eq!(
             moduli.len(),
@@ -1186,7 +1186,7 @@ impl NeuralNet {
     ) -> Result<()>
     where
         W: Clone + HasModulus,
-        F: Fancy<Item = W> + FancyArithmetic<Item = W> + CrtGadgets,
+        F: Fancy<Item = W> + FancyArithmetic<Item = W> + CrtProjGadgets,
     {
         let moduli = util::bitwidths_to_moduli(bitwidth);
 

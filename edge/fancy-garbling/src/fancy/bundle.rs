@@ -100,12 +100,13 @@ impl<W: Clone + HasModulus> Index<usize> for Bundle<W> {
 }
 
 impl<F: Fancy> BundleGadgets for F {}
-impl<F: FancyArithmetic + FancyProj> ArithmeticBundleGadgets for F {}
+impl<F: FancyArithmetic> ArithmeticBundleGadgets for F {}
+impl<F: FancyArithmetic + FancyProj> ArithmeticProjBundleGadgets for F {}
 impl<F: FancyBinary> BinaryBundleGadgets for F {}
 
 /// Arithmetic operations on wire bundles, extending the capability of `FancyArithmetic` operating
 /// on individual wires.
-pub trait ArithmeticBundleGadgets: FancyArithmetic + FancyProj {
+pub trait ArithmeticBundleGadgets: FancyArithmetic {
     /// Add two wire bundles pairwise, zipping addition.
     ///
     /// In CRT this is plain addition. In binary this is xor.
@@ -173,6 +174,23 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic + FancyProj {
             .map(Bundle::new)
     }
 
+    /// If b=0 then return 0, else return x.
+    fn mask(
+        &mut self,
+        b: &Self::Item,
+        x: &Bundle<Self::Item>,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Bundle<Self::Item>> {
+        x.wires()
+            .iter()
+            .map(|xwire| self.mul(xwire, b, channel))
+            .collect::<swanky_error::Result<_>>()
+            .map(Bundle)
+    }
+}
+
+/// Arithmetic operations on wire bundles that utilize projection gates.
+pub trait ArithmeticProjBundleGadgets: FancyArithmetic + FancyProj {
     /// Mixed radix addition.
     ///
     /// # Panics
@@ -313,20 +331,6 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic + FancyProj {
         Ok(opt_carry
             .as_ref()
             .map_or(digit_sum.clone(), |d| self.add(&digit_sum, d)))
-    }
-
-    /// If b=0 then return 0, else return x.
-    fn mask(
-        &mut self,
-        b: &Self::Item,
-        x: &Bundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Bundle<Self::Item>> {
-        x.wires()
-            .iter()
-            .map(|xwire| self.mul(xwire, b, channel))
-            .collect::<swanky_error::Result<_>>()
-            .map(Bundle)
     }
 
     /// Compute `x == y`. Returns a wire encoding the result mod 2.

@@ -543,6 +543,7 @@ mod plaintext {
 mod bundle {
     use super::*;
     use crate::{
+        ArithmeticProjBundleGadgets, CrtProjGadgets,
         fancy::{ArithmeticBundleGadgets, BinaryGadgets, BundleGadgets, CrtGadgets},
         util::{self, RngExt, crt_factor, crt_inv_factor},
     };

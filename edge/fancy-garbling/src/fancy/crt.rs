@@ -2,8 +2,8 @@
 
 use super::{HasModulus, bundle::ArithmeticBundleGadgets};
 use crate::{
-    FancyArithmetic, FancyBinary, FancyProj,
-    fancy::bundle::{Bundle, BundleGadgets},
+    FancyArithmetic, FancyBinary,
+    fancy::bundle::{ArithmeticProjBundleGadgets, Bundle, BundleGadgets},
     util,
 };
 use itertools::Itertools;
@@ -45,7 +45,7 @@ impl<W: Clone + HasModulus> From<Bundle<W>> for CrtBundle<W> {
     }
 }
 
-impl<F: FancyArithmetic + FancyBinary + FancyProj> CrtGadgets for F {}
+impl<F: FancyArithmetic + FancyBinary> CrtGadgets for F {}
 
 /// Extension trait for `Fancy` providing advanced CRT gadgets based on bundles of wires.
 pub trait CrtGadgets:
@@ -132,7 +132,12 @@ pub trait CrtGadgets:
     ) -> swanky_error::Result<CrtBundle<Self::Item>> {
         self.mul_bundles(x, y, channel).map(CrtBundle)
     }
+}
 
+impl<F: ArithmeticProjBundleGadgets + CrtGadgets> CrtProjGadgets for F {}
+
+/// CRT gadgets that use projection gates.
+pub trait CrtProjGadgets: ArithmeticProjBundleGadgets + CrtGadgets {
     /// Exponentiate `x` by the constant `c`.
     fn crt_cexp(
         &mut self,

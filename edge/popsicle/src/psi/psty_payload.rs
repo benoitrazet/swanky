@@ -32,8 +32,8 @@ use crate::{
     utils,
 };
 use fancy_garbling::{
-    AllWire, ArithmeticBundleGadgets, BinaryBundle, Bundle, CrtBundle, CrtGadgets, Fancy,
-    FancyBinary,
+    AllWire, ArithmeticProjBundleGadgets, BinaryBundle, Bundle, CrtBundle, CrtGadgets,
+    CrtProjGadgets, Fancy, FancyBinary,
 };
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_twopac::semihonest::{Evaluator, Garbler};
@@ -849,7 +849,7 @@ fn encode_opprf_payload(opprf_ids: &[Block512]) -> Vec<u16> {
 /// Fancy function to compute a weighted average for matching ID's
 /// where one party provides the weights and the other
 //  the values
-fn fancy_compute_payload_aggregate<F: Fancy + ArithmeticBundleGadgets + FancyBinary>(
+fn fancy_compute_payload_aggregate<F: Fancy + ArithmeticProjBundleGadgets + FancyBinary>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],

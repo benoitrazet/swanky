@@ -1,7 +1,7 @@
 //! The lowest level of a [`NeuralNet`](crate::NeuralNet) is a [`Layer`].
 
 use crate::util;
-use fancy_garbling::{BinaryBundle, BinaryGadgets, CrtBundle, CrtGadgets, Fancy, HasModulus};
+use fancy_garbling::{BinaryBundle, BinaryGadgets, CrtBundle, CrtProjGadgets, Fancy, HasModulus};
 use fancy_garbling::{FancyArithmetic, util as numbers};
 use itertools::iproduct;
 use ndarray::Array3;
@@ -409,7 +409,7 @@ impl Layer {
     ) -> Result<Array3<CrtBundle<W>>>
     where
         W: Clone + HasModulus,
-        F: Fancy<Item = W> + FancyArithmetic<Item = W> + CrtGadgets<Item = W>,
+        F: Fancy<Item = W> + FancyArithmetic<Item = W> + CrtProjGadgets<Item = W>,
     {
         let relu_accuracy = accuracy.relu.clone();
         let sign_accuracy = accuracy.sign.clone();

@@ -197,6 +197,7 @@ impl Fancy for Dummy {
 mod bundle {
     use super::*;
     use crate::{
+        ArithmeticProjBundleGadgets, CrtProjGadgets,
         fancy::{ArithmeticBundleGadgets, BinaryGadgets, Bundle, BundleGadgets, CrtGadgets},
         util::{self, RngExt},
     };
@@ -754,6 +755,7 @@ mod bundle {
 mod pmr_tests {
     use super::*;
     use crate::{
+        CrtProjGadgets,
         fancy::{BundleGadgets, CrtGadgets},
         util::RngExt,
     };

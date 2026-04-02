@@ -17,7 +17,7 @@ mod nonstreaming {
         AllWire, FancyArithmetic, FancyBinary, FancyProj,
         circuit::{ArithmeticCircuit, CircuitBuilder, CircuitType, eval_plain},
         classic::GarbledCircuit,
-        fancy::{ArithmeticBundleGadgets, Bundle, BundleGadgets, Fancy},
+        fancy::{ArithmeticProjBundleGadgets, Bundle, BundleGadgets, Fancy},
         util::{self, RngExt},
     };
     use itertools::Itertools;
@@ -480,8 +480,8 @@ mod streaming {
 #[cfg(test)]
 mod complex {
     use crate::{
-        AllWire, CrtBundle, CrtGadgets, Evaluator, Fancy, FancyArithmetic, FancyBinary, FancyProj,
-        Garbler, dummy::Dummy, util::RngExt,
+        AllWire, CrtBundle, CrtGadgets, CrtProjGadgets, Evaluator, Fancy, FancyArithmetic,
+        FancyBinary, FancyProj, Garbler, dummy::Dummy, util::RngExt,
     };
     use itertools::Itertools;
     use rand::thread_rng;
