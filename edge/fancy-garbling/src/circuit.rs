@@ -3,7 +3,7 @@
 
 use crate::{
     dummy::{Dummy, DummyVal},
-    fancy::{BinaryBundle, CrtBundle, Fancy, FancyInput, HasModulus},
+    fancy::{BinaryBundle, CrtBundle, Fancy, HasModulus},
     informer::Informer,
 };
 use itertools::Itertools;
@@ -215,6 +215,23 @@ impl<Circuit: CircuitType> Fancy for CircuitBuilder<Circuit> {
     fn output(&mut self, xref: &CircuitRef, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
         self.circ.push_output_ref(*xref);
         Ok(None)
+    }
+
+    fn encode_many(
+        &mut self,
+        _values: &[u16],
+        _moduli: &[u16],
+        _channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        unimplemented!("Encoding invalid for `CircuitBuilder`")
+    }
+
+    fn receive_many(
+        &mut self,
+        _moduli: &[u16],
+        _channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        unimplemented!("Receiving invalid for `CircuitBuilder`")
     }
 }
 

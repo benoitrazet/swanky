@@ -4,7 +4,7 @@ use crate::{
 };
 use fancy_garbling::{
     AllWire, BinaryBundle, BinaryWireLabel, CrtBundle, CrtGadgets, Fancy, FancyArithmetic,
-    FancyBinary, FancyInput, HasModulus, WireMod2,
+    FancyBinary, HasModulus, WireMod2,
     classic::{GarbledChannel, GarbledCircuit},
     dummy::Dummy,
     informer::Informer,
@@ -182,10 +182,7 @@ impl NeuralNet {
     }
 
     /// Encode an input so it can be evaluated by a boolean [`NeuralNet`].
-    pub fn encode_input_boolean<
-        W: HasModulus + Clone,
-        F: Fancy<Item = W> + FancyInput<Item = W>,
-    >(
+    pub fn encode_input_boolean<W: HasModulus + Clone, F: Fancy<Item = W>>(
         f: &mut F,
         input: &Array3<i64>,
         first_layer_bitwidth: usize,
@@ -201,10 +198,7 @@ impl NeuralNet {
     }
 
     /// Receive an input so it can be evaluated by a boolean [`NeuralNet`].
-    pub fn receive_input_boolean<
-        W: HasModulus + Clone,
-        F: Fancy<Item = W> + FancyInput<Item = W>,
-    >(
+    pub fn receive_input_boolean<W: HasModulus + Clone, F: Fancy<Item = W>>(
         f: &mut F,
         input: &Array3<i64>,
         first_layer_bitwidth: usize,
@@ -217,7 +211,7 @@ impl NeuralNet {
     }
 
     /// Encode an input so it can be evaluated by an arithmetic [`NeuralNet`].
-    pub fn encode_input_arith<W: HasModulus + Clone, F: Fancy<Item = W> + FancyInput<Item = W>>(
+    pub fn encode_input_arith<W: HasModulus + Clone, F: Fancy<Item = W>>(
         f: &mut F,
         input: &Array3<i64>,
         modulus: u128,
@@ -230,7 +224,7 @@ impl NeuralNet {
     }
 
     /// Receive an input so it can be evaluated by an arithmetic [`NeuralNet`].
-    pub fn receive_input_arith<W: HasModulus + Clone, F: Fancy<Item = W> + FancyInput<Item = W>>(
+    pub fn receive_input_arith<W: HasModulus + Clone, F: Fancy<Item = W>>(
         f: &mut F,
         input: &Array3<i64>,
         modulus: u128,
@@ -307,10 +301,7 @@ impl NeuralNet {
     ) -> Result<Vec<CrtBundle<W>>>
     where
         W: HasModulus + Clone,
-        F: Fancy<Item = W>
-            + FancyInput<Item = W>
-            + FancyArithmetic<Item = W>
-            + CrtGadgets<Item = W>,
+        F: Fancy<Item = W> + FancyArithmetic<Item = W> + CrtGadgets<Item = W>,
     {
         assert_eq!(
             moduli.len(),
@@ -360,7 +351,7 @@ impl NeuralNet {
     ) -> Result<Vec<BinaryBundle<W>>>
     where
         W: Clone + HasModulus,
-        F: Fancy<Item = W> + FancyInput<Item = W> + FancyBinary<Item = W>,
+        F: Fancy<Item = W> + FancyBinary<Item = W>,
     {
         assert_eq!(
             bitwidth.len(),
@@ -1142,7 +1133,7 @@ impl NeuralNet {
     ) -> Result<()>
     where
         W: Clone + HasModulus,
-        F: Fancy<Item = W> + FancyInput<Item = W> + FancyBinary<Item = W>,
+        F: Fancy<Item = W> + FancyBinary<Item = W>,
     {
         let mut errors = 0;
 
@@ -1195,7 +1186,7 @@ impl NeuralNet {
     ) -> Result<()>
     where
         W: Clone + HasModulus,
-        F: Fancy<Item = W> + FancyInput<Item = W> + FancyArithmetic<Item = W> + CrtGadgets,
+        F: Fancy<Item = W> + FancyArithmetic<Item = W> + CrtGadgets,
     {
         let moduli = util::bitwidths_to_moduli(bitwidth);
 

@@ -1,7 +1,7 @@
 //! An example that adds two secret numbers in a binary garbled circuit
 //! using fancy-garbling.
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyInput, util,
+    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, util,
 };
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
@@ -36,7 +36,7 @@ fn gb_sum(rng: SwankyRng, channel: &mut Channel, input: u128) {
 /// The garbler's wire exchange method
 fn gb_set_fancy_inputs<F>(gb: &mut F, input: u128, channel: &mut Channel) -> SUMInputs<F::Item>
 where
-    F: FancyInput<Item = AllWire>,
+    F: Fancy<Item = AllWire>,
 {
     // The number of bits needed to represent a single input, in this case a u128
     let nbits = 128;
@@ -80,7 +80,7 @@ fn ev_sum(rng: SwankyRng, channel: &mut Channel, input: u128) -> u128 {
 /// The evaluator's wire exchange method
 fn ev_set_fancy_inputs<F>(ev: &mut F, input: u128, channel: &mut Channel) -> SUMInputs<F::Item>
 where
-    F: FancyInput<Item = AllWire>,
+    F: Fancy<Item = AllWire>,
 {
     // The number of bits needed to represent a single input, in this case a u128
     let nbits = 128;

@@ -8,7 +8,7 @@ use swanky_error::ErrorKind;
 
 use crate::{
     FancyArithmetic, FancyBinary, check_binary,
-    fancy::{Fancy, FancyInput, HasModulus},
+    fancy::{Fancy, HasModulus},
 };
 
 /// Simple struct that performs the fancy computation over `u16`.
@@ -49,47 +49,6 @@ impl Dummy {
 impl Default for Dummy {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl FancyInput for Dummy {
-    type Item = DummyVal;
-
-    /// Encode a single dummy value.
-    fn encode(
-        &mut self,
-        value: u16,
-        modulus: u16,
-        _: &mut Channel,
-    ) -> swanky_error::Result<DummyVal> {
-        Ok(DummyVal::new(value, modulus))
-    }
-
-    /// Encode a slice of inputs and a slice of moduli as DummyVals.
-    fn encode_many(
-        &mut self,
-        xs: &[u16],
-        moduli: &[u16],
-        _: &mut Channel,
-    ) -> swanky_error::Result<Vec<DummyVal>> {
-        assert_eq!(xs.len(), moduli.len());
-        Ok(xs
-            .iter()
-            .zip(moduli.iter())
-            .map(|(x, q)| DummyVal::new(*x, *q))
-            .collect())
-    }
-
-    fn receive_many(
-        &mut self,
-        _moduli: &[u16],
-        _: &mut Channel,
-    ) -> swanky_error::Result<Vec<DummyVal>> {
-        // Receive is undefined for Dummy which is a single party "protocol"
-        swanky_error::bail!(
-            ErrorKind::UnsupportedError,
-            "`receive_many` is undefined for `Dummy`"
-        );
     }
 }
 
@@ -180,6 +139,43 @@ impl FancyArithmetic for Dummy {
 
 impl Fancy for Dummy {
     type Item = DummyVal;
+
+    /// Encode a single dummy value.
+    fn encode(
+        &mut self,
+        value: u16,
+        modulus: u16,
+        _: &mut Channel,
+    ) -> swanky_error::Result<DummyVal> {
+        Ok(DummyVal::new(value, modulus))
+    }
+
+    /// Encode a slice of inputs and a slice of moduli as DummyVals.
+    fn encode_many(
+        &mut self,
+        xs: &[u16],
+        moduli: &[u16],
+        _: &mut Channel,
+    ) -> swanky_error::Result<Vec<DummyVal>> {
+        assert_eq!(xs.len(), moduli.len());
+        Ok(xs
+            .iter()
+            .zip(moduli.iter())
+            .map(|(x, q)| DummyVal::new(*x, *q))
+            .collect())
+    }
+
+    fn receive_many(
+        &mut self,
+        _moduli: &[u16],
+        _: &mut Channel,
+    ) -> swanky_error::Result<Vec<DummyVal>> {
+        // Receive is undefined for Dummy which is a single party "protocol"
+        swanky_error::bail!(
+            ErrorKind::UnsupportedError,
+            "`receive_many` is undefined for `Dummy`"
+        );
+    }
 
     fn constant(
         &mut self,
@@ -756,7 +752,7 @@ mod bundle {
 mod pmr_tests {
     use super::*;
     use crate::{
-        fancy::{BundleGadgets, CrtGadgets, FancyInput},
+        fancy::{BundleGadgets, CrtGadgets},
         util::RngExt,
     };
 

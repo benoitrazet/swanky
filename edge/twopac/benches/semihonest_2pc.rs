@@ -2,7 +2,7 @@
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
-    FancyInput, WireMod2,
+    Fancy, WireMod2,
     circuit::{BinaryCircuit as Circuit, EvaluableCircuit},
 };
 use std::{fs::File, io::BufReader, time::Duration};

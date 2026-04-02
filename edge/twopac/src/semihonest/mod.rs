@@ -10,8 +10,7 @@ pub use garbler::Garbler;
 mod tests {
     use super::*;
     use fancy_garbling::{
-        AllWire, CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary, FancyInput, WireLabel,
-        WireMod2,
+        AllWire, CrtBundle, CrtGadgets, Fancy, FancyArithmetic, FancyBinary, WireLabel, WireMod2,
         circuit::{BinaryCircuit, CircuitInfo, EvaluableCircuit, eval_plain},
         dummy::Dummy,
         util::RngExt,

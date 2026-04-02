@@ -8,7 +8,7 @@ use aes_gcm::{
 };
 
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryBundleGadgets, BinaryGadgets, Fancy, FancyBinary, FancyInput,
+    AllWire, BinaryBundle, BinaryBundleGadgets, BinaryGadgets, Fancy, FancyBinary,
 };
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
