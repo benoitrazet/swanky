@@ -304,7 +304,7 @@ where
 impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
     type Item = AuthenticatedWire;
 
-    /// Encodes several bits as authenticated shares.
+  /// Encodes several bits as authenticated shares.
     ///
     /// This is done in four steps: First the garbler generates authenticated wires for each of those
     /// inputs and returns the zeroes generated for those wires; Then the garbler open the authenticated
@@ -383,6 +383,32 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         x: &AuthenticatedWire,
         channel: &mut Channel,
     ) -> swanky_error::Result<Option<u16>> {
-        todo!()
+        let auth_share: AuthShare<PartyGarbler> = x.auth_share();
+        let mut out = Vec::with_capacity(1);
+        AuthShareGenerator::open_with_delta(
+            &[auth_share],
+            self.delta(2).to_repr(),
+            &mut out,
+            channel,
+        )?;
+        Ok(Some(u16::from(out[0])))
+    }
+    // Preferable function when processing multiple outputs!
+    // It can efficiently batch opening bits.
+    fn outputs(
+        &mut self,
+        x: &[AuthenticatedWire],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Option<Vec<u16>>> {
+        let auth_shares: Vec<AuthShare<PartyGarbler>> =
+            x.iter().map(|wire| wire.auth_share()).collect();
+        let mut outputs = Vec::with_capacity(x.len());
+        AuthShareGenerator::open_with_delta(
+            &auth_shares,
+            self.delta(2).to_repr(),
+            &mut outputs,
+            channel,
+        )?;
+        Ok(Some(outputs.iter().map(|o| u16::from(*o)).collect()))
     }
 }
