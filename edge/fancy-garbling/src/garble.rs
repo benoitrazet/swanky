@@ -185,14 +185,14 @@ mod nonstreaming {
             })
             .unwrap();
 
-            let (en, ev, _) =
+            let (en, ev, map) =
                 GarbledCircuit::garble::<AllWire, _, _>(&c, SwankyRng::new()).unwrap();
 
             for x in 0..q {
                 for y in 0..ymod {
                     println!("TEST x={} y={}", x, y);
                     let xs = &en.encode_inputs(&[x, y]);
-                    let decoded = ev.eval(&c, xs).unwrap();
+                    let decoded = ev.eval(&c, xs, &map).unwrap();
                     let should_be = eval_plain(&c, &[x, y]).unwrap();
                     assert_eq!(decoded[0], should_be[0]);
                 }
@@ -219,7 +219,8 @@ mod nonstreaming {
         })
         .unwrap();
 
-        let (en, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&circ, SwankyRng::new()).unwrap();
+        let (en, ev, map) =
+            GarbledCircuit::garble::<AllWire, _, _>(&circ, SwankyRng::new()).unwrap();
         println!("mods={:?} nargs={} size={}", mods, nargs, ev.size());
 
         let Q: u128 = mods.iter().map(|&q| q as u128).product();
@@ -234,7 +235,7 @@ mod nonstreaming {
                 ds.extend(util::as_mixed_radix(x, &mods).iter());
             }
             let X = en.encode_inputs(&ds);
-            let outputs = ev.eval(&circ, &X).unwrap();
+            let outputs = ev.eval(&circ, &X, &map).unwrap();
             assert_eq!(util::from_mixed_radix(&outputs, &mods), should_be);
         }
     }
@@ -253,12 +254,13 @@ mod nonstreaming {
             Ok(b.finish())
         })
         .unwrap();
-        let (_, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&circ, SwankyRng::new()).unwrap();
+        let (_, ev, map) =
+            GarbledCircuit::garble::<AllWire, _, _>(&circ, SwankyRng::new()).unwrap();
 
         for _ in 0..64 {
             let outputs = eval_plain(&circ, &[]).unwrap();
             assert_eq!(outputs[0], c, "plaintext eval failed");
-            let outputs = ev.eval::<AllWire, _>(&circ, &[]).unwrap();
+            let outputs = ev.eval::<AllWire, _>(&circ, &[], &map).unwrap();
             assert_eq!(outputs[0], c, "garbled eval failed");
         }
     }
@@ -280,7 +282,8 @@ mod nonstreaming {
         })
         .unwrap();
 
-        let (en, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&circ, SwankyRng::new()).unwrap();
+        let (en, ev, map) =
+            GarbledCircuit::garble::<AllWire, _, _>(&circ, SwankyRng::new()).unwrap();
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
@@ -288,7 +291,7 @@ mod nonstreaming {
             assert_eq!(outputs[0], (x + c) % q, "plaintext");
 
             let X = en.encode_inputs(&[x]);
-            let Y = ev.eval(&circ, &X).unwrap();
+            let Y = ev.eval(&circ, &X, &map).unwrap();
             assert_eq!(Y[0], (x + c) % q, "garbled");
         }
     }

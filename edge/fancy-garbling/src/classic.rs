@@ -3,7 +3,7 @@
 
 use crate::{
     Fancy, WireLabel,
-    circuit::EvaluableCircuit,
+    circuit::CircuitExecutor,
     garble::{Evaluator, Garbler},
     util::output_tweak,
 };
@@ -45,19 +45,19 @@ impl GarbledCircuit {
     ///    associated underlying values.
     pub fn garble<
         Wire: WireLabel,
-        Circuit: EvaluableCircuit<Garbler<RNG, Wire>>,
+        Ex: CircuitExecutor<Garbler<RNG, Wire>>,
         RNG: CryptoRng + RngCore,
     >(
-        c: &Circuit,
+        c: &Ex,
         rng: RNG,
     ) -> swanky_error::Result<(Encoder<Wire>, Self, OutputMapping)> {
         let mut channel = GarbledChannel::new_writer(None);
         let mut garbler = Channel::with(&mut channel, |channel| Garbler::new(rng, channel))?;
 
         // get input wires, ignoring encoded values
-        let inputs = (0..c.num_inputs())
+        let inputs = (0..c.ninputs())
             .map(|i| {
-                let q = c.input_mod(i);
+                let q = c.modulus(i);
                 let (zero, _) = garbler.encode_wire(0, q);
                 zero
             })
@@ -66,7 +66,7 @@ impl GarbledCircuit {
         let zeros = Channel::with(&mut channel, |channel| {
             // First, garble the circuit, outputting the zero wirelabels
             // associated with the output.
-            let zeros = c.eval_to_wirelabels(&mut garbler, &inputs, channel)?;
+            let zeros = c.execute(&mut garbler, &inputs, channel)?;
             // Next, map the zero output wirelabels to the set of valid outputs.
             // This is needed for evaluators that don't use the output
             // mapping provided as ouput; in that case, we need the channel to
@@ -84,29 +84,31 @@ impl GarbledCircuit {
     }
 
     /// Evaluate the garbled circuit on the provided inputs.
-    pub fn eval<Wire: WireLabel, Circuit: EvaluableCircuit<Evaluator<Wire>>>(
+    pub fn eval<Wire: WireLabel, Ex: CircuitExecutor<Evaluator<Wire>>>(
         &self,
-        c: &Circuit,
+        c: &Ex,
         inputs: &[Wire],
+        output_mapping: &OutputMapping,
     ) -> swanky_error::Result<Vec<u16>> {
         let output = Channel::with(GarbledChannel::from(self), |channel| {
             let mut evaluator = Evaluator::new(channel)?;
-            let outputs = c.eval(&mut evaluator, inputs, channel)?;
-            Ok(outputs.expect("evaluator outputs always are Some(u16)"))
+            let wirelabels = c.execute(&mut evaluator, inputs, channel)?;
+            let outputs = output_mapping.to_outputs(&wirelabels)?;
+            Ok(outputs)
         })?;
         Ok(output)
     }
 
     /// Evaluate the garbled circuit on the provided inputs, returning the
     /// output wirelabels.
-    pub fn eval_to_wirelabels<Wire: WireLabel, Circuit: EvaluableCircuit<Evaluator<Wire>>>(
+    pub fn eval_to_wirelabels<Wire: WireLabel, Ex: CircuitExecutor<Evaluator<Wire>>>(
         &self,
-        c: &Circuit,
+        c: &Ex,
         inputs: &[Wire],
     ) -> swanky_error::Result<Vec<Wire>> {
         let wirelabels = Channel::with(GarbledChannel::from(self), |channel| {
             let mut evaluator = Evaluator::new(channel)?;
-            let wirelabels = c.eval_to_wirelabels(&mut evaluator, inputs, channel)?;
+            let wirelabels = c.execute(&mut evaluator, inputs, channel)?;
             Ok(wirelabels)
         })?;
         Ok(wirelabels)
