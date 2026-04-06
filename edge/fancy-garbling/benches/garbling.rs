@@ -35,7 +35,7 @@ where
             .collect::<Vec<u16>>();
         let xs = en.encode_inputs(&inps);
         bench.iter(|| {
-            let ys = ev.eval(&c, &xs).unwrap();
+            let ys = ev.eval_to_wirelabels(&c, &xs).unwrap();
             std::hint::black_box(ys);
         });
     });

@@ -1,6 +1,8 @@
 use crate::{
     FancyBinary, HasModulus,
-    circuit::{CircuitBuilder, CircuitRef, CircuitType, EvaluableCircuit, GateType},
+    circuit::{
+        CircuitBuilder, CircuitExecutor, CircuitRef, CircuitType, EvaluableCircuit, GateType,
+    },
 };
 use swanky_channel::Channel;
 
@@ -13,6 +15,25 @@ pub struct BinaryCircuit {
     pub(crate) const_refs: Vec<CircuitRef>,
     pub(crate) output_refs: Vec<CircuitRef>,
     pub(crate) num_nonfree_gates: usize,
+}
+
+impl<F: FancyBinary> CircuitExecutor<F> for BinaryCircuit {
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: &[<F as crate::Fancy>::Item],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<<F as crate::Fancy>::Item>> {
+        self.eval_to_wirelabels(backend, inputs, channel)
+    }
+
+    fn ninputs(&self) -> usize {
+        self.input_refs.len()
+    }
+
+    fn modulus(&self, _: usize) -> u16 {
+        2
+    }
 }
 
 /// Binary computation supported by fancy garbling.
