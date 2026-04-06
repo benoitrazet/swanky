@@ -1,7 +1,7 @@
 //! Implementation of the Pinkas-Schneider-Tkachenko-Yanai "extended" private
 //! set intersection protocol (cf. <https://eprint.iacr.org/2019/241>).
 use crate::psi::circuit_psi::{base_psi::*, circuits::*};
-use fancy_garbling::{BinaryBundle, Fancy, FancyBinary, FancyReveal, WireMod2};
+use fancy_garbling::{BinaryBundle, Fancy, FancyBinary, WireMod2};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use swanky_block::Block512;
 use swanky_channel::Channel;
@@ -99,7 +99,7 @@ fn bundle_payloads<F>(
     Vec<BinaryBundle<<F as Fancy>::Item>>,
 )>
 where
-    F: FancyBinary + FancyReveal + Fancy<Item = WireMod2>,
+    F: FancyBinary + Fancy<Item = WireMod2>,
 {
     let sender_payloads = fancy_unmask(
         f,
@@ -116,7 +116,7 @@ fn bundle_primary_keys<F>(
     circuit_inputs: &CircuitInputs<F::Item>,
 ) -> swanky_error::Result<Vec<BinaryBundle<<F as Fancy>::Item>>>
 where
-    F: FancyBinary + FancyReveal + Fancy<Item = WireMod2>,
+    F: FancyBinary + Fancy<Item = WireMod2>,
 {
     Ok(wires_to_bundle::<F>(
         &circuit_inputs.sender_primary_keys,

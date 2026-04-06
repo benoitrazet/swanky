@@ -1,8 +1,7 @@
 //! An example that secretly retrieves an element from an ORAM in a binary garbled circuit
 //! using fancy-garbling.
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyInput,
-    FancyReveal, util,
+    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyInput, util,
 };
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
@@ -107,7 +106,7 @@ fn fancy_linear_oram<F>(
     channel: &mut Channel,
 ) -> swanky_error::Result<BinaryBundle<F::Item>>
 where
-    F: FancyReveal + Fancy + BinaryGadgets + FancyBinary + FancyArithmetic,
+    F: Fancy + BinaryGadgets + FancyBinary + FancyArithmetic,
 {
     let ram: Vec<BinaryBundle<_>> = wire_inputs.ram;
     let index: BinaryBundle<_> = wire_inputs.query;

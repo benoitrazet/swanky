@@ -140,28 +140,30 @@ mod tests {
                 let rng = SwankyRng::new();
                 let mut gb =
                     Garbler::<SwankyRng, ChouOrlandiSender, Wire>::new(channel, rng).unwrap();
-                let xs = gb
+                let mut xs = gb
                     .encode_many(&vec![0_u16; 128], &vec![2; 128], channel)
                     .unwrap();
                 let ys = gb.receive_many(&vec![2; 128], channel).unwrap();
-                circ.eval(&mut gb, &xs, &ys, channel).unwrap();
+                xs.extend(ys);
+                circ.eval(&mut gb, &xs, channel).unwrap();
                 Ok(())
             },
             |channel| {
                 let rng = SwankyRng::new();
                 let mut ev =
                     Evaluator::<SwankyRng, ChouOrlandiReceiver, Wire>::new(channel, rng).unwrap();
-                let xs = ev.receive_many(&vec![2; 128], channel).unwrap();
+                let mut xs = ev.receive_many(&vec![2; 128], channel).unwrap();
                 let ys = ev
                     .encode_many(&vec![0_u16; 128], &vec![2; 128], channel)
                     .unwrap();
-                let out = circ.eval(&mut ev, &xs, &ys, channel).unwrap().unwrap();
+                xs.extend(ys);
+                let out = circ.eval(&mut ev, &xs, channel).unwrap().unwrap();
                 Ok(out)
             },
         )
         .unwrap();
 
-        let target = eval_plain(&circ, &vec![0_u16; 128], &vec![0_u16; 128]).unwrap();
+        let target = eval_plain(&circ, &vec![0_u16; 256]).unwrap();
         assert_eq!(out, target);
     }
 

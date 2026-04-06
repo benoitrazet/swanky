@@ -1,7 +1,7 @@
 use crate::{
     AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyInput, HasModulus, WireLabel,
     WireMod2, check_binary,
-    fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal},
+    fancy::{BinaryBundle, CrtBundle, Fancy},
     garble::binary_and::BinaryWireLabel,
     hash_wires,
     util::{RngExt, output_tweak, tweak, tweak2},
@@ -167,16 +167,6 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> FancyInput for Garbler<RNG, Wire
         _: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
         unimplemented!("Garbler cannot receive values")
-    }
-}
-
-impl<RNG: RngCore + CryptoRng, Wire: WireLabel> FancyReveal for Garbler<RNG, Wire> {
-    fn reveal(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<u16> {
-        // The evaluator needs our cooperation in order to see the output.
-        // Hence, we call output() ourselves.
-        self.output(x, channel)?;
-        let val = channel.read::<u16>()?;
-        Ok(val)
     }
 }
 

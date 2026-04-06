@@ -849,9 +849,7 @@ fn encode_opprf_payload(opprf_ids: &[Block512]) -> Vec<u16> {
 /// Fancy function to compute a weighted average for matching ID's
 /// where one party provides the weights and the other
 //  the values
-fn fancy_compute_payload_aggregate<
-    F: fancy_garbling::FancyReveal + Fancy + ArithmeticBundleGadgets + FancyBinary,
->(
+fn fancy_compute_payload_aggregate<F: Fancy + ArithmeticBundleGadgets + FancyBinary>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
