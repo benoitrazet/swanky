@@ -95,19 +95,20 @@ pub trait CircuitInfo {
     fn print_info(&self) -> swanky_error::Result<()>;
 }
 
-impl<C: EvaluableCircuit<Informer<Dummy>>> CircuitInfo for C {
+impl<C: CircuitExecutor<Informer<Dummy>>> CircuitInfo for C {
     fn print_info(&self) -> swanky_error::Result<()> {
         let mut informer = crate::informer::Informer::new(Dummy::new());
 
         // encode inputs as InformerVals
         let inputs = Channel::with(std::io::empty(), |channel| {
-            self.get_input_refs()
-                .iter()
-                .map(|r| informer.encode(0, r.modulus(), channel))
+            (0..self.ninputs())
+                .map(|i| informer.encode(0, self.modulus(i), channel))
                 .collect::<swanky_error::Result<Vec<DummyVal>>>()
         })?;
 
-        Channel::with(std::io::empty(), |c| self.eval(&mut informer, &inputs, c))?;
+        Channel::with(std::io::empty(), |c| {
+            self.execute(&mut informer, &inputs, c)
+        })?;
         println!("{}", informer.stats());
         Ok(())
     }

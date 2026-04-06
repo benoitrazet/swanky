@@ -1,6 +1,6 @@
 use fancy_garbling::{
     Fancy, WireMod2,
-    circuit::{BinaryCircuit as Circuit, EvaluableCircuit},
+    circuit::{BinaryCircuit as Circuit, CircuitExecutor},
 };
 use std::{fs::File, io::BufReader, time::SystemTime};
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
@@ -38,7 +38,7 @@ fn run_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
                 start.elapsed().unwrap().as_millis()
             );
             let start = SystemTime::now();
-            circ_.eval(&mut gb, &xs, channel).unwrap();
+            circ_.execute(&mut gb, &xs, channel).unwrap();
             println!(
                 "Garbler :: Circuit garbling: {} ms",
                 start.elapsed().unwrap().as_millis()
@@ -64,7 +64,7 @@ fn run_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
                 start.elapsed().unwrap().as_millis()
             );
             let start = SystemTime::now();
-            circ.eval(&mut ev, &xs, channel).unwrap();
+            circ.execute(&mut ev, &xs, channel).unwrap();
             println!(
                 "Evaluator :: Circuit evaluation: {} ms",
                 start.elapsed().unwrap().as_millis()
