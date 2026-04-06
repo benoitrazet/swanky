@@ -33,12 +33,9 @@ use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_channel::Channel;
 use swanky_party::GenericParty;
 
-pub mod unifier;
 pub mod wire;
-use crate::preprocesser::{
-    unifier::{CircuitExecutor, CircuitExecutorItem},
-    wire::{IndexedWire, PreProcessedWire},
-};
+use crate::preprocesser::wire::{IndexedWire, PreProcessedWire};
+use crate::unifier::{CircuitExecutor, CircuitExecutorItem};
 
 /// Pre-process a circuit for authenticated garbling.
 ///
@@ -55,7 +52,7 @@ use crate::preprocesser::{
 /// be later used for garbling.
 pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
     circuit: &impl Fn(
-        &mut CircuitExecutor<P>,
+        &mut CircuitExecutor<P, RNG>,
         BinaryBundle<CircuitExecutorItem<P>>,
         BinaryBundle<CircuitExecutorItem<P>>,
         &mut Channel,
@@ -69,7 +66,7 @@ pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
     HashMap<usize, PreProcessedWire<P>>,
 )> {
     // First Analyze the circuit gates by simulating both parties
-    let mut circuit_analyzer: CircuitExecutor<P> = CircuitExecutor::new_analyzer();
+    let mut circuit_analyzer = CircuitExecutor::new_analyzer();
     circuit_analyzer.mock_circuit(&circuit, input_size, channel)?;
 
     let nands = circuit_analyzer.analyzer().nands();

@@ -1,8 +1,8 @@
 //! Garbler in Authenticated Garbling
 use crate::mux;
-use crate::preprocesser::unifier::{CircuitExecutor, CircuitExecutorItem};
 use crate::preprocesser::{f_preprocessing, wire::PreProcessedWire};
 use crate::ps::PartyGarbler;
+use crate::unifier::{CircuitExecutor, CircuitExecutorItem};
 use crate::wire::AuthenticatedWireMod2;
 use fancy_garbling::{
     BinaryBundle, Fancy, FancyBinary,WireLabel, WireMod2, util::u128_to_bits,
@@ -14,6 +14,7 @@ use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_field_binary::{F2, F128b};
+use vectoreyes::U8x16;
 
 type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 
@@ -31,9 +32,9 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     pub fn new(rng: RNG) -> swanky_error::Result<Self> {
         Ok(Garbler {
             deltas: HashMap::new(),
+            current_wire_index: 0,
             preprocessed_wires_map: HashMap::new(),
             known_triples_map: HashMap::new(),
-            current_wire_index: 0,
             rng,
         })
     }
@@ -63,11 +64,12 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     fn get_current_wire_triple(&mut self, index: usize) -> AuthShare<PartyGarbler> {
         self.known_triples_map[&index].into_auth_share()
     }
+
     /// Pre-process the passed circuit
     pub fn preprocess_circuit(
         &mut self,
         circuit: &impl Fn(
-            &mut CircuitExecutor<PartyGarbler>,
+            &mut CircuitExecutor<PartyGarbler, RNG>,
             BinaryBundle<CircuitExecutorItem<PartyGarbler>>,
             BinaryBundle<CircuitExecutorItem<PartyGarbler>>,
             &mut Channel,

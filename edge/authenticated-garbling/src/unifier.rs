@@ -4,21 +4,29 @@ use std::collections::HashMap;
 use fancy_garbling::{
     BinaryBundle, BinaryGadgets, Fancy, FancyBinary, HasModulus, circuit_analyzer::{AnalyzerItem, CircuitAnalyzer}
 };
+use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::authshares::AuthShare;
 use swanky_channel::Channel;
 use swanky_party::GenericParty;
 
-use crate::preprocesser::wire::{PreProcessedWire, WirePreProcessor};
+use crate::{
+    garbler::Garbler,
+    preprocesser::wire::{PreProcessedWire, WirePreProcessor},
+    ps::PartyGarbler,
+    wire::AuthenticatedWireMod2,
+};
 
 /// A enum which includes all the ways a circuit can be preprocessed
-pub enum CircuitExecutor<P: GenericParty> {
+pub enum CircuitExecutor<P: GenericParty, RNG: CryptoRng + RngCore> {
     /// A [`CircuitAnalyzer`] which provides statistics about the circuit
     Analyzer(CircuitAnalyzer),
     /// A [`WirePreProcessor`] which preprocesses wires in a circuit
     WirePreProcessor(WirePreProcessor<P>),
+    /// A [`Garbler`] which garbles the circuit
+    Garbler(Garbler<RNG>),
 }
 
-impl<P: GenericParty> CircuitExecutor<P> {
+impl<P: GenericParty, RNG: CryptoRng + RngCore> CircuitExecutor<P, RNG> {
     /// Constructs a new [`CircuitAnalyzer`]
     pub fn new_analyzer() -> Self {
         CircuitExecutor::Analyzer(CircuitAnalyzer::new())
@@ -56,7 +64,7 @@ impl<P: GenericParty> CircuitExecutor<P> {
     pub fn mock_circuit(
         &mut self,
         circuit: &impl Fn(
-            &mut CircuitExecutor<P>,
+            &mut CircuitExecutor<P, RNG>,
             BinaryBundle<CircuitExecutorItem<P>>,
             BinaryBundle<CircuitExecutorItem<P>>,
             &mut Channel,
@@ -81,16 +89,22 @@ pub enum CircuitExecutorItem<P: GenericParty> {
     AnalyzerItem(AnalyzerItem),
     /// A [`WirePreProcessor`]'s [`PreProcessedWire`]
     PreProcessedWire(PreProcessedWire<P>),
+    /// A [`Garbler`]'s [`AuthenticatedWireMod2`]
+    GbWire(AuthenticatedWireMod2<PartyGarbler>),
 }
 
 impl<P: GenericParty> CircuitExecutorItem<P> {
-    /// Creates a [`PreProcessingItem`] from an [`AnalyzerItem`]
+    /// Creates a [`CircuitExecutorItem`] from an [`AnalyzerItem`]
     pub fn from_analyzer_item(analyzer_item: AnalyzerItem) -> Self {
         CircuitExecutorItem::AnalyzerItem(analyzer_item)
     }
-    /// Creates a [`PreProcessingItem`] from an [`PreProcessedWire`]
+    /// Creates a [`CircuitExecutorItem`] from an [`PreProcessedWire`]
     pub fn from_preprocessing_wire(preprocessed_wire: PreProcessedWire<P>) -> Self {
         CircuitExecutorItem::PreProcessedWire(preprocessed_wire)
+    }
+    /// Creates a [`CircuitExecutorItem`] from an [`AuthenticatedWireMod2`]
+    pub fn from_gb_authenticated_wire(wire: AuthenticatedWireMod2<PartyGarbler>) -> Self {
+        CircuitExecutorItem::GbWire(wire)
     }
     /// Returns a reference to the underlying [`AnalyzerItem`]
     pub fn analyzer_item(&self) -> &AnalyzerItem {
@@ -106,6 +120,13 @@ impl<P: GenericParty> CircuitExecutorItem<P> {
             _ => panic!("Current CircuitExecutorItem is not an PreProcessedWire"),
         }
     }
+    /// Returns a reference to the underlying [`AuthenticatedWireMod2`]
+    pub fn gb_authenticated_wire(&self) -> &AuthenticatedWireMod2<PartyGarbler> {
+        match &self {
+            CircuitExecutorItem::GbWire(w) => w,
+            _ => panic!("Current CircuitExecutorItem is not an Binary Wire!"),
+        }
+    }
 }
 
 impl<P: GenericParty> HasModulus for CircuitExecutorItem<P> {
@@ -113,11 +134,12 @@ impl<P: GenericParty> HasModulus for CircuitExecutorItem<P> {
         match &self {
             CircuitExecutorItem::AnalyzerItem(a) => a.modulus(),
             CircuitExecutorItem::PreProcessedWire(p) => p.modulus(),
+            CircuitExecutorItem::GbWire(w) => w.modulus(),
         }
     }
 }
 
-impl<P: GenericParty> FancyBinary for CircuitExecutor<P> {
+impl<P: GenericParty, RNG: CryptoRng + RngCore> FancyBinary for CircuitExecutor<P, RNG> {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         match self {
             CircuitExecutor::Analyzer(a) => {
@@ -125,6 +147,9 @@ impl<P: GenericParty> FancyBinary for CircuitExecutor<P> {
             }
             CircuitExecutor::WirePreProcessor(w) => CircuitExecutorItem::from_preprocessing_wire(
                 w.xor(x.preprocessed_wire(), y.preprocessed_wire()),
+            ),
+            CircuitExecutor::Garbler(gb) => CircuitExecutorItem::from_gb_authenticated_wire(
+                gb.xor(x.gb_authenticated_wire(), y.gb_authenticated_wire()),
             ),
         }
     }
@@ -148,6 +173,13 @@ impl<P: GenericParty> FancyBinary for CircuitExecutor<P> {
                     _channel,
                 )?))
             }
+            CircuitExecutor::Garbler(gb) => {
+                Ok(CircuitExecutorItem::from_gb_authenticated_wire(gb.and(
+                    x.gb_authenticated_wire(),
+                    y.gb_authenticated_wire(),
+                    _channel,
+                )?))
+            }
         }
     }
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
@@ -158,11 +190,14 @@ impl<P: GenericParty> FancyBinary for CircuitExecutor<P> {
             CircuitExecutor::WirePreProcessor(w) => {
                 CircuitExecutorItem::from_preprocessing_wire(w.negate(x.preprocessed_wire()))
             }
+            CircuitExecutor::Garbler(gb) => CircuitExecutorItem::from_gb_authenticated_wire(
+                gb.negate(x.gb_authenticated_wire()),
+            ),
         }
     }
 }
 
-impl<P: GenericParty> Fancy for CircuitExecutor<P> {
+impl<P: GenericParty, RNG: CryptoRng + RngCore> Fancy for CircuitExecutor<P, RNG> {
     type Item = CircuitExecutorItem<P>;
     fn receive_many(
         &mut self,
@@ -179,6 +214,11 @@ impl<P: GenericParty> Fancy for CircuitExecutor<P> {
                 .receive_many(_moduli, _channel)?
                 .into_iter()
                 .map(|w| CircuitExecutorItem::from_preprocessing_wire(w))
+                .collect()),
+            CircuitExecutor::Garbler(gb) => Ok(gb
+                .receive_many(_moduli, _channel)?
+                .into_iter()
+                .map(|w| CircuitExecutorItem::from_gb_authenticated_wire(w))
                 .collect()),
         }
     }
@@ -200,6 +240,11 @@ impl<P: GenericParty> Fancy for CircuitExecutor<P> {
                 .into_iter()
                 .map(|w| CircuitExecutorItem::from_preprocessing_wire(w))
                 .collect()),
+            CircuitExecutor::Garbler(gb) => Ok(gb
+                .encode_many(_values, _moduli, _channel)?
+                .into_iter()
+                .map(|w| CircuitExecutorItem::from_gb_authenticated_wire(w))
+                .collect()),
         }
     }
     fn constant(
@@ -216,6 +261,10 @@ impl<P: GenericParty> Fancy for CircuitExecutor<P> {
             CircuitExecutor::WirePreProcessor(w) => Ok(
                 CircuitExecutorItem::from_preprocessing_wire(w.constant(_val, _q, _channel)?),
             ),
+
+            CircuitExecutor::Garbler(gb) => Ok(CircuitExecutorItem::from_gb_authenticated_wire(
+                gb.constant(_val, _q, _channel)?,
+            )),
         }
     }
 
@@ -228,6 +277,8 @@ impl<P: GenericParty> Fancy for CircuitExecutor<P> {
             CircuitExecutor::Analyzer(a) => a.output(_x.analyzer_item(), _channel),
 
             CircuitExecutor::WirePreProcessor(w) => w.output(_x.preprocessed_wire(), _channel),
+
+            CircuitExecutor::Garbler(gb) => gb.output(_x.gb_authenticated_wire(), _channel),
         }
     }
 }
