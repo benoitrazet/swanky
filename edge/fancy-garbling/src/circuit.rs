@@ -117,24 +117,7 @@ impl<C: CircuitExecutor<Informer<Dummy>>> CircuitInfo for C {
 /// A Circuit that can be evaluated by a given Fancy object
 ///
 /// Supertrait ensures that circuit can be built by `CircuitBuilder`
-pub trait EvaluableCircuit<F: Fancy>: CircuitType {
-    /// Evaluate the circuit.
-    ///
-    /// The argument `f` provides the [`Fancy`] instantiation to use during
-    /// evaluation, and the actual circuit data is accessed using `channel`. The
-    /// output is a vector of `Option<u16>`s because certain [`Fancy`]
-    /// instantiations may not output anything (for example, a garbler doesn't
-    /// have an "output", so `None` would be returned here).
-    fn eval(
-        &self,
-        f: &mut F,
-        inputs: &[F::Item],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Option<Vec<u16>>> {
-        let wirelabels = self.eval_to_wirelabels(f, inputs, channel)?;
-        f.outputs(&wirelabels, channel)
-    }
-
+trait EvaluableCircuit<F: Fancy>: CircuitType {
     /// Evaluate the circuit up to producing the output [`Fancy::Item`]s, and
     /// output those.
     ///
