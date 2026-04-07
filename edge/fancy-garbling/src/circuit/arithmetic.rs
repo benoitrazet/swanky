@@ -1,6 +1,6 @@
 use crate::{
     FancyArithmetic, FancyBinary, FancyProj, HasModulus, check_binary,
-    circuit::{CircuitBuilder, CircuitExecutor, CircuitRef, CircuitType, EvaluableCircuit},
+    circuit::{CircuitBuilder, CircuitExecutor, CircuitRef, CircuitType},
 };
 use swanky_channel::Channel;
 
@@ -136,8 +136,8 @@ impl std::fmt::Display for ArithmeticGate {
     }
 }
 
-impl<F: FancyArithmetic + FancyProj> EvaluableCircuit<F> for ArithmeticCircuit {
-    fn eval_to_wirelabels(
+impl ArithmeticCircuit {
+    fn eval_to_wirelabels<F: FancyArithmetic + FancyProj>(
         &self,
         f: &mut F,
         inputs: &[F::Item],
@@ -258,7 +258,6 @@ impl CircuitType for ArithmeticCircuit {
 
 impl ArithmeticCircuit {
     /// Return the modulus of the gate indexed by `i`.
-    #[inline]
     pub fn modulus(&self, i: usize) -> u16 {
         self.gate_moduli[i]
     }
