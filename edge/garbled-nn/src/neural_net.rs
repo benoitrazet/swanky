@@ -1066,10 +1066,7 @@ impl NeuralNet {
 
             // Construct the zero wires for the input.
             let inputs = (0..self.ninputs())
-                .map(|_| {
-                    let (zeros, _) = garbler.bin_encode_wire(0, bitwidths[0]);
-                    zeros
-                })
+                .map(|_| garbler.bin_encode_zero(bitwidths[0]))
                 .collect::<Vec<_>>();
 
             // Evaluate the neural network to derive the zero wires for the output.

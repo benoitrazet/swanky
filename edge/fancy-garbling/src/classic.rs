@@ -58,8 +58,7 @@ impl GarbledCircuit {
         let inputs = (0..c.ninputs())
             .map(|i| {
                 let q = c.modulus(i);
-                let (zero, _) = garbler.encode_wire(0, q);
-                zero
+                garbler.encode_zero(q)
             })
             .collect_vec();
 

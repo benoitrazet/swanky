@@ -89,41 +89,15 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
         self.deltas
     }
 
-    /// Encode a wire, producing the zero wire as well as the encoded value.
-    pub fn encode_wire(&mut self, val: u16, modulus: u16) -> (Wire, Wire) {
-        let zero = Wire::rand(&mut self.rng, modulus);
-        let delta = self.delta(modulus);
-        let enc = zero.clone() + delta * val;
-        (zero, enc)
+    /// Output a fresh zero wirelabel associated with the provided modulus.
+    pub fn encode_zero(&mut self, modulus: u16) -> Wire {
+        Wire::rand(&mut self.rng, modulus)
     }
 
-    /// Encode many wires, producing zero wires as well as encoded values.
-    ///
-    /// # Panics
-    /// Panics if the length of `vals` and `moduli` are not equal.
-    fn encode_many_wires(&mut self, vals: &[u16], moduli: &[u16]) -> (Vec<Wire>, Vec<Wire>) {
-        assert_eq!(vals.len(), moduli.len());
-
-        let mut gbs = Vec::with_capacity(vals.len());
-        let mut evs = Vec::with_capacity(vals.len());
-        for (x, q) in vals.iter().zip(moduli.iter()) {
-            let (gb, ev) = self.encode_wire(*x, *q);
-            gbs.push(gb);
-            evs.push(ev);
-        }
-        (gbs, evs)
-    }
-
-    /// Encode a `BinaryBundle`, producing zero wires as well as encoded values.
-    pub fn bin_encode_wire(
-        &mut self,
-        val: u128,
-        nbits: usize,
-    ) -> (BinaryBundle<Wire>, BinaryBundle<Wire>) {
-        let xs = crate::util::u128_to_bits(val, nbits);
-        let ms = vec![2; nbits];
-        let (gbs, evs) = self.encode_many_wires(&xs, &ms);
-        (BinaryBundle::new(gbs), BinaryBundle::new(evs))
+    /// Output fresh zero wirelabels associated with a [`BinaryBundle`].
+    pub fn bin_encode_zero(&mut self, nbits: usize) -> BinaryBundle<Wire> {
+        let zeros = (0..nbits).map(|_| self.encode_zero(2)).collect::<Vec<_>>();
+        BinaryBundle::new(zeros)
     }
 }
 
@@ -406,11 +380,17 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
         moduli: &[u16],
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        let (zero, encoded) = self.encode_many_wires(values, moduli);
-        for wire in encoded {
-            channel.write(&wire.to_repr())?;
+        assert_eq!(values.len(), moduli.len());
+
+        let mut zeros = Vec::with_capacity(values.len());
+        for (x, q) in values.iter().zip(moduli.iter()) {
+            let delta = self.delta(*q);
+            let zero = self.encode_zero(*q);
+            let encoded = zero.clone() + delta * *x;
+            channel.write(&encoded.to_repr())?;
+            zeros.push(zero);
         }
-        Ok(zero)
+        Ok(zeros)
     }
 
     fn receive_many(
