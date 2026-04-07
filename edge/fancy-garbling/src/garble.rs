@@ -327,7 +327,6 @@ mod streaming {
     {
         let mut rng = SwankyRng::new();
         let inputs = input_mods.iter().map(|q| rng.gen_u16() % q).collect_vec();
-        let input_mods_ = input_mods.to_vec();
 
         // evaluate f_gb as a dummy
         let should_be = Channel::with(std::io::empty(), |channel| {
@@ -341,17 +340,14 @@ mod streaming {
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
                 let mut gb: Garbler<SwankyRng, Wire> = Garbler::new(rng, channel).unwrap();
-                let zeros = gb.encode_many(&inputs, &input_mods_, channel).unwrap();
+                let zeros = gb.encode_many(&inputs, input_mods, channel).unwrap();
                 f_gb(&mut gb, &zeros, channel);
                 Ok(())
             },
             |channel| {
                 let mut ev = Evaluator::new(channel).unwrap();
-                let ev_inp = input_mods
-                    .iter()
-                    .map(|q| ev.read_wire(*q, channel).unwrap())
-                    .collect_vec();
-                Ok(f_ev(&mut ev, &ev_inp, channel).unwrap())
+                let wires = ev.receive_many(input_mods, channel).unwrap();
+                Ok(f_ev(&mut ev, &wires, channel).unwrap())
             },
         )
         .unwrap();
@@ -546,11 +542,8 @@ mod complex {
                     // receive encoded wires from the garbler thread
                     let mut ev_inp = Vec::with_capacity(N);
                     for _ in 0..N {
-                        let ws = qs
-                            .iter()
-                            .map(|q| evaluator.read_wire(*q, channel).unwrap())
-                            .collect_vec();
-                        ev_inp.push(CrtBundle::new(ws));
+                        let wires = evaluator.crt_receive(Q, channel).unwrap();
+                        ev_inp.push(wires);
                     }
 
                     let result = complex_gadget(&mut evaluator, &ev_inp, channel).unwrap();

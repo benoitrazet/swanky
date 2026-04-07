@@ -143,8 +143,7 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
 
     /// Receive a garbler input wire.
     fn receive(&mut self, modulus: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
-        let w = self.evaluator.read_wire(modulus, channel)?;
-        Ok(w)
+        self.evaluator.receive(modulus, channel)
     }
 
     /// Receive garbler input wires.
@@ -153,7 +152,7 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
         moduli: &[u16],
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Wire>> {
-        moduli.iter().map(|q| self.receive(*q, channel)).collect()
+        self.evaluator.receive_many(moduli, channel)
     }
 
     /// Perform OT and obtain wires for the evaluator's inputs.

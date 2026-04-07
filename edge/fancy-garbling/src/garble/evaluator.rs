@@ -48,12 +48,6 @@ impl<Wire: WireLabel> Evaluator<Wire> {
         self.current_output += 1;
         current
     }
-
-    /// Read a Wire from the reader.
-    pub fn read_wire(&mut self, modulus: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
-        let block = channel.read()?;
-        Ok(Wire::from_repr(block, modulus))
-    }
 }
 
 impl<W: BinaryWireLabel> FancyBinary for Evaluator<W> {
@@ -227,16 +221,17 @@ impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
         moduli: &[u16],
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        (0..moduli.len())
-            .map(|_| {
+        moduli
+            .iter()
+            .map(|q| {
                 let block = channel.read()?;
-                Ok(Wire::from_repr(block, 2))
+                Ok(Wire::from_repr(block, *q))
             })
             .collect()
     }
 
     fn constant(&mut self, _: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
-        self.read_wire(q, channel)
+        Ok(Wire::from_repr(channel.read()?, q))
     }
 
     fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
