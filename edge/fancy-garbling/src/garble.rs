@@ -341,11 +341,8 @@ mod streaming {
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
                 let mut gb: Garbler<SwankyRng, Wire> = Garbler::new(rng, channel).unwrap();
-                let (gb_inp, ev_inp) = gb.encode_many_wires(&inputs, &input_mods_);
-                for w in ev_inp.iter() {
-                    channel.write(&w.to_repr()).unwrap();
-                }
-                f_gb(&mut gb, &gb_inp, channel);
+                let zeros = gb.encode_many(&inputs, &input_mods_, channel).unwrap();
+                f_gb(&mut gb, &zeros, channel);
                 Ok(())
             },
             |channel| {
@@ -484,7 +481,7 @@ mod streaming {
 mod complex {
     use crate::{
         AllWire, CrtBundle, CrtGadgets, CrtProjGadgets, Evaluator, Fancy, FancyArithmetic,
-        FancyBinary, FancyProj, Garbler, WireLabel, dummy::Dummy, util::RngExt,
+        FancyBinary, FancyProj, Garbler, dummy::Dummy, util::RngExt,
     };
     use itertools::Itertools;
     use rand::thread_rng;
@@ -537,11 +534,8 @@ mod complex {
                     // encode input and send it to the evaluator
                     let mut gb_inp = Vec::with_capacity(N);
                     for X in &input {
-                        let (zero, enc) = garbler.crt_encode_wire(*X, Q);
-                        for w in enc.iter() {
-                            channel.write(&w.to_repr()).unwrap();
-                        }
-                        gb_inp.push(zero);
+                        let zeros = garbler.crt_encode(*X, Q, channel).unwrap();
+                        gb_inp.push(zeros);
                     }
                     complex_gadget(&mut garbler, &gb_inp, channel).unwrap();
                     Ok(())

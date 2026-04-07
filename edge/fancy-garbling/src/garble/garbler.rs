@@ -1,7 +1,7 @@
 use crate::{
     AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyProj, HasModulus, WireLabel,
     WireMod2, check_binary,
-    fancy::{BinaryBundle, CrtBundle, Fancy},
+    fancy::{BinaryBundle, Fancy},
     garble::binary_and::BinaryWireLabel,
     hash_wires,
     util::{RngExt, output_tweak, tweak, tweak2},
@@ -101,7 +101,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
     ///
     /// # Panics
     /// Panics if the length of `vals` and `moduli` are not equal.
-    pub fn encode_many_wires(&mut self, vals: &[u16], moduli: &[u16]) -> (Vec<Wire>, Vec<Wire>) {
+    fn encode_many_wires(&mut self, vals: &[u16], moduli: &[u16]) -> (Vec<Wire>, Vec<Wire>) {
         assert_eq!(vals.len(), moduli.len());
 
         let mut gbs = Vec::with_capacity(vals.len());
@@ -112,18 +112,6 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
             evs.push(ev);
         }
         (gbs, evs)
-    }
-
-    /// Encode a `CrtBundle`, producing zero wires as well as encoded values.
-    pub fn crt_encode_wire(
-        &mut self,
-        val: u128,
-        modulus: u128,
-    ) -> (CrtBundle<Wire>, CrtBundle<Wire>) {
-        let ms = crate::util::factor(modulus);
-        let xs = crate::util::crt(val, &ms);
-        let (gbs, evs) = self.encode_many_wires(&xs, &ms);
-        (CrtBundle::new(gbs), CrtBundle::new(evs))
     }
 
     /// Encode a `BinaryBundle`, producing zero wires as well as encoded values.
