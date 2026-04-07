@@ -8,7 +8,7 @@ use std::cmp::max;
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
 
-/// An instantiation of [`FancyInput::Item`] used by [`CircuitAnalyzer`].
+/// An instantiation of [`Fancy::Item`] used by [`CircuitAnalyzer`].
 ///
 /// A dummy FancyItem which is returned when profiling a [`Fancy`] circuit.
 /// The [`AnalyzerItem`] contains the wire modulus and the depth of the computation.
