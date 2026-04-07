@@ -10,8 +10,7 @@ use swanky_channel::Channel;
 pub struct ArithmeticCircuit {
     pub(crate) gates: Vec<ArithmeticGate>,
     pub(crate) gate_moduli: Vec<u16>,
-    pub(crate) garbler_input_refs: Vec<CircuitRef>,
-    pub(crate) evaluator_input_refs: Vec<CircuitRef>,
+    pub(crate) input_refs: Vec<CircuitRef>,
     pub(crate) const_refs: Vec<CircuitRef>,
     pub(crate) output_refs: Vec<CircuitRef>,
     pub(crate) num_nonfree_gates: usize,
@@ -24,13 +23,8 @@ pub struct ArithmeticCircuit {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ArithmeticGate {
-    /// Input of garbler
-    GarblerInput {
-        /// Gate number
-        id: usize,
-    },
-    /// Input of evaluator
-    EvaluatorInput {
+    /// Input value
+    Input {
         /// Gate number
         id: usize,
     },
@@ -105,8 +99,7 @@ pub enum ArithmeticGate {
 impl std::fmt::Display for ArithmeticGate {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::GarblerInput { id } => write!(f, "GarblerInput {}", id),
-            Self::EvaluatorInput { id } => write!(f, "EvaluatorInput {}", id),
+            Self::Input { id } => write!(f, "Input {}", id),
             Self::Constant { val } => write!(f, "Constant {}", val),
             Self::Add { xref, yref, out } => write!(f, "Add ( {}, {}, {:?} )", xref, yref, out),
             Self::Sub { xref, yref, out } => write!(f, "Sub ( {}, {}, {:?} )", xref, yref, out),
@@ -128,24 +121,14 @@ impl<F: FancyArithmetic> EvaluableCircuit<F> for ArithmeticCircuit {
     fn eval_to_wirelabels(
         &self,
         f: &mut F,
-        garbler_inputs: &[F::Item],
-        evaluator_inputs: &[F::Item],
+        inputs: &[F::Item],
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<F::Item>> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
             let q = self.modulus(i);
             let (zref_, val) = match *gate {
-                ArithmeticGate::GarblerInput { id } => (None, garbler_inputs[id].clone()),
-                ArithmeticGate::EvaluatorInput { id } => {
-                    assert!(
-                        id < evaluator_inputs.len(),
-                        "id={} ev_inps.len()={}",
-                        id,
-                        evaluator_inputs.len()
-                    );
-                    (None, evaluator_inputs[id].clone())
-                }
+                ArithmeticGate::Input { id } => (None, inputs[id].clone()),
                 ArithmeticGate::Constant { val } => (None, f.constant(val, q, channel)?),
                 ArithmeticGate::Add { xref, yref, out } => (
                     out,
@@ -204,8 +187,7 @@ impl CircuitType for ArithmeticCircuit {
         let gates = Vec::with_capacity(ngates.unwrap_or(0));
         ArithmeticCircuit {
             gates,
-            garbler_input_refs: Vec::new(),
-            evaluator_input_refs: Vec::new(),
+            input_refs: Vec::new(),
             const_refs: Vec::new(),
             output_refs: Vec::new(),
             gate_moduli: Vec::new(),
@@ -225,16 +207,12 @@ impl CircuitType for ArithmeticCircuit {
         self.output_refs.push(xref)
     }
 
-    fn push_garbler_input_ref(&mut self, xref: CircuitRef) {
-        self.garbler_input_refs.push(xref)
+    fn push_input_ref(&mut self, xref: CircuitRef) {
+        self.input_refs.push(xref)
     }
 
     fn push_modulus(&mut self, modulus: u16) {
         self.gate_moduli.push(modulus)
-    }
-
-    fn push_evaluator_input_ref(&mut self, xref: CircuitRef) {
-        self.evaluator_input_refs.push(xref)
     }
 
     fn increment_nonfree_gates(&mut self) {
@@ -249,21 +227,12 @@ impl CircuitType for ArithmeticCircuit {
         &self.output_refs
     }
 
-    fn get_garbler_input_refs(&self) -> &[CircuitRef] {
-        &self.garbler_input_refs
+    fn get_input_refs(&self) -> &[CircuitRef] {
+        &self.input_refs
     }
 
-    fn get_evaluator_input_refs(&self) -> &[CircuitRef] {
-        &self.evaluator_input_refs
-    }
-
-    fn garbler_input_mod(&self, i: usize) -> u16 {
-        let r = self.garbler_input_refs[i];
-        r.modulus()
-    }
-
-    fn evaluator_input_mod(&self, i: usize) -> u16 {
-        let r = self.evaluator_input_refs[i];
+    fn input_mod(&self, i: usize) -> u16 {
+        let r = self.input_refs[i];
         r.modulus()
     }
 }

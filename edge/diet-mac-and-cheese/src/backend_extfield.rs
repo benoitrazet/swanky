@@ -52,12 +52,12 @@ where
 {
     pub(crate) fn init_with_fcom(
         channel: &mut C,
-        rng: SwankyRng,
+        mut rng: SwankyRng,
         fcom: &FCom<P, F2, T, SVOLE1>,
         fcom_ext: &FCom<P, T, T, SVOLE2>,
         no_batching: bool,
     ) -> Result<Self> {
-        let dmc = DietMacAndCheese::init_with_fcom(channel, rng.clone(), fcom, no_batching)?;
+        let dmc = DietMacAndCheese::init_with_fcom(channel, rng.fork(), fcom, no_batching)?;
         let lifted_dmc = DietMacAndCheese::init_with_fcom(channel, rng, fcom_ext, no_batching)?;
         Ok(Self {
             dmc,

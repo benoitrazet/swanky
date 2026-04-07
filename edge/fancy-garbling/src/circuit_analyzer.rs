@@ -2,7 +2,7 @@
 //! or the number of boolean and arithmetic gates in a circuit.
 use crate::{
     FancyArithmetic, FancyBinary,
-    fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
+    fancy::{Fancy, FancyInput, HasModulus},
 };
 use std::cmp::max;
 use swanky_channel::Channel;
@@ -243,12 +243,6 @@ impl Fancy for CircuitAnalyzer {
     fn output(&mut self, x: &Self::Item, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
         self.mul_depth = max(self.mul_depth, x.depth);
         Ok(None)
-    }
-}
-
-impl FancyReveal for CircuitAnalyzer {
-    fn reveal(&mut self, _x: &Self::Item, _: &mut Channel) -> swanky_error::Result<u16> {
-        Ok(0)
     }
 }
 

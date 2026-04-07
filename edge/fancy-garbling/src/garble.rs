@@ -39,18 +39,18 @@ mod nonstreaming {
                 GarbledCircuit::garble::<AllWire, _, _>(&c, SwankyRng::new()).unwrap();
             for _ in 0..16 {
                 let mut inps = Vec::new();
-                for i in 0..c.num_evaluator_inputs() {
-                    let q = c.evaluator_input_mod(i);
+                for i in 0..c.num_inputs() {
+                    let q = c.input_mod(i);
                     let x = rng.gen_u16() % q;
                     inps.push(x);
                 }
                 // Run the garbled circuit evaluator.
-                let xs = &en.encode_evaluator_inputs(&inps);
-                let wirelabels = ev.eval_to_wirelabels(&c, &[], xs).unwrap();
+                let xs = &en.encode_inputs(&inps);
+                let wirelabels = ev.eval_to_wirelabels(&c, xs).unwrap();
                 let decoded = output_mapping.to_outputs(&wirelabels).unwrap();
 
                 // Run the dummy evaluator.
-                let should_be = eval_plain(&c, &[], &inps).unwrap();
+                let should_be = eval_plain(&c, &inps).unwrap();
                 assert_eq!(decoded[0], should_be[0]);
             }
         }
@@ -60,8 +60,8 @@ mod nonstreaming {
     fn add() {
         garble_test_helper(|q, channel| {
             let mut b = CircuitBuilder::new();
-            let x = b.evaluator_input(q);
-            let y = b.evaluator_input(q);
+            let x = b.input(q);
+            let y = b.input(q);
             let z = b.add(&x, &y);
             b.output(&z, channel).unwrap();
             b.finish()
@@ -72,7 +72,7 @@ mod nonstreaming {
     fn add_many() {
         garble_test_helper(|q, channel| {
             let mut b = CircuitBuilder::new();
-            let xs = b.evaluator_inputs(&[q; 16]);
+            let xs = b.inputs(&[q; 16]);
             let z = b.add_many(&xs);
             b.output(&z, channel).unwrap();
             b.finish()
@@ -83,7 +83,7 @@ mod nonstreaming {
     fn or_many() {
         garble_test_helper(|_, channel| {
             let mut b: CircuitBuilder<ArithmeticCircuit> = CircuitBuilder::new();
-            let xs = b.evaluator_inputs(&[2; 16]);
+            let xs = b.inputs(&[2; 16]);
             let z = b.or_many(&xs, channel).unwrap();
             b.output(&z, channel).unwrap();
             b.finish()
@@ -94,8 +94,8 @@ mod nonstreaming {
     fn sub() {
         garble_test_helper(|q, channel| {
             let mut b = CircuitBuilder::new();
-            let x = b.evaluator_input(q);
-            let y = b.evaluator_input(q);
+            let x = b.input(q);
+            let y = b.input(q);
             let z = b.sub(&x, &y);
             b.output(&z, channel).unwrap();
             b.finish()
@@ -106,7 +106,7 @@ mod nonstreaming {
     fn cmul() {
         garble_test_helper(|q, channel| {
             let mut b = CircuitBuilder::new();
-            let x = b.evaluator_input(q);
+            let x = b.input(q);
             let z = if q > 2 { b.cmul(&x, 2) } else { b.cmul(&x, 1) };
             b.output(&z, channel).unwrap();
             b.finish()
@@ -121,7 +121,7 @@ mod nonstreaming {
                 tab.push((i + 1) % q);
             }
             let mut b = CircuitBuilder::new();
-            let x = b.evaluator_input(q);
+            let x = b.input(q);
             let z = b.proj(&x, q, Some(tab), channel).unwrap();
             b.output(&z, channel).unwrap();
             b.finish()
@@ -137,7 +137,7 @@ mod nonstreaming {
                 tab.push(rng.gen_u16() % q);
             }
             let mut b = CircuitBuilder::new();
-            let x = b.evaluator_input(q);
+            let x = b.input(q);
             let z = b.proj(&x, q, Some(tab), channel).unwrap();
             b.output(&z, channel).unwrap();
             b.finish()
@@ -148,7 +148,7 @@ mod nonstreaming {
     fn mod_change() {
         garble_test_helper(|q, channel| {
             let mut b = CircuitBuilder::new();
-            let x = b.evaluator_input(q);
+            let x = b.input(q);
             let z = b.mod_change(&x, q * 2, channel).unwrap();
             b.output(&z, channel).unwrap();
             b.finish()
@@ -159,8 +159,8 @@ mod nonstreaming {
     fn half_gate() {
         garble_test_helper(|q, channel| {
             let mut b = CircuitBuilder::new();
-            let x = b.evaluator_input(q);
-            let y = b.evaluator_input(q);
+            let x = b.input(q);
+            let y = b.input(q);
             let z = b.mul(&x, &y, channel).unwrap();
             b.output(&z, channel).unwrap();
             b.finish()
@@ -176,8 +176,8 @@ mod nonstreaming {
 
             let c = Channel::with(std::io::empty(), |channel| {
                 let mut b = CircuitBuilder::new();
-                let x = b.evaluator_input(q);
-                let y = b.evaluator_input(ymod);
+                let x = b.input(q);
+                let y = b.input(ymod);
                 let z = b.mul(&x, &y, channel).unwrap();
                 b.output(&z, channel).unwrap();
                 let c = b.finish();
@@ -191,9 +191,9 @@ mod nonstreaming {
             for x in 0..q {
                 for y in 0..ymod {
                     println!("TEST x={} y={}", x, y);
-                    let xs = &en.encode_evaluator_inputs(&[x, y]);
-                    let decoded = ev.eval(&c, &[], xs).unwrap();
-                    let should_be = eval_plain(&c, &[], &[x, y]).unwrap();
+                    let xs = &en.encode_inputs(&[x, y]);
+                    let decoded = ev.eval(&c, xs).unwrap();
+                    let should_be = eval_plain(&c, &[x, y]).unwrap();
                     assert_eq!(decoded[0], should_be[0]);
                 }
             }
@@ -210,7 +210,7 @@ mod nonstreaming {
         let circ = Channel::with(std::io::empty(), |channel| {
             let mut b = CircuitBuilder::new();
             let xs = (0..nargs)
-                .map(|_| Bundle::new(b.evaluator_inputs(&mods)))
+                .map(|_| Bundle::new(b.inputs(&mods)))
                 .collect_vec();
             let z = b.mixed_radix_addition(&xs, channel).unwrap();
             b.output_bundle(&z, channel).unwrap();
@@ -233,8 +233,8 @@ mod nonstreaming {
                 should_be = (should_be + x) % Q;
                 ds.extend(util::as_mixed_radix(x, &mods).iter());
             }
-            let X = en.encode_evaluator_inputs(&ds);
-            let outputs = ev.eval(&circ, &[], &X).unwrap();
+            let X = en.encode_inputs(&ds);
+            let outputs = ev.eval(&circ, &X).unwrap();
             assert_eq!(util::from_mixed_radix(&outputs, &mods), should_be);
         }
     }
@@ -256,9 +256,9 @@ mod nonstreaming {
         let (_, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&circ, SwankyRng::new()).unwrap();
 
         for _ in 0..64 {
-            let outputs = eval_plain(&circ, &[], &[]).unwrap();
+            let outputs = eval_plain(&circ, &[]).unwrap();
             assert_eq!(outputs[0], c, "plaintext eval failed");
-            let outputs = ev.eval::<AllWire, _>(&circ, &[], &[]).unwrap();
+            let outputs = ev.eval::<AllWire, _>(&circ, &[]).unwrap();
             assert_eq!(outputs[0], c, "garbled eval failed");
         }
     }
@@ -272,7 +272,7 @@ mod nonstreaming {
         let c = rng.gen_u16() % q;
 
         let circ = Channel::with(std::io::empty(), |channel| {
-            let x = b.evaluator_input(q);
+            let x = b.input(q);
             let y = b.constant(c, q, channel).unwrap();
             let z = b.add(&x, &y);
             b.output(&z, channel).unwrap();
@@ -284,11 +284,11 @@ mod nonstreaming {
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
-            let outputs = eval_plain(&circ, &[], &[x]).unwrap();
+            let outputs = eval_plain(&circ, &[x]).unwrap();
             assert_eq!(outputs[0], (x + c) % q, "plaintext");
 
-            let X = en.encode_evaluator_inputs(&[x]);
-            let Y = ev.eval(&circ, &[], &X).unwrap();
+            let X = en.encode_inputs(&[x]);
+            let Y = ev.eval(&circ, &X).unwrap();
             assert_eq!(Y[0], (x + c) % q, "garbled");
         }
     }

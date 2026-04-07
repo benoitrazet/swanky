@@ -1,13 +1,22 @@
-#!/bin/sh
+#!/bin/bash
+
+CORE_CRATES=(
+    # BEGIN CORE CRATES
+    swanky-adversary
+    swanky-channel
+    swanky-error
+    swanky-party
+    swanky-serialization
+    vectoreyes
+    # END CORE CRATES
+)
+
+PKG_ARGS=()
+for core_crate in "${CORE_CRATES[@]}"; do
+    PKG_ARGS+=(--package $core_crate)
+done
 
 # Run install_git_hooks.sh to enable this Git hook
 
 # Invariant 1: All tests in `core` must pass
-cargo test \
- --package swanky-adversary \
- --package swanky-channel \
- --package swanky-error \
- --package swanky-party \
- --package swanky-serialization \
- --package vectoreyes \
- --lib
+cargo test "${PKG_ARGS[@]}" --lib

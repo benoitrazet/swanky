@@ -55,17 +55,9 @@ impl GarbledCircuit {
         let mut garbler = Channel::with(&mut channel, |channel| Garbler::new(rng, channel))?;
 
         // get input wires, ignoring encoded values
-        let gb_inps = (0..c.num_garbler_inputs())
+        let inputs = (0..c.num_inputs())
             .map(|i| {
-                let q = c.garbler_input_mod(i);
-                let (zero, _) = garbler.encode_wire(0, q);
-                zero
-            })
-            .collect_vec();
-
-        let ev_inps = (0..c.num_evaluator_inputs())
-            .map(|i| {
-                let q = c.evaluator_input_mod(i);
+                let q = c.input_mod(i);
                 let (zero, _) = garbler.encode_wire(0, q);
                 zero
             })
@@ -74,7 +66,7 @@ impl GarbledCircuit {
         let zeros = Channel::with(&mut channel, |channel| {
             // First, garble the circuit, outputting the zero wirelabels
             // associated with the output.
-            let zeros = c.eval_to_wirelabels(&mut garbler, &gb_inps, &ev_inps, channel)?;
+            let zeros = c.eval_to_wirelabels(&mut garbler, &inputs, channel)?;
             // Next, map the zero output wirelabels to the set of valid outputs.
             // This is needed for evaluators that don't use the output
             // mapping provided as ouput; in that case, we need the channel to
@@ -84,7 +76,7 @@ impl GarbledCircuit {
         })?;
 
         let deltas = garbler.get_deltas();
-        let en = Encoder::new(gb_inps, ev_inps, deltas.clone());
+        let en = Encoder::new(inputs, deltas.clone());
         let gc = GarbledCircuit::new(channel.finish_writing());
         let output_mapping = OutputMapping::new(&zeros, &deltas);
 
@@ -95,12 +87,11 @@ impl GarbledCircuit {
     pub fn eval<Wire: WireLabel, Circuit: EvaluableCircuit<Evaluator<Wire>>>(
         &self,
         c: &Circuit,
-        garbler_inputs: &[Wire],
-        evaluator_inputs: &[Wire],
+        inputs: &[Wire],
     ) -> swanky_error::Result<Vec<u16>> {
         let output = Channel::with(GarbledChannel::from(self), |channel| {
             let mut evaluator = Evaluator::new(channel)?;
-            let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs, channel)?;
+            let outputs = c.eval(&mut evaluator, inputs, channel)?;
             Ok(outputs.expect("evaluator outputs always are Some(u16)"))
         })?;
         Ok(output)
@@ -111,13 +102,11 @@ impl GarbledCircuit {
     pub fn eval_to_wirelabels<Wire: WireLabel, Circuit: EvaluableCircuit<Evaluator<Wire>>>(
         &self,
         c: &Circuit,
-        garbler_inputs: &[Wire],
-        evaluator_inputs: &[Wire],
+        inputs: &[Wire],
     ) -> swanky_error::Result<Vec<Wire>> {
         let wirelabels = Channel::with(GarbledChannel::from(self), |channel| {
             let mut evaluator = Evaluator::new(channel)?;
-            let wirelabels =
-                c.eval_to_wirelabels(&mut evaluator, garbler_inputs, evaluator_inputs, channel)?;
+            let wirelabels = c.eval_to_wirelabels(&mut evaluator, inputs, channel)?;
             Ok(wirelabels)
         })?;
         Ok(wirelabels)
@@ -131,51 +120,25 @@ impl GarbledCircuit {
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Encoder<Wire> {
-    garbler_inputs: Vec<Wire>,
-    evaluator_inputs: Vec<Wire>,
+    inputs: Vec<Wire>,
     deltas: HashMap<u16, Wire>,
 }
 
 impl<Wire: WireLabel> Encoder<Wire> {
-    /// Make a new [`Encoder`] from lists of garbler and evaluator inputs,
-    /// alongside a map of moduli-to-wire-offsets.
-    pub fn new(
-        garbler_inputs: Vec<Wire>,
-        evaluator_inputs: Vec<Wire>,
-        deltas: HashMap<u16, Wire>,
-    ) -> Self {
-        Encoder {
-            garbler_inputs,
-            evaluator_inputs,
-            deltas,
-        }
+    /// Make a new [`Encoder`] from lists of inputs, alongside a map of
+    /// moduli-to-wire-offsets.
+    pub fn new(inputs: Vec<Wire>, deltas: HashMap<u16, Wire>) -> Self {
+        Encoder { inputs, deltas }
     }
 
-    /// Encode garbler input values into their associated wirelabels.
+    /// Encode input values into their associated wirelabels.
     ///
     /// # Panics
     /// This panics if `inputs.len()` does not equal the expected number of
     /// garbler inputs.
-    pub fn encode_garbler_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
-        assert_eq!(inputs.len(), self.garbler_inputs.len());
-        self.garbler_inputs
-            .iter()
-            .zip(inputs)
-            .map(|(zero, x)| {
-                let q = zero.modulus();
-                zero.clone() + self.deltas[&q].clone() * *x
-            })
-            .collect()
-    }
-
-    /// Encode evaluator input values into their associated wirelabels.
-    ///
-    /// # Panics
-    /// This panics if `inputs.len()` does not equal the expected number of
-    /// evaluator inputs.
-    pub fn encode_evaluator_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
-        assert_eq!(inputs.len(), self.evaluator_inputs.len());
-        self.evaluator_inputs
+    pub fn encode_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
+        assert_eq!(inputs.len(), self.inputs.len());
+        self.inputs
             .iter()
             .zip(inputs)
             .map(|(zero, x)| {

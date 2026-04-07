@@ -15,7 +15,7 @@ pub use vectorized::UniformIntegersUnderBound;
 ///
 /// This uses AES in a counter-mode-esque way, but with the counter always
 /// starting at zero. When used as a PRNG this is okay [TODO: citation?].
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SwankyRng(BlockRng64<SwankyRngCore>);
 
 impl RngCore for SwankyRng {
@@ -95,7 +95,7 @@ impl Default for SwankyRng {
 }
 
 /// The core of [`SwankyRng`], used with `BlockRng`.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SwankyRngCore {
     aes: Aes128EncryptOnly,
     // Overflowing a u64 would take well over 2^64 nanoseconds, which is over 500 years!
