@@ -1,8 +1,6 @@
 use crate::{
     FancyBinary, HasModulus,
-    circuit::{
-        CircuitBuilder, CircuitExecutor, CircuitRef, CircuitType, EvaluableCircuit, GateType,
-    },
+    circuit::{CircuitBuilder, CircuitExecutor, CircuitRef, CircuitType, GateType},
 };
 use swanky_channel::Channel;
 
@@ -106,8 +104,8 @@ impl std::fmt::Display for BinaryGate {
     }
 }
 
-impl<F: FancyBinary> EvaluableCircuit<F> for BinaryCircuit {
-    fn eval_to_wirelabels(
+impl BinaryCircuit {
+    fn eval_to_wirelabels<F: FancyBinary>(
         &self,
         f: &mut F,
         inputs: &[F::Item],

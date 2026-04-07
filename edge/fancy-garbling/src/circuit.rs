@@ -114,25 +114,6 @@ impl<C: CircuitExecutor<Informer<Dummy>>> CircuitInfo for C {
     }
 }
 
-/// A Circuit that can be evaluated by a given Fancy object
-///
-/// Supertrait ensures that circuit can be built by `CircuitBuilder`
-trait EvaluableCircuit<F: Fancy>: CircuitType {
-    /// Evaluate the circuit up to producing the output [`Fancy::Item`]s, and
-    /// output those.
-    ///
-    /// The argument `f` provides the [`Fancy`] instantiation to use during
-    /// evaluation, and the actual circuit data is accessed using `channel`. The
-    /// output is a vector of [`Fancy::Item`]s that correspond to the outputs of
-    /// the circuit evaluation.
-    fn eval_to_wirelabels(
-        &self,
-        f: &mut F,
-        inputs: &[F::Item],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<F::Item>>;
-}
-
 /// Trait representing circuit gates that can be used in `CircuitType`
 pub trait GateType: Display {
     /// Generate constant gate
