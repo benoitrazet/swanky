@@ -340,10 +340,10 @@ mod streaming {
 
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let mut gb = Garbler::new(rng, channel).unwrap();
+                let mut gb: Garbler<SwankyRng, Wire> = Garbler::new(rng, channel).unwrap();
                 let (gb_inp, ev_inp) = gb.encode_many_wires(&inputs, &input_mods_);
                 for w in ev_inp.iter() {
-                    gb.send_wire(w, channel).unwrap();
+                    channel.write(&w.to_repr()).unwrap();
                 }
                 f_gb(&mut gb, &gb_inp, channel);
                 Ok(())
@@ -484,7 +484,7 @@ mod streaming {
 mod complex {
     use crate::{
         AllWire, CrtBundle, CrtGadgets, CrtProjGadgets, Evaluator, Fancy, FancyArithmetic,
-        FancyBinary, FancyProj, Garbler, dummy::Dummy, util::RngExt,
+        FancyBinary, FancyProj, Garbler, WireLabel, dummy::Dummy, util::RngExt,
     };
     use itertools::Itertools;
     use rand::thread_rng;
@@ -539,7 +539,7 @@ mod complex {
                     for X in &input {
                         let (zero, enc) = garbler.crt_encode_wire(*X, Q);
                         for w in enc.iter() {
-                            garbler.send_wire(w, channel).unwrap();
+                            channel.write(&w.to_repr()).unwrap();
                         }
                         gb_inp.push(zero);
                     }

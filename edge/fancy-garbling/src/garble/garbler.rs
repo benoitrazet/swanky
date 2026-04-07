@@ -89,12 +89,6 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
         self.deltas
     }
 
-    /// Send a wire over the established channel.
-    pub fn send_wire(&mut self, wire: &Wire, channel: &mut Channel) -> swanky_error::Result<()> {
-        channel.write(&wire.to_repr())?;
-        Ok(())
-    }
-
     /// Encode a wire, producing the zero wire as well as the encoded value.
     pub fn encode_wire(&mut self, val: u16, modulus: u16) -> (Wire, Wire) {
         let zero = Wire::rand(&mut self.rng, modulus);
@@ -441,7 +435,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
 
     fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
         let (zero, wire) = Wire::constant(x, q, &self.delta(q), &mut self.rng);
-        self.send_wire(&wire, channel)?;
+        channel.write(&wire.to_repr())?;
         Ok(zero)
     }
 

@@ -160,9 +160,7 @@ impl<
         modulus: u16,
         channel: &mut Channel,
     ) -> swanky_error::Result<Wire> {
-        let (mine, theirs) = self.garbler.encode_wire(val, modulus);
-        self.garbler.send_wire(&theirs, channel)?;
-        Ok(mine)
+        self.garbler.encode(val, modulus, channel)
     }
 
     fn encode_many(
@@ -171,14 +169,7 @@ impl<
         moduli: &[u16],
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Wire>> {
-        vals.iter()
-            .zip(moduli.iter())
-            .map(|(x, q)| {
-                let (mine, theirs) = self.garbler.encode_wire(*x, *q);
-                self.garbler.send_wire(&theirs, channel)?;
-                Ok(mine)
-            })
-            .collect()
+        self.garbler.encode_many(vals, moduli, channel)
     }
 
     fn receive_many(
