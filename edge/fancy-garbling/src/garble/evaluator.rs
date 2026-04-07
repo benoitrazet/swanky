@@ -8,7 +8,6 @@ use crate::{
     util::{output_tweak, tweak, tweak2},
     wire::WireLabel,
 };
-use std::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
 use vectoreyes::U8x16;
@@ -21,7 +20,6 @@ pub struct Evaluator<Wire> {
     one: Wire,
     current_gate: usize,
     current_output: usize,
-    _phantom: PhantomData<Wire>,
 }
 
 impl<Wire: WireLabel> Evaluator<Wire> {
@@ -34,7 +32,6 @@ impl<Wire: WireLabel> Evaluator<Wire> {
             one: Wire::from_repr(one, 2),
             current_gate: 0,
             current_output: 0,
-            _phantom: PhantomData,
         })
     }
 
