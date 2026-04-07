@@ -91,8 +91,8 @@ pub(crate) trait LinearSharing<F: FiniteField, const N: usize>:
 /// underlying secret.
 #[derive(Debug, Clone, Copy, Hash)]
 pub(crate) struct CorrectionSharing<F: FiniteField, const N: usize> {
-    shares: [F; N],
-    correction: F,
+    pub(crate) shares: [F; N],
+    pub(crate) correction: F,
 }
 
 impl<F: FiniteField, const N: usize> LinearSharing<F, N> for CorrectionSharing<F, N> {
@@ -157,6 +157,9 @@ impl<F: FiniteField, const N: usize> CorrectionSharing<F, N> {
             if i != exclude && self.shares[i] != other.shares[i] {
                 return false;
             }
+        }
+        if self.correction != other.correction {
+            return false;
         }
         true
     }
