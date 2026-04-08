@@ -339,7 +339,6 @@ impl<Circuit: CircuitType> Default for CircuitBuilder<Circuit> {
 mod plaintext {
     use super::*;
     use crate::{FancyArithmetic, FancyBinary, FancyProj, util::RngExt};
-    use itertools::Itertools;
     use rand::thread_rng;
 
     struct TestAndGateFanN(usize);
@@ -485,84 +484,123 @@ mod plaintext {
         }
     }
 
-    #[test] // mod_change {{{
+    struct TestModChange(u16, u16);
+    impl<F: FancyProj> CircuitExecutor<F> for TestModChange {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as Fancy>::Item>> {
+            let y = backend.mod_change(&inputs[0], self.1, channel)?;
+            let z = backend.mod_change(&y, self.0, channel)?;
+            backend.output(&z, channel)?;
+            Ok(vec![z])
+        }
+
+        fn ninputs(&self) -> usize {
+            1
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            self.0
+        }
+    }
+
+    #[test]
     fn mod_change() {
         let mut rng = thread_rng();
         let p = rng.gen_prime();
         let q = rng.gen_prime();
+        let c = TestModChange(p, q);
 
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-            let x = b.input(p);
-            let y = b.mod_change(&x, q, channel).unwrap();
-            let z = b.mod_change(&y, p, channel).unwrap();
-            b.output(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
         for _ in 0..16 {
             let x = rng.gen_u16() % p;
-            let out = eval_plain(&c, &[x]).unwrap();
-            assert_eq!(out[0], x % q);
+            let output = eval_plain(&c, &[x]).unwrap()[0];
+            assert_eq!(output, x % q);
         }
     }
-    //}}}
-    #[test] // add_many_mod_change {{{
-    fn add_many_mod_change() {
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-            let n = 113;
-            let args = b.inputs(&vec![2; n]);
-            let wires = args
-                .iter()
-                .map(|x| b.mod_change(x, n as u16 + 1, channel).unwrap())
-                .collect_vec();
-            let s = b.add_many(&wires);
-            b.output(&s, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
 
-        let mut rng = thread_rng();
-        for _ in 0..64 {
-            let inps = (0..c.num_inputs())
-                .map(|i| rng.gen_u16() % c.input_mod(i))
-                .collect_vec();
-            let s: u16 = inps.iter().sum();
-            println!("{:?}, sum={}", inps, s);
-            let out = eval_plain(&c, &inps).unwrap();
-            assert_eq!(out[0], s);
+    struct TestAddManyModChange(usize);
+    impl<F: FancyProj + FancyArithmetic> CircuitExecutor<F> for TestAddManyModChange {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as Fancy>::Item>> {
+            let wires = inputs
+                .iter()
+                .map(|x| backend.mod_change(x, self.0 as u16 + 1, channel))
+                .collect::<Result<Vec<_>>>()?;
+            let output = backend.add_many(&wires);
+            backend.output(&output, channel)?;
+            Ok(vec![output])
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
         }
     }
-    // }}}
-    #[test] // constants {{{
+
+    #[test]
+    fn add_many_mod_change() {
+        let mut rng = thread_rng();
+        let n = 113;
+        let c = TestAddManyModChange(n);
+
+        for _ in 0..64 {
+            let inputs = (0..<TestAddManyModChange as CircuitExecutor<Dummy>>::ninputs(&c))
+                .map(|i| {
+                    rng.gen_u16() % <TestAddManyModChange as CircuitExecutor<Dummy>>::modulus(&c, i)
+                })
+                .collect::<Vec<_>>();
+            let expected: u16 = inputs.iter().sum();
+            let output = eval_plain(&c, &inputs).unwrap()[0];
+            assert_eq!(output, expected);
+        }
+    }
+
+    struct TestConstants(u16, u16);
+    impl<F: FancyArithmetic> CircuitExecutor<F> for TestConstants {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as Fancy>::Item>> {
+            let constant = backend.constant(self.1, self.0, channel)?;
+            let output = backend.add(&inputs[0], &constant);
+            backend.output(&output, channel)?;
+            Ok(vec![output])
+        }
+
+        fn ninputs(&self) -> usize {
+            1
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            self.0
+        }
+    }
+
+    #[test]
     fn constants() {
         let mut rng = thread_rng();
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;
-
-        let circ = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-
-            let x = b.input(q);
-            let y = b.constant(c, q, channel).unwrap();
-            let z = b.add(&x, &y);
-            b.output(&z, channel).unwrap();
-
-            let circ = b.finish();
-            Ok(circ)
-        })
-        .unwrap();
+        let circ = TestConstants(q, c);
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
-            let z = eval_plain(&circ, &[x]).unwrap();
-            assert_eq!(z[0], (x + c) % q);
+            let output = eval_plain(&circ, &[x]).unwrap()[0];
+            assert_eq!(output, (x + c) % q);
         }
     }
-    //}}}
 }
 
 #[cfg(test)]
