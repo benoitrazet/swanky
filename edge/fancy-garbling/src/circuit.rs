@@ -811,90 +811,130 @@ mod bundle {
         }
     }
 
-    #[test] // bundle cexp {{{
+    struct TestCrtCexp(Vec<u16>, u16);
+    impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtCexp {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as Fancy>::Item>> {
+            let x = CrtBundle::new(inputs.to_vec());
+            let z = backend.crt_cexp(&x, self.1, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len()
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i]
+        }
+    }
+
+    #[test]
     fn test_cexp() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
         let y = rng.gen_u16() % 10;
-
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-            let x = b.crt_input(q);
-            let z = b.crt_cexp(&x, y, channel).unwrap();
-            b.output_bundle(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
+        let c = TestCrtCexp(util::factor(q), y);
 
         for _ in 0..64 {
             let x = rng.gen_u16() as u128 % q;
-            let should_be = x.pow(y as u32) % q;
-            let res = eval_plain(&c, &crt_factor(x, q)).unwrap();
-            let z = crt_inv_factor(&res, q);
-            assert_eq!(z, should_be);
+            let z = eval_plain(&c, &crt_factor(x, q)).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, x.pow(y as u32) % q);
         }
     }
-    // }}}
-    #[test] // bundle remainder {{{
+
+    struct TestCrtRemainder(Vec<u16>, u16);
+    impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtRemainder {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as Fancy>::Item>> {
+            let x = CrtBundle::new(inputs.to_vec());
+            let z = backend.crt_rem(&x, self.1, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len()
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i]
+        }
+    }
+
+    #[test]
     fn test_remainder() {
         let mut rng = thread_rng();
         let ps = rng.gen_usable_factors();
         let q = ps.iter().fold(1, |acc, &x| (x as u128) * acc);
         let p = ps[rng.gen_u16() as usize % ps.len()];
-
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-            let x = b.crt_input(q);
-            let z = b.crt_rem(&x, p, channel).unwrap();
-            b.output_bundle(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
+        let c = TestCrtRemainder(ps, p);
 
         for _ in 0..64 {
             let x = rng.gen_u128() % q;
-            let should_be = x % p as u128;
-            let res = eval_plain(&c, &crt_factor(x, q)).unwrap();
-            let z = crt_inv_factor(&res, q);
-            assert_eq!(z, should_be);
+            let z = eval_plain(&c, &crt_factor(x, q)).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, x % p as u128);
         }
     }
-    //}}}
-    #[test] // bundle equality {{{
+
+    struct TestEquality(Vec<u16>);
+    impl<F: ArithmeticProjBundleGadgets> CircuitExecutor<F> for TestEquality {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as Fancy>::Item>> {
+            let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
+            let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
+            let z = backend.eq_bundles(&x, &y, channel)?;
+            backend.output(&z, channel)?;
+            Ok(vec![z])
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len() * 2
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i % self.0.len()]
+        }
+    }
+
+    #[test]
     fn test_equality() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
+        let c = TestEquality(util::factor(q));
 
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-            let x = b.crt_input(q);
-            let y = b.crt_input(q);
-            let z = b.eq_bundles(&x, &y, channel).unwrap();
-            b.output(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
-
-        // lets have at least one test where they are surely equal
+        // Let's have at least one test where they are surely equal.
         let x = rng.gen_u128() % q;
         let mut inputs = crt_factor(x, q);
         inputs.extend(crt_factor(x, q));
-        let res = eval_plain(&c, &inputs).unwrap();
-        assert_eq!(res, &[(x == x) as u16]);
+        let output = eval_plain(&c, &inputs).unwrap()[0];
+        assert_eq!(output, (x == x) as u16);
 
         for _ in 0..64 {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
             let mut inputs = crt_factor(x, q);
             inputs.extend(crt_factor(y, q));
-            let res = eval_plain(&c, &inputs).unwrap();
-            assert_eq!(res, &[(x == y) as u16]);
+            let output = eval_plain(&c, &inputs).unwrap()[0];
+            assert_eq!(output, (x == y) as u16);
         }
     }
-    //}}}
+
     #[test] // bundle mixed_radix_addition {{{
     fn test_mixed_radix_addition() {
         let mut rng = thread_rng();
