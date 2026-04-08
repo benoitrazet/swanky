@@ -1,7 +1,10 @@
-//! The `Fancy` trait represents the kinds of computations possible in `fancy-garbling`.
+//! Traits for representing specific kinds of garbled circuit computations.
 //!
-//! An implementer must be able to create inputs, constants, do modular arithmetic, and
-//! create projections.
+//! The core trait of this module is [`Fancy`], which represents the basic set
+//! of operations possible by a garbled circuit. There are also extension
+//! traits, in particular [`FancyBinary`] and [`FancyArithmetic`] that further
+//! extend the core [`Fancy`] trait to provide binary and arithmetic operations,
+//! respectively.
 
 use itertools::Itertools;
 use swanky_channel::Channel;
@@ -16,21 +19,35 @@ pub use bundle::{
 };
 pub use crt::{CrtBundle, CrtGadgets, CrtProjGadgets};
 
-/// An object that has some modulus. Basic object of `Fancy` computations.
+/// An object that has a modulus.
 pub trait HasModulus {
     /// The modulus of the wire.
     fn modulus(&self) -> u16;
 }
 
-/// DSL for the basic computations supported by `fancy-garbling`.
+/// The `Fancy` trait provides the basic set of operations possible in a garbled
+/// circuit.
 ///
-/// Primarily used as a supertrait for `FancyBinary` and `FancyArithmetic`,
-/// which indicate computation supported by the DSL.
+/// The trait contains an associated type, [`Fancy::Item`], which defines the
+/// underlying wirelabel representation. The trait then defines several methods
+/// for:
+/// 1. Encoding a value into a wirelabel ([`Fancy::encode`] and
+///    [`Fancy::encode_many`]).
+/// 2. Receiving a wirelabel for an unknown value ([`Fancy::receive`] and
+///    [`Fancy::receive_many`]).
+/// 3. Creating a wirelabel for a fixed (public) constant value
+///    ([`Fancy::constant`]).
+/// 4. Outputting a wirelabel as its underlying value ([`Fancy::output`] and
+///    [`Fancy::outputs`]).
+///
+/// This trait can be further extended to support binary, arithmetic, and/or
+/// projections by using the [`FancyBinary`], [`FancyArithmetic`], or
+/// [`FancyProj`] extension traits, respectively.
 pub trait Fancy {
-    /// The underlying wire datatype created by an object implementing `Fancy`.
+    /// The underlying wirelabel representation of this [`Fancy`] object.
     type Item: Clone + HasModulus;
 
-    /// Encode many values where the actual input is known.
+    /// Encode many wirelabels for known values.
     ///
     /// When writing a garbler, the return value must correspond to the zero
     /// wire label.
@@ -41,14 +58,14 @@ pub trait Fancy {
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>>;
 
-    /// Receive many values where the input is not known.
+    /// Receive many wirelabels for unknown values.
     fn receive_many(
         &mut self,
         moduli: &[u16],
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>>;
 
-    /// Create a constant `x` with modulus `q`.
+    /// Encode a constant `x` with modulus `q`.
     fn constant(
         &mut self,
         x: u16,
@@ -56,15 +73,20 @@ pub trait Fancy {
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item>;
 
-    /// Process this wire as output. Some `Fancy` implementers don't actually *return*
-    /// output, but they need to be involved in the process, so they can return `None`.
+    /// Output the value associated with wirelabel `x`.
+    ///
+    /// Some [`Fancy`] implementers don't actually *return* output, but they
+    /// need to be involved in the process, so they can return `None`.
     fn output(
         &mut self,
         x: &Self::Item,
         channel: &mut Channel,
     ) -> swanky_error::Result<Option<u16>>;
 
-    /// Output a slice of wires.
+    /// Output the values associated with a slice of wirelabels.
+    ///
+    /// Some [`Fancy`] implementers don't actually *return* output, but they
+    /// need to be involved in the process, so they can return `None`.
     fn outputs(
         &mut self,
         xs: &[Self::Item],
@@ -77,7 +99,7 @@ pub trait Fancy {
         Ok(zs.into_iter().collect())
     }
 
-    /// Encode a single value.
+    /// Encode a wirelabel for a known value.
     ///
     /// When writing a garbler, the return value must correspond to the zero
     /// wire label.
@@ -91,20 +113,19 @@ pub trait Fancy {
         Ok(xs.remove(0))
     }
 
-    /// Receive a single value.
+    /// Receive a wirelabel for an unknown value.
     fn receive(&mut self, modulus: u16, channel: &mut Channel) -> swanky_error::Result<Self::Item> {
         let mut xs = self.receive_many(&[modulus], channel)?;
         Ok(xs.remove(0))
     }
 }
 
-/// Fancy DSL providing binary operations
-///
+/// Extension trait for [`Fancy`] that provides binary operations.
 pub trait FancyBinary: Fancy {
-    /// Binary Xor
+    /// Binary XOR.
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
 
-    /// Binary And
+    /// Binary AND.
     fn and(
         &mut self,
         x: &Self::Item,
@@ -112,10 +133,10 @@ pub trait FancyBinary: Fancy {
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item>;
 
-    /// Binary Not
+    /// Binary negation.
     fn negate(&mut self, x: &Self::Item) -> Self::Item;
 
-    /// Uses Demorgan's Rule implemented with an and gate and negation.
+    /// Binary OR.
     fn or(
         &mut self,
         x: &Self::Item,
@@ -149,7 +170,7 @@ pub trait FancyBinary: Fancy {
             Ok((z, carry))
         }
     }
-    /// Returns 1 if all wires equal 1.
+    /// Return 1 if all wirelabels equal 1.
     ///
     /// # Panics
     /// Panics if `args` is empty.
@@ -164,7 +185,7 @@ pub trait FancyBinary: Fancy {
             .try_fold(args[0].clone(), |acc, x| self.and(&acc, x, channel))
     }
 
-    /// Returns 1 if any wire equals 1.
+    /// Return 1 if any wirelabel equals 1.
     ///
     /// # Panics
     /// Panics if `args` is empty.
@@ -179,7 +200,7 @@ pub trait FancyBinary: Fancy {
             .try_fold(args[0].clone(), |acc, x| self.or(&acc, x, channel))
     }
 
-    /// XOR many wires together.
+    /// XOR many wirelabels together.
     ///
     /// # Panics
     /// Panics if `args.len() < 2`.
@@ -190,7 +211,7 @@ pub trait FancyBinary: Fancy {
             .fold(args[0].clone(), |acc, x| self.xor(&acc, x))
     }
 
-    /// If `x = 0` returns the constant `b1` else return `b2`. Folds constants if possible.
+    /// If `x = 0` return the constant `b1`, otherwise return `b2`.
     fn mux_constant_bits(
         &mut self,
         x: &Self::Item,
@@ -206,7 +227,7 @@ pub trait FancyBinary: Fancy {
         }
     }
 
-    /// If `b = 0` returns `x` else `y`.
+    /// If `b = 0` return `x`, otherwise return `y`.
     fn mux(
         &mut self,
         b: &Self::Item,
@@ -220,7 +241,7 @@ pub trait FancyBinary: Fancy {
     }
 }
 
-/// DSL for arithmetic computation.
+/// Extension trait for [`Fancy`] that provides arithmetic operations.
 pub trait FancyArithmetic: Fancy {
     /// Add `x` and `y`.
     ///
@@ -234,7 +255,7 @@ pub trait FancyArithmetic: Fancy {
     /// This panics if `x` and `y` do not have equal moduli.
     fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
 
-    /// Multiply `x` times the constant `c`.
+    /// Multiply `x` with the constant `c`.
     fn cmul(&mut self, x: &Self::Item, c: u16) -> Self::Item;
 
     /// Multiply `x` and `y`.
@@ -244,9 +265,6 @@ pub trait FancyArithmetic: Fancy {
         y: &Self::Item,
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item>;
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // Functions built on top of arithmetic fancy operations.
 
     /// Sum up a slice of wires.
     ///
@@ -262,8 +280,12 @@ pub trait FancyArithmetic: Fancy {
     }
 }
 
-/// Fancy DSL providing projection gates, and associated methods that utilize
-/// projection gates.
+/// Extension trait for [`Fancy`] that provides a projection gate, alongside
+/// methods that utilize projection gates.
+///
+/// # Security Warning
+/// In its current form, using projection gates in arithmetic garbling is
+/// **insecure**.
 pub trait FancyProj: Fancy {
     /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
     ///
