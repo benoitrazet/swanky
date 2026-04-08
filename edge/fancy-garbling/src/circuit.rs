@@ -342,137 +342,149 @@ mod plaintext {
     use itertools::Itertools;
     use rand::thread_rng;
 
-    #[test] // {{{ and_gate_fan_n
+    struct TestAndGateFanN(usize);
+    impl<F: FancyBinary> CircuitExecutor<F> for TestAndGateFanN {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[F::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<F::Item>> {
+            let output = backend.and_many(inputs, channel)?;
+            backend.output(&output, channel)?;
+            Ok(vec![output])
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
+    #[test]
     fn and_gate_fan_n() {
         let mut rng = thread_rng();
         let n = 2 + (rng.gen_usize() % 200);
-
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::<BinaryCircuit>::new();
-            let inps = b.inputs(&vec![2; n]);
-            let z = b.and_many(&inps, channel).unwrap();
-            b.output(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
+        let c = TestAndGateFanN(n);
 
         for _ in 0..16 {
-            let mut inps: Vec<u16> = Vec::new();
-            for _ in 0..n {
-                inps.push(rng.gen_bool() as u16);
-            }
-            let res = inps.iter().fold(1, |acc, &x| x & acc);
-            let out = eval_plain(&c, &inps).unwrap()[0];
-            if out != res {
-                println!("{:?} {} {}", inps, out, res);
-                panic!("incorrect output n={}", n);
-            }
+            let inputs = (0..n).map(|_| rng.gen_bool() as u16).collect::<Vec<_>>();
+            let expected = inputs.iter().fold(1, |acc, &x| x & acc);
+            let output = eval_plain(&c, &inputs).unwrap()[0];
+            assert_eq!(output, expected);
         }
     }
-    //}}}
-    #[test] // {{{ or_gate_fan_n
+
+    struct TestOrGateFanN(usize);
+    impl<F: FancyBinary> CircuitExecutor<F> for TestOrGateFanN {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as Fancy>::Item>> {
+            let output = backend.or_many(inputs, channel)?;
+            backend.output(&output, channel)?;
+            Ok(vec![output])
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
+    #[test]
     fn or_gate_fan_n() {
         let mut rng = thread_rng();
         let n = 2 + (rng.gen_usize() % 200);
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b: CircuitBuilder<BinaryCircuit> = CircuitBuilder::new();
-            let inps = b.inputs(&vec![2; n]);
-            let z = b.or_many(&inps, channel).unwrap();
-            b.output(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
+        let c = TestOrGateFanN(n);
 
         for _ in 0..16 {
-            let mut inps: Vec<u16> = Vec::new();
-            for _ in 0..n {
-                inps.push(rng.gen_bool() as u16);
-            }
-            let res = inps.iter().fold(0, |acc, &x| x | acc);
-            let out = eval_plain(&c, &inps).unwrap()[0];
-            if out != res {
-                println!("{:?} {} {}", inps, out, res);
-                panic!();
-            }
+            let inputs = (0..n).map(|_| rng.gen_bool() as u16).collect::<Vec<_>>();
+            let expected = inputs.iter().fold(0, |acc, &x| x | acc);
+            let output = eval_plain(&c, &inputs).unwrap()[0];
+            assert_eq!(output, expected);
         }
     }
 
-    #[test] // {{{ or_gate_fan_n_arithmetic
-    fn or_gate_fan_n_arithmetic() {
-        let mut rng = thread_rng();
-        let n = 2 + (rng.gen_usize() % 200);
+    struct TestAndGate;
+    impl<F: FancyBinary> CircuitExecutor<F> for TestAndGate {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as Fancy>::Item>> {
+            let output = backend.and(&inputs[0], &inputs[1], channel)?;
+            backend.output(&output, channel)?;
+            Ok(vec![output])
+        }
 
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b: CircuitBuilder<ArithmeticCircuit> = CircuitBuilder::new();
-            let inps = b.inputs(&vec![2; n]);
-            let z = b.or_many(&inps, channel).unwrap();
-            b.output(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
+        fn ninputs(&self) -> usize {
+            2
+        }
 
-        for _ in 0..16 {
-            let mut inps: Vec<u16> = Vec::new();
-            for _ in 0..n {
-                inps.push(rng.gen_bool() as u16);
-            }
-            let res = inps.iter().fold(0, |acc, &x| x | acc);
-            let out = eval_plain(&c, &inps).unwrap()[0];
-            if out != res {
-                println!("{:?} {} {}", inps, out, res);
-                panic!();
-            }
+        fn modulus(&self, _: usize) -> u16 {
+            2
         }
     }
-    //}}}
-    #[test] // {{{ half_gate
+
+    #[test]
     fn binary_half_gate() {
         let mut rng = thread_rng();
-        let q = 2;
+        let c = TestAndGate;
 
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::<BinaryCircuit>::new();
-            let x = b.input(q);
-            let y = b.input(q);
-            let z = b.and(&x, &y, channel).unwrap();
-            b.output(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
         for _ in 0..16 {
-            let x = rng.gen_u16() % q;
-            let y = rng.gen_u16() % q;
-            let out = eval_plain(&c, &[x, y]).unwrap();
-            assert_eq!(out[0], x * y % q);
+            let x = rng.gen_bool() as u16;
+            let y = rng.gen_bool() as u16;
+            let output = eval_plain(&c, &[x, y]).unwrap()[0];
+            assert_eq!(output, x * y % 2);
         }
     }
-    #[test] // {{{ half_gate
+
+    struct TestMulGate(u16);
+    impl<F: FancyArithmetic> CircuitExecutor<F> for TestMulGate {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as Fancy>::Item>> {
+            let output = backend.mul(&inputs[0], &inputs[1], channel)?;
+            backend.output(&output, channel)?;
+            Ok(vec![output])
+        }
+
+        fn ninputs(&self) -> usize {
+            2
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            self.0
+        }
+    }
+
+    #[test]
     fn arithmetic_half_gate() {
         let mut rng = thread_rng();
         let q = rng.gen_prime();
+        let c = TestMulGate(q);
 
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-            let x = b.input(q);
-            let y = b.input(q);
-            let z = b.mul(&x, &y, channel).unwrap();
-            b.output(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
         for _ in 0..16 {
             let x = rng.gen_u16() % q;
             let y = rng.gen_u16() % q;
-            let out = eval_plain(&c, &[x, y]).unwrap();
-            assert_eq!(out[0], x * y % q);
+            let output = eval_plain(&c, &[x, y]).unwrap()[0];
+            assert_eq!(output, x * y % q);
         }
     }
-    //}}}
+
     #[test] // mod_change {{{
     fn mod_change() {
         let mut rng = thread_rng();
