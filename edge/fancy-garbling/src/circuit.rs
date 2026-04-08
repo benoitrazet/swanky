@@ -614,139 +614,203 @@ mod bundle {
     use itertools::Itertools;
     use rand::thread_rng;
 
-    #[test] // bundle input and output {{{
+    struct TestBundleInputOutput(Vec<u16>);
+    impl<F: Fancy> CircuitExecutor<F> for TestBundleInputOutput {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[F::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<F::Item>> {
+            let output = CrtBundle::new(inputs.to_vec());
+            backend.output_bundle(&output, channel)?;
+            Ok(output.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len()
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i]
+        }
+    }
+
+    #[test]
     fn test_bundle_input_output() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
-
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-            let x = b.crt_input(q);
-            println!("{:?} wires", x.wires().len());
-            b.output_bundle(&x, channel).unwrap();
-            let c: ArithmeticCircuit = b.finish();
-            Ok(c)
-        })
-        .unwrap();
-
-        println!("{:?}", c.output_refs);
+        let c = TestBundleInputOutput(util::factor(q));
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
-            let res = eval_plain(&c, &crt_factor(x, q)).unwrap();
-            println!("{:?}", res);
-            let z = crt_inv_factor(&res, q);
-            assert_eq!(x, z);
+            let y = eval_plain(&c, &crt_factor(x, q)).unwrap();
+            let output = crt_inv_factor(&y, q);
+            assert_eq!(output, x);
         }
     }
 
-    //}}}
-    #[test] // bundle addition {{{
+    struct TestCrtAddition(Vec<u16>);
+    impl<F: CrtGadgets> CircuitExecutor<F> for TestCrtAddition {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as Fancy>::Item>> {
+            let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
+            let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
+            let z = backend.crt_add(&x, &y);
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len() * 2
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i % self.0.len()]
+        }
+    }
+
+    #[test]
     fn test_addition() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
-
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-            let x = b.crt_input(q);
-            let y = b.crt_input(q);
-            let z = b.crt_add(&x, &y);
-            b.output_bundle(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
+        let c = TestCrtAddition(util::factor(q));
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
             let mut inputs = crt_factor(x, q);
             inputs.extend(crt_factor(y, q));
-            let res = eval_plain(&c, &inputs).unwrap();
-            let z = crt_inv_factor(&res, q);
-            assert_eq!(z, (x + y) % q);
+            let z = eval_plain(&c, &inputs).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, (x + y) % q);
         }
     }
-    //}}}
-    #[test] // bundle subtraction {{{
+
+    struct TestCrtSubtraction(Vec<u16>);
+    impl<F: CrtGadgets> CircuitExecutor<F> for TestCrtSubtraction {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as Fancy>::Item>> {
+            let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
+            let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
+            let z = backend.crt_sub(&x, &y);
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len() * 2
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i % self.0.len()]
+        }
+    }
+
+    #[test]
     fn test_subtraction() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
-
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-            let x = b.crt_input(q);
-            let y = b.crt_input(q);
-            let z = b.sub_bundles(&x, &y);
-            b.output_bundle(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
+        let c = TestCrtSubtraction(util::factor(q));
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
             let mut inputs = crt_factor(x, q);
             inputs.extend(crt_factor(y, q));
-            let res = eval_plain(&c, &inputs).unwrap();
-            let z = crt_inv_factor(&res, q);
-            assert_eq!(z, (x + q - y) % q);
+            let z = eval_plain(&c, &inputs).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, (x + q - y) % q);
         }
     }
-    //}}}
-    #[test] // bundle cmul {{{
+
+    struct TestCrtCmul(Vec<u16>, u128);
+    impl<F: CrtGadgets> CircuitExecutor<F> for TestCrtCmul {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as Fancy>::Item>> {
+            let x = CrtBundle::new(inputs.to_vec());
+            let z = backend.crt_cmul(&x, self.1);
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len()
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i]
+        }
+    }
+
+    #[test]
     fn test_cmul() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(16);
         let y = rng.gen_u128() % q;
-
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-            let x = b.crt_input(q);
-            let z = b.crt_cmul(&x, y);
-            b.output_bundle(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
+        let c = TestCrtCmul(util::factor(q), y);
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
-            let res = eval_plain(&c, &crt_factor(x, q)).unwrap();
-            let z = crt_inv_factor(&res, q);
-            assert_eq!(z, (x * y) % q);
+            let z = eval_plain(&c, &crt_factor(x, q)).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, (x * y) % q);
         }
     }
-    //}}}
-    #[test] // bundle multiplication {{{
+
+    struct TestCrtMultiplication(Vec<u16>);
+    impl<F: ArithmeticBundleGadgets> CircuitExecutor<F> for TestCrtMultiplication {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as Fancy>::Item>> {
+            let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
+            let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
+            let z = backend.mul_bundles(&x, &y, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len() * 2
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i % self.0.len()]
+        }
+    }
+
+    #[test]
     fn test_multiplication() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
-
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-            let x = b.crt_input(q);
-            let y = b.crt_input(q);
-            let z = b.mul_bundles(&x, &y, channel).unwrap();
-            b.output_bundle(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
+        let c = TestCrtMultiplication(util::factor(q));
 
         for _ in 0..16 {
             let x = rng.gen_u64() as u128 % q;
             let y = rng.gen_u64() as u128 % q;
             let mut inputs = crt_factor(x, q);
             inputs.extend(crt_factor(y, q));
-
-            let res = eval_plain(&c, &inputs).unwrap();
-            let z = crt_inv_factor(&res, q);
-            assert_eq!(z, (x * y) % q);
+            let z = eval_plain(&c, &inputs).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, (x * y) % q);
         }
     }
-    // }}}
+
     #[test] // bundle cexp {{{
     fn test_cexp() {
         let mut rng = thread_rng();
