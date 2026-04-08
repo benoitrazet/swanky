@@ -256,6 +256,11 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
             sum += f.reconstruct() * g.reconstruct();
         }
         ensure!(
+            sum == self.h.reconstruct(),
+            ErrorKind::OtherError,
+            "Dot product not equal to `h`"
+        );
+        ensure!(
             self.output.check_equality(&computed_output, exclude),
             ErrorKind::OtherError,
             "Output shares not equal to computed output shares"
@@ -501,6 +506,59 @@ mod tests {
         proof.output.output.correction = F::ZERO - share_sum;
 
         // Check that proof verification continues to fail.
+        assert!(proof.verify(&circuit, K, &cache_v).is_err());
+    }
+
+    // See GitHub Issue #43.
+    //
+    // Thanks to @rot256 for pointing this out!
+    #[test]
+    fn ensure_dot_product_checked() {
+        use swanky_field::FiniteRing;
+        use swanky_field_ff_primes::F128p;
+
+        type F = F128p;
+
+        let mut rng = SwankyRng::new();
+
+        // unsat. circuit: output = 1 regardless of input.
+        let (circuit, witness) = simple_arith_circuit::circuitgen::random_zero_circuit::<
+            F,
+            SwankyRng,
+        >(10, 1000, &mut rng);
+
+        let cache_p = crate::cache::Cache::new(&circuit, K, true);
+        let mut proof = ProofSingle::<F, N>::prove(&circuit, &witness, K, &cache_p, &mut rng);
+
+        let cache_v = crate::cache::Cache::new(&circuit, K, false);
+        assert!(proof.verify(&circuit, K, &cache_v).is_ok());
+
+        for i in 0..proof.output.fs.len() {
+            // Change the share of the unopened party in `fs` to force the dot product to fail.
+            proof.output.fs[i].shares[proof.unopened.id] += F::ONE;
+
+            // Confirm the proof fails to verify.
+            assert!(proof.verify(&circuit, K, &cache_v).is_err());
+
+            // Change the share back for the next iteration.
+            proof.output.fs[i].shares[proof.unopened.id] -= F::ONE;
+        }
+
+        for i in 0..proof.output.gs.len() {
+            // Change the share of the unopened party in `gs` to force the dot product to fail.
+            proof.output.gs[i].shares[proof.unopened.id] += F::ONE;
+
+            // Confirm the proof fails to verify.
+            assert!(proof.verify(&circuit, K, &cache_v).is_err());
+
+            // Change the share back for the next iteration.
+            proof.output.gs[i].shares[proof.unopened.id] -= F::ONE;
+        }
+
+        // Change the share of the unopened party in `h` to force the dot
+        // product to fail.
+        proof.output.h.shares[proof.unopened.id] += F::ONE;
+        // Confirm the proof fails to verify.
         assert!(proof.verify(&circuit, K, &cache_v).is_err());
     }
 }
