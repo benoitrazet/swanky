@@ -530,11 +530,35 @@ mod tests {
         let cache_p = crate::cache::Cache::new(&circuit, K, true);
         let mut proof = ProofSingle::<F, N>::prove(&circuit, &witness, K, &cache_p, &mut rng);
 
-        // Change the share of the unopened party in `fs` to force the dot product to fail.
-        proof.output.fs[proof.unopened.id].correction += F::ONE;
-
-        // Confirm the proof fails to verify.
         let cache_v = crate::cache::Cache::new(&circuit, K, false);
+        assert!(proof.verify(&circuit, K, &cache_v).is_ok());
+
+        for i in 0..proof.output.fs.len() {
+            // Change the share of the unopened party in `fs` to force the dot product to fail.
+            proof.output.fs[i].shares[proof.unopened.id] += F::ONE;
+
+            // Confirm the proof fails to verify.
+            assert!(proof.verify(&circuit, K, &cache_v).is_err());
+
+            // Change the share back for the next iteration.
+            proof.output.fs[i].shares[proof.unopened.id] -= F::ONE;
+        }
+
+        for i in 0..proof.output.gs.len() {
+            // Change the share of the unopened party in `gs` to force the dot product to fail.
+            proof.output.gs[i].shares[proof.unopened.id] += F::ONE;
+
+            // Confirm the proof fails to verify.
+            assert!(proof.verify(&circuit, K, &cache_v).is_err());
+
+            // Change the share back for the next iteration.
+            proof.output.gs[i].shares[proof.unopened.id] -= F::ONE;
+        }
+
+        // Change the share of the unopened party in `h` to force the dot
+        // product to fail.
+        proof.output.h.shares[proof.unopened.id] += F::ONE;
+        // Confirm the proof fails to verify.
         assert!(proof.verify(&circuit, K, &cache_v).is_err());
     }
 }
