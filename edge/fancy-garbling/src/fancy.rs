@@ -6,7 +6,6 @@
 //! extend the core [`Fancy`] trait to provide binary and arithmetic operations,
 //! respectively.
 
-use itertools::Itertools;
 use swanky_channel::Channel;
 
 mod binary;
@@ -315,7 +314,9 @@ pub trait FancyProj: Fancy {
         if from_modulus == to_modulus {
             return Ok(x.clone());
         }
-        let tab = (0..from_modulus).map(|x| x % to_modulus).collect_vec();
+        let tab = (0..from_modulus)
+            .map(|x| x % to_modulus)
+            .collect::<Vec<_>>();
         self.proj(x, to_modulus, Some(tab), channel)
     }
 }
