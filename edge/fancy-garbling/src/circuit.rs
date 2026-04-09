@@ -340,8 +340,9 @@ pub(crate) mod circuits {
     //! A collection of test circuits.
 
     use crate::{
-        ArithmeticBundleGadgets, ArithmeticProjBundleGadgets, BundleGadgets, CrtBundle, CrtGadgets,
-        CrtProjGadgets, FancyArithmetic, FancyBinary, FancyProj, circuit::CircuitExecutor,
+        ArithmeticBundleGadgets, ArithmeticProjBundleGadgets, Bundle, BundleGadgets, CrtBundle,
+        CrtGadgets, CrtProjGadgets, FancyArithmetic, FancyBinary, FancyProj,
+        circuit::CircuitExecutor,
     };
     use swanky_channel::Channel;
     use swanky_error::Result;
@@ -404,6 +405,28 @@ pub(crate) mod circuits {
 
         fn ninputs(&self) -> usize {
             2
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            self.0
+        }
+    }
+
+    pub(crate) struct TestAddMany(pub(crate) u16, pub(crate) usize);
+    impl<F: FancyArithmetic> CircuitExecutor<F> for TestAddMany {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[F::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<F::Item>> {
+            let output = backend.add_many(inputs);
+            backend.output(&output, channel)?;
+            Ok(vec![output])
+        }
+
+        fn ninputs(&self) -> usize {
+            self.1
         }
 
         fn modulus(&self, _: usize) -> u16 {
@@ -476,6 +499,28 @@ pub(crate) mod circuits {
         }
     }
 
+    pub(crate) struct TestMulGateUnequalMods(pub(crate) [u16; 2]);
+    impl<F: FancyArithmetic> CircuitExecutor<F> for TestMulGateUnequalMods {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[F::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<F::Item>> {
+            let output = backend.mul(&inputs[0], &inputs[1], channel)?;
+            backend.output(&output, channel)?;
+            Ok(vec![output])
+        }
+
+        fn ninputs(&self) -> usize {
+            2
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i]
+        }
+    }
+
     pub(crate) struct TestCmul(pub(crate) u16, pub(crate) u16);
     impl<F: FancyArithmetic> CircuitExecutor<F> for TestCmul {
         fn execute(
@@ -508,6 +553,28 @@ pub(crate) mod circuits {
         ) -> Result<Vec<<F as crate::Fancy>::Item>> {
             let tab = (0..self.0).map(|i| (i + 1) % self.0).collect();
             let output = backend.proj(&inputs[0], self.0, Some(tab), channel)?;
+            backend.output(&output, channel)?;
+            Ok(vec![output])
+        }
+
+        fn ninputs(&self) -> usize {
+            1
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            self.0
+        }
+    }
+
+    pub(crate) struct TestProjRand(pub(crate) u16, pub(crate) Vec<u16>);
+    impl<F: FancyProj> CircuitExecutor<F> for TestProjRand {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let output = backend.proj(&inputs[0], self.0, Some(self.1.clone()), channel)?;
             backend.output(&output, channel)?;
             Ok(vec![output])
         }
@@ -815,6 +882,32 @@ pub(crate) mod circuits {
             self.0[i % self.0.len()]
         }
     }
+
+    pub(crate) struct TestMixedRadixAddition(pub(crate) Vec<u16>, pub(crate) usize);
+    impl<F: CrtProjGadgets> CircuitExecutor<F> for TestMixedRadixAddition {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let xs = inputs
+                .chunks_exact(self.0.len())
+                .map(|v| Bundle::new(v.to_vec()))
+                .collect::<Vec<_>>();
+            let z = backend.mixed_radix_addition(&xs, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.1 * self.0.len()
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i % self.0.len()]
+        }
+    }
 }
 
 #[cfg(test)]
@@ -934,7 +1027,7 @@ mod plaintext {
 mod bundle {
     use super::*;
     use crate::{
-        ArithmeticProjBundleGadgets, CrtProjGadgets,
+        CrtProjGadgets,
         fancy::{BinaryGadgets, BundleGadgets},
         util::{self, RngExt, crt_factor, crt_inv_factor},
     };
@@ -1075,28 +1168,16 @@ mod bundle {
         }
     }
 
-    #[test] // bundle mixed_radix_addition {{{
+    #[test]
     fn test_mixed_radix_addition() {
         let mut rng = thread_rng();
-
         let nargs = 2 + rng.gen_usize() % 100;
         let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
-
-        let circ = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-            let xs = (0..nargs)
-                .map(|_| crate::fancy::Bundle::new(b.inputs(&mods)))
-                .collect_vec();
-            let z = b.mixed_radix_addition(&xs, channel).unwrap();
-            b.output_bundle(&z, channel).unwrap();
-            let circ = b.finish();
-            Ok(circ)
-        })
-        .unwrap();
+        let circ = circuits::TestMixedRadixAddition(mods.clone(), nargs);
 
         let Q: u128 = mods.iter().map(|&q| q as u128).product();
 
-        // test maximum overflow
+        // Test maximum overflow.
         let mut ds = Vec::new();
         for _ in 0..nargs {
             ds.extend(util::as_mixed_radix(Q - 1, &mods).iter());
@@ -1107,7 +1188,7 @@ mod bundle {
             (Q - 1) * (nargs as u128) % Q
         );
 
-        // test random values
+        // Test random values.
         for _ in 0..4 {
             let mut should_be = 0;
             let mut ds = Vec::new();
@@ -1120,7 +1201,7 @@ mod bundle {
             assert_eq!(util::from_mixed_radix(&res, &mods), should_be);
         }
     }
-    //}}}
+
     #[test] // bundle relu {{{
     fn test_relu() {
         let mut rng = thread_rng();
