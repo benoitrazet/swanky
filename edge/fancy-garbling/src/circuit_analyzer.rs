@@ -91,6 +91,10 @@ impl CircuitAnalyzer {
     pub fn nconstants(&self) -> usize {
         self.nconstants
     }
+    /// Return the number of XOR gates in the circuit
+    pub fn nxors(&self) -> usize {
+        self.nxors
+    }
 }
 
 impl FancyBinary for CircuitAnalyzer {
