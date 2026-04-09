@@ -107,7 +107,6 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         let index = self.current_wire_index();
 
         let wire = AuthenticatedWireMod2::new(zero, self.get_current_wire_share(index), index);
-
         Ok((wire, zero))
     }
 
@@ -173,21 +172,22 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         // inputs and returns the zeroes generated for those wires
         let (gbs, zeroes) = self.encode_many_auth_wires(values.len())?;
 
-        // Garbler open the authenticated shares associated with each authenticated wire
-        let mut auth_bits = Vec::with_capacity(values.len());
+        // Both parties open their input shares to each reach the bit mask that they will use
+        // to hide their inputs. The masks are called λ_w in the paper.
+        let mut masks = Vec::with_capacity(values.len());
         AuthShareGenerator::open_with_delta(
             &gbs.iter()
                 .map(|auth_wire| auth_wire.auth_share())
                 .collect::<Vec<AuthShare<PartyGarbler>>>(),
             self.get_delta().to_repr(),
-            &mut auth_bits,
+            &mut masks,
             channel,
         )?;
         // Garbler uses the opened bits to mask their input values
         let masked_values: Vec<F2> = values
             .iter()
-            .zip(auth_bits.iter())
-            .map(|(val, bit)| val + bit)
+            .zip(masks.iter())
+            .map(|(val, mask)| val + mask)
             .collect();
         // Garbler encodes the masked values and sends them to the evaluator
         let evs = self.encode_many_wires(&masked_values, &zeroes)?;
@@ -320,26 +320,31 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         let (auth_wires, zeroes): (Vec<AuthenticatedWireMod2<PartyGarbler>>, Vec<WireMod2>) =
             self.encode_many_auth_wires(values.len())?;
 
-        // Garbler open the authenticated shares associated with each authenticated wire
-        let mut auth_bits = Vec::with_capacity(values.len());
+        // Both parties open their input shares to each reach the bit mask that they will use
+        // to hide their inputs. The masks are called λ_w in the paper.
+        let mut masks = Vec::with_capacity(values.len());
         AuthShareGenerator::open_with_delta(
             &auth_wires
                 .iter()
                 .map(|auth_wire| auth_wire.auth_share())
                 .collect::<Vec<AuthShare<PartyGarbler>>>(),
             self.get_delta().to_repr(),
-            &mut auth_bits,
+            &mut masks,
             channel,
         )?;
-        // Garbler uses the opened bits to mask their input values
+        // Garbler uses the opened bits to mask their input values.
+        // In the paper, these masked values are called:
+        // x_w + λ_w := x_w ⊕ s_w ⊕ r_w
         let masked_values: Vec<F2> = values_f2
             .iter()
-            .zip(auth_bits.iter())
-            .map(|(val, bit)| val + bit)
+            .zip(masks.iter())
+            .map(|(val, mask)| val + mask)
             .collect();
-        // Garbler encodes the masked values and sends them to the evaluator
+        // Garbler encodes the masked values as wire labels and sends them to the evaluator
         let encoded = self.encode_many_wires(&masked_values, &zeroes)?;
         for wire in encoded.iter() {
+            // In the paper, these wire labels are called:
+            // L_{w,x_w ⊕λ_w}
             channel.write(&wire.to_repr())?;
         }
         Ok(auth_wires)
@@ -347,10 +352,28 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
 
     fn receive_many(
         &mut self,
-        _moduli: &[u16],
-        _: &mut Channel,
+        moduli: &[u16],
+        channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        unimplemented!("Garbler cannot receive values")
+        let (evs, zeroes) = self.encode_many_auth_wires(moduli.len())?;
+
+        // The garbler receives the evaluator's masked values:
+        // y_w + λ_w := y_w ⊕ s_w ⊕ r_w
+        let masked_values: Vec<F2> = (0..moduli.len())
+            .into_iter()
+            .map(|i| {
+                // The garbler receives the evaluator's masked value y_w + λ_w
+                channel.read().unwrap()
+            })
+            .collect();
+        // The garbler encodes the evaluators masked values as wire labels:
+        // L_{w,y_w ⊕λ_w}
+        let encoded = self.encode_many_wires(&masked_values, &zeroes)?;
+        // The garbler sends out the evaluator's wire labels.
+        let _ = encoded
+            .iter()
+            .map(|e: &WireMod2| channel.write(&(*e).to_repr()));
+        Ok(evs)
     }
     fn constant(
         &mut self,
