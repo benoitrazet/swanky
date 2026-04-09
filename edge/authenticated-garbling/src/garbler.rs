@@ -20,7 +20,7 @@ type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler<RNG> {
-    deltas: HashMap<u16, WireMod2>, // map from modulus to associated delta wire-label.
+    delta: Option<WireMod2>, // delta wire-label.
     current_wire_index: usize,
     preprocessed_wires_map: HashMap<usize, PreProcessedWire<PartyGarbler>>,
     known_triples_map: HashMap<usize, PreProcessedWire<PartyGarbler>>,
@@ -31,7 +31,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// Create a new garbler.
     pub fn new(rng: RNG) -> swanky_error::Result<Self> {
         Ok(Garbler {
-            deltas: HashMap::new(),
+            delta: None,
             current_wire_index: 0,
             preprocessed_wires_map: HashMap::new(),
             known_triples_map: HashMap::new(),
@@ -41,13 +41,15 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
 
     /// Create a delta if it has not been created yet for this modulus, otherwise just
     /// return the existing one.
-    pub fn delta(&mut self, q: u16) -> WireMod2 {
-        if let Some(delta) = self.deltas.get(&q) {
-            return *delta;
+    pub fn delta(&mut self) -> WireMod2 {
+        match self.delta {
+            Some(d) => d,
+            None => {
+                let w = WireMod2::rand_delta(&mut self.rng, 2);
+                self.delta = Some(w);
+                w
+            }
         }
-        let w = WireMod2::rand_delta(&mut self.rng, q);
-        self.deltas.insert(q, w);
-        w
     }
 
     /// The current output index of the garbling computation.
@@ -88,18 +90,15 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         )?;
         self.preprocessed_wires_map = preprocessed_wires_map;
         self.known_triples_map = known_triples_map;
-        self.deltas.extend(HashMap::from([(
-            2,
-            WireLabel::from_repr(and_generator.delta(), 2),
-        )]));
+        self.delta = Some(WireMod2::from_repr(and_generator.delta(), 2));
         Ok(())
     }
 
     /// Get the deltas, consuming the Garbler.
     ///
     /// This is useful for reusing wires in multiple garbled circuit instances.
-    pub fn get_deltas(self) -> HashMap<u16, WireMod2> {
-        self.deltas
+    pub fn get_delta(&self) -> WireMod2 {
+        self.delta.unwrap()
     }
 
     /// Encode an authenticated wire, producing the zero label.
@@ -135,7 +134,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         masked_val: F2,
         zero: WireMod2,
     ) -> swanky_error::Result<WireMod2> {
-        let delta = self.delta(2);
+        let delta = self.delta();
         let enc = zero + delta * u16::from(masked_val);
         Ok(enc)
     }
@@ -183,7 +182,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             &gbs.iter()
                 .map(|auth_wire| auth_wire.auth_share())
                 .collect::<Vec<AuthShare<PartyGarbler>>>(),
-            self.delta(2).to_repr(),
+            self.get_delta().to_repr(),
             &mut auth_bits,
             channel,
         )?;
@@ -220,9 +219,9 @@ where
         // Compute l1 from l0 for both inputs
         //
         // This wire label is L_{α,1} = L_{α,0} + Δ
-        let la1 = la0.wire_label() + self.delta(2);
+        let la1 = la0.wire_label() + self.get_delta();
         // This wire label is L_{β,1} = L_{β,0} + Δ
-        let lb1 = lb0.wire_label() + self.delta(2);
+        let lb1 = lb0.wire_label() + self.get_delta();
 
         // Hash l0 and l1 from both inputs and use the current index as a tweak
         //
@@ -246,13 +245,13 @@ where
         let key_c_triple = lc0_triple.key();
 
         // Compute Δ_rα := Δ x r_α: if r_α is 0, then this value is 0, otherwise its Δ
-        let delta_bit_a = mux(la0.auth_share().bit(), 0.into(), self.delta(2).to_repr());
+        let delta_bit_a = mux(la0.auth_share().bit(), 0.into(), self.get_delta().to_repr());
         // Compute Δ_rβ := Δ x r_β: if r_β is 0, then this value is 0, otherwise its Δ
-        let delta_bit_b = mux(lb0.auth_share().bit(), 0.into(), self.delta(2).to_repr());
+        let delta_bit_b = mux(lb0.auth_share().bit(), 0.into(), self.get_delta().to_repr());
         // Compute Δ_rγ := Δ x r_γ: if r_γ is 0, then this value is 0, otherwise its Δ
-        let delta_bit_c = mux(lc0_share.bit(), 0.into(), self.delta(2).to_repr());
+        let delta_bit_c = mux(lc0_share.bit(), 0.into(), self.get_delta().to_repr());
         // Compute Δ_r*γ := Δ x r*_γ: if r*_γ is 0, then this value is 0, otherwise its Δ
-        let delta_bit_c_triple = mux(lc0_triple.bit(), 0.into(), self.delta(2).to_repr());
+        let delta_bit_c_triple = mux(lc0_triple.bit(), 0.into(), self.get_delta().to_repr());
 
         // Gate_{γ,0} = H(L_{α,0}, γ) + H(L_{α,1}, γ) + K[s_β] + Δ_rβ
         let gate0 = h_la0 + h_la1 + key_b + delta_bit_b;
@@ -293,7 +292,7 @@ where
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         AuthenticatedWireMod2 {
             // Negation of a wire is just a matter of adding Δ
-            wire_label: x.wire_label() + self.delta(2),
+            wire_label: x.wire_label() + self.get_delta(),
             // The authenticated share is not affected by negation
             auth_share: x.auth_share(),
             // The index of the wire does not change, this is consistent
@@ -306,7 +305,7 @@ where
 impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
     type Item = AuthenticatedWire;
 
-  /// Encodes several bits as authenticated shares.
+    /// Encodes several bits as authenticated shares.
     ///
     /// This is done in four steps: First the garbler generates authenticated wires for each of those
     /// inputs and returns the zeroes generated for those wires; Then the garbler open the authenticated
@@ -331,7 +330,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
                 .iter()
                 .map(|auth_wire| auth_wire.auth_share())
                 .collect::<Vec<AuthShare<PartyGarbler>>>(),
-            self.delta(2).to_repr(),
+            self.get_delta().to_repr(),
             &mut auth_bits,
             channel,
         )?;
@@ -369,7 +368,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         // Constant wires get their own dedicated authenticated share just like
         // an input wire.
         let auth_share = self.get_current_wire_share(index);
-        let wire = zero + self.delta(2) * x;
+        let wire = zero + self.get_delta() * x;
         // Send the correct wire label to the evaluator
         channel.write(&wire.to_repr())?;
         // Store the authenticate wire as the zero wire label and the authenticated share.
@@ -389,7 +388,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         let mut out = Vec::with_capacity(1);
         AuthShareGenerator::open_with_delta(
             &[auth_share],
-            self.delta(2).to_repr(),
+            self.get_delta().to_repr(),
             &mut out,
             channel,
         )?;
@@ -407,7 +406,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         let mut outputs = Vec::with_capacity(x.len());
         AuthShareGenerator::open_with_delta(
             &auth_shares,
-            self.delta(2).to_repr(),
+            self.get_delta().to_repr(),
             &mut outputs,
             channel,
         )?;
