@@ -106,11 +106,8 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         let zero = WireMod2::rand(&mut self.rng, 2);
         let index = self.current_wire_index();
 
-        let wire = AuthenticatedWireMod2 {
-            wire_label: zero,
-            auth_share: self.get_current_wire_share(index),
-            index,
-        };
+        let wire = AuthenticatedWireMod2::new(zero, self.get_current_wire_share(index), index);
+
         Ok((wire, zero))
     }
 
@@ -266,23 +263,23 @@ where
         channel.write(&gate1)?;
         channel.write(&bit_c)?;
 
-        Ok(AuthenticatedWireMod2 {
-            wire_label: WireMod2::from_repr(lc0, 2),
-            auth_share: lc0_share,
+        Ok(AuthenticatedWireMod2::new(
+            WireMod2::from_repr(lc0, 2),
+            lc0_share,
             index,
-        })
+        ))
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         let index = self.current_wire_index();
-        AuthenticatedWireMod2 {
+        AuthenticatedWireMod2::new(
             // L_{γ,0} = L_{α,0} + L_{β,0}
-            wire_label: x.wire_label() + y.wire_label(),
+            x.wire_label() + y.wire_label(),
             // TODO: This is already computed in preprocessing, maybe re-use it?
             //       although i am not sure if the storage is worth it.
-            auth_share: x.auth_share() ^ y.auth_share(),
+            x.auth_share() ^ y.auth_share(),
             index,
-        }
+        )
     }
 
     /// We can negate by having garbler xor wire with Delta
@@ -290,15 +287,15 @@ where
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        AuthenticatedWireMod2 {
+        AuthenticatedWireMod2::new(
             // Negation of a wire is just a matter of adding Δ
-            wire_label: x.wire_label() + self.get_delta(),
+            x.wire_label() + self.get_delta(),
             // The authenticated share is not affected by negation
-            auth_share: x.auth_share(),
+            x.auth_share(),
             // The index of the wire does not change, this is consistent
             // with how this wire is assigned an index in preprocessing.
-            index: x.index(),
-        }
+            x.index(),
+        )
     }
 }
 
@@ -372,11 +369,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         // Send the correct wire label to the evaluator
         channel.write(&wire.to_repr())?;
         // Store the authenticate wire as the zero wire label and the authenticated share.
-        Ok(AuthenticatedWireMod2 {
-            wire_label: zero,
-            auth_share,
-            index,
-        })
+        Ok(AuthenticatedWireMod2::new(zero, auth_share, index))
     }
 
     fn output(

@@ -119,22 +119,18 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
 impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
     /// Overriding `negate` to be a noop: entirely handled on garbler's end
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        AuthenticatedWireMod2 {
-            wire_label: x.wire_label() + self.one,
-            auth_share: x.auth_share(),
-            index: x.index(),
-        }
+        AuthenticatedWireMod2::new(x.wire_label() + self.one, x.auth_share(), x.index())
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         let index = self.current_wire_index();
         let current_value = self.get_value(x.index()) + self.get_value(y.index());
         self.insert_value(index, current_value);
-        AuthenticatedWireMod2 {
-            wire_label: x.wire_label() + y.wire_label(),
-            auth_share: x.auth_share() ^ y.auth_share(),
+        AuthenticatedWireMod2::new(
+            x.wire_label() + y.wire_label(),
+            x.auth_share() ^ y.auth_share(),
             index,
-        }
+        )
     }
 
     fn and(
@@ -193,11 +189,11 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
         // z_γ + λ_γ := b_γ + lsb(L_{γ, z_γ + λ_γ})
         let current_value = F128b::from(lc).lsb() + bit_c;
         self.insert_value(index, current_value);
-        Ok(AuthenticatedWireMod2 {
-            wire_label: WireMod2::from_repr(lc, 2),
-            auth_share: lc_share,
+        Ok(AuthenticatedWireMod2::new(
+            WireMod2::from_repr(lc, 2),
+            lc_share,
             index,
-        })
+        ))
     }
 }
 
@@ -222,11 +218,11 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
             .map(|_| {
                 let received_value = channel.read()?;
                 let index = self.current_wire_index();
-                let wire = AuthenticatedWireMod2 {
-                    wire_label: WireMod2::from_repr(received_value, 2),
-                    auth_share: self.get_current_wire_share(index),
+                let wire = AuthenticatedWireMod2::new(
+                    WireMod2::from_repr(received_value, 2),
+                    self.get_current_wire_share(index),
                     index,
-                };
+                );
                 Ok(wire)
             })
             .collect()
@@ -240,11 +236,11 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         let index = self.current_wire_index();
         let wire_label = self.read_wire(q, channel)?;
 
-        Ok(AuthenticatedWireMod2 {
+        Ok(AuthenticatedWireMod2::new(
             wire_label,
-            auth_share: self.get_current_wire_share(index),
+            self.get_current_wire_share(index),
             index,
-        })
+        ))
     }
 
     fn output(
