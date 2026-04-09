@@ -336,12 +336,17 @@ impl<Circuit: CircuitType> Default for CircuitBuilder<Circuit> {
 }
 
 #[cfg(test)]
-mod plaintext {
-    use super::*;
-    use crate::{FancyArithmetic, FancyBinary, FancyProj, util::RngExt};
-    use rand::thread_rng;
+pub(crate) mod circuits {
+    //! A collection of test circuits.
 
-    struct TestAndGateFanN(usize);
+    use crate::{
+        ArithmeticBundleGadgets, ArithmeticProjBundleGadgets, BundleGadgets, CrtBundle, CrtGadgets,
+        CrtProjGadgets, FancyArithmetic, FancyBinary, FancyProj, circuit::CircuitExecutor,
+    };
+    use swanky_channel::Channel;
+    use swanky_error::Result;
+
+    pub(crate) struct TestAndGateFanN(pub(crate) usize);
     impl<F: FancyBinary> CircuitExecutor<F> for TestAndGateFanN {
         fn execute(
             &self,
@@ -363,28 +368,14 @@ mod plaintext {
         }
     }
 
-    #[test]
-    fn and_gate_fan_n() {
-        let mut rng = thread_rng();
-        let n = 2 + (rng.gen_usize() % 200);
-        let c = TestAndGateFanN(n);
-
-        for _ in 0..16 {
-            let inputs = (0..n).map(|_| rng.gen_bool() as u16).collect::<Vec<_>>();
-            let expected = inputs.iter().fold(1, |acc, &x| x & acc);
-            let output = eval_plain(&c, &inputs).unwrap()[0];
-            assert_eq!(output, expected);
-        }
-    }
-
-    struct TestOrGateFanN(usize);
+    pub(crate) struct TestOrGateFanN(pub(crate) usize);
     impl<F: FancyBinary> CircuitExecutor<F> for TestOrGateFanN {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &[<F as Fancy>::Item],
+            inputs: &[F::Item],
             channel: &mut Channel,
-        ) -> Result<Vec<<F as Fancy>::Item>> {
+        ) -> Result<Vec<F::Item>> {
             let output = backend.or_many(inputs, channel)?;
             backend.output(&output, channel)?;
             Ok(vec![output])
@@ -399,28 +390,14 @@ mod plaintext {
         }
     }
 
-    #[test]
-    fn or_gate_fan_n() {
-        let mut rng = thread_rng();
-        let n = 2 + (rng.gen_usize() % 200);
-        let c = TestOrGateFanN(n);
-
-        for _ in 0..16 {
-            let inputs = (0..n).map(|_| rng.gen_bool() as u16).collect::<Vec<_>>();
-            let expected = inputs.iter().fold(0, |acc, &x| x | acc);
-            let output = eval_plain(&c, &inputs).unwrap()[0];
-            assert_eq!(output, expected);
-        }
-    }
-
-    struct TestAndGate;
+    pub(crate) struct TestAndGate;
     impl<F: FancyBinary> CircuitExecutor<F> for TestAndGate {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &[<F as Fancy>::Item],
+            inputs: &[F::Item],
             channel: &mut Channel,
-        ) -> Result<Vec<<F as Fancy>::Item>> {
+        ) -> Result<Vec<F::Item>> {
             let output = backend.and(&inputs[0], &inputs[1], channel)?;
             backend.output(&output, channel)?;
             Ok(vec![output])
@@ -435,27 +412,14 @@ mod plaintext {
         }
     }
 
-    #[test]
-    fn binary_half_gate() {
-        let mut rng = thread_rng();
-        let c = TestAndGate;
-
-        for _ in 0..16 {
-            let x = rng.gen_bool() as u16;
-            let y = rng.gen_bool() as u16;
-            let output = eval_plain(&c, &[x, y]).unwrap()[0];
-            assert_eq!(output, x * y % 2);
-        }
-    }
-
-    struct TestMulGate(u16);
+    pub(crate) struct TestMulGate(pub(crate) u16);
     impl<F: FancyArithmetic> CircuitExecutor<F> for TestMulGate {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &[<F as Fancy>::Item],
+            inputs: &[F::Item],
             channel: &mut Channel,
-        ) -> Result<Vec<<F as Fancy>::Item>> {
+        ) -> Result<Vec<F::Item>> {
             let output = backend.mul(&inputs[0], &inputs[1], channel)?;
             backend.output(&output, channel)?;
             Ok(vec![output])
@@ -470,28 +434,14 @@ mod plaintext {
         }
     }
 
-    #[test]
-    fn arithmetic_half_gate() {
-        let mut rng = thread_rng();
-        let q = rng.gen_prime();
-        let c = TestMulGate(q);
-
-        for _ in 0..16 {
-            let x = rng.gen_u16() % q;
-            let y = rng.gen_u16() % q;
-            let output = eval_plain(&c, &[x, y]).unwrap()[0];
-            assert_eq!(output, x * y % q);
-        }
-    }
-
-    struct TestModChange(u16, u16);
+    pub(crate) struct TestModChange(pub(crate) u16, pub(crate) u16);
     impl<F: FancyProj> CircuitExecutor<F> for TestModChange {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &[<F as Fancy>::Item],
+            inputs: &[F::Item],
             channel: &mut Channel,
-        ) -> Result<Vec<<F as Fancy>::Item>> {
+        ) -> Result<Vec<F::Item>> {
             let y = backend.mod_change(&inputs[0], self.1, channel)?;
             let z = backend.mod_change(&y, self.0, channel)?;
             backend.output(&z, channel)?;
@@ -507,28 +457,14 @@ mod plaintext {
         }
     }
 
-    #[test]
-    fn mod_change() {
-        let mut rng = thread_rng();
-        let p = rng.gen_prime();
-        let q = rng.gen_prime();
-        let c = TestModChange(p, q);
-
-        for _ in 0..16 {
-            let x = rng.gen_u16() % p;
-            let output = eval_plain(&c, &[x]).unwrap()[0];
-            assert_eq!(output, x % q);
-        }
-    }
-
-    struct TestAddManyModChange(usize);
+    pub(crate) struct TestAddManyModChange(pub(crate) usize);
     impl<F: FancyProj + FancyArithmetic> CircuitExecutor<F> for TestAddManyModChange {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &[<F as Fancy>::Item],
+            inputs: &[F::Item],
             channel: &mut Channel,
-        ) -> Result<Vec<<F as Fancy>::Item>> {
+        ) -> Result<Vec<F::Item>> {
             let wires = inputs
                 .iter()
                 .map(|x| backend.mod_change(x, self.0 as u16 + 1, channel))
@@ -547,32 +483,14 @@ mod plaintext {
         }
     }
 
-    #[test]
-    fn add_many_mod_change() {
-        let mut rng = thread_rng();
-        let n = 113;
-        let c = TestAddManyModChange(n);
-
-        for _ in 0..64 {
-            let inputs = (0..<TestAddManyModChange as CircuitExecutor<Dummy>>::ninputs(&c))
-                .map(|i| {
-                    rng.gen_u16() % <TestAddManyModChange as CircuitExecutor<Dummy>>::modulus(&c, i)
-                })
-                .collect::<Vec<_>>();
-            let expected: u16 = inputs.iter().sum();
-            let output = eval_plain(&c, &inputs).unwrap()[0];
-            assert_eq!(output, expected);
-        }
-    }
-
-    struct TestConstants(u16, u16);
+    pub(crate) struct TestConstants(pub(crate) u16, pub(crate) u16);
     impl<F: FancyArithmetic> CircuitExecutor<F> for TestConstants {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &[<F as Fancy>::Item],
+            inputs: &[F::Item],
             channel: &mut Channel,
-        ) -> Result<Vec<<F as Fancy>::Item>> {
+        ) -> Result<Vec<F::Item>> {
             let constant = backend.constant(self.1, self.0, channel)?;
             let output = backend.add(&inputs[0], &constant);
             backend.output(&output, channel)?;
@@ -588,34 +506,8 @@ mod plaintext {
         }
     }
 
-    #[test]
-    fn constants() {
-        let mut rng = thread_rng();
-        let q = rng.gen_modulus();
-        let c = rng.gen_u16() % q;
-        let circ = TestConstants(q, c);
-
-        for _ in 0..64 {
-            let x = rng.gen_u16() % q;
-            let output = eval_plain(&circ, &[x]).unwrap()[0];
-            assert_eq!(output, (x + c) % q);
-        }
-    }
-}
-
-#[cfg(test)]
-mod bundle {
-    use super::*;
-    use crate::{
-        ArithmeticProjBundleGadgets, CrtProjGadgets,
-        fancy::{ArithmeticBundleGadgets, BinaryGadgets, BundleGadgets, CrtGadgets},
-        util::{self, RngExt, crt_factor, crt_inv_factor},
-    };
-    use itertools::Itertools;
-    use rand::thread_rng;
-
-    struct TestBundleInputOutput(Vec<u16>);
-    impl<F: Fancy> CircuitExecutor<F> for TestBundleInputOutput {
+    pub(crate) struct TestBundleInputOutput(pub(crate) Vec<u16>);
+    impl<F: BundleGadgets> CircuitExecutor<F> for TestBundleInputOutput {
         fn execute(
             &self,
             backend: &mut F,
@@ -636,28 +528,14 @@ mod bundle {
         }
     }
 
-    #[test]
-    fn test_bundle_input_output() {
-        let mut rng = thread_rng();
-        let q = rng.gen_usable_composite_modulus();
-        let c = TestBundleInputOutput(util::factor(q));
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let y = eval_plain(&c, &crt_factor(x, q)).unwrap();
-            let output = crt_inv_factor(&y, q);
-            assert_eq!(output, x);
-        }
-    }
-
-    struct TestCrtAddition(Vec<u16>);
+    pub(crate) struct TestCrtAddition(pub(crate) Vec<u16>);
     impl<F: CrtGadgets> CircuitExecutor<F> for TestCrtAddition {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &[<F as Fancy>::Item],
+            inputs: &[F::Item],
             channel: &mut Channel,
-        ) -> Result<Vec<<F as Fancy>::Item>> {
+        ) -> Result<Vec<F::Item>> {
             let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
             let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
             let z = backend.crt_add(&x, &y);
@@ -674,31 +552,14 @@ mod bundle {
         }
     }
 
-    #[test]
-    fn test_addition() {
-        let mut rng = thread_rng();
-        let q = rng.gen_usable_composite_modulus();
-        let c = TestCrtAddition(util::factor(q));
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let y = rng.gen_u128() % q;
-            let mut inputs = crt_factor(x, q);
-            inputs.extend(crt_factor(y, q));
-            let z = eval_plain(&c, &inputs).unwrap();
-            let output = crt_inv_factor(&z, q);
-            assert_eq!(output, (x + y) % q);
-        }
-    }
-
-    struct TestCrtSubtraction(Vec<u16>);
+    pub(crate) struct TestCrtSubtraction(pub(crate) Vec<u16>);
     impl<F: CrtGadgets> CircuitExecutor<F> for TestCrtSubtraction {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &[<F as Fancy>::Item],
+            inputs: &[F::Item],
             channel: &mut Channel,
-        ) -> Result<Vec<<F as Fancy>::Item>> {
+        ) -> Result<Vec<F::Item>> {
             let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
             let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
             let z = backend.crt_sub(&x, &y);
@@ -715,31 +576,14 @@ mod bundle {
         }
     }
 
-    #[test]
-    fn test_subtraction() {
-        let mut rng = thread_rng();
-        let q = rng.gen_usable_composite_modulus();
-        let c = TestCrtSubtraction(util::factor(q));
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let y = rng.gen_u128() % q;
-            let mut inputs = crt_factor(x, q);
-            inputs.extend(crt_factor(y, q));
-            let z = eval_plain(&c, &inputs).unwrap();
-            let output = crt_inv_factor(&z, q);
-            assert_eq!(output, (x + q - y) % q);
-        }
-    }
-
-    struct TestCrtCmul(Vec<u16>, u128);
+    pub(crate) struct TestCrtCmul(pub(crate) Vec<u16>, pub(crate) u128);
     impl<F: CrtGadgets> CircuitExecutor<F> for TestCrtCmul {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &[<F as Fancy>::Item],
+            inputs: &[F::Item],
             channel: &mut Channel,
-        ) -> Result<Vec<<F as Fancy>::Item>> {
+        ) -> Result<Vec<F::Item>> {
             let x = CrtBundle::new(inputs.to_vec());
             let z = backend.crt_cmul(&x, self.1);
             backend.output_bundle(&z, channel)?;
@@ -755,29 +599,14 @@ mod bundle {
         }
     }
 
-    #[test]
-    fn test_cmul() {
-        let mut rng = thread_rng();
-        let q = util::modulus_with_width(16);
-        let y = rng.gen_u128() % q;
-        let c = TestCrtCmul(util::factor(q), y);
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let z = eval_plain(&c, &crt_factor(x, q)).unwrap();
-            let output = crt_inv_factor(&z, q);
-            assert_eq!(output, (x * y) % q);
-        }
-    }
-
-    struct TestCrtMultiplication(Vec<u16>);
+    pub(crate) struct TestCrtMultiplication(pub(crate) Vec<u16>);
     impl<F: ArithmeticBundleGadgets> CircuitExecutor<F> for TestCrtMultiplication {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &[<F as Fancy>::Item],
+            inputs: &[F::Item],
             channel: &mut Channel,
-        ) -> Result<Vec<<F as Fancy>::Item>> {
+        ) -> Result<Vec<F::Item>> {
             let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
             let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
             let z = backend.mul_bundles(&x, &y, channel)?;
@@ -794,31 +623,14 @@ mod bundle {
         }
     }
 
-    #[test]
-    fn test_multiplication() {
-        let mut rng = thread_rng();
-        let q = rng.gen_usable_composite_modulus();
-        let c = TestCrtMultiplication(util::factor(q));
-
-        for _ in 0..16 {
-            let x = rng.gen_u64() as u128 % q;
-            let y = rng.gen_u64() as u128 % q;
-            let mut inputs = crt_factor(x, q);
-            inputs.extend(crt_factor(y, q));
-            let z = eval_plain(&c, &inputs).unwrap();
-            let output = crt_inv_factor(&z, q);
-            assert_eq!(output, (x * y) % q);
-        }
-    }
-
-    struct TestCrtCexp(Vec<u16>, u16);
+    pub(crate) struct TestCrtCexp(pub(crate) Vec<u16>, pub(crate) u16);
     impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtCexp {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &[<F as Fancy>::Item],
+            inputs: &[F::Item],
             channel: &mut Channel,
-        ) -> Result<Vec<<F as Fancy>::Item>> {
+        ) -> Result<Vec<F::Item>> {
             let x = CrtBundle::new(inputs.to_vec());
             let z = backend.crt_cexp(&x, self.1, channel)?;
             backend.output_bundle(&z, channel)?;
@@ -834,29 +646,14 @@ mod bundle {
         }
     }
 
-    #[test]
-    fn test_cexp() {
-        let mut rng = thread_rng();
-        let q = util::modulus_with_width(10);
-        let y = rng.gen_u16() % 10;
-        let c = TestCrtCexp(util::factor(q), y);
-
-        for _ in 0..64 {
-            let x = rng.gen_u16() as u128 % q;
-            let z = eval_plain(&c, &crt_factor(x, q)).unwrap();
-            let output = crt_inv_factor(&z, q);
-            assert_eq!(output, x.pow(y as u32) % q);
-        }
-    }
-
-    struct TestCrtRemainder(Vec<u16>, u16);
+    pub(crate) struct TestCrtRemainder(pub(crate) Vec<u16>, pub(crate) u16);
     impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtRemainder {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &[<F as Fancy>::Item],
+            inputs: &[F::Item],
             channel: &mut Channel,
-        ) -> Result<Vec<<F as Fancy>::Item>> {
+        ) -> Result<Vec<F::Item>> {
             let x = CrtBundle::new(inputs.to_vec());
             let z = backend.crt_rem(&x, self.1, channel)?;
             backend.output_bundle(&z, channel)?;
@@ -872,30 +669,14 @@ mod bundle {
         }
     }
 
-    #[test]
-    fn test_remainder() {
-        let mut rng = thread_rng();
-        let ps = rng.gen_usable_factors();
-        let q = ps.iter().fold(1, |acc, &x| (x as u128) * acc);
-        let p = ps[rng.gen_u16() as usize % ps.len()];
-        let c = TestCrtRemainder(ps, p);
-
-        for _ in 0..64 {
-            let x = rng.gen_u128() % q;
-            let z = eval_plain(&c, &crt_factor(x, q)).unwrap();
-            let output = crt_inv_factor(&z, q);
-            assert_eq!(output, x % p as u128);
-        }
-    }
-
-    struct TestEquality(Vec<u16>);
-    impl<F: ArithmeticProjBundleGadgets> CircuitExecutor<F> for TestEquality {
+    pub(crate) struct TestEqBundles(pub(crate) Vec<u16>);
+    impl<F: ArithmeticProjBundleGadgets> CircuitExecutor<F> for TestEqBundles {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &[<F as Fancy>::Item],
+            inputs: &[F::Item],
             channel: &mut Channel,
-        ) -> Result<Vec<<F as Fancy>::Item>> {
+        ) -> Result<Vec<F::Item>> {
             let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
             let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
             let z = backend.eq_bundles(&x, &y, channel)?;
@@ -911,12 +692,248 @@ mod bundle {
             self.0[i % self.0.len()]
         }
     }
+}
+
+#[cfg(test)]
+mod plaintext {
+    use super::circuits;
+    use super::*;
+    use crate::util::RngExt;
+    use rand::thread_rng;
 
     #[test]
-    fn test_equality() {
+    fn and_gate_fan_n() {
+        let mut rng = thread_rng();
+        let n = 2 + (rng.gen_usize() % 200);
+        let c = circuits::TestAndGateFanN(n);
+
+        for _ in 0..16 {
+            let inputs = (0..n).map(|_| rng.gen_bool() as u16).collect::<Vec<_>>();
+            let expected = inputs.iter().fold(1, |acc, &x| x & acc);
+            let output = eval_plain(&c, &inputs).unwrap()[0];
+            assert_eq!(output, expected);
+        }
+    }
+
+    #[test]
+    fn or_gate_fan_n() {
+        let mut rng = thread_rng();
+        let n = 2 + (rng.gen_usize() % 200);
+        let c = circuits::TestOrGateFanN(n);
+
+        for _ in 0..16 {
+            let inputs = (0..n).map(|_| rng.gen_bool() as u16).collect::<Vec<_>>();
+            let expected = inputs.iter().fold(0, |acc, &x| x | acc);
+            let output = eval_plain(&c, &inputs).unwrap()[0];
+            assert_eq!(output, expected);
+        }
+    }
+
+    #[test]
+    fn binary_half_gate() {
+        let mut rng = thread_rng();
+        let c = circuits::TestAndGate;
+
+        for _ in 0..16 {
+            let x = rng.gen_bool() as u16;
+            let y = rng.gen_bool() as u16;
+            let output = eval_plain(&c, &[x, y]).unwrap()[0];
+            assert_eq!(output, x * y % 2);
+        }
+    }
+
+    #[test]
+    fn arithmetic_half_gate() {
+        let mut rng = thread_rng();
+        let q = rng.gen_prime();
+        let c = circuits::TestMulGate(q);
+
+        for _ in 0..16 {
+            let x = rng.gen_u16() % q;
+            let y = rng.gen_u16() % q;
+            let output = eval_plain(&c, &[x, y]).unwrap()[0];
+            assert_eq!(output, x * y % q);
+        }
+    }
+
+    #[test]
+    fn mod_change() {
+        let mut rng = thread_rng();
+        let p = rng.gen_prime();
+        let q = rng.gen_prime();
+        let c = circuits::TestModChange(p, q);
+
+        for _ in 0..16 {
+            let x = rng.gen_u16() % p;
+            let output = eval_plain(&c, &[x]).unwrap()[0];
+            assert_eq!(output, x % q);
+        }
+    }
+
+    #[test]
+    fn add_many_mod_change() {
+        let mut rng = thread_rng();
+        let n = 113;
+        let c = circuits::TestAddManyModChange(n);
+
+        for _ in 0..64 {
+            let inputs =
+                (0..<circuits::TestAddManyModChange as CircuitExecutor<Dummy>>::ninputs(&c))
+                    .map(|i| {
+                        rng.gen_u16()
+                            % <circuits::TestAddManyModChange as CircuitExecutor<Dummy>>::modulus(
+                                &c, i,
+                            )
+                    })
+                    .collect::<Vec<_>>();
+            let expected: u16 = inputs.iter().sum();
+            let output = eval_plain(&c, &inputs).unwrap()[0];
+            assert_eq!(output, expected);
+        }
+    }
+
+    #[test]
+    fn constants() {
+        let mut rng = thread_rng();
+        let q = rng.gen_modulus();
+        let c = rng.gen_u16() % q;
+        let circ = circuits::TestConstants(q, c);
+
+        for _ in 0..64 {
+            let x = rng.gen_u16() % q;
+            let output = eval_plain(&circ, &[x]).unwrap()[0];
+            assert_eq!(output, (x + c) % q);
+        }
+    }
+}
+
+#[cfg(test)]
+mod bundle {
+    use super::*;
+    use crate::{
+        ArithmeticProjBundleGadgets, CrtProjGadgets,
+        fancy::{BinaryGadgets, BundleGadgets},
+        util::{self, RngExt, crt_factor, crt_inv_factor},
+    };
+    use itertools::Itertools;
+    use rand::thread_rng;
+
+    #[test]
+    fn test_bundle_input_output() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
-        let c = TestEquality(util::factor(q));
+        let c = circuits::TestBundleInputOutput(util::factor(q));
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let y = eval_plain(&c, &crt_factor(x, q)).unwrap();
+            let output = crt_inv_factor(&y, q);
+            assert_eq!(output, x);
+        }
+    }
+
+    #[test]
+    fn test_addition() {
+        let mut rng = thread_rng();
+        let q = rng.gen_usable_composite_modulus();
+        let c = circuits::TestCrtAddition(util::factor(q));
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let mut inputs = crt_factor(x, q);
+            inputs.extend(crt_factor(y, q));
+            let z = eval_plain(&c, &inputs).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, (x + y) % q);
+        }
+    }
+
+    #[test]
+    fn test_subtraction() {
+        let mut rng = thread_rng();
+        let q = rng.gen_usable_composite_modulus();
+        let c = circuits::TestCrtSubtraction(util::factor(q));
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let mut inputs = crt_factor(x, q);
+            inputs.extend(crt_factor(y, q));
+            let z = eval_plain(&c, &inputs).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, (x + q - y) % q);
+        }
+    }
+
+    #[test]
+    fn test_cmul() {
+        let mut rng = thread_rng();
+        let q = util::modulus_with_width(16);
+        let y = rng.gen_u128() % q;
+        let c = circuits::TestCrtCmul(util::factor(q), y);
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let z = eval_plain(&c, &crt_factor(x, q)).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, (x * y) % q);
+        }
+    }
+
+    #[test]
+    fn test_multiplication() {
+        let mut rng = thread_rng();
+        let q = rng.gen_usable_composite_modulus();
+        let c = circuits::TestCrtMultiplication(util::factor(q));
+
+        for _ in 0..16 {
+            let x = rng.gen_u64() as u128 % q;
+            let y = rng.gen_u64() as u128 % q;
+            let mut inputs = crt_factor(x, q);
+            inputs.extend(crt_factor(y, q));
+            let z = eval_plain(&c, &inputs).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, (x * y) % q);
+        }
+    }
+
+    #[test]
+    fn test_cexp() {
+        let mut rng = thread_rng();
+        let q = util::modulus_with_width(10);
+        let y = rng.gen_u16() % 10;
+        let c = circuits::TestCrtCexp(util::factor(q), y);
+
+        for _ in 0..64 {
+            let x = rng.gen_u16() as u128 % q;
+            let z = eval_plain(&c, &crt_factor(x, q)).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, x.pow(y as u32) % q);
+        }
+    }
+
+    #[test]
+    fn test_remainder() {
+        let mut rng = thread_rng();
+        let ps = rng.gen_usable_factors();
+        let q = ps.iter().fold(1, |acc, &x| (x as u128) * acc);
+        let p = ps[rng.gen_u16() as usize % ps.len()];
+        let c = circuits::TestCrtRemainder(ps, p);
+
+        for _ in 0..64 {
+            let x = rng.gen_u128() % q;
+            let z = eval_plain(&c, &crt_factor(x, q)).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, x % p as u128);
+        }
+    }
+
+    #[test]
+    fn test_eq_bundles() {
+        let mut rng = thread_rng();
+        let q = rng.gen_usable_composite_modulus();
+        let c = circuits::TestEqBundles(util::factor(q));
 
         // Let's have at least one test where they are surely equal.
         let x = rng.gen_u128() % q;
