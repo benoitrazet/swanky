@@ -81,7 +81,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
         let mut and_generator = AndTripleGenerator::new(channel, &mut self.rng)?;
-        let (preprocessed_wires_map, known_triples_map) = f_preprocessing(
+        let (preprocessed_wires_map, known_triples_map, _) = f_preprocessing(
             &circuit,
             &mut and_generator,
             input_size,

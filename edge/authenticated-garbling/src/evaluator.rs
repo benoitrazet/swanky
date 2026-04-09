@@ -29,8 +29,8 @@ pub struct Evaluator<RNG> {
     current_wire_index: usize,
     preprocessed_wires_map: HashMap<usize, PreProcessedWire<PartyEvaluator>>,
     known_triples_map: HashMap<usize, PreProcessedWire<PartyEvaluator>>,
-    values: HashMap<usize, F2>,
-    rng: RNG,
+    pub(crate) values: Vec<F2>,
+    pub(crate) rng: RNG,
 }
 
 impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
@@ -44,7 +44,7 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
             authentication_delta: U8x16::from(0),
             preprocessed_wires_map: HashMap::new(),
             known_triples_map: HashMap::new(),
-            values: HashMap::new(),
+            values: Vec::new(),
             current_wire_index: 0,
             rng,
         })
@@ -64,7 +64,7 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
         let mut and_generator = AndTripleGenerator::new(channel, &mut self.rng)?;
-        let (preprocessed_wires_map, known_triples_map) = f_preprocessing(
+        let (preprocessed_wires_map, known_triples_map, nwires) = f_preprocessing(
             &circuit,
             &mut and_generator,
             input_size,
@@ -74,6 +74,7 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
         self.preprocessed_wires_map = preprocessed_wires_map;
         self.known_triples_map = known_triples_map;
         self.authentication_delta = and_generator.delta();
+        self.values = Vec::with_capacity(nwires);
         Ok(())
     }
 
@@ -97,11 +98,11 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
     }
     /// Returns the underlying value associated with the wire index
     fn get_value(&mut self, index: usize) -> F2 {
-        self.values[&index]
+        self.values[index]
     }
     /// Sets the underlying associated with the wire index
-    fn insert_value(&mut self, index: usize, value: F2) {
-        self.values.insert(index, value);
+    pub(crate) fn insert_value(&mut self, index: usize, value: F2) {
+        self.values[index] = value;
     }
     /// Read a Wire from the reader.
     pub fn read_wire(
