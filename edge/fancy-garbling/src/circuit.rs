@@ -340,9 +340,9 @@ pub(crate) mod circuits {
     //! A collection of test circuits.
 
     use crate::{
-        ArithmeticBundleGadgets, ArithmeticProjBundleGadgets, Bundle, BundleGadgets, CrtBundle,
-        CrtGadgets, CrtProjGadgets, FancyArithmetic, FancyBinary, FancyProj,
-        circuit::CircuitExecutor,
+        ArithmeticBundleGadgets, ArithmeticProjBundleGadgets, BinaryBundle, BinaryGadgets, Bundle,
+        BundleGadgets, CrtBundle, CrtGadgets, CrtProjGadgets, FancyArithmetic, FancyBinary,
+        FancyProj, circuit::CircuitExecutor,
     };
     use swanky_channel::Channel;
     use swanky_error::Result;
@@ -908,6 +908,150 @@ pub(crate) mod circuits {
             self.0[i % self.0.len()]
         }
     }
+
+    pub(crate) struct TestRelu(pub(crate) Vec<u16>);
+    impl<F: CrtProjGadgets> CircuitExecutor<F> for TestRelu {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = CrtBundle::new(inputs.to_vec());
+            let z = backend.crt_relu(&x, "100%", None, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len()
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i]
+        }
+    }
+
+    pub(crate) struct TestSgn(pub(crate) Vec<u16>);
+    impl<F: CrtProjGadgets> CircuitExecutor<F> for TestSgn {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = CrtBundle::new(inputs.to_vec());
+            let z = backend.crt_sgn(&x, "100%", None, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len()
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i]
+        }
+    }
+
+    pub(crate) struct TestLeq(pub(crate) Vec<u16>);
+    impl<F: CrtProjGadgets> CircuitExecutor<F> for TestLeq {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
+            let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
+            let z = backend.crt_lt(&x, &y, "100%", channel)?;
+            backend.output(&z, channel)?;
+            Ok(vec![z])
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len() * 2
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i % self.0.len()]
+        }
+    }
+
+    pub(crate) struct TestMax(pub(crate) Vec<u16>, pub(crate) usize);
+    impl<F: CrtProjGadgets> CircuitExecutor<F> for TestMax {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let xs = inputs
+                .chunks_exact(self.0.len())
+                .map(|v| CrtBundle::new(v.to_vec()))
+                .collect::<Vec<_>>();
+            let z = backend.crt_max(&xs, "100%", channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len() * self.1
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i % self.0.len()]
+        }
+    }
+
+    pub(crate) struct TestBinaryAddition(pub(crate) usize);
+    impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryAddition {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = BinaryBundle::new(inputs[..self.0].to_vec());
+            let y = BinaryBundle::new(inputs[self.0..].to_vec());
+            let (z, carry) = backend.bin_addition(&x, &y, channel)?;
+            backend.output(&carry, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok([vec![carry], z.wires().to_vec()].concat())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0 * 2
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
+    pub(crate) struct TestBinaryDemux(pub(crate) usize);
+    impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryDemux {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = BinaryBundle::new(inputs.to_vec());
+            let output = backend.bin_demux(&x, channel)?;
+            backend.outputs(&output, channel)?;
+            Ok(output)
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1026,11 +1170,7 @@ mod plaintext {
 #[cfg(test)]
 mod bundle {
     use super::*;
-    use crate::{
-        CrtProjGadgets,
-        fancy::{BinaryGadgets, BundleGadgets},
-        util::{self, RngExt, crt_factor, crt_inv_factor},
-    };
+    use crate::util::{self, RngExt, crt_factor, crt_inv_factor, factor};
     use itertools::Itertools;
     use rand::thread_rng;
 
@@ -1172,210 +1312,142 @@ mod bundle {
     fn test_mixed_radix_addition() {
         let mut rng = thread_rng();
         let nargs = 2 + rng.gen_usize() % 100;
-        let mods = (0..7).map(|_| rng.gen_modulus()).collect_vec();
-        let circ = circuits::TestMixedRadixAddition(mods.clone(), nargs);
-
-        let Q: u128 = mods.iter().map(|&q| q as u128).product();
+        let moduli = (0..7).map(|_| rng.gen_modulus()).collect_vec();
+        let q: u128 = moduli.iter().map(|&q| q as u128).product();
+        let circ = circuits::TestMixedRadixAddition(moduli.clone(), nargs);
 
         // Test maximum overflow.
-        let mut ds = Vec::new();
+        let mut inputs = Vec::new();
         for _ in 0..nargs {
-            ds.extend(util::as_mixed_radix(Q - 1, &mods).iter());
+            inputs.extend(util::as_mixed_radix(q - 1, &moduli).iter());
         }
-        let res = eval_plain(&circ, &ds).unwrap();
+        let output = eval_plain(&circ, &inputs).unwrap();
         assert_eq!(
-            util::from_mixed_radix(&res, &mods),
-            (Q - 1) * (nargs as u128) % Q
+            util::from_mixed_radix(&output, &moduli),
+            (q - 1) * (nargs as u128) % q
         );
 
         // Test random values.
         for _ in 0..4 {
-            let mut should_be = 0;
-            let mut ds = Vec::new();
+            let mut expected = 0;
+            let mut inputs = Vec::new();
             for _ in 0..nargs {
-                let x = rng.gen_u128() % Q;
-                should_be = (should_be + x) % Q;
-                ds.extend(util::as_mixed_radix(x, &mods).iter());
+                let x = rng.gen_u128() % q;
+                expected = (expected + x) % q;
+                inputs.extend(util::as_mixed_radix(x, &moduli).iter());
             }
-            let res = eval_plain(&circ, &ds).unwrap();
-            assert_eq!(util::from_mixed_radix(&res, &mods), should_be);
+            let output = eval_plain(&circ, &inputs).unwrap();
+            assert_eq!(util::from_mixed_radix(&output, &moduli), expected);
         }
     }
 
-    #[test] // bundle relu {{{
+    #[test]
     fn test_relu() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
-        println!("q={}", q);
-
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-            let x = b.crt_input(q);
-            let z = b.crt_relu(&x, "100%", None, channel).unwrap();
-            b.output_bundle(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
+        let c = circuits::TestRelu(factor(q));
 
         for _ in 0..128 {
-            let pt = rng.gen_u128() % q;
-            let should_be = if pt < q / 2 { pt } else { 0 };
-            let res = eval_plain(&c, &crt_factor(pt, q)).unwrap();
-            let z = crt_inv_factor(&res, q);
-            assert_eq!(z, should_be);
+            let input = rng.gen_u128() % q;
+            let expected = if input < q / 2 { input } else { 0 };
+            let z = eval_plain(&c, &crt_factor(input, q)).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, expected);
         }
     }
-    //}}}
-    #[test] // bundle sgn {{{
+
+    #[test]
     fn test_sgn() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
-        println!("q={}", q);
-
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-            let x = b.crt_input(q);
-            let z = b.crt_sgn(&x, "100%", None, channel).unwrap();
-            b.output_bundle(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
+        let c = circuits::TestSgn(factor(q));
 
         for _ in 0..128 {
-            let pt = rng.gen_u128() % q;
-            let should_be = if pt < q / 2 { 1 } else { q - 1 };
-            let res = eval_plain(&c, &crt_factor(pt, q)).unwrap();
-            let z = crt_inv_factor(&res, q);
-            assert_eq!(z, should_be);
+            let input = rng.gen_u128() % q;
+            let expected = if input < q / 2 { 1 } else { q - 1 };
+            let z = eval_plain(&c, &crt_factor(input, q)).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, expected);
         }
     }
-    //}}}
-    #[test] // bundle leq {{{
+
+    #[test]
     fn test_leq() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
+        let c = circuits::TestLeq(factor(q));
 
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-            let x = b.crt_input(q);
-            let y = b.crt_input(q);
-            let z = b.crt_lt(&x, &y, "100%", channel).unwrap();
-            b.output(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
-
-        // lets have at least one test where they are surely equal
+        // Let's have at least one test where they are surely equal.
         let x = rng.gen_u128() % q / 2;
         let mut inputs = crt_factor(x, q);
         inputs.extend(crt_factor(x, q));
-        let res = eval_plain(&c, &inputs).unwrap();
-        assert_eq!(res, &[(x < x) as u16], "x={}", x);
+        let output = eval_plain(&c, &inputs).unwrap()[0];
+        assert_eq!(output, (x < x) as u16);
 
         for _ in 0..64 {
             let x = rng.gen_u128() % q / 2;
             let y = rng.gen_u128() % q / 2;
             let mut inputs = crt_factor(x, q);
             inputs.extend(crt_factor(y, q));
-            let res = eval_plain(&c, &inputs).unwrap();
-            assert_eq!(res, &[(x < y) as u16], "x={} y={}", x, y);
+            let output = eval_plain(&c, &inputs).unwrap()[0];
+            assert_eq!(output, (x < y) as u16);
         }
     }
-    //}}}
-    #[test] // bundle max {{{
+
+    #[test]
     fn test_max() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
         let n = 10;
-        println!("n={} q={}", n, q);
-
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::new();
-            let xs = (0..n).map(|_| b.crt_input(q)).collect_vec();
-            let z = b.crt_max(&xs, "100%", channel).unwrap();
-            b.output_bundle(&z, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
+        let c = circuits::TestMax(factor(q), n);
 
         for _ in 0..16 {
-            let inps = (0..n).map(|_| rng.gen_u128() % (q / 2)).collect_vec();
-            println!("{:?}", inps);
-            let should_be = *inps.iter().max().unwrap();
+            let inputs = (0..n).map(|_| rng.gen_u128() % (q / 2)).collect_vec();
+            let expected = *inputs.iter().max().unwrap();
 
-            let enc_inps = inps
+            let inputs = inputs
                 .into_iter()
                 .flat_map(|x| crt_factor(x, q))
                 .collect_vec();
-            let res = eval_plain(&c, &enc_inps).unwrap();
-            let z = crt_inv_factor(&res, q);
-            assert_eq!(z, should_be);
+            let z = eval_plain(&c, &inputs).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, expected);
         }
     }
-    //}}}
-    #[test] // binary addition {{{
+
+    #[test]
     fn test_binary_addition() {
         let mut rng = thread_rng();
         let n = 2 + (rng.gen_usize() % 10);
-        let q = 2;
-        let Q = util::product(&vec![q; n]);
-        println!("n={} q={} Q={}", n, q, Q);
-
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::<BinaryCircuit>::new();
-            let x = b.bin_input(n);
-            let y = b.bin_input(n);
-            let (zs, carry) = b.bin_addition(&x, &y, channel).unwrap();
-            b.output(&carry, channel).unwrap();
-            b.output_bundle(&zs, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
+        let q = util::product(&vec![2; n]);
+        let c = circuits::TestBinaryAddition(n);
 
         for _ in 0..16 {
-            let x = rng.gen_u128() % Q;
-            let y = rng.gen_u128() % Q;
-            println!("x={} y={}", x, y);
-            let res_should_be = (x + y) % Q;
-            let carry_should_be = (x + y >= Q) as u16;
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let expected_res = (x + y) % q;
+            let expected_carry = (x + y >= q) as u16;
             let mut inputs = util::u128_to_bits(x, n);
             inputs.extend(util::u128_to_bits(y, n));
-            let res = eval_plain(&c, &inputs).unwrap();
-            assert_eq!(util::u128_from_bits(&res[1..]), res_should_be);
-            assert_eq!(res[0], carry_should_be);
+            let output = eval_plain(&c, &inputs).unwrap();
+            assert_eq!(util::u128_from_bits(&output[1..]), expected_res);
+            assert_eq!(output[0], expected_carry);
         }
     }
-    //}}}
-    #[test] // binary demux {{{
+
+    #[test]
     fn test_bin_demux() {
         let mut rng = thread_rng();
         let nbits = 1 + (rng.gen_usize() % 7);
-        let Q = 1 << nbits as u128;
-
-        let c = Channel::with(std::io::empty(), |channel| {
-            let mut b = CircuitBuilder::<BinaryCircuit>::new();
-            let x = b.bin_input(nbits);
-            let d = b.bin_demux(&x, channel).unwrap();
-            b.outputs(&d, channel).unwrap();
-            let c = b.finish();
-            Ok(c)
-        })
-        .unwrap();
+        let q: u128 = 1 << nbits as u128;
+        let c = circuits::TestBinaryDemux(nbits);
 
         for _ in 0..16 {
-            let x = rng.gen_u128() % Q;
-            println!("x={}", x);
-            let mut should_be = vec![0; Q as usize];
-            should_be[x as usize] = 1;
-
-            let res = eval_plain(&c, &util::u128_to_bits(x, nbits)).unwrap();
-
-            for (i, y) in res.into_iter().enumerate() {
+            let x = rng.gen_u128() % q;
+            let mut expected = vec![0; q as usize];
+            expected[x as usize] = 1;
+            let output = eval_plain(&c, &util::u128_to_bits(x, nbits)).unwrap();
+            for (i, y) in output.into_iter().enumerate() {
                 if i as u128 == x {
                     assert_eq!(y, 1);
                 } else {
@@ -1384,5 +1456,4 @@ mod bundle {
             }
         }
     }
-    //}}}
 }
