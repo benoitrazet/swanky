@@ -390,6 +390,48 @@ pub(crate) mod circuits {
         }
     }
 
+    pub(crate) struct TestAddition(pub(crate) u16);
+    impl<F: FancyArithmetic> CircuitExecutor<F> for TestAddition {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[F::Item],
+            _: &mut Channel,
+        ) -> swanky_error::Result<Vec<F::Item>> {
+            let output = backend.add(&inputs[0], &inputs[1]);
+            Ok(vec![output])
+        }
+
+        fn ninputs(&self) -> usize {
+            2
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            self.0
+        }
+    }
+
+    pub(crate) struct TestSubtraction(pub(crate) u16);
+    impl<F: FancyArithmetic> CircuitExecutor<F> for TestSubtraction {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[F::Item],
+            _: &mut Channel,
+        ) -> swanky_error::Result<Vec<F::Item>> {
+            let z = backend.sub(&inputs[0], &inputs[1]);
+            Ok(vec![z])
+        }
+
+        fn ninputs(&self) -> usize {
+            2
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            self.0
+        }
+    }
+
     pub(crate) struct TestAndGate;
     impl<F: FancyBinary> CircuitExecutor<F> for TestAndGate {
         fn execute(
@@ -427,6 +469,51 @@ pub(crate) mod circuits {
 
         fn ninputs(&self) -> usize {
             2
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            self.0
+        }
+    }
+
+    pub(crate) struct TestCmul(pub(crate) u16, pub(crate) u16);
+    impl<F: FancyArithmetic> CircuitExecutor<F> for TestCmul {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let output = backend.cmul(&inputs[0], self.1);
+            backend.output(&output, channel)?;
+            Ok(vec![output])
+        }
+
+        fn ninputs(&self) -> usize {
+            1
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            self.0
+        }
+    }
+
+    pub(crate) struct TestProj(pub(crate) u16);
+    impl<F: FancyProj> CircuitExecutor<F> for TestProj {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let tab = (0..self.0).map(|i| (i + 1) % self.0).collect();
+            let output = backend.proj(&inputs[0], self.0, Some(tab), channel)?;
+            backend.output(&output, channel)?;
+            Ok(vec![output])
+        }
+
+        fn ninputs(&self) -> usize {
+            1
         }
 
         fn modulus(&self, _: usize) -> u16 {
@@ -686,6 +773,42 @@ pub(crate) mod circuits {
 
         fn ninputs(&self) -> usize {
             self.0.len() * 2
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i % self.0.len()]
+        }
+    }
+
+    pub(crate) struct TestComplexGadget(pub(crate) Vec<u16>, pub(crate) usize);
+    impl<F: CrtProjGadgets> CircuitExecutor<F> for TestComplexGadget {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let inputs = inputs
+                .chunks_exact(self.0.len())
+                .map(|x| CrtBundle::new(x.to_vec()))
+                .collect::<Vec<_>>();
+            let mut outputs = Vec::with_capacity(inputs.len());
+            for x in inputs.iter() {
+                let c = backend.crt_constant_bundle(1, x.composite_modulus(), channel)?;
+                let y = backend.crt_mul(x, &c, channel)?;
+                let z = backend.crt_relu(&y, "100%", None, channel)?;
+                outputs.push(z);
+            }
+            backend.crt_outputs(&outputs, channel)?;
+            Ok(outputs
+                .iter()
+                .map(|out| out.wires().to_vec())
+                .collect::<Vec<_>>()
+                .concat())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.1
         }
 
         fn modulus(&self, i: usize) -> u16 {
