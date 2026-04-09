@@ -6,7 +6,6 @@ use crate::{
     fancy::{Fancy, HasModulus},
     informer::Informer,
 };
-use std::fmt::Display;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -107,25 +106,6 @@ impl<C: CircuitExecutor<Informer<Dummy>>> CircuitInfo for C {
         })?;
         println!("{}", informer.stats());
         Ok(())
-    }
-}
-
-/// Trait representing circuit gates that can be used in `CircuitType`
-pub trait GateType: Display {
-    /// Generate constant gate
-    fn make_constant(val: u16) -> Self;
-
-    /// Generate input gate
-    fn make_input(id: usize) -> Self;
-}
-
-impl GateType for ArithmeticGate {
-    fn make_constant(val: u16) -> Self {
-        Self::Constant { val }
-    }
-
-    fn make_input(id: usize) -> Self {
-        Self::Input { id }
     }
 }
 

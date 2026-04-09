@@ -1,6 +1,6 @@
 use crate::{
     FancyBinary,
-    circuit::{CircuitExecutor, CircuitRef, GateType},
+    circuit::{CircuitExecutor, CircuitRef},
 };
 use swanky_channel::Channel;
 
@@ -161,15 +161,5 @@ impl BinaryCircuit {
             outputs.push(wirelabel.clone());
         }
         Ok(outputs)
-    }
-}
-
-impl GateType for BinaryGate {
-    fn make_constant(val: u16) -> Self {
-        Self::Constant { val }
-    }
-
-    fn make_input(id: usize) -> Self {
-        Self::Input { id }
     }
 }
