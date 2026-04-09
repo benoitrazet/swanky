@@ -3,10 +3,10 @@
 
 use crate::{
     dummy::{Dummy, DummyVal},
-    fancy::{BinaryBundle, CrtBundle, Fancy, HasModulus},
+    fancy::{Fancy, HasModulus},
     informer::Informer,
 };
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -204,135 +204,6 @@ pub fn eval_plain<C: CircuitExecutor<Dummy>>(
         circuit.execute(&mut dummy, &inputs, c)
     })?;
     Ok(outputs.iter().map(|x| x.val()).collect())
-}
-
-/// CircuitBuilder is used to build circuits.
-pub struct CircuitBuilder<Circuit> {
-    next_ref_ix: usize,
-    next_input_id: usize,
-    const_map: HashMap<(u16, u16), CircuitRef>,
-    circ: Circuit,
-}
-
-impl<Circuit: CircuitType> Fancy for CircuitBuilder<Circuit> {
-    type Item = CircuitRef;
-
-    fn constant(
-        &mut self,
-        val: u16,
-        modulus: u16,
-        _: &mut Channel,
-    ) -> swanky_error::Result<CircuitRef> {
-        Ok(self.lookup_constant(val, modulus))
-    }
-
-    fn output(&mut self, xref: &CircuitRef, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
-        self.circ.push_output_ref(*xref);
-        Ok(None)
-    }
-
-    fn encode_many(
-        &mut self,
-        _values: &[u16],
-        _moduli: &[u16],
-        _channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        unimplemented!("Encoding invalid for `CircuitBuilder`")
-    }
-
-    fn receive_many(
-        &mut self,
-        _moduli: &[u16],
-        _channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        unimplemented!("Receiving invalid for `CircuitBuilder`")
-    }
-}
-
-impl<Circuit: CircuitType> CircuitBuilder<Circuit> {
-    /// Make a new `CircuitBuilder`.
-    pub fn new() -> Self {
-        CircuitBuilder {
-            next_ref_ix: 0,
-            next_input_id: 0,
-            const_map: HashMap::new(),
-            circ: Circuit::new(None),
-        }
-    }
-
-    /// Finish circuit building, outputting the resulting circuit.
-    pub fn finish(self) -> Circuit {
-        self.circ
-    }
-
-    /// Look up a constant in the internal constant map, or add it if no such
-    /// constant exists.
-    fn lookup_constant(&mut self, val: u16, modulus: u16) -> CircuitRef {
-        match self.const_map.get(&(val, modulus)) {
-            Some(&r) => r,
-            None => {
-                let gate = Circuit::Gate::make_constant(val);
-                let r = self.gate(gate, modulus);
-                self.const_map.insert((val, modulus), r);
-                self.circ.push_const_ref(r);
-                r
-            }
-        }
-    }
-
-    fn get_next_input_id(&mut self) -> usize {
-        let current = self.next_input_id;
-        self.next_input_id += 1;
-        current
-    }
-
-    fn get_next_ciphertext_id(&mut self) -> usize {
-        let current = self.circ.get_num_nonfree_gates();
-        self.circ.increment_nonfree_gates();
-        current
-    }
-
-    fn get_next_ref_ix(&mut self) -> usize {
-        let current = self.next_ref_ix;
-        self.next_ref_ix += 1;
-        current
-    }
-
-    fn gate(&mut self, gate: Circuit::Gate, modulus: u16) -> CircuitRef {
-        self.circ.push_gates(gate);
-        self.circ.push_modulus(modulus);
-        let ix = self.get_next_ref_ix();
-        CircuitRef { ix, modulus }
-    }
-
-    /// Get CircuitRef for an input wire.
-    pub fn input(&mut self, modulus: u16) -> CircuitRef {
-        let id = self.get_next_input_id();
-        let r = self.gate(Circuit::Gate::make_input(id), modulus);
-        self.circ.push_input_ref(r);
-        r
-    }
-
-    /// Get a vec of CircuitRefs for inputs.
-    pub fn inputs(&mut self, mods: &[u16]) -> Vec<CircuitRef> {
-        mods.iter().map(|q| self.input(*q)).collect()
-    }
-
-    /// Get a CrtBundle using composite modulus `modulus`
-    pub fn crt_input(&mut self, modulus: u128) -> CrtBundle<CircuitRef> {
-        CrtBundle::new(self.inputs(&crate::util::factor(modulus)))
-    }
-
-    /// Get a BinaryBundle with `nbit` bits.
-    pub fn bin_input(&mut self, nbits: usize) -> BinaryBundle<CircuitRef> {
-        BinaryBundle::new(self.inputs(&vec![2; nbits]))
-    }
-}
-
-impl<Circuit: CircuitType> Default for CircuitBuilder<Circuit> {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 use crate::{
-    FancyBinary, HasModulus,
-    circuit::{CircuitBuilder, CircuitExecutor, CircuitRef, CircuitType, GateType},
+    FancyBinary,
+    circuit::{CircuitExecutor, CircuitRef, CircuitType, GateType},
 };
 use swanky_channel::Channel;
 
@@ -209,41 +209,5 @@ impl CircuitType for BinaryCircuit {
 
     fn input_mod(&self, _: usize) -> u16 {
         2
-    }
-}
-
-impl FancyBinary for CircuitBuilder<BinaryCircuit> {
-    fn xor(&mut self, xref: &Self::Item, yref: &Self::Item) -> Self::Item {
-        let gate = BinaryGate::Xor {
-            xref: *xref,
-            yref: *yref,
-            out: None,
-        };
-
-        self.gate(gate, xref.modulus())
-    }
-
-    fn negate(&mut self, xref: &Self::Item) -> Self::Item {
-        let gate = BinaryGate::Inv {
-            xref: *xref,
-            out: None,
-        };
-        self.gate(gate, xref.modulus())
-    }
-
-    fn and(
-        &mut self,
-        xref: &Self::Item,
-        yref: &Self::Item,
-        _: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        let gate = BinaryGate::And {
-            xref: *xref,
-            yref: *yref,
-            id: self.get_next_ciphertext_id(),
-            out: None,
-        };
-
-        Ok(self.gate(gate, xref.modulus()))
     }
 }

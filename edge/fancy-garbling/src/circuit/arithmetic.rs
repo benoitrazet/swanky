@@ -1,6 +1,6 @@
 use crate::{
-    FancyArithmetic, FancyBinary, FancyProj, HasModulus, check_binary,
-    circuit::{CircuitBuilder, CircuitExecutor, CircuitRef, CircuitType},
+    FancyArithmetic, FancyProj, HasModulus,
+    circuit::{CircuitExecutor, CircuitRef, CircuitType},
 };
 use swanky_channel::Channel;
 
@@ -260,115 +260,5 @@ impl ArithmeticCircuit {
     /// Return the modulus of the gate indexed by `i`.
     pub fn modulus(&self, i: usize) -> u16 {
         self.gate_moduli[i]
-    }
-}
-
-impl FancyBinary for CircuitBuilder<ArithmeticCircuit> {
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        check_binary!(x);
-        check_binary!(y);
-
-        self.add(x, y)
-    }
-
-    fn and(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        check_binary!(x);
-        check_binary!(y);
-
-        self.mul(x, y, channel)
-    }
-
-    fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        check_binary!(x);
-
-        let one = self.lookup_constant(1, 2);
-
-        self.xor(x, &one)
-    }
-}
-
-impl FancyArithmetic for CircuitBuilder<ArithmeticCircuit> {
-    fn add(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> CircuitRef {
-        assert_eq!(xref.modulus(), yref.modulus());
-        let gate = ArithmeticGate::Add {
-            xref: *xref,
-            yref: *yref,
-            out: None,
-        };
-        self.gate(gate, xref.modulus())
-    }
-
-    fn sub(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> CircuitRef {
-        assert_eq!(xref.modulus(), yref.modulus());
-        let gate = ArithmeticGate::Sub {
-            xref: *xref,
-            yref: *yref,
-            out: None,
-        };
-        self.gate(gate, xref.modulus())
-    }
-
-    fn cmul(&mut self, xref: &CircuitRef, c: u16) -> CircuitRef {
-        self.gate(
-            ArithmeticGate::Cmul {
-                xref: *xref,
-                c,
-                out: None,
-            },
-            xref.modulus(),
-        )
-    }
-
-    fn mul(
-        &mut self,
-        xref: &CircuitRef,
-        yref: &CircuitRef,
-        _channel: &mut Channel,
-    ) -> swanky_error::Result<CircuitRef> {
-        if xref.modulus() < yref.modulus() {
-            return self.mul(yref, xref, _channel);
-        }
-
-        let gate = ArithmeticGate::Mul {
-            xref: *xref,
-            yref: *yref,
-            id: self.get_next_ciphertext_id(),
-            out: None,
-        };
-
-        Ok(self.gate(gate, xref.modulus()))
-    }
-}
-
-impl FancyProj for CircuitBuilder<ArithmeticCircuit> {
-    fn proj(
-        &mut self,
-        xref: &CircuitRef,
-        output_modulus: u16,
-        tt: Option<Vec<u16>>,
-        _: &mut Channel,
-    ) -> swanky_error::Result<CircuitRef> {
-        assert!(tt.is_some(), "`tt` must not be `None`");
-        let tt = tt.unwrap();
-        assert!(
-            tt.len() >= xref.modulus() as usize,
-            "`tt` not large enough for `x`s modulus"
-        );
-        assert!(
-            tt.iter().all(|&x| x < output_modulus),
-            "`tt` value larger than `q`"
-        );
-        let gate = ArithmeticGate::Proj {
-            xref: *xref,
-            tt: tt.to_vec(),
-            id: self.get_next_ciphertext_id(),
-            out: None,
-        };
-        Ok(self.gate(gate, output_modulus))
     }
 }
