@@ -1,7 +1,7 @@
 //! Functions for parsing and running a circuit file based on the format given
 //! here: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
 
-use crate::circuit::{BinaryCircuit, BinaryGate, CircuitRef, CircuitType};
+use crate::circuit::{BinaryCircuit, BinaryGate, CircuitRef};
 use regex::{Captures, Regex};
 use std::str::FromStr;
 use swanky_error::{ErrorKind, Result, WrapErr, swanky_error};

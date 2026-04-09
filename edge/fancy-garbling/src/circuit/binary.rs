@@ -1,6 +1,6 @@
 use crate::{
     FancyBinary,
-    circuit::{CircuitExecutor, CircuitRef, CircuitType, GateType},
+    circuit::{CircuitExecutor, CircuitRef, GateType},
 };
 use swanky_channel::Channel;
 
@@ -105,6 +105,23 @@ impl std::fmt::Display for BinaryGate {
 }
 
 impl BinaryCircuit {
+    /// Construct a new empty [`BinaryCircuit`], allocating `ngates` of space to
+    /// store gates if provided.
+    pub fn new(ngates: Option<usize>) -> Self {
+        let gates = if let Some(n) = ngates {
+            Vec::with_capacity(n)
+        } else {
+            Vec::new()
+        };
+        Self {
+            gates,
+            input_refs: Vec::new(),
+            const_refs: Vec::new(),
+            output_refs: Vec::new(),
+            num_nonfree_gates: 0,
+        }
+    }
+
     fn eval_to_wirelabels<F: FancyBinary>(
         &self,
         f: &mut F,
@@ -138,8 +155,8 @@ impl BinaryCircuit {
             };
             cache[zref_.unwrap_or(i)] = Some(val);
         }
-        let mut outputs = Vec::with_capacity(self.noutputs());
-        for r in self.get_output_refs().iter() {
+        let mut outputs = Vec::with_capacity(self.output_refs.len());
+        for r in self.output_refs.iter() {
             let wirelabel = cache[r.ix].as_ref().unwrap();
             outputs.push(wirelabel.clone());
         }
@@ -154,60 +171,5 @@ impl GateType for BinaryGate {
 
     fn make_input(id: usize) -> Self {
         Self::Input { id }
-    }
-}
-
-impl CircuitType for BinaryCircuit {
-    type Gate = BinaryGate;
-
-    fn new(ngates: Option<usize>) -> Self {
-        let gates = Vec::with_capacity(ngates.unwrap_or(0));
-        Self {
-            gates,
-            input_refs: Vec::new(),
-            const_refs: Vec::new(),
-            output_refs: Vec::new(),
-            num_nonfree_gates: 0,
-        }
-    }
-
-    fn push_gates(&mut self, gate: Self::Gate) {
-        self.gates.push(gate)
-    }
-
-    fn push_const_ref(&mut self, xref: CircuitRef) {
-        self.const_refs.push(xref)
-    }
-
-    fn push_output_ref(&mut self, xref: CircuitRef) {
-        self.output_refs.push(xref)
-    }
-
-    fn push_input_ref(&mut self, xref: CircuitRef) {
-        self.input_refs.push(xref)
-    }
-
-    fn push_modulus(&mut self, modulus: u16) {
-        assert_eq!(modulus, 2);
-    }
-
-    fn increment_nonfree_gates(&mut self) {
-        self.num_nonfree_gates += 1;
-    }
-
-    fn get_num_nonfree_gates(&self) -> usize {
-        self.num_nonfree_gates
-    }
-
-    fn get_output_refs(&self) -> &[CircuitRef] {
-        &self.output_refs
-    }
-
-    fn get_input_refs(&self) -> &[CircuitRef] {
-        &self.input_refs
-    }
-
-    fn input_mod(&self, _: usize) -> u16 {
-        2
     }
 }

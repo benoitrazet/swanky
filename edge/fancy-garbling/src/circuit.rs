@@ -129,57 +129,6 @@ impl GateType for ArithmeticGate {
     }
 }
 
-/// Trait representing circuits that can be built by `CircuitBuilder`
-pub trait CircuitType {
-    /// Gates that the circuit is composed of
-    type Gate: GateType;
-
-    /// Increase number of nonfree gates
-    fn increment_nonfree_gates(&mut self);
-
-    /// Make a new `Circuit` object.
-    fn new(ngates: Option<usize>) -> Self;
-
-    /// Get all output refs
-    fn get_output_refs(&self) -> &[CircuitRef];
-
-    /// Get all input refs
-    fn get_input_refs(&self) -> &[CircuitRef];
-
-    /// Get number of nonfree gates
-    fn get_num_nonfree_gates(&self) -> usize;
-
-    /// Add a gate
-    fn push_gates(&mut self, gate: Self::Gate);
-
-    /// Add a constant ref
-    fn push_const_ref(&mut self, xref: CircuitRef);
-
-    /// Add an output ref
-    fn push_output_ref(&mut self, xref: CircuitRef);
-
-    /// Add an input ref
-    fn push_input_ref(&mut self, xref: CircuitRef);
-
-    /// Add wire moulus
-    fn push_modulus(&mut self, modulus: u16);
-
-    /// Return the modulus of the input indexed by `i`.
-    fn input_mod(&self, i: usize) -> u16;
-
-    /// Return the number of inputs.
-    #[inline]
-    fn num_inputs(&self) -> usize {
-        self.get_input_refs().len()
-    }
-
-    /// Return the number of outputs.
-    #[inline]
-    fn noutputs(&self) -> usize {
-        self.get_output_refs().len()
-    }
-}
-
 /// Evaluate the circuit in plaintext.
 ///
 /// # Panics

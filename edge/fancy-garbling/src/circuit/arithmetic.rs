@@ -1,6 +1,6 @@
 use crate::{
-    FancyArithmetic, FancyProj, HasModulus,
-    circuit::{CircuitExecutor, CircuitRef, CircuitType},
+    FancyArithmetic, FancyProj,
+    circuit::{CircuitExecutor, CircuitRef},
 };
 use swanky_channel::Channel;
 
@@ -190,69 +190,12 @@ impl ArithmeticCircuit {
             };
             cache[zref_.unwrap_or(i)] = Some(val);
         }
-        let mut outputs = Vec::with_capacity(self.noutputs());
-        for r in self.get_output_refs().iter() {
+        let mut outputs = Vec::with_capacity(self.output_refs.len());
+        for r in self.output_refs.iter() {
             let wirelabel = cache[r.ix].as_ref().unwrap();
             outputs.push(wirelabel.clone());
         }
         Ok(outputs)
-    }
-}
-
-impl CircuitType for ArithmeticCircuit {
-    type Gate = ArithmeticGate;
-
-    fn new(ngates: Option<usize>) -> ArithmeticCircuit {
-        let gates = Vec::with_capacity(ngates.unwrap_or(0));
-        ArithmeticCircuit {
-            gates,
-            input_refs: Vec::new(),
-            const_refs: Vec::new(),
-            output_refs: Vec::new(),
-            gate_moduli: Vec::new(),
-            num_nonfree_gates: 0,
-        }
-    }
-
-    fn push_gates(&mut self, gate: Self::Gate) {
-        self.gates.push(gate)
-    }
-
-    fn push_const_ref(&mut self, xref: CircuitRef) {
-        self.const_refs.push(xref)
-    }
-
-    fn push_output_ref(&mut self, xref: CircuitRef) {
-        self.output_refs.push(xref)
-    }
-
-    fn push_input_ref(&mut self, xref: CircuitRef) {
-        self.input_refs.push(xref)
-    }
-
-    fn push_modulus(&mut self, modulus: u16) {
-        self.gate_moduli.push(modulus)
-    }
-
-    fn increment_nonfree_gates(&mut self) {
-        self.num_nonfree_gates += 1;
-    }
-
-    fn get_num_nonfree_gates(&self) -> usize {
-        self.num_nonfree_gates
-    }
-
-    fn get_output_refs(&self) -> &[CircuitRef] {
-        &self.output_refs
-    }
-
-    fn get_input_refs(&self) -> &[CircuitRef] {
-        &self.input_refs
-    }
-
-    fn input_mod(&self, i: usize) -> u16 {
-        let r = self.input_refs[i];
-        r.modulus()
     }
 }
 
