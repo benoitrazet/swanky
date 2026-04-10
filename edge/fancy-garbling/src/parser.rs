@@ -1,7 +1,7 @@
 //! Functions for parsing and running a circuit file based on the format given
 //! here: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
 
-use crate::circuit::{BinaryCircuit, BinaryGate, CircuitRef};
+use crate::circuit::{BinaryCircuit, BinaryGate};
 use regex::{Captures, Regex};
 use std::str::FromStr;
 use swanky_error::{ErrorKind, Result, WrapErr, swanky_error};
@@ -82,23 +82,16 @@ impl BinaryCircuit {
         // Process inputs.
         for i in 0..n1 + n2 {
             circ.gates.push(BinaryGate::Input { id: i });
-            circ.input_refs.push(CircuitRef { ix: i, modulus: 2 });
+            circ.input_refs.push(i);
         }
         // Create a constant wire for negations.
         // This is no longer required for the implementation
         // of our garbler/evaluator pair. Consider removing
         circ.gates.push(BinaryGate::Constant { val: 1 });
-        let oneref = CircuitRef {
-            ix: n1 + n2,
-            modulus: 2,
-        };
-        circ.const_refs.push(oneref);
+        circ.const_refs.push(n1 + n2);
         // Process outputs.
         for i in 0..n3 {
-            circ.output_refs.push(CircuitRef {
-                ix: nwires - n3 + i,
-                modulus: 2,
-            });
+            circ.output_refs.push(nwires - n3 + i);
         }
         for line in reader.lines() {
             let line = line.wrap_err(ErrorKind::OtherError, "Failed to read line")?;
@@ -107,10 +100,6 @@ impl BinaryCircuit {
                     let cap = regex2captures(&re1, &line)?;
                     let yref = cap2int(&cap, 1)?;
                     let out = cap2int(&cap, 2)?;
-                    let yref = CircuitRef {
-                        ix: yref,
-                        modulus: 2,
-                    };
                     circ.gates.push(BinaryGate::Inv {
                         xref: yref,
                         out: Some(out),
@@ -122,14 +111,6 @@ impl BinaryCircuit {
                     let yref = cap2int(&cap, 2)?;
                     let out = cap2int(&cap, 3)?;
                     let typ = cap2typ(&cap, 4)?;
-                    let xref = CircuitRef {
-                        ix: xref,
-                        modulus: 2,
-                    };
-                    let yref = CircuitRef {
-                        ix: yref,
-                        modulus: 2,
-                    };
                     let gate = match typ {
                         GateType::AndGate => {
                             let gate = BinaryGate::And {
