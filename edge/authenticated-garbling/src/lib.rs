@@ -7,6 +7,7 @@ use swanky_party::party_system;
 use vectoreyes::{SimdBase, U8x16};
 
 pub mod evaluator;
+pub mod finalizer;
 pub mod garbler;
 pub mod preprocesser;
 pub mod wire;
