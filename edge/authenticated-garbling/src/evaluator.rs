@@ -327,8 +327,12 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
     ) -> swanky_error::Result<Option<Vec<u16>>> {
         let auth_shares: Vec<AuthShare<PartyEvaluator>> =
             x.iter().map(|wire| wire.auth_share()).collect();
+        let mut masks = Vec::with_capacity(x.len());
+        AuthShareGenerator::open_with_delta(&auth_shares, self.get_delta(), &mut masks, channel)?;
         let mut outputs = Vec::with_capacity(x.len());
-        AuthShareGenerator::open_with_delta(&auth_shares, self.get_delta(), &mut outputs, channel)?;
-        Ok(Some(outputs.iter().map(|o| u16::from(*o)).collect()))
+        for i in 0..x.len() {
+            outputs.push((masks[i] + self.get_value(x[i].index())).into());
+        }
+        Ok(Some(outputs))
     }
 }
