@@ -2,7 +2,7 @@
 
 use crate::{
     FancyArithmetic, FancyBinary,
-    fancy::{Fancy, FancyInput, HasModulus},
+    fancy::{Fancy, HasModulus},
 };
 use std::collections::{HashMap, HashSet};
 use swanky_channel::Channel;
@@ -191,29 +191,6 @@ impl<F: Fancy> Informer<F> {
     }
 }
 
-impl<F: Fancy + FancyInput<Item = <F as Fancy>::Item>> FancyInput for Informer<F> {
-    type Item = <F as Fancy>::Item;
-
-    fn receive_many(
-        &mut self,
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        self.stats.input_moduli.extend(moduli.iter().cloned());
-        self.underlying.receive_many(moduli, channel)
-    }
-
-    fn encode_many(
-        &mut self,
-        values: &[u16],
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        self.stats.input_moduli.extend(moduli.iter().cloned());
-        self.underlying.encode_many(values, moduli, channel)
-    }
-}
-
 impl<F: FancyBinary> FancyBinary for Informer<F> {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         let result = self.underlying.xor(x, y);
@@ -308,6 +285,25 @@ impl<F: FancyArithmetic> FancyArithmetic for Informer<F> {
 
 impl<F: Fancy> Fancy for Informer<F> {
     type Item = F::Item;
+
+    fn receive_many(
+        &mut self,
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        self.stats.input_moduli.extend(moduli.iter().cloned());
+        self.underlying.receive_many(moduli, channel)
+    }
+
+    fn encode_many(
+        &mut self,
+        values: &[u16],
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        self.stats.input_moduli.extend(moduli.iter().cloned());
+        self.underlying.encode_many(values, moduli, channel)
+    }
 
     fn constant(
         &mut self,

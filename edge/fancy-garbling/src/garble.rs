@@ -297,7 +297,7 @@ mod nonstreaming {
 #[cfg(test)]
 mod streaming {
     use crate::{
-        AllWire, Evaluator, FancyArithmetic, FancyInput, Garbler, WireLabel,
+        AllWire, Evaluator, Fancy, FancyArithmetic, Garbler, WireLabel,
         dummy::{Dummy, DummyVal},
         util::RngExt,
     };
@@ -480,8 +480,8 @@ mod streaming {
 #[cfg(test)]
 mod complex {
     use crate::{
-        AllWire, CrtBundle, CrtGadgets, Evaluator, FancyArithmetic, FancyBinary, FancyInput,
-        Garbler, dummy::Dummy, util::RngExt,
+        AllWire, CrtBundle, CrtGadgets, Evaluator, Fancy, FancyArithmetic, FancyBinary, Garbler,
+        dummy::Dummy, util::RngExt,
     };
     use itertools::Itertools;
     use rand::thread_rng;

@@ -33,7 +33,7 @@ use crate::{
 };
 use fancy_garbling::{
     AllWire, ArithmeticBundleGadgets, BinaryBundle, Bundle, CrtBundle, CrtGadgets, Fancy,
-    FancyBinary, FancyInput,
+    FancyBinary,
 };
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_twopac::semihonest::{Evaluator, Garbler};

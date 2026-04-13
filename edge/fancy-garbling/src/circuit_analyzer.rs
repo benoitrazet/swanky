@@ -2,13 +2,13 @@
 //! or the number of boolean and arithmetic gates in a circuit.
 use crate::{
     FancyArithmetic, FancyBinary,
-    fancy::{Fancy, FancyInput, HasModulus},
+    fancy::{Fancy, HasModulus},
 };
 use std::cmp::max;
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
 
-/// An instantiation of [`FancyInput::Item`] used by [`CircuitAnalyzer`].
+/// An instantiation of [`Fancy::Item`] used by [`CircuitAnalyzer`].
 ///
 /// A dummy FancyItem which is returned when profiling a [`Fancy`] circuit.
 /// The [`AnalyzerItem`] contains the wire modulus and the depth of the computation.
@@ -86,34 +86,6 @@ impl CircuitAnalyzer {
     /// Return the number of input wires of the circuit
     pub fn ninputs(&self) -> usize {
         self.ninputs
-    }
-}
-
-impl FancyInput for CircuitAnalyzer {
-    type Item = AnalyzerItem;
-
-    fn receive_many(
-        &mut self,
-        moduli: &[u16],
-        _: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        self.ninputs += moduli.len();
-        Ok(moduli
-            .iter()
-            .map(|q| AnalyzerItem {
-                modulus: *q,
-                depth: 0,
-            })
-            .collect())
-    }
-
-    fn encode_many(
-        &mut self,
-        _values: &[u16],
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        self.receive_many(moduli, channel)
     }
 }
 
@@ -231,6 +203,30 @@ impl FancyArithmetic for CircuitAnalyzer {
 
 impl Fancy for CircuitAnalyzer {
     type Item = AnalyzerItem;
+
+    fn receive_many(
+        &mut self,
+        moduli: &[u16],
+        _: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        self.ninputs += moduli.len();
+        Ok(moduli
+            .iter()
+            .map(|q| AnalyzerItem {
+                modulus: *q,
+                depth: 0,
+            })
+            .collect())
+    }
+
+    fn encode_many(
+        &mut self,
+        _values: &[u16],
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        self.receive_many(moduli, channel)
+    }
 
     fn constant(&mut self, _val: u16, q: u16, _: &mut Channel) -> swanky_error::Result<Self::Item> {
         self.nconstants += 1;

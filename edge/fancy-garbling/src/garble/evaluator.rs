@@ -1,7 +1,6 @@
 use super::security_warning::warn_proj;
 use crate::{
-    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyInput, HasModulus, WireMod2,
-    check_binary,
+    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireMod2, check_binary,
     fancy::Fancy,
     garble::binary_and::BinaryWireLabel,
     hash_wires,
@@ -79,32 +78,6 @@ impl<W: BinaryWireLabel> FancyBinary for Evaluator<W> {
         let gate0 = channel.read()?;
         let gate1 = channel.read()?;
         Ok(W::evaluate_and_gate(gate_num, A, B, &gate0, &gate1))
-    }
-}
-
-impl<Wire: BinaryWireLabel> FancyInput for Evaluator<Wire> {
-    type Item = Wire;
-
-    fn encode_many(
-        &mut self,
-        _values: &[u16],
-        _moduli: &[u16],
-        _: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        unimplemented!("Evaluator cannot encode values")
-    }
-
-    fn receive_many(
-        &mut self,
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        (0..moduli.len())
-            .map(|_| {
-                let block = channel.read()?;
-                Ok(Wire::from_repr(block, 2))
-            })
-            .collect()
     }
 }
 
@@ -239,6 +212,28 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
 
 impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
     type Item = Wire;
+
+    fn encode_many(
+        &mut self,
+        _values: &[u16],
+        _moduli: &[u16],
+        _: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        unimplemented!("Evaluator cannot encode values")
+    }
+
+    fn receive_many(
+        &mut self,
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        (0..moduli.len())
+            .map(|_| {
+                let block = channel.read()?;
+                Ok(Wire::from_repr(block, 2))
+            })
+            .collect()
+    }
 
     fn constant(&mut self, _: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
         self.read_wire(q, channel)
