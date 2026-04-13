@@ -24,6 +24,9 @@ pub use arithmetic::{ArithmeticCircuit, ArithmeticGate};
 /// many inputs the computation takes, and the moduli of those inputs; these are
 /// given in the `ninputs` and `modulus` methods, respectively.
 /// ```
+/// # use fancy_garbling::{FancyArithmetic, circuit::CircuitExecutor};
+/// # use swanky_channel::Channel;
+/// # use swanky_error::Result;
 /// struct AddCircuit(u16);
 /// impl<F: FancyArithmetic> CircuitExecutor<F> for AddCircuit {
 ///     fn execute(
@@ -32,7 +35,7 @@ pub use arithmetic::{ArithmeticCircuit, ArithmeticGate};
 ///         inputs: &[F::Item],
 ///         channel: &mut Channel,
 ///     ) -> Result<Vec<F::Item>> {
-///         let output = backend.add(&inputs[0], &inputs[1], channel)?;
+///         let output = backend.add(&inputs[0], &inputs[1]);
 ///         Ok(vec![output])
 ///     }
 ///
