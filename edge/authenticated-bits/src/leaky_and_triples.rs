@@ -19,6 +19,7 @@
 use crate::{
     and_triples::AndTriple,
     authshares::{AuthShare, AuthShareGenerator},
+    lsb,
 };
 use itertools::Itertools;
 use rand::{CryptoRng, Rng};
@@ -502,11 +503,6 @@ fn hash(input: F128b) -> F128b {
     F128b::from(U8x16::from(result))
 }
 
-// Extract the least-significant bit from a `F128b` value.
-fn lsb(input: F128b) -> F2 {
-    F2::from((U8x16::from(input).extract::<0>() & 1) != 0)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -627,13 +623,6 @@ mod tests {
                 },
             )
             .unwrap();
-        }
-    }
-
-    proptest! {
-        #[test]
-        fn lsb_works(input in any::<u128>()) {
-            prop_assert_eq!(lsb(F128b::from(U8x16::from(input))), F2::from((input & 1) != 0));
         }
     }
 }
