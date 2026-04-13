@@ -1,6 +1,6 @@
 use crate::{
-    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireLabel, WireMod2,
-    check_binary,
+    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyProj, HasModulus, WireLabel,
+    WireMod2, check_binary,
     fancy::{BinaryBundle, CrtBundle, Fancy},
     garble::binary_and::BinaryWireLabel,
     hash_wires,
@@ -352,7 +352,9 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         }
         Ok(X + Y)
     }
+}
 
+impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyProj for Garbler<RNG, Wire> {
     fn proj(
         &mut self,
         A: &Wire,

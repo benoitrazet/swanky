@@ -1,7 +1,7 @@
 //! `Informer` runs a fancy computation and learns information from it.
 
 use crate::{
-    FancyArithmetic, FancyBinary,
+    FancyArithmetic, FancyBinary, FancyProj,
     fancy::{Fancy, HasModulus},
 };
 use std::collections::{HashMap, HashSet};
@@ -267,7 +267,9 @@ impl<F: FancyArithmetic> FancyArithmetic for Informer<F> {
         self.update_moduli(x.modulus());
         Ok(result)
     }
+}
 
+impl<F: FancyProj> FancyProj for Informer<F> {
     fn proj(
         &mut self,
         x: &Self::Item,

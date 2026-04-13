@@ -54,6 +54,66 @@ impl<F: FancyBinary> BinaryGadgets for F {}
 
 /// Extension trait for `Fancy` providing gadgets that operate over bundles of mod2 wires.
 pub trait BinaryGadgets: FancyBinary + BundleGadgets {
+    /// Encode a binary input bundle.
+    fn bin_encode(
+        &mut self,
+        value: u128,
+        nbits: usize,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
+        let xs = util::u128_to_bits(value, nbits);
+        self.encode_bundle(&xs, &vec![2; nbits], channel)
+            .map(BinaryBundle::from)
+    }
+
+    /// Receive an binary input bundle.
+    fn bin_receive(
+        &mut self,
+        nbits: usize,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
+        self.receive_bundle(&vec![2; nbits], channel)
+            .map(BinaryBundle::from)
+    }
+
+    /// Encode many binary input bundles.
+    fn bin_encode_many(
+        &mut self,
+        values: &[u128],
+        nbits: usize,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<BinaryBundle<Self::Item>>> {
+        let xs = values
+            .iter()
+            .flat_map(|x| util::u128_to_bits(*x, nbits))
+            .collect_vec();
+        let mut wires = self.encode_many(&xs, &vec![2; values.len() * nbits], channel)?;
+        let buns = (0..values.len())
+            .map(|_| {
+                let ws = wires.drain(0..nbits).collect_vec();
+                BinaryBundle::new(ws)
+            })
+            .collect_vec();
+        Ok(buns)
+    }
+
+    /// Receive many binary input bundles.
+    fn bin_receive_many(
+        &mut self,
+        ninputs: usize,
+        nbits: usize,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<BinaryBundle<Self::Item>>> {
+        let mut wires = self.receive_many(&vec![2; ninputs * nbits], channel)?;
+        let buns = (0..ninputs)
+            .map(|_| {
+                let ws = wires.drain(0..nbits).collect_vec();
+                BinaryBundle::new(ws)
+            })
+            .collect_vec();
+        Ok(buns)
+    }
+
     /// Create a constant bundle using base 2 inputs.
     fn bin_constant_bundle(
         &mut self,

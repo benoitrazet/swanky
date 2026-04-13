@@ -7,7 +7,7 @@ use swanky_channel::Channel;
 use swanky_error::ErrorKind;
 
 use crate::{
-    FancyArithmetic, FancyBinary, check_binary,
+    FancyArithmetic, FancyBinary, FancyProj, check_binary,
     fancy::{Fancy, HasModulus},
 };
 
@@ -114,7 +114,9 @@ impl FancyArithmetic for Dummy {
             modulus: x.modulus,
         })
     }
+}
 
+impl FancyProj for Dummy {
     fn proj(
         &mut self,
         x: &DummyVal,
@@ -195,6 +197,7 @@ impl Fancy for Dummy {
 mod bundle {
     use super::*;
     use crate::{
+        ArithmeticProjBundleGadgets, CrtProjGadgets,
         fancy::{ArithmeticBundleGadgets, BinaryGadgets, Bundle, BundleGadgets, CrtGadgets},
         util::{self, RngExt},
     };
@@ -752,6 +755,7 @@ mod bundle {
 mod pmr_tests {
     use super::*;
     use crate::{
+        CrtProjGadgets,
         fancy::{BundleGadgets, CrtGadgets},
         util::RngExt,
     };

@@ -1,6 +1,7 @@
 use super::security_warning::warn_proj;
 use crate::{
-    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireMod2, check_binary,
+    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyProj, HasModulus, WireMod2,
+    check_binary,
     fancy::Fancy,
     garble::binary_and::BinaryWireLabel,
     hash_wires,
@@ -185,7 +186,9 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
         let res = L + R + A.clone() * new_b_color;
         Ok(res)
     }
+}
 
+impl<Wire: WireLabel + ArithmeticWire> FancyProj for Evaluator<Wire> {
     fn proj(
         &mut self,
         x: &Wire,
