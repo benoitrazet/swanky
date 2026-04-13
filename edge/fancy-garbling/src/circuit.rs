@@ -3,7 +3,7 @@
 
 use crate::{
     dummy::{Dummy, DummyVal},
-    fancy::{Fancy, HasModulus},
+    fancy::Fancy,
     informer::Informer,
 };
 use swanky_channel::Channel;
@@ -11,8 +11,6 @@ use swanky_error::Result;
 
 mod binary;
 pub use binary::{BinaryCircuit, BinaryGate};
-mod arithmetic;
-pub use arithmetic::{ArithmeticCircuit, ArithmeticGate};
 
 /// Trait for executing computations directly over a [`Fancy`] object.
 ///
@@ -59,26 +57,6 @@ pub trait CircuitExecutor<F: Fancy> {
     fn ninputs(&self) -> usize;
     /// The modulus for input `i`.
     fn modulus(&self, i: usize) -> u16;
-}
-
-/// The index and modulus of a gate in a circuit.
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct CircuitRef {
-    pub(crate) ix: usize,
-    pub(crate) modulus: u16,
-}
-
-impl std::fmt::Display for CircuitRef {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "[{} | {}]", self.ix, self.modulus)
-    }
-}
-
-impl HasModulus for CircuitRef {
-    fn modulus(&self) -> u16 {
-        self.modulus
-    }
 }
 
 /// Trait to display circuit evaluation costs
