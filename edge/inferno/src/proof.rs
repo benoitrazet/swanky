@@ -11,11 +11,11 @@
 
 use crate::cache::Cache;
 use crate::proof_single::ProofSingle;
-use anyhow::anyhow;
 use rayon::prelude::*;
 use simple_arith_circuit::Circuit;
-use swanky_aes_rng::AesRng;
+use swanky_error::{ErrorKind, Result, bail, ensure};
 use swanky_field::FiniteField;
+use swanky_rng::SwankyRng;
 
 /// The inferno proof. `N` denotes the number of parties in each MPC execution.
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -38,7 +38,7 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
         witness: &[F::PrimeField],
         compression_factor: usize,
         repetitions: usize,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> Self {
         assert!(N.is_power_of_two() && N <= 256);
         assert_eq!(witness.len(), circuit.ninputs());
@@ -48,7 +48,7 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
         log::debug!("Number of compression rounds = {nrounds}");
         let cache = Cache::new(circuit, compression_factor, true);
         // Each MPC-in-the-head repetition needs its own RNG, so we create the necessary RNGs here.
-        let mut rngs: Vec<AesRng> = (0..repetitions).map(|_| rng.fork()).collect();
+        let mut rngs: Vec<SwankyRng> = (0..repetitions).map(|_| rng.fork()).collect();
         // Use `rayon` to parallelize the MPC-in-the-head repetitions.
         let proofs: Vec<ProofSingle<F, N>> = rngs
             .par_iter_mut()
@@ -77,21 +77,23 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
         circuit: &Circuit<F::PrimeField>,
         compression_factor: usize,
         repetitions: usize,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         assert!(N.is_power_of_two() && N <= 256);
         assert_eq!(circuit.noutputs(), 1);
-        if !crate::utils::validate_parameters::<F>(N, compression_factor, repetitions) {
-            return Err(anyhow!(
-                "Invalid parameters: ({N}, {compression_factor}, {repetitions}) do not match acceptable settings"
-            ));
-        }
+        ensure!(
+            crate::utils::validate_parameters::<F>(N, compression_factor, repetitions),
+            ErrorKind::OtherError,
+            "Invalid parameters: ({N}, {compression_factor}, {repetitions}) do not match acceptable settings"
+        );
         let time = std::time::Instant::now();
         let cache = Cache::new(circuit, compression_factor, false);
-        if self.proofs.len() != repetitions {
-            return Err(anyhow!("Invalid number of repetitions"));
-        }
+        ensure!(
+            self.proofs.len() == repetitions,
+            ErrorKind::OtherError,
+            "Invalid number of repetitions"
+        );
         // Use `rayon` to parallelize the MPC-in-the-head repetitions.
-        let results: Vec<anyhow::Result<()>> = self
+        let results: Vec<Result<()>> = self
             .proofs
             .par_iter()
             .enumerate()
@@ -99,7 +101,7 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
                 let time_ = std::time::Instant::now();
                 log::debug!("Checking proof #{}", i + 1);
                 if let Err(e) = proof.verify(circuit, compression_factor, &cache) {
-                    return Err(anyhow!("Proof #{} failed: {}", i + 1, e));
+                    bail!(ErrorKind::OtherError, "Proof #{} failed: {}", i + 1, e);
                 }
                 log::debug!("Verifying proof #{} succeeded.", i + 1);
                 log::info!("Proof #{} verification time: {:?}", i + 1, time_.elapsed());
@@ -139,8 +141,8 @@ mod tests {
                 proptest! {
                 #[test]
                 fn serialize_bincode(seed in any_seed()) {
-                    let mut rng = AesRng::from_seed(seed);
-                    let (circuit, witness) = simple_arith_circuit::circuitgen::random_zero_circuit::<<$field as FiniteField>::PrimeField, AesRng>(10, 100, &mut rng);
+                    let mut rng = SwankyRng::from_seed(seed);
+                    let (circuit, witness) = simple_arith_circuit::circuitgen::random_zero_circuit::<<$field as FiniteField>::PrimeField, SwankyRng>(10, 100, &mut rng);
                     let proof = Proof::<$field, N>::prove(&circuit, &witness, K, T, &mut rng);
                     let serialized = bincode::serialize(&proof).unwrap();
                     let proof: Proof<$field, N> = bincode::deserialize(&serialized).unwrap();

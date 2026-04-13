@@ -5,6 +5,7 @@
  * The evaluation of a circuit requires a memory that is implemented with `CircuitMemory`.
 */
 use crate::parameters::FIELD_SIZE;
+use diet_mac_and_cheese::fields::SieveIrDeserialize;
 use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, RelationVisitor, Type, TypeId,
     TypedWireRange, ValueStreamKind, ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
@@ -19,6 +20,7 @@ use std::{
 use swanky_error::{ErrorKind, bail, swanky_error};
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::F2;
+use swanky_sieve_ir_api::{CircuitExecuter, CircuitResult, FieldBackend};
 use tempfile::tempdir;
 
 /// Gates
@@ -237,11 +239,9 @@ impl FunctionBodyVisitor for CircuitIngestor {
         Ok(())
     }
 
-    fn assert_zero(&mut self, _ty: TypeId, _src: WireId) -> swanky_error::Result<()> {
-        bail!(
-            ErrorKind::UnsupportedError,
-            "Invalid input: VOLE-in-the-head does not support `assert_zero` gates"
-        );
+    fn assert_zero(&mut self, ty: TypeId, src: WireId) -> swanky_error::Result<()> {
+        self.gates.push(GateM::AssertZero(ty, src));
+        Ok(())
     }
     fn convert(
         &mut self,
@@ -308,6 +308,91 @@ pub struct Circuit {
     pub private_inputs: Vec<F2>,
     /// Max wire id
     pub max_wire_id: WireId,
+}
+
+impl Circuit {
+    /// Split up a circuit into its interpreter and witness.
+    pub fn to_interpreter(&self) -> (CircuitInterpreter<'_>, &[F2], WireId) {
+        let interp = CircuitInterpreter {
+            gates: &self.gates,
+            max_wire_id: self.max_wire_id,
+        };
+        (interp, &self.private_inputs, self.max_wire_id)
+    }
+}
+
+/// An interpreter for dynamically parsed circuits.
+pub struct CircuitInterpreter<'a> {
+    gates: &'a [GateM],
+    max_wire_id: u64,
+}
+
+// TODO: Generalize field.
+impl<'a> CircuitExecuter<F2> for CircuitInterpreter<'a> {
+    fn execute<B: FieldBackend<F2>>(&self, backend: &mut B) -> CircuitResult<()> {
+        let mut memory = CircuitMemory::<B::Wire>::new(self.max_wire_id);
+        for g in self.gates.iter() {
+            match g {
+                GateM::Add(ty, dst, left, right) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(*ty, 0);
+
+                    let left = memory.get(left);
+                    let right = memory.get(right);
+
+                    let res = backend.add(&left, &right)?;
+
+                    memory.insert(*dst, res);
+                }
+                GateM::Mul(ty, dst, left, right) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(*ty, 0);
+
+                    let left = memory.get(left);
+                    let right = memory.get(right);
+
+                    let res = backend.mul(&left, &right)?;
+
+                    memory.insert(*dst, res);
+                }
+                GateM::AddConstant(ty, dst, left, right) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(*ty, 0);
+
+                    let left = memory.get(left);
+                    let right = F2::from_number(right)?;
+
+                    let res = backend.addc(&left, right)?;
+
+                    memory.insert(*dst, res);
+                }
+                GateM::Witness(ty, dst) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(*ty, 0);
+
+                    for wid in dst.start..=dst.end {
+                        let res = backend.input_private()?;
+
+                        memory.insert(wid, res);
+                    }
+                }
+                GateM::AssertZero(ty, src) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(*ty, 0);
+
+                    let src = memory.get(src);
+                    backend.assert_zero(&src)?;
+                }
+                _ => bail!(
+                    ErrorKind::OtherError,
+                    "Invalid input: VOLE-in-the-head does not support gate {:?}",
+                    g
+                ),
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /// Validate that the circuit can be processed by the system, according to the header info.
@@ -404,12 +489,6 @@ pub(crate) struct CircuitMemory<F> {
 }
 
 impl<F: Default + Clone + Copy> CircuitMemory<F> {
-    // NOTE: This accessor for the internal memory is only used in unit tests.
-    #[cfg(test)]
-    pub(crate) fn get_memory(&self) -> &[F] {
-        &self.cont
-    }
-
     /// Create a new circuit memory.
     ///
     /// Provided the maximum wire id, it will prepare a memory ready to received contents for
@@ -435,13 +514,8 @@ impl<F: Default + Clone + Copy> CircuitMemory<F> {
     ///
     /// This function assumes that it is called on a memory associated with a well-formed circuit,
     /// more specifically that the wire id has been previously set.
-    pub(crate) fn get(&self, wid: &WireId) -> &F {
-        let idx: usize = *wid as usize;
-        &self.cont[idx]
-    }
-
-    pub(crate) fn len(&self) -> usize {
-        self.cont.len()
+    pub(crate) fn get(&self, wid: &WireId) -> F {
+        self.cont[*wid as usize]
     }
 }
 

@@ -26,7 +26,7 @@
 //! <https://eprint.iacr.org/2018/578.pdf>
 //!
 use fancy_garbling::{
-    BinaryBundle, FancyInput,
+    BinaryBundle, BinaryGadgets,
     circuit_analyzer::{AnalyzerItem, CircuitAnalyzer},
 };
 use rand::{CryptoRng, Rng};
@@ -35,7 +35,7 @@ use swanky_authenticated_bits::{
     authshares::AuthShare,
 };
 use swanky_channel::Channel;
-use swanky_party::Party;
+use swanky_party::GenericParty;
 use vectoreyes::U8x16;
 
 /// Pre-process a circuit for authenticated garbling.
@@ -51,7 +51,7 @@ use vectoreyes::U8x16;
 /// Note that the fancy circuit passed to this function is generic in the size of the input,
 /// this is why we need to pass the input size separately. This fancy circuit is the same one that will
 /// be later used for garbling.
-pub fn f_preprocessing<P: Party, RNG: CryptoRng + Rng>(
+pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
     circuit: impl Fn(
         &mut CircuitAnalyzer,
         BinaryBundle<AnalyzerItem>,
@@ -89,9 +89,17 @@ pub fn f_preprocessing<P: Party, RNG: CryptoRng + Rng>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fancy_garbling::{BinaryGadgets, Fancy, FancyBinary, FancyReveal};
-    use swanky_aes_rng::AesRng;
-    use swanky_authenticated_bits::authshares::{PartyA, PartyB};
+    use fancy_garbling::{BinaryGadgets, Fancy, FancyBinary};
+    use swanky_party::party_system;
+    use swanky_rng::SwankyRng;
+
+    party_system! {
+        mod ps {
+            PartyA,
+            PartyB,
+        }
+    }
+    use ps::{PartyA, PartyB};
 
     /// Garbler
     ///
@@ -110,7 +118,7 @@ mod tests {
         channel: &mut Channel,
     ) -> swanky_error::Result<BinaryBundle<F::Item>>
     where
-        F: FancyReveal + Fancy + BinaryGadgets + FancyBinary,
+        F: Fancy + BinaryGadgets + FancyBinary,
     {
         f.bin_addition_no_carry(&garbler_wires, &evaluator_wires, channel)
     }
@@ -119,7 +127,7 @@ mod tests {
         let input_size = 400;
         let (_shares_gb, _shares_ev) = swanky_channel::local::local_channel_pair(
             |c| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut generator_and_triples = AndTripleGenerator::<Garbler>::new(c, &mut rng)?;
                 Ok(f_preprocessing(
                     fancy_sum,
@@ -130,7 +138,7 @@ mod tests {
                 ))
             },
             |c| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut generator_and_triples = AndTripleGenerator::<Evaluator>::new(c, &mut rng)?;
                 Ok(f_preprocessing(
                     fancy_sum,

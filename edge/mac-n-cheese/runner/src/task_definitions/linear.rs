@@ -1,8 +1,10 @@
 use std::marker::PhantomData;
 
 use mac_n_cheese_ir::compilation_format::wire_format::LinearPrototypeWireFormat;
-use mac_n_cheese_vole::mac::{Mac, MacTypes};
-use swanky_party::Party;
+use mac_n_cheese_vole::{
+    mac::{Mac, MacTypes},
+    party::Party,
+};
 
 use crate::task_framework::{NoContinuation, TaskDefinition};
 
@@ -19,7 +21,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for LinearTask<P, T> {
 
     fn initialize(
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut swanky_aes_rng::AesRng,
+        _rng: &mut swanky_rng::SwankyRng,
         _vc: crate::base_vole::VoleContexts<P>,
         _num_runner_threads: usize,
     ) -> swanky_error::Result<Self> {
@@ -33,7 +35,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for LinearTask<P, T> {
     fn finalize(
         self,
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut swanky_aes_rng::AesRng,
+        _rng: &mut swanky_rng::SwankyRng,
     ) -> swanky_error::Result<()> {
         Ok(())
     }

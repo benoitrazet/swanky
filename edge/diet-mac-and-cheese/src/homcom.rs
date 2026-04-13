@@ -4,41 +4,45 @@
 //! `check_zero`, `open` and `check_multiply`.
 //! These functionalities are used for diet Mac'n'Cheese and in the edabits
 //! conversion protocol for field-switching.
-use crate::{mac::Mac, svole_trait::SvoleT};
+use crate::{
+    mac::Mac,
+    party::{Party, Prover, Verifier, WhichParty},
+    svole_trait::SvoleT,
+};
 use generic_array::GenericArray;
 use log::{debug, warn};
 use rand::{Rng, SeedableRng};
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure};
 use swanky_field::{DegreeModulo, FiniteField, IsSubFieldOf};
-use swanky_party::either::PartyEither;
-use swanky_party::private::{
-    ProverPrivate, ProverPrivateCopy, VerifierPrivate, VerifierPrivateCopy,
+use swanky_party::{
+    either::PartyEither,
+    private::{PartyPrivate, PartyPrivateCopy},
+    ty_eq::{EqualityProposition, Witness},
 };
-use swanky_party::{IsParty, Party, Prover, Verifier, WhichParty};
+use swanky_rng::SwankyRng;
 use swanky_svole_wykw::LpnParams;
 
 // Size of batches for multiplication / assert-zero
 pub const BATCH_SIZE: usize = 3_000_000;
 
 pub struct MultCheckState<P: Party, V: Copy, T: Copy> {
-    triples: ProverPrivate<P, Vec<(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>)>>,
-    sum_b: VerifierPrivateCopy<P, T>,
-    chi_power: VerifierPrivateCopy<P, T>,
-    chi: VerifierPrivateCopy<P, T>,
+    triples: PartyPrivate<Prover, P, Vec<(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>)>>,
+    sum_b: PartyPrivateCopy<Verifier, P, T>,
+    chi_power: PartyPrivateCopy<Verifier, P, T>,
+    chi: PartyPrivateCopy<Verifier, P, T>,
     count: usize,
 }
 
 impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
     /// Initialize the state.
-    pub(crate) fn init(rng: &mut AesRng) -> Result<Self> {
-        let chi = VerifierPrivateCopy::new(T::random(rng));
+    pub(crate) fn init(rng: &mut SwankyRng) -> Result<Self> {
+        let chi = PartyPrivateCopy::new(T::random(rng));
 
         Ok(Self {
             triples: Default::default(),
-            sum_b: VerifierPrivateCopy::new(T::ZERO),
+            sum_b: PartyPrivateCopy::new(T::ZERO),
             chi_power: chi,
             chi,
             count: 0,
@@ -46,9 +50,9 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
     }
 
     /// Reset the state. Generates a new chi value (without communication).
-    fn reset(&mut self, rng: VerifierPrivate<P, &mut AesRng>) -> Result<()> {
+    fn reset(&mut self, rng: PartyPrivate<Verifier, P, &mut SwankyRng>) -> Result<()> {
         self.triples = Default::default();
-        self.sum_b = VerifierPrivateCopy::new(T::ZERO);
+        self.sum_b = PartyPrivateCopy::new(T::ZERO);
         self.chi = rng.map(|rng| T::random(rng)).into();
         self.chi_power = self.chi;
         self.count = 0;
@@ -59,7 +63,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
     pub(crate) fn accumulate(
         &mut self,
         &triple: &(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>),
-        delta: VerifierPrivateCopy<P, T>,
+        delta: PartyPrivateCopy<Verifier, P, T>,
     ) {
         match P::WHICH {
             WhichParty::Prover(ev) => {
@@ -80,18 +84,17 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
         &mut self,
         mask: Mac<P, T, T>,
         channel: &mut C,
-        rng: &mut AesRng,
-        delta: VerifierPrivateCopy<P, T>,
+        rng: &mut SwankyRng,
+        delta: PartyPrivateCopy<Verifier, P, T>,
     ) -> Result<usize> {
         match P::WHICH {
             WhichParty::Prover(ev) => {
-                channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
+                channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                 let chi = channel
                     .read_serializable()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read chi.".to_string())?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read chi.")?;
                 let mut chi_power = chi;
 
                 let mut sum_a0 = T::ZERO;
@@ -113,42 +116,40 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
 
                 channel
                     .write_serializable(&u)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'u'.".to_string())?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'u'.")?;
                 channel
                     .write_serializable(&v)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'v'.".to_string())?;
-                channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'v'.")?;
+                channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
 
                 let c = self.count;
-                self.reset(VerifierPrivate::empty(ev))?;
+                self.reset(PartyPrivate::empty(ev))?;
                 Ok(c)
             }
             WhichParty::Verifier(ev) => {
                 channel
                     .write_serializable::<T>(&self.chi.into_inner(ev))
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write chi.".to_string())?;
-                channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write chi.")?;
+                channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
 
                 let u = channel
                     .read_serializable::<T>()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'u'.".to_string())?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'u'.")?;
                 let v = channel
                     .read_serializable::<T>()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'v'.".to_string())?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'v'.")?;
 
                 let b_plus = self.sum_b.into_inner(ev) + mask.mac();
                 if b_plus == (u + (-delta.into_inner(ev)) * v) {
                     let c = self.count;
-                    self.reset(VerifierPrivate::new(rng))?;
+                    self.reset(PartyPrivate::new(rng))?;
                     Ok(c)
                 } else {
-                    self.reset(VerifierPrivate::new(rng))?;
+                    self.reset(PartyPrivate::new(rng))?;
                     bail!(
                         ErrorKind::OtherError,
                         "QuickSilver multiplication check failed."
@@ -208,26 +209,24 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
     pub(crate) fn finalize<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> Result<usize> {
         let mut rng = match P::WHICH {
             WhichParty::Prover(_) => {
-                let seed = channel.read_block().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to read seed block.".to_string(),
-                )?;
-                AesRng::from_seed(seed)
+                let seed = channel
+                    .read_block()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?;
+                SwankyRng::from_seed(seed)
             }
             WhichParty::Verifier(_) => {
                 let seed = rng.r#gen::<Block>();
                 channel
                     .write_block(&seed)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write seed.".to_string())?;
-                channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
-                AesRng::from_seed(seed)
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
+                channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
+                SwankyRng::from_seed(seed)
             }
         };
 
@@ -242,11 +241,10 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
                 }
                 channel
                     .write_serializable::<T>(&m)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'm'.".to_string())?;
-                channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'm'.")?;
+                channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
 
                 b
             }
@@ -258,7 +256,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
                 }
                 let m = channel
                     .read_serializable::<T>()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'm'.".to_string())?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'm'.")?;
 
                 key_chi == m
             }
@@ -278,7 +276,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
 
 /// Homomorphic commitment scheme.
 pub struct FCom<P: Party, V: Copy, T: Copy, SVOLE: SvoleT<P, V, T>> {
-    delta: VerifierPrivateCopy<P, T>,
+    delta: PartyPrivateCopy<Verifier, P, T>,
     svole: SVOLE,
     voles: PartyEither<P, Vec<(V, T)>, Vec<T>>,
 }
@@ -290,19 +288,19 @@ where
     /// Initialize the commitment scheme.
     pub fn init<C: AbstractChannel + Clone>(
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self> {
         let (svole, delta) = match P::WHICH {
             WhichParty::Prover(ev) => {
                 let svole = SVOLE::init(channel, rng, lpn_setup, lpn_extend, None)?;
-                (svole, VerifierPrivateCopy::empty(ev))
+                (svole, PartyPrivateCopy::empty(ev))
             }
             WhichParty::Verifier(ev) => {
                 let svole = SVOLE::init(channel, rng, lpn_setup, lpn_extend, None)?;
                 let delta = svole.delta(ev);
-                (svole, VerifierPrivateCopy::new(delta))
+                (svole, PartyPrivateCopy::new(delta))
             }
         };
 
@@ -316,8 +314,8 @@ where
     pub fn init_with_vole(svole: SVOLE) -> Result<Self> {
         Ok(Self {
             delta: match P::WHICH {
-                WhichParty::Prover(ev) => VerifierPrivateCopy::empty(ev),
-                WhichParty::Verifier(ev) => VerifierPrivateCopy::new(svole.delta(ev)),
+                WhichParty::Prover(ev) => PartyPrivateCopy::empty(ev),
+                WhichParty::Verifier(ev) => PartyPrivateCopy::new(svole.delta(ev)),
             },
             svole,
             voles: PartyEither::default(),
@@ -326,14 +324,14 @@ where
 
     pub fn init_with_delta<C: AbstractChannel + Clone>(
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         delta: T,
     ) -> Result<Self> {
         if let WhichParty::Verifier(_) = P::WHICH {
             Ok(Self {
-                delta: VerifierPrivateCopy::new(delta),
+                delta: PartyPrivateCopy::new(delta),
                 svole: SVOLE::init(channel, rng, lpn_setup, lpn_extend, Some(delta))?,
                 voles: PartyEither::default(),
             })
@@ -356,7 +354,7 @@ where
 
     /// Return the `Δ` value associated with the commitment scheme.
     #[inline]
-    pub fn get_delta(&self) -> VerifierPrivateCopy<P, T> {
+    pub fn get_delta(&self) -> PartyPrivateCopy<Verifier, P, T> {
         self.delta
     }
 
@@ -364,28 +362,28 @@ where
     pub fn random<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> Result<Mac<P, V, T>> {
         match P::WHICH {
-            WhichParty::Prover(ev) => match self.voles.as_mut().prover_into(ev).pop() {
-                Some(e) => return Ok(Mac::new(ProverPrivateCopy::new(e.0), e.1)),
+            WhichParty::Prover(ev) => match self.voles.as_mut().into_inner(ev).pop() {
+                Some(e) => return Ok(Mac::new(PartyPrivateCopy::new(e.0), e.1)),
                 None => {
                     self.svole.extend(channel, rng, &mut self.voles.as_mut())?;
 
                     assert_ne!(
-                        self.voles.as_ref().prover_into(ev).len(),
+                        self.voles.as_ref().into_inner(ev).len(),
                         0,
                         "VOLE extension should always produce VOLEs",
                     );
                 }
             },
-            WhichParty::Verifier(ev) => match self.voles.as_mut().verifier_into(ev).pop() {
-                Some(e) => return Ok(Mac::new(ProverPrivateCopy::empty(ev), e)),
+            WhichParty::Verifier(ev) => match self.voles.as_mut().into_inner(ev).pop() {
+                Some(e) => return Ok(Mac::new(PartyPrivateCopy::empty(ev), e)),
                 None => {
                     self.svole.extend(channel, rng, &mut self.voles.as_mut())?;
 
                     assert_ne!(
-                        self.voles.as_ref().verifier_into(ev).len(),
+                        self.voles.as_ref().into_inner(ev).len(),
                         0,
                         "VOLE extension should always produce VOLEs",
                     );
@@ -398,9 +396,9 @@ where
     /// Input a slice and return the associated MACs.
     pub fn input_prover<C: AbstractChannel + Clone>(
         &mut self,
-        ev: IsParty<P, Prover>,
+        ev: Witness<impl EqualityProposition<Prover, P>>,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         source: &[V],
     ) -> Result<Vec<T>> {
         debug!("input");
@@ -413,9 +411,9 @@ where
     /// Input a number of commitment values and return the associated MACs.
     pub fn input_verifier<C: AbstractChannel + Clone>(
         &mut self,
-        ev: IsParty<P, Verifier>,
+        ev: Witness<impl EqualityProposition<Verifier, P>>,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         source: usize,
     ) -> Result<Vec<Mac<P, V, T>>> {
         debug!("input");
@@ -426,9 +424,9 @@ where
 
     pub fn input_prover_low_level<C: AbstractChannel + Clone>(
         &mut self,
-        ev: IsParty<P, Prover>,
+        ev: Witness<impl EqualityProposition<Prover, P>>,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         source: &[V],
         out: &mut Vec<T>,
     ) -> Result<()> {
@@ -442,9 +440,9 @@ where
 
     pub fn input_verifier_low_level<C: AbstractChannel + Clone>(
         &mut self,
-        ev: IsParty<P, Verifier>,
+        ev: Witness<impl EqualityProposition<Verifier, P>>,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         source: usize,
         out: &mut Vec<Mac<P, V, T>>,
     ) -> Result<()> {
@@ -453,9 +451,9 @@ where
             let r = self.random(channel, rng)?;
             let y = channel
                 .read_serializable::<V>()
-                .wrap_err(ErrorKind::NetworkError, "Failed to read 'y'.".to_string())?;
+                .wrap_err(ErrorKind::NetworkError, "Failed to read 'y'.")?;
             out.push(Mac::new(
-                ProverPrivateCopy::empty(ev),
+                PartyPrivateCopy::empty(ev),
                 r.mac() - y * self.delta.into_inner(ev),
             ));
         }
@@ -464,9 +462,9 @@ where
 
     pub fn input1_prover<C: AbstractChannel + Clone>(
         &mut self,
-        ev: IsParty<P, Prover>,
+        ev: Witness<impl EqualityProposition<Prover, P>>,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         x: V,
     ) -> Result<T> {
         debug!("input1");
@@ -474,23 +472,23 @@ where
         let y = x - r.value().into_inner(ev);
         channel
             .write_serializable(&y)
-            .wrap_err(ErrorKind::NetworkError, "Failed to write 'y'.".to_string())?;
+            .wrap_err(ErrorKind::NetworkError, "Failed to write 'y'.")?;
         Ok(r.mac())
     }
 
     pub fn input1_verifier<C: AbstractChannel + Clone>(
         &mut self,
-        ev: IsParty<P, Verifier>,
+        ev: Witness<impl EqualityProposition<Verifier, P>>,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> Result<Mac<P, V, T>> {
         debug!("input1");
         let r = self.random(channel, rng)?;
         let y = channel
             .read_serializable::<V>()
-            .wrap_err(ErrorKind::NetworkError, "Failed to read 'y'.".to_string())?;
+            .wrap_err(ErrorKind::NetworkError, "Failed to read 'y'.")?;
         let out = Mac::new(
-            ProverPrivateCopy::empty(ev),
+            PartyPrivateCopy::empty(ev),
             r.mac() - y * self.delta.into_inner(ev),
         );
         Ok(out)
@@ -501,11 +499,11 @@ where
     pub fn affine_add_cst(&self, cst: V, x: Mac<P, V, T>) -> Mac<P, V, T> {
         match P::WHICH {
             WhichParty::Prover(ev) => Mac::new(
-                ProverPrivateCopy::new(cst + x.value().into_inner(ev)),
+                PartyPrivateCopy::new(cst + x.value().into_inner(ev)),
                 x.mac(),
             ),
             WhichParty::Verifier(ev) => Mac::new(
-                ProverPrivateCopy::empty(ev),
+                PartyPrivateCopy::empty(ev),
                 x.mac() - cst * self.delta.into_inner(ev),
             ),
         }
@@ -515,28 +513,26 @@ where
     pub fn check_zero<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         mac_batch: &[Mac<P, V, T>],
     ) -> Result<()> {
         debug!("check_zero");
         let seed = match P::WHICH {
-            WhichParty::Prover(_) => channel.read_block().wrap_err(
-                ErrorKind::NetworkError,
-                "Failed to read seed block.".to_string(),
-            )?,
+            WhichParty::Prover(_) => channel
+                .read_block()
+                .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?,
             WhichParty::Verifier(_) => {
                 let seed = rng.r#gen::<Block>();
                 channel
                     .write_block(&seed)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write seed.".to_string())?;
-                channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
+                channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                 seed
             }
         };
-        let mut rng = AesRng::from_seed(seed);
+        let mut rng = SwankyRng::from_seed(seed);
 
         let b = match P::WHICH {
             WhichParty::Prover(ev) => {
@@ -549,11 +545,10 @@ where
                 }
                 channel
                     .write_serializable::<T>(&m)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'm'.".to_string())?;
-                channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'm'.")?;
+                channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
 
                 b
             }
@@ -565,7 +560,7 @@ where
                 }
                 let m = channel
                     .read_serializable::<T>()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'm'.".to_string())?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'm'.")?;
 
                 key_chi == m
             }
@@ -580,7 +575,7 @@ where
         &mut self,
         channel: &mut C,
         batch: &[Mac<P, V, T>],
-        out: &mut VerifierPrivate<P, &mut Vec<V>>,
+        out: &mut PartyPrivate<Verifier, P, &mut Vec<V>>,
     ) -> Result<()> {
         debug!("open");
         let mut hasher = blake3::Hasher::new();
@@ -590,7 +585,7 @@ where
                 for mac in batch.iter() {
                     channel
                         .write_serializable::<V>(&mac.value().into_inner(ev))
-                        .wrap_err(ErrorKind::NetworkError, "Failed to write MAC.".to_string())?;
+                        .wrap_err(ErrorKind::NetworkError, "Failed to write MAC.")?;
                     hasher.update(&mac.value().into_inner(ev).to_bytes());
                 }
             }
@@ -599,7 +594,7 @@ where
                 for _ in 0..batch.len() {
                     let x = channel
                         .read_serializable::<V>()
-                        .wrap_err(ErrorKind::NetworkError, "Failed to read 'x'.".to_string())?;
+                        .wrap_err(ErrorKind::NetworkError, "Failed to read 'x'.")?;
                     out.as_mut().into_inner(ev).push(x);
                     hasher.update(&x.to_bytes());
                 }
@@ -607,7 +602,7 @@ where
         }
 
         let seed = Block::from(<[u8; 16]>::try_from(&hasher.finalize().as_bytes()[0..16]).unwrap());
-        let mut rng = AesRng::from_seed(seed);
+        let mut rng = SwankyRng::from_seed(seed);
 
         match P::WHICH {
             WhichParty::Prover(_) => {
@@ -618,11 +613,10 @@ where
                 }
                 channel
                     .write_serializable::<T>(&m)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'm'.".to_string())?;
-                channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'm'.")?;
+                channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
 
                 Ok(())
             }
@@ -637,7 +631,7 @@ where
                 }
                 let m = channel
                     .read_serializable::<T>()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'm'.".to_string())?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'm'.")?;
 
                 assert_eq!(out.as_ref().into_inner(ev).len(), batch.len());
                 if key_chi + self.delta.into_inner(ev) * x_chi == m {
@@ -654,7 +648,7 @@ where
     pub fn quicksilver_check_multiply<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         triples: &[(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>)],
     ) -> Result<()> {
         match P::WHICH {
@@ -664,7 +658,7 @@ where
 
                 let chi = channel
                     .read_serializable()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read chi.".to_string())?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read chi.")?;
                 let mut chi_power = chi;
 
                 for ((x, x_mac), (y, y_mac), (_, z_mac)) in triples
@@ -691,14 +685,13 @@ where
 
                 channel
                     .write_serializable(&u)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'u'.".to_string())?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'u'.")?;
                 channel
                     .write_serializable(&v)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'v'.".to_string())?;
-                channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'v'.")?;
+                channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
 
                 Ok(())
             }
@@ -706,11 +699,10 @@ where
                 let chi = T::random(rng);
                 channel
                     .write_serializable::<T>(&chi)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write chi.".to_string())?;
-                channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write chi.")?;
+                channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
 
                 let mut sum_b = T::ZERO;
                 let mut chi_power = chi;
@@ -730,10 +722,10 @@ where
 
                 let u = channel
                     .read_serializable::<T>()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'u'.".to_string())?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'u'.")?;
                 let v = channel
                     .read_serializable::<T>()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'v'.".to_string())?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'v'.")?;
 
                 let b_plus = sum_b + mask.mac();
                 if b_plus == (u + (-self.delta.into_inner(ev)) * v) {
@@ -754,7 +746,7 @@ where
     pub fn quicksilver_finalize<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         state: &mut MultCheckState<P, V, T>,
     ) -> Result<usize> {
         debug!("FCom: quicksilver_finalize");
@@ -766,7 +758,7 @@ where
     pub fn gen_mask<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> Result<Mac<P, T, T>> {
         let mut macs = GenericArray::<_, DegreeModulo<V, T>>::default();
         for mac in macs.iter_mut() {
@@ -779,6 +771,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::{FCom, Mac};
+    use crate::party::{Prover, Verifier};
     use crate::svole_thread::{SvoleAtomic, ThreadSvole};
     use crate::svole_trait::{Svole, SvoleT};
     use rand::SeedableRng;
@@ -786,13 +779,15 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::{AbstractChannel, Channel, SyncChannel};
     use swanky_field::{FiniteField, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b};
     use swanky_field_f61p::F61p;
-    use swanky_party::private::{ProverPrivateCopy, VerifierPrivate};
-    use swanky_party::{IS_PROVER, IS_VERIFIER, Prover, Verifier};
+    use swanky_party::{
+        private::{PartyPrivate, PartyPrivateCopy},
+        ty_eq::Witness,
+    };
+    use swanky_rng::SwankyRng;
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     fn test_fcom_random<V: IsSubFieldOf<T>, T: FiniteField>()
@@ -802,7 +797,7 @@ mod tests {
         let count = 100;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::from_seed(Default::default());
+            let mut rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -818,11 +813,15 @@ mod tests {
             for _ in 0..count {
                 v.push(fcom.random(&mut channel, &mut rng).unwrap());
             }
-            fcom.open(&mut channel, &v, &mut VerifierPrivate::empty(IS_PROVER))
-                .unwrap();
+            fcom.open(
+                &mut channel,
+                &v,
+                &mut PartyPrivate::empty(Witness::EQUAL_TYPES),
+            )
+            .unwrap();
             v
         });
-        let mut rng = AesRng::from_seed(Default::default());
+        let mut rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -838,15 +837,15 @@ mod tests {
             v.push(fcom.random(&mut channel, &mut rng).unwrap());
         }
 
-        let mut r = VerifierPrivate::new(Vec::new());
+        let mut r = PartyPrivate::new(Vec::new());
         fcom.open(&mut channel, &v, &mut r.as_mut()).unwrap();
 
         let resprover = handle.join().unwrap();
 
         for (i, res) in resprover.iter().enumerate() {
             assert_eq!(
-                r.as_ref().into_inner(IS_VERIFIER)[i],
-                res.value().into_inner(IS_PROVER)
+                r.as_ref().into_inner(Witness::EQUAL_TYPES)[i],
+                res.value().into_inner(Witness::EQUAL_TYPES)
             );
         }
     }
@@ -858,7 +857,7 @@ mod tests {
         let count = 200;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::from_seed(Default::default());
+            let mut rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -881,11 +880,15 @@ mod tests {
                 let a = fcom.affine_add_cst(cst, x);
                 v.push(a);
             }
-            fcom.open(&mut channel, &v, &mut VerifierPrivate::empty(IS_PROVER))
-                .unwrap();
+            fcom.open(
+                &mut channel,
+                &v,
+                &mut PartyPrivate::empty(Witness::EQUAL_TYPES),
+            )
+            .unwrap();
             v
         });
-        let mut rng = AesRng::from_seed(Default::default());
+        let mut rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -907,15 +910,15 @@ mod tests {
             v.push(a_mac);
         }
 
-        let mut r = VerifierPrivate::new(Vec::new());
+        let mut r = PartyPrivate::new(Vec::new());
         fcom.open(&mut channel, &v, &mut r.as_mut()).unwrap();
 
         let batch_prover = handle.join().unwrap();
 
         for (i, res) in batch_prover.iter().enumerate() {
             assert_eq!(
-                r.as_ref().into_inner(IS_VERIFIER)[i],
-                res.value().into_inner(IS_PROVER)
+                r.as_ref().into_inner(Witness::EQUAL_TYPES)[i],
+                res.value().into_inner(Witness::EQUAL_TYPES)
             );
         }
     }
@@ -927,7 +930,7 @@ mod tests {
         let count = 50;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::from_seed(Default::default());
+            let mut rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -943,18 +946,19 @@ mod tests {
             for _ in 0..count {
                 let x = fcom.random(&mut channel, &mut rng).unwrap();
                 let y = fcom.random(&mut channel, &mut rng).unwrap();
-                let z = x.value().into_inner(IS_PROVER) * y.value().into_inner(IS_PROVER);
+                let z = x.value().into_inner(Witness::EQUAL_TYPES)
+                    * y.value().into_inner(Witness::EQUAL_TYPES);
                 let z_mac = fcom
-                    .input_prover(IS_PROVER, &mut channel, &mut rng, &[z])
+                    .input_prover(Witness::EQUAL_TYPES, &mut channel, &mut rng, &[z])
                     .unwrap()[0];
-                v.push((x, y, Mac::new(ProverPrivateCopy::new(z), z_mac)));
+                v.push((x, y, Mac::new(PartyPrivateCopy::new(z), z_mac)));
             }
             channel.flush().unwrap();
             fcom.quicksilver_check_multiply(&mut channel, &mut rng, &v)
                 .unwrap();
             v
         });
-        let mut rng = AesRng::from_seed(Default::default());
+        let mut rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -971,7 +975,7 @@ mod tests {
             let xmac = fcom.random(&mut channel, &mut rng).unwrap();
             let ymac = fcom.random(&mut channel, &mut rng).unwrap();
             let zmac = fcom
-                .input_verifier(IS_VERIFIER, &mut channel, &mut rng, 1)
+                .input_verifier(Witness::EQUAL_TYPES, &mut channel, &mut rng, 1)
                 .unwrap()[0];
             v.push((xmac, ymac, zmac));
         }
@@ -988,7 +992,7 @@ mod tests {
         let count = 50;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::from_seed(Default::default());
+            let mut rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -1006,9 +1010,9 @@ mod tests {
                 for _ in 0..n {
                     let x = V::ZERO;
                     let xmac = fcom
-                        .input1_prover(IS_PROVER, &mut channel, &mut rng, x)
+                        .input1_prover(Witness::EQUAL_TYPES, &mut channel, &mut rng, x)
                         .unwrap();
-                    v.push(Mac::new(ProverPrivateCopy::new(x), xmac));
+                    v.push(Mac::new(PartyPrivateCopy::new(x), xmac));
                 }
                 channel.flush().unwrap();
                 let r = fcom.check_zero(&mut channel, &mut rng, v.as_slice());
@@ -1021,16 +1025,16 @@ mod tests {
                 for _ in 0..n {
                     let x = V::random_nonzero(&mut rng);
                     let xmac = fcom
-                        .input1_prover(IS_PROVER, &mut channel, &mut rng, x)
+                        .input1_prover(Witness::EQUAL_TYPES, &mut channel, &mut rng, x)
                         .unwrap();
-                    v.push(Mac::new(ProverPrivateCopy::new(x), xmac));
+                    v.push(Mac::new(PartyPrivateCopy::new(x), xmac));
                 }
                 channel.flush().unwrap();
                 let r = fcom.check_zero(&mut channel, &mut rng, v.as_slice());
                 assert!(r.is_err());
             }
         });
-        let mut rng = AesRng::from_seed(Default::default());
+        let mut rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -1047,7 +1051,7 @@ mod tests {
             let mut v = Vec::new();
             for _ in 0..n {
                 let xmac = fcom
-                    .input1_verifier(IS_VERIFIER, &mut channel, &mut rng)
+                    .input1_verifier(Witness::EQUAL_TYPES, &mut channel, &mut rng)
                     .unwrap();
                 v.push(xmac);
             }
@@ -1060,7 +1064,7 @@ mod tests {
             let mut v = Vec::new();
             for _ in 0..n {
                 let xmac = fcom
-                    .input1_verifier(IS_VERIFIER, &mut channel, &mut rng)
+                    .input1_verifier(Witness::EQUAL_TYPES, &mut channel, &mut rng)
                     .unwrap();
                 v.push(xmac);
             }
@@ -1080,7 +1084,7 @@ mod tests {
         let (sender, receiver) = UnixStream::pair().unwrap();
 
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::from_seed(Default::default());
+            let mut rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender_vole.try_clone().unwrap());
             let writer = BufWriter::new(sender_vole);
             let mut channel_vole = SyncChannel::new(reader, writer);
@@ -1101,7 +1105,7 @@ mod tests {
                 svole_prover.run(&mut channel_vole, &mut rng).unwrap();
             });
 
-            let mut rng = AesRng::from_seed(Default::default());
+            let mut rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -1113,18 +1117,19 @@ mod tests {
             for _ in 0..count {
                 let x = fcom.random(&mut channel, &mut rng).unwrap();
                 let y = fcom.random(&mut channel, &mut rng).unwrap();
-                let z = x.value().into_inner(IS_PROVER) * y.value().into_inner(IS_PROVER);
+                let z = x.value().into_inner(Witness::EQUAL_TYPES)
+                    * y.value().into_inner(Witness::EQUAL_TYPES);
                 let z_mac = fcom
-                    .input_prover(IS_PROVER, &mut channel, &mut rng, &[z])
+                    .input_prover(Witness::EQUAL_TYPES, &mut channel, &mut rng, &[z])
                     .unwrap()[0];
-                v.push((x, y, Mac::new(ProverPrivateCopy::new(z), z_mac)));
+                v.push((x, y, Mac::new(PartyPrivateCopy::new(z), z_mac)));
             }
             channel.flush().unwrap();
             fcom.quicksilver_check_multiply(&mut channel, &mut rng, &v)
                 .unwrap();
             v
         });
-        let mut rng = AesRng::from_seed(Default::default());
+        let mut rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver_vole.try_clone().unwrap());
         let writer = BufWriter::new(receiver_vole);
         let mut channel_vole = SyncChannel::new(reader, writer);
@@ -1145,7 +1150,7 @@ mod tests {
             svole_receiver.run(&mut channel_vole, &mut rng).unwrap();
         });
 
-        let mut rng = AesRng::from_seed(Default::default());
+        let mut rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -1158,7 +1163,7 @@ mod tests {
             let xmac = fcom.random(&mut channel, &mut rng).unwrap();
             let ymac = fcom.random(&mut channel, &mut rng).unwrap();
             let zmac = fcom
-                .input_verifier(IS_VERIFIER, &mut channel, &mut rng, 1)
+                .input_verifier(Witness::EQUAL_TYPES, &mut channel, &mut rng, 1)
                 .unwrap()[0];
             v.push((xmac, ymac, zmac));
         }

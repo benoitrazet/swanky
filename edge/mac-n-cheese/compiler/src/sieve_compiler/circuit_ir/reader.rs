@@ -38,7 +38,7 @@ fn circuit_reader_thread<RR: RelationReader, VSR: ValueStreamReader>(
             mac_n_cheese_sieve_parser::Type::Field { modulus } => types.push(Type::Field(
                 FieldType::from_modulus(modulus).ok_or_swanky_error(
                     ErrorKind::UnsupportedError,
-                    &format!("Unknown modulus {modulus}"),
+                    format!("Unknown modulus {modulus}"),
                 )?,
             )),
             mac_n_cheese_sieve_parser::Type::ExtField { .. } => {
@@ -131,11 +131,11 @@ struct Visitor<S: InstructionSink> {
 }
 impl<S: InstructionSink> Visitor<S> {
     fn lookup_type(&self, ty: TypeId) -> swanky_error::Result<Type> {
-        usize::try_from(ty)
-            .ok()
-            .and_then(|ty| self.sink.types().get(ty))
+        self.sink
+            .types()
+            .get(usize::from(ty))
             .copied()
-            .ok_or_swanky_error(ErrorKind::OtherError, &format!("invalid type id {ty}"))
+            .ok_or_swanky_error(ErrorKind::OtherError, format!("invalid type id {ty}"))
     }
     fn per_field<CFV>(&mut self, ty: TypeId, v: CFV) -> swanky_error::Result<()>
     where
@@ -333,7 +333,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
         let name_str = || String::from_utf8_lossy(name);
         let def = self.sink.functions().get(name).ok_or_swanky_error(
             ErrorKind::UnsupportedError,
-            &format!("Unknown function {:?}", name_str()),
+            format!("Unknown function {:?}", name_str()),
         )?;
         fn make_ranges(
             label: &str,
@@ -422,9 +422,11 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                 let input_sizes = vec![definition.cond_count]
                     .into_iter()
                     .chain(
-                        std::iter::repeat(definition.branch_sizes.iter().copied())
-                            .take(definition.num_branches)
-                            .flatten(),
+                        std::iter::repeat_n(
+                            definition.branch_sizes.iter().copied(),
+                            definition.num_branches,
+                        )
+                        .flatten(),
                     )
                     .collect::<Vec<_>>();
                 let in_ranges = make_ranges("input", &input_sizes, args)
@@ -561,10 +563,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
         for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> swanky_error::Result<()>,
     {
         let name = std::str::from_utf8(name)
-            .wrap_err(
-                ErrorKind::SerializationError,
-                "Function name isn't UTF-8".to_string(),
-            )?
+            .wrap_err(ErrorKind::SerializationError, "Function name isn't UTF-8")?
             .to_string();
         let sink = FunctionBuildingSink {
             types: self.sink.types(),
@@ -614,10 +613,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
         } = body;
 
         let name = std::str::from_utf8(name)
-            .wrap_err(
-                ErrorKind::SerializationError,
-                "Function name isn't UTF-8".to_string(),
-            )?
+            .wrap_err(ErrorKind::SerializationError, "Function name isn't UTF-8")?
             .to_string();
 
         match plugin_name.as_bytes() {
@@ -648,7 +644,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                     ),
                 };
 
-                let cond_tc = inputs.get(0).ok_or_swanky_error(
+                let cond_tc = inputs.first().ok_or_swanky_error(
                     ErrorKind::UnsupportedError,
                     "mux requires an input wire range for the condition",
                 )?;
@@ -675,7 +671,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                 let num_ranges_per_branch = outputs.len();
 
                 swanky_error::ensure!(
-                    branch_inputs.len() % num_ranges_per_branch == 0,
+                    branch_inputs.len().is_multiple_of(num_ranges_per_branch),
                     ErrorKind::OtherError,
                     "The number of branch inputs must be a multiple of the number of output wire ranges"
                 );
@@ -935,9 +931,10 @@ struct GlobalSink<VSR: ValueStreamReader> {
 
 impl<VSR: ValueStreamReader> GlobalSink<VSR> {
     fn flush(&mut self) -> swanky_error::Result<()> {
-        if let Err(_) = self
+        if self
             .sender
             .send(Ok(std::mem::take(&mut self.current_chunk)))
+            .is_err()
         {
             swanky_error::bail!(
                 ErrorKind::OtherError,
@@ -974,10 +971,8 @@ impl<VSR: ValueStreamReader> InstructionSink for GlobalSink<VSR> {
         field.visit(V(
             &mut self.public_inputs_reader,
             &mut self.current_chunk,
-            usize::try_from(count).wrap_err(
-                ErrorKind::OtherError,
-                "{count} does not fit in a usize.".to_string(),
-            )?,
+            usize::try_from(count)
+                .wrap_err(ErrorKind::OtherError, "{count} does not fit in a usize.")?,
         ))
     }
 
@@ -990,10 +985,7 @@ impl<VSR: ValueStreamReader> InstructionSink for GlobalSink<VSR> {
         let id = self
             .functions
             .iter()
-            .filter(|(_, d)| match d {
-                Def::FunctionDefinition(_, _) => true,
-                _ => false,
-            })
+            .filter(|(_, d)| matches!(d, Def::FunctionDefinition(_, _)))
             .collect::<Vec<_>>()
             .len();
         let old = self.functions.insert(

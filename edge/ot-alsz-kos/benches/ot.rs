@@ -17,6 +17,5 @@ criterion_group!(
     benches,
     do_bench::<swanky_ot_alsz_kos::alsz::Sender, swanky_ot_alsz_kos::alsz::Receiver>,
     do_bench::<swanky_ot_alsz_kos::kos::Sender, swanky_ot_alsz_kos::kos::Receiver>,
-    do_bench::<swanky_ot_alsz_kos::kos_delta::Sender, swanky_ot_alsz_kos::kos_delta::Receiver>,
 );
 criterion_main!(benches);

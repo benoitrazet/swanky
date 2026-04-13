@@ -31,30 +31,30 @@ use rand::{CryptoRng, Rng};
 use sha2::{Digest, Sha256};
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
-use swanky_party::{Party, WhichParty, private::ProverPrivate};
+use swanky_party::{GenericParty, GenericWhichParty, Party0, private::PartyPrivate};
 
 /// The equality functionality.
 ///
 /// See [`crate`] for details.
-pub struct EqualityFunctionality<P: Party> {
+pub struct EqualityFunctionality<P: GenericParty> {
     hash: Sha256,
-    commitment_salt: ProverPrivate<P, [u8; 32]>,
+    commitment_salt: PartyPrivate<Party0<P>, P, [u8; 32]>,
 }
 
-impl<P: Party> EqualityFunctionality<P> {
+impl<P: GenericParty> EqualityFunctionality<P> {
     /// Create a new [`EqualityFunctionality`].
     pub fn new<RNG>(rng: &mut RNG) -> Self
     where
         RNG: CryptoRng + Rng,
     {
-        match P::WHICH {
-            WhichParty::Prover(_e) => EqualityFunctionality {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(_e) => EqualityFunctionality {
                 hash: Sha256::new(),
-                commitment_salt: ProverPrivate::new(rng.r#gen()),
+                commitment_salt: PartyPrivate::new(rng.r#gen()),
             },
-            WhichParty::Verifier(e) => EqualityFunctionality {
+            GenericWhichParty::Party1(e) => EqualityFunctionality {
                 hash: Sha256::new(),
-                commitment_salt: ProverPrivate::empty(e),
+                commitment_salt: PartyPrivate::empty(e),
             },
         }
     }
@@ -64,8 +64,8 @@ impl<P: Party> EqualityFunctionality<P> {
     }
     /// Runs the equality check on all the inputs provided in [`input(&mut self, value: &[u8])`].
     pub fn finalize(self, channel: &mut Channel) -> swanky_error::Result<()> {
-        match P::WHICH {
-            WhichParty::Prover(e) => {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(e) => {
                 // Sender computes the commitment as H(H(value)||salt)
                 let mut salted_hash = Sha256::new();
                 salted_hash.update(self.hash.finalize());
@@ -90,7 +90,7 @@ impl<P: Party> EqualityFunctionality<P> {
                 );
                 Ok(())
             }
-            WhichParty::Verifier(_e) => {
+            GenericWhichParty::Party1(_e) => {
                 let hash_receiver = self.hash.finalize();
                 // Receiver receives commitment
                 let sender_commitment: [u8; 32] = channel.read()?;
@@ -120,20 +120,28 @@ mod tests {
     use proptest::prelude::*;
     use proptest::test_runner::TestRunner;
     use rand::SeedableRng;
-    use swanky_aes_rng::AesRng;
-    use swanky_party::{Prover, Verifier};
+    use swanky_party::party_system;
+    use swanky_rng::SwankyRng;
+
+    party_system! {
+        mod ps {
+            PartyA,
+            PartyB,
+        }
+    }
+    use ps::{PartyA, PartyB};
 
     fn check_equality(input_pr: &[u8], input_vr: &[u8]) -> swanky_error::Result<()> {
         swanky_channel::local::local_channel_pair(
             |c| {
-                let mut rng = AesRng::new();
-                let mut f_eq = EqualityFunctionality::<Prover>::new(&mut rng);
+                let mut rng = SwankyRng::new();
+                let mut f_eq = EqualityFunctionality::<PartyA>::new(&mut rng);
                 f_eq.input(input_pr);
                 f_eq.finalize(c)
             },
             |c| {
-                let mut rng = AesRng::new();
-                let mut f_eq = EqualityFunctionality::<Verifier>::new(&mut rng);
+                let mut rng = SwankyRng::new();
+                let mut f_eq = EqualityFunctionality::<PartyB>::new(&mut rng);
                 f_eq.input(input_vr);
                 f_eq.finalize(c)
             },
@@ -147,16 +155,16 @@ mod tests {
     ) -> swanky_error::Result<()> {
         swanky_channel::local::local_channel_pair(
             |c| {
-                let mut rng = AesRng::new();
-                let mut f_eq = EqualityFunctionality::<Prover>::new(&mut rng);
+                let mut rng = SwankyRng::new();
+                let mut f_eq = EqualityFunctionality::<PartyA>::new(&mut rng);
                 for input_pr in inputs_pr.iter() {
                     f_eq.input(input_pr);
                 }
                 f_eq.finalize(c)
             },
             |c| {
-                let mut rng = AesRng::new();
-                let mut f_eq = EqualityFunctionality::<Verifier>::new(&mut rng);
+                let mut rng = SwankyRng::new();
+                let mut f_eq = EqualityFunctionality::<PartyB>::new(&mut rng);
                 for input_vr in inputs_vr.iter() {
                     f_eq.input(input_vr);
                 }
@@ -191,7 +199,7 @@ mod tests {
     proptest! {
         #[test]
         fn batched_same_inputs_work(ninputs in 1..10, seed in any::<u128>()) {
-            let mut rng = AesRng::from_seed(seed.into());
+            let mut rng = SwankyRng::from_seed(seed.into());
             let inputs: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.r#gen::<[u8; 32]>()).collect();
             let res = batched_check_equality(&inputs, &inputs);
             prop_assert!(res.is_ok());
@@ -200,7 +208,7 @@ mod tests {
     proptest! {
         #[test]
         fn batched_different_inputs_fail(ninputs in 1..10, seed in any::<u128>()) {
-            let mut rng = AesRng::from_seed(seed.into());
+            let mut rng = SwankyRng::from_seed(seed.into());
             let inputs_pr: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.r#gen::<[u8; 32]>()).collect();
             let inputs_vr: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.r#gen::<[u8; 32]>()).collect();
             let res = batched_check_equality(&inputs_pr, &inputs_vr);

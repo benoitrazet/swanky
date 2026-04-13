@@ -35,7 +35,7 @@ impl<T> PartialEq for TaskQueueEntry<T> {
 impl<T> Eq for TaskQueueEntry<T> {}
 impl<T> PartialOrd for TaskQueueEntry<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.sort_key().partial_cmp(&other.sort_key())
+        Some(self.cmp(other))
     }
 }
 impl<T> Ord for TaskQueueEntry<T> {
@@ -115,13 +115,13 @@ impl<T> TaskQueue<T> {
             self.queue_changed.notify_all();
             old_queue
         };
-        if let Some(old_queue) = old_queue {
-            if !old_queue.is_empty() {
-                eprintln!(
-                    "Warning: closing task queue with {} items remaining",
-                    old_queue.len()
-                );
-            }
+        if let Some(old_queue) = old_queue
+            && !old_queue.is_empty()
+        {
+            eprintln!(
+                "Warning: closing task queue with {} items remaining",
+                old_queue.len()
+            );
         }
     }
 }

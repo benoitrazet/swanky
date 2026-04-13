@@ -11,8 +11,8 @@ use std::{
     ops::{AddAssign, MulAssign, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
-use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField};
-use swanky_serialization::{BiggerThanModulus, CanonicalSerialize};
+use swanky_field::{BiggerThanModulus, FiniteField, FiniteRing, PrimeFiniteField};
+use swanky_serialization::CanonicalSerialize;
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 
 /// A field element in the prime-order finite field $\textsf{GF}(2).$

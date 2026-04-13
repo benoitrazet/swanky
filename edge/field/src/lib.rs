@@ -3,8 +3,10 @@
 //! See [`FiniteField`] and [`FiniteRing`] to get started.
 
 #![deny(missing_docs)]
+mod error;
 mod field;
 mod ring;
+pub use error::*;
 pub use field::*;
 pub use ring::*;
 

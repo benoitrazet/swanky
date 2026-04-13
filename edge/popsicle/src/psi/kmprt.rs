@@ -46,7 +46,7 @@ impl Sender {
         let s_hat = self.0.conditional_secret_sharing(inputs, channels, rng)?;
 
         // conditional reconstruction
-        let points = inputs.iter().cloned().zip(s_hat.into_iter()).collect_vec();
+        let points = inputs.iter().cloned().zip(s_hat).collect_vec();
         self.0.opprf_senders[0].send(&mut channels[0].1, &points, inputs.len(), rng)?;
 
         Ok(())
@@ -81,7 +81,7 @@ impl Receiver {
 
         let intersection = inputs
             .iter()
-            .zip(s_hat.into_iter())
+            .zip(s_hat)
             .filter_map(|(x, s)| {
                 if s == Block512::default() {
                     Some(*x)
@@ -189,12 +189,12 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::SyncChannel;
+    use swanky_rng::SwankyRng;
 
     #[test]
     fn test_secret_sharing_of_zero() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let nparties = (rng.r#gen::<usize>() % 98) + 2;
         let shares = secret_sharing_of_zero(nparties, &mut rng);
         assert!(shares.len() == nparties);
@@ -207,8 +207,9 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::needless_range_loop)]
     fn test_protocol() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
 
         let nparties = 3;
         let set_size = 1 << 6;
@@ -250,7 +251,7 @@ mod tests {
             let pid = i + 1;
             let my_set = set1.clone();
             std::thread::spawn(move || {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut sender = Sender::init(pid, &mut channels, &mut rng).unwrap();
                 sender.send(&my_set, &mut channels, &mut rng).unwrap();
             });

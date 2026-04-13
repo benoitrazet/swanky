@@ -10,6 +10,7 @@ use crate::fields::SieveIrDeserialize;
 use crate::homcom::FCom;
 use crate::mac::{Mac, MacT};
 use crate::memory::Memory;
+use crate::party::{Party, Prover, WhichParty};
 use crate::plaintext::DietMacAndCheesePlaintext;
 use crate::plugins::{
     DisjunctionBody, PluginExecution, PluginType, Ram, RamArithV0, RamArithV1, RamBoolV0,
@@ -38,15 +39,17 @@ use std::io::{Read, Seek};
 use std::iter;
 use std::marker::PhantomData;
 use std::path::PathBuf;
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, OptionExt, Result, WrapErr, bail, ensure};
 use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField, StatisticallySecureField};
 use swanky_field_binary::{F2, F40b};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F127p, F128p, F384p, F384q, Secp256k1, Secp256k1order};
-use swanky_party::private::{ProverPrivate, ProverPrivateCopy};
-use swanky_party::{IsParty, Party, Prover, WhichParty};
+use swanky_party::{
+    private::{PartyPrivate, PartyPrivateCopy},
+    ty_eq::{EqualityProposition, Witness},
+};
+use swanky_rng::SwankyRng;
 use swanky_svole_wykw::LpnParams;
 
 // This file implements IR0+ support for diet-mac-n-cheese and is broken up into the following components:
@@ -246,7 +249,7 @@ impl<
 {
     pub fn init(
         channel: &mut C,
-        mut rng: AesRng,
+        mut rng: SwankyRng,
         fcom_f2: &FCom<P, F2, F40b, SvoleF2>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -279,7 +282,7 @@ impl<
 
     pub fn init_with_svole(
         channel: &mut C,
-        mut rng: AesRng,
+        mut rng: SwankyRng,
         fcom_f2: &FCom<P, F2, F40b, SvoleF2>,
         svole2: SvoleFE,
         no_batching: bool,
@@ -433,7 +436,7 @@ impl<
             C: AbstractChannel + Clone,
             SvoleF: SvoleT<P, F, F>,
         >(
-            ev: IsParty<P, Prover>,
+            ev: Witness<impl EqualityProposition<P, Prover>>,
             dmc: &mut DietMacAndCheese<P, F, F, C, SvoleF>,
             wit_tape: I,
             inputs: &[<DietMacAndCheese<P, F, F, C, SvoleF> as BackendT>::Wire],
@@ -444,18 +447,18 @@ impl<
             debug_assert_eq!(cond, 1);
 
             // so the guard is the last input
-            let guard_val = inputs[inputs.len() - 1].value().into_inner(ev);
+            let guard_val = inputs[inputs.len() - 1].value().into_inner(ev.sym());
 
             // lookup the clause based on the guard
             let opt = *st
                 .clause_resolver
                 .as_ref()
-                .into_inner(ev)
+                .into_inner(ev.sym())
                 .get(&guard_val)
                 .expect("no clause guard is satisfied");
 
             st.dora
-                .mux(dmc, wit_tape, inputs, ProverPrivateCopy::new(opt))
+                .mux(dmc, wit_tape, inputs, PartyPrivateCopy::new(opt))
         }
 
         match self.dora_states.entry(disj.id()) {
@@ -472,15 +475,15 @@ impl<
                     &mut self.dmc,
                     iter::empty(),
                     inputs,
-                    ProverPrivateCopy::empty(ev),
+                    PartyPrivateCopy::empty(ev),
                 ),
             },
             Entry::Vacant(entry) => {
                 // compile disjunction to the field
                 let disjunction = Disjunction::compile(disj, disj.cond(), fun_store);
 
-                let mut resolver: ProverPrivate<P, HashMap<FP, _>> =
-                    ProverPrivate::new(Default::default());
+                let mut resolver: PartyPrivate<Prover, P, HashMap<FP, _>> =
+                    PartyPrivate::new(Default::default());
                 if let WhichParty::Prover(ev) = P::WHICH {
                     for (i, guard) in disj.guards().enumerate() {
                         let guard = FP::try_from_int(*guard).unwrap();
@@ -508,7 +511,7 @@ impl<
                         &mut self.dmc,
                         iter::empty(),
                         inputs,
-                        ProverPrivateCopy::empty(ev),
+                        PartyPrivateCopy::empty(ev),
                     ),
                 }
             }
@@ -541,7 +544,7 @@ impl<
                         &mut self.dmc.rng,
                         b2,
                     )?;
-                    v.push(Mac::new(ProverPrivateCopy::new(b2), mac));
+                    v.push(Mac::new(PartyPrivateCopy::new(b2), mac));
                 }
             }
             WhichParty::Verifier(ev) => {
@@ -579,8 +582,8 @@ impl<
     }
 
     fn assert_conv_from_bits(&mut self, x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire> {
-        let mut power_twos = ProverPrivateCopy::new(FE::ONE);
-        let mut recomposed_value = ProverPrivateCopy::new(FE::ZERO);
+        let mut power_twos: PartyPrivateCopy<Prover, _, _> = PartyPrivateCopy::new(FE::ONE);
+        let mut recomposed_value: PartyPrivateCopy<Prover, _, _> = PartyPrivateCopy::new(FE::ZERO);
 
         let mut bits = Vec::with_capacity(x.len());
 
@@ -687,7 +690,7 @@ impl<
         }
         self.dmc.channel.flush().wrap_err(
             ErrorKind::OtherError,
-            "Error during channel flush (using legacy channel).".to_string(),
+            "Error during channel flush (using legacy channel).",
         )?;
         Ok(())
     }
@@ -1210,10 +1213,13 @@ where
     ) -> Result<Vec<Mac<P, F2, F40b>>> {
         if *start != *end {
             if self.is_boolean {
-                let mut v = Vec::with_capacity((end + 1 - start).try_into().wrap_err(
-                    ErrorKind::OtherError,
-                    format!("{} + 1 - {} does not fit in a usize.", end, start),
-                )?);
+                let mut v = Vec::with_capacity(
+                    (end + 1 - start)
+                        .try_into()
+                        .wrap_err_with(ErrorKind::OtherError, || {
+                            format!("{} + 1 - {} does not fit in a usize.", end, start)
+                        })?,
+                );
                 for inp in *start..(*end + 1) {
                     let in_wire = self.memory.get(inp);
                     debug!("CONV GET {in_wire:?}");
@@ -1352,7 +1358,7 @@ pub struct EvaluatorCirc<
     fcom_f2_ext: Option<FCom<P, F40b, F40b, SvoleF2Ext>>,
     type_store: TypeStore,
     eval: Vec<Box<dyn EvaluatorT<P>>>,
-    rng: AesRng,
+    rng: SwankyRng,
     multithreaded_voles: Vec<Box<dyn SvoleStopSignal>>,
     // Helper array used in `callframe_start` to avoid allocating a new array everytime the function is called.
     // This is an optimization.
@@ -1372,7 +1378,7 @@ impl<
 {
     /// Initialize a new (single-threaded) `EvaluatorCirc`.
     ///
-    /// This requires an [`AbstractChannel`] and an [`AesRng`] to initialize the
+    /// This requires an [`AbstractChannel`] and a [`SwankyRng`] to initialize the
     /// homomorphic commitment scheme for [`F2`] and its extension field
     /// [`F40b`]. This is suboptimal; ideally, these protocols would only start
     /// in circuits where they are strictly required (i.e., Boolean circuits or
@@ -1387,7 +1393,7 @@ impl<
     /// evaluation, see [`Self::new_multithreaded`].
     pub fn new(
         channel: &mut C,
-        mut rng: AesRng,
+        mut rng: SwankyRng,
         inputs: CircInputs,
         type_store: TypeStore,
         lpn_size: LpnSize,
@@ -1440,7 +1446,7 @@ impl<
             fcom_f2_ext: None,
             type_store,
             eval: Vec::new(),
-            rng: AesRng::new(),
+            rng: SwankyRng::new(),
             multithreaded_voles: vec![],
             helper_callframe_arr: [0; 256],
             no_batching: false, // unused
@@ -1460,7 +1466,7 @@ impl<
     pub fn new_multithreaded<C2: AbstractChannel + Clone + 'static + Send, I>(
         channels_vole: &mut I,
         threads_per_field: usize,
-        mut rng: AesRng,
+        mut rng: SwankyRng,
         inputs: CircInputs,
         type_store: TypeStore,
         no_batching: bool,
@@ -1597,7 +1603,7 @@ impl<
                     };
                     let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
                         ErrorKind::OtherError,
-                        "Failed to represent field ID as a u8.".to_string(),
+                        "Failed to represent field ID as a u8.",
                     )?;
                     let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)?
                     else {
@@ -1652,7 +1658,7 @@ impl<
                     };
                     let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
                         ErrorKind::OtherError,
-                        "Failed to represent field ID as a u8.".to_string(),
+                        "Failed to represent field ID as a u8.",
                     )?;
                     let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)?
                     else {
@@ -1711,7 +1717,7 @@ impl<
                     };
                     let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
                         ErrorKind::OtherError,
-                        "Failed to represent field ID as a u8.".to_string(),
+                        "Failed to represent field ID as a u8.",
                     )?;
                     if let TypeSpecification::Plugin(_) = type_store.get(&field_id)? {
                         bail!(
@@ -1760,7 +1766,7 @@ impl<
                     };
                     let field_id = u8::try_from(number_to_u64(&field_id)?).wrap_err(
                         ErrorKind::OtherError,
-                        "Failed to represent field ID as a u8.".to_string(),
+                        "Failed to represent field ID as a u8.",
                     )?;
                     if let TypeSpecification::Plugin(_) = type_store.get(&field_id)? {
                         bail!(
@@ -1794,7 +1800,7 @@ impl<
     fn load_backend_fe<FE: PrimeFiniteField + StatisticallySecureField + SieveIrDeserialize>(
         &mut self,
         channel: &mut C,
-        rng: AesRng,
+        rng: SwankyRng,
         idx: usize,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -1830,7 +1836,7 @@ impl<
     pub fn load_backend(
         &mut self,
         channel: &mut C,
-        rng: AesRng,
+        rng: SwankyRng,
         field: std::any::TypeId,
         idx: usize,
         lpn_size: LpnSize,
@@ -1996,7 +2002,7 @@ impl<
     fn load_backend_multithreaded_f2(
         &mut self,
         channel: &mut C,
-        rng: AesRng,
+        rng: SwankyRng,
         _idx: usize,
     ) -> Result<()> {
         info!("loading field F2");
@@ -2026,7 +2032,7 @@ impl<
         channel: &mut C,
         channels_vole: &mut I,
         threads_per_field: usize,
-        mut rng: AesRng,
+        mut rng: SwankyRng,
         idx: usize,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -2078,7 +2084,7 @@ impl<
         channel: &mut C,
         channels_vole: &mut I,
         threads_per_field: usize,
-        rng: AesRng,
+        rng: SwankyRng,
         field: std::any::TypeId,
         idx: usize,
         lpn_size: LpnSize,
@@ -2648,6 +2654,7 @@ pub(crate) mod tests {
     use super::EdabitsMap;
     use super::TypeStore;
     use crate::LpnSize;
+    use crate::party::{Prover, Verifier};
     use crate::svole_trait::Svole;
     use crate::{
         backend_multifield::EvaluatorCirc,
@@ -2666,7 +2673,6 @@ pub(crate) mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::{Channel, SyncChannel};
     use swanky_error::{ErrorKind, WrapErr};
     use swanky_field::FiniteRing;
@@ -2674,7 +2680,7 @@ pub(crate) mod tests {
     use swanky_field_binary::F2;
     use swanky_field_f61p::F61p;
     use swanky_field_ff_primes::{F384p, F384q, Secp256k1, Secp256k1order};
-    use swanky_party::{Prover, Verifier};
+    use swanky_rng::SwankyRng;
 
     pub(crate) const FF0: u8 = 0;
     const FF1: u8 = 1;
@@ -2748,10 +2754,10 @@ pub(crate) mod tests {
         let type_store_prover = type_store.clone();
         let (sender, receiver) = UnixStream::pair().wrap_err(
             ErrorKind::NetworkError,
-            "Failed to create Unix socket pair.".to_string(),
+            "Failed to create Unix socket pair.",
         )?;
         let handle: JoinHandle<swanky_error::Result<()>> = std::thread::spawn(move || {
-            let rng = AesRng::from_seed(Default::default());
+            let rng = SwankyRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -2779,7 +2785,7 @@ pub(crate) mod tests {
             swanky_error::Result::Ok(())
         });
 
-        let rng = AesRng::from_seed(Default::default());
+        let rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);

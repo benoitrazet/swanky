@@ -113,7 +113,7 @@ pub mod simple {
             }
             self.pb
                 .write_all(&self.buf)
-                .wrap_err(ErrorKind::OtherError, "Failed to write bytes.".to_string())?;
+                .wrap_err(ErrorKind::OtherError, "Failed to write bytes.")?;
             Ok(())
         }
         /// Returns number of own wires
@@ -137,7 +137,7 @@ pub mod simple {
     impl<'a, T: CanonicalSerialize, const NARGS: usize> Reader<'a, T, NARGS> {
         pub fn new(buf: &'a [u8]) -> swanky_error::Result<Self> {
             swanky_error::ensure!(
-                buf.len() % WireFormat::<T, NARGS>::stride() == 0,
+                buf.len().is_multiple_of(WireFormat::<T, NARGS>::stride()),
                 ErrorKind::OtherError,
                 "The input buffer's length ({}) isn't a multiple of {} as is needed \
                 for NARGS={NARGS}",
@@ -152,6 +152,7 @@ pub mod simple {
         pub fn len_remaining(&self) -> usize {
             self.buf.len() / WireFormat::<T, NARGS>::stride()
         }
+        #[allow(clippy::should_implement_trait)]
         pub fn next(&mut self) -> swanky_error::Result<[ReadWire<T>; NARGS]>
         where
             ArrayUnrolledOps: UnrollableArraySize<NARGS>,
@@ -167,7 +168,7 @@ pub mod simple {
                         which_wire: u32::from_le_bytes(<[u8; 4]>::try_from(&arg[4..8]).unwrap()),
                         data: T::from_bytes(GenericArray::from_slice(&arg[8..])).wrap_err(
                             ErrorKind::SerializationError,
-                            "Failed to decode data bytes.".to_string(),
+                            "Failed to decode data bytes.",
                         )?,
                     })
                 });
@@ -252,7 +253,7 @@ pub mod simd_batched {
             }
             self.pb
                 .write_all(bytemuck::cast_slice(buf))
-                .wrap_err(ErrorKind::OtherError, "Failed to write bytes.".to_string())?;
+                .wrap_err(ErrorKind::OtherError, "Failed to write bytes.")?;
             Ok(())
         }
         /// Returns number of own wires
@@ -269,12 +270,12 @@ pub mod simd_batched {
     // This iterator should be TrustedLen
     pub fn read<const NARGS: usize>(
         buf: &[U32x4],
-    ) -> swanky_error::Result<impl '_ + Iterator<Item = [ReadWire; NARGS]> + ExactSizeIterator>
+    ) -> swanky_error::Result<impl '_ + ExactSizeIterator<Item = [ReadWire; NARGS]>>
     where
         ArrayUnrolledOps: UnrollableArraySize<NARGS>,
     {
         swanky_error::ensure!(
-            buf.len() % (2 * NARGS) == 0,
+            buf.len().is_multiple_of(2 * NARGS),
             ErrorKind::OtherError,
             "buffer isn't the right size for the batched SIMD wire format"
         );

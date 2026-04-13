@@ -4,22 +4,98 @@
 //! create projections.
 
 use itertools::Itertools;
+use swanky_channel::Channel;
 
 mod binary;
 mod bundle;
 mod crt;
-mod input;
-mod reveal;
 pub use binary::{BinaryBundle, BinaryGadgets};
-pub use bundle::{ArithmeticBundleGadgets, BinaryBundleGadgets, Bundle, BundleGadgets};
-pub use crt::{CrtBundle, CrtGadgets};
-pub use input::FancyInput;
-pub use reveal::FancyReveal;
+pub use bundle::{
+    ArithmeticBundleGadgets, ArithmeticProjBundleGadgets, BinaryBundleGadgets, Bundle,
+    BundleGadgets,
+};
+pub use crt::{CrtBundle, CrtGadgets, CrtProjGadgets};
 
 /// An object that has some modulus. Basic object of `Fancy` computations.
 pub trait HasModulus {
     /// The modulus of the wire.
     fn modulus(&self) -> u16;
+}
+
+/// DSL for the basic computations supported by `fancy-garbling`.
+///
+/// Primarily used as a supertrait for `FancyBinary` and `FancyArithmetic`,
+/// which indicate computation supported by the DSL.
+pub trait Fancy {
+    /// The underlying wire datatype created by an object implementing `Fancy`.
+    type Item: Clone + HasModulus;
+
+    /// Encode many values where the actual input is known.
+    ///
+    /// When writing a garbler, the return value must correspond to the zero
+    /// wire label.
+    fn encode_many(
+        &mut self,
+        values: &[u16],
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>>;
+
+    /// Receive many values where the input is not known.
+    fn receive_many(
+        &mut self,
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>>;
+
+    /// Create a constant `x` with modulus `q`.
+    fn constant(
+        &mut self,
+        x: u16,
+        q: u16,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Self::Item>;
+
+    /// Process this wire as output. Some `Fancy` implementers don't actually *return*
+    /// output, but they need to be involved in the process, so they can return `None`.
+    fn output(
+        &mut self,
+        x: &Self::Item,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Option<u16>>;
+
+    /// Output a slice of wires.
+    fn outputs(
+        &mut self,
+        xs: &[Self::Item],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Option<Vec<u16>>> {
+        let mut zs = Vec::with_capacity(xs.len());
+        for x in xs.iter() {
+            zs.push(self.output(x, channel)?);
+        }
+        Ok(zs.into_iter().collect())
+    }
+
+    /// Encode a single value.
+    ///
+    /// When writing a garbler, the return value must correspond to the zero
+    /// wire label.
+    fn encode(
+        &mut self,
+        value: u16,
+        modulus: u16,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Self::Item> {
+        let mut xs = self.encode_many(&[value], &[modulus], channel)?;
+        Ok(xs.remove(0))
+    }
+
+    /// Receive a single value.
+    fn receive(&mut self, modulus: u16, channel: &mut Channel) -> swanky_error::Result<Self::Item> {
+        let mut xs = self.receive_many(&[modulus], channel)?;
+        Ok(xs.remove(0))
+    }
 }
 
 /// Fancy DSL providing binary operations
@@ -85,7 +161,7 @@ pub trait FancyBinary: Fancy {
         assert!(!args.is_empty(), "`args` cannot be empty");
         args.iter()
             .skip(1)
-            .fold(Ok(args[0].clone()), |acc, x| self.and(&(acc?), x, channel))
+            .try_fold(args[0].clone(), |acc, x| self.and(&acc, x, channel))
     }
 
     /// Returns 1 if any wire equals 1.
@@ -100,7 +176,7 @@ pub trait FancyBinary: Fancy {
         assert!(!args.is_empty(), "`args` cannot be empty");
         args.iter()
             .skip(1)
-            .fold(Ok(args[0].clone()), |acc, x| self.or(&(acc?), x, channel))
+            .try_fold(args[0].clone(), |acc, x| self.or(&acc, x, channel))
     }
 
     /// XOR many wires together.
@@ -144,44 +220,6 @@ pub trait FancyBinary: Fancy {
     }
 }
 
-/// DSL for the basic computations supported by `fancy-garbling`.
-///
-/// Primarily used as a supertrait for `FancyBinary` and `FancyArithmetic`,
-/// which indicate computation supported by the DSL.
-pub trait Fancy {
-    /// The underlying wire datatype created by an object implementing `Fancy`.
-    type Item: Clone + HasModulus;
-
-    /// Create a constant `x` with modulus `q`.
-    fn constant(
-        &mut self,
-        x: u16,
-        q: u16,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item>;
-
-    /// Process this wire as output. Some `Fancy` implementers don't actually *return*
-    /// output, but they need to be involved in the process, so they can return `None`.
-    fn output(
-        &mut self,
-        x: &Self::Item,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Option<u16>>;
-
-    /// Output a slice of wires.
-    fn outputs(
-        &mut self,
-        xs: &[Self::Item],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Option<Vec<u16>>> {
-        let mut zs = Vec::with_capacity(xs.len());
-        for x in xs.iter() {
-            zs.push(self.output(x, channel)?);
-        }
-        Ok(zs.into_iter().collect())
-    }
-}
-
 /// DSL for arithmetic computation.
 pub trait FancyArithmetic: Fancy {
     /// Add `x` and `y`.
@@ -207,6 +245,26 @@ pub trait FancyArithmetic: Fancy {
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item>;
 
+    ////////////////////////////////////////////////////////////////////////////////
+    // Functions built on top of arithmetic fancy operations.
+
+    /// Sum up a slice of wires.
+    ///
+    /// # Panics
+    /// Panics if `args.len() < 2`.
+    fn add_many(&mut self, args: &[Self::Item]) -> Self::Item {
+        assert!(args.len() >= 2, "`args.len()` must be two or more");
+        let mut z = args[0].clone();
+        for x in args.iter().skip(1) {
+            z = self.add(&z, x);
+        }
+        z
+    }
+}
+
+/// Fancy DSL providing projection gates, and associated methods that utilize
+/// projection gates.
+pub trait FancyProj: Fancy {
     /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
     ///
     /// Optional `tt` is useful for hiding the gate from the evaluator.
@@ -224,21 +282,6 @@ pub trait FancyArithmetic: Fancy {
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item>;
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // Functions built on top of arithmetic fancy operations.
-
-    /// Sum up a slice of wires.
-    ///
-    /// # Panics
-    /// Panics if `args.len() < 2`.
-    fn add_many(&mut self, args: &[Self::Item]) -> Self::Item {
-        assert!(args.len() >= 2, "`args.len()` must be two or more");
-        let mut z = args[0].clone();
-        for x in args.iter().skip(1) {
-            z = self.add(&z, x);
-        }
-        z
-    }
     /// Change the modulus of `x` to `to_modulus` using a projection gate.
     fn mod_change(
         &mut self,
@@ -262,4 +305,3 @@ macro_rules! check_binary {
 }
 
 pub(crate) use check_binary;
-use swanky_channel::Channel;

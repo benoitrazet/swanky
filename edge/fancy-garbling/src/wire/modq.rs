@@ -1,6 +1,6 @@
 use crate::{ArithmeticWire, HasModulus, WireLabel, util, wire::_unrank};
 use rand::{CryptoRng, Rng, RngCore};
-use swanky_block::Block;
+use vectoreyes::U8x16;
 
 /// Intermediate struct to deserialize WireModQ to
 ///
@@ -16,34 +16,28 @@ struct UntrustedWireModQ {
 
 #[cfg(feature = "serde")]
 impl TryFrom<UntrustedWireModQ> for WireModQ {
-    type Error = crate::errors::WireDeserializationError;
+    type Error = swanky_error::Error;
 
     fn try_from(wire: UntrustedWireModQ) -> Result<Self, Self::Error> {
-        // Modulus must be at least 2
-        if wire.q < 2 {
-            return Err(Self::Error::InvalidWireModQ(
-                crate::errors::ModQDeserializationError::BadModulus(wire.q),
-            ));
-        }
+        swanky_error::ensure!(
+            wire.q >= 2,
+            swanky_error::ErrorKind::OtherError,
+            "Modulus must be at least two",
+        );
 
         // Check correct length and make sure all values are less than the modulus
         let expected_len = crate::util::digits_per_u128(wire.q);
         let given_len = wire.ds.len();
-        if given_len != expected_len {
-            return Err(Self::Error::InvalidWireModQ(
-                crate::errors::ModQDeserializationError::InvalidDigitsLength {
-                    got: given_len,
-                    needed: expected_len,
-                },
-            ));
-        }
+        swanky_error::ensure!(
+            given_len == expected_len,
+            swanky_error::ErrorKind::OtherError,
+            "Invalid number of digits. Expected: {expected_len}. Got: {given_len}"
+        );
         if let Some(i) = wire.ds.iter().position(|&x| x >= wire.q) {
-            return Err(Self::Error::InvalidWireModQ(
-                crate::errors::ModQDeserializationError::DigitTooLarge {
-                    digit: wire.ds[i],
-                    modulus: wire.q,
-                },
-            ));
+            swanky_error::bail!(
+                swanky_error::ErrorKind::OtherError,
+                "Digit {i} is greater than the modulus",
+            );
         }
         Ok(WireModQ {
             q: wire.q,
@@ -73,6 +67,91 @@ impl HasModulus for WireModQ {
     }
 }
 
+impl core::ops::Add for WireModQ {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        assert_eq!(self.q, rhs.q);
+
+        let mut xs = self.ds.clone();
+        let ys = &rhs.ds;
+        let q = self.q;
+
+        debug_assert_eq!(xs.len(), ys.len());
+        xs.iter_mut().zip(ys.iter()).for_each(|(x, &y)| {
+            let (zp, overflow) = (*x + y).overflowing_sub(q);
+            *x = if overflow { *x + y } else { zp }
+        });
+        Self { ds: xs, q }
+    }
+}
+
+impl core::ops::AddAssign for WireModQ {
+    fn add_assign(&mut self, rhs: Self) {
+        assert_eq!(self.q, rhs.q);
+
+        let q = self.q;
+
+        debug_assert_eq!(self.ds.len(), rhs.ds.len());
+        self.ds.iter_mut().zip(rhs.ds.iter()).for_each(|(x, &y)| {
+            let (zp, overflow) = (*x + y).overflowing_sub(q);
+            *x = if overflow { *x + y } else { zp }
+        });
+    }
+}
+
+impl core::ops::Sub for WireModQ {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self + -rhs
+    }
+}
+
+impl core::ops::SubAssign for WireModQ {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = self.clone() - rhs;
+    }
+}
+
+impl core::ops::Neg for WireModQ {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        let q = self.q;
+        let mut ds = self.ds.clone();
+        ds.iter_mut().for_each(|d| {
+            if *d > 0 {
+                *d = q - *d;
+            } else {
+                *d = 0;
+            }
+        });
+        Self { q, ds }
+    }
+}
+
+impl core::ops::Mul<u16> for WireModQ {
+    type Output = Self;
+
+    fn mul(self, rhs: u16) -> Self::Output {
+        let q = self.q;
+        let mut ds = self.ds.clone();
+        ds.iter_mut()
+            .for_each(|d| *d = (*d as u32 * rhs as u32 % q as u32) as u16);
+        Self { ds, q }
+    }
+}
+
+impl core::ops::MulAssign<u16> for WireModQ {
+    fn mul_assign(&mut self, rhs: u16) {
+        let q = self.q;
+        self.ds
+            .iter_mut()
+            .for_each(|d| *d = (*d as u32 * rhs as u32 % q as u32) as u16);
+    }
+}
+
 impl WireLabel for WireModQ {
     fn rand_delta<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
         if q < 2 {
@@ -90,11 +169,11 @@ impl WireLabel for WireModQ {
         self.ds.clone()
     }
 
-    fn to_block(&self) -> Block {
+    fn to_repr(&self) -> U8x16 {
         // This function converts a [`WireMod3`] into its [`Block`] representation.
         // The values stored in [`WireModQ`] are repacked depending on q
         // into a 128b value as a [`Block`].
-        Block::from(util::from_base_q(&self.ds, self.q))
+        util::from_base_q(&self.ds, self.q).into()
     }
 
     fn color(&self) -> u16 {
@@ -103,44 +182,7 @@ impl WireLabel for WireModQ {
         color
     }
 
-    fn plus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self {
-        let xs = &mut self.ds;
-        let ys = &other.ds;
-        let q = self.q;
-
-        // Assuming modulus has to be the same here
-        // Will enforce by type system
-        //debug_assert_eq!(, ymod);
-        debug_assert_eq!(xs.len(), ys.len());
-        xs.iter_mut().zip(ys.iter()).for_each(|(x, &y)| {
-            let (zp, overflow) = (*x + y).overflowing_sub(q);
-            *x = if overflow { *x + y } else { zp }
-        });
-
-        self
-    }
-
-    fn cmul_eq(&mut self, c: u16) -> &mut Self {
-        let q = self.q;
-        self.ds
-            .iter_mut()
-            .for_each(|d| *d = (*d as u32 * c as u32 % q as u32) as u16);
-        self
-    }
-
-    fn negate_eq(&mut self) -> &mut Self {
-        let q = self.q;
-        self.ds.iter_mut().for_each(|d| {
-            if *d > 0 {
-                *d = q - *d;
-            } else {
-                *d = 0;
-            }
-        });
-        self
-    }
-
-    fn from_block(inp: Block, q: u16) -> Self {
+    fn from_repr(inp: U8x16, q: u16) -> Self {
         if q < 2 {
             panic!(
                 "[WireModQ::from_block] Modulus must be at least 2. Got {}",
@@ -167,17 +209,7 @@ impl WireLabel for WireModQ {
         };
         Self { q, ds }
     }
-    /// Unpack the wire represented by a `Block` with modulus `q`. Assumes that
-    /// the block was constructed through the `AllWire` API.
-    fn zero(q: u16) -> Self {
-        if q < 2 {
-            panic!("[WireModQ::zero] Modulus must be at least 2. Got {}", q);
-        }
-        Self {
-            q,
-            ds: vec![0; util::digits_per_u128(q)],
-        }
-    }
+
     fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
         if q < 2 {
             panic!("[WireModQ::rand] Modulus must be at least 2. Got {}", q);
@@ -188,14 +220,14 @@ impl WireLabel for WireModQ {
         Self { q, ds }
     }
 
-    fn hash_to_mod(hash: Block, q: u16) -> Self {
+    fn hash_to_mod(hash: U8x16, q: u16) -> Self {
         if q < 2 {
             panic!(
                 "[WireModQ::hash_to_mod] Modulus must be at least 2. Got {}",
                 q
             );
         }
-        Self::from_block(hash, q)
+        Self::from_repr(hash, q)
     }
 }
 

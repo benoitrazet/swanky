@@ -3,6 +3,7 @@ use core::fmt::Debug;
 use diet_mac_and_cheese::EvaluatorCirc;
 use diet_mac_and_cheese::LpnSize;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
+use diet_mac_and_cheese::party::Verifier;
 use diet_mac_and_cheese::svole_trait::Svole;
 use log::info;
 use mac_n_cheese_sieve_parser::RelationReader as RR;
@@ -22,11 +23,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 use std::time::Instant;
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::TrackChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::{F2, F40b};
-use swanky_party::Verifier;
+use swanky_rng::SwankyRng;
 use tungstenite::Message;
 use tungstenite::accept;
 use web_mac_n_cheese_websocket::channel_websocket::WsChannel;
@@ -69,7 +69,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
     let mut channel = TrackChannel::new(WsChannel::new(websocket));
 
     // MAC AND CHEESE STARTS
-    let rng = AesRng::new();
+    let rng = SwankyRng::new();
 
     let no_batching = false;
     let mut evaluator =
@@ -85,10 +85,8 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
     info!("init time: {:?}", start.elapsed());
 
     let start = Instant::now();
-    let relation_file = File::open(relation.as_path()).wrap_err(
-        ErrorKind::FilesystemError,
-        "Failed to open relation.".to_string(),
-    )?;
+    let relation_file = File::open(relation.as_path())
+        .wrap_err(ErrorKind::FilesystemError, "Failed to open relation.")?;
     let relation_reader = BufReader::new(relation_file);
     evaluator.evaluate_relation_text(relation_reader)?;
     info!("time circ exec: {:?}", start.elapsed());

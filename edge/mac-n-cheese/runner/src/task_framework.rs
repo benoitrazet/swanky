@@ -10,19 +10,19 @@ use mac_n_cheese_ir::compilation_format::{
 };
 use mac_n_cheese_vole::{
     mac::{Mac, MacTypes},
+    party::{Party, Prover, WhichParty},
     specialization::SmallBinaryFieldSpecialization,
 };
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
-use swanky_aes_rng::AesRng;
 use swanky_error::{ErrorKind, OptionExt, WrapErr};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, SmallBinaryField};
 use swanky_party::{
-    Party, WhichParty,
     either::PartyEither,
-    private::{ProverPrivate, ProverPrivateCopy},
+    private::{PartyPrivate, PartyPrivateCopy},
 };
+use swanky_rng::SwankyRng;
 use swanky_serialization::{CanonicalSerialize, SequenceDeserializer, SequenceSerializer};
 use vectoreyes::{
     I32x4, SimdBase, SimdBaseGatherable, U32x4, U64x4,
@@ -86,7 +86,7 @@ pub struct TaskContext<'a> {
     // A task can migrate between threads during its lifetime.
     pub thread_id: usize,
     pub task_id: TaskId,
-    pub rng: &'a mut AesRng,
+    pub rng: &'a mut SwankyRng,
     pub arena: &'a bumpalo::Bump,
     pub prototype_has_been_verified: bool,
     pub task: Task<'a>,
@@ -100,7 +100,7 @@ pub type TaskDependencies<P> = FxHashMap<TaskId, Arc<TaskOutput<P>>>;
 pub struct TaskInput<P: Party> {
     pub challenge: Option<Challenge>,
     pub task_data: Option<BytesFromDisk>,
-    pub prover_private_data: ProverPrivate<P, Option<BytesFromDisk>>,
+    pub prover_private_data: PartyPrivate<Prover, P, Option<BytesFromDisk>>,
     // don't read this directly
     pub task_dependencies: TaskDependencies<P>,
 }
@@ -373,7 +373,7 @@ impl<P: Party> TaskInput<P> {
         );
         let num_lengths = U32x4::broadcast(input_sizes.len().try_into().wrap_err(
             ErrorKind::OtherError,
-            "Failed to convert input_sizes to i32.".to_string(),
+            "Failed to convert input_sizes to i32.",
         )?);
         const ONES: U32x4 = U32x4::from_array([u32::MAX; 4]);
         for chunk in chunks {
@@ -512,47 +512,47 @@ impl<'a, P: Party, FE: FiniteField> ProverPrivateFieldElementCommunicator<'a, P,
                     let mut cursor = Cursor::new(outgoing);
                     let s = FE::Serializer::new(&mut cursor).wrap_err(
                         ErrorKind::InitializationError,
-                        "Failed to initialize field element serializer.".to_string(),
+                        "Failed to initialize field element serializer.",
                     )?;
-                    PartyEither::prover_new(e, (cursor, s))
+                    PartyEither::new(e, (cursor, s))
                 }
                 WhichParty::Verifier(e) => {
                     let mut cursor = Cursor::new(incoming);
                     let d = FE::Deserializer::new(&mut cursor).wrap_err(
                         ErrorKind::InitializationError,
-                        "Failed to initialize field element deserializer.".to_string(),
+                        "Failed to initialize field element deserializer.",
                     )?;
-                    PartyEither::verifier_new(e, (cursor, d))
+                    PartyEither::new(e, (cursor, d))
                 }
             },
         })
     }
-    pub fn communicate(&mut self, x: ProverPrivateCopy<P, FE>) -> swanky_error::Result<FE> {
+    pub fn communicate(&mut self, x: PartyPrivateCopy<Prover, P, FE>) -> swanky_error::Result<FE> {
         Ok(match P::WHICH {
             WhichParty::Prover(e) => {
                 let x = x.into_inner(e);
-                let (cursor, s) = self.content.as_mut().prover_into(e);
+                let (cursor, s) = self.content.as_mut().into_inner(e);
                 s.write(cursor, x).wrap_err(
                     ErrorKind::SerializationError,
-                    "Failed to serialize field element.".to_string(),
+                    "Failed to serialize field element.",
                 )?;
                 x
             }
             WhichParty::Verifier(e) => {
-                let (cursor, d) = self.content.as_mut().verifier_into(e);
+                let (cursor, d) = self.content.as_mut().into_inner(e);
                 d.read(cursor).wrap_err(
                     ErrorKind::SerializationError,
-                    "Failed to deserialize field element.".to_string(),
+                    "Failed to deserialize field element.",
                 )?
             }
         })
     }
     pub fn finish(self) -> swanky_error::Result<()> {
         if let WhichParty::Prover(e) = P::WHICH {
-            let (mut cursor, s) = self.content.prover_into(e);
+            let (mut cursor, s) = self.content.into_inner(e);
             s.finish(&mut cursor).wrap_err(
                 ErrorKind::SerializationError,
-                "Failed to finish serialization of field element.".to_string(),
+                "Failed to finish serialization of field element.",
             )?;
         }
         Ok(())
@@ -565,12 +565,12 @@ pub trait TaskDefinition<P: Party>: 'static + Sized + Send + Sync {
     fn global_vole_support_needed() -> GlobalVolesNeeded;
     fn initialize(
         c: &mut TlsConnection<P>,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         vc: VoleContexts<P>,
         num_runner_threads: usize,
     ) -> swanky_error::Result<Self>;
     type TaskContinuation: 'static + Send;
-    fn finalize(self, c: &mut TlsConnection<P>, rng: &mut AesRng) -> swanky_error::Result<()>;
+    fn finalize(self, c: &mut TlsConnection<P>, rng: &mut SwankyRng) -> swanky_error::Result<()>;
     fn start_task(
         &self,
         ctx: &mut TaskContext,

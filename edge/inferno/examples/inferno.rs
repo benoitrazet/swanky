@@ -1,20 +1,19 @@
-#![allow(clippy::all)]
 use clap::Parser;
 use inferno::Proof;
 use rand::SeedableRng;
 use simple_arith_circuit::Circuit;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use swanky_aes_rng::AesRng;
 use swanky_field::FiniteField;
 use swanky_field_binary::F64b;
+use swanky_rng::SwankyRng;
 
 const N: usize = 16;
 const K: usize = 8;
 const T: usize = 40;
 
 fn circuitgen<F: FiniteField>(
-    rng: &mut AesRng,
+    rng: &mut SwankyRng,
     mults_only: bool,
     ninputs: usize,
     ngates: usize,
@@ -25,7 +24,7 @@ fn circuitgen<F: FiniteField>(
             ninputs,
             ngates,
         );
-        simple_arith_circuit::circuitgen::mul_zero_circuit::<F::PrimeField, AesRng>(
+        simple_arith_circuit::circuitgen::mul_zero_circuit::<F::PrimeField, SwankyRng>(
             ninputs, ngates, rng,
         )
     } else {
@@ -34,7 +33,7 @@ fn circuitgen<F: FiniteField>(
             ninputs,
             ngates
         );
-        simple_arith_circuit::circuitgen::random_zero_circuit::<F::PrimeField, AesRng>(
+        simple_arith_circuit::circuitgen::random_zero_circuit::<F::PrimeField, SwankyRng>(
             ninputs, ngates, rng,
         )
     };
@@ -42,7 +41,7 @@ fn circuitgen<F: FiniteField>(
 }
 
 fn prover<F: FiniteField>(args: Args) {
-    let mut rng = AesRng::from_entropy();
+    let mut rng = SwankyRng::from_entropy();
 
     let (circuit, witness) = circuitgen::<F>(&mut rng, args.mults_only, args.ninputs, args.ngates);
 
@@ -62,13 +61,13 @@ fn prover<F: FiniteField>(args: Args) {
     if let Some(filename) = args.filename.as_ref() {
         log::info!("Writing proof to '{:?}'", filename);
         let mut file = std::fs::File::create(filename).unwrap();
-        file.write(&serialized).unwrap();
+        file.write_all(&serialized).unwrap();
 
         let serialized = bincode::serialize(&circuit).unwrap();
         let circuitfile = filename.with_extension("circuit");
         log::info!("Writing circuit to '{:?}", circuitfile);
         let mut file = std::fs::File::create(circuitfile).unwrap();
-        file.write(&serialized).unwrap();
+        file.write_all(&serialized).unwrap();
     }
 
     let time = std::time::Instant::now();

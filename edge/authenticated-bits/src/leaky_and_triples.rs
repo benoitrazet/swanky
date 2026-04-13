@@ -27,7 +27,7 @@ use swanky_error::{ErrorKind, WrapErr};
 use swanky_f_eq::EqualityFunctionality;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
-use swanky_party::{Party, WhichParty};
+use swanky_party::{GenericParty, GenericWhichParty};
 use swanky_serialization::{CanonicalSerialize, SequenceDeserializer, SequenceSerializer};
 use vectoreyes::{SimdBase, U8x16};
 
@@ -35,7 +35,7 @@ use vectoreyes::{SimdBase, U8x16};
 ///
 /// See [`crate::leaky_and_triples`] for details.
 #[derive(Clone, Copy)]
-pub(crate) struct LeakyAndTriple<P: Party> {
+pub(crate) struct LeakyAndTriple<P: GenericParty> {
     /// The authenticated share $`\langle x \rangle`$.
     x: AuthShare<P>,
     /// The authenticated share $`\langle y \rangle`$.
@@ -45,7 +45,7 @@ pub(crate) struct LeakyAndTriple<P: Party> {
     z: AuthShare<P>,
 }
 
-impl<P: Party> LeakyAndTriple<P> {
+impl<P: GenericParty> LeakyAndTriple<P> {
     /// The authenticated share $`\langle x \rangle`$.
     pub(crate) fn x(&self) -> AuthShare<P> {
         self.x
@@ -64,28 +64,28 @@ impl<P: Party> LeakyAndTriple<P> {
 }
 
 /// A type for generating [`LeakyAndTriple`]s.
-pub(crate) struct LeakyAndTripleGenerator<P: Party> {
+pub(crate) struct LeakyAndTripleGenerator<P: GenericParty> {
     pub(crate) auth_share_generator: AuthShareGenerator<P>,
 }
 
-impl<P: Party> LeakyAndTripleGenerator<P> {
+impl<P: GenericParty> LeakyAndTripleGenerator<P> {
     /// Create a new [`LeakyAndTripleGenerator`].
     pub(crate) fn new<RNG: CryptoRng + Rng>(
         channel: &mut Channel,
         mut rng: RNG,
     ) -> swanky_error::Result<Self> {
         let delta = rng.r#gen::<F128b>();
-        // We require that for Party A (the Prover) `lsb(Δ) = 1`, and for Party
-        // B (the Verifier) `lsb(Δ) = 0`. So adjust `delta` as needed.
-        let delta = match P::WHICH {
-            WhichParty::Prover(_) => {
+        // We require that for Party A `lsb(Δ) = 1`, and for Party
+        // B `lsb(Δ) = 0`. So adjust `delta` as needed.
+        let delta = match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(_) => {
                 if lsb(delta) == F2::ZERO {
                     delta + F128b::ONE
                 } else {
                     delta
                 }
             }
-            WhichParty::Verifier(_) => {
+            GenericWhichParty::Party1(_) => {
                 if lsb(delta) == F2::ONE {
                     delta + F128b::ONE
                 } else {
@@ -107,11 +107,11 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
         channel: &mut Channel,
         rng: RNG,
     ) -> swanky_error::Result<Self> {
-        match P::WHICH {
-            WhichParty::Prover(_) => {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(_) => {
                 assert_eq!(lsb(F128b::from(delta)), F2::ONE)
             }
-            WhichParty::Verifier(_) => {
+            GenericWhichParty::Party1(_) => {
                 assert_eq!(lsb(F128b::from(delta)), F2::ZERO)
             }
         }
@@ -257,11 +257,11 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
             .zip(cs.iter())
             .zip(hashed_x_keys.iter())
         {
-            match P::WHICH {
-                WhichParty::Prover(_) => {
+            match P::GENERIC_WHICH {
+                GenericWhichParty::Party0(_) => {
                     send_g(x, *c, *hashed_x_key, channel)?;
                 }
-                WhichParty::Verifier(_) => {
+                GenericWhichParty::Party1(_) => {
                     receive_g_and_compute_s(x, z, *c, *hashed_x_key, channel)?;
                 }
             }
@@ -272,11 +272,11 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
             .zip(cs.iter())
             .zip(hashed_x_keys.iter())
         {
-            match P::WHICH {
-                WhichParty::Prover(_) => {
+            match P::GENERIC_WHICH {
+                GenericWhichParty::Party0(_) => {
                     receive_g_and_compute_s(x, z, *c, *hashed_x_key, channel)?;
                 }
-                WhichParty::Verifier(_) => {
+                GenericWhichParty::Party1(_) => {
                     send_g(x, *c, *hashed_x_key, channel)?;
                 }
             }
@@ -289,17 +289,17 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
             let mut serializer: F2BitSerializer = SequenceSerializer::new(&mut channel.as_std_io())
                 .wrap_err(
                     ErrorKind::InitializationError,
-                    "Failed to initialize bit sequence serializer.".to_string(),
+                    "Failed to initialize bit sequence serializer.",
                 )?;
             for s in ss.iter() {
                 let lsb_s_mine = lsb(*s);
                 serializer
                     .write(channel.as_std_io(), lsb_s_mine)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write LSB.".to_string())?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write LSB.")?;
             }
             serializer.finish(channel.as_std_io()).wrap_err(
                 ErrorKind::SerializationError,
-                "Failed to finalize bit serialization.".to_string(),
+                "Failed to finalize bit serialization.",
             )?;
             Ok(())
         };
@@ -309,13 +309,13 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
             let mut deserializer: F2BitDeserializer =
                 SequenceDeserializer::new(&mut channel.as_std_io()).wrap_err(
                     ErrorKind::InitializationError,
-                    "Failed to initialize bit sequence deserializer.".to_string(),
+                    "Failed to initialize bit sequence deserializer.",
                 )?;
             for ((x, y, z), s) in shares.into_iter().tuples().zip(ss.iter()) {
                 let lsb_s_mine = lsb(*s);
                 let lsb_s_other = deserializer
                     .read(channel.as_std_io())
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read LSB.".to_string())?;
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read LSB.")?;
                 let d = lsb_s_mine + lsb_s_other;
                 // Send `L := S + dΔ` to `Feq`.
                 feq.input(U8x16::from(s + d * delta));
@@ -329,12 +329,12 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
 
         // Compute the correction bit `d` and output the updating triples using
         // the above functions.
-        match P::WHICH {
-            WhichParty::Prover(_) => {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(_) => {
                 send_lsb(channel)?;
                 receive_lsb(channel)?;
             }
-            WhichParty::Verifier(_) => {
+            GenericWhichParty::Party1(_) => {
                 receive_lsb(channel)?;
                 send_lsb(channel)?;
             }
@@ -343,12 +343,12 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
         feq.finalize(channel)
     }
 
-    /// Open the (leaky) AND triples in `triples`.
+    /// Open the (leaky) AND triples in `triples` using a supplied $`\Delta`$ value.
     ///
     /// This corresponds to opening each of the underlying authenticated shares.
-    pub(crate) fn open(
-        &self,
+    pub(crate) fn open_with_delta(
         triples: &[LeakyAndTriple<P>],
+        delta: U8x16,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
         // Flatten triples into a vector of shares so we can call
@@ -358,7 +358,7 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
             .flat_map(|triple| [triple.x, triple.y, triple.z])
             .collect();
         let mut out = Vec::with_capacity(3 * triples.len());
-        self.auth_share_generator.open(&shares, &mut out, channel)?;
+        AuthShareGenerator::open_with_delta(&shares, delta, &mut out, channel)?;
         // Confirm when testing that all the triples are indeed valid.
         #[cfg(test)]
         {
@@ -455,8 +455,7 @@ impl<P: Party> LeakyAndTripleGenerator<P> {
 
         // Open the `⟨d⟩`s in one shot. This is much more efficient than opening
         // the `⟨d⟩`s on a per-bucket basis.
-        self.auth_share_generator
-            .open(&ds, &mut ds_opened, channel)?;
+        AuthShareGenerator::open_with_delta(&ds, self.delta(), &mut ds_opened, channel)?;
 
         for (bucket, ds_opened) in leaky_ands
             .chunks_exact(bucket_size)
@@ -511,15 +510,23 @@ fn lsb(input: F128b) -> F2 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::authshares::{PartyA, PartyB};
     use bytemuck::TransparentWrapper;
     use proptest::prelude::*;
     use rand::SeedableRng;
-    use swanky_aes_rng::AesRng;
+    use swanky_party::party_system;
+    use swanky_rng::SwankyRng;
+
+    party_system! {
+        mod ps {
+            PartyA,
+            PartyB,
+        }
+    }
+    use ps::{PartyA, PartyB};
 
     fn generators(
-        mut rng_a: &mut AesRng,
-        mut rng_b: &mut AesRng,
+        mut rng_a: &mut SwankyRng,
+        mut rng_b: &mut SwankyRng,
     ) -> (
         LeakyAndTripleGenerator<PartyA>,
         LeakyAndTripleGenerator<PartyB>,
@@ -535,8 +542,8 @@ mod tests {
         ntriples: usize,
         generator_a: &mut LeakyAndTripleGenerator<PartyA>,
         generator_b: &mut LeakyAndTripleGenerator<PartyB>,
-        mut rng_a: &mut AesRng,
-        mut rng_b: &mut AesRng,
+        mut rng_a: &mut SwankyRng,
+        mut rng_b: &mut SwankyRng,
     ) -> (Vec<LeakyAndTriple<PartyA>>, Vec<LeakyAndTriple<PartyB>>) {
         swanky_channel::local::local_channel_pair(
             |c| {
@@ -561,11 +568,13 @@ mod tests {
     ) -> (bool, bool) {
         swanky_channel::local::local_channel_pair(
             |c| {
-                let result = generator_a.open(&output_a, c);
+                let result =
+                    LeakyAndTripleGenerator::open_with_delta(&output_a, generator_a.delta(), c);
                 Ok(result.is_ok())
             },
             |c| {
-                let result = generator_b.open(&output_b, c);
+                let result =
+                    LeakyAndTripleGenerator::open_with_delta(&output_b, generator_b.delta(), c);
                 Ok(result.is_ok())
             },
         )
@@ -578,8 +587,8 @@ mod tests {
         fn honest_generation_works(ntriples in 1..10000usize,
                                    seed_a in any::<u128>(),
                                    seed_b in any::<u128>()) {
-            let mut rng_a = AesRng::from_seed(seed_a.into());
-            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let mut rng_a = SwankyRng::from_seed(seed_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_b.into());
             let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
             let (triples_a, triples_b) = generate_triples(ntriples, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
             let (validation_a, validation_b) =
@@ -597,22 +606,22 @@ mod tests {
                          seed_b in any::<u128>()) {
             let bucket_size = 5;
             let nleaky = ntriples * bucket_size;
-            let mut rng_a = AesRng::from_seed(seed_a.into());
-            let mut rng_b = AesRng::from_seed(seed_b.into());
+            let mut rng_a = SwankyRng::from_seed(seed_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_b.into());
             let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
             let (triples_a, triples_b) = generate_triples(nleaky, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
             swanky_channel::local::local_channel_pair(
                 |channel| {
                     let mut out = vec![];
                     generator_a.combine(&triples_a, &mut out, bucket_size, channel).unwrap();
-                    let result = generator_a.open(AndTriple::peel_slice(&out), channel);
+                    let result = LeakyAndTripleGenerator::open_with_delta(AndTriple::peel_slice(&out), generator_a.delta(), channel);
                     assert!(result.is_ok());
                     Ok(())
                 },
                 |channel| {
                     let mut out = vec![];
                     generator_b.combine(&triples_b, &mut out, bucket_size, channel).unwrap();
-                    let result = generator_b.open(AndTriple::peel_slice(&out), channel);
+                    let result = LeakyAndTripleGenerator::open_with_delta(AndTriple::peel_slice(&out), generator_b.delta(), channel);
                     assert!(result.is_ok());
                     Ok(())
                 },

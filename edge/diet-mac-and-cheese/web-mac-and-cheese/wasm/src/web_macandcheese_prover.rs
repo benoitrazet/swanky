@@ -2,6 +2,7 @@ use crate::js_channel::ShimChannel;
 use diet_mac_and_cheese::EvaluatorCirc;
 use diet_mac_and_cheese::LpnSize;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
+use diet_mac_and_cheese::party::Prover;
 use diet_mac_and_cheese::svole_trait::Svole;
 use log::Level;
 use log::info;
@@ -10,10 +11,9 @@ use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
 use std::collections::VecDeque;
 use std::io::Cursor;
 use std::panic;
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::TrackChannel;
 use swanky_field_binary::{F2, F40b};
-use swanky_party::Prover;
+use swanky_rng::SwankyRng;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -27,7 +27,7 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     // This sets the panic hook to the browser console
     panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    let rng = AesRng::new();
+    let rng = SwankyRng::new();
     let mut channel = TrackChannel::new(ShimChannel::new());
     let mut inputs = CircInputs::default();
 

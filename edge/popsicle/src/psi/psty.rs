@@ -8,7 +8,7 @@ use aes_gcm::{
 };
 
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryBundleGadgets, BinaryGadgets, Fancy, FancyBinary, FancyInput,
+    AllWire, BinaryBundle, BinaryBundleGadgets, BinaryGadgets, Fancy, FancyBinary,
 };
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
@@ -72,7 +72,7 @@ impl Sender {
     ) -> swanky_error::Result<Self> {
         let opprf = KmprtSender::init(channel, rng).wrap_err(
             ErrorKind::InitializationError,
-            "Failed to initialize KMPRT sender.".to_string(),
+            "Failed to initialize KMPRT sender.",
         )?;
         Ok(Self { opprf })
     }
@@ -118,10 +118,9 @@ impl Sender {
             })
             .collect_vec();
 
-        self.opprf.send(channel, &points, nbins, rng).wrap_err(
-            ErrorKind::OtherError,
-            "Failed to run PSI as sender.".to_string(),
-        )?;
+        self.opprf
+            .send(channel, &points, nbins, rng)
+            .wrap_err(ErrorKind::OtherError, "Failed to run PSI as sender.")?;
 
         Ok(SenderState { opprf_outputs: ts })
     }
@@ -140,7 +139,7 @@ impl SenderState {
         let mut gb = Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
             .wrap_err(
             ErrorKind::InitializationError,
-            "Failed to initialize garbler during setup.".to_string(),
+            "Failed to initialize garbler during setup.",
         )?;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
         let mods = vec![2; my_input_bits.len()]; // all binary moduli
@@ -194,10 +193,10 @@ impl SenderState {
 
             let key = opprf_output.prefix(KEY_SIZE);
             let key: &Key<Aes256Gcm> = key.into();
-            let cipher = Aes256Gcm::new(&key);
+            let cipher = Aes256Gcm::new(key);
 
             let nonce = Nonce::from_slice(&nonce_bytes);
-            match cipher.decrypt(&nonce, ciphertext.as_ref()) {
+            match cipher.decrypt(nonce, ciphertext.as_ref()) {
                 Ok(dec) => {
                     let payload = dec.to_owned().split_off(PAD_LEN);
                     payloads.push(payload)
@@ -217,7 +216,7 @@ impl Receiver {
     ) -> swanky_error::Result<Self> {
         let opprf = KmprtReceiver::init(channel, rng).wrap_err(
             ErrorKind::InitializationError,
-            "Failed to initialize KMPRT receiver.".to_string(),
+            "Failed to initialize KMPRT receiver.",
         )?;
         Ok(Self { opprf })
     }
@@ -233,7 +232,7 @@ impl Receiver {
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES).wrap_err(
             ErrorKind::InitializationError,
-            "Failed to create new Cuckoo hash.".to_string(),
+            "Failed to create new Cuckoo hash.",
         )?;
 
         // Send cuckoo hash info to receiver.
@@ -251,10 +250,10 @@ impl Receiver {
             })
             .collect::<Vec<Block>>();
 
-        let opprf_outputs = self.opprf.receive(channel, &table, rng).wrap_err(
-            ErrorKind::OtherError,
-            "Failed to receive OPPRF outputs.".to_string(),
-        )?;
+        let opprf_outputs = self
+            .opprf
+            .receive(channel, &table, rng)
+            .wrap_err(ErrorKind::OtherError, "Failed to receive OPPRF outputs.")?;
 
         Ok(ReceiverState {
             opprf_outputs,
@@ -285,7 +284,7 @@ impl ReceiverState {
             Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
                 .wrap_err(
                     ErrorKind::InitializationError,
-                    "Failed to initialize receiver during setup.".to_string(),
+                    "Failed to initialize receiver during setup.",
                 )?;
 
         let mods = vec![2; nbins * HASH_SIZE * 8];
@@ -311,10 +310,10 @@ impl ReceiverState {
 
         let mut intersection = Vec::new();
         for (opt_item, in_intersection) in self.cuckoo.items.iter().zip_eq(mpc_outs.into_iter()) {
-            if let Some(item) = opt_item {
-                if in_intersection == 1_u16 {
-                    intersection.push(self.inputs[item.input_index].clone());
-                }
+            if let Some(item) = opt_item
+                && in_intersection == 1_u16
+            {
+                intersection.push(self.inputs[item.input_index].clone());
             }
         }
         Ok(intersection)
@@ -332,7 +331,7 @@ impl ReceiverState {
         let (mut ev, x, y) = self.compute_setup(channel, rng)?;
         let result = fancy_compute_cardinality(&mut ev, &x, &y, channel)?;
         let cardinality_outs = ev
-            .outputs(&result.wires(), channel)?
+            .outputs(result.wires(), channel)?
             .expect("evaluator should produce outputs");
 
         let mut cardinality = 0;
@@ -376,16 +375,16 @@ impl ReceiverState {
             rng.fill_bytes(&mut nonce_bytes);
             let nonce = Nonce::from_slice(&nonce_bytes);
 
-            let cipher = Aes256Gcm::new(&key);
-            let ciphertext = cipher.encrypt(&nonce, payload.as_ref()).map_err(|_| {
+            let cipher = Aes256Gcm::new(key);
+            let ciphertext = cipher.encrypt(nonce, payload.as_ref()).map_err(|_| {
                 swanky_error::Error::new(
                     ErrorKind::OtherError,
-                    "Failed to encrypt payload.".to_string(),
+                    "Failed to encrypt payload.",
                     None, // aes_gcm::Error does not implement std::error::Error
                 )
             })?;
 
-            channel.write_bytes(&nonce)?;
+            channel.write_bytes(nonce)?;
             channel.write_bytes(&ciphertext)?;
         }
         Ok(())
@@ -468,7 +467,7 @@ impl SemiHonest for Receiver {}
 mod tests {
     use super::*;
     use crate::utils::rand_vec_vec;
-    use swanky_aes_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     const ITEM_SIZE: usize = 8;
     const SET_SIZE: usize = 1 << 6;
@@ -477,7 +476,7 @@ mod tests {
     fn psty_cardinality(sender_inputs: Vec<Vec<u8>>, receiver_inputs: Vec<Vec<u8>>) -> usize {
         let (_, output) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut psi = Sender::init(channel, &mut rng).unwrap();
 
                 let state = psi.send(&sender_inputs, channel, &mut rng).unwrap();
@@ -485,7 +484,7 @@ mod tests {
                 Ok(())
             },
             |channel| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut psi = Receiver::init(channel, &mut rng).unwrap();
 
                 let state = psi.receive(&receiver_inputs, channel, &mut rng).unwrap();
@@ -498,7 +497,7 @@ mod tests {
 
     #[test]
     fn psty_test_cardinality_same_sets() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
 
         let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
         let receiver_inputs = sender_inputs.clone();
@@ -530,7 +529,7 @@ mod tests {
     #[test]
     fn psty_test_cardinality_subsets_different_set_size() {
         if SET_SIZE >= NUM_DIFF {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let sender_inputs: Vec<Vec<u8>> = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
             let mut receiver_inputs = vec![vec![0; ITEM_SIZE]; SET_SIZE - NUM_DIFF];
             receiver_inputs.clone_from_slice(&sender_inputs[NUM_DIFF..]);
@@ -544,16 +543,16 @@ mod tests {
     #[test]
     // test fancy cardinality for sets that only differ in a few elements
     fn psty_test_cardinality_few_elements_diff() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let sender_inputs: Vec<Vec<u8>> = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
         let mut receiver_inputs = sender_inputs.clone();
 
-        for i in 0..NUM_DIFF {
+        for receiver_input in receiver_inputs.iter_mut().take(NUM_DIFF) {
             // change the value of the first byte at that index,
             // if its above 0, set it to 0, otherwise set it to 1.
             // this ensures that
             // receiver_inputs[differing_index] != sender_inputs[differing_index]
-            receiver_inputs[i][0] = if receiver_inputs[i][0] > 0 { 0 } else { 1 };
+            receiver_input[0] = if receiver_input[0] > 0 { 0 } else { 1 };
         }
 
         let cardinality = psty_cardinality(sender_inputs, receiver_inputs);
@@ -562,7 +561,7 @@ mod tests {
 
     #[test]
     fn psty_test_cardinality_random_sets() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
 
         let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
         let receiver_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
@@ -587,20 +586,20 @@ mod tests {
     #[test]
     fn payloads() {
         let payload_size = 16;
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
         let receiver_inputs = sender_inputs.clone();
         let payloads = rand_vec_vec(SET_SIZE, payload_size, &mut rng);
 
         let (received_payloads, _) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut psi = Sender::init(channel, &mut rng).unwrap();
                 let state = psi.send(&sender_inputs, channel, &mut rng).unwrap();
                 Ok(state.receive_payloads(payload_size, channel).unwrap())
             },
             |channel| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut psi = Receiver::init(channel, &mut rng).unwrap();
 
                 let state = psi.receive(&receiver_inputs, channel, &mut rng).unwrap();

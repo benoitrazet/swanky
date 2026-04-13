@@ -1,6 +1,6 @@
 //! Various fancy circuits
 use crate::circuit_psi::*;
-use fancy_garbling::{BinaryBundle, BinaryGadgets, Fancy, FancyBinary, FancyReveal};
+use fancy_garbling::{BinaryBundle, BinaryGadgets, Fancy, FancyBinary};
 use itertools::Itertools;
 use swanky_channel::Channel;
 
@@ -22,7 +22,7 @@ pub fn fancy_intersection_bit_vector<F>(
     channel: &mut Channel,
 ) -> swanky_error::Result<Vec<F::Item>>
 where
-    F: FancyReveal + Fancy + FancyBinary,
+    F: Fancy + FancyBinary,
 {
     sender_inputs
         .chunks(HASH_SIZE * 8)
@@ -41,7 +41,7 @@ where
 /// by grouping wires together according to the size of the element being bundled.
 pub fn wires_to_bundle<F>(x: &[F::Item], size: usize) -> Vec<BinaryBundle<F::Item>>
 where
-    F: FancyReveal + Fancy + FancyBinary,
+    F: Fancy + FancyBinary,
 {
     x.chunks(size)
         .map(|x_chunk| BinaryBundle::new(x_chunk.to_vec()))
@@ -55,7 +55,7 @@ pub fn fancy_unmask<F>(
     masks: &[BinaryBundle<F::Item>],
 ) -> swanky_error::Result<Vec<BinaryBundle<F::Item>>>
 where
-    F: FancyReveal + Fancy + FancyBinary,
+    F: Fancy + FancyBinary,
 {
     let mut res = Vec::new();
 
@@ -100,7 +100,7 @@ where
     let mut acc = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8, channel)?; // multiplication extends the representation of the number
     let zero = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8, channel)?;
 
-    for (i, bit) in intersect_bitvec.into_iter().enumerate() {
+    for (i, bit) in intersect_bitvec.iter().enumerate() {
         let mux_a = f.bin_multiplex(bit, &zero, &payload_a[i], channel)?;
         let mux_b = f.bin_multiplex(bit, &zero, &payload_b[i], channel)?;
         let mul = f.bin_addition_no_carry(&mux_a, &mux_b, channel)?;

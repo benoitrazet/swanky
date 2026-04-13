@@ -13,12 +13,13 @@ use bytemuck::Zeroable;
 use mac_n_cheese_ir::compilation_format::{
     Manifest, PrivateDataAddress, TaskId, TaskPriority, fb::DataChunkAddress,
 };
+use mac_n_cheese_vole::party::{Party, Prover, WhichParty};
 use moka::sync::SegmentedCache;
 use parking_lot::Mutex;
 use rand::RngCore;
 use rustc_hash::FxHashMap;
 use swanky_error::{ErrorKind, WrapErr};
-use swanky_party::{Party, WhichParty, either::PartyEither, private::ProverPrivate};
+use swanky_party::{either::PartyEither, private::PartyPrivate};
 
 use crate::{
     alloc::{BytesFromDisk, OwnedAlignedBytes},
@@ -48,7 +49,7 @@ struct PublicReadRequest {
 impl std::cmp::Eq for PublicReadRequest {}
 impl std::cmp::PartialEq for PublicReadRequest {
     fn eq(&self, other: &Self) -> bool {
-        (&self.chunk.0) == (&other.chunk.0)
+        self.chunk.0 == other.chunk.0
     }
 }
 impl std::hash::Hash for PublicReadRequest {
@@ -95,7 +96,7 @@ struct ThreadPoolReactor<P: Party> {
     // in topological order.
     outgoing_data: Queue<OutgoingData>,
     manifest: Arc<Manifest>,
-    privates_file: ProverPrivate<P, File>,
+    privates_file: PartyPrivate<Prover, P, File>,
     keys: Keys<P>,
     incoming_slots: Mutex<FxHashMap<TaskId, Arc<IncomingSlot<P>>>>,
     // This should be in topological order for the same reason that outgoing data should be.
@@ -154,15 +155,13 @@ impl<P: Party> ThreadPoolReactor<P> {
             // TODO: do a vectored send
             conn.write_all(bytemuck::bytes_of(&tdh)).wrap_err(
                 ErrorKind::NetworkError,
-                "Failed to write task data handler bytes.".to_string(),
+                "Failed to write task data handler bytes.",
             )?;
-            conn.write_all(&data.payload).wrap_err(
-                ErrorKind::NetworkError,
-                "Failed to write payload bytes.".to_string(),
-            )?;
+            conn.write_all(&data.payload)
+                .wrap_err(ErrorKind::NetworkError, "Failed to write payload bytes.")?;
             conn.flush().wrap_err(
                 ErrorKind::NetworkError,
-                "Failed to flush network connection.".to_string(),
+                "Failed to flush network connection.",
             )?; // shouldn't actually do anything
             span.finish();
         }
@@ -179,7 +178,7 @@ impl<P: Party> ThreadPoolReactor<P> {
                 .read(&mut bytemuck::bytes_of_mut(&mut tdh)[0..1])
                 .wrap_err(
                     ErrorKind::NetworkError,
-                    "Failed to read first task data handler byte.".to_string(),
+                    "Failed to read first task data handler byte.",
                 )?
                 == 0
             {
@@ -188,13 +187,11 @@ impl<P: Party> ThreadPoolReactor<P> {
             conn.read_exact(&mut bytemuck::bytes_of_mut(&mut tdh)[1..])
                 .wrap_err(
                     ErrorKind::NetworkError,
-                    "Failed to read remaining task data handler bytes.".to_string(),
+                    "Failed to read remaining task data handler bytes.",
                 )?;
             let mut buf = OwnedAlignedBytes::zeroed(tdh.length as usize);
-            conn.read_exact(&mut buf).wrap_err(
-                ErrorKind::NetworkError,
-                "Failed to read encrypted bytes.".to_string(),
-            )?;
+            conn.read_exact(&mut buf)
+                .wrap_err(ErrorKind::NetworkError, "Failed to read encrypted bytes.")?;
             self.keys.decrypt_incoming(tdh, &mut buf)?;
             event_log::ReadIncomingData {
                 task_id: tdh.task_id,
@@ -226,14 +223,14 @@ impl<P: Party> ThreadPoolReactor<P> {
                         + std::mem::size_of::<aes_gcm::Tag>()];
                     if conn.read(&mut buf[0..1]).wrap_err(
                         ErrorKind::NetworkError,
-                        "Failed to read first challenge data byte.".to_string(),
+                        "Failed to read first challenge data byte.",
                     )? == 0
                     {
                         break;
                     }
                     conn.read_exact(&mut buf[1..]).wrap_err(
                         ErrorKind::NetworkError,
-                        "Failed to read remaining challenge data bytes.".to_string(),
+                        "Failed to read remaining challenge data bytes.",
                     )?;
                     let (data, tag) = buf.split_at_mut(std::mem::size_of::<ChallengeData>());
                     let mut nonce: Nonce<<Aes128Gcm as AeadCore>::NonceSize> = Default::default();
@@ -269,7 +266,7 @@ impl<P: Party> ThreadPoolReactor<P> {
             WhichParty::Verifier(e) => {
                 let mut ctr = 0_u64;
                 while let Some((id, challenge)) =
-                    self.outgoing_challenges.as_ref().verifier_into(e).dequeue()
+                    self.outgoing_challenges.as_ref().into_inner(e).dequeue()
                 {
                     let span = event_log::SendingChallenge { task_id: id }.start();
                     let cd = ChallengeData {
@@ -289,14 +286,10 @@ impl<P: Party> ThreadPoolReactor<P> {
                         .unwrap();
                     tag_dst.copy_from_slice(&tag);
                     ctr += 1;
-                    conn.write_all(&buf).wrap_err(
-                        ErrorKind::NetworkError,
-                        "Failed to write bytes.".to_string(),
-                    )?;
-                    conn.flush().wrap_err(
-                        ErrorKind::NetworkError,
-                        "Failed to flush network.".to_string(),
-                    )?; // shouldn't actually do anything
+                    conn.write_all(&buf)
+                        .wrap_err(ErrorKind::NetworkError, "Failed to write bytes.")?;
+                    conn.flush()
+                        .wrap_err(ErrorKind::NetworkError, "Failed to flush network.")?; // shouldn't actually do anything
                     span.finish();
                 }
             }
@@ -309,7 +302,7 @@ impl<P: Party> ThreadPoolReactor<P> {
                 let mut out =
                     OwnedAlignedBytes::zeroed(usize::try_from(req.chunk.length()).wrap_err(
                         ErrorKind::OtherError,
-                        "Failed to represent request length as a usize.".to_string(),
+                        "Failed to represent request length as a usize.",
                     )?);
                 self.manifest.read_data_chunk(&req.chunk, &mut out)?;
                 Ok(Arc::new(out))
@@ -322,10 +315,9 @@ impl<P: Party> ThreadPoolReactor<P> {
                         .as_ref()
                         .into_inner(e)
                         .read_exact_at(&mut out, req.offset)
-                        .wrap_err(
-                            ErrorKind::FilesystemError,
-                            format!("Failed to read bytes at offset {}", req.offset),
-                        )?,
+                        .wrap_err_with(ErrorKind::FilesystemError, || {
+                            format!("Failed to read bytes at offset {}", req.offset)
+                        })?,
                     WhichParty::Verifier(_) => {
                         panic!("The verifier shouldn't be reading private data")
                     }
@@ -374,27 +366,27 @@ impl<P: Party> ThreadPoolReactor<P> {
     }
     fn maybe_launch_incoming(&self, task_id: TaskId, slot: &mut Option<IncomingSlotData<P>>) {
         let data = slot.as_ref().unwrap();
-        if let Some(req) = &data.request {
-            if data.response.satisifies(&req.request) {
-                event_log::IncomingSlotsLock
-                    .lock(&self.incoming_slots)
-                    .remove(&task_id);
-                let data = std::mem::take(slot).unwrap();
-                let IncomingRequest {
-                    priority,
-                    request: req,
-                    cb,
-                } = data.request.unwrap();
-                let resp = data.response;
-                debug_assert_eq!(req.want_private_data.is_some(), resp.private_data.is_some());
-                debug_assert_eq!(req.want_task_data.is_some(), resp.task_data.is_some());
-                debug_assert_eq!(req.want_incoming_network, resp.incoming_bytes.is_some());
-                debug_assert_eq!(req.want_challenge, resp.challenge.is_some());
-                self.run_queue.enqueue(TaskQueueEntry {
-                    id: RunningTaskId { task_id, priority },
-                    metadata: Box::new((resp, cb)),
-                })
-            }
+        if let Some(req) = &data.request
+            && data.response.satisifies(&req.request)
+        {
+            event_log::IncomingSlotsLock
+                .lock(&self.incoming_slots)
+                .remove(&task_id);
+            let data = std::mem::take(slot).unwrap();
+            let IncomingRequest {
+                priority,
+                request: req,
+                cb,
+            } = data.request.unwrap();
+            let resp = data.response;
+            debug_assert_eq!(req.want_private_data.is_some(), resp.private_data.is_some());
+            debug_assert_eq!(req.want_task_data.is_some(), resp.task_data.is_some());
+            debug_assert_eq!(req.want_incoming_network, resp.incoming_bytes.is_some());
+            debug_assert_eq!(req.want_challenge, resp.challenge.is_some());
+            self.run_queue.enqueue(TaskQueueEntry {
+                id: RunningTaskId { task_id, priority },
+                metadata: Box::new((resp, cb)),
+            })
         }
     }
 }
@@ -467,7 +459,7 @@ impl<P: Party> Reactor<P> for ThreadPoolReactor<P> {
                     rand::thread_rng().fill_bytes(&mut challenge);
                     self.outgoing_challenges
                         .as_ref()
-                        .verifier_into(e)
+                        .into_inner(e)
                         .enqueue((task_id.task_id, challenge));
                     Some(challenge)
                 }
@@ -503,7 +495,7 @@ impl<P: Party> Reactor<P> for ThreadPoolReactor<P> {
         self.file_read_requests.close();
         self.outgoing_data.close();
         if let WhichParty::Verifier(e) = P::WHICH {
-            self.outgoing_challenges.as_ref().verifier_into(e).close();
+            self.outgoing_challenges.as_ref().into_inner(e).close();
         }
     }
 }
@@ -511,7 +503,7 @@ impl<P: Party> Reactor<P> for ThreadPoolReactor<P> {
 pub fn new_reactor<P: Party>(
     ts: &mut ThreadSpawner,
     circuit_manifest: Arc<Manifest>,
-    private_data: ProverPrivate<P, File>,
+    private_data: PartyPrivate<Prover, P, File>,
     mut extra_connections: Vec<TcpStream>,
     run_queue: RunQueue<P>,
     keys: Keys<P>,
@@ -528,8 +520,8 @@ pub fn new_reactor<P: Party>(
             Default::default(),
         )),
         outgoing_challenges: match P::WHICH {
-            WhichParty::Prover(e) => PartyEither::prover_new(e, ()),
-            WhichParty::Verifier(e) => PartyEither::verifier_new(e, Queue::unbounded(8192)),
+            WhichParty::Prover(e) => PartyEither::new(e, ()),
+            WhichParty::Verifier(e) => PartyEither::new(e, Queue::unbounded(8192)),
         },
         disk_cache: moka::sync::SegmentedCache::builder(4)
             .time_to_idle(TIME_TO_IDLE_DISK_CACHE)
@@ -540,10 +532,9 @@ pub fn new_reactor<P: Party>(
     // Spin up the outgoing network threads.
     for (i, conn) in extra_connections.iter().enumerate() {
         let tpr = tpr.clone();
-        let conn = conn.try_clone().wrap_err(
-            ErrorKind::NetworkError,
-            "Failed to clone TCP stream.".to_string(),
-        )?;
+        let conn = conn
+            .try_clone()
+            .wrap_err(ErrorKind::NetworkError, "Failed to clone TCP stream.")?;
         ts.spawn(format!("Outgoing network thread {i}"), move || {
             tpr.outgoing_thread(conn, i as u64)
         });

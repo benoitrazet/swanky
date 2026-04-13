@@ -1,19 +1,8 @@
-#![allow(clippy::all)]
 //! This module implements a reader for "Bristol Fashion" circuit definition files.
 
 use std::io::BufRead;
 use std::str::SplitWhitespace;
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("I/O Error: `{0}`")]
-    IOError(#[from] std::io::Error),
-    #[error("Parse Error (Int): `{0}`")]
-    ParseIntError(#[from] std::num::ParseIntError),
-    #[error("Parse Error (Bristol): `{0}`")]
-    ParseBristolError(String),
-}
+use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure, swanky_error};
 
 pub type Wire = u64;
 
@@ -142,9 +131,12 @@ impl<R: BufRead> Reader<R> {
         Self { reader, line, row }
     }
 
-    fn next_line(&mut self) -> Result<Option<SplitWhitespace<'_>>, Error> {
+    fn next_line(&mut self) -> Result<Option<SplitWhitespace<'_>>> {
         self.line.clear();
-        let n = self.reader.read_line(&mut self.line)?;
+        let n = self
+            .reader
+            .read_line(&mut self.line)
+            .wrap_err(ErrorKind::OtherError, "failed to read next line")?;
         self.row += 1;
         Ok(if n != 0 {
             Some(self.line.split_whitespace())
@@ -153,155 +145,156 @@ impl<R: BufRead> Reader<R> {
         })
     }
 
-    fn expect_line(&mut self) -> Result<SplitWhitespace<'_>, Error> {
+    fn expect_line(&mut self) -> Result<SplitWhitespace<'_>> {
         let row = self.row;
         let ret = self.next_line()?;
-        ret.ok_or_else(|| Error::ParseBristolError(format!("unexpected EOF on line {}", row)))
+        ret.ok_or_else(|| swanky_error!(ErrorKind::OtherError, "unexpected EOF on line {row}"))
     }
 
-    fn read_u64(tokens: &mut SplitWhitespace, msg: &str) -> Result<u64, Error> {
+    fn read_u64(tokens: &mut SplitWhitespace, msg: &str) -> Result<u64> {
         tokens
             .next()
-            .ok_or_else(|| Error::ParseBristolError(msg.to_string()))?
+            .ok_or_else(|| swanky_error!(ErrorKind::OtherError, "no next token: {msg}"))?
             .parse::<u64>()
-            .map_err(Error::from)
+            .wrap_err(ErrorKind::OtherError, "unable to parse string as u64")
     }
 
-    fn read_bool(tokens: &mut SplitWhitespace, msg: &str) -> Result<bool, Error> {
+    fn read_bool(tokens: &mut SplitWhitespace, msg: &str) -> Result<bool> {
         let x = tokens
             .next()
-            .ok_or_else(|| Error::ParseBristolError(msg.to_string()))?
-            .parse::<u8>()?;
-        Self::parsing_assert(x == 0 || x == 1, format!("expected 0 or 1, but got {}", x))?;
-        Ok(if x == 0 { false } else { true })
+            .ok_or_else(|| swanky_error!(ErrorKind::OtherError, "no next token: {msg}"))?
+            .parse::<u8>()
+            .wrap_err(ErrorKind::OtherError, "unable to parse string as u8")?;
+        ensure!(
+            x == 0 || x == 1,
+            ErrorKind::OtherError,
+            "expected 0 or 1, but got {x}"
+        );
+        Ok(x != 0)
     }
 
-    fn read_gate_kind<'a>(tokens: &mut SplitWhitespace<'a>) -> Result<&'a str, Error> {
+    fn read_gate_kind<'a>(tokens: &mut SplitWhitespace<'a>) -> Result<&'a str> {
         tokens.next_back().ok_or_else(|| {
-            Error::ParseBristolError("unexpected EOL, expected gate kind".to_string())
+            swanky_error!(ErrorKind::OtherError, "unexpected EOL, expected gate kind")
         })
     }
 
-    fn read_ngates(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+    fn read_ngates(tokens: &mut SplitWhitespace) -> Result<u64> {
         Self::read_u64(tokens, "unexpected EOL, expected ngates")
     }
 
-    fn read_nwires(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+    fn read_nwires(tokens: &mut SplitWhitespace) -> Result<u64> {
         Self::read_u64(tokens, "unexpected EOL, expected nwires")
     }
 
-    fn read_ninputs(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+    fn read_ninputs(tokens: &mut SplitWhitespace) -> Result<u64> {
         Self::read_u64(tokens, "unexpected EOL, expected ninputs")
     }
 
-    fn read_input_size(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+    fn read_input_size(tokens: &mut SplitWhitespace) -> Result<u64> {
         Self::read_u64(tokens, "unexpected EOL, expected input size")
     }
 
-    fn read_noutputs(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+    fn read_noutputs(tokens: &mut SplitWhitespace) -> Result<u64> {
         Self::read_u64(tokens, "unexpected EOL, expected noutputs")
     }
 
-    fn read_output_size(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+    fn read_output_size(tokens: &mut SplitWhitespace) -> Result<u64> {
         Self::read_u64(tokens, "unexpected EOL, expected output size")
     }
 
-    fn read_gate_input_arity(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+    fn read_gate_input_arity(tokens: &mut SplitWhitespace) -> Result<u64> {
         Self::read_u64(tokens, "unexpected EOL, expected gate input arity")
     }
 
-    fn read_gate_output_arity(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+    fn read_gate_output_arity(tokens: &mut SplitWhitespace) -> Result<u64> {
         Self::read_u64(tokens, "unexpected EOL, expected gate output arity")
     }
 
-    fn read_gate_input(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+    fn read_gate_input(tokens: &mut SplitWhitespace) -> Result<u64> {
         Self::read_u64(tokens, "unexpected EOL, expected gate input")
     }
 
-    fn read_gate_input_lit(tokens: &mut SplitWhitespace) -> Result<bool, Error> {
+    fn read_gate_input_lit(tokens: &mut SplitWhitespace) -> Result<bool> {
         Self::read_bool(tokens, "unexpected EOL, expected gate input lit")
     }
 
-    fn read_gate_output(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+    fn read_gate_output(tokens: &mut SplitWhitespace) -> Result<u64> {
         Self::read_u64(tokens, "unexpected EOL, expected gate output")
     }
 
-    fn parsing_assert(cond: bool, msg: String) -> Result<(), Error> {
-        if cond {
-            Ok(())
-        } else {
-            Err(Error::ParseBristolError(msg))
-        }
-    }
-
-    fn read_binary_gate(tokens: &mut SplitWhitespace) -> Result<(Wire, Wire, Wire), Error> {
+    fn read_binary_gate(tokens: &mut SplitWhitespace) -> Result<(Wire, Wire, Wire)> {
         let in_arity = Self::read_gate_input_arity(tokens)?;
-        Self::parsing_assert(
+        ensure!(
             in_arity == 2,
-            format!("unexpected input arity, expected 2 but got {}", in_arity),
-        )?;
+            ErrorKind::OtherError,
+            "unexpected input arity, expected 2 but got {in_arity}"
+        );
         let out_arity = Self::read_gate_output_arity(tokens)?;
-        Self::parsing_assert(
+        ensure!(
             out_arity == 1,
-            format!("unexpected output arity, expected 1 but got {}", out_arity),
-        )?;
+            ErrorKind::OtherError,
+            "unexpected output arity, expected 1 but got {out_arity}"
+        );
         let a = Self::read_gate_input(tokens)?;
         let b = Self::read_gate_input(tokens)?;
         let out = Self::read_gate_output(tokens)?;
-        let _ = Self::read_eol(tokens)?;
+        Self::read_eol(tokens)?;
         Ok((a, b, out))
     }
 
-    fn read_unary_gate(tokens: &mut SplitWhitespace) -> Result<(Wire, Wire), Error> {
+    fn read_unary_gate(tokens: &mut SplitWhitespace) -> Result<(Wire, Wire)> {
         let in_arity = Self::read_gate_input_arity(tokens)?;
-        Self::parsing_assert(
+        ensure!(
             in_arity == 1,
-            format!("unexpected input arity, expected 1 but got {}", in_arity),
-        )?;
+            ErrorKind::OtherError,
+            "unexpected input arity, expected 1 but got {in_arity}"
+        );
         let out_arity = Self::read_gate_output_arity(tokens)?;
-        Self::parsing_assert(
+        ensure!(
             out_arity == 1,
-            format!("unexpected output arity, expected 1 but got {}", out_arity),
-        )?;
+            ErrorKind::OtherError,
+            "unexpected output arity, expected 1 but got {out_arity}"
+        );
         let a = Self::read_gate_input(tokens)?;
         let out = Self::read_gate_output(tokens)?;
-        let _ = Self::read_eol(tokens)?;
+        Self::read_eol(tokens)?;
         Ok((a, out))
     }
 
-    fn read_eq_gate(tokens: &mut SplitWhitespace) -> Result<(bool, Wire), Error> {
+    fn read_eq_gate(tokens: &mut SplitWhitespace) -> Result<(bool, Wire)> {
         let in_arity = Self::read_gate_input_arity(tokens)?;
-        Self::parsing_assert(
+        ensure!(
             in_arity == 1,
-            format!("unexpected input arity, expected 1 but got {}", in_arity),
-        )?;
+            ErrorKind::OtherError,
+            "unexpected input arity, expected 1 but got {in_arity}"
+        );
         let out_arity = Self::read_gate_output_arity(tokens)?;
-        Self::parsing_assert(
+        ensure!(
             out_arity == 1,
-            format!("unexpected output arity, expected 1 but got {}", out_arity),
-        )?;
+            ErrorKind::OtherError,
+            "unexpected output arity, expected 1 but got {out_arity}"
+        );
         let lit = Self::read_gate_input_lit(tokens)?;
         let out = Self::read_gate_output(tokens)?;
-        let _ = Self::read_eol(tokens)?;
+        Self::read_eol(tokens)?;
         Ok((lit, out))
     }
 
-    fn read_eol(tokens: &mut SplitWhitespace) -> Result<(), Error> {
+    fn read_eol(tokens: &mut SplitWhitespace) -> Result<()> {
         let x = tokens.next();
         match x {
-            Some(_) => Err(Error::ParseBristolError(
-                "unexpected token, expected EOL".to_string(),
-            )),
+            Some(_) => bail!(ErrorKind::OtherError, "unexpected token, expected EOL"),
             None => Ok(()),
         }
     }
 
-    fn read(mut self) -> Result<Circuit, Error> {
+    fn read(mut self) -> Result<Circuit> {
         // Read number of gates (`ngates`) and number of wires (`nwires`) from first line
         let mut tokens = self.expect_line()?;
         let ngates = Self::read_ngates(&mut tokens)?;
         let nwires = Self::read_nwires(&mut tokens)?;
-        let _ = Self::read_eol(&mut tokens)?;
+        Self::read_eol(&mut tokens)?;
 
         // Read number of inputs and sizes from second line
         let mut tokens = self.expect_line()?;
@@ -311,7 +304,7 @@ impl<R: BufRead> Reader<R> {
             let input_size = Self::read_input_size(&mut tokens)?;
             input_sizes.push(input_size);
         }
-        let _ = Self::read_eol(&mut tokens)?;
+        Self::read_eol(&mut tokens)?;
 
         // Read number of outputs and sizes from third line
         let mut tokens = self.expect_line()?;
@@ -321,11 +314,11 @@ impl<R: BufRead> Reader<R> {
             let output_size = Self::read_output_size(&mut tokens)?;
             output_sizes.push(output_size);
         }
-        let _ = Self::read_eol(&mut tokens)?;
+        Self::read_eol(&mut tokens)?;
 
         // Skip an empty line
         let mut tokens = self.expect_line()?;
-        let _ = Self::read_eol(&mut tokens)?;
+        Self::read_eol(&mut tokens)?;
 
         // Read gates from remaining lines
         let mut gates: Vec<Gate> = Vec::with_capacity(usize::try_from(ngates).unwrap());
@@ -354,16 +347,19 @@ impl<R: BufRead> Reader<R> {
                     gates.push(Gate::EQ { lit, out });
                 }
                 "MAND" => {
-                    let error_msg = format!(
+                    bail!(
+                        ErrorKind::OtherError,
                         "unexpected gate kind on line {}: MAND only supported by extended format",
                         5 + i
                     );
-                    return Err(Error::ParseBristolError(error_msg));
                 }
                 _ => {
-                    let error_msg =
-                        format!("unexpected gate kind on line {}: {}", 5 + i, gate_kind);
-                    return Err(Error::ParseBristolError(error_msg));
+                    bail!(
+                        ErrorKind::OtherError,
+                        "unexpected gate kind on line {}: {}",
+                        5 + i,
+                        gate_kind
+                    );
                 }
             }
         }
@@ -376,7 +372,7 @@ impl<R: BufRead> Reader<R> {
                     break;
                 }
                 Some(mut tokens) => {
-                    let _ = Self::read_eol(&mut tokens)?;
+                    Self::read_eol(&mut tokens)?;
                 }
             }
         }
@@ -394,7 +390,7 @@ impl<R: BufRead> Reader<R> {
 /// Parses a reader formatted as Bristol Fashion into a `Circuit`.
 /// Produces an I/O error on failure to read, and a parse error if
 /// the reader is not well-formed Bristol Fashion.
-pub fn read<R: BufRead>(reader: R) -> Result<Circuit, Error> {
+pub fn read<R: BufRead>(reader: R) -> Result<Circuit> {
     Reader::new(reader).read()
 }
 

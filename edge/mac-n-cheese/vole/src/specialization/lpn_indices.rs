@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
-use swanky_aes_rng::AesRng;
 use swanky_field::FiniteField;
+use swanky_rng::SwankyRng;
 use vectoreyes::{
     SimdBase, SimdBase4x64, SimdBase8, SimdBase8x, SimdBase32, U8x32, U16x8, U16x16, U32x8, U64x4,
     array_utils::ArrayUnrolledExt,
@@ -18,10 +18,7 @@ fn transform_random_into_arrays_of_size_ten_stored_as_a_vector(raw: [U16x8; 5]) 
     // Now we need to shuffle the groups of two values that we got from the community chest.
     // U16x16 doesn't have a shuffle function, but U32x8 does! We want to move groups of two values
     // around, anyway, so we can convert our values to U32x8 and then shuffle there.
-    let [a, b, c, d] = combined.array_map(
-        #[inline(always)]
-        |x| U32x8::from(x),
-    );
+    let [a, b, c, d] = combined.array_map(U32x8::from);
     // The shuffle will affect the 8 random values that are supposed to stay together, but that's
     // fine, since we don't care if we end up shuffling our random values.
     // We say that the upper 6 values (the last 3 values of the shuffle) should be ignored, so
@@ -34,10 +31,7 @@ fn transform_random_into_arrays_of_size_ten_stored_as_a_vector(raw: [U16x8; 5]) 
         c.shuffle::<0, 1, 3, 2>(),
         d.shuffle::<0, 1, 2, 3>(),
     ];
-    shuffled.array_map(
-        #[inline(always)]
-        |x| U16x16::from(x),
-    )
+    shuffled.array_map(U16x16::from)
 }
 #[test]
 fn test_transform_random_into_arrays_of_size_ten_stored_as_a_vector() {
@@ -229,7 +223,7 @@ fn test_visit_permutations() {
 
 /// The upper 6 values in each vector should not be used. The lower 10 contain the indices.
 #[inline(always)] // since it's using SIMD
-pub(super) fn matrix_entries_vectorized(rng: &mut AesRng) -> [U16x16; 4] {
+pub(super) fn matrix_entries_vectorized(rng: &mut SwankyRng) -> [U16x16; 4] {
     // Since we're operating on GF(2^40), the associated prime field has a modulus of 2. As a result,
     // the prime field entry that's associated with the matrix entry is always 1.
     // These indices are supposed to be uniform mod 2^16. We can get that distribution for free by
@@ -256,7 +250,7 @@ pub(super) fn matrix_entries_vectorized(rng: &mut AesRng) -> [U16x16; 4] {
 }
 
 pub(super) fn matrix_entries<'a, FE: FiniteField>(
-    rng: &'a mut AesRng,
+    rng: &'a mut SwankyRng,
 ) -> impl Iterator<Item = [(u16, FE); 10]> + 'a {
     std::iter::repeat_with(move || {
         matrix_entries_vectorized(rng).array_zip(<[[FE; 10]; 4]>::array_generate(|_| {

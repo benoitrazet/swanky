@@ -100,4 +100,22 @@ def new_crate(ctx: click.Context, name: str, description: str, core: bool) -> No
     )
     cargo_toml = "\n".join(lines)
     cargo_toml_path.write_text(cargo_toml)
+    if core:
+        pre_push_hook_path = ROOT / "etc" / "hooks" / "pre-push"
+        pre_push_hook = pre_push_hook_path.read_text()
+        lines = pre_push_hook.split("\n")
+
+        assert "    # BEGIN CORE CRATES" in lines
+        assert "    # END CORE CRATES" in lines
+
+        begin_idx = lines.index("    # BEGIN CORE CRATES")
+        end_idx = lines.index("    # END CORE CRATES")
+
+        lines = (
+            lines[0 : begin_idx + 1]
+            + sorted(lines[begin_idx + 1 : end_idx] + [f"    {name}"])
+            + lines[end_idx:]
+        )
+        pre_push_hook = "\n".join(lines)
+        pre_push_hook_path.write_text(pre_push_hook)
     ctx.invoke(readme.gen_crate_list, check=False)

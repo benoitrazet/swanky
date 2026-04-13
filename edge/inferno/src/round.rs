@@ -1,5 +1,5 @@
-use swanky_aes_rng::AesRng;
 use swanky_field::FiniteField;
+use swanky_rng::SwankyRng;
 
 use crate::{
     cache::Cache,
@@ -48,6 +48,7 @@ pub(crate) fn round1<S: LinearSharing<F, N>, F: FiniteField, const N: usize>(
 }
 
 // This round is only run by the prover.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn round_compress_start<F: FiniteField, const N: usize>(
     round: Round<SecretSharing<F, N>>,
     k: usize,          // The compression factor.
@@ -56,7 +57,7 @@ pub(crate) fn round_compress_start<F: FiniteField, const N: usize>(
     hashers: &mut Hashers<N>,
     rands: &mut Vec<(SecretSharing<F, N>, SecretSharing<F, N>)>,
     hs: &mut Vec<Vec<SecretSharing<F, N>>>,
-    rngs: &mut [AesRng; N],
+    rngs: &mut [SwankyRng; N],
 ) -> Round<SecretSharing<F, N>> {
     let dimension = (round.xs.len() as f32 / k as f32).ceil() as usize;
     log::debug!(

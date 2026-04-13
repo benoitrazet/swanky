@@ -41,7 +41,7 @@ super::define_events! {
 
 #[test]
 fn test_it() {
-    let events_snapshot = vec![
+    let events_snapshot = [
         EventLogEntry {
             timestamp: Default::default(),
             thread_id: 0,

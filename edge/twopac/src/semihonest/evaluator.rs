@@ -1,6 +1,6 @@
 use fancy_garbling::{
-    AllWire, ArithmeticWire, Evaluator as Ev, Fancy, FancyArithmetic, FancyBinary, FancyInput,
-    FancyReveal, WireLabel, WireMod2,
+    AllWire, ArithmeticWire, Evaluator as Ev, Fancy, FancyArithmetic, FancyBinary, FancyProj,
+    WireLabel, WireMod2,
 };
 use rand::{CryptoRng, Rng};
 use swanky_adversary::SemiHonest;
@@ -23,10 +23,8 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
 {
     /// Make a new `Evaluator`.
     pub fn new(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self> {
-        let ot = OT::init(channel, &mut rng).wrap_err(
-            ErrorKind::InitializationError,
-            "Failed to initialize OT.".to_string(),
-        )?;
+        let ot = OT::init(channel, &mut rng)
+            .wrap_err(ErrorKind::InitializationError, "Failed to initialize OT.")?;
         let evaluator = Ev::new(channel)?;
         Ok(Self { evaluator, ot, rng })
     }
@@ -38,11 +36,107 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
     ) -> swanky_error::Result<Vec<Block>> {
         self.ot
             .receive(channel, inputs, &mut self.rng)
-            .wrap_err(ErrorKind::OtherError, "Failed to run OT.".to_string())
+            .wrap_err(ErrorKind::OtherError, "Failed to run OT.")
     }
 }
 
-impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyInput
+fn combine<Wire: WireLabel>(wires: &[Block], q: u16) -> Wire {
+    assert!(!wires.is_empty());
+    let acc = Wire::from_repr(wires[0], q);
+    wires[1..].iter().enumerate().fold(acc, |acc, (i, w)| {
+        let w = Wire::from_repr(*w, q);
+        acc + w * (1 << (i + 1))
+    })
+}
+
+impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest> FancyBinary
+    for Evaluator<RNG, OT, WireMod2>
+{
+    fn and(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Self::Item> {
+        self.evaluator.and(x, y, channel)
+    }
+
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        self.evaluator.xor(x, y)
+    }
+
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
+        self.evaluator.negate(x)
+    }
+}
+
+impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest> FancyBinary
+    for Evaluator<RNG, OT, AllWire>
+{
+    fn and(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Self::Item> {
+        self.evaluator.and(x, y, channel)
+    }
+
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        self.evaluator.xor(x, y)
+    }
+
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
+        self.evaluator.negate(x)
+    }
+}
+
+impl<
+    RNG: CryptoRng + Rng,
+    OT: OtReceiver<Msg = Block> + SemiHonest,
+    Wire: WireLabel + ArithmeticWire,
+> FancyArithmetic for Evaluator<RNG, OT, Wire>
+{
+    fn add(&mut self, x: &Wire, y: &Wire) -> Self::Item {
+        self.evaluator.add(x, y)
+    }
+
+    fn sub(&mut self, x: &Wire, y: &Wire) -> Self::Item {
+        self.evaluator.sub(x, y)
+    }
+
+    fn cmul(&mut self, x: &Wire, c: u16) -> Self::Item {
+        self.evaluator.cmul(x, c)
+    }
+
+    fn mul(
+        &mut self,
+        x: &Wire,
+        y: &Wire,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Self::Item> {
+        self.evaluator.mul(x, y, channel)
+    }
+}
+
+impl<
+    RNG: CryptoRng + Rng,
+    OT: OtReceiver<Msg = Block> + SemiHonest,
+    Wire: WireLabel + ArithmeticWire,
+> FancyProj for Evaluator<RNG, OT, Wire>
+{
+    fn proj(
+        &mut self,
+        x: &Wire,
+        q: u16,
+        tt: Option<Vec<u16>>,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Self::Item> {
+        self.evaluator.proj(x, q, tt, channel)
+    }
+}
+
+impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> Fancy
     for Evaluator<RNG, OT, Wire>
 {
     type Item = Wire;
@@ -78,10 +172,9 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
             }
             lens.push(len);
         }
-        let wires = self.run_ot(&bs, channel).wrap_err(
-            ErrorKind::OtherError,
-            "Failed to run oblivious transfer.".to_string(),
-        )?;
+        let wires = self
+            .run_ot(&bs, channel)
+            .wrap_err(ErrorKind::OtherError, "Failed to run oblivious transfer.")?;
         let mut start = 0;
         Ok(lens
             .into_iter()
@@ -94,88 +187,6 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
             })
             .collect::<Vec<Wire>>())
     }
-}
-
-fn combine<Wire: WireLabel>(wires: &[Block], q: u16) -> Wire {
-    wires.iter().enumerate().fold(Wire::zero(q), |acc, (i, w)| {
-        let w = Wire::from_block(*w, q);
-        acc.plus(&w.cmul(1 << i))
-    })
-}
-
-impl<RNG, OT> FancyBinary for Evaluator<RNG, OT, WireMod2> {
-    fn and(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        self.evaluator.and(x, y, channel)
-    }
-
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        self.evaluator.xor(x, y)
-    }
-
-    fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        self.evaluator.negate(x)
-    }
-}
-
-impl<RNG, OT> FancyBinary for Evaluator<RNG, OT, AllWire> {
-    fn and(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        self.evaluator.and(x, y, channel)
-    }
-
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        self.evaluator.xor(x, y)
-    }
-
-    fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        self.evaluator.negate(x)
-    }
-}
-
-impl<RNG, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<RNG, OT, Wire> {
-    fn add(&mut self, x: &Wire, y: &Wire) -> Self::Item {
-        self.evaluator.add(x, y)
-    }
-
-    fn sub(&mut self, x: &Wire, y: &Wire) -> Self::Item {
-        self.evaluator.sub(x, y)
-    }
-
-    fn cmul(&mut self, x: &Wire, c: u16) -> Self::Item {
-        self.evaluator.cmul(x, c)
-    }
-
-    fn mul(
-        &mut self,
-        x: &Wire,
-        y: &Wire,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        self.evaluator.mul(x, y, channel)
-    }
-
-    fn proj(
-        &mut self,
-        x: &Wire,
-        q: u16,
-        tt: Option<Vec<u16>>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        self.evaluator.proj(x, q, tt, channel)
-    }
-}
-
-impl<RNG, OT, Wire: WireLabel> Fancy for Evaluator<RNG, OT, Wire> {
-    type Item = Wire;
 
     fn constant(
         &mut self,
@@ -188,12 +199,6 @@ impl<RNG, OT, Wire: WireLabel> Fancy for Evaluator<RNG, OT, Wire> {
 
     fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
         self.evaluator.output(x, channel)
-    }
-}
-
-impl<RNG: CryptoRng + Rng, OT, Wire: WireLabel> FancyReveal for Evaluator<RNG, OT, Wire> {
-    fn reveal(&mut self, x: &Self::Item, channel: &mut Channel) -> swanky_error::Result<u16> {
-        self.evaluator.reveal(x, channel)
     }
 }
 

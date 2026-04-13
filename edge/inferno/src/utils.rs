@@ -21,17 +21,17 @@ pub(crate) fn validate_parameters<F: FiniteField>(
     // XXX: Currently we only use the parameters from Table 4 in the Limbo paper,
     // which provides valid parameter settings for `F_{2^{64}}` (and larger fields).
     if F::NumberOfBitsInBitDecomposition::USIZE >= 64 {
-        match (nparties, compression_factor, repetitions) {
+        matches!(
+            (nparties, compression_factor, repetitions),
             (16, 8, 40)
-            | (16, 16, 38)
-            | (32, 8, 34)
-            | (32, 16, 32)
-            | (64, 8, 30)
-            | (64, 16, 28)
-            | (128, 8, 27)
-            | (128, 16, 25) => true,
-            _ => false,
-        }
+                | (16, 16, 38)
+                | (32, 8, 34)
+                | (32, 16, 32)
+                | (64, 8, 30)
+                | (64, 16, 28)
+                | (128, 8, 27)
+                | (128, 16, 25)
+        )
     } else {
         false
     }

@@ -1,20 +1,19 @@
-#![allow(clippy::all)]
-use anyhow::{Error, Result};
 use clap::{Arg, ArgAction, ArgMatches, Command, arg};
 use inferno::Proof;
 use simple_arith_circuit::{Circuit, builder};
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use swanky_aes_rng::AesRng;
+use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F64b};
+use swanky_rng::SwankyRng;
 
 const N: usize = 16; // Number of MPC parties
 const K: usize = 8; // Compression factor
 const T: usize = 40; // Number of repetitions
 
-fn string_to_f2(s: &str) -> Result<Vec<F2>, Error> {
+fn string_to_f2(s: &str) -> Result<Vec<F2>> {
     let mut v = Vec::with_capacity(s.len());
     for c in s.chars() {
         let f = match c {
@@ -28,40 +27,58 @@ fn string_to_f2(s: &str) -> Result<Vec<F2>, Error> {
 }
 
 fn prover(circuit_path: &Path, witness: &str, eqcheck: &str, output: &Path) -> Result<()> {
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let witness = string_to_f2(witness)?;
     let eqcheck = string_to_f2(eqcheck)?;
     log::info!("Reading circuit from {:?}", circuit_path);
-    let circuit = Circuit::<F2>::read_bristol_fashion(circuit_path, None)?;
+    let circuit = Circuit::<F2>::read_bristol_fashion(circuit_path, None)
+        .wrap_err_with(ErrorKind::SerializationError, || {
+            format!("Failed to read '{circuit_path:?}'")
+        })?;
     let circuit = builder::add_binary_equality_check(circuit, &eqcheck);
     log::info!("Building proof");
     let proof = Proof::<F64b, N>::prove(&circuit, &witness, K, T, &mut rng);
     log::info!("Serializing proof");
-    let serialized = bincode::serialize(&proof)?;
+    let serialized = bincode::serialize(&proof)
+        .wrap_err(ErrorKind::SerializationError, "Failed to serialize proof")?;
     log::info!("Writing proof to {:?}", output);
-    let mut file = File::create(output)?;
-    file.write(&serialized)?;
+    let mut file = File::create(output).wrap_err_with(ErrorKind::FilesystemError, || {
+        format!("Failed to create file '{output:?}'")
+    })?;
+    file.write_all(&serialized)
+        .wrap_err(ErrorKind::FilesystemError, "Failed to write proof to disk")?;
     Ok(())
 }
 
-fn verifier(circuit_path: &Path, proof_path: &Path, eqcheck: &str) -> Result<(), Error> {
+fn verifier(circuit_path: &Path, proof_path: &Path, eqcheck: &str) -> Result<()> {
     let eqcheck = string_to_f2(eqcheck)?;
     log::info!("Reading circuit from {:?}", circuit_path);
-    let circuit = Circuit::read_bristol_fashion(circuit_path, None)?;
+    let circuit = Circuit::read_bristol_fashion(circuit_path, None)
+        .wrap_err_with(ErrorKind::SerializationError, || {
+            format!("Failed to read '{circuit_path:?}'")
+        })?;
     let circuit = builder::add_binary_equality_check(circuit, &eqcheck);
     log::info!("Reading proof from {:?}", proof_path);
-    let file = File::open(proof_path)?;
-    let proof: Proof<F64b, N> = bincode::deserialize_from(file)?;
+    let file = File::open(proof_path).wrap_err_with(ErrorKind::FilesystemError, || {
+        format!("Failed to open file '{proof_path:?}'")
+    })?;
+    let proof: Proof<F64b, N> = bincode::deserialize_from(file)
+        .wrap_err(ErrorKind::SerializationError, "Failed to deserialize proof")?;
     log::info!("Verifying proof");
-    proof.verify(&circuit, K, T)?;
+    proof
+        .verify(&circuit, K, T)
+        .wrap_err(ErrorKind::OtherError, "Failed to verify circuit")?;
     print!("Verification succeeded!");
     Ok(())
 }
 
-fn evaluator(circuit_path: &Path, witness: &str) -> Result<(), Error> {
+fn evaluator(circuit_path: &Path, witness: &str) -> Result<()> {
     let witness = string_to_f2(witness)?;
     log::info!("Reading circuit from {:?}", circuit_path);
-    let circuit = Circuit::read_bristol_fashion(circuit_path, None)?;
+    let circuit = Circuit::read_bristol_fashion(circuit_path, None)
+        .wrap_err_with(ErrorKind::SerializationError, || {
+            format!("Failed to read circuit '{circuit_path:?}'")
+        })?;
     let mut wires = Vec::with_capacity(circuit.nwires());
     let outputs = circuit.eval(&witness, &mut wires);
     print!("Output = ");
@@ -127,12 +144,12 @@ fn main() {
         .get_matches();
 
     fn set_logging(matches: &ArgMatches) {
-        if let Some(value) = matches.get_one::<bool>("logging") {
-            if *value {
-                env_logger::Builder::from_default_env()
-                    .filter_level(log::LevelFilter::Info)
-                    .init();
-            }
+        if let Some(value) = matches.get_one::<bool>("logging")
+            && *value
+        {
+            env_logger::Builder::from_default_env()
+                .filter_level(log::LevelFilter::Info)
+                .init();
         }
     }
 

@@ -3,8 +3,8 @@ use crate::{
     util,
 };
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryWireLabel, CrtBundle, CrtGadgets, Fancy, FancyArithmetic,
-    FancyBinary, FancyInput, HasModulus, WireMod2,
+    AllWire, BinaryBundle, BinaryGadgets, BinaryWireLabel, CrtBundle, CrtGadgets, CrtProjGadgets,
+    Fancy, FancyArithmetic, FancyBinary, HasModulus, WireMod2,
     classic::{GarbledChannel, GarbledCircuit},
     dummy::Dummy,
     informer::Informer,
@@ -20,11 +20,11 @@ use std::{
     path::Path,
     time::{Duration, Instant},
 };
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel::Channel;
-use swanky_error::{ErrorKind, Result, swanky_error};
+use swanky_error::{ErrorKind, Result, WrapErr, swanky_error};
 use swanky_ot_alsz_kos::alsz;
+use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 /// Input encoder for a garbled neural network.
@@ -59,7 +59,7 @@ impl<W: BinaryWireLabel> InputEncoder<W> {
                         .wires()
                         .iter()
                         .enumerate()
-                        .map(|(i, zero)| zero.plus(&self.delta.cmul(1 & (bits >> i) as u16)))
+                        .map(|(i, zero)| *zero + self.delta * (1 & (bits >> i) as u16))
                         .collect::<Vec<_>>(),
                 )
             })
@@ -88,7 +88,7 @@ impl OutputMap {
                 .map(|zero| {
                     [
                         zero.hash(output_tweak(i, 0)),
-                        zero.plus(&delta).hash(output_tweak(i, 1)),
+                        (*zero + delta).hash(output_tweak(i, 1)),
                     ]
                 })
                 .collect::<Vec<_>>();
@@ -153,22 +153,20 @@ impl NeuralNet {
     /// # Errors
     /// This returns an error if the directory does not contain a `model.json` file
     /// and a `weights.json` file.
-    pub fn from_dir(dir: &Path) -> std::io::Result<Self> {
+    pub fn from_dir(dir: &Path) -> Result<Self> {
         let model_path = dir.join(Path::new("model.json"));
-        if !model_path.is_file() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidFilename,
-                "`model.json` does not exist in the given diretory",
-            ));
-        }
+        swanky_error::ensure!(
+            model_path.is_file(),
+            ErrorKind::FilesystemError,
+            "`model.json` does not exist in the given diretory"
+        );
 
         let weights_path = dir.join(Path::new("weights.json"));
-        if !weights_path.is_file() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidFilename,
-                "`weights.json` does not exist in the given diretory",
-            ));
-        }
+        swanky_error::ensure!(
+            weights_path.is_file(),
+            ErrorKind::FilesystemError,
+            "`weights.json` does not exist in the given diretory"
+        );
 
         NeuralNet::from_json(&model_path, &weights_path)
     }
@@ -184,10 +182,7 @@ impl NeuralNet {
     }
 
     /// Encode an input so it can be evaluated by a boolean [`NeuralNet`].
-    pub fn encode_input_boolean<
-        W: HasModulus + Clone,
-        F: Fancy<Item = W> + FancyInput<Item = W>,
-    >(
+    pub fn encode_input_boolean<W: HasModulus + Clone, F: Fancy<Item = W> + BinaryGadgets>(
         f: &mut F,
         input: &Array3<i64>,
         first_layer_bitwidth: usize,
@@ -203,10 +198,7 @@ impl NeuralNet {
     }
 
     /// Receive an input so it can be evaluated by a boolean [`NeuralNet`].
-    pub fn receive_input_boolean<
-        W: HasModulus + Clone,
-        F: Fancy<Item = W> + FancyInput<Item = W>,
-    >(
+    pub fn receive_input_boolean<W: HasModulus + Clone, F: Fancy<Item = W> + BinaryGadgets>(
         f: &mut F,
         input: &Array3<i64>,
         first_layer_bitwidth: usize,
@@ -219,7 +211,7 @@ impl NeuralNet {
     }
 
     /// Encode an input so it can be evaluated by an arithmetic [`NeuralNet`].
-    pub fn encode_input_arith<W: HasModulus + Clone, F: Fancy<Item = W> + FancyInput<Item = W>>(
+    pub fn encode_input_arith<W: HasModulus + Clone, F: Fancy<Item = W> + CrtGadgets>(
         f: &mut F,
         input: &Array3<i64>,
         modulus: u128,
@@ -232,7 +224,7 @@ impl NeuralNet {
     }
 
     /// Receive an input so it can be evaluated by an arithmetic [`NeuralNet`].
-    pub fn receive_input_arith<W: HasModulus + Clone, F: Fancy<Item = W> + FancyInput<Item = W>>(
+    pub fn receive_input_arith<W: HasModulus + Clone, F: Fancy<Item = W> + CrtGadgets>(
         f: &mut F,
         input: &Array3<i64>,
         modulus: u128,
@@ -309,10 +301,7 @@ impl NeuralNet {
     ) -> Result<Vec<CrtBundle<W>>>
     where
         W: HasModulus + Clone,
-        F: Fancy<Item = W>
-            + FancyInput<Item = W>
-            + FancyArithmetic<Item = W>
-            + CrtGadgets<Item = W>,
+        F: Fancy<Item = W> + FancyArithmetic<Item = W> + CrtProjGadgets<Item = W>,
     {
         assert_eq!(
             moduli.len(),
@@ -362,7 +351,7 @@ impl NeuralNet {
     ) -> Result<Vec<BinaryBundle<W>>>
     where
         W: Clone + HasModulus,
-        F: Fancy<Item = W> + FancyInput<Item = W> + FancyBinary<Item = W>,
+        F: Fancy<Item = W> + FancyBinary<Item = W>,
     {
         assert_eq!(
             bitwidth.len(),
@@ -437,89 +426,108 @@ impl NeuralNet {
 
     /// Read a [`NeuralNet`] from model and weights files containing data in
     /// tensorflow JSON output.
-    pub fn from_json(model: &Path, weights: &Path) -> std::io::Result<Self> {
-        use std::io::{Error, ErrorKind, Result};
-
+    pub fn from_json(model: &Path, weights: &Path) -> Result<Self> {
         // Extract the layers from `model`.
-        let file = File::open(model)?;
-        let root: Value = serde_json::from_reader(file)?;
-        let root = root.as_object().ok_or(Error::new(
-            ErrorKind::InvalidData,
-            format!("Root value in {model:?} must be an object"),
-        ))?;
+        let file = File::open(model).wrap_err_with(ErrorKind::FilesystemError, || {
+            format!("Failed to open file '{model:?}'")
+        })?;
+        let root: Value = serde_json::from_reader(file)
+            .wrap_err_with(ErrorKind::OtherError, || {
+                format!("Failed to open file '{model:?}' as JSON")
+            })?;
+        let root = root.as_object().ok_or_else(|| {
+            swanky_error!(
+                ErrorKind::OtherError,
+                "Root value in {model:?} must be an object",
+            )
+        })?;
 
         let layers_json = if root
             .get("config")
-            .ok_or(Error::new(
-                ErrorKind::InvalidData,
-                format!("Root object in {model:?} must contain 'config' key"),
-            ))?
+            .ok_or_else(|| {
+                swanky_error!(
+                    ErrorKind::OtherError,
+                    "Root object in {model:?} must contain 'config' key",
+                )
+            })?
             .is_array()
         {
             &root["config"]
         } else {
-            let config = root["config"].as_object().ok_or(Error::new(
-                ErrorKind::InvalidData,
-                "Config value must be either an array or an object",
-            ))?;
-            config.get("layers").ok_or(Error::new(
-                ErrorKind::InvalidData,
-                "Config object must contain 'layers' key",
-            ))?
+            let config = root["config"].as_object().ok_or_else(|| {
+                swanky_error!(
+                    ErrorKind::OtherError,
+                    "Config value must be either an array or an object",
+                )
+            })?;
+            config.get("layers").ok_or_else(|| {
+                swanky_error!(
+                    ErrorKind::OtherError,
+                    "Config object must contain 'layers' key",
+                )
+            })?
         };
 
         // Extract the weights and biases from `weights`.
-        let file = File::open(weights)?;
-        let root: Value = serde_json::from_reader(file)?;
+        let file = File::open(weights).wrap_err_with(ErrorKind::FilesystemError, || {
+            format!("Failed to open file '{model:?}'")
+        })?;
+        let root: Value = serde_json::from_reader(file)
+            .wrap_err_with(ErrorKind::OtherError, || {
+                format!("Failed to open file '{model:?}' as JSON")
+            })?;
         let mut weights_and_biases_iter = root
             .as_array()
-            .ok_or(Error::new(
-                ErrorKind::InvalidData,
-                format!("Root value in {weights:?} must be an array"),
-            ))?
+            .ok_or_else(|| {
+                swanky_error!(
+                    ErrorKind::OtherError,
+                    "Root value in {weights:?} must be an array",
+                )
+            })?
             .chunks_exact(2);
 
         let mut layers: Vec<Layer> = Vec::new();
         for layer in layers_json
             .as_array()
-            .ok_or(Error::new(
-                ErrorKind::InvalidData,
-                "Layers value must be an array",
-            ))?
+            .ok_or_else(|| swanky_error!(ErrorKind::OtherError, "Layers value must be an array"))?
             .iter()
             .map(|c| {
-                c.as_object().ok_or(Error::new(
-                    ErrorKind::InvalidData,
-                    "Layers array value must be an object",
-                ))
+                c.as_object().ok_or_else(|| {
+                    swanky_error!(
+                        ErrorKind::OtherError,
+                        "Layers array value must be an object",
+                    )
+                })
             })
         {
             let layer = layer?;
             let cfg = layer
                 .get("config")
-                .ok_or(Error::new(
-                    ErrorKind::InvalidData,
-                    "Layer object must contain 'config' key",
-                ))?
+                .ok_or_else(|| {
+                    swanky_error!(
+                        ErrorKind::OtherError,
+                        "Layer object must contain 'config' key",
+                    )
+                })?
                 .as_object()
-                .ok_or(Error::new(
-                    ErrorKind::InvalidData,
-                    "Config value must be an object",
-                ))?;
+                .ok_or_else(|| {
+                    swanky_error!(ErrorKind::OtherError, "Config value must be an object")
+                })?;
 
             // Extract whether to use padding from the config object.
             let is_padding = |cfg: &Map<String, Value>| -> Result<bool> {
                 let padding = cfg
                     .get("padding")
-                    .ok_or(Error::new(
-                        ErrorKind::InvalidData,
-                        "Config object must contain 'padding' key",
-                    ))?
+                    .ok_or_else(|| {
+                        swanky_error!(
+                            ErrorKind::OtherError,
+                            "Config object must contain 'padding' key",
+                        )
+                    })?
                     .as_str()
-                    .ok_or(Error::new(
-                        ErrorKind::InvalidData,
-                        "Padding value must be a string",
-                    ))?;
+                    .ok_or_else(|| {
+                        swanky_error!(ErrorKind::OtherError, "Padding value must be a string")
+                    })?;
                 Ok(padding == "same")
             };
 
@@ -528,16 +536,14 @@ impl NeuralNet {
                 let mut biases = Vec::new();
                 for bias in biases_json
                     .as_array()
-                    .ok_or(Error::new(
-                        ErrorKind::InvalidData,
-                        "Biases value must be an array",
-                    ))?
+                    .ok_or_else(|| {
+                        swanky_error!(ErrorKind::OtherError, "Biases value must be an array")
+                    })?
                     .iter()
                 {
-                    let bias = bias.as_i64().ok_or(Error::new(
-                        ErrorKind::InvalidData,
-                        "Bias value must be an integer",
-                    ))?;
+                    let bias = bias.as_i64().ok_or_else(|| {
+                        swanky_error!(ErrorKind::OtherError, "Bias value must be an integer")
+                    })?;
                     biases.push(Some(bias));
                 }
                 Ok(biases)
@@ -547,15 +553,19 @@ impl NeuralNet {
             let activation = |cfg: &Map<String, Value>| -> Result<ActivationFunction> {
                 ActivationFunction::try_from(
                     cfg.get("activation")
-                        .ok_or(Error::new(
-                            ErrorKind::InvalidData,
-                            "Config object must contain 'activation' key",
-                        ))?
+                        .ok_or_else(|| {
+                            swanky_error!(
+                                ErrorKind::OtherError,
+                                "Config object must contain 'activation' key",
+                            )
+                        })?
                         .as_str()
-                        .ok_or(Error::new(
-                            ErrorKind::InvalidData,
-                            "Activation value must be a string",
-                        ))?,
+                        .ok_or_else(|| {
+                            swanky_error!(
+                                ErrorKind::OtherError,
+                                "Activation value must be a string",
+                            )
+                        })?,
                 )
             };
 
@@ -563,60 +573,58 @@ impl NeuralNet {
             let stride = |cfg: &Map<String, Value>| -> Result<(usize, usize)> {
                 let stride = cfg
                     .get("strides")
-                    .ok_or(Error::new(
-                        ErrorKind::InvalidData,
-                        "Config object must contain 'strides' key",
-                    ))?
+                    .ok_or_else(|| {
+                        swanky_error!(
+                            ErrorKind::OtherError,
+                            "Config object must contain 'strides' key",
+                        )
+                    })?
                     .as_array()
-                    .ok_or(Error::new(
-                        ErrorKind::InvalidData,
-                        "Strides value must be an array",
-                    ))?
+                    .ok_or_else(|| {
+                        swanky_error!(ErrorKind::OtherError, "Strides value must be an array")
+                    })?
                     .iter()
                     .map(|v| {
-                        v.as_u64().ok_or(Error::new(
-                            ErrorKind::InvalidData,
-                            "Strides array value must be an integer",
-                        ))
+                        v.as_u64().ok_or_else(|| {
+                            swanky_error!(
+                                ErrorKind::OtherError,
+                                "Strides array value must be an integer",
+                            )
+                        })
                     })
                     .collect::<Result<Vec<_>>>()?;
-                if stride.len() < 2 {
-                    return Err(Error::new(
-                        ErrorKind::InvalidData,
-                        "Strides array must have at least two elements",
-                    ));
-                }
+                swanky_error::ensure!(
+                    stride.len() >= 2,
+                    ErrorKind::OtherError,
+                    "Strides array must have at least two elements"
+                );
                 Ok((stride[0] as usize, stride[1] as usize))
             };
 
             let input_shape = if let Some(v) = cfg.get("batch_input_shape") {
                 let mut shape = v
                     .as_array()
-                    .ok_or(Error::new(
-                        ErrorKind::InvalidData,
-                        "Batch input shape must be an array",
-                    ))?
+                    .ok_or_else(|| {
+                        swanky_error!(ErrorKind::OtherError, "Batch input shape must be an array")
+                    })?
                     .clone();
                 if shape[0].is_null() {
                     shape.remove(0);
                 }
-                let height = shape[0].as_u64().ok_or(Error::new(
-                    ErrorKind::InvalidData,
-                    "Height must be an unsigned integer",
-                ))? as usize;
+                let height = shape[0].as_u64().ok_or_else(|| {
+                    swanky_error!(ErrorKind::OtherError, "Height must be an unsigned integer")
+                })? as usize;
                 let width = if shape.len() > 1 {
-                    shape[1].as_u64().ok_or(Error::new(
-                        ErrorKind::InvalidData,
-                        "Width must be an unsigned integer",
-                    ))? as usize
+                    shape[1].as_u64().ok_or_else(|| {
+                        swanky_error!(ErrorKind::OtherError, "Width must be an unsigned integer")
+                    })? as usize
                 } else {
                     1
                 };
                 let depth = if shape.len() > 2 {
-                    shape[2].as_u64().ok_or(Error::new(
-                        ErrorKind::InvalidData,
-                        "Depth must be an unsigned integer",
-                    ))? as usize
+                    shape[2].as_u64().ok_or_else(|| {
+                        swanky_error!(ErrorKind::OtherError, "Depth must be an unsigned integer")
+                    })? as usize
                 } else {
                     1
                 };
@@ -624,67 +632,75 @@ impl NeuralNet {
             } else {
                 layers
                     .last()
-                    .ok_or(Error::new(
-                        ErrorKind::InvalidData,
-                        "No last layer to extract input shape",
-                    ))?
+                    .ok_or_else(|| {
+                        swanky_error!(
+                            ErrorKind::OtherError,
+                            "No last layer to extract input shape",
+                        )
+                    })?
                     .output_dims()
             };
 
             match layer
                 .get("class_name")
-                .ok_or(Error::new(
-                    ErrorKind::InvalidData,
-                    "Layer object must contain 'class_name' key",
-                ))?
+                .ok_or_else(|| {
+                    swanky_error!(
+                        ErrorKind::OtherError,
+                        "Layer object must contain 'class_name' key",
+                    )
+                })?
                 .as_str()
-                .ok_or(Error::new(
-                    ErrorKind::InvalidData,
-                    "Layer class name must be a string",
-                ))? {
+                .ok_or_else(|| {
+                    swanky_error!(ErrorKind::OtherError, "Layer class name must be a string")
+                })? {
                 "Dense" => {
-                    let weights_and_biases = weights_and_biases_iter.next().ok_or(Error::new(
-                        ErrorKind::InvalidData,
-                        "Not enough weights and biases",
-                    ))?;
+                    let weights_and_biases = weights_and_biases_iter.next().ok_or_else(|| {
+                        swanky_error!(ErrorKind::OtherError, "Not enough weights and biases")
+                    })?;
                     let num_neurons = cfg
                         .get("units")
-                        .ok_or(Error::new(
-                            ErrorKind::InvalidData,
-                            "Config object must contain 'units' key",
-                        ))?
+                        .ok_or_else(|| {
+                            swanky_error!(
+                                ErrorKind::OtherError,
+                                "Config object must contain 'units' key",
+                            )
+                        })?
                         .as_u64()
-                        .ok_or(Error::new(
-                            ErrorKind::InvalidData,
-                            "Units value must be an unsigned integer",
-                        ))? as usize;
+                        .ok_or_else(|| {
+                            swanky_error!(
+                                ErrorKind::OtherError,
+                                "Units value must be an unsigned integer",
+                            )
+                        })? as usize;
                     let mut weights = vec![Array3::from_elem(input_shape, Some(0)); num_neurons];
 
                     // Keras outputs the weights in the transposition of what we need.
-                    let weights_data = weights_and_biases[0].as_array().ok_or(Error::new(
-                        ErrorKind::InvalidData,
-                        "Weights value must be an array",
-                    ))?;
-                    if weights_data.len() != input_shape.0 {
-                        return Err(Error::new(
-                            ErrorKind::InvalidData,
-                            "Weights length must equal input shape",
-                        ));
-                    }
+                    let weights_data = weights_and_biases[0].as_array().ok_or_else(|| {
+                        swanky_error!(ErrorKind::OtherError, "Weights value must be an array")
+                    })?;
+                    swanky_error::ensure!(
+                        weights_data.len() == input_shape.0,
+                        ErrorKind::OtherError,
+                        "Weights length must equal input shape"
+                    );
 
                     for (inp_num, data) in weights_data.iter().enumerate() {
                         for (neuron_num, val) in data
                             .as_array()
-                            .ok_or(Error::new(
-                                ErrorKind::InvalidData,
-                                "Weights value must be an array",
-                            ))?
+                            .ok_or_else(|| {
+                                swanky_error!(
+                                    ErrorKind::OtherError,
+                                    "Weights value must be an array",
+                                )
+                            })?
                             .iter()
                             .map(|v| {
-                                v.as_i64().ok_or(Error::new(
-                                    ErrorKind::InvalidData,
-                                    "Weight value must be an integer",
-                                ))
+                                v.as_i64().ok_or_else(|| {
+                                    swanky_error!(
+                                        ErrorKind::OtherError,
+                                        "Weight value must be an integer",
+                                    )
+                                })
                             })
                             .enumerate()
                         {
@@ -706,36 +722,40 @@ impl NeuralNet {
                 "Conv2D" => {
                     let pad = is_padding(cfg)?;
 
-                    let weights_and_biases = weights_and_biases_iter.next().ok_or(Error::new(
-                        ErrorKind::InvalidData,
-                        "Not enough weights and biases",
-                    ))?;
+                    let weights_and_biases = weights_and_biases_iter.next().ok_or_else(|| {
+                        swanky_error!(ErrorKind::OtherError, "Not enough weights and biases")
+                    })?;
 
                     let kernel_size = cfg
                         .get("kernel_size")
-                        .ok_or(Error::new(
-                            ErrorKind::InvalidData,
-                            "Config object must contain 'kernel_size' key",
-                        ))?
+                        .ok_or_else(|| {
+                            swanky_error!(
+                                ErrorKind::OtherError,
+                                "Config object must contain 'kernel_size' key",
+                            )
+                        })?
                         .as_array()
-                        .ok_or(Error::new(
-                            ErrorKind::InvalidData,
-                            "Kernel size value must be an array",
-                        ))?
+                        .ok_or_else(|| {
+                            swanky_error!(
+                                ErrorKind::OtherError,
+                                "Kernel size value must be an array",
+                            )
+                        })?
                         .iter()
                         .map(|v| {
-                            v.as_u64().ok_or(Error::new(
-                                ErrorKind::InvalidData,
-                                "Kernel size array value must be an unsigned integer",
-                            ))
+                            v.as_u64().ok_or_else(|| {
+                                swanky_error!(
+                                    ErrorKind::OtherError,
+                                    "Kernel size array value must be an unsigned integer",
+                                )
+                            })
                         })
                         .collect::<Result<Vec<_>>>()?;
-                    if kernel_size.len() < 2 {
-                        return Err(Error::new(
-                            ErrorKind::InvalidData,
-                            "Kernel size array must have at least two elements",
-                        ));
-                    }
+                    swanky_error::ensure!(
+                        kernel_size.len() >= 2,
+                        ErrorKind::OtherError,
+                        "Kernel size array must have at least two elements"
+                    );
                     let kernel_shape = (
                         kernel_size[0] as usize,
                         kernel_size[1] as usize,
@@ -746,37 +766,44 @@ impl NeuralNet {
 
                     let weights = weights_and_biases[0]
                         .as_array()
-                        .ok_or(Error::new(
-                            ErrorKind::InvalidData,
-                            "Weights value must be an array",
-                        ))?
+                        .ok_or_else(|| {
+                            swanky_error!(ErrorKind::OtherError, "Weights value must be an array")
+                        })?
                         .iter()
                         .map(|x| {
                             x.as_array()
-                                .ok_or(Error::new(
-                                    ErrorKind::InvalidData,
-                                    "Weights x-coordinate must be an array",
-                                ))?
+                                .ok_or_else(|| {
+                                    swanky_error!(
+                                        ErrorKind::OtherError,
+                                        "Weights x-coordinate must be an array",
+                                    )
+                                })?
                                 .iter()
                                 .map(|y| {
                                     y.as_array()
-                                        .ok_or(Error::new(
-                                            ErrorKind::InvalidData,
-                                            "Weights y-coordinate must be an array",
-                                        ))?
+                                        .ok_or_else(|| {
+                                            swanky_error!(
+                                                ErrorKind::OtherError,
+                                                "Weights y-coordinate must be an array",
+                                            )
+                                        })?
                                         .iter()
                                         .map(|z| {
                                             z.as_array()
-                                                .ok_or(Error::new(
-                                                    ErrorKind::InvalidData,
-                                                    "Weights z-coordinate must be an array",
-                                                ))?
+                                                .ok_or_else(|| {
+                                                    swanky_error!(
+                                                        ErrorKind::OtherError,
+                                                        "Weights z-coordinate must be an array",
+                                                    )
+                                                })?
                                                 .iter()
                                                 .map(|v| {
-                                                    v.as_i64().ok_or(Error::new(
-                                                        ErrorKind::InvalidData,
-                                                        "Weight value must be an integer",
-                                                    ))
+                                                    v.as_i64().ok_or_else(|| {
+                                                        swanky_error!(
+                                                            ErrorKind::OtherError,
+                                                            "Weight value must be an integer",
+                                                        )
+                                                    })
                                                 })
                                                 .collect::<Result<Vec<_>>>()
                                         })
@@ -788,46 +815,46 @@ impl NeuralNet {
 
                     let nfilters = cfg
                         .get("filters")
-                        .ok_or(Error::new(
-                            ErrorKind::InvalidData,
-                            "Config object must contain 'filters' key",
-                        ))?
+                        .ok_or_else(|| {
+                            swanky_error!(
+                                ErrorKind::OtherError,
+                                "Config object must contain 'filters' key",
+                            )
+                        })?
                         .as_u64()
-                        .ok_or(Error::new(
-                            ErrorKind::InvalidData,
-                            "Filters value must be an unsigned integer",
-                        ))? as usize;
+                        .ok_or_else(|| {
+                            swanky_error!(
+                                ErrorKind::OtherError,
+                                "Filters value must be an unsigned integer",
+                            )
+                        })? as usize;
                     let mut filters = vec![Array3::from_elem(kernel_shape, Some(0)); nfilters];
-                    if weights.len() != kernel_shape.0 {
-                        return Err(Error::new(
-                            ErrorKind::InvalidData,
-                            "Weights length must equal kernel shape",
-                        ));
-                    }
+                    swanky_error::ensure!(
+                        weights.len() == kernel_shape.0,
+                        ErrorKind::OtherError,
+                        "Weights length must equal kernel shape"
+                    );
 
                     for (x, weights) in weights.into_iter().enumerate() {
-                        if weights.len() != kernel_shape.1 {
-                            return Err(Error::new(
-                                ErrorKind::InvalidData,
-                                "Weights x-coordinate length must equal kernel shape",
-                            ));
-                        }
+                        swanky_error::ensure!(
+                            weights.len() == kernel_shape.1,
+                            ErrorKind::OtherError,
+                            "Weights x-coordinate length must equal kernel shape"
+                        );
 
                         for (y, weights) in weights.into_iter().enumerate() {
-                            if weights.len() != kernel_shape.2 {
-                                return Err(Error::new(
-                                    ErrorKind::InvalidData,
-                                    "Weights y-coordinate length must equal kernel shape",
-                                ));
-                            }
+                            swanky_error::ensure!(
+                                weights.len() == kernel_shape.2,
+                                ErrorKind::OtherError,
+                                "Weights y-coordinate length must equal kernel shape"
+                            );
 
                             for (z, weights) in weights.into_iter().enumerate() {
-                                if weights.len() != nfilters {
-                                    return Err(Error::new(
-                                        ErrorKind::InvalidData,
-                                        "Weights z-coordinate length must equal the number of filters",
-                                    ));
-                                }
+                                swanky_error::ensure!(
+                                    weights.len() == nfilters,
+                                    ErrorKind::OtherError,
+                                    "Weights z-coordinate length must equal the number of filters"
+                                );
 
                                 for (filter_num, val) in weights.into_iter().enumerate() {
                                     filters[filter_num][(x, y, z)] = Some(val);
@@ -837,12 +864,11 @@ impl NeuralNet {
                     }
 
                     let biases = biases(&weights_and_biases[1])?;
-                    if biases.len() != nfilters {
-                        return Err(Error::new(
-                            ErrorKind::InvalidData,
-                            "Biases length must equal the number of filters",
-                        ));
-                    }
+                    swanky_error::ensure!(
+                        biases.len() == nfilters,
+                        ErrorKind::OtherError,
+                        "Biases length must equal the number of filters"
+                    );
 
                     let activation = activation(cfg)?;
 
@@ -892,10 +918,7 @@ impl NeuralNet {
                     });
                 }
                 name => {
-                    return Err(Error::new(
-                        ErrorKind::InvalidData,
-                        format!("Invalid layer class name: {name}"),
-                    ))?;
+                    swanky_error::bail!(ErrorKind::OtherError, "Invalid layer class name: {name}");
                 }
             }
         }
@@ -917,7 +940,7 @@ impl NeuralNet {
         let (_, outputs) = swanky_channel::local::local_channel_pair(
             |channel| {
                 let mut garbler: Garbler<_, alsz::Sender, WireMod2> =
-                    Garbler::new(channel, AesRng::new())?;
+                    Garbler::new(channel, SwankyRng::new())?;
                 let inputs =
                     NeuralNet::encode_input_boolean(&mut garbler, input, bitwidths[0], channel)?;
                 let outputs = self.eval_boolean(
@@ -934,8 +957,8 @@ impl NeuralNet {
                 Ok(())
             },
             |channel| {
-                let mut evaluator: Evaluator<AesRng, alsz::Receiver, WireMod2> =
-                    Evaluator::new(channel, AesRng::new())?;
+                let mut evaluator: Evaluator<SwankyRng, alsz::Receiver, WireMod2> =
+                    Evaluator::new(channel, SwankyRng::new())?;
                 let inputs =
                     NeuralNet::receive_input_boolean(&mut evaluator, input, bitwidths[0], channel)?;
                 let outputs = self.eval_boolean(
@@ -971,7 +994,7 @@ impl NeuralNet {
         let (_, outputs) = swanky_channel::local::local_channel_pair(
             |channel| {
                 let mut gb: Garbler<_, alsz::Sender, AllWire> =
-                    Garbler::new(channel, AesRng::new())?;
+                    Garbler::new(channel, SwankyRng::new())?;
                 let inps = NeuralNet::encode_input_arith(
                     &mut gb,
                     input,
@@ -998,8 +1021,8 @@ impl NeuralNet {
                 Ok(())
             },
             |channel| {
-                let mut ev: Evaluator<AesRng, alsz::Receiver, AllWire> =
-                    Evaluator::new(channel, AesRng::new())?;
+                let mut ev: Evaluator<SwankyRng, alsz::Receiver, AllWire> =
+                    Evaluator::new(channel, SwankyRng::new())?;
                 let inps = NeuralNet::receive_input_arith(
                     &mut ev,
                     input,
@@ -1110,7 +1133,7 @@ impl NeuralNet {
     ) -> Result<()>
     where
         W: Clone + HasModulus,
-        F: Fancy<Item = W> + FancyInput<Item = W> + FancyBinary<Item = W>,
+        F: Fancy<Item = W> + FancyBinary<Item = W>,
     {
         let mut errors = 0;
 
@@ -1163,7 +1186,7 @@ impl NeuralNet {
     ) -> Result<()>
     where
         W: Clone + HasModulus,
-        F: Fancy<Item = W> + FancyInput<Item = W> + FancyArithmetic<Item = W> + CrtGadgets,
+        F: Fancy<Item = W> + FancyArithmetic<Item = W> + CrtProjGadgets,
     {
         let moduli = util::bitwidths_to_moduli(bitwidth);
 
@@ -1302,7 +1325,7 @@ mod tests {
     use fancy_garbling::WireMod2;
     use ndarray::Array3;
     use std::path::Path;
-    use swanky_aes_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     static DINN_30_DIR: &str = "neural_nets/DINN_30";
     static DINN_30_Bitwidths: [usize; 3] = [9; 3];
@@ -1354,7 +1377,7 @@ mod tests {
     fn garbling_works_for_model(dir: &str, bitwidths: &[usize]) {
         let (nn, test) = get_nn_and_test(Path::new(dir));
         let (encoder, gc, output_map) = nn
-            .gc_garble_boolean::<WireMod2, _>(bitwidths, false, AesRng::new())
+            .gc_garble_boolean::<WireMod2, _>(bitwidths, false, SwankyRng::new())
             .unwrap();
         // Extract the wirelabels associated with our input of interest.
         let inputs = encoder.encode_inputs(&test, bitwidths[0]);

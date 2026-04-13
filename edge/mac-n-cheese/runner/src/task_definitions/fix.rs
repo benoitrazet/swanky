@@ -1,8 +1,10 @@
 use mac_n_cheese_ir::compilation_format::FieldMacType;
-use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
+use mac_n_cheese_vole::{
+    mac::{Mac, MacConstantContext, MacTypes},
+    party::Party,
+};
 use std::{io::Cursor, sync::Arc};
 use swanky_error::{ErrorKind, OptionExt, WrapErr};
-use swanky_party::Party;
 use swanky_serialization::{CanonicalSerialize, SequenceDeserializer};
 
 use crate::{
@@ -29,7 +31,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for FixTask<P, T> {
 
     fn initialize(
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut swanky_aes_rng::AesRng,
+        _rng: &mut swanky_rng::SwankyRng,
         vc: crate::base_vole::VoleContexts<P>,
         _num_runner_threads: usize,
     ) -> swanky_error::Result<Self> {
@@ -43,7 +45,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for FixTask<P, T> {
     fn finalize(
         self,
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut swanky_aes_rng::AesRng,
+        _rng: &mut swanky_rng::SwankyRng,
     ) -> swanky_error::Result<()> {
         Ok(())
     }
@@ -67,7 +69,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for FixTask<P, T> {
             .lift_result()
             .wrap_err(
                 ErrorKind::InitializationError,
-                "Failed to lift cursor to field element deserializer.".to_string(),
+                "Failed to lift cursor to field element deserializer.",
             )?;
         let num_out = ctx.task_prototype.outputs().get(0).count() as usize;
         let mut out = TaskDataBuffer::<Mac<P, T>>::with_capacity(num_out);
@@ -86,7 +88,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for FixTask<P, T> {
                 .lift_result()
                 .wrap_err(
                     ErrorKind::SerializationError,
-                    "Failed to read private value.".to_string(),
+                    "Failed to read private value.",
                 )?;
             let adjustment = private_value
                 .zip(random_mac.0.mac_value().into())

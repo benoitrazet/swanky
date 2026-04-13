@@ -6,8 +6,8 @@ use generic_array::GenericArray;
 use rand::Rng;
 use std::ops::{AddAssign, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, ConstantTimeLess, CtOption};
-use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField};
-use swanky_serialization::{BiggerThanModulus, CanonicalSerialize};
+use swanky_field::{BiggerThanModulus, FiniteField, FiniteRing, PrimeFiniteField};
+use swanky_serialization::CanonicalSerialize;
 
 /// A finite field over the Mersenne Prime 2^61 - 1
 #[derive(Clone, Copy, Eq, Debug, Hash)]

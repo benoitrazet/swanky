@@ -29,10 +29,9 @@ wasm-bindgen.workspace = true
 
 diet-mac-and-cheese.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
-swanky-aes-rng.workspace = true
+swanky-rng.workspace = true
 swanky-channel-legacy.workspace = true
 swanky-field-binary.workspace = true
-swanky-party.workspace = true
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-O4']

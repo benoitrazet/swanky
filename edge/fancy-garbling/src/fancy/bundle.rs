@@ -1,5 +1,5 @@
 use crate::{
-    FancyArithmetic, FancyBinary,
+    FancyArithmetic, FancyBinary, FancyProj,
     fancy::{Fancy, HasModulus},
 };
 use itertools::Itertools;
@@ -101,6 +101,7 @@ impl<W: Clone + HasModulus> Index<usize> for Bundle<W> {
 
 impl<F: Fancy> BundleGadgets for F {}
 impl<F: FancyArithmetic> ArithmeticBundleGadgets for F {}
+impl<F: FancyArithmetic + FancyProj> ArithmeticProjBundleGadgets for F {}
 impl<F: FancyBinary> BinaryBundleGadgets for F {}
 
 /// Arithmetic operations on wire bundles, extending the capability of `FancyArithmetic` operating
@@ -173,6 +174,23 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
             .map(Bundle::new)
     }
 
+    /// If b=0 then return 0, else return x.
+    fn mask(
+        &mut self,
+        b: &Self::Item,
+        x: &Bundle<Self::Item>,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Bundle<Self::Item>> {
+        x.wires()
+            .iter()
+            .map(|xwire| self.mul(xwire, b, channel))
+            .collect::<swanky_error::Result<_>>()
+            .map(Bundle)
+    }
+}
+
+/// Arithmetic operations on wire bundles that utilize projection gates.
+pub trait ArithmeticProjBundleGadgets: FancyArithmetic + FancyProj {
     /// Mixed radix addition.
     ///
     /// # Panics
@@ -315,20 +333,6 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
             .map_or(digit_sum.clone(), |d| self.add(&digit_sum, d)))
     }
 
-    /// If b=0 then return 0, else return x.
-    fn mask(
-        &mut self,
-        b: &Self::Item,
-        x: &Bundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Bundle<Self::Item>> {
-        x.wires()
-            .iter()
-            .map(|xwire| self.mul(xwire, b, channel))
-            .collect::<swanky_error::Result<_>>()
-            .map(Bundle)
-    }
-
     /// Compute `x == y`. Returns a wire encoding the result mod 2.
     ///
     /// # Panics
@@ -386,6 +390,67 @@ pub trait BinaryBundleGadgets: FancyBinary {
 /// Extension trait for Fancy which provides Bundle constructions which are not
 /// necessarily CRT nor binary-based.
 pub trait BundleGadgets: Fancy {
+    /// Encode a bundle.
+    fn encode_bundle(
+        &mut self,
+        values: &[u16],
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Bundle<Self::Item>> {
+        self.encode_many(values, moduli, channel).map(Bundle::new)
+    }
+
+    /// Receive a bundle.
+    fn receive_bundle(
+        &mut self,
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Bundle<Self::Item>> {
+        self.receive_many(moduli, channel).map(Bundle::new)
+    }
+
+    /// Encode many input bundles.
+    ///
+    /// # Panics,
+    /// Panics if `values` and `moduli` are of unequal length.
+    fn encode_bundles(
+        &mut self,
+        values: &[Vec<u16>],
+        moduli: &[Vec<u16>],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<Bundle<Self::Item>>> {
+        let qs = moduli.iter().flatten().cloned().collect_vec();
+        let xs = values.iter().flatten().cloned().collect_vec();
+        assert_eq!(xs.len(), qs.len(), "unequal number of values and moduli");
+        let mut wires = self.encode_many(&xs, &qs, channel)?;
+        let buns = moduli
+            .iter()
+            .map(|qs| {
+                let ws = wires.drain(0..qs.len()).collect_vec();
+                Bundle::new(ws)
+            })
+            .collect_vec();
+        Ok(buns)
+    }
+
+    /// Receive many input bundles.
+    fn receive_many_bundles(
+        &mut self,
+        moduli: &[Vec<u16>],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<Bundle<Self::Item>>> {
+        let qs = moduli.iter().flatten().cloned().collect_vec();
+        let mut wires = self.receive_many(&qs, channel)?;
+        let buns = moduli
+            .iter()
+            .map(|qs| {
+                let ws = wires.drain(0..qs.len()).collect_vec();
+                Bundle::new(ws)
+            })
+            .collect_vec();
+        Ok(buns)
+    }
+
     /// Creates a bundle of constant wires using moduli `ps`.
     fn constant_bundle(
         &mut self,

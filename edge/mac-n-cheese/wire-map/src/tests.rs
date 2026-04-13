@@ -69,10 +69,7 @@ impl<'a> MirroredWireMap<'a> {
         self.wire_map.free(start, end).unwrap();
         self.check_allocated();
     }
-    fn canonical_allocation(
-        canonical: &mut Vec<Allocation>,
-        wire: WireId,
-    ) -> Option<&mut Allocation> {
+    fn canonical_allocation(canonical: &mut [Allocation], wire: WireId) -> Option<&mut Allocation> {
         canonical
             .iter_mut()
             .find(|x| (x.start..=x.end_inclusive()).contains(&wire))

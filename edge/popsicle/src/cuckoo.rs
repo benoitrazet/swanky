@@ -144,7 +144,7 @@ mod tests {
     use crate::utils;
     use itertools::Itertools;
     use rand::Rng;
-    use swanky_aes_rng::AesRng;
+    use swanky_rng::SwankyRng;
 
     const NHASHES: usize = 3;
     const ITEMSIZE: usize = 8;
@@ -152,7 +152,7 @@ mod tests {
 
     #[test]
     fn test_build() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let inputs = utils::rand_vec_vec(SETSIZE, ITEMSIZE, &mut rng);
         let key = rng.r#gen();
         let hashes = utils::compress_and_hash_inputs(&inputs, key);
@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     fn hashing() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let inputs = utils::rand_vec_vec(SETSIZE, ITEMSIZE, &mut rng);
 
         let key = rng.r#gen();
@@ -188,7 +188,7 @@ mod tests {
         // each item in a cuckoo bin should also be in one of the table bins
         for (opt_item, bin) in cuckoo.items.iter().zip_eq(&table) {
             if let Some(item) = opt_item {
-                assert!(bin.iter().any(|bin_elem| *bin_elem == item.entry));
+                assert!(bin.contains(&item.entry));
             }
         }
     }

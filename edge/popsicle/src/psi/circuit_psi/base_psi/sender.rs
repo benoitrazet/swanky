@@ -29,9 +29,10 @@ pub struct OpprfSender {
 /// Specifically, the `SenderState` describes how the OPPRF is
 /// programmed by the `OpprfSender`:
 /// - `opprf_primary_keys_in` and `opprf_payloads_in` are the programmed
-/// inputs of the OPPRF.
+///   inputs of the OPPRF.
 /// - `opprf_primary_keys_out` and `opprf_payloads_out` are their respective
-/// programmed outputs.
+///   programmed outputs.
+///
 /// When the OPPRF is called on a programmed input, it returns a
 /// programmed output. When the OPPRF is called on any other value,
 /// it returns a value that is sampled uniformly random.
@@ -66,13 +67,13 @@ impl BasePsi for OpprfSender {
         let key = channel.read()?;
         let opprf_primary_keys = KmprtSender::init(channel, rng).wrap_err(
             ErrorKind::InitializationError,
-            "Failed to initialize KMPRT sender for primary keys.".to_string(),
+            "Failed to initialize KMPRT sender for primary keys.",
         )?;
         let mut opprf_payload = None;
         if has_payload {
             opprf_payload = Some(KmprtSender::init(channel, rng).wrap_err(
                 ErrorKind::InitializationError,
-                "Failed to initialize KMPRT sender for payload.".to_string(),
+                "Failed to initialize KMPRT sender for payload.",
             )?);
         }
 
@@ -125,11 +126,11 @@ impl BasePsi for OpprfSender {
                 // Then place the item in that bin while keeping track
                 // of the index of the hash function used in the process
                 opprf_primary_keys_in[bin].push(*x ^ Block::from(h as u128));
-                if payloads.is_some() {
+                if let Some(payloads) = payloads {
                     // The payload values are masked before being sent out
                     // and placed in the same bin index as the primary key they
                     // are associated with.
-                    opprf_payloads_in[bin].push(payloads.unwrap()[i] ^ opprf_payloads_out[bin]);
+                    opprf_payloads_in[bin].push(payloads[i] ^ opprf_payloads_out[bin]);
                 }
                 bins.push(bin);
             }
@@ -172,7 +173,7 @@ impl BasePsi for OpprfSender {
             .send(channel, &opprf_program, self.nbins.unwrap(), rng)
             .wrap_err(
                 ErrorKind::OtherError,
-                "Failed to send primary keys during exchange.".to_string(),
+                "Failed to send primary keys during exchange.",
             )?;
         if !&self.state.opprf_payloads_in.is_empty() {
             let points_data = flatten_bins_payloads(
@@ -185,7 +186,7 @@ impl BasePsi for OpprfSender {
                 .send(channel, &points_data, self.nbins.unwrap(), rng)
                 .wrap_err(
                     ErrorKind::OtherError,
-                    "Failed to send payload during exchange.".to_string(),
+                    "Failed to send payload during exchange.",
                 )?;
         }
         Ok(())
@@ -196,7 +197,7 @@ impl BasePsi for OpprfSender {
         channel: &mut Channel,
     ) -> swanky_error::Result<CircuitInputs<F::Item>>
     where
-        F: FancyInput<Item = WireMod2>,
+        F: Fancy<Item = WireMod2>,
     {
         let sender_primary_keys = bin_encode_many_block512(
             gc_party,

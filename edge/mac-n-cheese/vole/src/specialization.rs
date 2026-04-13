@@ -1,9 +1,9 @@
 use generic_array::GenericArray;
 use generic_array::typenum::Unsigned;
 use std::convert::TryFrom;
-use swanky_aes_rng::AesRng;
 use swanky_field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, SmallBinaryField};
+use swanky_rng::SwankyRng;
 use vectoreyes::{
     ExtendingCast, I32x4, SimdBase, SimdBase32, SimdBaseGatherable, U8x16, U16x8, U32x4, U32x8,
     U64x2, U64x4,
@@ -20,14 +20,14 @@ pub trait FiniteFieldSpecialization<VF: FiniteField + IsSubFieldOf<FE>, FE: Fini
     fn extract_sender_pair(pair: Self::SenderPairContents) -> (VF, FE);
     /// src_base_voles must be 1<<16 long
     fn lpn_sender(
-        lpn_rng: &mut AesRng,
+        lpn_rng: &mut SwankyRng,
         src_base_voles: &[Self::SenderPairContents],
         dst: &mut [Self::SenderPairContents],
     );
     /// src_base_voles must be 1<<16 long
-    fn lpn_receiver(lpn_rng: &mut AesRng, src_base_voles: &[FE], dst: &mut [FE]);
+    fn lpn_receiver(lpn_rng: &mut SwankyRng, src_base_voles: &[FE], dst: &mut [FE]);
     fn spsvole_receiver_consistency_check_compute_vb(
-        rng_chi: &mut AesRng,
+        rng_chi: &mut SwankyRng,
         y: FE,
         spsvole_result: &[FE],
     ) -> FE {
@@ -40,7 +40,7 @@ pub trait FiniteFieldSpecialization<VF: FiniteField + IsSubFieldOf<FE>, FE: Fini
 
     // TODO: should this be degree in length? Probably not.
     fn spsvole_sender_compute_va(
-        rng_chi: &mut AesRng,
+        rng_chi: &mut SwankyRng,
         spsvole_result: &[Self::SenderPairContents],
     ) -> (FE, GenericArray<VF, DegreeModulo<VF, FE>>) {
         generic_spsvole_sender_compute_va::<VF, FE, Self>(rng_chi, spsvole_result)
@@ -65,7 +65,7 @@ impl<VF: FiniteField + IsSubFieldOf<FE>, FE: FiniteField> FiniteFieldSpecializat
     }
 
     fn lpn_sender(
-        lpn_rng: &mut AesRng,
+        lpn_rng: &mut SwankyRng,
         src_base_voles: &[Self::SenderPairContents],
         uws: &mut [Self::SenderPairContents],
     ) {
@@ -84,7 +84,7 @@ impl<VF: FiniteField + IsSubFieldOf<FE>, FE: FiniteField> FiniteFieldSpecializat
         }
     }
 
-    fn lpn_receiver(lpn_rng: &mut AesRng, src_base_voles: &[FE], vs: &mut [FE]) {
+    fn lpn_receiver(lpn_rng: &mut SwankyRng, src_base_voles: &[FE], vs: &mut [FE]) {
         assert_eq!(src_base_voles.len(), 1 << 16);
         for (b, matrix_entries) in vs
             .iter_mut()
@@ -104,7 +104,7 @@ fn generic_spsvole_sender_compute_va<
     FE: FiniteField,
     S: FiniteFieldSpecialization<VF, FE>,
 >(
-    rng_chi: &mut AesRng,
+    rng_chi: &mut SwankyRng,
     spsvole_result: &[S::SenderPairContents],
 ) -> (FE, GenericArray<VF, DegreeModulo<VF, FE>>) {
     let mut x_stars: GenericArray<VF, DegreeModulo<VF, FE>> = Default::default();
@@ -149,7 +149,7 @@ where
     }
 
     fn lpn_sender(
-        lpn_rng: &mut AesRng,
+        lpn_rng: &mut SwankyRng,
         src_base_voles: &[Self::SenderPairContents],
         dst: &mut [Self::SenderPairContents],
     ) {
@@ -166,10 +166,7 @@ where
             };
             let indices = lpn_indices::matrix_entries_vectorized(lpn_rng);
             four_uws
-                .array_zip(indices.array_map(
-                    #[inline(always)]
-                    |x| <[U16x8; 2]>::from(x),
-                ))
+                .array_zip(indices.array_map(<[U16x8; 2]>::from))
                 .array_for_each(
                     #[inline(always)]
                     |(dst, [lo, hi])| {
@@ -219,7 +216,7 @@ where
         }
     }
 
-    fn lpn_receiver(lpn_rng: &mut AesRng, src_base_voles: &[FE], dst: &mut [FE]) {
+    fn lpn_receiver(lpn_rng: &mut SwankyRng, src_base_voles: &[FE], dst: &mut [FE]) {
         // SAFETY: SmallBinaryField types are repr(transparent) to u64.
         let src_base_voles: &[u64] = unsafe {
             std::slice::from_raw_parts(src_base_voles.as_ptr() as *const _, src_base_voles.len())
@@ -232,7 +229,7 @@ where
     }
 
     fn spsvole_receiver_consistency_check_compute_vb(
-        rng_chi: &mut AesRng,
+        rng_chi: &mut SwankyRng,
         y: FE,
         spsvole_result: &[FE],
     ) -> FE {
@@ -279,7 +276,7 @@ where
     }
 
     fn spsvole_sender_compute_va(
-        rng_chi: &mut AesRng,
+        rng_chi: &mut SwankyRng,
         spsvole_result: &[Self::SenderPairContents],
     ) -> (FE, GenericArray<F2, Degree<FE>>) {
         let mut x_stars = U64x2::ZERO;
@@ -350,7 +347,7 @@ where
     }
 
     /*fn copee_sender_128(
-        inputs_rng: &mut AesRng,
+        inputs_rng: &mut SwankyRng,
         copee: &mut CopeeSender<FE>,
         io: &mut impl Write,
         _s: &mut <<FE as FiniteField>::PrimeField as CanonicalSerialize>::Serializer,
@@ -421,7 +418,7 @@ where
     F2: IsSubFieldOf<FE>,
 {
     use rand::RngCore;
-    fn simple_lpn(lpn_rng: &mut AesRng, src_base_voles: &[u64], dst: &mut [u64]) {
+    fn simple_lpn(lpn_rng: &mut SwankyRng, src_base_voles: &[u64], dst: &mut [u64]) {
         let indices_generator = std::iter::repeat_with(|| {
             IntoIterator::into_iter(lpn_indices::matrix_entries_vectorized(lpn_rng))
         })
@@ -434,7 +431,10 @@ where
         }
     }
     for extra in 0..3 {
-        let mut rng = AesRng::new();
+        use rand::{Rng, SeedableRng};
+
+        let mut rng = SwankyRng::new();
+        let seed = rng.r#gen();
         let mut src_base_voles = Vec::with_capacity(1 << 16);
         for _ in 0..1 << 16 {
             src_base_voles.push(rng.next_u64());
@@ -446,9 +446,13 @@ where
         }
         let mut expected_out = dst.clone();
         let mut actual_out = dst.clone();
-        simple_lpn(&mut rng.clone(), &src_base_voles, &mut expected_out);
+        simple_lpn(
+            &mut SwankyRng::from_seed(seed),
+            &src_base_voles,
+            &mut expected_out,
+        );
         <SmallBinaryFieldSpecialization as FiniteFieldSpecialization<F2, FE>>::lpn_sender(
-            &mut rng.clone(),
+            &mut SwankyRng::from_seed(seed),
             &src_base_voles,
             &mut actual_out,
         );

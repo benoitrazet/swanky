@@ -67,7 +67,7 @@ fn read_size_prefix_in_vec(stream: &mut impl Read, buffer: &mut Vec<u8>) -> Resu
     buffer.resize(size, 0u8);
     stream
         .read_exact(&mut buffer[4..])
-        .wrap_err(ErrorKind::OtherError, "Failed to read data.".to_string())?;
+        .wrap_err(ErrorKind::OtherError, "Failed to read data.")?;
     Ok(Some(()))
 }
 
@@ -176,10 +176,9 @@ pub struct InputFlatbuffers {
 impl InputFlatbuffers {
     /// Create an `InputFlatbuffers` for private witness inputs.
     pub fn new_private_inputs(path: &PathBuf) -> Result<Self> {
-        let file = std::fs::File::open(path).wrap_err(
-            ErrorKind::FilesystemError,
-            format!("Failed to open {path:?}."),
-        )?;
+        let file = std::fs::File::open(path).wrap_err_with(ErrorKind::FilesystemError, || {
+            format!("Failed to open {path:?}.")
+        })?;
         let buffer_file = BufReader::new(file);
         let buffer_mem = vec![];
 
@@ -196,10 +195,9 @@ impl InputFlatbuffers {
 
     /// Create an `InputFlatbuffers` for public instance inputs.
     pub fn new_public_inputs(path: &PathBuf) -> Result<Self> {
-        let file = std::fs::File::open(path).wrap_err(
-            ErrorKind::FilesystemError,
-            format!("Failed to open {path:?}."),
-        )?;
+        let file = std::fs::File::open(path).wrap_err_with(ErrorKind::FilesystemError, || {
+            format!("Failed to open {path:?}.")
+        })?;
         let buffer_file = BufReader::new(file);
         let buffer_mem = vec![];
         let mut public_inputs = Self {

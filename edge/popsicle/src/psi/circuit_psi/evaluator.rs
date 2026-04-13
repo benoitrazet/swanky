@@ -36,7 +36,7 @@ where
             ev: Evaluator::<RNG, OtReceiver, WireMod2>::new(channel, RNG::from_seed(seed))
                 .wrap_err(
                     ErrorKind::InitializationError,
-                    "Failed to create fancy evaluator.".to_string(),
+                    "Failed to create fancy evaluator.",
                 )?,
             rng: RNG::from_seed(seed),
             _base_psi: PhantomData,
@@ -70,11 +70,13 @@ where
         channel: &mut Channel,
     ) -> swanky_error::Result<Intersection> {
         // (0)
-        if payloads.is_some() && primary_keys.len() != payloads.unwrap().len() {
+        if let Some(payloads) = payloads
+            && primary_keys.len() != payloads.len()
+        {
             swanky_error::bail!(
                 ErrorKind::OtherError,
                 "Failed to intersect due to incomplete payload set: (#payloads := {}) != (#primary keys := {})",
-                payloads.unwrap().len(),
+                payloads.len(),
                 primary_keys.len(),
             );
         }

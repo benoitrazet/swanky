@@ -27,19 +27,19 @@ impl<'a> super::CircuitBuilder<'a> {
         self.register_prototype(|pb| {
             let mut s = FE::Serializer::new(pb).wrap_err(
                 ErrorKind::InitializationError,
-                "Failed to initialize field element serializer.".to_string(),
+                "Failed to initialize field element serializer.",
             )?;
             let mut n = 0_u32;
             for value in values {
                 n = n.checked_add(1).unwrap();
                 s.write(pb, value).wrap_err(
                     ErrorKind::SerializationError,
-                    "Failed to write byte of '{value}'.".to_string(),
+                    "Failed to write byte of '{value}'.",
                 )?;
             }
             s.finish(pb).wrap_err(
                 ErrorKind::SerializationError,
-                "Failed to finish field element serialization.".to_string(),
+                "Failed to finish field element serialization.",
             )?;
             pb.output(Type::Mac(ty), n);
             Ok(TaskKind::Constant(ty))

@@ -1,42 +1,41 @@
-#![allow(clippy::all)]
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
-    AllWire, FancyArithmetic,
+    AllWire, FancyArithmetic, FancyProj,
     circuit::{ArithmeticCircuit as Circuit, CircuitBuilder, CircuitType},
     classic::GarbledCircuit,
     util::RngExt,
 };
 use std::time::Duration;
-use swanky_aes_rng::AesRng;
 use swanky_channel::Channel;
+use swanky_rng::SwankyRng;
 
-fn bench_garble<F: 'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
+fn bench_garble<F>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
 where
-    F: Fn(u16) -> Circuit,
+    F: Fn(u16) -> Circuit + 'static,
 {
     c.bench_function(&format!("garbling::{}_gb ({})", name, q), move |bench| {
         let c = make_circuit(q);
         bench.iter(|| {
-            let gb = GarbledCircuit::garble::<AllWire, _, _>(&c, AesRng::new()).unwrap();
+            let gb = GarbledCircuit::garble::<AllWire, _, _>(&c, SwankyRng::new()).unwrap();
             std::hint::black_box(gb);
         });
     });
 }
 
-fn bench_eval<F: 'static>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
+fn bench_eval<F>(c: &mut Criterion, name: &str, make_circuit: F, q: u16)
 where
-    F: Fn(u16) -> Circuit,
+    F: Fn(u16) -> Circuit + 'static,
 {
     c.bench_function(&format!("garbling::{}_ev ({})", name, q), move |bench| {
         let mut rng = rand::thread_rng();
         let c = make_circuit(q);
-        let (en, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&c, AesRng::new()).unwrap();
-        let inps = (0..c.num_garbler_inputs())
-            .map(|i| rng.gen_u16() % c.garbler_input_mod(i))
+        let (en, ev, _) = GarbledCircuit::garble::<AllWire, _, _>(&c, SwankyRng::new()).unwrap();
+        let inps = (0..c.num_inputs())
+            .map(|i| rng.gen_u16() % c.input_mod(i))
             .collect::<Vec<u16>>();
-        let xs = en.encode_garbler_inputs(&inps);
+        let xs = en.encode_inputs(&inps);
         bench.iter(|| {
-            let ys = ev.eval(&c, &xs, &[]).unwrap();
+            let ys = ev.eval(&c, &xs).unwrap();
             std::hint::black_box(ys);
         });
     });
@@ -46,7 +45,7 @@ fn proj(q: u16) -> Circuit {
     Channel::with(std::io::empty(), |channel| {
         let tt = (0..q).map(|i| (i + 1) % q).collect::<Vec<u16>>();
         let mut b = CircuitBuilder::new();
-        let x = b.garbler_input(q);
+        let x = b.input(q);
         for _ in 0..1000 {
             let _ = b.proj(&x, q, Some(tt.clone()), channel).unwrap();
         }
@@ -58,7 +57,7 @@ fn proj(q: u16) -> Circuit {
 fn mul(q: u16) -> Circuit {
     Channel::with(std::io::empty(), |channel| {
         let mut b = CircuitBuilder::new();
-        let x = b.garbler_input(q);
+        let x = b.input(q);
         for _ in 0..1000 {
             let _ = b.mul(&x, &x, channel).unwrap();
         }

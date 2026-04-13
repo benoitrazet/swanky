@@ -1,8 +1,8 @@
 //! `Informer` runs a fancy computation and learns information from it.
 
 use crate::{
-    FancyArithmetic, FancyBinary,
-    fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
+    FancyArithmetic, FancyBinary, FancyProj,
+    fancy::{Fancy, HasModulus},
 };
 use std::collections::{HashMap, HashSet};
 use swanky_channel::Channel;
@@ -18,8 +18,7 @@ pub struct Informer<F: Fancy> {
 /// The statistics revealed by the informer.
 #[derive(Clone, Debug)]
 pub struct InformerStats {
-    garbler_input_moduli: Vec<u16>,
-    evaluator_input_moduli: Vec<u16>,
+    input_moduli: Vec<u16>,
     constants: HashSet<(u16, u16)>,
     outputs: Vec<u16>,
     nadds: usize,
@@ -32,24 +31,14 @@ pub struct InformerStats {
 }
 
 impl InformerStats {
-    /// Number of garbler inputs in the fancy computation.
-    pub fn num_garbler_inputs(&self) -> usize {
-        self.garbler_input_moduli.len()
+    /// Number of inputs in the fancy computation.
+    pub fn num_inputs(&self) -> usize {
+        self.input_moduli.len()
     }
 
-    /// Moduli of garbler inputs in the fancy computation.
-    pub fn garbler_input_moduli(&self) -> Vec<u16> {
-        self.garbler_input_moduli.clone()
-    }
-
-    /// Number of evaluator inputs in the fancy computation.
-    pub fn num_evaluator_inputs(&self) -> usize {
-        self.evaluator_input_moduli.len()
-    }
-
-    /// Moduli of evaluator inputs in the fancy computation.
-    pub fn evaluator_input_moduli(&self) -> Vec<u16> {
-        self.evaluator_input_moduli.clone()
+    /// Moduli of inputs in the fancy computation.
+    pub fn input_moduli(&self) -> Vec<u16> {
+        self.input_moduli.clone()
     }
 
     /// Number of constants in the fancy computation.
@@ -104,8 +93,7 @@ impl std::fmt::Display for InformerStats {
     /// For example, below is the output when run on `circuits/AES-non-expanded.txt`:
     /// ```text
     /// computation info:
-    ///   garbler inputs:                  128 // comms cost: 16 Kb
-    ///   evaluator inputs:                128 // comms cost: 48 Kb
+    ///   inputs:                          256 // comms cost: 32 Kb
     ///   outputs:                         128
     ///   output ciphertexts:              256 // comms cost: 32 Kb
     ///   constants:                         1 // comms cost: 0.125 Kb
@@ -120,29 +108,16 @@ impl std::fmt::Display for InformerStats {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut total = 0.0;
         writeln!(f, "computation info:")?;
-        let comm = self.num_garbler_inputs() as f64 * 128.0 / 1000.0;
+        let comm = self.num_inputs() as f64 * 128.0 / 1000.0;
 
         writeln!(
             f,
-            "  garbler inputs:     {:16} // communication: {:.2} Kb",
-            self.num_garbler_inputs(),
+            "  inputs:     {:16} // communication: {:.2} Kb",
+            self.num_inputs(),
             comm
         )?;
         total += comm;
-        // The cost of IKNP is 256 bits for one random and one 128 bit string
-        // dependent on the random one. This is for each input bit, so for
-        // modulus `q` we need to do `log2(q)` OTs.
-        let comm = self.evaluator_input_moduli.iter().fold(0.0, |acc, q| {
-            acc + (*q as f64).log2().ceil() * 384.0 / 1000.0
-        });
 
-        writeln!(
-            f,
-            "  evaluator inputs:   {:16} // communication: {:.2} Kb",
-            self.num_evaluator_inputs(),
-            comm
-        )?;
-        total += comm;
         let comm = self.num_output_ciphertexts() as f64 * 128.0 / 1000.0;
 
         writeln!(f, "  outputs:            {:16}", self.num_outputs())?;
@@ -191,8 +166,7 @@ impl<F: Fancy> Informer<F> {
         Informer {
             underlying,
             stats: InformerStats {
-                garbler_input_moduli: Vec::new(),
-                evaluator_input_moduli: Vec::new(),
+                input_moduli: Vec::new(),
                 constants: HashSet::new(),
                 outputs: Vec::new(),
                 nadds: 0,
@@ -214,33 +188,6 @@ impl<F: Fancy> Informer<F> {
     fn update_moduli(&mut self, q: u16) {
         let entry = self.stats.moduli.entry(q).or_insert(0);
         *entry += 1;
-    }
-}
-
-impl<F: Fancy + FancyInput<Item = <F as Fancy>::Item>> FancyInput for Informer<F> {
-    type Item = <F as Fancy>::Item;
-
-    fn receive_many(
-        &mut self,
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        self.stats
-            .garbler_input_moduli
-            .extend(moduli.iter().cloned());
-        self.underlying.receive_many(moduli, channel)
-    }
-
-    fn encode_many(
-        &mut self,
-        values: &[u16],
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        self.stats
-            .garbler_input_moduli
-            .extend(moduli.iter().cloned());
-        self.underlying.encode_many(values, moduli, channel)
     }
 }
 
@@ -320,7 +267,9 @@ impl<F: FancyArithmetic> FancyArithmetic for Informer<F> {
         self.update_moduli(x.modulus());
         Ok(result)
     }
+}
 
+impl<F: FancyProj> FancyProj for Informer<F> {
     fn proj(
         &mut self,
         x: &Self::Item,
@@ -338,6 +287,25 @@ impl<F: FancyArithmetic> FancyArithmetic for Informer<F> {
 
 impl<F: Fancy> Fancy for Informer<F> {
     type Item = F::Item;
+
+    fn receive_many(
+        &mut self,
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        self.stats.input_moduli.extend(moduli.iter().cloned());
+        self.underlying.receive_many(moduli, channel)
+    }
+
+    fn encode_many(
+        &mut self,
+        values: &[u16],
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        self.stats.input_moduli.extend(moduli.iter().cloned());
+        self.underlying.encode_many(values, moduli, channel)
+    }
 
     fn constant(
         &mut self,
@@ -358,11 +326,5 @@ impl<F: Fancy> Fancy for Informer<F> {
         let result = self.underlying.output(x, channel)?;
         self.stats.outputs.push(x.modulus());
         Ok(result)
-    }
-}
-
-impl<F: Fancy + FancyReveal> FancyReveal for Informer<F> {
-    fn reveal(&mut self, x: &Self::Item, channel: &mut Channel) -> swanky_error::Result<u16> {
-        self.underlying.reveal(x, channel)
     }
 }

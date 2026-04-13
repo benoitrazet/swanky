@@ -4,4 +4,3 @@
 pub mod alsz;
 pub mod explicit_round;
 pub mod kos;
-pub mod kos_delta;

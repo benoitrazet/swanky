@@ -28,7 +28,8 @@ pub struct OpprfReceiver {
 /// queried by the `OpprfReceiver` and what output they receiver:
 /// - `opprf_primary_keys_in` and `opprf_payloads_in` input queries to the OPPRF.
 /// - `opprf_primary_keys_out` and `opprf_payloads_out` are the results of
-/// the OPPRF on those respective queries.
+///   the OPPRF on those respective queries.
+///
 /// When the OPPRF is called on a programmed input, it returns a
 /// programmed output. When the OPPRF is called on any other value,
 /// it returns a value that is sampled uniformly random. The OPPRF
@@ -67,14 +68,14 @@ impl BasePsi for OpprfReceiver {
 
         let opprf_primary_keys = KmprtReceiver::init(channel, rng).wrap_err(
             ErrorKind::InitializationError,
-            "Failed to initialize KMPRT receiver for primary keys.".to_string(),
+            "Failed to initialize KMPRT receiver for primary keys.",
         )?;
 
         let mut opprf_payload = None;
         if has_payload {
             opprf_payload = Some(KmprtReceiver::init(channel, rng).wrap_err(
                 ErrorKind::InitializationError,
-                "Failed to initialize KMPRT receiver for payload.".to_string(),
+                "Failed to initialize KMPRT receiver for payload.",
             )?);
         }
 
@@ -115,8 +116,8 @@ impl BasePsi for OpprfReceiver {
         let opprf_primary_keys_in = cuckoo_place_ids(&cuckoo.items, rng);
 
         let mut opprf_payloads_in = vec![];
-        if payloads.is_some() {
-            opprf_payloads_in = cuckoo_place_payloads(&cuckoo.items, payloads.unwrap(), rng);
+        if let Some(payloads) = payloads {
+            opprf_payloads_in = cuckoo_place_payloads(&cuckoo.items, payloads, rng);
         }
         self.state = ReceiverState {
             opprf_primary_keys_in,
@@ -143,7 +144,7 @@ impl BasePsi for OpprfReceiver {
             .receive(channel, &self.state.opprf_primary_keys_in, rng)
             .wrap_err(
                 ErrorKind::OtherError,
-                "Failed to receive primary keys during exchange.".to_string(),
+                "Failed to receive primary keys during exchange.",
             )?;
         if !self.state.opprf_payloads_in.is_empty() {
             self.state.opprf_payloads_out = self
@@ -153,7 +154,7 @@ impl BasePsi for OpprfReceiver {
                 .receive(channel, &self.state.opprf_primary_keys_in, rng)
                 .wrap_err(
                     ErrorKind::OtherError,
-                    "Failed to receive payload during exchange.".to_string(),
+                    "Failed to receive payload during exchange.",
                 )?;
         }
         Ok(())
@@ -164,7 +165,7 @@ impl BasePsi for OpprfReceiver {
         channel: &mut Channel,
     ) -> swanky_error::Result<CircuitInputs<F::Item>>
     where
-        F: FancyInput<Item = WireMod2>,
+        F: Fancy<Item = WireMod2>,
     {
         // We compute the number of wires that the receivers should
         // expect from the sender by taking the size of an element in

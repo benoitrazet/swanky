@@ -35,16 +35,10 @@ def upgrade_deps(post_rust_upgrade: bool = False) -> None:
             raise click.ClickException(f"{cmd_name} failed")
 
     if not post_rust_upgrade:
-        with tempfile.TemporaryDirectory() as tmp_str:
-            tmp = Path(tmp_str)
-            if sys.platform == "darwin":
-                # On macOS, niv wants to be able to call the security command to get TLS root certs
-                (tmp / "security").symlink_to("/usr/bin/security")
-            cmd(
-                ["niv", "update"],
-                cwd=ROOT / "etc",
-                env=os.environ | {"PATH": str(tmp) + os.pathsep + os.environ["PATH"]},
-            )
+        cmd(
+            ["npins", "update"],
+            cwd=ROOT / "etc" / "nix",
+        )
         latest_rust = (
             subprocess.check_output(
                 [

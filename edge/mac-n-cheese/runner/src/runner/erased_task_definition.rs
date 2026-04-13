@@ -1,7 +1,7 @@
 use std::{any::Any, marker::PhantomData, sync::atomic::AtomicBool};
 
-use swanky_aes_rng::AesRng;
-use swanky_party::Party;
+use mac_n_cheese_vole::party::Party;
+use swanky_rng::SwankyRng;
 
 use crate::{
     alloc::{AlignedBytesMut, OwnedAlignedBytes},
@@ -26,7 +26,11 @@ trait ObjectSafeTaskDefinition<P: Party>: 'static + Send + Sync {
         incoming_data: OwnedAlignedBytes,
         outgoing_data: AlignedBytesMut,
     ) -> swanky_error::Result<TaskResult<P, Box<dyn Any + Send>>>;
-    fn finalize(&mut self, c: &mut TlsConnection<P>, rng: &mut AesRng) -> swanky_error::Result<()>;
+    fn finalize(
+        &mut self,
+        c: &mut TlsConnection<P>,
+        rng: &mut SwankyRng,
+    ) -> swanky_error::Result<()>;
 }
 
 struct TaskDefinitionWrapper<P: Party, T: TaskDefinition<P>>(Option<T>, PhantomData<P>);
@@ -50,7 +54,11 @@ impl<P: Party, T: TaskDefinition<P>> ObjectSafeTaskDefinition<P> for TaskDefinit
     fn needs_challenge(&self) -> bool {
         T::NEEDS_CHALLENGE
     }
-    fn finalize(&mut self, c: &mut TlsConnection<P>, rng: &mut AesRng) -> swanky_error::Result<()> {
+    fn finalize(
+        &mut self,
+        c: &mut TlsConnection<P>,
+        rng: &mut SwankyRng,
+    ) -> swanky_error::Result<()> {
         self.0
             .take()
             .expect("Finalized called multiple times")
@@ -121,7 +129,7 @@ impl<P: Party> ErasedTaskDefinition<P> {
     pub fn finalize(
         &mut self,
         c: &mut TlsConnection<P>,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> swanky_error::Result<()> {
         self.contents.finalize(c, rng)
     }

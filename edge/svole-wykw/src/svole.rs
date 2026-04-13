@@ -9,11 +9,11 @@ use rand::{
     distributions::{Distribution, Uniform},
 };
 use swanky_adversary::{Malicious, SemiHonest};
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{Degree, DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_ocelot_error::Error;
+use swanky_rng::SwankyRng;
 
 // LPN parameters used in the protocol. We use three stages, two sets of LPN
 // parameters for setup, and one set of LPN parameters for the extend phase.
@@ -116,7 +116,7 @@ fn compute_num_saved<FE: FiniteField>(params: LpnParams) -> usize {
 
 fn lpn_mtx_indices<FE: FiniteField>(
     distribution: &Uniform<u32>,
-    mut rng: &mut AesRng,
+    mut rng: &mut SwankyRng,
 ) -> [(usize, FE::PrimeField); LPN_PARAMS_D] {
     let mut indices = [0u32; LPN_PARAMS_D];
     for i in 0..LPN_PARAMS_D {
@@ -143,7 +143,7 @@ pub struct Sender<T: FiniteField> {
     // not, as long as the value type is a subfield of `T`.
     base_voles: Vec<(T::PrimeField, T)>,
     // Shared RNG with the receiver for generating the LPN matrix.
-    lpn_rng: AesRng,
+    lpn_rng: SwankyRng,
 }
 
 impl<T: FiniteField> Sender<T> {
@@ -152,7 +152,7 @@ impl<T: FiniteField> Sender<T> {
         channel: &mut C,
         params: LpnParams,
         num_saved: usize,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         output: &mut Vec<(V, T)>,
     ) -> Result<(), Error>
     where
@@ -239,7 +239,7 @@ impl<T: FiniteField> Sender<T> {
     /// Initialize the VOLE sender.
     pub fn init<C: AbstractChannel>(
         channel: &mut C,
-        mut rng: &mut AesRng,
+        mut rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self, Error> {
@@ -248,12 +248,12 @@ impl<T: FiniteField> Sender<T> {
         let base_voles_setup: Vec<(T::PrimeField, T)> = base_sender.send(
             channel,
             compute_num_saved::<T>(lpn_setup),
-            &mut AesRng::from_rng(&mut rng).expect("random number generation shouldn't fail"),
+            &mut SwankyRng::from_rng(&mut rng).expect("random number generation shouldn't fail"),
         )?;
         let spsvole = SpsSender::<T>::init(channel, pows, rng)?;
         let seed = rng.r#gen::<Block>();
         let seed = swanky_cointoss::receive(channel, &[seed])?[0];
-        let lpn_rng = AesRng::from_seed(seed);
+        let lpn_rng = SwankyRng::from_seed(seed);
         let mut sender = Self {
             lpn_setup,
             lpn_extend,
@@ -276,7 +276,7 @@ impl<T: FiniteField> Sender<T> {
     pub fn send<C: AbstractChannel, V: IsSubFieldOf<T>>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         output: &mut Vec<(V, T)>,
     ) -> Result<(), Error>
     where
@@ -295,7 +295,7 @@ impl<T: FiniteField> Sender<T> {
     pub fn duplicate<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> Result<Self, Error> {
         let mut base_voles: Vec<(T::PrimeField, T)> = Vec::new();
         self.send_internal(
@@ -329,7 +329,7 @@ pub struct Receiver<T: FiniteField> {
     delta: T,
     base_voles: Vec<T>,
     // Shared RNG with the sender for generating the LPN matrix.
-    lpn_rng: AesRng,
+    lpn_rng: SwankyRng,
 }
 
 impl<T: FiniteField> Receiver<T> {
@@ -338,7 +338,7 @@ impl<T: FiniteField> Receiver<T> {
         channel: &mut C,
         params: LpnParams,
         num_saved: usize,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         output: &mut Vec<T>,
     ) -> Result<(), Error>
     where
@@ -413,7 +413,7 @@ impl<T: FiniteField> Receiver<T> {
     /// When provided as argument it uses a particular `delta`.
     pub fn init<C: AbstractChannel>(
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         delta: Option<T>,
@@ -430,7 +430,7 @@ impl<T: FiniteField> Receiver<T> {
         let spsvole = SpsReceiver::<T>::init(channel, pows, delta, rng)?;
         let seed = rng.r#gen::<Block>();
         let seed = swanky_cointoss::send(channel, &[seed])?[0];
-        let lpn_rng = AesRng::from_seed(seed);
+        let lpn_rng = SwankyRng::from_seed(seed);
         let mut receiver = Self {
             lpn_setup,
             lpn_extend,
@@ -461,7 +461,7 @@ impl<T: FiniteField> Receiver<T> {
     pub fn receive<C: AbstractChannel, V: IsSubFieldOf<T>>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
         output: &mut Vec<T>,
     ) -> Result<(), Error>
     where
@@ -480,7 +480,7 @@ impl<T: FiniteField> Receiver<T> {
     pub fn duplicate<C: AbstractChannel, SFE: IsSubFieldOf<T>>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> Result<Self, Error>
     where
         T::PrimeField: IsSubFieldOf<SFE>,
@@ -522,11 +522,11 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_aes_rng::AesRng;
     use swanky_channel_legacy::Channel;
     use swanky_field::{FiniteField, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b, F128b};
     use swanky_field_f61p::F61p;
+    use swanky_rng::SwankyRng;
 
     fn test_lpn_svole_<V: IsSubFieldOf<T>, T: FiniteField>()
     where
@@ -534,7 +534,7 @@ mod tests {
     {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -544,7 +544,7 @@ mod tests {
             vole.send(&mut channel, &mut rng, &mut out).unwrap();
             out
         });
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -571,7 +571,7 @@ mod tests {
     {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -589,7 +589,7 @@ mod tests {
             uws.extend(uws3);
             uws
         });
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);

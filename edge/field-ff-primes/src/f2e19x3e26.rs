@@ -115,11 +115,11 @@ impl num_traits::Num for F2e19x3e26 {
     // larger than the modulus, so we use that here even though it doesn't perfectly
     // describe the situation (since `from_str_radix` could presumably error out
     // for another reason).
-    type FromStrRadixErr = swanky_serialization::BiggerThanModulus;
+    type FromStrRadixErr = swanky_field::BiggerThanModulus;
     fn from_str_radix(s: &str, r: u32) -> Result<Self, Self::FromStrRadixErr> {
         match <u128 as num_traits::Num>::from_str_radix(s, r) {
             Ok(num) => Self::try_from(num),
-            Err(_) => Err(swanky_serialization::BiggerThanModulus),
+            Err(_) => Err(swanky_field::BiggerThanModulus),
         }
     }
 }

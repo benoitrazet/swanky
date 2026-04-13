@@ -19,20 +19,21 @@ use crate::{
 
 fn walk_inputs(paths: &[PathBuf]) -> swanky_error::Result<Vec<PathBuf>> {
     fn visit(dst: &mut Vec<PathBuf>, input: &Path) -> swanky_error::Result<()> {
-        if let Some(name) = input.file_name() {
-            if name.to_string_lossy().starts_with('.') {
-                // Ignore hidden files
-                return Ok(());
-            }
+        if let Some(name) = input.file_name()
+            && name.to_string_lossy().starts_with('.')
+        {
+            // Ignore hidden files
+            return Ok(());
         }
         if input.is_dir() {
-            for item in std::fs::read_dir(input).wrap_err(
-                ErrorKind::FilesystemError,
-                format!("Unable to open directory {input:?}"),
-            )? {
+            for item in std::fs::read_dir(input)
+                .wrap_err_with(ErrorKind::FilesystemError, || {
+                    format!("Unable to open directory {input:?}")
+                })?
+            {
                 let item = item.wrap_err(
                     ErrorKind::FilesystemError,
-                    format!("Unable to access directory item"),
+                    "Unable to access directory item",
                 )?;
                 visit(dst, &item.path())?;
             }
@@ -70,28 +71,28 @@ impl MessageReader {
                 Some(file) => {
                     let pos = file.stream_position().wrap_err(
                         ErrorKind::FilesystemError,
-                        "Unable to get file stream position.".to_string(),
+                        "Unable to get file stream position.",
                     )?;
                     // This isn't the most efficient way to check this, but it's easy!
                     // This gets called infrequently enough that we don't care.
                     if pos
                         == file.seek(std::io::SeekFrom::End(0)).wrap_err(
                             ErrorKind::FilesystemError,
-                            "Unable to seek to the end of a file.".to_string(),
+                            "Unable to seek to the end of a file.",
                         )?
                     {
                         self.current_file = None;
                         continue;
                     }
-                    file.seek(std::io::SeekFrom::Start(pos)).wrap_err(
-                        ErrorKind::FilesystemError,
-                        "Unable to seek to {pos}.".to_string(),
-                    )?;
+                    file.seek(std::io::SeekFrom::Start(pos))
+                        .wrap_err_with(ErrorKind::FilesystemError, || {
+                            format!("Unable to seek to {pos}.")
+                        })?;
                     let (len, len_buf) = {
                         let mut len_buf = [0; 4];
                         file.read_exact(&mut len_buf).wrap_err(
                             ErrorKind::FilesystemError,
-                            "Failed to read flatbuffer length.".to_string(),
+                            "Failed to read flatbuffer length.",
                         )?;
                         (u32::from_le_bytes(len_buf) as usize, len_buf)
                     };
@@ -99,7 +100,7 @@ impl MessageReader {
                     self.buf[..4].copy_from_slice(&len_buf);
                     file.read_exact(&mut self.buf[4..]).wrap_err(
                         ErrorKind::FilesystemError,
-                        "Reading flatbuffer root message".to_string(),
+                        "Reading flatbuffer root message",
                     )?;
                     return Ok(Some(
                         fb::size_prefixed_root_as_root_with_opts(
@@ -111,17 +112,18 @@ impl MessageReader {
                         )
                         .wrap_err(
                             ErrorKind::FilesystemError,
-                            "Failed to verify flatbuffer root buffer.".to_string(),
+                            "Failed to verify flatbuffer root buffer.",
                         )?,
                     ));
                 }
                 _ => {
                     // If current_file is None, then paths can't be empty, by the above condition.
                     let path = self.paths.pop().unwrap();
-                    self.current_file = Some(File::open(&path).wrap_err(
-                        ErrorKind::FilesystemError,
-                        format!("Failed to open file {path:?}"),
-                    )?);
+                    self.current_file = Some(
+                        File::open(&path).wrap_err_with(ErrorKind::FilesystemError, || {
+                            format!("Failed to open file {path:?}")
+                        })?,
+                    );
                 }
             }
         }
@@ -131,7 +133,7 @@ impl MessageReader {
         match self.next_root()? {
             Some(root) => Ok(Some(root.message_as_relation().ok_or_swanky_error(
                 ErrorKind::OtherError,
-                &format!("wanted relation, got {:?}", root.message_type()),
+                format!("wanted relation, got {:?}", root.message_type()),
             )?)),
             _ => Ok(None),
         }
@@ -200,12 +202,12 @@ impl RelationReader {
     ) -> swanky_error::Result<()> {
         if let Some(c) = gate.gate_as_gate_constant() {
             v.constant(
-                c.type_id().into(),
+                c.type_id(),
                 c.out_id(),
                 &bytes2number(c.constant().map(|x| x.bytes()).unwrap_or_default())?,
             )?;
         } else if let Some(x) = gate.gate_as_gate_assert_zero() {
-            v.assert_zero(x.type_id().into(), x.in_id())?;
+            v.assert_zero(x.type_id(), x.in_id())?;
         } else if let Some(x) = gate.gate_as_gate_copy() {
             func_in_buf.clear();
             for input in x.in_id().into_iter().flat_map(|x| x.iter()) {
@@ -239,34 +241,34 @@ impl RelationReader {
                 num_input_wires
             );
             v.copy(
-                x.type_id().into(),
+                x.type_id(),
                 WireRange {
                     start: x.out_id().unwrap().first_id(),
                     end: x.out_id().unwrap().last_id(),
                 },
-                &func_in_buf,
+                func_in_buf,
             )?;
         } else if let Some(x) = gate.gate_as_gate_add() {
-            v.add(x.type_id().into(), x.out_id(), x.left_id(), x.right_id())?;
+            v.add(x.type_id(), x.out_id(), x.left_id(), x.right_id())?;
         } else if let Some(x) = gate.gate_as_gate_mul() {
-            v.mul(x.type_id().into(), x.out_id(), x.left_id(), x.right_id())?;
+            v.mul(x.type_id(), x.out_id(), x.left_id(), x.right_id())?;
         } else if let Some(x) = gate.gate_as_gate_add_constant() {
             v.addc(
-                x.type_id().into(),
+                x.type_id(),
                 x.out_id(),
                 x.in_id(),
                 &bytes2number(x.constant().map(|x| x.bytes()).unwrap_or_default())?,
             )?;
         } else if let Some(x) = gate.gate_as_gate_mul_constant() {
             v.mulc(
-                x.type_id().into(),
+                x.type_id(),
                 x.out_id(),
                 x.in_id(),
                 &bytes2number(x.constant().map(|x| x.bytes()).unwrap_or_default())?,
             )?;
         } else if let Some(x) = gate.gate_as_gate_public() {
             v.public_input(
-                x.type_id().into(),
+                x.type_id(),
                 WireRange {
                     start: x
                         .out_id()
@@ -286,7 +288,7 @@ impl RelationReader {
             )?;
         } else if let Some(x) = gate.gate_as_gate_private() {
             v.private_input(
-                x.type_id().into(),
+                x.type_id(),
                 WireRange {
                     start: x
                         .out_id()
@@ -305,20 +307,20 @@ impl RelationReader {
                 },
             )?;
         } else if let Some(x) = gate.gate_as_gate_new() {
-            v.new(x.type_id().into(), x.first_id(), x.last_id())?;
+            v.new(x.type_id(), x.first_id(), x.last_id())?;
         } else if let Some(x) = gate.gate_as_gate_delete() {
-            v.delete(x.type_id().into(), x.first_id(), x.last_id())?;
+            v.delete(x.type_id(), x.first_id(), x.last_id())?;
         } else if let Some(x) = gate.gate_as_gate_convert() {
             v.convert(
                 TypedWireRange {
-                    ty: x.out_type_id().into(),
+                    ty: x.out_type_id(),
                     range: WireRange {
                         start: x.out_first_id(),
                         end: x.out_last_id(),
                     },
                 },
                 TypedWireRange {
-                    ty: x.in_type_id().into(),
+                    ty: x.in_type_id(),
                     range: WireRange {
                         start: x.in_first_id(),
                         end: x.in_last_id(),
@@ -441,11 +443,11 @@ impl super::RelationReader for RelationReader {
         for conv in relation.conversions().into_iter().flat_map(|x| x.iter()) {
             header.conversion.push(ConversionDescription {
                 output: TypedCount {
-                    ty: conv.output_count().type_id().into(),
+                    ty: conv.output_count().type_id(),
                     count: conv.output_count().count(),
                 },
                 input: TypedCount {
-                    ty: conv.input_count().type_id().into(),
+                    ty: conv.input_count().type_id(),
                     count: conv.input_count().count(),
                 },
             });
@@ -475,7 +477,7 @@ impl super::RelationReader for RelationReader {
                             .into_iter()
                             .flat_map(|x| x.iter())
                             .map(|count| TypedCount {
-                                ty: count.type_id().into(),
+                                ty: count.type_id(),
                                 count: count.count(),
                             }),
                     );
@@ -485,7 +487,7 @@ impl super::RelationReader for RelationReader {
                             .into_iter()
                             .flat_map(|x| x.iter())
                             .map(|count| TypedCount {
-                                ty: count.type_id().into(),
+                                ty: count.type_id(),
                                 count: count.count(),
                             }),
                     );
@@ -529,7 +531,7 @@ impl super::RelationReader for RelationReader {
                                 .into_iter()
                                 .flat_map(|x| x.iter())
                                 .map(|count| TypedCount {
-                                    ty: count.type_id().into(),
+                                    ty: count.type_id(),
                                     count: count.count(),
                                 }),
                         );
@@ -540,7 +542,7 @@ impl super::RelationReader for RelationReader {
                                 .into_iter()
                                 .flat_map(|x| x.iter())
                                 .map(|count| TypedCount {
-                                    ty: count.type_id().into(),
+                                    ty: count.type_id(),
                                     count: count.count(),
                                 }),
                         );

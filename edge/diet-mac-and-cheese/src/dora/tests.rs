@@ -4,16 +4,17 @@ use std::{
     os::unix::net::UnixStream,
 };
 
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::Channel;
 use swanky_field::FiniteRing;
 use swanky_field_f61p::F61p;
-use swanky_party::{IS_VERIFIER, Prover, Verifier, private::ProverPrivateCopy};
+use swanky_party::{private::PartyPrivateCopy, ty_eq::Witness};
+use swanky_rng::SwankyRng;
 use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
 use crate::{
     DietMacAndCheese,
     dora::{Clause, DisjGate},
+    party::{Prover, Verifier},
     svole_trait::Svole,
 };
 use crate::{backend_trait::BackendT, circuit_ir::WireCount};
@@ -44,7 +45,7 @@ fn test_range_example() {
     let range_check_clone = range_check.clone();
 
     let handle = std::thread::spawn(move || {
-        let rng = AesRng::from_seed(Default::default());
+        let rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
@@ -62,7 +63,7 @@ fn test_range_example() {
             let wi: usize = prover.rng.r#gen::<usize>() % RANGE_SIZE;
             let wf = F61p::try_from(wi as u128).unwrap();
             let v = prover.input_private(Some(wf)).unwrap();
-            disj.mux(&mut prover, iter::empty(), &[v], ProverPrivateCopy::new(wi))
+            disj.mux(&mut prover, iter::empty(), &[v], PartyPrivateCopy::new(wi))
                 .unwrap(); // because it is assigned 1
         }
         disj.finalize(&mut prover).unwrap();
@@ -70,7 +71,7 @@ fn test_range_example() {
         prover.finalize().unwrap();
     });
 
-    let rng = AesRng::from_seed(Default::default());
+    let rng = SwankyRng::from_seed(Default::default());
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
@@ -88,7 +89,7 @@ fn test_range_example() {
             &mut dmc,
             iter::empty(),
             &[v],
-            ProverPrivateCopy::empty(IS_VERIFIER),
+            PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
         )
         .unwrap();
     }
@@ -149,7 +150,7 @@ fn test_witness_example() {
     let range_check_clone = disj.clone();
 
     let handle = std::thread::spawn(move || {
-        let rng = AesRng::from_seed(Default::default());
+        let rng = SwankyRng::from_seed(Default::default());
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
@@ -184,14 +185,14 @@ fn test_witness_example() {
             &mut prover,
             wit_tape.into_iter(),
             &input,
-            ProverPrivateCopy::new(wi),
+            PartyPrivateCopy::new(wi),
         )
         .unwrap();
         disj.finalize(&mut prover).unwrap();
         prover.finalize().unwrap();
     });
 
-    let rng = AesRng::from_seed(Default::default());
+    let rng = SwankyRng::from_seed(Default::default());
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
@@ -212,7 +213,7 @@ fn test_witness_example() {
         &mut verifier,
         iter::empty(),
         &input,
-        ProverPrivateCopy::empty(IS_VERIFIER),
+        PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
     )
     .unwrap();
 

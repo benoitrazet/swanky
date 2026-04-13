@@ -1,16 +1,15 @@
-#![allow(clippy::all)]
 use keyed_arena::KeyedArena;
 use rand::SeedableRng;
 use std::str::FromStr;
 use std::{any::type_name, hint::black_box, time::Instant};
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, F56b, F63b};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::F128p;
-use swanky_party::{IS_PROVER, IS_VERIFIER};
+use swanky_party::ty_eq::Witness;
+use swanky_rng::SwankyRng;
 
 use mac_n_cheese_vole::{
     mac::Mac,
@@ -30,7 +29,7 @@ fn do_bench<
     use std::os::unix::net::UnixStream;
     use swanky_channel_legacy::Channel;
     let (a, b) = UnixStream::pair().unwrap();
-    let mut base_vole_rng = AesRng::from_seed(Block::from(2456));
+    let mut base_vole_rng = SwankyRng::from_seed(Block::from(2456));
     let alpha = FE::random(&mut base_vole_rng);
     let delta = -alpha;
     let mut base_svoles_s = Vec::new();
@@ -40,11 +39,11 @@ fn do_bench<
         let x = VF::random(&mut base_vole_rng);
         let beta = FE::random(&mut base_vole_rng);
         let tag = x * alpha + beta;
-        base_svoles_s.push(Mac::prover_new(IS_PROVER, x, beta));
-        base_svoles_r.push(Mac::verifier_new(IS_VERIFIER, tag));
+        base_svoles_s.push(Mac::prover_new(Witness::EQUAL_TYPES, x, beta));
+        base_svoles_r.push(Mac::verifier_new(Witness::EQUAL_TYPES, tag));
     }
     let sender = std::thread::spawn(move || {
-        let mut rng = AesRng::from_seed(Block::from(456));
+        let mut rng = SwankyRng::from_seed(Block::from(456));
         let mut channel = Channel::new(
             BufReader::new(a.try_clone().unwrap()),
             BufWriter::new(a.try_clone().unwrap()),
@@ -54,7 +53,7 @@ fn do_bench<
         out
     });
     let svole_receiver = {
-        let mut rng = AesRng::from_seed(Block::from(455820961));
+        let mut rng = SwankyRng::from_seed(Block::from(455820961));
         let mut channel = Channel::new(
             BufReader::new(b.try_clone().unwrap()),
             BufWriter::new(b.try_clone().unwrap()),
@@ -71,10 +70,10 @@ fn do_bench<
     let mut comms_5 = vec![0; sizes.comms_5s];
     let selector = 43;
     let mut arena = KeyedArena::with_capacity(256_000, 16);
-    let sender_rng_initial = AesRng::from_seed(Block::from(3485));
-    let mut sender_rng = sender_rng_initial.clone();
-    let receiver_rng_initial = AesRng::from_seed(Block::from(12359));
-    let mut receiver_rng = receiver_rng_initial.clone();
+    let sender_rng_initial = SwankyRng::from_seed(Block::from(3485));
+    let mut sender_rng = sender_rng_initial;
+    let receiver_rng_initial = SwankyRng::from_seed(Block::from(12359));
+    let mut receiver_rng = receiver_rng_initial;
     let svole_sender_stage2 = svole_sender
         .send(
             &arena,
@@ -142,11 +141,11 @@ fn do_bench<
     assert_eq!(sender_voles.len(), receiver_voles.len());
     for (sv, tag) in sender_voles.iter().zip(receiver_voles.iter()) {
         let (x, beta) = (*sv).into();
-        assert_eq!(x * alpha + beta, tag.tag(IS_VERIFIER));
+        assert_eq!(x * alpha + beta, tag.tag(Witness::EQUAL_TYPES));
     }
     for (sv, tag) in sender_voles.iter().zip(receiver_voles.iter()) {
         let (x, beta) = (*sv).into();
-        assert_eq!(x * alpha + beta, tag.tag(IS_VERIFIER));
+        assert_eq!(x * alpha + beta, tag.tag(Witness::EQUAL_TYPES));
     }
     println!(
         "do_bench<{}, {}, {}> has sizes:\n{:#?}",
@@ -159,12 +158,11 @@ fn do_bench<
     let start = Instant::now();
     for _ in 0..n {
         arena.reset();
-        let mut rng = sender_rng_initial.clone();
         let svole_sender_stage2 = svole_sender
             .send(
                 &arena,
                 selector,
-                &mut rng,
+                &mut sender_rng,
                 black_box(&base_svoles_s),
                 black_box(comms_1.as_mut_slice()),
             )
@@ -198,12 +196,11 @@ fn do_bench<
     let start = Instant::now();
     for _ in 0..n {
         arena.reset();
-        let mut rng = receiver_rng_initial.clone();
         let svole_receiver_stage2 = svole_receiver
             .receive(
                 &arena,
                 selector,
-                &mut rng,
+                &mut receiver_rng,
                 black_box(&base_svoles_r),
                 &mut receiver_voles,
                 black_box(comms_1.as_slice()),
@@ -220,7 +217,7 @@ fn do_bench<
                 black_box(comms_4.as_mut_slice()),
             )
             .unwrap();
-        let receiver_voles = svole_receiver_stage3
+        svole_receiver_stage3
             .stage3(
                 &svole_receiver,
                 &arena,
@@ -229,7 +226,7 @@ fn do_bench<
                 black_box(comms_5.as_slice()),
             )
             .unwrap();
-        black_box(receiver_voles);
+        black_box(());
     }
     let elapsed = start.elapsed();
     let per_vole = elapsed / u32::try_from(n * sizes.voles_outputted).unwrap();

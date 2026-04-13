@@ -1,7 +1,7 @@
 use crate::{
-    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyInput, HasModulus, WireLabel,
+    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyProj, HasModulus, WireLabel,
     WireMod2, check_binary,
-    fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal},
+    fancy::{BinaryBundle, CrtBundle, Fancy},
     garble::binary_and::BinaryWireLabel,
     hash_wires,
     util::{RngExt, output_tweak, tweak, tweak2},
@@ -10,7 +10,6 @@ use rand::{CryptoRng, RngCore};
 #[cfg(feature = "serde")]
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
-use swanky_block::Block;
 use swanky_channel::Channel;
 
 use super::security_warning::warn_proj;
@@ -33,7 +32,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel + DeserializeOwned> Garbler<RNG, 
         let f = std::fs::File::open(filename)?;
         let reader = std::io::BufReader::new(f);
         let deltas: HashMap<u16, Wire> = serde_json::from_reader(reader)?;
-        self.deltas.extend(deltas.into_iter());
+        self.deltas.extend(deltas);
         Ok(())
     }
 }
@@ -43,12 +42,12 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
     pub fn new(mut rng: RNG, channel: &mut Channel) -> swanky_error::Result<Self> {
         let zero = Wire::rand(&mut rng, 2);
         let delta = Wire::rand_delta(&mut rng, 2);
-        let one = zero.plus(&delta);
+        let one = zero.clone() + delta.clone();
         let mut deltas = HashMap::new();
         deltas.insert(2, delta);
         // Send the one wirelabel to the evaluator. This is used to make binary
         // negation free.
-        channel.write(&one.to_block())?;
+        channel.write(&one.to_repr())?;
         Ok(Garbler {
             zero,
             deltas,
@@ -92,7 +91,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
 
     /// Send a wire over the established channel.
     pub fn send_wire(&mut self, wire: &Wire, channel: &mut Channel) -> swanky_error::Result<()> {
-        channel.write(&wire.to_block())?;
+        channel.write(&wire.to_repr())?;
         Ok(())
     }
 
@@ -100,7 +99,7 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
     pub fn encode_wire(&mut self, val: u16, modulus: u16) -> (Wire, Wire) {
         let zero = Wire::rand(&mut self.rng, modulus);
         let delta = self.delta(modulus);
-        let enc = zero.plus(&delta.cmul(val));
+        let enc = zero.clone() + delta * val;
         (zero, enc)
     }
 
@@ -146,41 +145,6 @@ impl<RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<RNG, Wire> {
     }
 }
 
-impl<RNG: CryptoRng + RngCore, Wire: WireLabel> FancyInput for Garbler<RNG, Wire> {
-    type Item = Wire;
-
-    fn encode_many(
-        &mut self,
-        values: &[u16],
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        let (zero, encoded) = self.encode_many_wires(values, moduli);
-        for wire in encoded {
-            channel.write(&wire.to_block())?;
-        }
-        Ok(zero)
-    }
-
-    fn receive_many(
-        &mut self,
-        _moduli: &[u16],
-        _: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        unimplemented!("Garbler cannot receive values")
-    }
-}
-
-impl<RNG: RngCore + CryptoRng, Wire: WireLabel> FancyReveal for Garbler<RNG, Wire> {
-    fn reveal(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<u16> {
-        // The evaluator needs our cooperation in order to see the output.
-        // Hence, we call output() ourselves.
-        self.output(x, channel)?;
-        let val = channel.read::<u16>()?;
-        Ok(val)
-    }
-}
-
 impl<RNG: RngCore + CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, W> {
     fn and(
         &mut self,
@@ -197,7 +161,7 @@ impl<RNG: RngCore + CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, 
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        x.plus(y)
+        *x + *y
     }
 
     /// We can negate by having garbler xor wire with Delta
@@ -205,7 +169,7 @@ impl<RNG: RngCore + CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, 
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        let zero = self.zero.clone();
+        let zero = self.zero;
         self.xor(&zero, x)
     }
 }
@@ -260,16 +224,16 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
 {
     fn add(&mut self, x: &Wire, y: &Wire) -> Wire {
         assert_eq!(x.modulus(), y.modulus());
-        x.plus(y)
+        x.clone() + y.clone()
     }
 
     fn sub(&mut self, x: &Wire, y: &Wire) -> Wire {
         assert_eq!(x.modulus(), y.modulus());
-        x.minus(y)
+        x.clone() - y.clone()
     }
 
     fn cmul(&mut self, x: &Wire, c: u16) -> Wire {
-        x.cmul(c)
+        x.clone() * c
     }
 
     fn mul(&mut self, A: &Wire, B: &Wire, channel: &mut Channel) -> swanky_error::Result<Wire> {
@@ -285,7 +249,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         let Db = self.delta(qb);
 
         let r;
-        let mut gate = vec![Block::default(); q as usize + qb as usize - 2];
+        let mut gate = vec![Default::default(); q as usize + qb as usize - 2];
 
         // hack for unequal moduli
         if q != qb {
@@ -302,7 +266,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
             let mut B_ = B.clone();
             for b in 0..qb {
                 if b > 0 {
-                    B_.plus_eq(&Db);
+                    B_ += Db.clone();
                 }
                 let new_color = ((r + b) % q) as u128;
                 let ct = (u128::from(B_.hash(t)) & 0xFFFF) ^ new_color;
@@ -310,10 +274,10 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
             }
 
             let mut packed = 0;
-            for i in 0..qb as usize {
-                packed += minitable[i] << (16 * i);
+            for (i, item) in minitable.iter().enumerate().take(qb as usize) {
+                packed += item << (16 * i);
             }
-            gate.push(Block::from(packed));
+            gate.push(packed.into());
         } else {
             r = B.color(); // secret value known only to the garbler (ev knows r+b)
         }
@@ -322,25 +286,25 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
 
         // X = H(A+aD) + arD such that a + A.color == 0
         let alpha = (q - A.color()) % q; // alpha = -A.color
-        let X1 = A.plus(&D.cmul(alpha));
+        let X1 = A.clone() + D.clone() * alpha;
 
         // Y = H(B + bD) + (b + r)A such that b + B.color == 0
         let beta = (qb - B.color()) % qb;
-        let Y1 = B.plus(&Db.cmul(beta));
+        let Y1 = B.clone() + Db.clone() * beta;
 
         let [hashX, hashY] = hash_wires([&X1, &Y1], g);
 
-        let X = Wire::hash_to_mod(hashX, q).plus_mov(&D.cmul(alpha * r % q));
-        let Y = Wire::hash_to_mod(hashY, q).plus_mov(&A.cmul((beta + r) % q));
+        let X = Wire::hash_to_mod(hashX, q) + D.clone() * (alpha * r % q);
+        let Y = Wire::hash_to_mod(hashY, q) + A.clone() * ((beta + r) % q);
 
         let mut precomp = Vec::with_capacity(q as usize);
         // precompute a lookup table of X.minus(&D_cmul[(a * r % q)])
         //                            = X.plus(&D_cmul[((q - (a * r % q)) % q)])
         let mut X_ = X.clone();
-        precomp.push(X_.to_block());
+        precomp.push(X_.to_repr());
         for _ in 1..q {
-            X_.plus_eq(&D);
-            precomp.push(X_.to_block());
+            X_ += D.clone();
+            precomp.push(X_.to_repr());
         }
 
         // We can vectorize the hashes here too, but then we need to precompute all `q` sums of A
@@ -349,7 +313,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         let mut A_ = A.clone();
         for a in 0..q {
             if a > 0 {
-                A_.plus_eq(&D);
+                A_ += D.clone();
             }
             // garbler's half-gate: outputs X-arD
             // G = H(A+aD) ^ X+a(-r)D = H(A+aD) ^ X-arD
@@ -363,17 +327,17 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         // precompute a lookup table of Y.minus(&A_cmul[((b+r) % q)])
         //                            = Y.plus(&A_cmul[((q - ((b+r) % q)) % q)])
         let mut Y_ = Y.clone();
-        precomp.push(Y_.to_block());
+        precomp.push(Y_.to_repr());
         for _ in 1..q {
-            Y_.plus_eq(A);
-            precomp.push(Y_.to_block());
+            Y_ += A.clone();
+            precomp.push(Y_.to_repr());
         }
 
         // Same note about vectorization as A
         let mut B_ = B.clone();
         for b in 0..qb {
             if b > 0 {
-                B_.plus_eq(&Db);
+                B_ += Db.clone();
             }
             // evaluator's half-gate: outputs Y-(b+r)D
             // G = H(B+bD) + Y-(b+r)A
@@ -386,9 +350,11 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         for block in gate.iter() {
             channel.write(block)?;
         }
-        Ok(X.plus_mov(&Y))
+        Ok(X + Y)
     }
+}
 
+impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyProj for Garbler<RNG, Wire> {
     fn proj(
         &mut self,
         A: &Wire,
@@ -401,7 +367,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
         let tt = tt.unwrap();
 
         let q_in = A.modulus();
-        let mut gate = vec![Block::default(); q_in as usize - 1];
+        let mut gate = vec![Default::default(); q_in as usize - 1];
 
         let tao = A.color();
         let g = tweak(self.current_gate());
@@ -411,10 +377,8 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
 
         // output zero-wire
         // W_g^0 <- -H(g, W_{a_1}^0 - \tao\Delta_m) - \phi(-\tao)\Delta_n
-        let C = A
-            .plus(&Din.cmul((q_in - tao) % q_in))
-            .hashback(g, q_out)
-            .plus_mov(&Dout.cmul((q_out - tt[((q_in - tao) % q_in) as usize]) % q_out));
+        let C = (A.clone() + Din.clone() * ((q_in - tao) % q_in)).hashback(g, q_out)
+            + Dout.clone() * ((q_out - tt[((q_in - tao) % q_in) as usize]) % q_out);
 
         // precompute `let C_ = C.plus(&Dout.cmul(tt[x as usize]))`
         let C_precomputed = {
@@ -422,17 +386,17 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
             (0..q_out)
                 .map(|x| {
                     if x > 0 {
-                        C_.plus_eq(&Dout);
+                        C_ += Dout.clone();
                     }
-                    C_.to_block()
+                    C_.to_repr()
                 })
-                .collect::<Vec<Block>>()
+                .collect::<Vec<_>>()
         };
 
         let mut A_ = A.clone();
         for x in 0..q_in {
             if x > 0 {
-                A_.plus_eq(&Din); // avoiding expensive cmul for `A_ = A.plus(&Din.cmul(x))`
+                A_ += Din.clone(); // avoiding expensive cmul for `A_ = A.plus(&Din.cmul(x))`
             }
 
             let ix = (tao as usize + x as usize) % q_in as usize;
@@ -454,9 +418,29 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
 impl<RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
     type Item = Wire;
 
+    fn encode_many(
+        &mut self,
+        values: &[u16],
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        let (zero, encoded) = self.encode_many_wires(values, moduli);
+        for wire in encoded {
+            channel.write(&wire.to_repr())?;
+        }
+        Ok(zero)
+    }
+
+    fn receive_many(
+        &mut self,
+        _moduli: &[u16],
+        _: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        unimplemented!("Garbler cannot receive values")
+    }
+
     fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
-        let zero = Wire::rand(&mut self.rng, q);
-        let wire = zero.plus(self.delta(q).cmul_eq(x));
+        let (zero, wire) = Wire::constant(x, q, &self.delta(q), &mut self.rng);
         self.send_wire(&wire, channel)?;
         Ok(zero)
     }
@@ -466,7 +450,7 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
         let i = self.current_output();
         let D = self.delta(q);
         for k in 0..q {
-            let block = X.plus(&D.cmul(k)).hash(output_tweak(i, k));
+            let block = (X.clone() + D.clone() * k).hash(output_tweak(i, k));
             channel.write(&block)?;
         }
         Ok(None)

@@ -5,14 +5,16 @@ use rustc_hash::FxHashMap;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, ensure};
 use swanky_field::{FiniteField, IsSubFieldOf};
-use swanky_party::{
-    Party, WhichParty,
-    private::{ProverPrivate, ProverPrivateCopy},
-};
+use swanky_party::private::{PartyPrivate, PartyPrivateCopy};
 
 use crate::{
-    DietMacAndCheese, backend_trait::BackendT, dora::perm::permutation, mac::Mac,
-    ram::collapse_vec, svole_trait::SvoleT,
+    DietMacAndCheese,
+    backend_trait::BackendT,
+    dora::perm::permutation,
+    mac::Mac,
+    party::{Party, Prover, WhichParty},
+    ram::collapse_vec,
+    svole_trait::SvoleT,
 };
 
 use super::{MemorySpace, tx::TxChannel};
@@ -54,7 +56,7 @@ pub struct DoraRam<
     challenge_size: usize,
     space: M,
     ch: TxChannel<C>,
-    memory: ProverPrivate<P, FxHashMap<Vec<V>, Vec<V>>>,
+    memory: PartyPrivate<Prover, P, FxHashMap<Vec<V>, Vec<V>>>,
     rds: Vec<Vec<Mac<P, V, F>>>,
     wrs: Vec<Vec<Mac<P, V, F>>>,
     _ph: PhantomData<SVOLE>,
@@ -67,7 +69,7 @@ where
 {
     values
         .iter()
-        .map(|&x| Mac::new(ProverPrivateCopy::new(x), T::ZERO))
+        .map(|&x| Mac::new(PartyPrivateCopy::new(x), T::ZERO))
         .collect()
 }
 
@@ -151,7 +153,7 @@ where
                             .fcom
                             .input1_prover(ev, &mut self.ch, &mut dmc.rng, x)
                             .unwrap();
-                        Mac::new(ProverPrivateCopy::new(x), m)
+                        Mac::new(PartyPrivateCopy::new(x), m)
                     }))
                 {
                     flat.push(elem);
@@ -293,18 +295,17 @@ where
 
         let (chal_cmbn, chal_perm1) = match P::WHICH {
             WhichParty::Prover(_) => {
-                dmc.channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
+                dmc.channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                 (
                     dmc.channel.read_serializable::<V>().wrap_err(
                         ErrorKind::NetworkError,
-                        "Failed to read combined challenge.".to_string(),
+                        "Failed to read combined challenge.",
                     )?,
                     dmc.channel.read_serializable::<V>().wrap_err(
                         ErrorKind::NetworkError,
-                        "Failed to read permutation challenge.".to_string(),
+                        "Failed to read permutation challenge.",
                     )?,
                 )
             }
@@ -314,16 +315,15 @@ where
 
                 dmc.channel.write_serializable(&chal_cmbn).wrap_err(
                     ErrorKind::NetworkError,
-                    "Failed to write combined challenge.".to_string(),
+                    "Failed to write combined challenge.",
                 )?;
                 dmc.channel.write_serializable(&chal_perm1).wrap_err(
                     ErrorKind::NetworkError,
-                    "Failed to write permutation challenge.".to_string(),
+                    "Failed to write permutation challenge.",
                 )?;
-                dmc.channel.flush().wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to flush channel.".to_string(),
-                )?;
+                dmc.channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
 
                 chals
             }

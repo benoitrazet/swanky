@@ -6,16 +6,17 @@ use crate::{
     backend_trait::BackendT,
     circuit_ir::{FieldInputs, FunStore},
     mac::{Mac, MacT, make_x_i},
+    party::{Party, WhichParty},
     plugins::DisjunctionBody,
 };
 
 use generic_array::GenericArray;
 use std::marker::PhantomData;
-use swanky_aes_rng::AesRng;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField};
 use swanky_field_binary::{F2, F40b};
-use swanky_party::{Party, WhichParty, private::ProverPrivateCopy};
+use swanky_party::private::PartyPrivateCopy;
+use swanky_rng::SwankyRng;
 
 // This file provides an implementation of the Plaintext backend.
 // `DietMacAndCheePlaintext<V,T>` is the main struct for this backend.
@@ -32,7 +33,7 @@ use swanky_party::{Party, WhichParty, private::ProverPrivateCopy};
 
 pub(crate) struct DietMacAndCheesePlaintext<V: IsSubFieldOf<T>, T: FiniteField> {
     // The random generator is necessary for the random gate
-    rng: AesRng,
+    rng: SwankyRng,
     // This optional backend is for the extension field associated to the binary field.
     // It is necessary for lifting `F2` values to its tag extension field `F40b`.
     extfield_backend: Option<Box<DietMacAndCheesePlaintext<F40b, F40b>>>,
@@ -210,7 +211,7 @@ impl<P: Party> BackendConvT<P> for DietMacAndCheesePlaintext<F2, F40b> {
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
         match P::WHICH {
             WhichParty::Prover(_) => {
-                let bmac = Mac::new(ProverPrivateCopy::new(w.0), F40b::ZERO);
+                let bmac = Mac::new(PartyPrivateCopy::new(w.0), F40b::ZERO);
                 Ok(vec![bmac])
             }
             WhichParty::Verifier(_) => {
@@ -247,7 +248,7 @@ impl<P: Party, F: PrimeFiniteField> BackendConvT<P> for DietMacAndCheesePlaintex
                 for b in bits {
                     let b2 = F2::from(b);
                     let dummy_tag = F40b::ZERO;
-                    let bmac = Mac::new(ProverPrivateCopy::new(b2), dummy_tag);
+                    let bmac = Mac::new(PartyPrivateCopy::new(b2), dummy_tag);
                     v.push(bmac);
                 }
             }

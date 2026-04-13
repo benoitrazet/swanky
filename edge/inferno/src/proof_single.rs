@@ -7,16 +7,15 @@ use crate::{
     round::{Round, round_compress_finish, round_compress_start, round1},
     secretsharing::{CorrectionSharing, LinearSharing, SecretSharing},
 };
-use anyhow::anyhow;
 use blake3::Hash;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use simple_arith_circuit::Circuit;
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
+use swanky_error::{ErrorKind, Result, ensure};
 use swanky_field::FiniteField;
 use swanky_field::FiniteRing;
-use swanky_serialization::serde_vec;
+use swanky_rng::SwankyRng;
 
 /// The proof for a single execution of the protocol. `N` denotes
 /// the number of participants in the MPC.
@@ -41,7 +40,7 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
         witness: &[F::PrimeField],
         compression_factor: usize,
         cache: &Cache<F>,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> Self {
         let nrounds = crate::utils::nrounds(circuit, compression_factor);
         let nmuls = circuit.nmuls();
@@ -54,7 +53,7 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
             .collect::<Vec<u128>>()
             .try_into()
             .unwrap(); // This `unwrap` will never fail.
-        let mut rngs = seeds.map(|seed| AesRng::from_seed(Block::from(seed)));
+        let mut rngs = seeds.map(|seed| SwankyRng::from_seed(Block::from(seed)));
 
         // Secret share the witness.
         let ws: Vec<SecretSharing<F::PrimeField, N>> = witness
@@ -123,14 +122,14 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
     /// Verify the proof. This checks that:
     /// 1. The outputs of the MPC parties are correct.
     /// 2. The shares of the opened parties are correct. Checking this requires
-    /// re-running (most of) the protocol and validating that the trace of each
-    /// opened party is valid.
+    ///    re-running (most of) the protocol and validating that the trace of each
+    ///    opened party is valid.
     pub fn verify(
         &self,
         circuit: &Circuit<F::PrimeField>,
         compression_factor: usize,
         cache: &Cache<F>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let nrounds = crate::utils::nrounds(circuit, compression_factor);
         let mut hashers = Hashers::<N>::new();
 
@@ -147,7 +146,7 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
         log::debug!("Challenge: {:?}", challenge);
         // Compute the multiplication inputs from the reconstructed
         // witness and reconstructed multiplication outputs.
-        let (xs, ys) = circuit.eval_trace(&witness, &mults);
+        let (xs, ys, output) = circuit.eval_trace(&witness, &mults);
         // Now let's validate that these multiplication inputs are correct!
         // We do this by running the protocol on these reconstructed values
         // and seeing whether we get the correct result at the end.
@@ -198,16 +197,17 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
         // that they match the output shares.
         self.output.verify_last_round(round, id)?;
         // Finally, check that the output shares are valid.
-        self.output.verify()?;
+        self.output.verify(output, id)?;
         Ok(())
     }
 }
 
 /// The output shares of the prover. This output contains four pieces of information:
 /// * `fs`, `gs`, and `h` correspond to the final dot product. For the proof to be valid
-/// it needs to hold that `dot(fs, gs) = h`.
+///   it needs to hold that `dot(fs, gs) = h`.
 /// * `output` corresponds to the output value. For the proof to be valid it must hold that
-/// `output = 1`.
+///   `output = 1`.
+///
 /// All four of these pieces are provided in shared form, as they correspond to the values of
 /// each party in the MPC computation.
 #[derive(Serialize, Deserialize)]
@@ -239,18 +239,32 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
     /// Verify that the prover output is valid. This involves the following checks:
     /// 1. The `output` shares reconstruct to `0`.
     /// 2. The `fs` and `gs` shares dot product to `h`.
-    pub fn verify(&self) -> anyhow::Result<()> {
+    /// 3. The output matches the computed output from circuit evaluation.
+    pub fn verify(
+        &self,
+        computed_output: CorrectionSharing<F::PrimeField, N>,
+        exclude: usize,
+    ) -> Result<()> {
         let output = self.output.reconstruct();
-        if output != <F::PrimeField as FiniteRing>::ZERO {
-            return Err(anyhow!("Output not equal to zero"));
-        }
+        ensure!(
+            output == <F::PrimeField as FiniteRing>::ZERO,
+            ErrorKind::OtherError,
+            "Output not equal to zero"
+        );
         let mut sum = F::ZERO;
         for (f, g) in self.fs.iter().zip(self.gs.iter()) {
             sum += f.reconstruct() * g.reconstruct();
         }
-        if sum != self.h.reconstruct() {
-            return Err(anyhow!("Dot product not equal to `h`"));
-        }
+        ensure!(
+            sum == self.h.reconstruct(),
+            ErrorKind::OtherError,
+            "Dot product not equal to `h`"
+        );
+        ensure!(
+            self.output.check_equality(&computed_output, exclude),
+            ErrorKind::OtherError,
+            "Output shares not equal to computed output shares"
+        );
         Ok(())
     }
 
@@ -263,21 +277,27 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
         &self,
         round: Round<CorrectionSharing<F, N>>,
         exclude: usize,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         assert!(exclude < N);
         for (f, f_) in self.fs.iter().zip(round.xs.iter()) {
-            if !f.check_equality(f_, exclude) {
-                return Err(anyhow!("`f` shares not equal"));
-            }
+            ensure!(
+                f.check_equality(f_, exclude),
+                ErrorKind::OtherError,
+                "`f` shares not equal"
+            );
         }
         for (g, g_) in self.gs.iter().zip(round.ys.iter()) {
-            if !g.check_equality(g_, exclude) {
-                return Err(anyhow!("`g` shares not equal"));
-            }
+            ensure!(
+                g.check_equality(g_, exclude),
+                ErrorKind::OtherError,
+                "`g` shares not equal"
+            );
         }
-        if !self.h.check_equality(&round.z.unwrap(), exclude) {
-            return Err(anyhow!("`h` shares not equal"));
-        }
+        ensure!(
+            self.h.check_equality(&round.z.unwrap(), exclude),
+            ErrorKind::OtherError,
+            "`h` shares not equal"
+        );
         Ok(())
     }
 }
@@ -291,10 +311,8 @@ pub(crate) struct OpenedPartiesShares<F: FiniteField, const N: usize> {
     // `Deserialize` on `[u128; N]` is problematic.
     seeds: Vec<u128>,
     // The correction values for the witness
-    #[serde(bound = "", with = "serde_vec")]
     witness: Vec<F::PrimeField>,
     // The correction values for the multiplication outputs
-    #[serde(bound = "", with = "serde_vec")]
     mults: Vec<F::PrimeField>,
     #[serde(bound = "")]
     hs: Vec<Vec<CorrectionSharing<F, N>>>,
@@ -347,32 +365,32 @@ impl<F: FiniteField, const N: usize> OpenedPartiesShares<F, N> {
         }
     }
 
-    pub fn reconstruct_rngs(&self) -> [AesRng; N] {
+    pub fn reconstruct_rngs(&self) -> [SwankyRng; N] {
         self.seeds
             .iter()
-            .map(|seed| AesRng::from_seed(Block::from(*seed)))
-            .collect::<Vec<AesRng>>()
+            .map(|seed| SwankyRng::from_seed(Block::from(*seed)))
+            .collect::<Vec<SwankyRng>>()
             .try_into()
             .unwrap() // This `unwrap` will never fail
     }
 
     pub fn reconstruct_witness(
         &self,
-        rngs: &mut [AesRng; N],
+        rngs: &mut [SwankyRng; N],
     ) -> Vec<CorrectionSharing<F::PrimeField, N>> {
         Self::reconstruct(&self.witness, rngs)
     }
 
     pub fn reconstruct_mults(
         &self,
-        rngs: &mut [AesRng; N],
+        rngs: &mut [SwankyRng; N],
     ) -> Vec<CorrectionSharing<F::PrimeField, N>> {
         Self::reconstruct(&self.mults, rngs)
     }
 
     fn reconstruct(
         corrections: &[F::PrimeField],
-        rngs: &mut [AesRng; N],
+        rngs: &mut [SwankyRng; N],
     ) -> Vec<CorrectionSharing<F::PrimeField, N>> {
         corrections
             .iter()
@@ -404,12 +422,13 @@ impl UnopenedParty {
         }
     }
 
-    pub fn verify_id(&self, id: usize) -> anyhow::Result<()> {
-        if id == self.id {
-            Ok(())
-        } else {
-            Err(anyhow!("Incorrect party ID encountered"))
-        }
+    pub fn verify_id(&self, id: usize) -> Result<()> {
+        ensure!(
+            id == self.id,
+            ErrorKind::OtherError,
+            "Incorrect party ID encountered"
+        );
+        Ok(())
     }
 }
 
@@ -437,8 +456,8 @@ mod tests {
                 proptest! {
                 #[test]
                 fn serialize_bincode(seed in any_seed()) {
-                    let mut rng = AesRng::from_seed(seed);
-                    let (circuit, witness) = simple_arith_circuit::circuitgen::random_zero_circuit::<<$field as FiniteField>::PrimeField, AesRng>(10, 1000, &mut rng);
+                    let mut rng = SwankyRng::from_seed(seed);
+                    let (circuit, witness) = simple_arith_circuit::circuitgen::random_zero_circuit::<<$field as FiniteField>::PrimeField, SwankyRng>(10, 1000, &mut rng);
                     let cache = crate::cache::Cache::new(&circuit, K, true);
                     let proof = ProofSingle::<$field, N>::prove(&circuit, &witness, K, &cache, &mut rng);
                     let serialized = bincode::serialize(&proof).unwrap();
@@ -453,4 +472,93 @@ mod tests {
 
     test_serialization!(serialization_f128p, F128p);
     test_serialization!(test_serialization_f64b, F64b);
+
+    // See GitHub Issue #43.
+    //
+    // Thanks to @rot256 for pointing this out!
+    #[test]
+    fn poc_check_equality_ignores_correction() {
+        use simple_arith_circuit::{Circuit, Op};
+        use swanky_field::FiniteRing;
+        use swanky_field_ff_primes::F128p;
+
+        type F = F128p;
+
+        let mut rng = SwankyRng::new();
+
+        // unsat. circuit: output = 1 regardless of input.
+        let circuit: Circuit<F> = Circuit::new(1, 1, vec![Op::Constant(F::ONE)]);
+        let fake_witness = vec![F::random(&mut rng)];
+
+        // honest (unsat.) proof, internally consistent, but output.reconstruct() = 1.
+        let cache_p = crate::cache::Cache::new(&circuit, K, true);
+        let mut proof = ProofSingle::<F, N>::prove(&circuit, &fake_witness, K, &cache_p, &mut rng);
+
+        // Confirm the output is non-zero.
+        assert_ne!(proof.output.output.reconstruct(), F::ZERO);
+
+        // Confirm the proof fails to verify.
+        let cache_v = crate::cache::Cache::new(&circuit, K, false);
+        assert!(proof.verify(&circuit, K, &cache_v).is_err());
+
+        // set correction so output.reconstruct() = 0.
+        let share_sum: F = proof.output.output.shares.into_iter().sum();
+        proof.output.output.correction = F::ZERO - share_sum;
+
+        // Check that proof verification continues to fail.
+        assert!(proof.verify(&circuit, K, &cache_v).is_err());
+    }
+
+    // See GitHub Issue #43.
+    //
+    // Thanks to @rot256 for pointing this out!
+    #[test]
+    fn ensure_dot_product_checked() {
+        use swanky_field::FiniteRing;
+        use swanky_field_ff_primes::F128p;
+
+        type F = F128p;
+
+        let mut rng = SwankyRng::new();
+
+        // unsat. circuit: output = 1 regardless of input.
+        let (circuit, witness) = simple_arith_circuit::circuitgen::random_zero_circuit::<
+            F,
+            SwankyRng,
+        >(10, 1000, &mut rng);
+
+        let cache_p = crate::cache::Cache::new(&circuit, K, true);
+        let mut proof = ProofSingle::<F, N>::prove(&circuit, &witness, K, &cache_p, &mut rng);
+
+        let cache_v = crate::cache::Cache::new(&circuit, K, false);
+        assert!(proof.verify(&circuit, K, &cache_v).is_ok());
+
+        for i in 0..proof.output.fs.len() {
+            // Change the share of the unopened party in `fs` to force the dot product to fail.
+            proof.output.fs[i].shares[proof.unopened.id] += F::ONE;
+
+            // Confirm the proof fails to verify.
+            assert!(proof.verify(&circuit, K, &cache_v).is_err());
+
+            // Change the share back for the next iteration.
+            proof.output.fs[i].shares[proof.unopened.id] -= F::ONE;
+        }
+
+        for i in 0..proof.output.gs.len() {
+            // Change the share of the unopened party in `gs` to force the dot product to fail.
+            proof.output.gs[i].shares[proof.unopened.id] += F::ONE;
+
+            // Confirm the proof fails to verify.
+            assert!(proof.verify(&circuit, K, &cache_v).is_err());
+
+            // Change the share back for the next iteration.
+            proof.output.gs[i].shares[proof.unopened.id] -= F::ONE;
+        }
+
+        // Change the share of the unopened party in `h` to force the dot
+        // product to fail.
+        proof.output.h.shares[proof.unopened.id] += F::ONE;
+        // Confirm the proof fails to verify.
+        assert!(proof.verify(&circuit, K, &cache_v).is_err());
+    }
 }

@@ -54,6 +54,66 @@ impl<F: FancyBinary> BinaryGadgets for F {}
 
 /// Extension trait for `Fancy` providing gadgets that operate over bundles of mod2 wires.
 pub trait BinaryGadgets: FancyBinary + BundleGadgets {
+    /// Encode a binary input bundle.
+    fn bin_encode(
+        &mut self,
+        value: u128,
+        nbits: usize,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
+        let xs = util::u128_to_bits(value, nbits);
+        self.encode_bundle(&xs, &vec![2; nbits], channel)
+            .map(BinaryBundle::from)
+    }
+
+    /// Receive an binary input bundle.
+    fn bin_receive(
+        &mut self,
+        nbits: usize,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
+        self.receive_bundle(&vec![2; nbits], channel)
+            .map(BinaryBundle::from)
+    }
+
+    /// Encode many binary input bundles.
+    fn bin_encode_many(
+        &mut self,
+        values: &[u128],
+        nbits: usize,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<BinaryBundle<Self::Item>>> {
+        let xs = values
+            .iter()
+            .flat_map(|x| util::u128_to_bits(*x, nbits))
+            .collect_vec();
+        let mut wires = self.encode_many(&xs, &vec![2; values.len() * nbits], channel)?;
+        let buns = (0..values.len())
+            .map(|_| {
+                let ws = wires.drain(0..nbits).collect_vec();
+                BinaryBundle::new(ws)
+            })
+            .collect_vec();
+        Ok(buns)
+    }
+
+    /// Receive many binary input bundles.
+    fn bin_receive_many(
+        &mut self,
+        ninputs: usize,
+        nbits: usize,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<BinaryBundle<Self::Item>>> {
+        let mut wires = self.receive_many(&vec![2; ninputs * nbits], channel)?;
+        let buns = (0..ninputs)
+            .map(|_| {
+                let ws = wires.drain(0..nbits).collect_vec();
+                BinaryBundle::new(ws)
+            })
+            .collect_vec();
+        Ok(buns)
+    }
+
     /// Create a constant bundle using base 2 inputs.
     fn bin_constant_bundle(
         &mut self,
@@ -214,10 +274,10 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
             .collect::<swanky_error::Result<Vec<Self::Item>>>()
             .map(BinaryBundle::new)?;
 
-        for i in 1..xwires.len() {
+        for (i, ywire) in ywires.iter().enumerate().take(xwires.len()).skip(1) {
             let mul = xwires
                 .iter()
-                .map(|x| self.and(x, &ywires[i], channel))
+                .map(|x| self.and(x, ywire, channel))
                 .collect::<swanky_error::Result<Vec<Self::Item>>>()
                 .map(BinaryBundle::new)?;
             let shifted = self.shift(&mul, i, channel).map(BinaryBundle)?;
@@ -251,10 +311,10 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         let zero = self.constant(0, 2, channel)?;
         sum.pad(&zero, 1);
 
-        for i in 1..xwires.len() {
+        for (i, ywire) in ywires.iter().enumerate().take(xwires.len()).skip(1) {
             let mul = xwires
                 .iter()
-                .map(|x| self.and(x, &ywires[i], channel))
+                .map(|x| self.and(x, ywire, channel))
                 .collect::<Result<_, _>>()
                 .map(BinaryBundle::new)?;
             let shifted = self
@@ -341,7 +401,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
             .collect_vec();
         c1_bs
             .into_iter()
-            .zip(c2_bs.into_iter())
+            .zip(c2_bs)
             .map(|(b1, b2)| self.mux_constant_bits(x, b1, b2, channel))
             .collect::<swanky_error::Result<Vec<Self::Item>>>()
             .map(BinaryBundle::new)
@@ -376,9 +436,9 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
             .into_iter()
             .enumerate()
             .filter_map(|(i, b)| if b > 0 { Some(i) } else { None })
-            .fold(Ok(zero), |z, shift_amt| {
+            .try_fold(zero, |z, shift_amt| {
                 let s = self.shift(x, shift_amt, channel).map(BinaryBundle)?;
-                self.bin_addition_no_carry(&(z?), &s, channel)
+                self.bin_addition_no_carry(&z, &s, channel)
             })
     }
 
@@ -476,22 +536,20 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         channel: &mut Channel,
     ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
         assert!(!xs.is_empty(), "`xs` cannot be empty");
-        xs.iter().skip(1).fold(Ok(xs[0].clone()), |x, y| {
-            x.map(|x| {
-                let pos = self.bin_lt(&x, y, channel)?;
-                let neg = self.negate(&pos);
-                Ok(BinaryBundle::new(
-                    x.wires()
-                        .iter()
-                        .zip(y.wires().iter())
-                        .map(|(x, y)| {
-                            let xp = self.and(x, &neg, channel)?;
-                            let yp = self.and(y, &pos, channel)?;
-                            Ok(self.xor(&xp, &yp))
-                        })
-                        .collect::<swanky_error::Result<Vec<Self::Item>>>()?,
-                ))
-            })?
+        xs.iter().skip(1).try_fold(xs[0].clone(), |x, y| {
+            let pos = self.bin_lt(&x, y, channel)?;
+            let neg = self.negate(&pos);
+            Ok(BinaryBundle::new(
+                x.wires()
+                    .iter()
+                    .zip(y.wires().iter())
+                    .map(|(x, y)| {
+                        let xp = self.and(x, &neg, channel)?;
+                        let yp = self.and(y, &pos, channel)?;
+                        Ok(self.xor(&xp, &yp))
+                    })
+                    .collect::<swanky_error::Result<Vec<Self::Item>>>()?,
+            ))
         })
     }
 

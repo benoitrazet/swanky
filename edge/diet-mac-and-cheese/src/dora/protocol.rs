@@ -3,12 +3,15 @@ use swanky_error::Result;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::{FiniteField, IsSubFieldOf};
-use swanky_party::{
-    Party, WhichParty,
-    private::{ProverPrivate, ProverPrivateCopy},
-};
+use swanky_party::private::{PartyPrivate, PartyPrivateCopy};
 
-use crate::{DietMacAndCheese, dora::comm::CommittedWitness, mac::Mac, svole_trait::SvoleT};
+use crate::{
+    DietMacAndCheese,
+    dora::comm::CommittedWitness,
+    mac::Mac,
+    party::{Party, Prover, WhichParty},
+    svole_trait::SvoleT,
+};
 
 use super::{
     COMPACT_MIN, COMPACT_MUL,
@@ -34,8 +37,8 @@ pub struct Dora<
     trace: Vec<Trace<DietMacAndCheese<P, V, F, C, SvoleF>>>,
     max_trace: usize, // maximum trace len before compactification
     tx: blake3::Hasher,
-    calls: ProverPrivateCopy<P, usize>,
-    accs: ProverPrivate<P, Vec<Accumulator<V>>>, // current state of accumulator
+    calls: PartyPrivateCopy<Prover, P, usize>,
+    accs: PartyPrivate<Prover, P, Vec<Accumulator<V>>>, // current state of accumulator
 }
 
 impl<
@@ -49,7 +52,7 @@ where
     F::PrimeField: IsSubFieldOf<V>,
 {
     pub fn new(disj: Disjunction<V>) -> Self {
-        let accs = ProverPrivate::new(
+        let accs = PartyPrivate::new(
             disj.clauses()
                 .iter()
                 .map(|rel| Accumulator::init(rel))
@@ -62,7 +65,7 @@ where
             trace: Vec::with_capacity(max_trace),
             max_trace,
             tx: blake3::Hasher::new(),
-            calls: ProverPrivateCopy::new(0),
+            calls: PartyPrivateCopy::new(0),
             accs,
         }
     }
@@ -75,7 +78,7 @@ where
         dmc: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
         mut wit_tape: impl Iterator<Item = V>, // witness tape
         input: &[Mac<P, V, F>],
-        opt: ProverPrivateCopy<P, usize>,
+        opt: PartyPrivateCopy<Prover, P, usize>,
     ) -> Result<Vec<Mac<P, V, F>>> {
         // check if we should compact the trace first
         if self.trace.len() >= self.max_trace {
@@ -114,17 +117,13 @@ where
                     dmc,
                     &self.disj,
                     input.iter().copied(),
-                    ProverPrivate::new(&wit),
+                    PartyPrivate::new(&wit),
                 )?;
                 debug_assert_eq!(comm_wit.value(ev, clause), wit);
 
                 // commit to cross terms
-                let comm_cxt = CommittedCrossTerms::commit(
-                    &mut ch,
-                    dmc,
-                    &self.disj,
-                    ProverPrivate::new(&cxt),
-                )?;
+                let comm_cxt =
+                    CommittedCrossTerms::commit(&mut ch, dmc, &self.disj, PartyPrivate::new(&cxt))?;
 
                 // commit to old accumulator
                 let comm_acc = ComittedAcc::commit(
@@ -169,20 +168,16 @@ where
                     dmc,
                     &self.disj,
                     input.iter().copied(),
-                    ProverPrivate::empty(ev),
+                    PartyPrivate::empty(ev),
                 )?;
 
                 // commit to cross terms
-                let cxt = CommittedCrossTerms::commit(
-                    &mut ch,
-                    dmc,
-                    &self.disj,
-                    ProverPrivate::empty(ev),
-                )?;
+                let cxt =
+                    CommittedCrossTerms::commit(&mut ch, dmc, &self.disj, PartyPrivate::empty(ev))?;
 
                 // commit to old accumulator
                 let acc_old =
-                    ComittedAcc::commit(&mut ch, dmc, &self.disj, &ProverPrivate::empty(ev))?;
+                    ComittedAcc::commit(&mut ch, dmc, &self.disj, &PartyPrivate::empty(ev))?;
 
                 // fold
                 let challenge = ch.challenge();
@@ -237,7 +232,7 @@ where
                         &mut ch,
                         dmc,
                         &self.disj,
-                        &ProverPrivate::new(acc),
+                        &PartyPrivate::new(acc),
                     )?);
                 }
             }
@@ -247,7 +242,7 @@ where
                         &mut ch,
                         dmc,
                         &self.disj,
-                        &ProverPrivate::empty(ev),
+                        &PartyPrivate::empty(ev),
                     )?);
                 }
             }
@@ -259,18 +254,16 @@ where
         } else {
             match P::WHICH {
                 WhichParty::Prover(_) => {
-                    ch.flush().wrap_err(
-                        ErrorKind::NetworkError,
-                        "Failed to flush channel.".to_string(),
-                    )?;
+                    ch.flush()
+                        .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                     (
                         dmc.channel.read_serializable::<V>().wrap_err(
                             ErrorKind::NetworkError,
-                            "Failed to read permutation challenge.".to_string(),
+                            "Failed to read permutation challenge.",
                         )?,
                         dmc.channel.read_serializable::<V>().wrap_err(
                             ErrorKind::NetworkError,
-                            "Failed to read combined challenge.".to_string(),
+                            "Failed to read combined challenge.",
                         )?,
                     )
                 }
@@ -279,16 +272,15 @@ where
                     let chal_cmbn = V::random(&mut dmc.rng);
                     dmc.channel.write_serializable(&chal_perm).wrap_err(
                         ErrorKind::NetworkError,
-                        "Failed to write permutation challenge.".to_string(),
+                        "Failed to write permutation challenge.",
                     )?;
                     dmc.channel.write_serializable(&chal_cmbn).wrap_err(
                         ErrorKind::NetworkError,
-                        "Failed to write combined challenge.".to_string(),
+                        "Failed to write combined challenge.",
                     )?;
-                    dmc.channel.flush().wrap_err(
-                        ErrorKind::NetworkError,
-                        "Failed to flush channel.".to_string(),
-                    )?;
+                    dmc.channel
+                        .flush()
+                        .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                     (chal_perm, chal_cmbn)
                 }
             }

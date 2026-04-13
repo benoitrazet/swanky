@@ -1,8 +1,10 @@
 use mac_n_cheese_ir::compilation_format::FieldMacType;
-use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
+use mac_n_cheese_vole::{
+    mac::{Mac, MacConstantContext, MacTypes},
+    party::Party,
+};
 use std::{io::Cursor, ops::Deref, sync::Arc};
 use swanky_error::{ErrorKind, OptionExt, WrapErr};
-use swanky_party::Party;
 use swanky_serialization::{CanonicalSerialize, SequenceDeserializer};
 
 use crate::{
@@ -25,7 +27,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for ConstantTask<P, T> {
 
     fn initialize(
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut swanky_aes_rng::AesRng,
+        _rng: &mut swanky_rng::SwankyRng,
         vc: crate::base_vole::VoleContexts<P>,
         _num_runner_threads: usize,
     ) -> swanky_error::Result<Self> {
@@ -39,7 +41,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for ConstantTask<P, T> {
     fn finalize(
         self,
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut swanky_aes_rng::AesRng,
+        _rng: &mut swanky_rng::SwankyRng,
     ) -> swanky_error::Result<()> {
         Ok(())
     }
@@ -61,14 +63,14 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for ConstantTask<P, T> {
         let mut cursor = Cursor::new(input.task_data().deref());
         let mut de = <T::VF as CanonicalSerialize>::Deserializer::new(&mut cursor).wrap_err(
             ErrorKind::SerializationError,
-            "Failed to initialize field element deserializer.".to_string(),
+            "Failed to initialize field element deserializer.",
         )?;
         for _ in 0..num_outputs {
             out.push(Mac::<P, T>::constant(
                 &self.constant_context,
                 de.read(&mut cursor).wrap_err(
                     ErrorKind::SerializationError,
-                    "Failed to deserialize field element.".to_string(),
+                    "Failed to deserialize field element.",
                 )?,
             ));
         }

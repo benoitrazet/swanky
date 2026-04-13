@@ -70,11 +70,11 @@ impl Config {
 
         let toml_contents: Config = toml::from_str(&std::fs::read_to_string(toml_file).wrap_err(
             ErrorKind::FilesystemError,
-            "Failed to read DMC config TOML to string.".to_string(),
+            "Failed to read DMC config TOML to string.",
         )?)
         .wrap_err(
             ErrorKind::SerializationError,
-            "Failed to parse DMC config from TOML.".to_string(),
+            "Failed to parse DMC config from TOML.",
         )?;
 
         if let Some(lpn) = toml_contents.lpn {

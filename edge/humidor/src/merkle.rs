@@ -41,7 +41,7 @@ where
 {
     let mut hash = H::new();
 
-    a.iter().for_each(|f| hash.update(&f.to_bytes()));
+    a.iter().for_each(|f| hash.update(f.to_bytes()));
 
     hash.finalize()
 }

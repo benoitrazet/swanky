@@ -1,10 +1,9 @@
 use std::marker::PhantomData;
 
 use mac_n_cheese_ir::compilation_format::wire_format::Xor4PrototypeWireFormat;
-use mac_n_cheese_vole::specialization::SmallBinaryFieldSpecialization;
+use mac_n_cheese_vole::{party::Party, specialization::SmallBinaryFieldSpecialization};
 use swanky_field::IsSubFieldOf;
 use swanky_field_binary::{F2, SmallBinaryField};
-use swanky_party::Party;
 
 use crate::task_framework::{NoContinuation, TaskDefinition};
 
@@ -22,7 +21,7 @@ where
 
     fn initialize(
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut swanky_aes_rng::AesRng,
+        _rng: &mut swanky_rng::SwankyRng,
         _vc: crate::base_vole::VoleContexts<P>,
         _num_runner_threads: usize,
     ) -> swanky_error::Result<Self> {
@@ -34,7 +33,7 @@ where
     fn finalize(
         self,
         _c: &mut crate::tls::TlsConnection<P>,
-        _rng: &mut swanky_aes_rng::AesRng,
+        _rng: &mut swanky_rng::SwankyRng,
     ) -> swanky_error::Result<()> {
         Ok(())
     }

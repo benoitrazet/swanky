@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use std::{fs::File, path::PathBuf};
 
 use clap::{Parser, Subcommand};
@@ -35,19 +34,17 @@ fn generate_graphviz(circuit: File, mut out: File) -> swanky_error::Result<()> {
     let manifest = circuit.manifest();
     writeln!(out, "digraph X {{").wrap_err(
         ErrorKind::FilesystemError,
-        "Failed to write beginning of DOT graph.".to_string(),
+        "Failed to write beginning of DOT graph.",
     )?;
-    writeln!(out, "node [shape=Mrecord];").wrap_err(
-        ErrorKind::FilesystemError,
-        "Failed to write node shape.".to_string(),
-    )?;
+    writeln!(out, "node [shape=Mrecord];")
+        .wrap_err(ErrorKind::FilesystemError, "Failed to write node shape.")?;
     writeln!(out, "fontname=\"Source Code Pro,Menlo,monospace\";").wrap_err(
         ErrorKind::FilesystemError,
-        "Failed to write font declaration.".to_string(),
+        "Failed to write font declaration.",
     )?;
     writeln!(out, "labelloc=\"t\";").wrap_err(
         ErrorKind::OtherError,
-        "Failed to write label location declaration.".to_string(),
+        "Failed to write label location declaration.",
     )?;
     let prototypes = manifest.prototypes();
     let mut in_degree = vec![0_u64; manifest.tasks().len()];
@@ -67,11 +64,11 @@ fn generate_graphviz(circuit: File, mut out: File) -> swanky_error::Result<()> {
         }
         writeln!(out, "subgraph cluster_{} {{", task_id).wrap_err(
             ErrorKind::FilesystemError,
-            "Failed to write subgraph cluster.".to_string(),
+            "Failed to write subgraph cluster.",
         )?;
         writeln!(out, "label = {:?};", label).wrap_err(
             ErrorKind::FilesystemError,
-            "Failed to write label '{label:?}'.".to_string(),
+            "Failed to write label '{label:?}'.",
         )?;
         let mut body_label = String::new();
         let mut first = true;
@@ -110,7 +107,7 @@ fn generate_graphviz(circuit: File, mut out: File) -> swanky_error::Result<()> {
             )
             .wrap_err(
                 ErrorKind::FilesystemError,
-                "Failed to write graph nodes/edge.".to_string(),
+                "Failed to write graph nodes/edge.",
             )?;
         }
         for (input_idx, inputs) in task.multi_array_inputs().iter().enumerate() {
@@ -135,22 +132,19 @@ fn generate_graphviz(circuit: File, mut out: File) -> swanky_error::Result<()> {
                 )
                 .wrap_err(
                     ErrorKind::FilesystemError,
-                    "Failed to write graph nodes/edge.".to_string(),
+                    "Failed to write graph nodes/edge.",
                 )?;
             }
         }
-        writeln!(out, "T{} [label={:?}];", task_id, body_label).wrap_err(
-            ErrorKind::FilesystemError,
-            "Failed to write task node.".to_string(),
-        )?;
+        writeln!(out, "T{} [label={:?}];", task_id, body_label)
+            .wrap_err(ErrorKind::FilesystemError, "Failed to write task node.")?;
         writeln!(out, "}}").wrap_err(
             ErrorKind::FilesystemError,
-            "Failed to write end of DOT graph.".to_string(),
+            "Failed to write end of DOT graph.",
         )?;
     }
     // Check that the degrees match what's on disk.
-    let mut buf = Vec::new();
-    buf.resize(manifest.dependent_counts().length() as usize, 0);
+    let mut buf = vec![0; manifest.dependent_counts().length() as usize];
     circuit.read_data_chunk(manifest.dependent_counts(), &mut buf)?;
     let counts: &[GraphDegreeCount] = bytemuck::cast_slice(&buf);
     swanky_error::ensure!(
@@ -174,11 +168,11 @@ fn generate_graphviz(circuit: File, mut out: File) -> swanky_error::Result<()> {
     }
     writeln!(out, "subgraph  cluster_allocations{{").wrap_err(
         ErrorKind::FilesystemError,
-        "Failed to write start of subgraph.".to_string(),
+        "Failed to write start of subgraph.",
     )?;
     writeln!(out, "label={:?};", "Allocation Sizes").wrap_err(
         ErrorKind::FilesystemError,
-        "Failed to write allocation sizes label.".to_string(),
+        "Failed to write allocation sizes label.",
     )?;
     let mut label = String::new();
     label.push('{');
@@ -199,19 +193,19 @@ fn generate_graphviz(circuit: File, mut out: File) -> swanky_error::Result<()> {
     label.push('}');
     writeln!(out, "asz_contents [shape={:?}, label={label:?}]", "record").wrap_err(
         ErrorKind::FilesystemError,
-        "Failed to write asz_contents node.".to_string(),
+        "Failed to write asz_contents node.",
     )?;
     writeln!(out, "}}").wrap_err(
         ErrorKind::FilesystemError,
-        "Failed to write end of subgraph.".to_string(),
+        "Failed to write end of subgraph.",
     )?;
     writeln!(out, "subgraph cluster_task_kinds_used {{").wrap_err(
         ErrorKind::FilesystemError,
-        "Failed to write cluster_task_kinds_used subgraph start..".to_string(),
+        "Failed to write cluster_task_kinds_used subgraph start..",
     )?;
     writeln!(out, "label={:?};", "Task Kinds Used").wrap_err(
         ErrorKind::FilesystemError,
-        "Failed to write task kinds used label.".to_string(),
+        "Failed to write task kinds used label.",
     )?;
     let mut label = String::new();
     label.push('{');
@@ -222,13 +216,11 @@ fn generate_graphviz(circuit: File, mut out: File) -> swanky_error::Result<()> {
         write!(label, "<f{i}> {:?}", TaskKind::try_from(tsk)?).unwrap();
     }
     label.push('}');
-    writeln!(out, "tku_contents [shape={:?}, label={label:?}]", "record").wrap_err(
-        ErrorKind::FilesystemError,
-        "Failed to write tku_contents.".to_string(),
-    )?;
+    writeln!(out, "tku_contents [shape={:?}, label={label:?}]", "record")
+        .wrap_err(ErrorKind::FilesystemError, "Failed to write tku_contents.")?;
     writeln!(out, "}}").wrap_err(
         ErrorKind::FilesystemError,
-        "Failed to write end of subgraph.".to_string(),
+        "Failed to write end of subgraph.",
     )?;
     writeln!(
         out,
@@ -237,11 +229,11 @@ fn generate_graphviz(circuit: File, mut out: File) -> swanky_error::Result<()> {
     )
     .wrap_err(
         ErrorKind::FilesystemError,
-        "Failed to write circuit manifest label.".to_string(),
+        "Failed to write circuit manifest label.",
     )?;
     writeln!(out, "}}").wrap_err(
         ErrorKind::FilesystemError,
-        "Failed to write end of subgraph.".to_string(),
+        "Failed to write end of subgraph.",
     )?;
     Ok(())
 }
@@ -282,10 +274,7 @@ fn main() -> swanky_error::Result<()> {
                 },
                 BufWriter::new(stdout_holder.lock()),
             )
-            .wrap_err(
-                ErrorKind::OtherError,
-                "Failed to convert to a writer.".to_string(),
-            )?;
+            .wrap_err(ErrorKind::OtherError, "Failed to convert to a writer.")?;
         }
     }
     Ok(())

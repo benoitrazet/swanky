@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 #![deny(unused_must_use)]
 
 pub const MAC_N_CHEESE_VERSION: u64 = 1;

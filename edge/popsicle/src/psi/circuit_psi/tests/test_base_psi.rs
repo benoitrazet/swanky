@@ -10,9 +10,9 @@ mod tests {
     use fancy_garbling::WireMod2;
     use swanky_twopac::semihonest::{Evaluator, Garbler};
 
-    use swanky_aes_rng::AesRng;
     use swanky_block::Block512;
     use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
+    use swanky_rng::SwankyRng;
 
     // Run Base Psi
     fn psty_base_psi(
@@ -26,25 +26,25 @@ mod tests {
     ) {
         swanky_channel::local::local_channel_pair(
             |channel| {
-                let mut rng = AesRng::seed_from_u64(seed_sx);
+                let mut rng = SwankyRng::seed_from_u64(seed_sx);
                 let mut gb =
-                    Garbler::<AesRng, OtSender, WireMod2>::new(channel, rng.clone()).unwrap();
+                    Garbler::<SwankyRng, OtSender, WireMod2>::new(channel, rng.fork()).unwrap();
                 Ok(OpprfSender::base_psi(
                     &mut gb,
-                    &primary_keys,
-                    Some(&payloads),
+                    primary_keys,
+                    Some(payloads),
                     channel,
                     &mut rng,
                 ))
             },
             |channel| {
-                let mut rng = AesRng::seed_from_u64(seed_rx);
+                let mut rng = SwankyRng::seed_from_u64(seed_rx);
                 let mut ev =
-                    Evaluator::<AesRng, OtReceiver, WireMod2>::new(channel, rng.clone()).unwrap();
+                    Evaluator::<SwankyRng, OtReceiver, WireMod2>::new(channel, rng.fork()).unwrap();
                 Ok(OpprfReceiver::base_psi(
                     &mut ev,
-                    &primary_keys,
-                    Some(&payloads),
+                    primary_keys,
+                    Some(payloads),
                     channel,
                     &mut rng,
                 ))
@@ -57,13 +57,13 @@ mod tests {
     // Test that the Base Psi Sender produced no errors
     fn test_psty_base_psi_sender_succeeded_arbitrary_primary_keys() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let primary_keys = rand_u8_vec_unique(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (result_sender, _) =
                 psty_base_psi(&primary_keys, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_sender.is_err(),
+                result_sender.is_ok(),
                 "PSTY's Base Psi failed on the sender side"
             );
         }
@@ -72,14 +72,14 @@ mod tests {
     // Test that the Base Psi Sender produced no errors
     fn test_psty_base_psi_sender_succeeded_arbitrary_payloads() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let primary_keys = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
             let (result_sender, _) =
                 psty_base_psi(&primary_keys, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_sender.is_err(),
+                result_sender.is_ok(),
                 "PSTY's Base Psi failed on the sender side"
             );
         }
@@ -88,13 +88,13 @@ mod tests {
     // Test that the Base Psi Sender produced no errors
     fn test_psty_base_psi_sender_succeeded_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let primary_keys = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (result_sender, _) =
                 psty_base_psi(&primary_keys, &payloads, rng.r#gen(), DEFAULT_SEED);
             assert!(
-                !result_sender.is_err(),
+                result_sender.is_ok(),
                 "PSTY's Base Psi failed on the sender side"
             );
         }
@@ -103,13 +103,13 @@ mod tests {
     // Test that the Base Psi Receiver produced no errors
     fn test_psty_base_psi_receiver_succeeded_arbitrary_primary_keyss() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let primary_keys = rand_u8_vec_unique(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, result_receiver) =
                 psty_base_psi(&primary_keys, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_receiver.is_err(),
+                result_receiver.is_ok(),
                 "PSTY's Base Psi failed on the receiver side"
             );
         }
@@ -118,14 +118,14 @@ mod tests {
     // Test that the Base Psi Receiver produced no errors
     fn test_psty_base_psi_receiver_succeeded_arbitrary_payloads() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let primary_keys = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
             let (_, result_receiver) =
                 psty_base_psi(&primary_keys, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
-                !result_receiver.is_err(),
+                result_receiver.is_ok(),
                 "PSTY's Base Psi failed on the receiver side"
             );
         }
@@ -134,13 +134,13 @@ mod tests {
     // Test that the Base Psi Receiver produced no errors
     fn test_psty_base_psi_receiver_succeeded_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
             let primary_keys = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, result_receiver) =
                 psty_base_psi(&primary_keys, &payloads, DEFAULT_SEED, rng.r#gen());
             assert!(
-                !result_receiver.is_err(),
+                result_receiver.is_ok(),
                 "PSTY's Base Psi failed on the receiver side"
             );
         }

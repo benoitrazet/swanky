@@ -1,6 +1,6 @@
 use crate::{HasModulus, WireLabel, WireMod2, hash_wires, util::tweak2};
 use subtle::ConditionallySelectable;
-use swanky_block::Block;
+use vectoreyes::U8x16;
 
 /// The [`BinaryWireLabel`] provides the subroutines to implement AND gates
 /// for the garbler and evaluator in [`crate::fancy::FancyBinary`].
@@ -9,17 +9,17 @@ pub trait BinaryWireLabel: WireLabel + ConditionallySelectable {
     ///
     /// Outputs a tuple consisting of the two gates (that should be transfered to the evaluator)
     /// and the next wirelabel for the garbler.
-    fn garble_and_gate(gate_num: usize, A: &Self, B: &Self, delta: &Self) -> (Block, Block, Self);
+    fn garble_and_gate(gate_num: usize, A: &Self, B: &Self, delta: &Self) -> (U8x16, U8x16, Self);
 
     /// Evaluates an 'and' gate given two inputs wires and two half-gates from the garbler.
     ///
     /// Outputs C = A & B
-    fn evaluate_and_gate(gate_num: usize, A: &Self, B: &Self, gate0: &Block, gate1: &Block)
+    fn evaluate_and_gate(gate_num: usize, A: &Self, B: &Self, gate0: &U8x16, gate1: &U8x16)
     -> Self;
 }
 
 impl BinaryWireLabel for WireMod2 {
-    fn garble_and_gate(gate_num: usize, A: &Self, B: &Self, delta: &Self) -> (Block, Block, Self) {
+    fn garble_and_gate(gate_num: usize, A: &Self, B: &Self, delta: &Self) -> (U8x16, U8x16, Self) {
         let q = A.modulus();
         let D = delta;
 
@@ -29,14 +29,14 @@ impl BinaryWireLabel for WireMod2 {
 
         // X = H(A+aD) + arD such that a + A.color == 0
         let alpha = A.color(); // alpha = -A.color
-        let X1 = A.plus(&D.cmul(alpha));
+        let X1 = *A + *D * alpha;
 
         // Y = H(B + bD) + (b + r)A such that b + B.color == 0
         let beta = (q - B.color()) % q;
-        let Y1 = B.plus(&D.cmul(beta));
+        let Y1 = *B + *D * beta;
 
-        let AD = A.plus(D);
-        let BD = B.plus(D);
+        let AD = *A + *D;
+        let BD = *B + *D;
 
         // idx is always boolean for binary gates, so it can be represented as a `u8`
         let a_selector = (A.color() as u8).into();
@@ -48,39 +48,39 @@ impl BinaryWireLabel for WireMod2 {
 
         let [hashA, hashB, hashX, hashY] = hash_wires([&newA, &B, &X1, &Y1], g);
 
-        let X = Self::hash_to_mod(hashX, q).plus_mov(&D.cmul(alpha * r % q));
+        let X = Self::hash_to_mod(hashX, q) + *D * (alpha * r % q);
         let Y = Self::hash_to_mod(hashY, q);
 
         let gate0 =
-            hashA ^ Block::conditional_select(&X.to_block(), &X.plus(D).to_block(), idx.into());
-        let gate1 = hashB ^ Y.plus(A).to_block();
+            hashA ^ U8x16::conditional_select(&X.to_repr(), &(X + *D).to_repr(), idx.into());
+        let gate1 = hashB ^ (Y + *A).to_repr();
 
-        (gate0, gate1, X.plus_mov(&Y))
+        (gate0, gate1, X + Y)
     }
 
     fn evaluate_and_gate(
         gate_num: usize,
         A: &Self,
         B: &Self,
-        gate0: &Block,
-        gate1: &Block,
+        gate0: &U8x16,
+        gate1: &U8x16,
     ) -> Self {
         let g = tweak2(gate_num as u64, 0);
 
         let [hashA, hashB] = hash_wires([A, B], g);
 
         // garbler's half gate
-        let L = Self::from_block(
-            Block::conditional_select(&hashA, &(hashA ^ *gate0), (A.color() as u8).into()),
+        let L = Self::from_repr(
+            U8x16::conditional_select(&hashA, &(hashA ^ *gate0), (A.color() as u8).into()),
             2,
         );
 
         // evaluator's half gate
-        let R = Self::from_block(
-            Block::conditional_select(&hashB, &(hashB ^ *gate1), (B.color() as u8).into()),
+        let R = Self::from_repr(
+            U8x16::conditional_select(&hashB, &(hashB ^ *gate1), (B.color() as u8).into()),
             2,
         );
 
-        L.plus_mov(&R.plus_mov(&A.cmul(B.color())))
+        L + R + *A * B.color()
     }
 }

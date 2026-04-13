@@ -77,17 +77,15 @@ pub fn main() -> swanky_error::Result<()> {
         max: cli.max_accuracy,
     };
 
-    let nn = NeuralNet::from_dir(&dir).unwrap_or_else(|e| Error::exit(&Error::from(e)));
+    let nn = NeuralNet::from_dir(&dir)?;
     println!("{nn:?}");
 
     print!("reading tests... ");
-    let tests = swanky_garbled_nn::io::read_tests(&dir, ntests)
-        .unwrap_or_else(|e| Error::exit(&Error::from(e)));
+    let tests = swanky_garbled_nn::io::read_tests(&dir, ntests)?;
     println!("finished");
 
     print!("reading labels... ");
-    let labels =
-        swanky_garbled_nn::io::read_labels(&dir).unwrap_or_else(|e| Error::exit(&Error::from(e)));
+    let labels = swanky_garbled_nn::io::read_labels(&dir)?;
     println!("finished");
 
     // Pad the bitwidth with the last value.

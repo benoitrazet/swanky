@@ -1,12 +1,22 @@
-#!/bin/sh
+#!/bin/bash
 
-# Copy this file into `.git/hooks/` to enable its use:
-#  `$> cp etc/hooks/* .git/hooks`
+CORE_CRATES=(
+    # BEGIN CORE CRATES
+    swanky-adversary
+    swanky-channel
+    swanky-error
+    swanky-party
+    swanky-serialization
+    vectoreyes
+    # END CORE CRATES
+)
 
-# All Clippy errors and warnings must be fixed prior to a push.
-# Comment out this next line if you have enabled it in the `pre-commit` hook
-cargo clippy -- -Dwarnings
+PKG_ARGS=()
+for core_crate in "${CORE_CRATES[@]}"; do
+    PKG_ARGS+=(--package $core_crate)
+done
 
-# It is preferable to run all tests before pushing, but note this can be long
-# If you'd like to enable this check, uncomment the next line
-# cargo test
+# Run install_git_hooks.sh to enable this Git hook
+
+# Invariant 1: All tests in `core` must pass
+cargo test "${PKG_ARGS[@]}" --lib

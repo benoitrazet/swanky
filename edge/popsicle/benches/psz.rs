@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 //! Private set intersection (PSZ) benchmarks using `criterion`.
 
 use criterion::{Criterion, criterion_group, criterion_main};
@@ -8,8 +7,8 @@ use std::{
     os::unix::net::UnixStream,
     time::Duration,
 };
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::Channel;
+use swanky_rng::SwankyRng;
 
 const SIZE: usize = 15;
 
@@ -24,13 +23,13 @@ fn rand_vec_vec(size: usize) -> Vec<Vec<u8>> {
 fn _bench_psz_init() {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
         let _ = psz::Sender::init(&mut channel, &mut rng).unwrap();
     });
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
@@ -41,14 +40,14 @@ fn _bench_psz_init() {
 fn _bench_psz(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
         let mut psi = psz::Sender::init(&mut channel, &mut rng).unwrap();
         psi.send(&inputs1, &mut channel, &mut rng).unwrap();
     });
-    let mut rng = AesRng::new();
+    let mut rng = SwankyRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
@@ -61,8 +60,8 @@ fn _bench_psz(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
 fn bench_psi(c: &mut Criterion) {
     c.bench_function("psi::PSZ (initialization)", move |bench| {
         bench.iter(|| {
-            let result = _bench_psz_init();
-            std::hint::black_box(result)
+            _bench_psz_init();
+            std::hint::black_box(())
         })
     });
     c.bench_function("psi::PSZ (n = 2^8)", move |bench| {

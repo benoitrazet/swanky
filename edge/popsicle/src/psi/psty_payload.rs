@@ -32,8 +32,8 @@ use crate::{
     utils,
 };
 use fancy_garbling::{
-    AllWire, ArithmeticBundleGadgets, BinaryBundle, Bundle, CrtBundle, CrtGadgets, Fancy,
-    FancyBinary, FancyInput,
+    AllWire, ArithmeticProjBundleGadgets, BinaryBundle, Bundle, CrtBundle, CrtGadgets,
+    CrtProjGadgets, Fancy, FancyBinary,
 };
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_twopac::semihonest::{Evaluator, Garbler};
@@ -111,11 +111,11 @@ impl Sender {
         let key = channel.read::<Block>()?;
         let opprf = KmprtSender::init(channel, rng).wrap_err(
             ErrorKind::InitializationError,
-            "Failed to initialize KMPRT OPPRF sender.".to_string(),
+            "Failed to initialize KMPRT OPPRF sender.",
         )?;
         let opprf_payload = KmprtSender::init(channel, rng).wrap_err(
             ErrorKind::InitializationError,
-            "Failed to initialize KMPRT OPPRF payload sender.".to_string(),
+            "Failed to initialize KMPRT OPPRF payload sender.",
         )?;
         Ok(Self {
             key,
@@ -143,8 +143,7 @@ impl Sender {
         let (aggregate, sum_weights) = state.build_and_compute_circuit(&mut gb, channel).unwrap();
         let weighted_mean = gb.crt_div(&aggregate, &sum_weights, channel).unwrap();
 
-        gb.outputs(&weighted_mean.wires().to_vec(), channel)
-            .unwrap();
+        gb.outputs(weighted_mean.wires(), channel).unwrap();
 
         Ok(())
     }
@@ -184,20 +183,11 @@ impl Sender {
             state.payload.chunks(megasize).map(|x| x.to_vec()).collect();
 
         let (aggregate, sum_weights) = self
-            .compute_payload(
-                ts_id,
-                ts_payload,
-                table,
-                payload,
-                &path_deltas,
-                channel,
-                rng,
-            )
+            .compute_payload(ts_id, ts_payload, table, payload, path_deltas, channel, rng)
             .unwrap();
         let weighted_mean = gb.crt_div(&aggregate, &sum_weights, channel).unwrap();
         println!("Done");
-        gb.outputs(&weighted_mean.wires().to_vec(), channel)
-            .unwrap();
+        gb.outputs(weighted_mean.wires(), channel).unwrap();
         Ok(())
     }
 
@@ -206,6 +196,7 @@ impl Sender {
     /// were precomputed.
     /// Returns a garbled output over given megabins that the user can open or join with other
     /// threads results using compute_aggregate.
+    #[allow(clippy::too_many_arguments)]
     pub fn compute_payload<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         ts_id: Vec<Vec<Block512>>,
@@ -221,7 +212,7 @@ impl Sender {
         let _ = gb.load_deltas(path_deltas);
 
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
-        let q = fancy_garbling::util::product(&qs);
+        let q = fancy_garbling::util::product(qs);
 
         let mut acc = gb.crt_constant_bundle(0, q, channel).unwrap();
         let mut sum_weights = gb.crt_constant_bundle(0, q, channel).unwrap();
@@ -279,8 +270,7 @@ impl Sender {
         }
 
         let weighted_mean = gb.crt_div(&acc, &sum_weights, channel).unwrap();
-        gb.outputs(&weighted_mean.wires().to_vec(), channel)
-            .unwrap();
+        gb.outputs(weighted_mean.wires(), channel).unwrap();
         Ok(())
     }
 
@@ -366,13 +356,10 @@ impl Sender {
 
         self.opprf
             .send(channel, &points_id, nbins, rng)
-            .wrap_err(ErrorKind::OtherError, "Failed to send OPPRF.".to_string())?;
+            .wrap_err(ErrorKind::OtherError, "Failed to send OPPRF.")?;
         self.opprf_payload
             .send(channel, &points_data, nbins, rng)
-            .wrap_err(
-                ErrorKind::OtherError,
-                "Failed to send OPPRF payload.".to_string(),
-            )?;
+            .wrap_err(ErrorKind::OtherError, "Failed to send OPPRF payload.")?;
         Ok(())
     }
 }
@@ -455,11 +442,11 @@ impl Receiver {
 
         let opprf = KmprtReceiver::init(channel, rng).wrap_err(
             ErrorKind::InitializationError,
-            "Failed to initialize KMPRT OPPRF receiver.".to_string(),
+            "Failed to initialize KMPRT OPPRF receiver.",
         )?;
         let opprf_payload = KmprtReceiver::init(channel, rng).wrap_err(
             ErrorKind::InitializationError,
-            "Failed to initialize KMPRT OPPRF payload receiver.".to_string(),
+            "Failed to initialize KMPRT OPPRF payload receiver.",
         )?;
         Ok(Self {
             key,
@@ -496,11 +483,11 @@ impl Receiver {
         let weighted_mean = ev.crt_div(&aggregate, &sum_weights, channel).unwrap();
 
         let weighted_mean_outs = ev
-            .outputs(&weighted_mean.wires().to_vec(), channel)
+            .outputs(weighted_mean.wires(), channel)
             .unwrap()
             .expect("evaluator should produce outputs");
 
-        let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, &qs);
+        let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, qs);
 
         Ok(weighted_mean)
     }
@@ -529,10 +516,10 @@ impl Receiver {
 
         let weighted_mean = ev.crt_div(&aggregate, &sum_weights, channel).unwrap();
         let weighted_mean_outs = ev
-            .outputs(&weighted_mean.wires().to_vec(), channel)
+            .outputs(weighted_mean.wires(), channel)
             .unwrap()
             .expect("evaluator should produce outputs");
-        let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, &qs);
+        let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, qs);
 
         Ok(weighted_mean)
     }
@@ -553,7 +540,7 @@ impl Receiver {
             Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
                 .unwrap();
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
-        let q = fancy_garbling::util::product(&qs);
+        let q = fancy_garbling::util::product(qs);
 
         let mut acc = ev.crt_constant_bundle(0, q, channel).unwrap();
         let mut sum_weights = ev.crt_constant_bundle(0, q, channel).unwrap();
@@ -598,7 +585,7 @@ impl Receiver {
                 .unwrap();
 
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
-        let _q = fancy_garbling::util::product(&qs);
+        let _q = fancy_garbling::util::product(qs);
 
         let mut acc = CrtBundle::new(aggregates[0].clone());
         let mut sum_weights = CrtBundle::new(sum_of_weights[0].clone());
@@ -614,10 +601,10 @@ impl Receiver {
         let weighted_mean = ev.crt_div(&acc, &sum_weights, channel).unwrap();
 
         let weighted_mean_outs = ev
-            .outputs(&weighted_mean.wires().to_vec(), channel)
+            .outputs(weighted_mean.wires(), channel)
             .unwrap()
             .expect("evaluator should produce outputs");
-        let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, &qs);
+        let weighted_mean = fancy_garbling::util::crt_inv(&weighted_mean_outs, qs);
 
         println!("weighted_mean{}", weighted_mean);
 
@@ -635,7 +622,7 @@ impl Receiver {
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, self.key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES).wrap_err(
             ErrorKind::InitializationError,
-            "Failed to create Cuckoo hash.".to_string(),
+            "Failed to create Cuckoo hash.",
         )?;
 
         channel.write(&0usize)?;
@@ -681,7 +668,7 @@ impl Receiver {
 
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES).wrap_err(
             ErrorKind::InitializationError,
-            "Failed to create Cuckoo hash.".to_string(),
+            "Failed to create Cuckoo hash.",
         )?;
         let cuckoo_large: Vec<&[Option<CuckooItem>]> = cuckoo.items.chunks(megasize).collect();
         let nmegabins = cuckoo_large.len();
@@ -726,17 +713,14 @@ impl Receiver {
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<()> {
-        state.opprf_ids = self.opprf.receive(channel, &state.table, rng).wrap_err(
-            ErrorKind::OtherError,
-            "Failed to receive OPPRF.".to_string(),
-        )?;
+        state.opprf_ids = self
+            .opprf
+            .receive(channel, &state.table, rng)
+            .wrap_err(ErrorKind::OtherError, "Failed to receive OPPRF.")?;
         state.opprf_payloads = self
             .opprf_payload
             .receive(channel, &state.table, rng)
-            .wrap_err(
-                ErrorKind::OtherError,
-                "Failed to receive OPPRF payloads.".to_string(),
-            )?;
+            .wrap_err(ErrorKind::OtherError, "Failed to receive OPPRF payloads.")?;
         Ok(())
     }
 }
@@ -833,7 +817,7 @@ fn encode_payloads(payload: &[Block512]) -> Vec<u16> {
             let b = blk.prefix(PAYLOAD_SIZE);
             let mut b_8 = [0_u8; 16]; // beyond 64 bits padded with 0s
             b_8[..PAYLOAD_SIZE].clone_from_slice(&b[..PAYLOAD_SIZE]);
-            fancy_garbling::util::crt(u128::from_le_bytes(b_8), &q)
+            fancy_garbling::util::crt(u128::from_le_bytes(b_8), q)
         })
         .collect()
 }
@@ -858,16 +842,14 @@ fn encode_opprf_payload(opprf_ids: &[Block512]) -> Vec<u16> {
             let b = blk.prefix(PAYLOAD_PRIME_SIZE);
             let mut b_8 = [0_u8; 16];
             b_8[..PAYLOAD_SIZE].clone_from_slice(&b[..PAYLOAD_SIZE]);
-            fancy_garbling::util::crt(u128::from_le_bytes(b_8), &q)
+            fancy_garbling::util::crt(u128::from_le_bytes(b_8), q)
         })
         .collect()
 }
 /// Fancy function to compute a weighted average for matching ID's
 /// where one party provides the weights and the other
 //  the values
-fn fancy_compute_payload_aggregate<
-    F: fancy_garbling::FancyReveal + Fancy + ArithmeticBundleGadgets + FancyBinary,
->(
+fn fancy_compute_payload_aggregate<F: Fancy + ArithmeticProjBundleGadgets + FancyBinary>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
@@ -881,7 +863,7 @@ fn fancy_compute_payload_aggregate<
     assert_eq!(receiver_payloads.len(), receiver_masks.len());
 
     let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
-    let q = fancy_garbling::util::product(&qs);
+    let q = fancy_garbling::util::product(qs);
 
     let eqs = sender_inputs
         .chunks(HASH_SIZE * 8)
@@ -925,7 +907,7 @@ fn fancy_compute_payload_aggregate<
     for (i, b) in eqs.iter().enumerate() {
         let b_ws = one
             .iter()
-            .map(|w| f.mul(w, &b, channel))
+            .map(|w| f.mul(w, b, channel))
             .collect::<swanky_error::Result<Vec<F::Item>>>()?;
         let b_crt = CrtBundle::new(b_ws);
 
@@ -1028,8 +1010,8 @@ mod tests {
     use crate::utils::rand_u64_vec;
     use rand::{prelude::SliceRandom, thread_rng};
     use std::collections::HashMap;
-    use swanky_aes_rng::AesRng;
     use swanky_block::Block512;
+    use swanky_rng::SwankyRng;
 
     const ITEM_SIZE: usize = 8;
 
@@ -1037,8 +1019,8 @@ mod tests {
         let mut vec: Vec<u64> = (0..n as u64).collect();
         vec.shuffle(&mut thread_rng());
         let mut ids = Vec::with_capacity(n);
-        for i in 0..n {
-            let v: Vec<u8> = vec[i].to_le_bytes().iter().take(id_size).cloned().collect();
+        for x in vec.iter().take(n) {
+            let v: Vec<u8> = x.to_le_bytes().iter().take(id_size).cloned().collect();
             ids.push(v);
         }
         ids
@@ -1072,9 +1054,8 @@ mod tests {
                 // Assumes values are 64 bit long
                 let client_val =
                     u64::from_le_bytes(payloads_client[i].prefix(8).try_into().unwrap());
-                weighted_payload =
-                    weighted_payload + client_val * sever_elements.get(&id_client).unwrap();
-                sum_weights = sum_weights + sever_elements.get(&id_client).unwrap();
+                weighted_payload += client_val * sever_elements.get(&id_client).unwrap();
+                sum_weights += sever_elements.get(&id_client).unwrap();
             }
         }
         weighted_payload as u128 / sum_weights as u128
@@ -1088,7 +1069,7 @@ mod tests {
         let weight_max: u64 = 10000;
         let payload_max: u64 = 10000;
 
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
 
         let sender_inputs = enum_ids_shuffled(set_size_sx, ITEM_SIZE);
         let receiver_inputs = enum_ids_shuffled(set_size_rx, ITEM_SIZE);
@@ -1104,16 +1085,15 @@ mod tests {
 
         let (_, weighted_mean) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut psi = Sender::init(channel, &mut rng).unwrap();
                 // For small to medium sized sets where batching can occur accross all bins
-                let _ = psi
-                    .full_protocol(&sender_inputs, &weights, channel, &mut rng)
+                psi.full_protocol(&sender_inputs, &weights, channel, &mut rng)
                     .unwrap();
                 Ok(())
             },
             |channel| {
-                let mut rng = AesRng::new();
+                let mut rng = SwankyRng::new();
                 let mut psi = Receiver::init(channel, &mut rng).unwrap();
                 // For small to medium sized sets where batching can occur accross all bins
                 let weighted_mean = psi

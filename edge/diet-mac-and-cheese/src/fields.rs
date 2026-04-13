@@ -192,7 +192,7 @@ macro_rules! impl_sieve_ir_deserialize_binary_ext_field {
                     &val.to_le_bytes()[0..<$t as CanonicalSerialize>::ByteReprLen::USIZE],
                 )).wrap_err(
                     ErrorKind::SerializationError,
-                    "Failed to convert number to field element.".to_string(),
+                    "Failed to convert number to field element."
                 )
             }
         }) *

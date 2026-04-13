@@ -4,10 +4,10 @@ use bytemuck::TransparentWrapper;
 use mac_n_cheese_ir::compilation_format::{FieldTypeMacVisitor, Type};
 use mac_n_cheese_vole::{
     mac::{Mac, MacTypes},
+    party::Party,
     specialization::FiniteFieldSpecialization,
 };
 use swanky_field::{FiniteField, IsSubFieldOf};
-use swanky_party::Party;
 
 #[repr(transparent)]
 #[derive(Clone, Copy, Default)]

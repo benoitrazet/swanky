@@ -2,11 +2,10 @@
 //!
 //! Note: all number representations in this library are little-endian.
 
+use crate::WireLabel;
 use itertools::Itertools;
 use std::collections::HashMap;
-use swanky_block::Block;
-
-use crate::WireLabel;
+use vectoreyes::U8x16;
 
 ////////////////////////////////////////////////////////////////////////////////
 // tweak functions for garbling
@@ -68,7 +67,7 @@ pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16) {
 
 /// Convert `x` into base `q`, building a vector of length `n`.
 fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
-    let ms = std::iter::repeat(q).take(n).collect_vec();
+    let ms = std::iter::repeat_n(q, n).collect_vec();
     as_mixed_radix(x, &ms)
 }
 
@@ -187,7 +186,7 @@ pub fn factor(inp: u128) -> Vec<u16> {
     let mut fs = Vec::new();
     for &p in PRIMES.iter() {
         let q = p as u128;
-        if x % q == 0 {
+        if x.is_multiple_of(q) {
             fs.push(p);
             x /= q;
         }
@@ -269,7 +268,7 @@ pub const PRIMES: [u16; 29] = [
     101, 103, 107, 109,
 ];
 
-/// Primes skipping the modulus 2, which allows certain gadgets.
+// /// Primes skipping the modulus 2, which allows certain gadgets.
 // pub const PRIMES_SKIP_2: [u16; 29] = [
 //     3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97,
 //     101, 103, 107, 109, 113,
@@ -312,8 +311,8 @@ pub fn base_primes_with_width(nbits: u32, primes: &[u16]) -> Vec<u16> {
     ps
 }
 
-/// Generate a CRT modulus that support at least n-bit integers, using the built-in
-/// PRIMES_SKIP_2 (does not include 2 as a factor).
+// /// Generate a CRT modulus that support at least n-bit integers, using the built-in
+// /// PRIMES_SKIP_2 (does not include 2 as a factor).
 // pub fn modulus_with_width_skip2(nbits: u32) -> u128 {
 //     base_modulus_with_width(nbits, &PRIMES_SKIP_2)
 // }
@@ -323,7 +322,7 @@ pub fn product(xs: &[u16]) -> u128 {
     xs.iter().fold(1, |acc, &x| acc * x as u128)
 }
 
-/// Raise a u16 to a power mod some value.
+// /// Raise a u16 to a power mod some value.
 // pub fn powm(inp: u16, pow: u16, modulus: u16) -> u16 {
 //     let mut x = inp as u16;
 //     let mut z = 1;
@@ -382,20 +381,20 @@ pub trait RngExt: rand::Rng + Sized {
         self.r#gen()
     }
     /// Randomly generate a `Block`.
-    fn gen_block(&mut self) -> Block {
+    fn gen_block(&mut self) -> U8x16 {
         self.r#gen()
     }
     /// Randomly generate a valid `Block`.
-    fn gen_usable_block(&mut self, modulus: u16) -> Block {
+    fn gen_usable_block(&mut self, modulus: u16) -> U8x16 {
         if is_power_of_2(modulus) {
             let nbits = (modulus - 1).count_ones();
             if 128 % nbits == 0 {
-                return Block::from(self.gen_u128());
+                return U8x16::from(self.gen_u128());
             }
         }
         let n = digits_per_u128(modulus);
         let max = (modulus as u128).pow(n as u32);
-        Block::from(self.gen_u128() % max)
+        U8x16::from(self.gen_u128() % max)
     }
     /// Randomly generate a prime (among the set of supported primes).
     fn gen_prime(&mut self) -> u16 {

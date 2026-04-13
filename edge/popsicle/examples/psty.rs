@@ -1,9 +1,8 @@
-#![allow(clippy::all)]
 //! Private set intersection (PSTY) benchmarks using `criterion`.
 
 use popsicle::psty::{Receiver, Sender};
 use std::time::SystemTime;
-use swanky_aes_rng::AesRng;
+use swanky_rng::SwankyRng;
 
 const NBYTES: usize = 16;
 const NINPUTS: usize = 1 << 16;
@@ -21,7 +20,7 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
 
     let _ = swanky_channel::local::local_channel_pair(
         |channel| {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
 
             let start = SystemTime::now();
             let mut sender = Sender::init(channel, &mut rng).unwrap();
@@ -36,7 +35,7 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
                 start.elapsed().unwrap().as_millis()
             );
             let start = SystemTime::now();
-            let _ = state.compute_intersection(channel, &mut rng).unwrap();
+            state.compute_intersection(channel, &mut rng).unwrap();
             println!(
                 "Sender :: intersection time: {} ms",
                 start.elapsed().unwrap().as_millis()
@@ -44,7 +43,7 @@ fn psty(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
             Ok(())
         },
         |channel| {
-            let mut rng = AesRng::new();
+            let mut rng = SwankyRng::new();
 
             let start = SystemTime::now();
             let mut receiver = Receiver::init(channel, &mut rng).unwrap();

@@ -1,10 +1,9 @@
-#![allow(clippy::all)]
 #![deny(unused_must_use)]
 
 pub mod fb_reader;
 pub mod text_parser;
 
-use std::{io::Write, path::Path};
+use std::{io::Write, ops::RangeInclusive, path::Path};
 
 use crypto_bigint::{CheckedAdd, CheckedMul};
 
@@ -21,10 +20,11 @@ pub enum PluginTypeArg {
 }
 
 impl PluginTypeArg {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> swanky_error::Result<Self> {
         if s.starts_with("0x") || s.starts_with("0X") {
             let mut out = Number::default();
-            for &byte in s[2..].as_bytes() {
+            for &byte in &s.as_bytes()[2..] {
                 out = Option::<_>::from(out.checked_mul(&Number::from_u8(16)))
                     .ok_or_swanky_error(ErrorKind::OtherError, "Number too big.")?;
                 let digit = if byte <= b'9' {
@@ -164,13 +164,17 @@ impl std::fmt::Display for Header {
 /// A range of wire values, as defined in the SIEVE IR spec.
 ///
 /// Note that this range is _inclusive_; iteration should use
-/// [`RangeInclusive`](std::ops::RangeInclusive) syntax to account for this.
+/// [`RangeInclusive`] syntax to account for this.
 #[derive(Debug, Clone, Copy)]
 pub struct WireRange {
     pub start: WireId,
     pub end: WireId,
 }
 impl WireRange {
+    pub fn is_empty(&self) -> bool {
+        self.end < self.start
+    }
+
     pub fn len(&self) -> u64 {
         if self.end >= self.start {
             (self.end - self.start) + 1
@@ -188,6 +192,9 @@ impl WireRange {
         );
 
         Ok(self.start)
+    }
+    pub fn range(&self) -> RangeInclusive<WireId> {
+        self.start..=self.end
     }
 }
 
@@ -210,6 +217,7 @@ pub enum ConversionSemantics {
 }
 
 pub trait FunctionBodyVisitor {
+    #[allow(clippy::new_ret_no_self, clippy::wrong_self_convention)]
     fn new(&mut self, ty: TypeId, first: WireId, last: WireId) -> swanky_error::Result<()>;
     fn delete(&mut self, ty: TypeId, first: WireId, last: WireId) -> swanky_error::Result<()>;
     fn add(
@@ -303,19 +311,14 @@ impl<T: Write> PrintingVisitor<T> {
     fn write_wire_ranges(&mut self, ranges: &[WireRange]) -> swanky_error::Result<()> {
         for (i, range) in ranges.iter().enumerate() {
             if i != 0 {
-                write!(self.0, ",")
-                    .wrap_err(ErrorKind::OtherError, "Failed to write comma.".to_string())?;
+                write!(self.0, ",").wrap_err(ErrorKind::OtherError, "Failed to write comma.")?;
             }
             if range.start == range.end {
-                write!(self.0, "$0x{:x}", range.start).wrap_err(
-                    ErrorKind::OtherError,
-                    "Failed to write single wire.".to_string(),
-                )?;
+                write!(self.0, "$0x{:x}", range.start)
+                    .wrap_err(ErrorKind::OtherError, "Failed to write single wire.")?;
             } else {
-                write!(self.0, "$0x{:x}...$0x{:x}", range.start, range.end).wrap_err(
-                    ErrorKind::OtherError,
-                    "Failed to write wire range.".to_string(),
-                )?;
+                write!(self.0, "$0x{:x}...$0x{:x}", range.start, range.end)
+                    .wrap_err(ErrorKind::OtherError, "Failed to write wire range.")?;
             }
         }
         Ok(())
@@ -323,20 +326,12 @@ impl<T: Write> PrintingVisitor<T> {
 }
 impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
     fn new(&mut self, ty: TypeId, first: WireId, last: WireId) -> swanky_error::Result<()> {
-        Ok(
-            writeln!(self.0, "@new(0x{ty:x}:$0x{first:x}...$0x{last:x});").wrap_err(
-                ErrorKind::OtherError,
-                "Failed to write 'new' gate.".to_string(),
-            )?,
-        )
+        writeln!(self.0, "@new(0x{ty:x}:$0x{first:x}...$0x{last:x});")
+            .wrap_err(ErrorKind::OtherError, "Failed to write 'new' gate.")
     }
     fn delete(&mut self, ty: TypeId, first: WireId, last: WireId) -> swanky_error::Result<()> {
-        Ok(
-            writeln!(self.0, "@delete(0x{ty:x} : $0x{first:x}...$0x{last:x});").wrap_err(
-                ErrorKind::OtherError,
-                "Failed to write 'delete' gate.".to_string(),
-            )?,
-        )
+        writeln!(self.0, "@delete(0x{ty:x} : $0x{first:x}...$0x{last:x});")
+            .wrap_err(ErrorKind::OtherError, "Failed to write 'delete' gate.")
     }
     fn add(
         &mut self,
@@ -345,14 +340,11 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
         left: WireId,
         right: WireId,
     ) -> swanky_error::Result<()> {
-        Ok(writeln!(
+        writeln!(
             self.0,
             "$0x{dst:x} <- @add(0x{ty:x} : $0x{left:x}, $0x{right:x});"
         )
-        .wrap_err(
-            ErrorKind::OtherError,
-            "Failed to write 'and' gate.".to_string(),
-        )?)
+        .wrap_err(ErrorKind::OtherError, "Failed to write 'and' gate.")
     }
     fn mul(
         &mut self,
@@ -361,14 +353,11 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
         left: WireId,
         right: WireId,
     ) -> swanky_error::Result<()> {
-        Ok(writeln!(
+        writeln!(
             self.0,
             "$0x{dst:x} <- @mul(0x{ty:x} : $0x{left:x}, $0x{right:x});"
         )
-        .wrap_err(
-            ErrorKind::OtherError,
-            "Failed to write 'mul' gate.".to_string(),
-        )?)
+        .wrap_err(ErrorKind::OtherError, "Failed to write 'mul' gate.")
     }
     fn addc(
         &mut self,
@@ -377,15 +366,12 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
         left: WireId,
         right: &Number,
     ) -> swanky_error::Result<()> {
-        Ok(writeln!(
+        writeln!(
             self.0,
             "$0x{dst:x} <- @addc(0x{ty:x} : $0x{left:x}, <{}>);",
             Self::hex(right),
         )
-        .wrap_err(
-            ErrorKind::OtherError,
-            "Failed to write 'addc' gate.".to_string(),
-        )?)
+        .wrap_err(ErrorKind::OtherError, "Failed to write 'addc' gate.")
     }
     fn mulc(
         &mut self,
@@ -394,57 +380,39 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
         left: WireId,
         right: &Number,
     ) -> swanky_error::Result<()> {
-        Ok(writeln!(
+        writeln!(
             self.0,
             "$0x{dst:x} <- @mulc(0x{ty:x} : $0x{left:x}, <{}>);",
             Self::hex(right),
         )
-        .wrap_err(
-            ErrorKind::OtherError,
-            "Failed to write 'mulc' gate.".to_string(),
-        )?)
+        .wrap_err(ErrorKind::OtherError, "Failed to write 'mulc' gate.")
     }
     fn copy(&mut self, ty: TypeId, dst: WireRange, src: &[WireRange]) -> swanky_error::Result<()> {
         self.write_wire_ranges(&[dst])?;
         write!(self.0, " <- 0x{ty:x} : ").wrap_err(
             ErrorKind::OtherError,
-            "Failed to write 'copy' gate assignment / type.".to_string(),
+            "Failed to write 'copy' gate assignment / type.",
         )?;
         self.write_wire_ranges(src)?;
-        Ok(writeln!(self.0, ";").wrap_err(
-            ErrorKind::OtherError,
-            "Failed to write semicolon.".to_string(),
-        )?)
+        writeln!(self.0, ";").wrap_err(ErrorKind::OtherError, "Failed to write semicolon.")
     }
     fn constant(&mut self, ty: TypeId, dst: WireId, src: &Number) -> swanky_error::Result<()> {
-        Ok(
-            writeln!(self.0, "$0x{dst:x} <- 0x{ty:x} : <{}>;", Self::hex(src)).wrap_err(
-                ErrorKind::OtherError,
-                "Failed to write constant.".to_string(),
-            )?,
-        )
+        writeln!(self.0, "$0x{dst:x} <- 0x{ty:x} : <{}>;", Self::hex(src))
+            .wrap_err(ErrorKind::OtherError, "Failed to write constant.")
     }
     fn public_input(&mut self, ty: TypeId, dst: WireRange) -> swanky_error::Result<()> {
         self.write_wire_ranges(&[dst])?;
-        Ok(writeln!(self.0, " <- @public(0x{ty:x});").wrap_err(
-            ErrorKind::OtherError,
-            "Failed to write public input.".to_string(),
-        )?)
+        writeln!(self.0, " <- @public(0x{ty:x});")
+            .wrap_err(ErrorKind::OtherError, "Failed to write public input.")
     }
     fn private_input(&mut self, ty: TypeId, dst: WireRange) -> swanky_error::Result<()> {
         self.write_wire_ranges(&[dst])?;
-        Ok(writeln!(self.0, " <- @private(0x{ty:x});").wrap_err(
-            ErrorKind::OtherError,
-            "Failed to write private input.".to_string(),
-        )?)
+        writeln!(self.0, " <- @private(0x{ty:x});")
+            .wrap_err(ErrorKind::OtherError, "Failed to write private input.")
     }
     fn assert_zero(&mut self, ty: TypeId, src: WireId) -> swanky_error::Result<()> {
-        Ok(
-            writeln!(self.0, "@assert_zero(0x{ty:x} : $0x{src:x});").wrap_err(
-                ErrorKind::OtherError,
-                "Failed to write 'assert_zero' gate.".to_string(),
-            )?,
-        )
+        writeln!(self.0, "@assert_zero(0x{ty:x} : $0x{src:x});")
+            .wrap_err(ErrorKind::OtherError, "Failed to write 'assert_zero' gate.")
     }
     fn convert(
         &mut self,
@@ -462,32 +430,24 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
     ) -> swanky_error::Result<()> {
         if !dst.is_empty() {
             self.write_wire_ranges(dst)?;
-            write!(self.0, " <- ").wrap_err(
-                ErrorKind::OtherError,
-                "Failed to write call target arrow.".to_string(),
-            )?;
+            write!(self.0, " <- ")
+                .wrap_err(ErrorKind::OtherError, "Failed to write call target arrow.")?;
         }
         write!(
             self.0,
             "@call({}",
             std::str::from_utf8(name).wrap_err(
                 ErrorKind::SerializationError,
-                "Failed to deserialize name from UTF-8 bytes.".to_string()
+                "Failed to deserialize name from UTF-8 bytes."
             )?
         )
-        .wrap_err(
-            ErrorKind::OtherError,
-            "Failed to write 'call' gate.".to_string(),
-        )?;
+        .wrap_err(ErrorKind::OtherError, "Failed to write 'call' gate.")?;
         if !args.is_empty() {
-            write!(self.0, ", ")
-                .wrap_err(ErrorKind::OtherError, "Failed to write comma.".to_string())?;
+            write!(self.0, ", ").wrap_err(ErrorKind::OtherError, "Failed to write comma.")?;
             self.write_wire_ranges(args)?;
         }
-        writeln!(self.0, ");").wrap_err(
-            ErrorKind::OtherError,
-            "Failed to write paren / semicolon.".to_string(),
-        )?;
+        writeln!(self.0, ");")
+            .wrap_err(ErrorKind::OtherError, "Failed to write paren / semicolon.")?;
         Ok(())
     }
 }
@@ -507,40 +467,30 @@ impl<T: Write> RelationVisitor for PrintingVisitor<T> {
         write!(
             self.0,
             "@function({}",
-            std::str::from_utf8(name).wrap_err(
-                ErrorKind::SerializationError,
-                "Function name isn't UTF-8.".to_string()
-            )?
+            std::str::from_utf8(name)
+                .wrap_err(ErrorKind::SerializationError, "Function name isn't UTF-8.")?
         )
         .wrap_err(
             ErrorKind::OtherError,
-            "Failed to write start of function declaration.".to_string(),
+            "Failed to write start of function declaration.",
         )?;
         for (name, arr) in [("out", outputs), ("in", inputs)] {
             if !arr.is_empty() {
                 write!(self.0, ", @{name}:")
-                    .wrap_err(ErrorKind::OtherError, "Failed to write name.".to_string())?;
+                    .wrap_err(ErrorKind::OtherError, "Failed to write name.")?;
                 for (i, entry) in arr.iter().enumerate() {
                     if i != 0 {
-                        write!(self.0, ",").wrap_err(
-                            ErrorKind::OtherError,
-                            "Failed to write comma.".to_string(),
-                        )?;
+                        write!(self.0, ",")
+                            .wrap_err(ErrorKind::OtherError, "Failed to write comma.")?;
                     }
-                    write!(self.0, "0x{:x}:0x{:x}", entry.ty, entry.count).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to write wire counts.".to_string(),
-                    )?;
+                    write!(self.0, "0x{:x}:0x{:x}", entry.ty, entry.count)
+                        .wrap_err(ErrorKind::OtherError, "Failed to write wire counts.")?;
                 }
             }
         }
-        writeln!(self.0, ")").wrap_err(
-            ErrorKind::OtherError,
-            "Failed to write close paren.".to_string(),
-        )?;
+        writeln!(self.0, ")").wrap_err(ErrorKind::OtherError, "Failed to write close paren.")?;
         body(self)?;
-        writeln!(self.0, "@end")
-            .wrap_err(ErrorKind::OtherError, "Failed to write '@end'.".to_string())?;
+        writeln!(self.0, "@end").wrap_err(ErrorKind::OtherError, "Failed to write '@end'.")?;
         Ok(())
     }
 
@@ -555,39 +505,25 @@ impl<T: Write> RelationVisitor for PrintingVisitor<T> {
         write!(
             self.0,
             "@function({}",
-            std::str::from_utf8(name).wrap_err(
-                ErrorKind::SerializationError,
-                "Function name isn't UTF-8.".to_string()
-            )?
+            std::str::from_utf8(name)
+                .wrap_err(ErrorKind::SerializationError, "Function name isn't UTF-8.")?
         )
-        .wrap_err(
-            ErrorKind::OtherError,
-            "Failed to write function name.".to_string(),
-        )?;
+        .wrap_err(ErrorKind::OtherError, "Failed to write function name.")?;
         for (name, arr) in [("out", outputs), ("in", inputs)] {
             if !arr.is_empty() {
-                write!(self.0, ", @{name}:").wrap_err(
-                    ErrorKind::OtherError,
-                    "Failed to write 'out' or 'in'.".to_string(),
-                )?;
+                write!(self.0, ", @{name}:")
+                    .wrap_err(ErrorKind::OtherError, "Failed to write 'out' or 'in'.")?;
                 for (i, entry) in arr.iter().enumerate() {
                     if i != 0 {
-                        write!(self.0, ",").wrap_err(
-                            ErrorKind::OtherError,
-                            "Failed to write comma.".to_string(),
-                        )?;
+                        write!(self.0, ",")
+                            .wrap_err(ErrorKind::OtherError, "Failed to write comma.")?;
                     }
-                    write!(self.0, "0x{:x}:0x{:x}", entry.ty, entry.count).wrap_err(
-                        ErrorKind::OtherError,
-                        "Failed to write wire type / count.".to_string(),
-                    )?;
+                    write!(self.0, "0x{:x}:0x{:x}", entry.ty, entry.count)
+                        .wrap_err(ErrorKind::OtherError, "Failed to write wire type / count.")?;
                 }
             }
         }
-        writeln!(self.0, ")").wrap_err(
-            ErrorKind::OtherError,
-            "Failed to write close paren.".to_string(),
-        )?;
+        writeln!(self.0, ")").wrap_err(ErrorKind::OtherError, "Failed to write close paren.")?;
 
         let PluginBinding {
             plugin_type:
@@ -600,26 +536,23 @@ impl<T: Write> RelationVisitor for PrintingVisitor<T> {
             public_counts,
         } = body;
 
-        write!(self.0, "  @plugin({}, {}", name, operation).wrap_err(
-            ErrorKind::OtherError,
-            "Failed to write plugin declaration.".to_string(),
-        )?;
+        write!(self.0, "  @plugin({}, {}", name, operation)
+            .wrap_err(ErrorKind::OtherError, "Failed to write plugin declaration.")?;
         if !args.is_empty() {
-            write!(self.0, ", ")
-                .wrap_err(ErrorKind::OtherError, "Failed to write comma.".to_string())?;
+            write!(self.0, ", ").wrap_err(ErrorKind::OtherError, "Failed to write comma.")?;
             for (i, arg) in args.iter().enumerate() {
                 if i != 0 {
                     write!(self.0, ",")
-                        .wrap_err(ErrorKind::OtherError, "Failed to write comma.".to_string())?;
+                        .wrap_err(ErrorKind::OtherError, "Failed to write comma.")?;
                 }
                 match arg {
                     PluginTypeArg::Number(n) => write!(self.0, "0x{n:x}").wrap_err(
                         ErrorKind::OtherError,
-                        "Failed to write plugin number argument.".to_string(),
+                        "Failed to write plugin number argument.",
                     )?,
                     PluginTypeArg::String(s) => write!(self.0, "{s}").wrap_err(
                         ErrorKind::OtherError,
-                        "Failed to write plugin string argument.".to_string(),
+                        "Failed to write plugin string argument.",
                     )?,
                 }
             }
@@ -628,26 +561,21 @@ impl<T: Write> RelationVisitor for PrintingVisitor<T> {
             if !arr.is_empty() {
                 write!(self.0, ", @{name}:").wrap_err(
                     ErrorKind::OtherError,
-                    "Failed to write 'private' or 'public'.".to_string(),
+                    "Failed to write 'private' or 'public'.",
                 )?;
                 for (i, entry) in arr.iter().enumerate() {
                     if i != 0 {
-                        write!(self.0, ",").wrap_err(
-                            ErrorKind::OtherError,
-                            "Failed to write comma.".to_string(),
-                        )?;
+                        write!(self.0, ",")
+                            .wrap_err(ErrorKind::OtherError, "Failed to write comma.")?;
                     }
                     write!(self.0, "0x{:x}:0x{:x}", entry.ty, entry.count).wrap_err(
                         ErrorKind::OtherError,
-                        "Failed to write private / public type / count.".to_string(),
+                        "Failed to write private / public type / count.",
                     )?;
                 }
             }
         }
-        writeln!(self.0, ")").wrap_err(
-            ErrorKind::OtherError,
-            "Failed to write close paren.".to_string(),
-        )?;
+        writeln!(self.0, ")").wrap_err(ErrorKind::OtherError, "Failed to write close paren.")?;
 
         Ok(())
     }

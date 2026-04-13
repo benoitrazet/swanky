@@ -1,3 +1,5 @@
+use crate::party::{Party, Prover, WhichParty};
+
 use generic_array::GenericArray;
 use std::{
     fmt::Debug,
@@ -7,7 +9,10 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 use swanky_error::{ErrorKind, bail};
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F40b};
-use swanky_party::{IsParty, Party, Prover, WhichParty, private::ProverPrivateCopy};
+use swanky_party::{
+    private::PartyPrivateCopy,
+    ty_eq::{EqualityProposition, Witness},
+};
 
 pub(crate) fn make_x_i<V: IsSubFieldOf<T>, T: FiniteField>(i: usize) -> T {
     let mut v: GenericArray<V, DegreeModulo<V, T>> = GenericArray::default();
@@ -44,7 +49,7 @@ impl<T: FiniteField> MacT for T {
 /// The following holds for a global key known `Δ` known only to the verifier:
 /// `t = v · Δ + k`.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Mac<P: Party, V: Copy, T>(ProverPrivateCopy<P, V>, T);
+pub struct Mac<P: Party, V: Copy, T>(PartyPrivateCopy<Prover, P, V>, T);
 
 // TODO: Is this safe?
 impl<P: Party> From<Mac<P, F2, F40b>> for Mac<P, F40b, F40b> {
@@ -76,11 +81,11 @@ impl<P: Party> TryFrom<Mac<P, F40b, F40b>> for Mac<P, F2, F40b> {
                         )
                     } else {
                         // Safe: We've already checked that res is not none.
-                        ProverPrivateCopy::new(res.unwrap())
+                        PartyPrivateCopy::new(res.unwrap())
                     }
                 }
 
-                WhichParty::Verifier(ev) => ProverPrivateCopy::empty(ev),
+                WhichParty::Verifier(ev) => PartyPrivateCopy::empty(ev),
             },
             value.1,
         ))
@@ -89,12 +94,12 @@ impl<P: Party> TryFrom<Mac<P, F40b, F40b>> for Mac<P, F2, F40b> {
 
 impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> Mac<P, V, T> {
     #[inline]
-    pub(crate) fn new(x: ProverPrivateCopy<P, V>, m: T) -> Self {
+    pub(crate) fn new(x: PartyPrivateCopy<Prover, P, V>, m: T) -> Self {
         Self(x, m)
     }
 
     #[inline]
-    pub(crate) fn value(&self) -> ProverPrivateCopy<P, V> {
+    pub(crate) fn value(&self) -> PartyPrivateCopy<Prover, P, V> {
         self.0
     }
 
@@ -104,13 +109,13 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> Mac<P, V, T> {
     }
 
     #[inline]
-    pub(crate) fn decompose(&self, ev: IsParty<P, Prover>) -> (V, T) {
-        (self.0.into_inner(ev), self.1)
+    pub(crate) fn decompose(&self, ev: Witness<impl EqualityProposition<P, Prover>>) -> (V, T) {
+        (self.0.into_inner(ev.sym()), self.1)
     }
 
     /// Lift an array of MACs from the value field to the tag field.
     pub fn lift(xs: &GenericArray<Self, DegreeModulo<V, T>>) -> Mac<P, T, T> {
-        let mut value = ProverPrivateCopy::new(T::ZERO);
+        let mut value = PartyPrivateCopy::new(T::ZERO);
         let mut mac = T::ZERO;
 
         for (i, x) in xs.iter().enumerate() {
@@ -185,7 +190,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> Mul<V> for Mac<P, V, T> {
 }
 
 #[cfg(test)]
-use swanky_party::Verifier;
+use crate::party::Verifier;
 
 #[cfg(test)]
 pub(crate) fn validate<V: IsSubFieldOf<T>, T: FiniteField>(
@@ -193,10 +198,10 @@ pub(crate) fn validate<V: IsSubFieldOf<T>, T: FiniteField>(
     verifier: Mac<Verifier, V, T>,
     delta: T,
 ) {
-    use swanky_party::IS_PROVER;
+    use swanky_party::ty_eq::Witness;
 
     assert_eq!(
-        prover.value().into_inner(IS_PROVER) * delta + verifier.mac(),
+        prover.value().into_inner(Witness::EQUAL_TYPES) * delta + verifier.mac(),
         prover.mac()
     );
 }
@@ -204,31 +209,34 @@ pub(crate) fn validate<V: IsSubFieldOf<T>, T: FiniteField>(
 #[cfg(test)]
 mod tests {
     use generic_array::GenericArray;
-    use swanky_aes_rng::AesRng;
     use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b};
-    use swanky_party::{IS_VERIFIER, Prover, Verifier, private::ProverPrivateCopy};
+    use swanky_party::{private::PartyPrivateCopy, ty_eq::Witness};
+    use swanky_rng::SwankyRng;
 
-    use crate::mac::validate;
+    use crate::{
+        mac::validate,
+        party::{Prover, Verifier},
+    };
 
     use super::Mac;
 
     fn generate<V: IsSubFieldOf<T>, T: FiniteField>(
         random: bool,
         delta: T,
-        rng: &mut AesRng,
+        rng: &mut SwankyRng,
     ) -> (Mac<Prover, V, T>, Mac<Verifier, V, T>) {
         let value = if random { V::random(rng) } else { V::ZERO };
         let vmac = T::random(rng);
-        let prover = Mac::new(ProverPrivateCopy::new(value), value * delta - vmac);
-        let verifier = Mac::new(ProverPrivateCopy::empty(IS_VERIFIER), vmac);
+        let prover = Mac::new(PartyPrivateCopy::new(value), value * delta - vmac);
+        let verifier = Mac::new(PartyPrivateCopy::empty(Witness::EQUAL_TYPES), vmac);
         validate(prover, verifier, delta);
         (prover, verifier)
     }
 
     #[test]
     fn mac_lifting_works() {
-        let mut rng = AesRng::new();
+        let mut rng = SwankyRng::new();
         for _ in 0..10 {
             let delta = F40b::random(&mut rng);
             let mut provers = GenericArray::default();
@@ -246,8 +254,8 @@ mod tests {
 
     #[test]
     fn mac_f2_mac_f40b_roundtrip() {
-        let zero: Mac<Prover, F2, F40b> = Mac::new(ProverPrivateCopy::new(F2::ZERO), F40b::ZERO);
-        let one: Mac<Prover, F2, F40b> = Mac::new(ProverPrivateCopy::new(F2::ONE), F40b::ZERO);
+        let zero: Mac<Prover, F2, F40b> = Mac::new(PartyPrivateCopy::new(F2::ZERO), F40b::ZERO);
+        let one: Mac<Prover, F2, F40b> = Mac::new(PartyPrivateCopy::new(F2::ONE), F40b::ZERO);
 
         assert_eq!(
             <Mac<_, _, _>>::try_from(<Mac<_, F40b, _>>::from(zero)).unwrap(),

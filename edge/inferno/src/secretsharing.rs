@@ -91,8 +91,8 @@ pub(crate) trait LinearSharing<F: FiniteField, const N: usize>:
 /// underlying secret.
 #[derive(Debug, Clone, Copy, Hash)]
 pub(crate) struct CorrectionSharing<F: FiniteField, const N: usize> {
-    shares: [F; N],
-    correction: F,
+    pub(crate) shares: [F; N],
+    pub(crate) correction: F,
 }
 
 impl<F: FiniteField, const N: usize> LinearSharing<F, N> for CorrectionSharing<F, N> {
@@ -158,6 +158,9 @@ impl<F: FiniteField, const N: usize> CorrectionSharing<F, N> {
                 return false;
             }
         }
+        if self.correction != other.correction {
+            return false;
+        }
         true
     }
 
@@ -185,8 +188,8 @@ impl<F: FiniteField, const N: usize> std::ops::Add for CorrectionSharing<F, N> {
     #[inline]
     fn add(self, other: Self) -> Self {
         let mut shares = [F::ZERO; N];
-        for i in 0..N {
-            shares[i] = self.shares[i] + other.shares[i];
+        for (i, share) in shares.iter_mut().enumerate().take(N) {
+            *share = self.shares[i] + other.shares[i];
         }
         Self {
             shares,
@@ -201,8 +204,8 @@ impl<F: FiniteField, const N: usize> std::ops::Sub for CorrectionSharing<F, N> {
     #[inline]
     fn sub(self, other: Self) -> Self {
         let mut shares = [F::ZERO; N];
-        for i in 0..N {
-            shares[i] = self.shares[i] - other.shares[i];
+        for (i, share) in shares.iter_mut().enumerate().take(N) {
+            *share = self.shares[i] - other.shares[i];
         }
         Self {
             shares,
@@ -305,7 +308,7 @@ impl<'de, F: FiniteField, const N: usize> serde::Deserialize<'de> for Correction
                 let mut de = F::Deserializer::new(&mut cursor).map_err(Error::custom)?;
 
                 let mut shares = CorrectionSharing::<F, N>::default();
-                for (_i, share) in shares.shares.iter_mut().enumerate() {
+                for share in shares.shares.iter_mut() {
                     *share = de.read(&mut cursor).map_err(Error::custom)?;
                 }
                 shares.correction = de.read(&mut cursor).map_err(Error::custom)?;
@@ -492,11 +495,11 @@ impl<F: FiniteField, const N: usize> From<SecretSharing<F, N>> for CorrectionSha
 mod tests {
     use super::*;
     use rand::SeedableRng;
-    use swanky_aes_rng::AesRng;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
     use swanky_field_ff_primes::F128p;
     use swanky_polynomial::Polynomial;
+    use swanky_rng::SwankyRng;
 
     const N: usize = 16;
 
@@ -504,10 +507,10 @@ mod tests {
         ($name:ident, $field:ty) => {
             #[test]
             fn $name() {
-                let mut rng = AesRng::new();
-                let mut rngs: [AesRng; N] = (0..N)
-                    .map(|_| AesRng::new())
-                    .collect::<Vec<AesRng>>()
+                let mut rng = SwankyRng::new();
+                let mut rngs: [SwankyRng; N] = (0..N)
+                    .map(|_| SwankyRng::new())
+                    .collect::<Vec<SwankyRng>>()
                     .try_into()
                     .unwrap();
                 let x = <$field as FiniteRing>::random(&mut rng);
@@ -525,10 +528,10 @@ mod tests {
         ($name:ident, $field:ty) => {
             #[test]
             fn $name() {
-                let mut rng = AesRng::from_seed(Default::default());
-                let mut rngs: [AesRng; N] = (0..N)
-                    .map(|_| AesRng::new())
-                    .collect::<Vec<AesRng>>()
+                let mut rng = SwankyRng::from_seed(Default::default());
+                let mut rngs: [SwankyRng; N] = (0..N)
+                    .map(|_| SwankyRng::new())
+                    .collect::<Vec<SwankyRng>>()
                     .try_into()
                     .unwrap();
                 let e = <$field>::random(&mut rng);
@@ -577,10 +580,10 @@ mod tests {
                 proptest! {
                 #[test]
                 fn sharing_serialize_serde_json(a in any_fe(), seed in any_seed()) {
-                    let mut rng = AesRng::from_seed(seed);
-                    let mut rngs: [AesRng; N] = (0..N)
+                    let mut rng = SwankyRng::from_seed(seed);
+                    let mut rngs: [SwankyRng; N] = (0..N)
                         .map(|_| rng.fork())
-                        .collect::<Vec<AesRng>>()
+                        .collect::<Vec<SwankyRng>>()
                         .try_into()
                         .unwrap();
                     let sharing = CorrectionSharing::<$field, N>::new(a, &mut rngs);
@@ -595,10 +598,10 @@ mod tests {
                 proptest! {
                 #[test]
                 fn sharing_serialize_bincode(a in any_fe(), seed in any_seed()) {
-                    let mut rng = AesRng::from_seed(seed);
-                    let mut rngs: [AesRng; N] = (0..N)
+                    let mut rng = SwankyRng::from_seed(seed);
+                    let mut rngs: [SwankyRng; N] = (0..N)
                         .map(|_| rng.fork())
-                        .collect::<Vec<AesRng>>()
+                        .collect::<Vec<SwankyRng>>()
                         .try_into()
                         .unwrap();
                     let sharing = CorrectionSharing::<$field, N>::new(a, &mut rngs);
@@ -613,9 +616,9 @@ mod tests {
                 proptest! {
                 #[test]
                 fn sharing_vec_serialize_bincode(a in any_fe(), seed in any_seed()) {
-                    let mut rng = AesRng::from_seed(seed);
-                    let mut rngs: [AesRng; N] = (0..N)
-                    .map(|_| rng.fork()).collect::<Vec<AesRng>>().try_into().unwrap();
+                    let mut rng = SwankyRng::from_seed(seed);
+                    let mut rngs: [SwankyRng; N] = (0..N)
+                    .map(|_| rng.fork()).collect::<Vec<SwankyRng>>().try_into().unwrap();
                     let vec: Vec<CorrectionSharing<$field, N>> = (0..100).map(|_| CorrectionSharing::<$field, N>::new(a, &mut rngs)).collect();
                     let ser = bincode::serialize(&vec).unwrap();
                     let vec_: Vec<CorrectionSharing<$field, N>> = bincode::deserialize(&ser).unwrap();

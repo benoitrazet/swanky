@@ -1,19 +1,17 @@
-use std::marker::PhantomData;
-
+use super::security_warning::warn_proj;
 use crate::{
-    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyInput, HasModulus, WireMod2,
+    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyProj, HasModulus, WireMod2,
     check_binary,
-    fancy::{Fancy, FancyReveal},
+    fancy::Fancy,
     garble::binary_and::BinaryWireLabel,
     hash_wires,
     util::{output_tweak, tweak, tweak2},
     wire::WireLabel,
 };
-use swanky_block::Block;
+use std::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
-
-use super::security_warning::warn_proj;
+use vectoreyes::U8x16;
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
@@ -31,9 +29,9 @@ impl<Wire: WireLabel> Evaluator<Wire> {
     pub fn new(channel: &mut Channel) -> swanky_error::Result<Self> {
         // Receive the constant one wirelabel from the garbler. This is used to
         // make negation free.
-        let one = channel.read::<Block>()?;
+        let one = channel.read::<U8x16>()?;
         Ok(Evaluator {
-            one: Wire::from_block(one, 2),
+            one: Wire::from_repr(one, 2),
             current_gate: 0,
             current_output: 0,
             _phantom: PhantomData,
@@ -57,18 +55,18 @@ impl<Wire: WireLabel> Evaluator<Wire> {
     /// Read a Wire from the reader.
     pub fn read_wire(&mut self, modulus: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
         let block = channel.read()?;
-        Ok(Wire::from_block(block, modulus))
+        Ok(Wire::from_repr(block, modulus))
     }
 }
 
 impl<W: BinaryWireLabel> FancyBinary for Evaluator<W> {
     /// Negate is a noop for the evaluator
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        x.plus(&self.one)
+        *x + self.one
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        x.plus(y)
+        *x + *y
     }
 
     fn and(
@@ -84,48 +82,12 @@ impl<W: BinaryWireLabel> FancyBinary for Evaluator<W> {
     }
 }
 
-impl<Wire: BinaryWireLabel> FancyInput for Evaluator<Wire> {
-    type Item = Wire;
-
-    fn encode_many(
-        &mut self,
-        _values: &[u16],
-        _moduli: &[u16],
-        _: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        unimplemented!("Evaluator cannot encode values")
-    }
-
-    fn receive_many(
-        &mut self,
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        (0..moduli.len())
-            .map(|_| {
-                let block = channel.read()?;
-                Ok(Wire::from_block(block, 2))
-            })
-            .collect()
-    }
-}
-
-impl<Wire: WireLabel> FancyReveal for Evaluator<Wire> {
-    fn reveal(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<u16> {
-        let val = self
-            .output(x, channel)?
-            .expect("Evaluator always outputs Some(u16)");
-        channel.write(&val)?;
-        Ok(val)
-    }
-}
-
 impl FancyBinary for Evaluator<AllWire> {
     /// Overriding `negate` to be a noop: entirely handled on garbler's end
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         check_binary!(x);
 
-        x.plus(&self.one)
+        x.clone() + self.one.clone()
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
@@ -162,16 +124,16 @@ impl FancyBinary for Evaluator<AllWire> {
 impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
     fn add(&mut self, x: &Wire, y: &Wire) -> Wire {
         assert_eq!(x.modulus(), y.modulus());
-        x.plus(y)
+        x.clone() + y.clone()
     }
 
     fn sub(&mut self, x: &Wire, y: &Wire) -> Wire {
         assert_eq!(x.modulus(), y.modulus());
-        x.minus(y)
+        x.clone() - y.clone()
     }
 
     fn cmul(&mut self, x: &Wire, c: u16) -> Wire {
-        x.cmul(c)
+        x.clone() * c
     }
 
     fn mul(&mut self, A: &Wire, B: &Wire, channel: &mut Channel) -> swanky_error::Result<Wire> {
@@ -185,7 +147,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
         let mut gate = Vec::with_capacity(ngates);
         {
             for _ in 0..ngates {
-                let block = channel.read::<Block>()?;
+                let block = channel.read::<U8x16>()?;
                 gate.push(block);
             }
         }
@@ -199,7 +161,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
             Wire::hash_to_mod(hashA, q)
         } else {
             let ct_left = gate[A.color() as usize - 1];
-            Wire::from_block(ct_left ^ hashA, q)
+            Wire::from_repr(ct_left ^ hashA, q)
         };
 
         // evaluator's half gate
@@ -207,7 +169,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
             Wire::hash_to_mod(hashB, q)
         } else {
             let ct_right = gate[(q + B.color()) as usize - 2];
-            Wire::from_block(ct_right ^ hashB, q)
+            Wire::from_repr(ct_right ^ hashB, q)
         };
 
         // hack for unequal mods
@@ -221,10 +183,12 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
             B.color()
         };
 
-        let res = L.plus_mov(&R.plus_mov(&A.cmul(new_b_color)));
+        let res = L + R + A.clone() * new_b_color;
         Ok(res)
     }
+}
 
+impl<Wire: WireLabel + ArithmeticWire> FancyProj for Evaluator<Wire> {
     fn proj(
         &mut self,
         x: &Wire,
@@ -236,7 +200,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
         let ngates = (x.modulus() - 1) as usize;
         let mut gate = Vec::with_capacity(ngates);
         for _ in 0..ngates {
-            let block = channel.read::<Block>()?;
+            let block = channel.read::<U8x16>()?;
             gate.push(block);
         }
         let t = tweak(self.current_gate());
@@ -244,13 +208,35 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
             Ok(x.hashback(t, q))
         } else {
             let ct = gate[x.color() as usize - 1];
-            Ok(Wire::from_block(ct ^ x.hash(t), q))
+            Ok(Wire::from_repr(ct ^ x.hash(t), q))
         }
     }
 }
 
 impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
     type Item = Wire;
+
+    fn encode_many(
+        &mut self,
+        _values: &[u16],
+        _moduli: &[u16],
+        _: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        unimplemented!("Evaluator cannot encode values")
+    }
+
+    fn receive_many(
+        &mut self,
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        (0..moduli.len())
+            .map(|_| {
+                let block = channel.read()?;
+                Ok(Wire::from_repr(block, 2))
+            })
+            .collect()
+    }
 
     fn constant(&mut self, _: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
         self.read_wire(q, channel)

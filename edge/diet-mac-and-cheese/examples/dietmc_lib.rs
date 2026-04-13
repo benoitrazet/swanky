@@ -18,15 +18,15 @@ use std::net::{TcpListener, TcpStream};
 use diet_mac_and_cheese::EvaluatorCirc;
 use diet_mac_and_cheese::LpnSize;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, FunStore, GateM, TypeStore};
+use diet_mac_and_cheese::party::{Prover, Verifier};
 use diet_mac_and_cheese::svole_trait::Svole;
 use mac_n_cheese_sieve_parser::Number;
-use swanky_aes_rng::AesRng;
 use swanky_channel_legacy::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::{F2, F40b};
 use swanky_field_f61p::F61p;
-use swanky_party::{Prover, Verifier};
+use swanky_rng::SwankyRng;
 
 fn field_to_number<F: FiniteField>(v: F) -> Number {
     // NOTE: We assume that `to_bytes()` converts a field value into a sequence of bytes in lower-endian.
@@ -39,10 +39,10 @@ fn field_to_number<F: FiniteField>(v: F) -> Number {
 }
 
 fn start_connection_verifier(addr: &String) -> Result<TcpStream> {
-    let listener = TcpListener::bind(addr.clone()).wrap_err(
-        ErrorKind::NetworkError,
-        format!("Failed to bind listener to {addr}."),
-    )?;
+    let listener = TcpListener::bind(addr.clone())
+        .wrap_err_with(ErrorKind::NetworkError, || {
+            format!("Failed to bind listener to {addr}.")
+        })?;
     match listener.accept() {
         Ok((stream, _addr)) => {
             println!("accept connections on {addr:?}");
@@ -103,7 +103,7 @@ fn main() -> Result<()> {
         let stream = start_connection_verifier(&addr.to_string())?;
         let reader = BufReader::new(stream.try_clone().wrap_err(
             ErrorKind::NetworkError,
-            "Failed to clone TCP stream for reader.".to_string(),
+            "Failed to clone TCP stream for reader.",
         )?);
         let writer = BufWriter::new(stream);
         let mut channel = Channel::new(reader, writer);
@@ -115,7 +115,7 @@ fn main() -> Result<()> {
         let mut evaluator =
             EvaluatorCirc::<Verifier, _, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
                 &mut channel,
-                AesRng::new(),
+                SwankyRng::new(),
                 CircInputs::default(),
                 TypeStore::default(),
                 lpn_size,
@@ -125,7 +125,7 @@ fn main() -> Result<()> {
         println!("Load the F61p backend");
         evaluator.load_backend(
             &mut channel,
-            AesRng::new(),
+            SwankyRng::new(),
             std::any::TypeId::of::<F61p>(),
             ty as usize,
             lpn_size,
@@ -145,7 +145,7 @@ fn main() -> Result<()> {
         let stream = start_connection_prover(&addr.to_string())?;
         let reader = BufReader::new(stream.try_clone().wrap_err(
             ErrorKind::NetworkError,
-            "Failed to clone TCP stream for reader.".to_string(),
+            "Failed to clone TCP stream for reader.",
         )?);
         let writer = BufWriter::new(stream);
         let mut channel = Channel::new(reader, writer);
@@ -159,7 +159,7 @@ fn main() -> Result<()> {
         let mut evaluator =
             EvaluatorCirc::<Prover, _, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
                 &mut channel,
-                AesRng::new(),
+                SwankyRng::new(),
                 CircInputs::default(),
                 TypeStore::default(),
                 lpn_size,
@@ -169,7 +169,7 @@ fn main() -> Result<()> {
         println!("Load the F61p backend");
         evaluator.load_backend(
             &mut channel,
-            AesRng::new(),
+            SwankyRng::new(),
             std::any::TypeId::of::<F61p>(),
             ty as usize,
             lpn_size,

@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use std::io::{Cursor, Read};
 
 use mac_n_cheese_sieve_parser::PrintingVisitor;
@@ -9,7 +8,7 @@ fn main() -> swanky_error::Result<()> {
     std::io::stdin()
         .lock()
         .read_to_end(&mut input)
-        .wrap_err(ErrorKind::OtherError, "Failed to read stdin.".to_string())?;
+        .wrap_err(ErrorKind::OtherError, "Failed to read stdin.")?;
     let parser = mac_n_cheese_sieve_parser::text_parser::RelationReader::new(Cursor::new(input))?;
     println!("{}", parser.header());
     println!("@begin");

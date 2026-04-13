@@ -5,21 +5,21 @@
 //! 1. Create a circuit with a non-empty shared-witness range using the
 //!    `new_with_shared` constructor.
 //! 2. In the prover:
-//!     a. Create a prover with the `noninteractive::Prover` constructor.
-//!     b. Call the `shared_mask` method to retrieve the shared mask `m` and
-//!        commit to the shared witness `u` and the mask using the ZKP2
-//!        commitment (sending it to the verifier).
-//!     c. Run `make_proof_and_shared_check` using the ZKP2 commitment to
-//!        `(u,m)` to get the proof, matrix `A`, and vector `b`. Send the proof
-//!        to the verifier.
-//!     d. Prove that `A*u + m = b` in ZKP2.
+//!    1. Create a prover with the `noninteractive::Prover` constructor.
+//!    2. Call the `shared_mask` method to retrieve the shared mask `m` and
+//!       commit to the shared witness `u` and the mask using the ZKP2
+//!       commitment (sending it to the verifier).
+//!    3. Run `make_proof_and_shared_check` using the ZKP2 commitment to
+//!       `(u,m)` to get the proof, matrix `A`, and vector `b`. Send the proof
+//!       to the verifier.
+//!    4. Prove that `A*u + m = b` in ZKP2.
 //! 3. In the verifier:
-//!     a. Create a verifier with the `noninteractive::Verifier` constructor.
-//!     b. Get the proof from the prover.
-//!     c. Call `verify_with_shared` on the ZKP2 commitment to `(u,m)`, checking
-//!        whether the verifier accepts and retrieving the matrix `A` and the
-//!        vector `b`.
-//!     d. Verify that `A*u + m = b` in ZKP2.
+//!    1. Create a verifier with the `noninteractive::Verifier` constructor.
+//!    2. Get the proof from the prover.
+//!    3. Call `verify_with_shared` on the ZKP2 commitment to `(u,m)`, checking
+//!       whether the verifier accepts and retrieving the matrix `A` and the
+//!       vector `b`.
+//!    4. Verify that `A*u + m = b` in ZKP2.
 
 // A Note on Shared-Witness Checking
 // =================================
@@ -68,10 +68,10 @@ use ndarray::{Array1, Array2, ArrayView1, Axis, concatenate};
 use rand::{CryptoRng, Rng, SeedableRng};
 use sprs::{CsMat, TriMat};
 use std::ops::Range;
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_field::FiniteField;
 use swanky_field_fft::FieldForFFT;
+use swanky_rng::SwankyRng;
 #[cfg(test)]
 use swanky_serialization::CanonicalSerialize;
 
@@ -80,9 +80,9 @@ type HashOutput<T> = digest::Output<T>;
 #[cfg(test)]
 use proptest::{collection::vec as pvec, prelude::*, *};
 
-use crate::merkle;
 use crate::params::Params;
 use crate::util::*;
+use crate::{merkle, security_warning::warn_vulnerabilities};
 use simple_arith_circuit::{Circuit, Op};
 
 /// This is a marker trait consolidating the traits needed for a Ligero field.
@@ -129,6 +129,7 @@ impl<Field: FieldForLigero> Public<Field> {
     /// and an external proof system.
     #[allow(non_snake_case)]
     fn new(c: &Circuit<Field>, shared: Option<Range<usize>>) -> Self {
+        warn_vulnerabilities();
         // By the SZ Lemma, Pr[p(x) = q(x)] for monomials p and q and uniform x
         // chosen independently of p and q is 1/|F|, so one linear check should
         // give us 1/|F| soundness.
@@ -230,7 +231,7 @@ impl<Field: FieldForLigero> Public<Field> {
 
         self.shared_mask
             .clone()
-            .zip(rshared.rows().into_iter())
+            .zip(rshared.rows())
             .for_each(|(m_i, row_i)| {
                 self.shared.clone().zip(row_i).for_each(|(s_j, &r_ij)| {
                     self.Padd.add_triplet(m_i, s_j, r_ij);
@@ -303,6 +304,8 @@ impl<Field: FieldForLigero, H: CryptoDigest> Secret<Field, H> {
         inp: &[Field],
         shared: Option<Range<usize>>,
     ) -> Self {
+        warn_vulnerabilities();
+
         debug_assert_eq!(c.ninputs(), inp.len());
 
         let public = Public::new(c, shared);
@@ -396,7 +399,7 @@ impl Arbitrary for Secret<TestField, TestHash> {
             proptest::array::uniform16(0u8..),
         )
             .prop_map(|(ckt, inp, seed)| {
-                let mut rng = AesRng::from_seed(Block::from(seed));
+                let mut rng = SwankyRng::from_seed(Block::from(seed));
                 Secret::new(&mut rng, &ckt, &inp, None)
             })
             .boxed()
@@ -437,7 +440,7 @@ proptest! {
         }),
         seed: [u8;16],
     ) {
-        let mut rng = AesRng::from_seed(Block::from(seed));
+        let mut rng = SwankyRng::from_seed(Block::from(seed));
         let s = Secret::<_, TestHash>::new(&mut rng, &c, &i, None);
         let mut wires = Vec::new();
         let output = c.eval(&i, &mut wires)[0];
@@ -460,7 +463,7 @@ proptest! {
         rshared_vec in pvec(arb_test_field(), 10),
         seed: [u8;16],
     ) {
-        let mut rng = AesRng::from_seed(Block::from(seed));
+        let mut rng = SwankyRng::from_seed(Block::from(seed));
         let mut s: Secret<_, sha2::Sha256> = Secret::new(&mut rng, &c, &i, Some(0..10));
         let mut wires = Vec::new();
         let output = c.eval(&i, &mut wires)[0];
@@ -484,7 +487,7 @@ proptest! {
         (c, i) in simple_arith_circuit::circuitgen::arbitrary_zero_circuit::<TestField>(20, 50),
         seed: [u8;16],
     ) {
-        let mut rng = AesRng::from_seed(Block::from(seed));
+        let mut rng = SwankyRng::from_seed(Block::from(seed));
         let s: Secret<_, sha2::Sha256> = Secret::new(&mut rng, &c, &i, None);
         let mut wires = Vec::new();
         let output = c.eval(&i, &mut wires)[0];
@@ -507,7 +510,7 @@ proptest! {
         rshared_vec in pvec(arb_test_field(), 10),
         seed: [u8;16],
     ) {
-        let mut rng = AesRng::from_seed(Block::from(seed));
+        let mut rng = SwankyRng::from_seed(Block::from(seed));
         let mut s: Secret<_, sha2::Sha256> = Secret::new(&mut rng, &c, &i, Some(0..10));
         let mut wires = Vec::new();
         let output = c.eval(&i, &mut wires)[0];
@@ -525,6 +528,7 @@ proptest! {
 
 /// The theoretical proof size according to Section 5.3 of
 /// <https://dl.acm.org/doi/pdf/10.1145/3133956.3134104>
+#[allow(clippy::too_many_arguments)]
 pub fn expected_proof_size(
     sigma: usize,
     n: usize,
@@ -587,6 +591,7 @@ impl<Field: FieldForLigero> Round1<Field> {
         num_shared_checks: usize,
         rng: &mut impl rand::Rng,
     ) -> Self {
+        warn_vulnerabilities();
         Round1 {
             r: Array1::from_shape_fn(4 * params.m, |_| Field::random(rng)),
             radd: Array1::from_shape_fn(params.m * params.l, |_| Field::random(rng)),
@@ -655,6 +660,8 @@ pub struct Round3<Field> {
 impl<Field: FieldForLigero> Round3<Field> {
     /// Pick Verifier's columns to view.
     fn new<R: Rng + CryptoRng>(params: &Params<Field>, rng: &mut R) -> Self {
+        warn_vulnerabilities();
+
         Round3 {
             phantom: std::marker::PhantomData,
 
@@ -715,6 +722,8 @@ fn verify<Field: FieldForLigero, H: CryptoDigest>(
 ) -> bool {
     use ndarray::s;
 
+    warn_vulnerabilities();
+
     let params = public.params;
 
     public.finalize_Padd(&r1.rshared, &r2.qshared);
@@ -726,7 +735,7 @@ fn verify<Field: FieldForLigero, H: CryptoDigest>(
     let rz = params.fft3_rows(make_ra_Iml_Pa_neg(&params, &r1.rz, &public.Pz).view());
 
     let U = r4.U_lemma.columns.view();
-    let Uw = U.slice(s![0 * params.m..params.m, ..]);
+    let Uw = U.slice(s![0..params.m, ..]);
     let Ux = U.slice(s![params.m..2 * params.m, ..]);
     let Uy = U.slice(s![2 * params.m..3 * params.m, ..]);
     let Uz = U.slice(s![3 * params.m..4 * params.m, ..]);
@@ -969,9 +978,10 @@ pub mod interactive {
         pub fn new<R: Rng + CryptoRng>(
             rng: &mut R,
             c: &Circuit<Field>,
-            w: &Vec<Field>,
+            w: &[Field],
             shared: Option<Range<usize>>,
         ) -> Self {
+            warn_vulnerabilities();
             Self {
                 secret: Secret::new(rng, c, w, shared),
             }
@@ -1155,6 +1165,7 @@ pub mod interactive {
     impl<Field: FieldForLigero, H: CryptoDigest> Verifier<Field, H> {
         /// Create a new verifier from a circuit.
         pub fn new(c: &Circuit<Field>, shared: Option<Range<usize>>) -> Self {
+            warn_vulnerabilities();
             Self {
                 phantom: std::marker::PhantomData,
 
@@ -1240,7 +1251,7 @@ pub mod interactive {
 
     #[test]
     fn test_small() {
-        let mut rng = AesRng::from_entropy();
+        let mut rng = SwankyRng::from_entropy();
         let (ckt, w) = simple_arith_circuit::circuitgen::simple_test_circuit::<TestField>();
 
         let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
@@ -1265,7 +1276,7 @@ pub mod interactive {
             }),
             seed: [u8;16],
         ) {
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = SwankyRng::from_seed(Block::from(seed));
             let mut wires = Vec::new();
             let output = ckt.eval(&w, &mut wires)[0];
             let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
@@ -1288,7 +1299,7 @@ pub mod interactive {
             (ckt, w) in simple_arith_circuit::circuitgen::arbitrary_zero_circuit::<TestField>(20, 50),
             seed: [u8;16],
         ) {
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = SwankyRng::from_seed(Block::from(seed));
 
             let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
             let mut v = Verifier::new(&ckt, None);
@@ -1313,7 +1324,7 @@ pub mod interactive {
             }),
             seed: [u8;16],
         ) {
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = SwankyRng::from_seed(Block::from(seed));
             let mut wires = Vec::new();
             let output = ckt.eval(&w, &mut wires)[0];
             let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, Some(0..10));
@@ -1337,7 +1348,7 @@ pub mod interactive {
                 .prop_flat_map(|(ckt, w)| (Just(ckt), Just(w))),
             seed: [u8;16],
         ) {
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = SwankyRng::from_seed(Block::from(seed));
             let mut p = Prover::<TestField, TestHash>::new(&mut rng, &ckt, &w, Some(0..10));
             let mut v = Verifier::new(&ckt, Some(0..10));
 
@@ -1400,7 +1411,7 @@ pub mod noninteractive {
                 params,
                 num_shared_elems,
                 num_shared_checks,
-                &mut AesRng::from_seed(seed),
+                &mut SwankyRng::from_seed(seed),
             ),
             digest,
         )
@@ -1417,31 +1428,31 @@ pub mod noninteractive {
         r2.p0
             .clone()
             .into_iter()
-            .for_each(|f| hash.update(&f.to_bytes()));
+            .for_each(|f| hash.update(f.to_bytes()));
         r2.qadd
             .clone()
             .into_iter()
-            .for_each(|f| hash.update(&f.to_bytes()));
+            .for_each(|f| hash.update(f.to_bytes()));
         r2.qx
             .clone()
             .into_iter()
-            .for_each(|f| hash.update(&f.to_bytes()));
+            .for_each(|f| hash.update(f.to_bytes()));
         r2.qy
             .clone()
             .into_iter()
-            .for_each(|f| hash.update(&f.to_bytes()));
+            .for_each(|f| hash.update(f.to_bytes()));
         r2.qz
             .clone()
             .into_iter()
-            .for_each(|f| hash.update(&f.to_bytes()));
+            .for_each(|f| hash.update(f.to_bytes()));
         r2.v.clone()
             .into_iter()
-            .for_each(|f| hash.update(&f.to_bytes()));
+            .for_each(|f| hash.update(f.to_bytes()));
 
         let digest = hash.finalize();
         let seed = Block::from(<[u8; 16]>::try_from(&digest[0..16]).unwrap());
 
-        Round3::new(params, &mut AesRng::from_seed(seed))
+        Round3::new(params, &mut SwankyRng::from_seed(seed))
     }
 
     /// Non-interactive Ligero prover.
@@ -1455,9 +1466,10 @@ pub mod noninteractive {
         pub fn new<R: Rng + CryptoRng>(
             rng: &mut R,
             circuit: &Circuit<Field>,
-            witness: &Vec<Field>,
+            witness: &[Field],
             shared: Option<Range<usize>>,
         ) -> Self {
+            warn_vulnerabilities();
             let mut hash = H::new();
             let bytes = bincode::serialize(&circuit).unwrap(); // XXX: unwrap
             hash.update(&bytes);
@@ -1545,6 +1557,7 @@ pub mod noninteractive {
     impl<Field: FieldForLigero, H: CryptoDigest> Verifier<Field, H> {
         /// Create a verifier out of a circuit.
         pub fn new(circuit: &Circuit<Field>, shared: Option<Range<usize>>) -> Self {
+            warn_vulnerabilities();
             let mut hash = H::new();
             let bytes = bincode::serialize(circuit).unwrap(); // XXX: unwrap
             hash.update(&bytes);
@@ -1610,7 +1623,7 @@ pub mod noninteractive {
 
     #[test]
     fn test_small() {
-        let mut rng = AesRng::from_entropy();
+        let mut rng = SwankyRng::from_entropy();
         let (ckt, w) = simple_arith_circuit::circuitgen::simple_test_circuit::<TestField>();
 
         let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
@@ -1630,7 +1643,7 @@ pub mod noninteractive {
             }),
             seed: [u8; 16],
         ) {
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = SwankyRng::from_seed(Block::from(seed));
             let mut wires = Vec::new();
             let output = ckt.eval(&w, &mut wires)[0];
             let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
@@ -1648,7 +1661,7 @@ pub mod noninteractive {
             (ckt, w) in simple_arith_circuit::circuitgen::arbitrary_zero_circuit::<TestField>(20, 50),
             seed: [u8; 16],
         ) {
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = SwankyRng::from_seed(Block::from(seed));
 
             let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
             let mut v = Verifier::new(&ckt, None);
@@ -1670,7 +1683,7 @@ pub mod noninteractive {
         ) {
             use sha2::Sha256;
 
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = SwankyRng::from_seed(Block::from(seed));
             let mut wires = Vec::new();
             let output = ckt.eval(&w, &mut wires)[0];
             let mut p = <Prover<_, Sha256>>::new(&mut rng, &ckt, &w, Some(0..10));
@@ -1698,7 +1711,7 @@ pub mod noninteractive {
         ) {
             use sha2::Sha256;
 
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = SwankyRng::from_seed(Block::from(seed));
             let mut p = Prover::<_,TestHash>::new(&mut rng, &ckt, &w, Some(0..10));
             let mut v = Verifier::new(&ckt, Some(0..10));
 

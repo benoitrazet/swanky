@@ -1,9 +1,6 @@
-use rand::{CryptoRng, Rng, RngCore};
-use swanky_block::Block;
-
-#[cfg(feature = "serde")]
-use crate::errors::WireDeserializationError;
 use crate::{ArithmeticWire, HasModulus, WireLabel, wire::_unrank};
+use rand::{CryptoRng, Rng, RngCore};
+use vectoreyes::U8x16;
 
 /// Intermediate struct to deserialize WireMod3 to
 ///
@@ -19,12 +16,14 @@ struct UntrustedWireMod3 {
 
 #[cfg(feature = "serde")]
 impl TryFrom<UntrustedWireMod3> for WireMod3 {
-    type Error = WireDeserializationError;
+    type Error = swanky_error::Error;
 
     fn try_from(wire: UntrustedWireMod3) -> Result<Self, Self::Error> {
-        if wire.lsb & wire.msb != 0 {
-            return Err(Self::Error::InvalidWireMod3);
-        }
+        swanky_error::ensure!(
+            wire.lsb & wire.msb == 0,
+            swanky_error::ErrorKind::OtherError,
+            "Mod 3 wire is ill-formed",
+        );
         Ok(WireMod3 {
             lsb: wire.lsb,
             msb: wire.msb,
@@ -58,12 +57,95 @@ impl HasModulus for WireMod3 {
     }
 }
 
+impl core::ops::Add for WireMod3 {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let a1 = self.lsb;
+        let a2 = self.msb;
+        let b1 = rhs.lsb;
+        let b2 = rhs.msb;
+
+        let t = (a1 | b2) ^ (a2 | b1);
+        let c1 = (a2 | b2) ^ t;
+        let c2 = (a1 | b1) ^ t;
+        Self { lsb: c1, msb: c2 }
+    }
+}
+
+impl core::ops::AddAssign for WireMod3 {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs;
+    }
+}
+
+impl core::ops::Sub for WireMod3 {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self + -rhs
+    }
+}
+
+impl core::ops::SubAssign for WireMod3 {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = *self - rhs;
+    }
+}
+
+impl core::ops::Neg for WireMod3 {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        // Negation just involves swapping `lsb` and `msb`.
+        let mut output = self;
+        std::mem::swap(&mut output.lsb, &mut output.msb);
+        output
+    }
+}
+
+impl core::ops::Mul<u16> for WireMod3 {
+    type Output = Self;
+
+    #[allow(clippy::suspicious_arithmetic_impl)]
+    fn mul(self, rhs: u16) -> Self::Output {
+        let c = rhs % 3;
+        match c {
+            0 => Self { msb: 0, lsb: 0 },
+            1 => self,
+            2 => Self {
+                msb: self.lsb,
+                lsb: self.msb,
+            },
+            _ => unreachable!("Due to initial `rhs % 3`"),
+        }
+    }
+}
+
+impl core::ops::MulAssign<u16> for WireMod3 {
+    #[allow(clippy::suspicious_op_assign_impl)]
+    fn mul_assign(&mut self, rhs: u16) {
+        let c = rhs % 3;
+        match c {
+            0 => {
+                self.msb = 0;
+                self.lsb = 0;
+            }
+            1 => {}
+            2 => {
+                std::mem::swap(&mut self.lsb, &mut self.msb);
+            }
+            _ => unreachable!("Due to initial `rhs % 3`"),
+        }
+    }
+}
+
 impl WireMod3 {
     /// We have to convert `block` into a valid `Mod3` encoding.
     ///
     /// We do this by computing the `Mod3` digits using `_unrank`,
     /// and then map these to a `Mod3` encoding.
-    pub(crate) fn encode_block_mod3(block: Block) -> Self {
+    pub(crate) fn encode_block_mod3(block: U8x16) -> Self {
         let mut lsb = 0u64;
         let mut msb = 0u64;
         let mut ds = _unrank(u128::from(block), 3);
@@ -93,11 +175,11 @@ impl WireLabel for WireMod3 {
             .collect()
     }
 
-    fn to_block(&self) -> Block {
+    fn to_repr(&self) -> U8x16 {
         // This function converts a [`WireMod3`] into its [`Block`] representation.
         // The two 64b values stored in [`WireMod3`], i.e. the lsb and msb, and packed
         // into a 128b value as a [`Block`].
-        Block::from(((self.msb as u128) << 64) | (self.lsb as u128))
+        (((self.msb as u128) << 64) | (self.lsb as u128)).into()
     }
 
     fn color(&self) -> u16 {
@@ -106,44 +188,7 @@ impl WireLabel for WireMod3 {
         color
     }
 
-    fn plus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self {
-        let a1 = &mut self.lsb;
-        let a2 = &mut self.msb;
-        let b1 = other.lsb;
-        let b2 = other.msb;
-
-        let t = (*a1 | b2) ^ (*a2 | b1);
-        let c1 = (*a2 | b2) ^ t;
-        let c2 = (*a1 | b1) ^ t;
-        *a1 = c1;
-        *a2 = c2;
-        self
-    }
-
-    fn cmul_eq(&mut self, c: u16) -> &mut Self {
-        match c {
-            0 => {
-                self.msb = 0;
-                self.lsb = 0;
-            }
-            1 => {}
-            2 => {
-                std::mem::swap(&mut self.lsb, &mut self.msb);
-            }
-            c => {
-                self.cmul_eq(c % 3);
-            }
-        }
-        self
-    }
-
-    fn negate_eq(&mut self) -> &mut Self {
-        // Negation just involves swapping `lsb` and `msb`.
-        std::mem::swap(&mut self.lsb, &mut self.msb);
-        self
-    }
-
-    fn from_block(inp: Block, q: u16) -> Self {
+    fn from_repr(inp: U8x16, q: u16) -> Self {
         if q != 3 {
             panic!("[WireMod3::from_block] Expected mod 3. Got mod {}", q)
         }
@@ -155,13 +200,6 @@ impl WireLabel for WireMod3 {
         let msb = (inp >> 64) as u64;
         debug_assert_eq!(lsb & msb, 0);
         Self { lsb, msb }
-    }
-
-    fn zero(q: u16) -> Self {
-        if q != 3 {
-            panic!("[WireMod3::zero] Expected modulo 3. Got {}", q);
-        }
-        Self::default()
     }
 
     fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
@@ -178,7 +216,7 @@ impl WireLabel for WireMod3 {
         Self { lsb, msb }
     }
 
-    fn hash_to_mod(hash: Block, q: u16) -> Self {
+    fn hash_to_mod(hash: U8x16, q: u16) -> Self {
         if q != 3 {
             panic!("[WireMod3::hash_to_mod] Expected mod 3. Got mod {}", q)
         }

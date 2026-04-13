@@ -1,20 +1,21 @@
 [workspace]
 resolver = "2"
 members = [
+  "core/adversary",
+  "core/channel",
   "core/error",
+  "core/party",
+  "core/serialization",
   "core/vectoreyes",
-  "edge/adversary",
-  "edge/aes-hash",
-  "edge/aes-rng",
   "edge/authenticated-bits",
   "edge/authenticated-garbling",
   "edge/bit-matrix-transpose",
   "edge/block",
   "edge/bristol-fashion",
   "edge/bytearray-utils",
-  "edge/channel",
   "edge/channel-legacy",
   "edge/cointoss",
+  "edge/cr-hash",
   "edge/deprecated-bitwise-utils",
   "edge/diet-mac-and-cheese",
   "edge/diet-mac-and-cheese/web-mac-and-cheese/wasm",
@@ -52,12 +53,12 @@ members = [
   "edge/ot-noar-pinkas",
   "edge/ot-test",
   "edge/ot-traits",
-  "edge/party",
-  "edge/party2",
   "edge/polynomial",
   "edge/popsicle",
+  "edge/rng",
   "edge/schmivitz",
-  "edge/serialization",
+  "edge/sieve-ir-api",
+  "edge/sieve-ir-codegen",
   "edge/simple-arith-circuit",
   "edge/svole-wykw",
   "edge/twopac",
@@ -96,17 +97,16 @@ mac-n-cheese-wire-map = { path = "edge/mac-n-cheese/wire-map" }
 popsicle = { path = "edge/popsicle" }
 schmivitz = { path = "edge/schmivitz" }
 simple-arith-circuit = { path = "edge/simple-arith-circuit" }
-swanky-adversary = { path = "edge/adversary" }
-swanky-aes-hash = { path = "edge/aes-hash" }
-swanky-aes-rng = { path = "edge/aes-rng" }
+swanky-adversary = { path = "core/adversary" }
 swanky-authenticated-bits = { path = "edge/authenticated-bits" }
 swanky-authenticated-garbling = { path = "edge/authenticated-garbling" }
 swanky-bit-matrix-transpose = { path = "edge/bit-matrix-transpose" }
 swanky-block = { path = "edge/block" }
 swanky-bytearray-utils = { path = "edge/bytearray-utils" }
-swanky-channel = { path = "edge/channel" }
+swanky-channel = { path = "core/channel" }
 swanky-channel-legacy = { path = "edge/channel-legacy" }
 swanky-cointoss = { path = "edge/cointoss" }
+swanky-cr-hash = { path = "edge/cr-hash" }
 swanky-deprecated-bitwise-utils = { path = "edge/deprecated-bitwise-utils" }
 swanky-error = { path = "core/error" }
 swanky-f-eq = { path = "edge/f-eq" }
@@ -130,10 +130,12 @@ swanky-ot-dummy = { path = "edge/ot-dummy" }
 swanky-ot-noar-pinkas = { path = "edge/ot-noar-pinkas" }
 swanky-ot-test = { path = "edge/ot-test" }
 swanky-ot-traits = { path = "edge/ot-traits" }
-swanky-party = { path = "edge/party" }
-swanky-party2 = { path = "edge/party2" }
+swanky-party = { path = "core/party" }
 swanky-polynomial = { path = "edge/polynomial" }
-swanky-serialization = { path = "edge/serialization" }
+swanky-rng = { path = "edge/rng" }
+swanky-serialization = { path = "core/serialization" }
+swanky-sieve-ir-api = { path = "edge/sieve-ir-api" }
+swanky-sieve-ir-codegen = { path = "edge/sieve-ir-codegen" }
 swanky-svole-wykw = { path = "edge/svole-wykw" }
 swanky-twopac = { path = "edge/twopac" }
 vectoreyes = { path = "core/vectoreyes" }
@@ -150,7 +152,6 @@ ff_codegen = { git = "https://github.com/GaloisInc/ff", rev = "c29da06f50c67fe9e
 # External Dependencies
 aes = "0.8.4"
 aes-gcm = "0.10.3"
-anyhow = "1.0.102"
 arc-swap = "1.8.2"
 arrayvec = "0.7.6"
 bincode = "=1.3.3" # See https://sr.ht/~stygianentity/bincode/
@@ -246,7 +247,6 @@ subtle = { version = "2.6.1", features = [
 ] }
 syn = { version = "2.0.117", features = ["full"] }
 tempfile = "3.26.0"
-thiserror = "2.0.18"
 toml = "1.0.4"
 tungstenite = { version = "0.28.0", features = ["rustls"] }
 twox-hash = "2.1.2"

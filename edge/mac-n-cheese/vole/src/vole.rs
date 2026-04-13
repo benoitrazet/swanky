@@ -2,11 +2,9 @@ use arrayvec::ArrayVec;
 use bytemuck::TransparentWrapper;
 use generic_array::{GenericArray, typenum::Unsigned};
 use keyed_arena::{AllocationKey, KeyedArena};
-use party::{IS_PROVER, IS_VERIFIER, Party};
 use rand::prelude::Distribution;
 use rand::{CryptoRng, Rng, SeedableRng, distributions::Uniform};
 use std::{marker::PhantomData, ops::Deref};
-use swanky_aes_rng::AesRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, WrapErr};
@@ -15,7 +13,8 @@ use swanky_field::{Degree, DegreeModulo, FiniteField};
 use swanky_ot_alsz_kos::explicit_round::{
     KosReceiver, KosReceiverStage2, KosSender, KosSenderStage2,
 };
-use swanky_party as party;
+use swanky_party::ty_eq::Witness;
+use swanky_rng::SwankyRng;
 use swanky_serialization::CanonicalSerialize;
 use swanky_svole_wykw::ggm_utils::*;
 
@@ -27,6 +26,7 @@ use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16, U64x2};
 
 use crate::{
     mac::{Mac, MacTypes},
+    party::{self, Party},
     specialization::FiniteFieldSpecialization,
 };
 
@@ -50,8 +50,8 @@ fn make_ggm_seeds(lpn_seeds: &Aes128EncryptOnly) -> (Aes128EncryptOnly, Aes128En
     )
 }
 
-fn lpn_rng_from_seed(selector: u64, lpn_seeds: &Aes128EncryptOnly) -> AesRng {
-    AesRng::from_seed(lpn_seeds.encrypt(U64x2::from([selector, 0]).into()).into())
+fn lpn_rng_from_seed(selector: u64, lpn_seeds: &Aes128EncryptOnly) -> SwankyRng {
+    SwankyRng::from_seed(lpn_seeds.encrypt(U64x2::from([selector, 0]).into()))
 }
 
 /// Generates powers of `FE::GENERATOR`.
@@ -120,12 +120,12 @@ impl<T: MacTypes> VoleSender<T> {
         let lpn_seeds = Aes128EncryptOnly::new_with_key(
             swanky_cointoss::send(channel, &[rng.r#gen::<Block>()]).wrap_err(
                 ErrorKind::NetworkError,
-                "Failed to send seeds to AES key scheduler.".to_string(),
+                "Failed to send seeds to AES key scheduler.",
             )?[0],
         );
         let ot = KosReceiver::init(channel, rng).wrap_err(
             ErrorKind::InitializationError,
-            "Failed to initialize KOS OT receiver.".to_string(),
+            "Failed to initialize KOS OT receiver.",
         )?;
         let ggm_seeds = make_ggm_seeds(&lpn_seeds);
         Ok(VoleSender {
@@ -160,7 +160,7 @@ impl<T: MacTypes> VoleSender<T> {
             .sps_base_voles()
             .iter()
             .copied()
-            .map(|mac| mac.prover_extract(IS_PROVER))
+            .map(|mac| mac.prover_extract(Witness::EQUAL_TYPES))
             .zip(alphas_and_betas.iter_mut())
             .zip(choices.chunks_exact_mut(T::LPN.log2m))
         {
@@ -189,7 +189,7 @@ impl<T: MacTypes> VoleSender<T> {
             .receive(arena, selector, choices, rng, outgoing_bytes)
             .wrap_err(
                 ErrorKind::OtherError,
-                "Failed to receive receiver stage two.".to_string(),
+                "Failed to receive receiver stage two.",
             )?;
         let mut commitment_key = [0; 32];
         rng.fill_bytes(&mut commitment_key);
@@ -245,7 +245,7 @@ impl<T: MacTypes> VoleSenderStep3<T> {
             )
             .wrap_err(
                 ErrorKind::OtherError,
-                "Failed to perform receiver stage two.".to_string(),
+                "Failed to perform receiver stage two.",
             )?;
         incoming_bytes = &incoming_bytes[ot_bytes..];
         outgoing_bytes = &mut outgoing_bytes[KosReceiverStage2::OUTGOING_BYTES..];
@@ -261,7 +261,7 @@ impl<T: MacTypes> VoleSenderStep3<T> {
             .sps_base_voles()
             .iter()
             .copied()
-            .map(|mac| mac.prover_extract(IS_PROVER))
+            .map(|mac| mac.prover_extract(Witness::EQUAL_TYPES))
             .zip(alphas_and_betas.iter())
             .enumerate()
         {
@@ -280,7 +280,7 @@ impl<T: MacTypes> VoleSenderStep3<T> {
             incoming_bytes = &incoming_bytes[d.len()..];
             let d: T::TF = T::TF::from_bytes(&d).wrap_err(
                 ErrorKind::SerializationError,
-                "Failed to read field element.".to_string(),
+                "Failed to read field element.",
             )?;
             // TODO: is alpha supposed to be private? If so there's a cache timing attack here.
             result[i * m + alpha] = (*beta, w - (d + sum)).into();
@@ -290,10 +290,10 @@ impl<T: MacTypes> VoleSenderStep3<T> {
         // TODO: can we use one of the seeds that we've already agreed upon for this?
         // TODO: is this supposed to be done as part of a cointoss? (I'm just following the
         // original implementation, for now.)
-        let mut rng_chi = AesRng::from_seed(self.seed);
+        let mut rng_chi = SwankyRng::from_seed(self.seed);
         let (mut va, x_stars) = T::S::spsvole_sender_compute_va(
             &mut rng_chi,
-            TransparentWrapper::peel_slice(TransparentWrapper::peel_slice(&result)),
+            TransparentWrapper::peel_slice(TransparentWrapper::peel_slice(result)),
         );
         for (pows, (x_star, (u, w))) in sender.pows.iter().zip(
             x_stars.iter().zip(
@@ -301,7 +301,7 @@ impl<T: MacTypes> VoleSenderStep3<T> {
                     .sps_base_consistency()
                     .iter()
                     .copied()
-                    .map(|mac| mac.prover_extract(IS_PROVER)),
+                    .map(|mac| mac.prover_extract(Witness::EQUAL_TYPES)),
             ),
         ) {
             let fe: T::VF = *x_star - u;
@@ -383,12 +383,12 @@ impl<T: MacTypes> VoleReceiver<T> {
         let lpn_seeds = Aes128EncryptOnly::new_with_key(
             swanky_cointoss::receive(channel, &[rng.r#gen::<Block>()]).wrap_err(
                 ErrorKind::OtherError,
-                "Failed to receive seeds for AES key scheduler.".to_string(),
+                "Failed to receive seeds for AES key scheduler.",
             )?[0],
         );
         let ot = KosSender::init(channel, rng).wrap_err(
             ErrorKind::InitializationError,
-            "Failed to initialize KOS OT sender.".to_string(),
+            "Failed to initialize KOS OT sender.",
         )?;
         let ggm_seeds = make_ggm_seeds(&lpn_seeds);
         Ok(VoleReceiver {
@@ -400,6 +400,7 @@ impl<T: MacTypes> VoleReceiver<T> {
             phantom: PhantomData,
         })
     }
+    #[allow(clippy::too_many_arguments)]
     pub fn receive(
         &self,
         arena: &KeyedArena,
@@ -437,9 +438,9 @@ impl<T: MacTypes> VoleReceiver<T> {
             incoming_bytes = &incoming_bytes[<T::VF as CanonicalSerialize>::ByteReprLen::USIZE..];
             let a_prime = T::VF::from_bytes(&bytes).wrap_err(
                 ErrorKind::SerializationError,
-                "Failed to read field element.".to_string(),
+                "Failed to read field element.",
             )?;
-            *gamma = v.tag(IS_VERIFIER) - a_prime * self.delta;
+            *gamma = v.tag(Witness::EQUAL_TYPES) - a_prime * self.delta;
         }
         assert_eq!(T::LPN.weight, lpn_params::LPN_EXTEND_PARAMS_WEIGHT);
         assert_eq!(T::LPN.log2m, lpn_params::LPN_EXTEND_PARAMS_LOG_M);
@@ -482,14 +483,18 @@ impl<T: MacTypes> VoleReceiver<T> {
             )
             .wrap_err(
                 ErrorKind::OtherError,
-                "Failed to obliviously send stage two bytes.".to_string(),
+                "Failed to obliviously send stage two bytes.",
             )?;
         outgoing_bytes = &mut outgoing_bytes[ot_outgoing_size..];
         // This is true by construction. But it's a good reminder of this property.
         debug_assert_eq!(gammas.len() * m, result.len());
         debug_assert_eq!(result.len() % m, 0);
         for (gamma, results) in IntoIterator::into_iter(gammas).zip(result.chunks_exact(m)) {
-            let d = gamma - results.iter().map(|mac| mac.tag(IS_VERIFIER)).sum();
+            let d = gamma
+                - results
+                    .iter()
+                    .map(|mac| mac.tag(Witness::EQUAL_TYPES))
+                    .sum();
             outgoing_bytes[0..<T::TF as CanonicalSerialize>::ByteReprLen::USIZE]
                 .copy_from_slice(&d.to_bytes());
             outgoing_bytes =
@@ -508,7 +513,7 @@ pub struct VoleReceiverStep4<T: MacTypes> {
     selector: u64,
     phantom: PhantomData<T>,
 }
-impl<'a, T: MacTypes> VoleReceiverStep4<T> {
+impl<T: MacTypes> VoleReceiverStep4<T> {
     pub fn stage2(
         self,
         receiver: &VoleReceiver<T>,
@@ -534,10 +539,7 @@ impl<'a, T: MacTypes> VoleReceiverStep4<T> {
         );
         self.ot_stage2
             .stage2(arena, &incoming_bytes[0..KosSenderStage2::INCOMING_BYTES])
-            .wrap_err(
-                ErrorKind::OtherError,
-                "Failed to run KOS sender stage two.".to_string(),
-            )?;
+            .wrap_err(ErrorKind::OtherError, "Failed to run KOS sender stage two.")?;
         incoming_bytes = &incoming_bytes[KosSenderStage2::INCOMING_BYTES..];
         let mut x_stars: GenericArray<T::VF, DegreeModulo<T::VF, T::TF>> = Default::default();
         for x_star in x_stars.iter_mut() {
@@ -549,23 +551,23 @@ impl<'a, T: MacTypes> VoleReceiverStep4<T> {
             incoming_bytes = &incoming_bytes[bytes.len()..];
             *x_star = T::VF::from_bytes(&bytes).wrap_err(
                 ErrorKind::SerializationError,
-                "Failed to read field element.".to_string(),
+                "Failed to read field element.",
             )?;
         }
         let delta = receiver.delta;
         let seed = *<&[u8; 16]>::try_from(&incoming_bytes[0..16]).unwrap();
         incoming_bytes = &incoming_bytes[16..];
-        let mut rng_chi = AesRng::from_seed(Block::from(seed));
+        let mut rng_chi = SwankyRng::from_seed(Block::from(seed));
         let y: T::TF = receiver
             .pows
             .iter()
             .zip(x_stars.iter().zip(base_voles.sps_base_consistency().iter()))
-            .map(|(pow, (x, y))| (y.tag(IS_VERIFIER) - *x * delta) * *pow)
+            .map(|(pow, (x, y))| (y.tag(Witness::EQUAL_TYPES) - *x * delta) * *pow)
             .sum();
         let vb: T::TF = T::S::spsvole_receiver_consistency_check_compute_vb(
             &mut rng_chi,
             y,
-            TransparentWrapper::peel_slice(TransparentWrapper::peel_slice(&spsvole_result)),
+            TransparentWrapper::peel_slice(TransparentWrapper::peel_slice(spsvole_result)),
         );
         // Now run the eq protocol on vb
         let mut commitment = [0; 32];
@@ -585,7 +587,7 @@ pub struct VoleReceiverStep6<T: MacTypes> {
     selector: u64,
     phantom: PhantomData<T>,
 }
-impl<'a, T: MacTypes> VoleReceiverStep6<T> {
+impl<T: MacTypes> VoleReceiverStep6<T> {
     pub fn stage3(
         self,
         receiver: &VoleReceiver<T>,

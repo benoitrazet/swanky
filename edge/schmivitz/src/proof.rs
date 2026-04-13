@@ -7,6 +7,7 @@
 //! Emmanuela Orsini, Lawrence Roy, and Peter Scholl. [Publicly Verifiable Zero-Knowledge and
 //! Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
 //!
+use mac_n_cheese_sieve_parser::WireId;
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
 use rayon::iter::*;
@@ -14,11 +15,15 @@ use std::{iter::zip, marker::PhantomData};
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b, F128b};
+use swanky_sieve_ir_api::CircuitExecuter;
 
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
     parameters::SECURITY_PARAM,
-    proof::{prover_preparer::ProverPreparer, prover_traverser::ProverTraverser},
+    proof::{
+        prover_preparer::ProverPreparer, prover_traverser::ProverTraverser,
+        transcript::ChiGenerator,
+    },
     vole::{AsSecretBytes, RandomVoleP, RandomVoleV},
 };
 
@@ -34,10 +39,11 @@ mod verifier_traverser;
 pub struct Proof<Vole: RandomVoleP, VoleV: RandomVoleV> {
     /// Commitment to the extended witness ($`d`$ in the paper).
     witness_commitment: Vec<F2>,
-    polynomial_count: usize,
     /// Aggregated commitment to the degree-1 term coefficients for each gate in the circuit
     /// ($`\tilde a`$ in the paper).
     degree_1_commitment: F128b,
+    /// Aggregated commitment to the assert_zero gates.
+    assert_zero_commitment: F128b,
     /// Challenge generated to decommit to the VOLEs after committing to the degree coefficients.
     decommitment_challenge: [u8; SECURITY_PARAM / 8],
     /// Partial decommitment of the VOLEs.
@@ -68,9 +74,30 @@ where
     }
 
     /// Create a proof of knowledge of a witness that satisfies the given circuit.
-    pub fn prove<R>(circuit: &Circuit, transcript: &mut Transcript, rng: &mut R) -> Result<Self>
+    pub fn prove_with_circuit<R>(
+        circuit: &Circuit,
+        transcript: &mut Transcript,
+        rng: &mut R,
+    ) -> Result<Self>
     where
         R: CryptoRng + RngCore,
+    {
+        let (gates, private_input, max_wire_id) = circuit.to_interpreter();
+        Self::prove(gates, private_input, max_wire_id, transcript, rng)
+    }
+
+    /// Create a proof of knowledge of a witness that satisfies the given circuit.
+    pub fn prove<R, C>(
+        circuit: C,
+        private_input: &[F2],
+        max_wire_id: WireId,
+        transcript: &mut Transcript,
+        rng: &mut R,
+    ) -> Result<Self>
+    // TODO: Get rid of max_wire_id
+    where
+        R: CryptoRng + RngCore,
+        C: CircuitExecuter<F2>, // Can't do higher order trait bounds... See https://github.com/rust-lang/rust/issues/108185#issuecomment-2819123578
     {
         let t = std::time::Instant::now();
         let mut transcript = transcript::Transcript::from(transcript);
@@ -78,10 +105,10 @@ where
 
         // Evaluate the circuit in the clear to get the full witness and all wire values
         let t = std::time::Instant::now();
-        let mut circuit_preparer = ProverPreparer::new(circuit.max_wire_id)?;
-        circuit_preparer.execute(circuit)?;
+        let mut circuit_preparer = ProverPreparer::new(private_input, max_wire_id)?;
+        circuit.execute(&mut circuit_preparer)?;
 
-        let (witness, wire_values, polynomial_count) = circuit_preparer.into_parts();
+        let (witness, _challenge_count) = circuit_preparer.into_parts();
         log::info!("1: circuit preparer: {:?}", t.elapsed());
 
         let t = std::time::Instant::now();
@@ -95,8 +122,11 @@ where
 
         let t = std::time::Instant::now();
         // Commit to extended witness (`d` in the paper)
-        let witness_commitment: Vec<F2> = zip(witness, voles.witness_mask())
-            .map(|(w, u)| w - u)
+        let witness_commitment: Vec<F2> = voles
+            .witness_mask()
+            .iter()
+            .zip(witness.iter())
+            .map(|(u, w)| w - u)
             .collect();
         log::info!("3: witness_commitment: {:?}", t.elapsed());
 
@@ -108,15 +138,15 @@ where
 
         // Add witness commitment to the transcript and generate a challenge for each polynomial
         transcript.append_witness_commitment(witness_commitment.as_slice());
-        let witness_challenges = transcript.extract_witness_challenges(polynomial_count);
+        let chi_challenge = transcript.extract_challenge();
 
         // Traverse circuit to compute the coefficients for the degree 0 and 1 terms for each
         // gate / polynomial (`A_i0` and `A_i1` in the paper) and start to aggregate these with
         // the challenges.
-        let mut circuit_traverser = ProverTraverser::new(wire_values, witness_challenges, voles)?;
-        circuit_traverser.execute(circuit)?;
-        // TODO: consider not returning the `voles` with `into_parts()`. This interface does not communicate that `voles` are only read but not modified by the circuit traverser
-        let (degree_0_aggregation, degree_1_aggregation, voles) = circuit_traverser.into_parts()?;
+        let mut circuit_traverser = ProverTraverser::new(witness, chi_challenge, voles)?;
+        circuit.execute(&mut circuit_traverser)?;
+        let (degree_0_aggregation, degree_1_aggregation, assert_zero_commitment, voles) =
+            circuit_traverser.into_parts()?;
 
         log::info!("4: circuit_traverser.into_parts: {:?}", t.elapsed());
 
@@ -130,7 +160,11 @@ where
         let degree_1_commitment = degree_1_aggregation + degree_1_mask;
 
         // Add aggregated responses to transcript
-        transcript.append_polynomial_commitments(&degree_0_commitment, &degree_1_commitment);
+        transcript.append_polynomial_commitments(
+            &degree_0_commitment,
+            &degree_1_commitment,
+            &assert_zero_commitment,
+        );
         let decommitment_challenge = transcript.extract_decommitment_challenge();
 
         // Decommit the VOLEs
@@ -141,7 +175,7 @@ where
         Ok(Self {
             witness_commitment,
             degree_1_commitment,
-            polynomial_count,
+            assert_zero_commitment,
             decommitment_challenge,
             partial_decommitment,
             vole: PhantomData,
@@ -164,10 +198,23 @@ where
         Ok(())
     }
 
+    /// Verify the proof for the given Circuit.
+    ///
+    pub fn verify_with_circuit(
+        &self,
+        circuit: &Circuit,
+        transcript: &mut Transcript,
+    ) -> Result<()> {
+        let (gates, _private_input, _max_wire_id) = circuit.to_interpreter();
+        self.verify(gates, transcript)
+    }
+
     /// Verify the proof.
     ///
-    pub fn verify(&self, circuit: &Circuit, transcript: &mut Transcript) -> Result<()>
-where {
+    pub fn verify<C>(&self, circuit: C, transcript: &mut Transcript) -> Result<()>
+    where
+        C: CircuitExecuter<F2>, // Can't do higher order trait bounds... See https://github.com/rust-lang/rust/issues/108185#issuecomment-2819123578
+    {
         let mut transcript = transcript::Transcript::from(transcript);
         transcript.append_public_values();
 
@@ -193,8 +240,8 @@ where {
         // Add hV (from VOLE) to the transcript here instead of in the vole part.
 
         // TODO: Should we be doing something with these challenges?
-        let witness_challenges = transcript.extract_witness_challenges(self.polynomial_count);
-        log::info!("3: extract_witness_challenges {:?}", t.elapsed());
+        let chi_challenge = transcript.extract_challenge();
+        log::info!("3: extract_challenges {:?}", t.elapsed());
 
         // Compute masked witnesses Q' = Q[..l] + d * Delta
         let t = std::time::Instant::now();
@@ -229,13 +276,12 @@ where {
 
         // Run circuit traversal and get the aggregate value (part of c~)
         let mut verifier_traverser = VerifierTraverser::new(
-            witness_challenges,
+            chi_challenge,
             reconstructed_voles.verifier_key(),
             masked_witnesses,
-            circuit.max_wire_id,
         )?;
-        verifier_traverser.execute(circuit)?;
-        let validation_aggregate = verifier_traverser.into_parts()?;
+        circuit.execute(&mut verifier_traverser)?;
+        let (validation_aggregate, aggregate_assert_zero) = verifier_traverser.into_parts()?;
         log::info!("5: circuit traverser {:?}", t.elapsed());
 
         let t = std::time::Instant::now();
@@ -245,7 +291,11 @@ where {
             validation - self.degree_1_commitment * reconstructed_voles.verifier_key();
 
         // Add aggregated responses to the transcript
-        transcript.append_polynomial_commitments(&degree_0_commitment, &self.degree_1_commitment);
+        transcript.append_polynomial_commitments(
+            &degree_0_commitment,
+            &self.degree_1_commitment,
+            &self.assert_zero_commitment,
+        );
 
         // Get the VOLE decommitment challenge and make sure it's valid
         let decommitment_challenge = transcript.extract_decommitment_challenge();
@@ -255,6 +305,15 @@ where {
                 "Verification failed: VOLE challenge did not match expected value"
             );
         }
+
+        // Assert zero check
+        if self.assert_zero_commitment != aggregate_assert_zero {
+            bail!(
+                ErrorKind::OtherError,
+                "Verification failed: Assert zero check failed"
+            );
+        }
+
         log::info!("6: last check {:?}", t.elapsed());
 
         Ok(())
@@ -321,7 +380,7 @@ mod tests {
         let circuit = load_circuit_prover(&mut circuit_cursor, &private_input_path)?;
         let rng = &mut thread_rng();
 
-        let proof = Proof::<InsecureVole, InsecureCommitments>::prove::<_>(
+        let proof = Proof::<InsecureVole, InsecureCommitments>::prove_with_circuit::<_>(
             &circuit,
             &mut transcript(),
             rng,
@@ -347,7 +406,11 @@ mod tests {
             @end";
 
         let (proof, mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes)?;
-        assert!(proof?.verify(&mini_circuit, &mut transcript()).is_ok());
+        assert!(
+            proof?
+                .verify_with_circuit(&mini_circuit, &mut transcript())
+                .is_ok()
+        );
 
         Ok(())
     }
@@ -383,7 +446,11 @@ mod tests {
             @end ";
 
         let (proof, small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes)?;
-        assert!(proof?.verify(&small_circuit, &mut transcript()).is_ok());
+        assert!(
+            proof?
+                .verify_with_circuit(&small_circuit, &mut transcript())
+                .is_ok()
+        );
 
         Ok(())
     }
@@ -408,7 +475,11 @@ mod tests {
         // If we use a different transcript to verify, it'll fail
         let transcript = &mut transcript();
         transcript.append_message(b"I am but a simple verifier", b"trying to be secure");
-        assert!(proof?.verify(&small_circuit, transcript).is_err());
+        assert!(
+            proof?
+                .verify_with_circuit(&small_circuit, transcript)
+                .is_err()
+        );
 
         Ok(())
     }
@@ -436,12 +507,12 @@ mod tests {
 
         let dir = tempdir().wrap_err(
             ErrorKind::FilesystemError,
-            "Failed to create a temporary directory.".to_string(),
+            "Failed to create a temporary directory.",
         )?;
         let private_input_path = dir.path().join("basic_happy_small_test_path");
         let mut private_input = File::create(private_input_path.clone()).wrap_err(
             ErrorKind::FilesystemError,
-            "Failed to create private input file.".to_string(),
+            "Failed to create private input file.",
         )?;
         let private_input_bytes = "version 2.0.0;
             private_input;
@@ -455,35 +526,22 @@ mod tests {
             @end ";
         writeln!(private_input, "{private_input_bytes}").wrap_err(
             ErrorKind::FilesystemError,
-            "Failed to write private input bytes to file.".to_string(),
+            "Failed to write private input bytes to file.",
         )?;
 
         let small_circuit = load_circuit_prover(small_circuit_text, &private_input_path)?;
         let rng = &mut thread_rng();
 
-        let proof = Proof::<InsecureVole, InsecureCommitments>::prove::<_>(
+        let proof = Proof::<InsecureVole, InsecureCommitments>::prove_with_circuit::<_>(
             &small_circuit,
             &mut transcript(),
             rng,
         )?;
 
-        // Adding an extra challenge should fail
-        let mut too_many_challenges = proof.clone();
-        too_many_challenges.polynomial_count += 1;
-
         assert!(
-            too_many_challenges
-                .verify(&small_circuit, &mut transcript())
-                .is_err()
-        );
-
-        // Not having enough challenges should fail
-        let mut too_few_challenges = proof.clone();
-        too_few_challenges.polynomial_count += 1;
-        assert!(
-            too_few_challenges
-                .verify(&small_circuit, &mut transcript())
-                .is_err()
+            proof
+                .verify_with_circuit(&small_circuit, &mut transcript())
+                .is_ok()
         );
 
         Ok(())
