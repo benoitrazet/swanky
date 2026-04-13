@@ -17,19 +17,12 @@ pub use arithmetic::{ArithmeticCircuit, ArithmeticGate};
 
 /// Trait for executing computations directly over a [`Fancy`] object.
 ///
-/// Existing circuit constructs in `fancy-garbling` (e.g., [`CircuitBuilder`]
-/// and [`EvaluableCircuit`]) separate out circuit _building_ from circuit
-/// _execution_, which means they pay an interpretation cost for evaluating the
-/// circuit (since the built circuit must be interpreted in order to be
-/// evaluated). This trait allows for building up computations that can be
-/// _directly_ executed, avoiding any additional cost.
-///
 /// # Example
 /// Below is a simple example of computing an add gate over an arbitrary
 /// modulus. The computation is defined in `execute` by directly calling
 /// operations on the underlying [`Fancy`] backend. We also need to track how
-/// many inputs the computation should take, and the moduli of those inputs;
-/// these are given in the `ninputs` and `modulus` methods, respectively.
+/// many inputs the computation takes, and the moduli of those inputs; these are
+/// given in the `ninputs` and `modulus` methods, respectively.
 /// ```
 /// struct AddCircuit(u16);
 /// impl<F: FancyArithmetic> CircuitExecutor<F> for AddCircuit {
