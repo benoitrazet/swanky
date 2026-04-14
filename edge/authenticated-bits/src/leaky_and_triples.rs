@@ -30,7 +30,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
 use swanky_party::{GenericParty, GenericWhichParty};
 use swanky_serialization::{CanonicalSerialize, SequenceDeserializer, SequenceSerializer};
-use vectoreyes::{SimdBase, U8x16};
+use vectoreyes::U8x16;
 
 /// A leaky AND triple.
 ///
@@ -99,7 +99,7 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
         mut rng: RNG,
     ) -> swanky_error::Result<Self> {
         let delta = Self::generate_valid_delta(&mut rng);
-        Self::new_with_delta(U8x16::from(delta), channel, rng)
+        Self::new_with_delta(delta, channel, rng)
     }
 
     /// Create a new [`LeakyAndTripleGenerator`] with a supplied $`\Delta`$

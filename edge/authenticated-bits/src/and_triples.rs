@@ -37,7 +37,6 @@
 use crate::{
     authshares::{AuthShare, AuthShareGenerator},
     leaky_and_triples::{LeakyAndTriple, LeakyAndTripleGenerator},
-    lsb,
 };
 use bytemuck::TransparentWrapper;
 use rand::{CryptoRng, Rng, SeedableRng, seq::SliceRandom};
@@ -45,7 +44,7 @@ use std::io::{Cursor, Seek};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
-use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
+use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer};
 use swanky_party::{
     GenericParty, GenericWhichParty, Party1, either::PartyEither, private::PartyPrivate,
 };
