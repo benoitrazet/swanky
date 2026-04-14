@@ -102,7 +102,9 @@ impl<P: GenericParty> AndTripleGenerator<P> {
         Ok(Self { leaky_generator })
     }
 
-    /// Generate a valid delta that can be used by the [`AndTripleGenerator`]
+    /// Generate a valid Δ that can be used by the [`AndTripleGenerator`].
+    /// Refer to the LeakyAndTripleGenerator::generate_valid_delta docs
+    /// for more information on what a valid Δ is.
     pub fn generate_valid_delta<RNG: CryptoRng + Rng>(rng: &mut RNG) -> U8x16 {
         LeakyAndTripleGenerator::<P>::generate_valid_delta(rng)
     }
