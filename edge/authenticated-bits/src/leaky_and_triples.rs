@@ -29,7 +29,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
 use swanky_party::{GenericParty, GenericWhichParty};
 use swanky_serialization::{CanonicalSerialize, SequenceDeserializer, SequenceSerializer};
-use vectoreyes::{SimdBase, U8x16};
+use vectoreyes::U8x16;
 
 /// A leaky AND triple.
 ///
@@ -69,31 +69,41 @@ pub(crate) struct LeakyAndTripleGenerator<P: GenericParty> {
 }
 
 impl<P: GenericParty> LeakyAndTripleGenerator<P> {
-    /// Create a new [`LeakyAndTripleGenerator`].
-    pub(crate) fn new<RNG: CryptoRng + Rng>(
-        channel: &mut Channel,
-        mut rng: RNG,
-    ) -> swanky_error::Result<Self> {
+    /// Generate a valid Δ that can be used by the [`LeakyAndTripleGenerator`]
+    ///
+    /// The AND and Leaky AND triple generation protocols require that parties
+    /// have Δ with different least significant bits (lsb). Towards that we
+    /// require that Party0's Δ has lsb == 1 and Party1's Δ has lsb == 0.
+    pub(crate) fn generate_valid_delta<RNG: CryptoRng + Rng>(rng: &mut RNG) -> U8x16 {
         let delta = rng.r#gen::<F128b>();
         // We require that for Party A `lsb(Δ) = 1`, and for Party
         // B `lsb(Δ) = 0`. So adjust `delta` as needed.
         let delta = match P::GENERIC_WHICH {
             GenericWhichParty::Party0(_) => {
-                if lsb(delta) == F2::ZERO {
+                if delta.lsb() == F2::ZERO {
                     delta + F128b::ONE
                 } else {
                     delta
                 }
             }
             GenericWhichParty::Party1(_) => {
-                if lsb(delta) == F2::ONE {
+                if delta.lsb() == F2::ONE {
                     delta + F128b::ONE
                 } else {
                     delta
                 }
             }
         };
-        Self::new_with_delta(U8x16::from(delta), channel, rng)
+        U8x16::from(delta)
+    }
+
+    /// Create a new [`LeakyAndTripleGenerator`].
+    pub(crate) fn new<RNG: CryptoRng + Rng>(
+        channel: &mut Channel,
+        mut rng: RNG,
+    ) -> swanky_error::Result<Self> {
+        let delta = Self::generate_valid_delta(&mut rng);
+        Self::new_with_delta(delta, channel, rng)
     }
 
     /// Create a new [`LeakyAndTripleGenerator`] with a supplied $`\Delta`$
@@ -109,10 +119,10 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
     ) -> swanky_error::Result<Self> {
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(_) => {
-                assert_eq!(lsb(F128b::from(delta)), F2::ONE)
+                assert_eq!(F128b::from(delta).lsb(), F2::ONE)
             }
             GenericWhichParty::Party1(_) => {
-                assert_eq!(lsb(F128b::from(delta)), F2::ZERO)
+                assert_eq!(F128b::from(delta).lsb(), F2::ZERO)
             }
         }
         let auth_share_generator = AuthShareGenerator::new_with_delta(delta, channel, rng)?;
@@ -292,7 +302,7 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
                     "Failed to initialize bit sequence serializer.",
                 )?;
             for s in ss.iter() {
-                let lsb_s_mine = lsb(*s);
+                let lsb_s_mine = s.lsb();
                 serializer
                     .write(channel.as_std_io(), lsb_s_mine)
                     .wrap_err(ErrorKind::NetworkError, "Failed to write LSB.")?;
@@ -312,7 +322,7 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
                     "Failed to initialize bit sequence deserializer.",
                 )?;
             for ((x, y, z), s) in shares.into_iter().tuples().zip(ss.iter()) {
-                let lsb_s_mine = lsb(*s);
+                let lsb_s_mine = s.lsb();
                 let lsb_s_other = deserializer
                     .read(channel.as_std_io())
                     .wrap_err(ErrorKind::NetworkError, "Failed to read LSB.")?;
@@ -502,11 +512,6 @@ fn hash(input: F128b) -> F128b {
     F128b::from(U8x16::from(result))
 }
 
-// Extract the least-significant bit from a `F128b` value.
-fn lsb(input: F128b) -> F2 {
-    F2::from((U8x16::from(input).extract::<0>() & 1) != 0)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -627,13 +632,6 @@ mod tests {
                 },
             )
             .unwrap();
-        }
-    }
-
-    proptest! {
-        #[test]
-        fn lsb_works(input in any::<u128>()) {
-            prop_assert_eq!(lsb(F128b::from(U8x16::from(input))), F2::from((input & 1) != 0));
         }
     }
 }
