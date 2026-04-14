@@ -9,13 +9,19 @@ use swanky_serialization::{
     ByteElementDeserializer, ByteElementSerializer, BytesDeserializationCannotFail,
     CanonicalSerialize,
 };
-use vectoreyes::U8x16;
+use vectoreyes::{SimdBase, U8x16};
 
 /// An element of the finite field $\textsf{GF}(2^{128})$ reduced over $x^{128} + x^7 + x^2 + x + 1$
 #[derive(Debug, Clone, Copy, Hash, Eq)]
 // We use a u128 since Rust will pass it in registers, unlike a __m128i
 pub struct F128b(pub(crate) u128);
 
+impl F128b {
+    /// Extract the least-significant bit from a `F128b` value.
+    pub fn lsb(self) -> F2 {
+        F2::from((U8x16::from(self).extract::<0>() & 1) != 0)
+    }
+}
 #[cfg(test)]
 use swanky_polynomial::Polynomial;
 
@@ -288,8 +294,18 @@ swanky_field::field_ops!(F128b);
 
 #[cfg(test)]
 mod tests {
+    use crate::F2;
+
     use super::F128b;
+    use proptest::prelude::*;
+    use vectoreyes::U8x16;
     swanky_field_test::test_field!(test_field, F128b, crate::f128b::polynomial_modulus_f128b);
+    proptest! {
+        #[test]
+        fn lsb_works(input in any::<u128>()) {
+            prop_assert_eq!(F128b::from(U8x16::from(input)).lsb(), F2::from((input & 1) != 0));
+        }
+    }
 }
 
 #[test]

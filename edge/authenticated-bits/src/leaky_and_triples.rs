@@ -19,7 +19,6 @@
 use crate::{
     and_triples::AndTriple,
     authshares::{AuthShare, AuthShareGenerator},
-    lsb,
 };
 use itertools::Itertools;
 use rand::{CryptoRng, Rng};
@@ -75,20 +74,20 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
     /// The AND and Leaky AND triple generation protocols require that parties
     /// have Δ with different least significant bits (lsb). Towards that we
     /// require that Party0's Δ has lsb == 1 and Party1's Δ has lsb == 0.
-    pub fn generate_valid_delta<RNG: CryptoRng + Rng>(rng: &mut RNG) -> U8x16 {
+    pub(crate) fn generate_valid_delta<RNG: CryptoRng + Rng>(rng: &mut RNG) -> U8x16 {
         let delta = rng.r#gen::<F128b>();
         // We require that for Party A `lsb(Δ) = 1`, and for Party
         // B `lsb(Δ) = 0`. So adjust `delta` as needed.
         let delta = match P::GENERIC_WHICH {
             GenericWhichParty::Party0(_) => {
-                if lsb(delta) == F2::ZERO {
+                if delta.lsb() == F2::ZERO {
                     delta + F128b::ONE
                 } else {
                     delta
                 }
             }
             GenericWhichParty::Party1(_) => {
-                if lsb(delta) == F2::ONE {
+                if delta.lsb() == F2::ONE {
                     delta + F128b::ONE
                 } else {
                     delta
@@ -120,10 +119,10 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
     ) -> swanky_error::Result<Self> {
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(_) => {
-                assert_eq!(lsb(F128b::from(delta)), F2::ONE)
+                assert_eq!(F128b::from(delta).lsb(), F2::ONE)
             }
             GenericWhichParty::Party1(_) => {
-                assert_eq!(lsb(F128b::from(delta)), F2::ZERO)
+                assert_eq!(F128b::from(delta).lsb(), F2::ZERO)
             }
         }
         let auth_share_generator = AuthShareGenerator::new_with_delta(delta, channel, rng)?;
@@ -303,7 +302,7 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
                     "Failed to initialize bit sequence serializer.",
                 )?;
             for s in ss.iter() {
-                let lsb_s_mine = lsb(*s);
+                let lsb_s_mine = s.lsb();
                 serializer
                     .write(channel.as_std_io(), lsb_s_mine)
                     .wrap_err(ErrorKind::NetworkError, "Failed to write LSB.")?;
@@ -323,7 +322,7 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
                     "Failed to initialize bit sequence deserializer.",
                 )?;
             for ((x, y, z), s) in shares.into_iter().tuples().zip(ss.iter()) {
-                let lsb_s_mine = lsb(*s);
+                let lsb_s_mine = s.lsb();
                 let lsb_s_other = deserializer
                     .read(channel.as_std_io())
                     .wrap_err(ErrorKind::NetworkError, "Failed to read LSB.")?;
