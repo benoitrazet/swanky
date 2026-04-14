@@ -104,27 +104,8 @@ impl<P: GenericParty> AndTripleGenerator<P> {
     }
 
     /// Generate a valid delta that can be used by the [`AndTripleGenerator`]
-    pub fn generate_valid_delta<RNG: CryptoRng + Rng>(mut rng: RNG) -> U8x16 {
-        let delta = rng.r#gen::<F128b>();
-        // We require that for Party A `lsb(Δ) = 1`, and for Party
-        // B `lsb(Δ) = 0`. So adjust `delta` as needed.
-        let delta = match P::GENERIC_WHICH {
-            GenericWhichParty::Party0(_) => {
-                if lsb(delta) == F2::ZERO {
-                    delta + F128b::ONE
-                } else {
-                    delta
-                }
-            }
-            GenericWhichParty::Party1(_) => {
-                if lsb(delta) == F2::ONE {
-                    delta + F128b::ONE
-                } else {
-                    delta
-                }
-            }
-        };
-        U8x16::from(delta)
+    pub fn generate_valid_delta<RNG: CryptoRng + Rng>(rng: &mut RNG) -> U8x16 {
+        LeakyAndTripleGenerator::<P>::generate_valid_delta(rng)
     }
 
     /// Create a new [`AndTripleGenerator`] with a supplied $`\Delta`$ value.

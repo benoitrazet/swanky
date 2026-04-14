@@ -70,11 +70,8 @@ pub(crate) struct LeakyAndTripleGenerator<P: GenericParty> {
 }
 
 impl<P: GenericParty> LeakyAndTripleGenerator<P> {
-    /// Create a new [`LeakyAndTripleGenerator`].
-    pub(crate) fn new<RNG: CryptoRng + Rng>(
-        channel: &mut Channel,
-        mut rng: RNG,
-    ) -> swanky_error::Result<Self> {
+    /// Generate a valid delta that can be used by the [`AndTripleGenerator`]
+    pub fn generate_valid_delta<RNG: CryptoRng + Rng>(rng: &mut RNG) -> U8x16 {
         let delta = rng.r#gen::<F128b>();
         // We require that for Party A `lsb(Δ) = 1`, and for Party
         // B `lsb(Δ) = 0`. So adjust `delta` as needed.
@@ -94,6 +91,14 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
                 }
             }
         };
+        U8x16::from(delta)
+    }
+    /// Create a new [`LeakyAndTripleGenerator`].
+    pub(crate) fn new<RNG: CryptoRng + Rng>(
+        channel: &mut Channel,
+        mut rng: RNG,
+    ) -> swanky_error::Result<Self> {
+        let delta = Self::generate_valid_delta(&mut rng);
         Self::new_with_delta(U8x16::from(delta), channel, rng)
     }
 
