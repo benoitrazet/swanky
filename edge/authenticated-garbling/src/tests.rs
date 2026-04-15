@@ -25,7 +25,7 @@ mod tests {
         swanky_channel::local::local_channel_pair(
             |c| {
                 let rng = SwankyRng::new();
-                Garbler::new(rng)
+                Garbler::new(rng, c)
             },
             |c| {
                 let rng = SwankyRng::new();
@@ -40,7 +40,7 @@ mod tests {
         swanky_channel::local::local_channel_pair(
             |c| {
                 let rng = SwankyRng::new();
-                let mut gb = Garbler::new(rng).unwrap();
+                let mut gb = Garbler::new(rng, c).unwrap();
                 gb.preprocess_circuit(&mut fancy_sum, input_size, c)
             },
             |c| {
