@@ -21,6 +21,7 @@ type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler<RNG> {
     delta: WireMod2, // delta wire-label.
+    zero: WireMod2, // delta wire-label.
     current_wire_index: usize,
     preprocessed_wires_map: HashMap<usize, PreProcessedWire<PartyGarbler>>,
     known_triples_map: HashMap<usize, PreProcessedWire<PartyGarbler>>,
@@ -30,10 +31,14 @@ pub struct Garbler<RNG> {
 
 impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// Create a new garbler.
-    pub fn new(mut rng: RNG) -> swanky_error::Result<Self> {
+    pub fn new(mut rng: RNG, channel: &mut Channel) -> swanky_error::Result<Self> {
         let delta = WireMod2::from_repr(AndTripleGenerator::<PartyGarbler>::generate_valid_delta(&mut rng), 2);
+        let zero = WireMod2::rand(&mut rng, 2);
+        let one = zero.clone() + delta.clone();
+        channel.write(&one.to_repr())?;
         Ok(Garbler {
             delta,
+            zero,
             current_wire_index: 0,
             preprocessed_wires_map: HashMap::new(),
             known_triples_map: HashMap::new(),
@@ -237,15 +242,7 @@ where
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        AuthenticatedWireMod2::new(
-            // Negation of a wire is just a matter of adding Δ
-            x.wire_label() + self.delta(),
-            // The authenticated share is not affected by negation
-            x.auth_share(),
-            // The index of the wire does not change, this is consistent
-            // with how this wire is assigned an index in preprocessing.
-            x.index(),
-        )
+         AuthenticatedWireMod2::new(x.wire_label() + self.zero, x.auth_share(), x.index())
     }
 }
 
