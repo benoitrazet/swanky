@@ -102,6 +102,14 @@ impl<P: GenericParty> AndTripleGenerator<P> {
         Ok(Self { leaky_generator })
     }
 
+    /// Generate a valid Δ that can be used by the [`AndTripleGenerator`].
+    /// The AND and Leaky AND triple generation protocols require that parties
+    /// have Δ with different least significant bits (lsb). Towards that we
+    /// require that Party0's Δ has lsb == 1 and Party1's Δ has lsb == 0.
+    pub fn generate_valid_delta<RNG: CryptoRng + Rng>(rng: &mut RNG) -> U8x16 {
+        LeakyAndTripleGenerator::<P>::generate_valid_delta(rng)
+    }
+
     /// Create a new [`AndTripleGenerator`] with a supplied $`\Delta`$ value.
     ///
     /// # Panics
