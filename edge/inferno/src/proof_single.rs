@@ -34,6 +34,21 @@ pub(crate) struct ProofSingle<F: FiniteField, const N: usize> {
 }
 
 impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
+    #[cfg(test)]
+    /// Create a new [`ProofSingle`] object from a set of output shares, party
+    /// shares, and an unopened party ID.
+    pub(crate) fn new(
+        output: OutputShares<F, N>,
+        shares: OpenedPartiesShares<F, N>,
+        unopened: UnopenedParty,
+    ) -> Self {
+        Self {
+            output,
+            shares,
+            unopened,
+        }
+    }
+
     /// Generate a proof that `circuit(witness) = 0`.
     pub fn prove(
         circuit: &Circuit<F::PrimeField>,
@@ -227,7 +242,10 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
     /// Construct an `OutputShares` object from the computations of the final round
     /// of the MPC-in-the-head protocol and the output shares of the protocol
     /// execution.
-    fn new(round: Round<SecretSharing<F, N>>, output: SecretSharing<F::PrimeField, N>) -> Self {
+    pub(crate) fn new(
+        round: Round<SecretSharing<F, N>>,
+        output: SecretSharing<F::PrimeField, N>,
+    ) -> Self {
         Self {
             fs: round.xs.into_iter().map(|x| x.into()).collect(),
             gs: round.ys.into_iter().map(|y| y.into()).collect(),
