@@ -5,7 +5,7 @@ use crate::ps::PartyGarbler;
 use crate::unifier::{CircuitExecutor, CircuitExecutorItem};
 use crate::wire::AuthenticatedWireMod2;
 use fancy_garbling::{
-    BinaryBundle, Fancy, FancyBinary,WireLabel, WireMod2, util::u128_to_bits,
+    BinaryBundle, Fancy, FancyBinary,WireLabel, WireMod2, 
 };
 
 use rand::{CryptoRng, RngCore};
@@ -53,7 +53,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     }
 
     /// Return the garbler's delta as U8x16
-    pub fn delta_U8x16(&mut self) -> U8x16 {
+    pub fn delta_u8x16(&mut self) -> U8x16 {
         self.delta().to_repr()
     }
 
@@ -85,7 +85,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         input_size: usize,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
-        let mut and_generator = AndTripleGenerator::new_with_delta(self.delta_U8x16(), channel, &mut self.rng)?;
+        let mut and_generator = AndTripleGenerator::new_with_delta(self.delta_u8x16(), channel, &mut self.rng)?;
         let (preprocessed_wires_map, known_triples_map, _) = f_preprocessing(
             &circuit,
             &mut and_generator,
@@ -197,13 +197,13 @@ where
         let key_c_triple = lc0_triple.key();
 
         // Compute Δ_rα := Δ x r_α: if r_α is 0, then this value is 0, otherwise its Δ
-        let delta_bit_a = mux(la0.auth_share().bit(), 0.into(), self.delta_U8x16());
+        let delta_bit_a = mux(la0.auth_share().bit(), 0.into(), self.delta_u8x16());
         // Compute Δ_rβ := Δ x r_β: if r_β is 0, then this value is 0, otherwise its Δ
-        let delta_bit_b = mux(lb0.auth_share().bit(), 0.into(), self.delta_U8x16());
+        let delta_bit_b = mux(lb0.auth_share().bit(), 0.into(), self.delta_u8x16());
         // Compute Δ_rγ := Δ x r_γ: if r_γ is 0, then this value is 0, otherwise its Δ
-        let delta_bit_c = mux(lc0_share.bit(), 0.into(), self.delta_U8x16());
+        let delta_bit_c = mux(lc0_share.bit(), 0.into(), self.delta_u8x16());
         // Compute Δ_r*γ := Δ x r*_γ: if r*_γ is 0, then this value is 0, otherwise its Δ
-        let delta_bit_c_triple = mux(lc0_triple.bit(), 0.into(), self.delta_U8x16());
+        let delta_bit_c_triple = mux(lc0_triple.bit(), 0.into(), self.delta_u8x16());
 
         // Gate_{γ,0} = H(L_{α,0}, γ) + H(L_{α,1}, γ) + K[s_β] + Δ_rβ
         let gate0 = h_la0 + h_la1 + key_b + delta_bit_b;
@@ -275,7 +275,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
                 .iter()
                 .map(|auth_wire| auth_wire.auth_share())
                 .collect::<Vec<AuthShare<PartyGarbler>>>(),
-            self.delta_U8x16(),
+            self.delta_u8x16(),
             &mut masks,
             channel,
         )?;
@@ -310,7 +310,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         // y_w + λ_w := y_w ⊕ s_w ⊕ r_w
         let masked_values: Vec<F2> = (0..moduli.len())
             .into_iter()
-            .map(|i| {
+            .map(|_i| {
                 // The garbler receives the evaluator's masked value y_w + λ_w
                 channel.read().unwrap()
             })
@@ -355,7 +355,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         let mut out = Vec::with_capacity(1);
         AuthShareGenerator::open_with_delta(
             &[auth_share],
-            self.delta_U8x16(),
+            self.delta_u8x16(),
             &mut out,
             channel,
         )?;
@@ -373,7 +373,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         let mut outputs = Vec::with_capacity(x.len());
         AuthShareGenerator::open_with_delta(
             &auth_shares,
-            self.delta_U8x16(),
+            self.delta_u8x16(),
             &mut outputs,
             channel,
         )?;

@@ -4,7 +4,7 @@
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_party::party_system;
-use vectoreyes::{SimdBase, U8x16};
+use vectoreyes::{U8x16};
 
 pub mod evaluator;
 pub mod finalizer;

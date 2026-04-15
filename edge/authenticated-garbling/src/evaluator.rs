@@ -222,7 +222,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
                 // y_w + λ_w := y_w ⊕ s_w ⊕ r_w
                 let value_f2 = F2::from(values[i]) + self.values[index_shift + i];
                 // The evaluator sends that value to the garbler
-                channel.write(&value_f2);
+                let _ = channel.write(&value_f2);
                 // The evaluator receives the wire label associated with their masked value.
                 // This value is the following in the paper:
                 // L_{w,y_w ⊕λ_w}

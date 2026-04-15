@@ -17,7 +17,9 @@ pub struct Finalizer<P: GenericParty> {
 }
 
 impl<P: GenericParty> Finalizer<P> {
-    pub(crate) fn new(values: Vec<F2>) -> Self {
+    /// Construct a new finalizer using the existing values
+    /// computed during garbling
+    pub fn new(values: Vec<F2>) -> Self {
         Finalizer {
             values,
             validation_bits: Vec::new(),
@@ -25,9 +27,7 @@ impl<P: GenericParty> Finalizer<P> {
             phantom: PhantomData,
         }
     }
-    pub(crate) fn insert_validation_bit(&mut self, c: F2) {
-        self.validation_bits.push(c);
-    }
+
     pub(crate) fn validate(&self) -> swanky_error::Result<bool> {
         for bit in self.validation_bits.iter() {
             if *bit != F2::from(0) {
@@ -43,16 +43,18 @@ impl<P: GenericParty> Finalizer<P> {
     pub(crate) fn value_at_index(&mut self, index: usize) -> F2 {
         self.values[index]
     }
-    pub(crate) fn exchange_masked_values(&mut self, nwires: usize, channel: &mut Channel) {
+    /// The evaluator sends a masked value to the garbler in order for them to perform
+    /// the final validations in the protocol before opening the results.
+    pub fn exchange_masked_values(&mut self, nwires: usize, channel: &mut Channel) {
         match P::GENERIC_WHICH {
-            swanky_party::GenericWhichParty::Party0(witness) => {
-                (0..nwires).map(|_| {
+            swanky_party::GenericWhichParty::Party0(_witness) => {
+                let _ = (0..nwires).map(|_| {
                     let value = channel.read().unwrap();
                     self.values.push(value);
                 });
             }
-            swanky_party::GenericWhichParty::Party1(witness) => {
-                self.values.iter().map(|v| channel.write(v));
+            swanky_party::GenericWhichParty::Party1(_witness) => {
+                let _ = self.values.iter().map(|v| channel.write(v));
             }
         }
     }
@@ -103,7 +105,7 @@ impl<P: GenericParty> std::fmt::Display for Finalizer<P> {
 }
 
 impl<P: GenericParty> FancyBinary for Finalizer<P> {
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+    fn xor(&mut self, _x: &Self::Item, _y: &Self::Item) -> Self::Item {
         let index = self.current_index;
         FinalizerItem::new(self.value_at_index(index), &mut self.current_index)
     }
@@ -119,7 +121,7 @@ impl<P: GenericParty> FancyBinary for Finalizer<P> {
         Ok(res)
     }
     /// Double check later that negation does not affect the authentication shares
-    fn negate(&mut self, x: &Self::Item) -> Self::Item {
+    fn negate(&mut self, _x: &Self::Item) -> Self::Item {
         let index = self.current_index;
         FinalizerItem::new(self.value_at_index(index), &mut self.current_index)
     }
@@ -134,8 +136,8 @@ impl<P: GenericParty> Fancy for Finalizer<P> {
         moduli: &[u16],
         _channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        let mut start_index = 0;
-        let mut end_index = 0;
+        let  start_index;
+        let  end_index;
         match P::GENERIC_WHICH {
             swanky_party::GenericWhichParty::Party0(_gb) => {
                 // The evaluator's wires go second in the values' vector
@@ -160,8 +162,8 @@ impl<P: GenericParty> Fancy for Finalizer<P> {
         moduli: &[u16],
         _channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        let mut start_index = 0;
-        let mut end_index = 0;
+        let  start_index;
+        let  end_index;
         match P::GENERIC_WHICH {
             swanky_party::GenericWhichParty::Party0(_gb) => {
                 // The garbler's wires go first in the values' vector
