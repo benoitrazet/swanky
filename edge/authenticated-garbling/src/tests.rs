@@ -1,11 +1,10 @@
-
 #[cfg(test)]
 mod tests {
 
-    use crate::garbler::{Garbler};
-    use crate::evaluator::{Evaluator};
+    use crate::evaluator::Evaluator;
+    use crate::garbler::Garbler;
 
-    use fancy_garbling::{BinaryBundle, BinaryGadgets, Fancy, FancyBinary, };
+    use fancy_garbling::{BinaryBundle, BinaryGadgets, Fancy, FancyBinary};
     use swanky_channel::Channel;
     use swanky_rng::SwankyRng;
 
@@ -34,7 +33,7 @@ mod tests {
         )
         .unwrap();
     }
-        #[test]
+    #[test]
     fn test_party_preprocessing_passes() {
         let input_size = 400;
         swanky_channel::local::local_channel_pair(
@@ -45,8 +44,8 @@ mod tests {
             },
             |c| {
                 let rng = SwankyRng::new();
-               let mut ev =  Evaluator::new(c, rng).unwrap();
-               ev.preprocess_circuit(&mut fancy_sum, input_size, c)
+                let mut ev = Evaluator::new(c, rng).unwrap();
+                ev.preprocess_circuit(&mut fancy_sum, input_size, c)
             },
         )
         .unwrap();

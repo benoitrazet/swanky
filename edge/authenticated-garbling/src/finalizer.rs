@@ -130,14 +130,13 @@ impl<P: GenericParty> FancyBinary for Finalizer<P> {
 impl<P: GenericParty> Fancy for Finalizer<P> {
     type Item = FinalizerItem<P>;
 
-
     fn receive_many(
         &mut self,
         moduli: &[u16],
         _channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        let  start_index;
-        let  end_index;
+        let start_index;
+        let end_index;
         match P::GENERIC_WHICH {
             swanky_party::GenericWhichParty::Party0(_gb) => {
                 // The evaluator's wires go second in the values' vector
@@ -162,8 +161,8 @@ impl<P: GenericParty> Fancy for Finalizer<P> {
         moduli: &[u16],
         _channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        let  start_index;
-        let  end_index;
+        let start_index;
+        let end_index;
         match P::GENERIC_WHICH {
             swanky_party::GenericWhichParty::Party0(_gb) => {
                 // The garbler's wires go first in the values' vector

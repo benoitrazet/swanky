@@ -170,7 +170,6 @@ impl<P: GenericParty> std::fmt::Display for WirePreProcessor<P> {
     }
 }
 
-
 impl<P: GenericParty> FancyBinary for WirePreProcessor<P> {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         let index = self.current_index();

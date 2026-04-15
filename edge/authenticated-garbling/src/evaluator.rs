@@ -38,7 +38,8 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
     pub fn new(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self> {
         // Receive the constant one wirelabel from the garbler. This is used to
         // make negation free.
-        let authentication_delta = AndTripleGenerator::<PartyEvaluator>::generate_valid_delta(&mut rng);
+        let authentication_delta =
+            AndTripleGenerator::<PartyEvaluator>::generate_valid_delta(&mut rng);
         let one = channel.read::<U8x16>()?;
         Ok(Evaluator {
             one: WireMod2::from_repr(one, 2),
@@ -64,7 +65,8 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
         input_size: usize,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
-        let mut and_generator = AndTripleGenerator::new_with_delta(self.delta(), channel, &mut self.rng)?;
+        let mut and_generator =
+            AndTripleGenerator::new_with_delta(self.delta(), channel, &mut self.rng)?;
         let (preprocessed_wires_map, known_triples_map, nwires) = f_preprocessing(
             &circuit,
             &mut and_generator,
@@ -115,7 +117,6 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
         Ok(WireMod2::from_repr(bytes, 2))
     }
 }
-
 
 impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
     /// Overriding `negate` to be a noop: entirely handled on garbler's end.

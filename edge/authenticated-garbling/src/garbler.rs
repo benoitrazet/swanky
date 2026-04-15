@@ -4,9 +4,7 @@ use crate::preprocesser::{f_preprocessing, wire::PreProcessedWire};
 use crate::ps::PartyGarbler;
 use crate::unifier::{CircuitExecutor, CircuitExecutorItem};
 use crate::wire::AuthenticatedWireMod2;
-use fancy_garbling::{
-    BinaryBundle, Fancy, FancyBinary,WireLabel, WireMod2, 
-};
+use fancy_garbling::{BinaryBundle, Fancy, FancyBinary, WireLabel, WireMod2};
 
 use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
@@ -21,7 +19,7 @@ type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler<RNG> {
     delta: WireMod2, // delta wire-label.
-    zero: WireMod2, // delta wire-label.
+    zero: WireMod2,  // delta wire-label.
     current_wire_index: usize,
     preprocessed_wires_map: HashMap<usize, PreProcessedWire<PartyGarbler>>,
     known_triples_map: HashMap<usize, PreProcessedWire<PartyGarbler>>,
@@ -32,7 +30,10 @@ pub struct Garbler<RNG> {
 impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// Create a new garbler.
     pub fn new(mut rng: RNG, channel: &mut Channel) -> swanky_error::Result<Self> {
-        let delta = WireMod2::from_repr(AndTripleGenerator::<PartyGarbler>::generate_valid_delta(&mut rng), 2);
+        let delta = WireMod2::from_repr(
+            AndTripleGenerator::<PartyGarbler>::generate_valid_delta(&mut rng),
+            2,
+        );
         let zero = WireMod2::rand(&mut rng, 2);
         let one = zero.clone() + delta.clone();
         channel.write(&one.to_repr())?;
@@ -85,7 +86,8 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         input_size: usize,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
-        let mut and_generator = AndTripleGenerator::new_with_delta(self.delta_u8x16(), channel, &mut self.rng)?;
+        let mut and_generator =
+            AndTripleGenerator::new_with_delta(self.delta_u8x16(), channel, &mut self.rng)?;
         let (preprocessed_wires_map, known_triples_map, _) = f_preprocessing(
             &circuit,
             &mut and_generator,
@@ -149,7 +151,6 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         Ok(evs)
     }
 }
-
 
 impl<RNG> FancyBinary for Garbler<RNG>
 where
@@ -242,7 +243,7 @@ where
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-         AuthenticatedWireMod2::new(x.wire_label() + self.zero, x.auth_share(), x.index())
+        AuthenticatedWireMod2::new(x.wire_label() + self.zero, x.auth_share(), x.index())
     }
 }
 
@@ -353,12 +354,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
     ) -> swanky_error::Result<Option<u16>> {
         let auth_share: AuthShare<PartyGarbler> = x.auth_share();
         let mut out = Vec::with_capacity(1);
-        AuthShareGenerator::open_with_delta(
-            &[auth_share],
-            self.delta_u8x16(),
-            &mut out,
-            channel,
-        )?;
+        AuthShareGenerator::open_with_delta(&[auth_share], self.delta_u8x16(), &mut out, channel)?;
         Ok(Some(u16::from(out[0])))
     }
     // Preferable function when processing multiple outputs!

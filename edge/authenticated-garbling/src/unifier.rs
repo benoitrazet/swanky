@@ -2,7 +2,8 @@
 use std::collections::HashMap;
 
 use fancy_garbling::{
-    BinaryBundle, BinaryGadgets, Fancy, FancyBinary, HasModulus, circuit_analyzer::{AnalyzerItem, CircuitAnalyzer}
+    BinaryBundle, BinaryGadgets, Fancy, FancyBinary, HasModulus,
+    circuit_analyzer::{AnalyzerItem, CircuitAnalyzer},
 };
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::authshares::AuthShare;
