@@ -12,6 +12,7 @@ pub mod garbler;
 pub mod preprocesser;
 pub mod wire;
 pub mod unifier;
+mod tests;
 
 /// Mux over bit: if the bit is 0, returns value0, otherwise value1
 pub fn mux(bit: F2, value0: U8x16, value1: U8x16) -> U8x16 {
