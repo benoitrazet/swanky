@@ -35,13 +35,14 @@ pub struct Evaluator<RNG> {
 
 impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
     /// Create a new `Evaluator`.
-    pub fn new(channel: &mut Channel, rng: RNG) -> swanky_error::Result<Self> {
+    pub fn new(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self> {
         // Receive the constant one wirelabel from the garbler. This is used to
         // make negation free.
+        let authentication_delta = AndTripleGenerator::<PartyEvaluator>::generate_valid_delta(&mut rng);
         let one = channel.read::<U8x16>()?;
         Ok(Evaluator {
             one: WireMod2::from_repr(one, 2),
-            authentication_delta: U8x16::from(0),
+            authentication_delta,
             preprocessed_wires_map: HashMap::new(),
             known_triples_map: HashMap::new(),
             values: Vec::new(),
@@ -63,7 +64,7 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
         input_size: usize,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
-        let mut and_generator = AndTripleGenerator::new(channel, &mut self.rng)?;
+        let mut and_generator = AndTripleGenerator::new_with_delta(self.delta(), channel, &mut self.rng)?;
         let (preprocessed_wires_map, known_triples_map, nwires) = f_preprocessing(
             &circuit,
             &mut and_generator,
@@ -79,7 +80,7 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
     }
 
     /// Get the deltas, consuming the Evaluator
-    pub fn get_delta(&self) -> U8x16 {
+    pub fn delta(&self) -> U8x16 {
         self.authentication_delta
     }
     /// The current output index of the garbling computation.
@@ -259,7 +260,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
                 .iter()
                 .map(|auth_wire| auth_wire.auth_share())
                 .collect::<Vec<AuthShare<PartyEvaluator>>>(),
-            self.get_delta(),
+            self.delta(),
             &mut masks,
             channel,
         )?;
@@ -315,7 +316,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
     ) -> swanky_error::Result<Option<u16>> {
         let auth_share: AuthShare<PartyEvaluator> = x.auth_share();
         let mut out = Vec::with_capacity(1);
-        AuthShareGenerator::open_with_delta(&[auth_share], self.get_delta(), &mut out, channel)?;
+        AuthShareGenerator::open_with_delta(&[auth_share], self.delta(), &mut out, channel)?;
         Ok(Some(u16::from(out[0])))
     }
     // Preferable function when processing multiple outputs!
@@ -328,7 +329,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         let auth_shares: Vec<AuthShare<PartyEvaluator>> =
             x.iter().map(|wire| wire.auth_share()).collect();
         let mut masks = Vec::with_capacity(x.len());
-        AuthShareGenerator::open_with_delta(&auth_shares, self.get_delta(), &mut masks, channel)?;
+        AuthShareGenerator::open_with_delta(&auth_shares, self.delta(), &mut masks, channel)?;
         let mut outputs = Vec::with_capacity(x.len());
         for i in 0..x.len() {
             outputs.push((masks[i] + self.get_value(x[i].index())).into());
