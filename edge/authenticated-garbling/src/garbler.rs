@@ -143,50 +143,6 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         }
         Ok(evs)
     }
-    /// Encodes several bits as Binary bundles of authenticated shares along with their associated wire masked labels.
-    ///
-    /// This is done in four steps: First the garbler generates authenticated wires for each of those
-    /// inputs and returns the zeroes generated for those wires; Then the garbler open the authenticated
-    /// shares associated with each authenticated wire; Then the garbler uses the opened bits to mask their
-    /// input values and finally encodes them as labels.
-    pub fn bin_encode_wire(
-        &mut self,
-        val: u128,
-        nbits: usize,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<(
-        BinaryBundle<AuthenticatedWireMod2<PartyGarbler>>,
-        BinaryBundle<WireMod2>,
-    )> {
-        let xs = u128_to_bits(val, nbits);
-        let values: Vec<F2> = xs.iter().map(|b| F2::from(*b)).collect();
-        // Garbler generates authenticated wires for each of those
-        // inputs and returns the zeroes generated for those wires
-        let (gbs, zeroes) = self.encode_many_auth_wires(values.len())?;
-
-        // Both parties open their input shares to each reach the bit mask that they will use
-        // to hide their inputs. The masks are called λ_w in the paper.
-        let mut masks = Vec::with_capacity(values.len());
-        AuthShareGenerator::open_with_delta(
-            &gbs.iter()
-                .map(|auth_wire| auth_wire.auth_share())
-                .collect::<Vec<AuthShare<PartyGarbler>>>(),
-            self.delta_U8x16(),
-            &mut masks,
-            channel,
-        )?;
-        // Garbler uses the opened bits to mask their input values
-        let masked_values: Vec<F2> = values
-            .iter()
-            .zip(masks.iter())
-            .map(|(val, mask)| val + mask)
-            .collect();
-        // Save the masked values for the finalization step
-        self.input_masked_values.extend(masked_values.clone());
-        // Garbler encodes the masked values and sends them to the evaluator
-        let evs = self.encode_many_wires(&masked_values, &zeroes)?;
-        Ok((BinaryBundle::new(gbs), BinaryBundle::new(evs)))
-    }
 }
 
 
