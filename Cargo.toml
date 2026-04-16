@@ -150,7 +150,7 @@ ff = { git = "https://github.com/GaloisInc/ff", rev = "c29da06f50c67fe9e7361c26f
 ff_codegen = { git = "https://github.com/GaloisInc/ff", rev = "c29da06f50c67fe9e7361c26f61ac831915244f8" }
 
 # External Dependencies
-aes = "0.8.4"
+aes = "=0.8.4" # See issue #375
 aes-gcm = "0.10.3"
 arc-swap = "1.8.2"
 arrayvec = "0.7.6"
