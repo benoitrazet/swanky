@@ -8,7 +8,6 @@ use crate::{
     util::{output_tweak, tweak, tweak2},
     wire::WireLabel,
 };
-use std::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
 use vectoreyes::U8x16;
@@ -21,7 +20,6 @@ pub struct Evaluator<Wire> {
     one: Wire,
     current_gate: usize,
     current_output: usize,
-    _phantom: PhantomData<Wire>,
 }
 
 impl<Wire: WireLabel> Evaluator<Wire> {
@@ -34,7 +32,6 @@ impl<Wire: WireLabel> Evaluator<Wire> {
             one: Wire::from_repr(one, 2),
             current_gate: 0,
             current_output: 0,
-            _phantom: PhantomData,
         })
     }
 
@@ -50,12 +47,6 @@ impl<Wire: WireLabel> Evaluator<Wire> {
         let current = self.current_output;
         self.current_output += 1;
         current
-    }
-
-    /// Read a Wire from the reader.
-    pub fn read_wire(&mut self, modulus: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
-        let block = channel.read()?;
-        Ok(Wire::from_repr(block, modulus))
     }
 }
 
@@ -230,16 +221,17 @@ impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
         moduli: &[u16],
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        (0..moduli.len())
-            .map(|_| {
+        moduli
+            .iter()
+            .map(|q| {
                 let block = channel.read()?;
-                Ok(Wire::from_repr(block, 2))
+                Ok(Wire::from_repr(block, *q))
             })
             .collect()
     }
 
     fn constant(&mut self, _: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
-        self.read_wire(q, channel)
+        Ok(Wire::from_repr(channel.read()?, q))
     }
 
     fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {

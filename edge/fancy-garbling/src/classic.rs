@@ -7,7 +7,6 @@ use crate::{
     garble::{Evaluator, Garbler},
     util::output_tweak,
 };
-use itertools::Itertools;
 use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
 use swanky_channel::Channel;
@@ -54,14 +53,13 @@ impl GarbledCircuit {
         let mut channel = GarbledChannel::new_writer(None);
         let mut garbler = Channel::with(&mut channel, |channel| Garbler::new(rng, channel))?;
 
-        // get input wires, ignoring encoded values
+        // Produce zero wirelabels for the inputs.
         let inputs = (0..c.ninputs())
             .map(|i| {
                 let q = c.modulus(i);
-                let (zero, _) = garbler.encode_wire(0, q);
-                zero
+                garbler.encode_zero(q)
             })
-            .collect_vec();
+            .collect::<Vec<_>>();
 
         let zeros = Channel::with(&mut channel, |channel| {
             // First, garble the circuit, outputting the zero wirelabels
@@ -69,7 +67,7 @@ impl GarbledCircuit {
             let zeros = c.execute(&mut garbler, &inputs, channel)?;
             // Next, map the zero output wirelabels to the set of valid outputs.
             // This is needed for evaluators that don't use the output
-            // mapping provided as ouput; in that case, we need the channel to
+            // mapping provided as output; in that case, we need the channel to
             // contain that mapping, which is what the below does.
             garbler.outputs(&zeros, channel)?;
             Ok(zeros)
@@ -83,20 +81,16 @@ impl GarbledCircuit {
         Ok((en, gc, output_mapping))
     }
 
-    /// Evaluate the garbled circuit on the provided inputs.
+    /// Evaluate the garbled circuit on the provided inputs, mapping the output
+    /// wirelabels to their associated values.
     pub fn eval<Wire: WireLabel, Ex: CircuitExecutor<Evaluator<Wire>>>(
         &self,
         c: &Ex,
         inputs: &[Wire],
         output_mapping: &OutputMapping,
     ) -> swanky_error::Result<Vec<u16>> {
-        let output = Channel::with(GarbledChannel::from(self), |channel| {
-            let mut evaluator = Evaluator::new(channel)?;
-            let wirelabels = c.execute(&mut evaluator, inputs, channel)?;
-            let outputs = output_mapping.to_outputs(&wirelabels)?;
-            Ok(outputs)
-        })?;
-        Ok(output)
+        let wirelabels = self.eval_to_wirelabels(c, inputs)?;
+        output_mapping.to_outputs(&wirelabels)
     }
 
     /// Evaluate the garbled circuit on the provided inputs, returning the
