@@ -1,7 +1,4 @@
-use crate::{
-    FancyBinary, HasModulus,
-    circuit::{CircuitBuilder, CircuitExecutor, CircuitRef, CircuitType, GateType},
-};
+use crate::{FancyBinary, circuit::CircuitExecutor};
 use swanky_channel::Channel;
 
 /// Static representation of binary computation supported by fancy garbling.
@@ -9,9 +6,9 @@ use swanky_channel::Channel;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BinaryCircuit {
     pub(crate) gates: Vec<BinaryGate>,
-    pub(crate) input_refs: Vec<CircuitRef>,
-    pub(crate) const_refs: Vec<CircuitRef>,
-    pub(crate) output_refs: Vec<CircuitRef>,
+    pub(crate) input_refs: Vec<usize>,
+    pub(crate) const_refs: Vec<usize>,
+    pub(crate) output_refs: Vec<usize>,
     pub(crate) num_nonfree_gates: usize,
 }
 
@@ -22,6 +19,10 @@ impl<F: FancyBinary> CircuitExecutor<F> for BinaryCircuit {
         inputs: &[<F as crate::Fancy>::Item],
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<<F as crate::Fancy>::Item>> {
+        assert_eq!(
+            inputs.len(),
+            <BinaryCircuit as CircuitExecutor<F>>::ninputs(self)
+        );
         self.eval_to_wirelabels(backend, inputs, channel)
     }
 
@@ -55,10 +56,10 @@ pub enum BinaryGate {
     /// Xor gate
     Xor {
         /// Reference to input 1
-        xref: CircuitRef,
+        xref: usize,
 
         /// Reference to input 2
-        yref: CircuitRef,
+        yref: usize,
 
         /// Output wire index
         out: Option<usize>,
@@ -66,10 +67,10 @@ pub enum BinaryGate {
     /// And gate
     And {
         /// Reference to input 1
-        xref: CircuitRef,
+        xref: usize,
 
         /// Reference to input 2
-        yref: CircuitRef,
+        yref: usize,
 
         /// Gate number
         id: usize,
@@ -80,7 +81,7 @@ pub enum BinaryGate {
     /// Not gate
     Inv {
         /// Reference to input
-        xref: CircuitRef,
+        xref: usize,
 
         /// Output wire index
         out: Option<usize>,
@@ -105,6 +106,23 @@ impl std::fmt::Display for BinaryGate {
 }
 
 impl BinaryCircuit {
+    /// Construct a new empty [`BinaryCircuit`], allocating `ngates` of space to
+    /// store gates if provided.
+    pub fn new(ngates: Option<usize>) -> Self {
+        let gates = if let Some(n) = ngates {
+            Vec::with_capacity(n)
+        } else {
+            Vec::new()
+        };
+        Self {
+            gates,
+            input_refs: Vec::new(),
+            const_refs: Vec::new(),
+            output_refs: Vec::new(),
+            num_nonfree_gates: 0,
+        }
+    }
+
     fn eval_to_wirelabels<F: FancyBinary>(
         &self,
         f: &mut F,
@@ -117,133 +135,29 @@ impl BinaryCircuit {
             let (zref_, val) = match *gate {
                 BinaryGate::Input { id } => (None, inputs[id].clone()),
                 BinaryGate::Constant { val } => (None, f.constant(val, q, channel)?),
-                BinaryGate::Inv { xref, out } => (out, f.negate(cache[xref.ix].as_ref().unwrap())),
+                BinaryGate::Inv { xref, out } => (out, f.negate(cache[xref].as_ref().unwrap())),
                 BinaryGate::Xor { xref, yref, out } => (
                     out,
-                    f.xor(
-                        cache[xref.ix].as_ref().unwrap(),
-                        cache[yref.ix].as_ref().unwrap(),
-                    ),
+                    f.xor(cache[xref].as_ref().unwrap(), cache[yref].as_ref().unwrap()),
                 ),
                 BinaryGate::And {
                     xref, yref, out, ..
                 } => (
                     out,
                     f.and(
-                        cache[xref.ix].as_ref().unwrap(),
-                        cache[yref.ix].as_ref().unwrap(),
+                        cache[xref].as_ref().unwrap(),
+                        cache[yref].as_ref().unwrap(),
                         channel,
                     )?,
                 ),
             };
             cache[zref_.unwrap_or(i)] = Some(val);
         }
-        let mut outputs = Vec::with_capacity(self.noutputs());
-        for r in self.get_output_refs().iter() {
-            let wirelabel = cache[r.ix].as_ref().unwrap();
+        let mut outputs = Vec::with_capacity(self.output_refs.len());
+        for r in self.output_refs.iter() {
+            let wirelabel = cache[*r].as_ref().unwrap();
             outputs.push(wirelabel.clone());
         }
         Ok(outputs)
-    }
-}
-
-impl GateType for BinaryGate {
-    fn make_constant(val: u16) -> Self {
-        Self::Constant { val }
-    }
-
-    fn make_input(id: usize) -> Self {
-        Self::Input { id }
-    }
-}
-
-impl CircuitType for BinaryCircuit {
-    type Gate = BinaryGate;
-
-    fn new(ngates: Option<usize>) -> Self {
-        let gates = Vec::with_capacity(ngates.unwrap_or(0));
-        Self {
-            gates,
-            input_refs: Vec::new(),
-            const_refs: Vec::new(),
-            output_refs: Vec::new(),
-            num_nonfree_gates: 0,
-        }
-    }
-
-    fn push_gates(&mut self, gate: Self::Gate) {
-        self.gates.push(gate)
-    }
-
-    fn push_const_ref(&mut self, xref: CircuitRef) {
-        self.const_refs.push(xref)
-    }
-
-    fn push_output_ref(&mut self, xref: CircuitRef) {
-        self.output_refs.push(xref)
-    }
-
-    fn push_input_ref(&mut self, xref: CircuitRef) {
-        self.input_refs.push(xref)
-    }
-
-    fn push_modulus(&mut self, modulus: u16) {
-        assert_eq!(modulus, 2);
-    }
-
-    fn increment_nonfree_gates(&mut self) {
-        self.num_nonfree_gates += 1;
-    }
-
-    fn get_num_nonfree_gates(&self) -> usize {
-        self.num_nonfree_gates
-    }
-
-    fn get_output_refs(&self) -> &[CircuitRef] {
-        &self.output_refs
-    }
-
-    fn get_input_refs(&self) -> &[CircuitRef] {
-        &self.input_refs
-    }
-
-    fn input_mod(&self, _: usize) -> u16 {
-        2
-    }
-}
-
-impl FancyBinary for CircuitBuilder<BinaryCircuit> {
-    fn xor(&mut self, xref: &Self::Item, yref: &Self::Item) -> Self::Item {
-        let gate = BinaryGate::Xor {
-            xref: *xref,
-            yref: *yref,
-            out: None,
-        };
-
-        self.gate(gate, xref.modulus())
-    }
-
-    fn negate(&mut self, xref: &Self::Item) -> Self::Item {
-        let gate = BinaryGate::Inv {
-            xref: *xref,
-            out: None,
-        };
-        self.gate(gate, xref.modulus())
-    }
-
-    fn and(
-        &mut self,
-        xref: &Self::Item,
-        yref: &Self::Item,
-        _: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        let gate = BinaryGate::And {
-            xref: *xref,
-            yref: *yref,
-            id: self.get_next_ciphertext_id(),
-            out: None,
-        };
-
-        Ok(self.gate(gate, xref.modulus()))
     }
 }
