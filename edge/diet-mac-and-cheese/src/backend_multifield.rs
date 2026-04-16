@@ -1008,13 +1008,11 @@ where
 
             Instance(_, out) => {
                 self.memory.allocate_possibly(out.0, out.1);
-                let mut curr_out = out.0;
-                for instance in instances.unwrap() {
+                for (curr_out, instance) in (out.0..).zip(instances.unwrap()) {
                     let v = self
                         .backend
                         .input_public(B::FieldElement::from_number(&instance)?)?;
                     self.memory.set(curr_out, &v);
-                    curr_out += 1;
                 }
             }
 
