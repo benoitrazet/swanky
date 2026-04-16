@@ -392,6 +392,28 @@ impl<P: GenericParty> AuthShareGenerator<P> {
             },
         }
     }
+
+    /// Return the [`AuthBitGenerator`] associated with _this_ party's share.
+    ///
+    /// This corresponds to the prover component for proving correctness of this
+    /// party's share.
+    pub fn auth_bit_generator_mine(&self) -> &AuthBitGenerator<Party0<P>> {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(ev) => self.party_a.as_ref().into_inner(ev),
+            GenericWhichParty::Party1(ev) => self.party_b.as_ref().into_inner(ev),
+        }
+    }
+
+    /// Return the [`AuthBitGenerator`] associated with _the other_ party's share.
+    ///
+    /// This corresponds to the verifier component for verifying correctness of
+    /// the other party's share.
+    pub fn auth_bit_generator_theirs(&self) -> &AuthBitGenerator<Party1<P>> {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(ev) => self.party_b.as_ref().into_inner(ev),
+            GenericWhichParty::Party1(ev) => self.party_a.as_ref().into_inner(ev),
+        }
+    }
 }
 
 #[cfg(test)]
