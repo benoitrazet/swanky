@@ -3,7 +3,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     Fancy, WireMod2,
-    circuit::{BinaryCircuit as Circuit, EvaluableCircuit},
+    circuit::{BinaryCircuit as Circuit, CircuitExecutor},
 };
 use std::{fs::File, io::BufReader, time::Duration};
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
@@ -27,7 +27,7 @@ fn _bench_circuit(circ: &Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
                 .unwrap();
             let ys = gb.receive_many(&vec![2; n_ev_inputs], channel).unwrap();
             xs.extend(ys);
-            circ_.eval(&mut gb, &xs, channel).unwrap();
+            circ_.execute(&mut gb, &xs, channel).unwrap();
             Ok(())
         },
         |channel| {
@@ -38,7 +38,7 @@ fn _bench_circuit(circ: &Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
                 .encode_many(&ev_inputs, &vec![2; n_ev_inputs], channel)
                 .unwrap();
             xs.extend(ys);
-            circ.eval(&mut ev, &xs, channel).unwrap();
+            circ.execute(&mut ev, &xs, channel).unwrap();
             Ok(())
         },
     )

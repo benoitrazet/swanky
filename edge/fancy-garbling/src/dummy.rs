@@ -107,8 +107,11 @@ impl FancyArithmetic for Dummy {
         &mut self,
         x: &DummyVal,
         y: &DummyVal,
-        _: &mut Channel,
+        _channel: &mut Channel,
     ) -> swanky_error::Result<DummyVal> {
+        if x.modulus < y.modulus {
+            return self.mul(y, x, _channel);
+        }
         Ok(DummyVal {
             val: x.val * y.val % x.modulus,
             modulus: x.modulus,

@@ -6,14 +6,61 @@ use crate::{
     fancy::{BinaryBundle, CrtBundle, Fancy, HasModulus},
     informer::Informer,
 };
-use itertools::Itertools;
 use std::{collections::HashMap, fmt::Display};
 use swanky_channel::Channel;
+use swanky_error::Result;
 
 mod binary;
 pub use binary::{BinaryCircuit, BinaryGate};
 mod arithmetic;
 pub use arithmetic::{ArithmeticCircuit, ArithmeticGate};
+
+/// Trait for executing computations directly over a [`Fancy`] object.
+///
+/// # Example
+/// Below is a simple example of computing an add gate over an arbitrary
+/// modulus. The computation is defined in `execute` by directly calling
+/// operations on the underlying [`Fancy`] backend. We also need to track how
+/// many inputs the computation takes, and the moduli of those inputs; these are
+/// given in the `ninputs` and `modulus` methods, respectively.
+/// ```
+/// # use fancy_garbling::{FancyArithmetic, circuit::CircuitExecutor};
+/// # use swanky_channel::Channel;
+/// # use swanky_error::Result;
+/// struct AddCircuit(u16);
+/// impl<F: FancyArithmetic> CircuitExecutor<F> for AddCircuit {
+///     fn execute(
+///         &self,
+///         backend: &mut F,
+///         inputs: &[F::Item],
+///         channel: &mut Channel,
+///     ) -> Result<Vec<F::Item>> {
+///         let output = backend.add(&inputs[0], &inputs[1]);
+///         Ok(vec![output])
+///     }
+///
+///     fn ninputs(&self) -> usize {
+///         2
+///     }
+///
+///     fn modulus(&self, _: usize) -> u16 {
+///         2
+///     }
+/// }
+/// ```
+pub trait CircuitExecutor<F: Fancy> {
+    /// Execute a circuit on a given [`Fancy`] backend using the provided inputs.
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: &[F::Item],
+        channel: &mut Channel,
+    ) -> Result<Vec<F::Item>>;
+    /// The number of inputs to provide to [`CircuitExecutor::execute`].
+    fn ninputs(&self) -> usize;
+    /// The modulus for input `i`.
+    fn modulus(&self, i: usize) -> u16;
+}
 
 /// The index and modulus of a gate in a circuit.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -44,58 +91,23 @@ pub trait CircuitInfo {
     fn print_info(&self) -> swanky_error::Result<()>;
 }
 
-impl<C: EvaluableCircuit<Informer<Dummy>>> CircuitInfo for C {
+impl<C: CircuitExecutor<Informer<Dummy>>> CircuitInfo for C {
     fn print_info(&self) -> swanky_error::Result<()> {
         let mut informer = crate::informer::Informer::new(Dummy::new());
 
         // encode inputs as InformerVals
         let inputs = Channel::with(std::io::empty(), |channel| {
-            self.get_input_refs()
-                .iter()
-                .map(|r| informer.encode(0, r.modulus(), channel))
+            (0..self.ninputs())
+                .map(|i| informer.encode(0, self.modulus(i), channel))
                 .collect::<swanky_error::Result<Vec<DummyVal>>>()
         })?;
 
-        Channel::with(std::io::empty(), |c| self.eval(&mut informer, &inputs, c))?;
+        Channel::with(std::io::empty(), |c| {
+            self.execute(&mut informer, &inputs, c)
+        })?;
         println!("{}", informer.stats());
         Ok(())
     }
-}
-
-/// A Circuit that can be evaluated by a given Fancy object
-///
-/// Supertrait ensures that circuit can be built by `CircuitBuilder`
-pub trait EvaluableCircuit<F: Fancy>: CircuitType {
-    /// Evaluate the circuit.
-    ///
-    /// The argument `f` provides the [`Fancy`] instantiation to use during
-    /// evaluation, and the actual circuit data is accessed using `channel`. The
-    /// output is a vector of `Option<u16>`s because certain [`Fancy`]
-    /// instantiations may not output anything (for example, a garbler doesn't
-    /// have an "output", so `None` would be returned here).
-    fn eval(
-        &self,
-        f: &mut F,
-        inputs: &[F::Item],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Option<Vec<u16>>> {
-        let wirelabels = self.eval_to_wirelabels(f, inputs, channel)?;
-        f.outputs(&wirelabels, channel)
-    }
-
-    /// Evaluate the circuit up to producing the output [`Fancy::Item`]s, and
-    /// output those.
-    ///
-    /// The argument `f` provides the [`Fancy`] instantiation to use during
-    /// evaluation, and the actual circuit data is accessed using `channel`. The
-    /// output is a vector of [`Fancy::Item`]s that correspond to the outputs of
-    /// the circuit evaluation.
-    fn eval_to_wirelabels(
-        &self,
-        f: &mut F,
-        inputs: &[F::Item],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<F::Item>>;
 }
 
 /// Trait representing circuit gates that can be used in `CircuitType`
@@ -173,23 +185,25 @@ pub trait CircuitType {
 /// # Panics
 /// Panics if `inputs.len()` does not equal the circuit's expected number of
 /// inputs.
-pub fn eval_plain<C: EvaluableCircuit<Dummy>>(
+pub fn eval_plain<C: CircuitExecutor<Dummy>>(
     circuit: &C,
     inputs: &[u16],
 ) -> swanky_error::Result<Vec<u16>> {
-    assert_eq!(inputs.len(), circuit.num_inputs());
+    assert_eq!(inputs.len(), circuit.ninputs());
 
     let mut dummy = crate::dummy::Dummy::new();
 
     // encode inputs as DummyVals
     let inputs = inputs
         .iter()
-        .zip(circuit.get_input_refs().iter())
-        .map(|(x, r)| DummyVal::new(*x, r.modulus()))
-        .collect_vec();
+        .enumerate()
+        .map(|(i, x)| DummyVal::new(*x, circuit.modulus(i)))
+        .collect::<Vec<_>>();
 
-    let outputs = Channel::with(std::io::empty(), |c| circuit.eval(&mut dummy, &inputs, c))?;
-    Ok(outputs.expect("dummy will always return Some(u16) output"))
+    let outputs = Channel::with(std::io::empty(), |c| {
+        circuit.execute(&mut dummy, &inputs, c)
+    })?;
+    Ok(outputs.iter().map(|x| x.val()).collect())
 }
 
 /// CircuitBuilder is used to build circuits.

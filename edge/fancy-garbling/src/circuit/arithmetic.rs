@@ -1,6 +1,6 @@
 use crate::{
     FancyArithmetic, FancyBinary, FancyProj, HasModulus, check_binary,
-    circuit::{CircuitBuilder, CircuitRef, CircuitType, EvaluableCircuit},
+    circuit::{CircuitBuilder, CircuitExecutor, CircuitRef, CircuitType},
 };
 use swanky_channel::Channel;
 
@@ -14,6 +14,25 @@ pub struct ArithmeticCircuit {
     pub(crate) const_refs: Vec<CircuitRef>,
     pub(crate) output_refs: Vec<CircuitRef>,
     pub(crate) num_nonfree_gates: usize,
+}
+
+impl<F: FancyArithmetic + FancyProj> CircuitExecutor<F> for ArithmeticCircuit {
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: &[<F as crate::Fancy>::Item],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<<F as crate::Fancy>::Item>> {
+        self.eval_to_wirelabels(backend, inputs, channel)
+    }
+
+    fn ninputs(&self) -> usize {
+        self.input_refs.len()
+    }
+
+    fn modulus(&self, i: usize) -> u16 {
+        self.gate_moduli[i]
+    }
 }
 
 /// Arithmetic computation supported by fancy garbling.
@@ -117,8 +136,8 @@ impl std::fmt::Display for ArithmeticGate {
     }
 }
 
-impl<F: FancyArithmetic + FancyProj> EvaluableCircuit<F> for ArithmeticCircuit {
-    fn eval_to_wirelabels(
+impl ArithmeticCircuit {
+    fn eval_to_wirelabels<F: FancyArithmetic + FancyProj>(
         &self,
         f: &mut F,
         inputs: &[F::Item],
@@ -239,7 +258,6 @@ impl CircuitType for ArithmeticCircuit {
 
 impl ArithmeticCircuit {
     /// Return the modulus of the gate indexed by `i`.
-    #[inline]
     pub fn modulus(&self, i: usize) -> u16 {
         self.gate_moduli[i]
     }
