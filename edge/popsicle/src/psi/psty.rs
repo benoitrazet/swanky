@@ -309,7 +309,7 @@ impl ReceiverState {
             .expect("evaluator should produce outputs");
 
         let mut intersection = Vec::new();
-        for (opt_item, in_intersection) in self.cuckoo.items.iter().zip_eq(mpc_outs.into_iter()) {
+        for (opt_item, in_intersection) in self.cuckoo.items.iter().zip_eq(mpc_outs) {
             if let Some(item) = opt_item
                 && in_intersection == 1_u16
             {

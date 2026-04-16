@@ -148,7 +148,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         for (i, ((_, w), (alpha, beta))) in base_uws
             .iter()
             .copied()
-            .zip(alphas.iter().zip(betas.into_iter()))
+            .zip(alphas.iter().zip(betas))
             .enumerate()
         {
             let ot_output = bytemuck::cast_slice(&keys[i * nbits..(i + 1) * nbits]);
@@ -195,10 +195,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             // of non-zero `u` is equal to the number of `base_uws` (`t`) in the calling function.
             // Don't `break` after we hit the last non-zero `u` to avoid a potential side-channel attack.
             if u != FE::PrimeField::ZERO {
-                for (x, chi_coeff) in x_stars
-                    .iter_mut()
-                    .zip(chi.decompose::<FE::PrimeField>().into_iter())
-                {
+                for (x, chi_coeff) in x_stars.iter_mut().zip(chi.decompose::<FE::PrimeField>()) {
                     *x += u * chi_coeff;
                 }
             }

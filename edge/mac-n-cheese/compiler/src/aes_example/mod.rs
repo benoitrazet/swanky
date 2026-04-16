@@ -454,8 +454,7 @@ pub fn aes_main(args: AesArgs) -> swanky_error::Result<()> {
             let expected_value_bits: Vec<_> = (0..128)
                 .map(|i| F2::from(((final_aes_output.as_array()[15 - i / 8] >> (i % 8)) & 1) != 0))
                 .collect();
-            let expected_value_proto =
-                cb.new_constant_prototype(MAC_TY, expected_value_bits.into_iter())?;
+            let expected_value_proto = cb.new_constant_prototype(MAC_TY, expected_value_bits)?;
             let expected_value = cb
                 .instantiate(&expected_value_proto, &[], &[])?
                 .outputs(Type::Mac(MAC_TY));

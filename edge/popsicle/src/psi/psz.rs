@@ -158,7 +158,7 @@ impl Receiver {
         // Iterate through each input/output pair and see whether it exists in
         // the appropriate set.
         let mut intersection = Vec::with_capacity(n);
-        for (opt_item, output) in tbl.items.iter().zip(outputs.into_iter()) {
+        for (opt_item, output) in tbl.items.iter().zip(outputs) {
             if let Some(item) = opt_item {
                 let prefix = output.prefix(masksize);
                 if hs[item.hash_index].contains(prefix) {
@@ -206,7 +206,7 @@ impl Receiver {
         // the appropriate set.
         let mut intersection = HashMap::with_capacity(n);
 
-        for (opt_item, output) in tbl.items.iter().zip(outputs.into_iter()) {
+        for (opt_item, output) in tbl.items.iter().zip(outputs) {
             if let Some(item) = opt_item {
                 let tag = &output.as_ref()[0..masksize];
 

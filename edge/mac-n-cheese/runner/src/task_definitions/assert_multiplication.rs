@@ -55,7 +55,7 @@ mod vope {
         assert_eq!(voles.len(), DegreeModulo::<T::VF, T::TF>::USIZE);
         let mut rnd0 = T::TF::ZERO;
         let mut rnd1 = T::TF::ZERO;
-        for (pair, entry) in voles.iter().copied().zip(lifting_vector::<T>().into_iter()) {
+        for (pair, entry) in voles.iter().copied().zip(lifting_vector::<T>()) {
             let (x, y) = pair.0.prover_extract(e);
             rnd0 += x * entry;
             rnd1 += y * entry;

@@ -1168,7 +1168,7 @@ where
                         let values = self.backend.ram_read(ram_id, &addr)?;
                         debug_assert_eq!(values.len(), *value_count);
 
-                        for (w, value) in (outputs[0].0..=outputs[0].1).zip(values.into_iter()) {
+                        for (w, value) in (outputs[0].0..=outputs[0].1).zip(values) {
                             self.memory.set(w, &value);
                         }
                     }

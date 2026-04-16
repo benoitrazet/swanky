@@ -431,11 +431,7 @@ pub fn run_proof_background<P: Party>(
     let mut task_definitions =
         FxHashMap::with_capacity_and_hasher(manifest.task_kinds_used().len(), Default::default());
     debug_assert_eq!(manifest.task_kinds_used().len(), vole_contexts.len());
-    for (tk_encoded, vc) in manifest
-        .task_kinds_used()
-        .iter()
-        .zip(vole_contexts.into_iter())
-    {
+    for (tk_encoded, vc) in manifest.task_kinds_used().iter().zip(vole_contexts) {
         struct V<'a, P: Party>(
             VoleContexts<P>,
             &'a mut SwankyRng,

@@ -177,7 +177,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
 
         let seeds = self.oprf.send(channel, bins.len(), rng)?;
         // Run the one-time OPPRF on each bin.
-        for (j, (bin, seed)) in bins.into_iter().zip(seeds.into_iter()).enumerate() {
+        for (j, (bin, seed)) in bins.into_iter().zip(seeds).enumerate() {
             // `beta` is the maximum number of entries a bin could have.
             let beta = if j < params.m1 {
                 params.beta1
@@ -258,7 +258,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         }
         let mut table = vec![Block512::default(); m];
         // Place points in table based on the hash of their OPRF output.
-        for (h, (y_, (_, y))) in hs.into_iter().zip(ys.into_iter().zip(points.into_iter())) {
+        for (h, (y_, (_, y))) in hs.into_iter().zip(ys.into_iter().zip(points)) {
             table[h] = y ^ y_;
         }
         // Fill rest of table with random elements.
@@ -370,7 +370,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
         let oprf_outputs = self.oprf.receive(channel, &items, rng)?;
 
         let zero = Block512::default();
-        for (item, output) in table.items.into_iter().zip(oprf_outputs.into_iter()) {
+        for (item, output) in table.items.into_iter().zip(oprf_outputs) {
             let m = channel.read_usize()?;
             let v = channel.read_block()?;
             let h = hash_output(v, output, m);
