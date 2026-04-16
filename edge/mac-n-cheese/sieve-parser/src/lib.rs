@@ -5,7 +5,7 @@ pub mod text_parser;
 
 use std::{io::Write, ops::RangeInclusive, path::Path};
 
-use crypto_bigint::{CheckedAdd, CheckedMul};
+use crypto_bigint::CheckedAdd;
 
 use swanky_error::{ErrorKind, OptionExt, WrapErr};
 

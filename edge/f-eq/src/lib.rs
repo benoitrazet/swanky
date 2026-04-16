@@ -119,7 +119,7 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
     use proptest::test_runner::TestRunner;
-    use rand::SeedableRng;
+    use rand::{Rng, SeedableRng};
     use swanky_party::party_system;
     use swanky_rng::SwankyRng;
 

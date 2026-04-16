@@ -152,13 +152,13 @@ ff_codegen = { git = "https://github.com/GaloisInc/ff", rev = "c29da06f50c67fe9e
 # External Dependencies
 aes = "=0.8.4" # See issue #375
 aes-gcm = "0.10.3"
-arc-swap = "1.8.2"
+arc-swap = "1.9.1"
 arrayvec = "0.7.6"
 bincode = "=1.3.3" # See https://sr.ht/~stygianentity/bincode/
 bitpacking = "0.9.3"
 bitvec = { version = "1.0.1", features = ["alloc"] }
 # We disable avx512 since we typically run on skylake.
-blake3 = { version = "1.8.3", features = ["no_avx512"] }
+blake3 = { version = "1.8.4", features = ["no_avx512"] }
 bufstream = "0.1.4"
 bumpalo = "3.20.2"
 bumpalo-herd = "0.1.2"
@@ -169,19 +169,19 @@ bytemuck = { version = "1.25.0", features = [
   "aarch64_simd",
 ] }
 bytes = "1.11.1"
-cc = "1.2.56"
+cc = "1.2.60"
 ciborium = "0.2.2"
-clap = { version = "4.5.60", features = ["derive"] }
+clap = { version = "4.6.1", features = ["derive"] }
 console_error_panic_hook = "0.1.7"
 console_log = { version = "1.0", features = ["color"] }
 criterion = "0.8.2"
 crossbeam = "0.8.4"
 crossbeam-queue = "0.3.12"
-crypto-bigint = { version = "0.6.1", features = ["hybrid-array"] }
+crypto-bigint = { version = "0.7.3", features = ["hybrid-array", "subtle"] }
 curve25519-dalek = { version = "4.1.3", features = ["rand_core"] }
 dhat = "0.3.3"
-digest = "=0.10.7" # See issue #364
-env_logger = "0.11.9"
+digest = "0.11.2"
+env_logger = "0.11.10"
 flatbuffers = "25.12.19" # Keep this version in sync with edge/flatbuffer-build/src/flatc-ver.txt
 flume = "0.12.0"
 generic-array = { version = "1.3.5", features = ["serde"] }
@@ -189,7 +189,7 @@ hex = "0.4.3"
 io-uring = "0.7.11"
 itertools = "0.14.0"
 jemallocator = "0.5.4"
-libc = "0.2.182"
+libc = "0.2.185"
 log = "0.4.29"
 lz4 = "1.28.1"
 memchr = "2.8.0"
@@ -197,7 +197,7 @@ memmap2 = "0.9.10"
 merkle-cbt = "0.3.2"
 merlin = "3.0.0"
 mimalloc = { version = "0.1.48", default-features = false }
-moka = { version = "0.12.14", features = ["sync"] }
+moka = { version = "0.12.15", features = ["sync"] }
 ndarray = "=0.15.6" # See issue #123
 # Rather than enabling nix features on a per-crate basis (which could lead to issues where
 # compiling the whole workspace might succeed, but compiling an individual crate might fail),
@@ -213,30 +213,30 @@ proc-macro2 = "1.0.106"
 rand = "=0.8.5" # See issue #345
 rand_chacha = "=0.3.1" # See issue #345
 rand_core = "=0.6.4" # See issue #345
-proptest = "1.10.0"
+proptest = "1.11.0"
 quick-xml = "0.39.2"
 quote = "1.0.45"
-rayon = "1.11.0"
+rayon = "1.12.0"
 regex = "1.12.3"
 ring = "0.17.14"
 rpmalloc = "0.2.2"
-rustc-hash = "2.1.1"
-rustls = { version = "0.23.37", default-features = false, features = [
+rustc-hash = "2.1.2"
+rustls = { version = "0.23.38", default-features = false, features = [
   "std",
   "ring",
 ] }
 rustls-pemfile = "2.2.0"
 serde = "1.0.228"
 serde_json = "1.0.149"
-sha2 = "0.10.9"
-sha3 = "0.10.8"
+sha2 = "0.11.0"
+sha3 = "0.11.0"
 smallvec = { version = "1.15.1", features = [
   "const_generics",
   "union",
   "const_new",
 ] }
 snafu = "0.9.0"
-snmalloc-rs = { version = "0.3.8", default-features = false, features = [
+snmalloc-rs = { version = "0.7.4", default-features = false, features = [
   "build_cc",
   "usecxx17",
 ] }
@@ -246,11 +246,11 @@ subtle = { version = "2.6.1", features = [
   "const-generics",
 ] }
 syn = { version = "2.0.117", features = ["full"] }
-tempfile = "3.26.0"
-toml = "1.0.4"
-tungstenite = { version = "0.28.0", features = ["rustls"] }
+tempfile = "3.27.0"
+toml = "1.1.2"
+tungstenite = { version = "0.29.0", features = ["rustls"] }
 twox-hash = "2.1.2"
-wasm-bindgen = "0.2.114"
+wasm-bindgen = "0.2.118"
 zstd = "0.13.3"
 
 [profile.release]
