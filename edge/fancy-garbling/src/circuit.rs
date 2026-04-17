@@ -1337,10 +1337,8 @@ pub mod circuits {
 }
 
 #[cfg(test)]
-mod plaintext {
-    use super::circuits;
-    use super::*;
-    use crate::util::RngExt;
+mod fancy_binary {
+    use crate::{circuit::circuits, dummy::Dummy, util::RngExt};
     use rand::thread_rng;
 
     #[test]
@@ -1383,6 +1381,26 @@ mod plaintext {
             assert_eq!(output, x * y % 2);
         }
     }
+}
+
+#[cfg(test)]
+mod fancy_arithmetic {
+    use crate::{circuit::circuits, dummy::Dummy, util::RngExt};
+    use rand::thread_rng;
+
+    #[test]
+    fn constants() {
+        let mut rng = thread_rng();
+        let q = rng.gen_modulus();
+        let c = rng.gen_u16() % q;
+        let circ = circuits::TestConstants(q, c);
+
+        for _ in 0..64 {
+            let x = rng.gen_u16() % q;
+            let output = Dummy::eval(&circ, &[x]).unwrap()[0];
+            assert_eq!(output, (x + c) % q);
+        }
+    }
 
     #[test]
     fn arithmetic_half_gate() {
@@ -1397,6 +1415,16 @@ mod plaintext {
             assert_eq!(output, x * y % q);
         }
     }
+}
+
+#[cfg(test)]
+mod fancy_proj {
+    use crate::{
+        circuit::{CircuitExecutor, circuits},
+        dummy::Dummy,
+        util::RngExt,
+    };
+    use rand::thread_rng;
 
     #[test]
     fn mod_change() {
@@ -1433,34 +1461,22 @@ mod plaintext {
             assert_eq!(output, expected);
         }
     }
-
-    #[test]
-    fn constants() {
-        let mut rng = thread_rng();
-        let q = rng.gen_modulus();
-        let c = rng.gen_u16() % q;
-        let circ = circuits::TestConstants(q, c);
-
-        for _ in 0..64 {
-            let x = rng.gen_u16() % q;
-            let output = Dummy::eval(&circ, &[x]).unwrap()[0];
-            assert_eq!(output, (x + c) % q);
-        }
-    }
 }
 
 #[cfg(test)]
-mod bundle {
-    use super::*;
-    use crate::util::{self, RngExt, crt_factor, crt_inv_factor, factor};
-    use itertools::Itertools;
+mod bundle_gadgets {
+    use crate::{
+        circuit::circuits,
+        dummy::Dummy,
+        util::{RngExt, crt_factor, crt_inv_factor, factor, u128_from_bits, u128_to_bits},
+    };
     use rand::thread_rng;
 
     #[test]
     fn test_bundle_input_output() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
-        let c = circuits::TestBundleInputOutput(util::factor(q));
+        let c = circuits::TestBundleInputOutput(factor(q));
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
@@ -1471,10 +1487,38 @@ mod bundle {
     }
 
     #[test]
+    fn test_shift_extend() {
+        let mut rng = thread_rng();
+        let nbits = 64;
+        let q = 1 << nbits;
+
+        for _ in 0..16 {
+            let shift_size = rng.gen_usize() % nbits;
+            let x = rng.gen_u128() % q;
+            let c = circuits::TestShiftExtend(nbits, shift_size);
+
+            let inputs = u128_to_bits(x, nbits);
+            let output = Dummy::eval(&c, &inputs).unwrap();
+            assert_eq!(u128_from_bits(&output), x << shift_size);
+        }
+    }
+}
+
+#[cfg(test)]
+mod crt_gadgets {
+    use rand::thread_rng;
+
+    use crate::{
+        circuit::circuits,
+        dummy::Dummy,
+        util::{self, RngExt, crt_factor, crt_inv_factor, factor},
+    };
+
+    #[test]
     fn test_addition() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
-        let c = circuits::TestCrtAddition(util::factor(q));
+        let c = circuits::TestCrtAddition(factor(q));
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
@@ -1518,12 +1562,23 @@ mod bundle {
             assert_eq!(output, (x * y) % q);
         }
     }
+}
+
+#[cfg(test)]
+mod arithmetic_bundle_gadgets {
+    use rand::thread_rng;
+
+    use crate::{
+        circuit::circuits,
+        dummy::Dummy,
+        util::{RngExt, crt_factor, crt_inv_factor, factor},
+    };
 
     #[test]
     fn test_multiplication() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
-        let c = circuits::TestCrtMultiplication(util::factor(q));
+        let c = circuits::TestCrtMultiplication(factor(q));
 
         for _ in 0..16 {
             let x = rng.gen_u64() as u128 % q;
@@ -1540,7 +1595,7 @@ mod bundle {
     fn test_mask() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
-        let c = circuits::TestMask(util::factor(q));
+        let c = circuits::TestMask(factor(q));
 
         for _ in 0..16 {
             let b = rng.gen_bool();
@@ -1557,13 +1612,23 @@ mod bundle {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod crt_proj_gadgets {
+    use crate::{
+        circuit::circuits,
+        dummy::Dummy,
+        util::{RngExt, crt_factor, crt_inv_factor, factor, modulus_with_width, product},
+    };
+    use rand::thread_rng;
 
     #[test]
     fn test_cexp() {
         let mut rng = thread_rng();
-        let q = util::modulus_with_width(10);
+        let q = modulus_with_width(10);
         let y = rng.gen_u16() % 10;
-        let c = circuits::TestCrtCexp(util::factor(q), y);
+        let c = circuits::TestCrtCexp(factor(q), y);
 
         for _ in 0..64 {
             let x = rng.gen_u16() as u128 % q;
@@ -1582,7 +1647,7 @@ mod bundle {
             let qs = rng.gen_usable_factors();
             let n = qs.len();
             let q = crate::util::product(&qs);
-            let c = circuits::TestCrtDivision(util::factor(q));
+            let c = circuits::TestCrtDivision(factor(q));
 
             let q_ = crate::util::product(&qs[..n - 1]);
             let pt_x = rng.gen_u128() % q_;
@@ -1613,10 +1678,165 @@ mod bundle {
     }
 
     #[test]
+    fn test_relu() {
+        let mut rng = thread_rng();
+        let q = modulus_with_width(10);
+        let c = circuits::TestRelu(factor(q));
+
+        for _ in 0..128 {
+            let input = rng.gen_u128() % q;
+            let expected = if input < q / 2 { input } else { 0 };
+            let z = Dummy::eval(&c, &crt_factor(input, q)).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, expected);
+        }
+    }
+
+    #[test]
+    fn test_sgn() {
+        let mut rng = thread_rng();
+        let q = modulus_with_width(10);
+        let c = circuits::TestSgn(factor(q));
+
+        for _ in 0..128 {
+            let input = rng.gen_u128() % q;
+            let expected = if input < q / 2 { 1 } else { q - 1 };
+            let z = Dummy::eval(&c, &crt_factor(input, q)).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, expected);
+        }
+    }
+
+    #[test]
+    fn test_leq() {
+        let mut rng = thread_rng();
+        let q = modulus_with_width(10);
+        let c = circuits::TestLeq(factor(q));
+
+        // Let's have at least one test where they are surely equal.
+        let x = rng.gen_u128() % q / 2;
+        let mut inputs = crt_factor(x, q);
+        inputs.extend(crt_factor(x, q));
+        let output = Dummy::eval(&c, &inputs).unwrap()[0];
+        assert_eq!(output, (x < x) as u16);
+
+        for _ in 0..64 {
+            let x = rng.gen_u128() % q / 2;
+            let y = rng.gen_u128() % q / 2;
+            let mut inputs = crt_factor(x, q);
+            inputs.extend(crt_factor(y, q));
+            let output = Dummy::eval(&c, &inputs).unwrap()[0];
+            assert_eq!(output, (x < y) as u16);
+        }
+    }
+
+    #[test]
+    fn test_max() {
+        let mut rng = thread_rng();
+        let q = modulus_with_width(10);
+        let n = 10;
+        let c = circuits::TestMax(factor(q), n);
+
+        for _ in 0..16 {
+            let inputs = (0..n).map(|_| rng.gen_u128() % (q / 2)).collect::<Vec<_>>();
+            let expected = *inputs.iter().max().unwrap();
+
+            let inputs = inputs
+                .into_iter()
+                .flat_map(|x| crt_factor(x, q))
+                .collect::<Vec<_>>();
+            let z = Dummy::eval(&c, &inputs).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, expected);
+        }
+    }
+
+    #[test]
+    fn test_crt_to_pmr() {
+        fn to_pmr_pt(x: u128, ps: &[u16]) -> Vec<u16> {
+            let mut ds = vec![0; ps.len()];
+            let mut q = 1;
+            for i in 0..ps.len() {
+                let p = ps[i] as u128;
+                ds[i] = ((x / q) % p) as u16;
+                q *= p;
+            }
+            ds
+        }
+
+        let mut rng = rand::thread_rng();
+        for _ in 0..8 {
+            let ps = rng.gen_usable_factors();
+            let q = product(&ps);
+
+            let input = rng.gen_u128() % q;
+            let expected = to_pmr_pt(input, &ps);
+            let c = circuits::TestCrtToPmr(ps);
+            let output = Dummy::eval(&c, &crt_factor(input, q)).unwrap();
+            assert_eq!(output, expected);
+        }
+    }
+
+    #[test]
+    fn test_pmr_lt() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..8 {
+            let qs = rng.gen_usable_factors();
+            let n = qs.len();
+            let q = product(&qs);
+            let q_ = product(&qs[..n - 1]);
+            let pt_x = rng.gen_u128() % q_;
+            let pt_y = rng.gen_u128() % q_;
+            let c = circuits::TestPmrLessThan(qs);
+            let mut inputs = crt_factor(pt_x, q);
+            inputs.extend(crt_factor(pt_y, q));
+            let output = Dummy::eval(&c, &inputs).unwrap()[0];
+            if pt_x < pt_y {
+                assert_eq!(output, 1);
+            } else {
+                assert_eq!(output, 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_pmr_geq() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..8 {
+            let qs = rng.gen_usable_factors();
+            let n = qs.len();
+            let q = product(&qs);
+            let q_ = product(&qs[..n - 1]);
+            let pt_x = rng.gen_u128() % q_;
+            let pt_y = rng.gen_u128() % q_;
+            let c = circuits::TestPmrGreaterThanOrEqual(qs);
+            let mut inputs = crt_factor(pt_x, q);
+            inputs.extend(crt_factor(pt_y, q));
+            let output = Dummy::eval(&c, &inputs).unwrap()[0];
+            if pt_x >= pt_y {
+                assert_eq!(output, 1);
+            } else {
+                assert_eq!(output, 0);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod arithmetic_proj_bundle_gadgets {
+    use rand::thread_rng;
+
+    use crate::{
+        circuit::circuits,
+        dummy::Dummy,
+        util::{RngExt, as_mixed_radix, crt_factor, factor, from_mixed_radix, product},
+    };
+
+    #[test]
     fn test_eq_bundles() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
-        let c = circuits::TestEqBundles(util::factor(q));
+        let c = circuits::TestEqBundles(factor(q));
 
         // Let's have at least one test where they are surely equal.
         let x = rng.gen_u128() % q;
@@ -1646,11 +1866,11 @@ mod bundle {
         // Test maximum overflow.
         let mut inputs = Vec::new();
         for _ in 0..nargs {
-            inputs.extend(util::as_mixed_radix(q - 1, &moduli).iter());
+            inputs.extend(as_mixed_radix(q - 1, &moduli).iter());
         }
         let output = Dummy::eval(&circ, &inputs).unwrap();
         assert_eq!(
-            util::from_mixed_radix(&output, &moduli),
+            from_mixed_radix(&output, &moduli),
             (q - 1) * (nargs as u128) % q
         );
 
@@ -1661,10 +1881,10 @@ mod bundle {
             for _ in 0..nargs {
                 let x = rng.gen_u128() % q;
                 expected = (expected + x) % q;
-                inputs.extend(util::as_mixed_radix(x, &moduli).iter());
+                inputs.extend(as_mixed_radix(x, &moduli).iter());
             }
             let output = Dummy::eval(&circ, &inputs).unwrap();
-            assert_eq!(util::from_mixed_radix(&output, &moduli), expected);
+            assert_eq!(from_mixed_radix(&output, &moduli), expected);
         }
     }
 
@@ -1673,18 +1893,18 @@ mod bundle {
         let mut rng = thread_rng();
         let nargs = 2 + rng.gen_usize() % 10;
         let moduli = (0..7).map(|_| rng.gen_modulus()).collect::<Vec<_>>();
-        let q = util::product(&moduli);
+        let q = product(&moduli);
         let circ = circuits::TestMixedRadixAdditionMSBOnly(moduli.clone(), nargs);
 
         // Test maximum overflow.
         let mut inputs = Vec::new();
         for _ in 0..nargs {
-            inputs.extend(util::as_mixed_radix(q - 1, &moduli).iter());
+            inputs.extend(as_mixed_radix(q - 1, &moduli).iter());
         }
         let output = Dummy::eval(&circ, &inputs).unwrap()[0];
         assert_eq!(
             output,
-            *util::as_mixed_radix((q - 1) * (nargs as u128) % q, &moduli)
+            *as_mixed_radix((q - 1) * (nargs as u128) % q, &moduli)
                 .last()
                 .unwrap()
         );
@@ -1696,106 +1916,23 @@ mod bundle {
             for _ in 0..nargs {
                 let x = rng.gen_u128() % q;
                 expected = (expected + x) % q;
-                inputs.extend(util::as_mixed_radix(x, &moduli).iter());
+                inputs.extend(as_mixed_radix(x, &moduli).iter());
             }
             let output = Dummy::eval(&circ, &inputs).unwrap()[0];
-            assert_eq!(
-                output,
-                *util::as_mixed_radix(expected, &moduli).last().unwrap()
-            );
+            assert_eq!(output, *as_mixed_radix(expected, &moduli).last().unwrap());
         }
     }
+}
 
-    #[test]
-    fn test_relu() {
-        let mut rng = thread_rng();
-        let q = util::modulus_with_width(10);
-        let c = circuits::TestRelu(factor(q));
+#[cfg(test)]
+mod binary_gadgets {
+    use rand::thread_rng;
 
-        for _ in 0..128 {
-            let input = rng.gen_u128() % q;
-            let expected = if input < q / 2 { input } else { 0 };
-            let z = Dummy::eval(&c, &crt_factor(input, q)).unwrap();
-            let output = crt_inv_factor(&z, q);
-            assert_eq!(output, expected);
-        }
-    }
-
-    #[test]
-    fn test_sgn() {
-        let mut rng = thread_rng();
-        let q = util::modulus_with_width(10);
-        let c = circuits::TestSgn(factor(q));
-
-        for _ in 0..128 {
-            let input = rng.gen_u128() % q;
-            let expected = if input < q / 2 { 1 } else { q - 1 };
-            let z = Dummy::eval(&c, &crt_factor(input, q)).unwrap();
-            let output = crt_inv_factor(&z, q);
-            assert_eq!(output, expected);
-        }
-    }
-
-    #[test]
-    fn test_leq() {
-        let mut rng = thread_rng();
-        let q = util::modulus_with_width(10);
-        let c = circuits::TestLeq(factor(q));
-
-        // Let's have at least one test where they are surely equal.
-        let x = rng.gen_u128() % q / 2;
-        let mut inputs = crt_factor(x, q);
-        inputs.extend(crt_factor(x, q));
-        let output = Dummy::eval(&c, &inputs).unwrap()[0];
-        assert_eq!(output, (x < x) as u16);
-
-        for _ in 0..64 {
-            let x = rng.gen_u128() % q / 2;
-            let y = rng.gen_u128() % q / 2;
-            let mut inputs = crt_factor(x, q);
-            inputs.extend(crt_factor(y, q));
-            let output = Dummy::eval(&c, &inputs).unwrap()[0];
-            assert_eq!(output, (x < y) as u16);
-        }
-    }
-
-    #[test]
-    fn test_max() {
-        let mut rng = thread_rng();
-        let q = util::modulus_with_width(10);
-        let n = 10;
-        let c = circuits::TestMax(factor(q), n);
-
-        for _ in 0..16 {
-            let inputs = (0..n).map(|_| rng.gen_u128() % (q / 2)).collect_vec();
-            let expected = *inputs.iter().max().unwrap();
-
-            let inputs = inputs
-                .into_iter()
-                .flat_map(|x| crt_factor(x, q))
-                .collect::<Vec<_>>();
-            let z = Dummy::eval(&c, &inputs).unwrap();
-            let output = crt_inv_factor(&z, q);
-            assert_eq!(output, expected);
-        }
-    }
-
-    #[test]
-    fn test_shift_extend() {
-        let mut rng = thread_rng();
-        let nbits = 64;
-        let q = 1 << nbits;
-
-        for _ in 0..16 {
-            let shift_size = rng.gen_usize() % nbits;
-            let x = rng.gen_u128() % q;
-            let c = circuits::TestShiftExtend(nbits, shift_size);
-
-            let inputs = util::u128_to_bits(x, nbits);
-            let output = Dummy::eval(&c, &inputs).unwrap();
-            assert_eq!(util::u128_from_bits(&output), x << shift_size);
-        }
-    }
+    use crate::{
+        circuit::circuits,
+        dummy::Dummy,
+        util::{self, RngExt},
+    };
 
     #[test]
     fn test_binary_addition() {
@@ -2049,76 +2186,6 @@ mod bundle {
             let z = Dummy::eval(&c, &inputs).unwrap();
             let output = util::u128_from_bits(&z);
             assert_eq!(output, expected);
-        }
-    }
-
-    #[test]
-    fn test_crt_to_pmr() {
-        fn to_pmr_pt(x: u128, ps: &[u16]) -> Vec<u16> {
-            let mut ds = vec![0; ps.len()];
-            let mut q = 1;
-            for i in 0..ps.len() {
-                let p = ps[i] as u128;
-                ds[i] = ((x / q) % p) as u16;
-                q *= p;
-            }
-            ds
-        }
-
-        let mut rng = rand::thread_rng();
-        for _ in 0..8 {
-            let ps = rng.gen_usable_factors();
-            let q = util::product(&ps);
-
-            let input = rng.gen_u128() % q;
-            let expected = to_pmr_pt(input, &ps);
-            let c = circuits::TestCrtToPmr(ps);
-            let output = Dummy::eval(&c, &crt_factor(input, q)).unwrap();
-            assert_eq!(output, expected);
-        }
-    }
-
-    #[test]
-    fn test_pmr_lt() {
-        let mut rng = rand::thread_rng();
-        for _ in 0..8 {
-            let qs = rng.gen_usable_factors();
-            let n = qs.len();
-            let q = crate::util::product(&qs);
-            let q_ = crate::util::product(&qs[..n - 1]);
-            let pt_x = rng.gen_u128() % q_;
-            let pt_y = rng.gen_u128() % q_;
-            let c = circuits::TestPmrLessThan(qs);
-            let mut inputs = crt_factor(pt_x, q);
-            inputs.extend(crt_factor(pt_y, q));
-            let output = Dummy::eval(&c, &inputs).unwrap()[0];
-            if pt_x < pt_y {
-                assert_eq!(output, 1);
-            } else {
-                assert_eq!(output, 0);
-            }
-        }
-    }
-
-    #[test]
-    fn test_pmr_geq() {
-        let mut rng = rand::thread_rng();
-        for _ in 0..8 {
-            let qs = rng.gen_usable_factors();
-            let n = qs.len();
-            let q = crate::util::product(&qs);
-            let q_ = crate::util::product(&qs[..n - 1]);
-            let pt_x = rng.gen_u128() % q_;
-            let pt_y = rng.gen_u128() % q_;
-            let c = circuits::TestPmrGreaterThanOrEqual(qs);
-            let mut inputs = crt_factor(pt_x, q);
-            inputs.extend(crt_factor(pt_y, q));
-            let output = Dummy::eval(&c, &inputs).unwrap()[0];
-            if pt_x >= pt_y {
-                assert_eq!(output, 1);
-            } else {
-                assert_eq!(output, 0);
-            }
         }
     }
 }
