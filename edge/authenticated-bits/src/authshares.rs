@@ -627,8 +627,8 @@ mod tests {
         assert!(result_b);
         for ((c, c_), (a, b)) in outputs_a
             .into_iter()
-            .zip(outputs_b.into_iter())
-            .zip(output_bits_a.into_iter().zip(output_bits_b.into_iter()))
+            .zip(outputs_b)
+            .zip(output_bits_a.into_iter().zip(output_bits_b))
         {
             // The outputs for each party from `AuthShareGenerator::open` should
             // be the same.
