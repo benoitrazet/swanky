@@ -812,6 +812,31 @@ pub mod circuits {
         }
     }
 
+    /// Circuit for testing [`BinaryGadgets::bin_and`].
+    pub struct TestBinaryAnd(pub usize);
+    impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryAnd {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = BinaryBundle::new(inputs[..self.0].to_vec());
+            let y = BinaryBundle::new(inputs[self.0..].to_vec());
+            let z = backend.bin_and(&x, &y, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0 * 2
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
     /// Circuit for testing [`BinaryGadgets::bin_addition`].
     pub struct TestBinaryAddition(pub usize);
     impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryAddition {
@@ -831,6 +856,55 @@ pub mod circuits {
 
         fn ninputs(&self) -> usize {
             self.0 * 2
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
+    /// Circuit for testing [`BinaryGadgets::bin_mul`].
+    pub struct TestBinaryMultiplication(pub usize);
+    impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryMultiplication {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = BinaryBundle::new(inputs[..self.0].to_vec());
+            let y = BinaryBundle::new(inputs[self.0..].to_vec());
+            let z = backend.bin_mul(&x, &y, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0 * 2
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
+    /// Circuit for testing [`BinaryGadgets::bin_twos_complement`].
+    pub struct TestBinaryTwosComplement(pub usize);
+    impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryTwosComplement {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = BinaryBundle::new(inputs[..self.0].to_vec());
+            let z = backend.bin_twos_complement(&x, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0
         }
 
         fn modulus(&self, _: usize) -> u16 {
