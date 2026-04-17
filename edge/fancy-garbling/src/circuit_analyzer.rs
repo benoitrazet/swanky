@@ -113,12 +113,7 @@ impl FancyBinary for CircuitAnalyzer {
         }
     }
 
-    fn and(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        _: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
+    fn and(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
         self.nands += 1;
         // Fancy's AND gate calls the underlying arithmetic multiplication
         self.nmuls += 1;
@@ -171,12 +166,7 @@ impl FancyArithmetic for CircuitAnalyzer {
         }
     }
 
-    fn mul(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        _: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
+    fn mul(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
         self.nmuls += 1;
         Ok(AnalyzerItem {
             modulus: x.modulus,
@@ -192,7 +182,7 @@ impl FancyProj for CircuitAnalyzer {
         _q: u16,
         _tt: Option<Vec<u16>>,
         _: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
+    ) -> Result<Self::Item> {
         swanky_error::bail!(
             ErrorKind::UnsupportedError,
             "Projection gates are unsupported"
@@ -203,11 +193,7 @@ impl FancyProj for CircuitAnalyzer {
 impl Fancy for CircuitAnalyzer {
     type Item = AnalyzerItem;
 
-    fn receive_many(
-        &mut self,
-        moduli: &[u16],
-        _: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
+    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
         self.ninputs += moduli.len();
         Ok(moduli
             .iter()
@@ -223,11 +209,11 @@ impl Fancy for CircuitAnalyzer {
         _values: &[u16],
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
+    ) -> Result<Vec<Self::Item>> {
         self.receive_many(moduli, channel)
     }
 
-    fn constant(&mut self, _val: u16, q: u16, _: &mut Channel) -> swanky_error::Result<Self::Item> {
+    fn constant(&mut self, _val: u16, q: u16, _: &mut Channel) -> Result<Self::Item> {
         self.nconstants += 1;
         Ok(AnalyzerItem {
             modulus: q,
@@ -235,7 +221,7 @@ impl Fancy for CircuitAnalyzer {
         })
     }
 
-    fn output(&mut self, x: &Self::Item, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
+    fn output(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Option<u16>> {
         self.mul_depth = max(self.mul_depth, x.depth);
         Ok(None)
     }
