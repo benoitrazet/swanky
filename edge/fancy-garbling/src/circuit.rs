@@ -549,6 +549,31 @@ pub mod circuits {
         }
     }
 
+    /// Circuit for testing [`ArithmeticBundleGadgets::mask`].
+    pub struct TestMask(pub Vec<u16>);
+    impl<F: ArithmeticBundleGadgets> CircuitExecutor<F> for TestMask {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[F::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<F::Item>> {
+            let b = &inputs[0];
+            let x = CrtBundle::new(inputs[1..self.0.len() + 1].to_vec());
+            let z = backend.mask(b, &x, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len() + 1
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            if i == 0 { 2 } else { self.0[i - 1] }
+        }
+    }
+
     /// Circuit for testing [`CrtProjGadgets::crt_cexp`].
     pub struct TestCrtCexp(pub Vec<u16>, pub u16);
     impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtCexp {
@@ -570,6 +595,31 @@ pub mod circuits {
 
         fn modulus(&self, i: usize) -> u16 {
             self.0[i]
+        }
+    }
+
+    /// Circuit for testing [`CrtProjGadgets::crt_div`].
+    pub struct TestCrtDivision(pub Vec<u16>);
+    impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtDivision {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[F::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<F::Item>> {
+            let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
+            let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
+            let z = backend.crt_div(&x, &y, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len() * 2
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i % self.0.len()]
         }
     }
 
@@ -786,6 +836,30 @@ pub mod circuits {
         }
     }
 
+    /// Circuit for testing [`BundleGadgets::shift_extend`].
+    pub struct TestShiftExtend(pub usize, pub usize);
+    impl<F: BundleGadgets> CircuitExecutor<F> for TestShiftExtend {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = BinaryBundle::new(inputs.to_vec());
+            let z = backend.shift_extend(&x, self.1, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
     /// Circuit for testing [`BinaryGadgets::bin_and`].
     pub struct TestBinaryAnd(pub usize);
     impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryAnd {
@@ -837,6 +911,32 @@ pub mod circuits {
         }
     }
 
+    /// Circuit for testing [`BinaryGadgets::bin_subtraction`].
+    pub struct TestBinarySubtraction(pub usize);
+    impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinarySubtraction {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = BinaryBundle::new(inputs[..self.0].to_vec());
+            let y = BinaryBundle::new(inputs[self.0..].to_vec());
+            let (z, underflow) = backend.bin_subtraction(&x, &y, channel)?;
+            backend.output(&underflow, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok([vec![underflow], z.wires().to_vec()].concat())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0 * 2
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
     /// Circuit for testing [`BinaryGadgets::bin_mul`].
     pub struct TestBinaryMultiplication(pub usize);
     impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryMultiplication {
@@ -862,6 +962,203 @@ pub mod circuits {
         }
     }
 
+    /// Circuit for testing [`BinaryGadgets::bin_multiplication_lower_half`].
+    pub struct TestBinaryMultiplicationLowerHalf(pub usize);
+    impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryMultiplicationLowerHalf {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = BinaryBundle::new(inputs[..self.0].to_vec());
+            let y = BinaryBundle::new(inputs[self.0..].to_vec());
+            let z = backend.bin_multiplication_lower_half(&x, &y, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0 * 2
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
+    /// Circuit for testing [`BinaryGadgets::bin_div`].
+    pub struct TestBinaryDivision(pub usize);
+    impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryDivision {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = BinaryBundle::new(inputs[..self.0].to_vec());
+            let y = BinaryBundle::new(inputs[self.0..].to_vec());
+            let z = backend.bin_div(&x, &y, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0 * 2
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
+    /// Circuit for testing [`BinaryGadgets::bin_lt`].
+    pub struct TestBinaryLessThan(pub usize);
+    impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryLessThan {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = BinaryBundle::new(inputs[..self.0].to_vec());
+            let y = BinaryBundle::new(inputs[self.0..].to_vec());
+            let z = backend.bin_lt(&x, &y, channel)?;
+            backend.output(&z, channel)?;
+            Ok(vec![z])
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0 * 2
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
+    /// Circuit for testing [`BinaryGadgets::bin_lt_signed`].
+    pub struct TestBinaryLessThanSigned(pub usize);
+    impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryLessThanSigned {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = BinaryBundle::new(inputs[..self.0].to_vec());
+            let y = BinaryBundle::new(inputs[self.0..].to_vec());
+            let z = backend.bin_lt_signed(&x, &y, channel)?;
+            backend.output(&z, channel)?;
+            Ok(vec![z])
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0 * 2
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
+    /// Circuit for testing [`BinaryGadgets::bin_rsa`].
+    pub struct TestBinaryArithmeticRightShift(pub usize, pub usize);
+    impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryArithmeticRightShift {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = BinaryBundle::new(inputs.to_vec());
+            let z = backend.bin_rsa(&x, self.1);
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
+    /// Circuit for testing [`BinaryGadgets::bin_rsl`].
+    pub struct TestBinaryLogicalRightShift(pub usize, pub usize);
+    impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryLogicalRightShift {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = BinaryBundle::new(inputs.to_vec());
+            let z = backend.bin_rsl(&x, self.1, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
+    /// Circuit for testing [`BinaryGadgets::bin_eq_bundles`].
+    pub struct TestBinaryEqBundles(pub usize);
+    impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryEqBundles {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = BinaryBundle::new(inputs[..self.0].to_vec());
+            let y = BinaryBundle::new(inputs[self.0..].to_vec());
+            let z = backend.bin_eq_bundles(&x, &y, channel)?;
+            backend.output(&z, channel)?;
+            Ok(vec![z])
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0 * 2
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
+    /// Circuit for testing [`BinaryGadgets::bin_abs`].
+    pub struct TestBinaryAbs(pub usize);
+    impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryAbs {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = BinaryBundle::new(inputs.to_vec());
+            let z = backend.bin_abs(&x, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
     /// Circuit for testing [`BinaryGadgets::bin_twos_complement`].
     pub struct TestBinaryTwosComplement(pub usize);
     impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryTwosComplement {
@@ -871,7 +1168,7 @@ pub mod circuits {
             inputs: &[<F as crate::Fancy>::Item],
             channel: &mut Channel,
         ) -> Result<Vec<<F as crate::Fancy>::Item>> {
-            let x = BinaryBundle::new(inputs[..self.0].to_vec());
+            let x = BinaryBundle::new(inputs.to_vec());
             let z = backend.bin_twos_complement(&x, channel)?;
             backend.output_bundle(&z, channel)?;
             Ok(z.wires().to_vec())
@@ -903,6 +1200,33 @@ pub mod circuits {
 
         fn ninputs(&self) -> usize {
             self.0
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
+    /// Circuit for testing [`BinaryGadgets::bin_max`].
+    pub struct TestBinaryMax(pub usize, pub usize);
+    impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryMax {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let xs = inputs
+                .chunks_exact(self.0)
+                .map(|v| BinaryBundle::new(v.to_vec()))
+                .collect::<Vec<_>>();
+            let z = backend.bin_max(&xs, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0 * self.1
         }
 
         fn modulus(&self, _: usize) -> u16 {
@@ -1112,6 +1436,28 @@ mod bundle {
     }
 
     #[test]
+    fn test_mask() {
+        let mut rng = thread_rng();
+        let q = rng.gen_usable_composite_modulus();
+        let c = circuits::TestMask(util::factor(q));
+
+        for _ in 0..16 {
+            let b = rng.gen_bool();
+            let x = rng.gen_u128() % q;
+
+            let mut inputs = vec![b as u16];
+            inputs.extend(crt_factor(x, q));
+            let z = Dummy::eval(&c, &inputs).unwrap();
+            let output = crt_inv_factor(&z, q);
+            if b {
+                assert_eq!(output, x);
+            } else {
+                assert_eq!(output, 0);
+            }
+        }
+    }
+
+    #[test]
     fn test_cexp() {
         let mut rng = thread_rng();
         let q = util::modulus_with_width(10);
@@ -1123,6 +1469,29 @@ mod bundle {
             let z = Dummy::eval(&c, &crt_factor(x, q)).unwrap();
             let output = crt_inv_factor(&z, q);
             assert_eq!(output, x.pow(y as u32) % q);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_division() {
+        let mut rng = thread_rng();
+
+        for _ in 0..16 {
+            let qs = rng.gen_usable_factors();
+            let n = qs.len();
+            let q = crate::util::product(&qs);
+            let c = circuits::TestCrtDivision(util::factor(q));
+
+            let q_ = crate::util::product(&qs[..n - 1]);
+            let pt_x = rng.gen_u128() % q_;
+            let pt_y = rng.gen_u128() % q_;
+
+            let mut inputs = crt_factor(pt_x, q);
+            inputs.extend(crt_factor(pt_y, q));
+            let z = Dummy::eval(&c, &inputs).unwrap();
+            let output = crt_inv_factor(&z, q);
+            assert_eq!(output, pt_x / pt_y);
         }
     }
 
@@ -1265,7 +1634,7 @@ mod bundle {
             let inputs = inputs
                 .into_iter()
                 .flat_map(|x| crt_factor(x, q))
-                .collect_vec();
+                .collect::<Vec<_>>();
             let z = Dummy::eval(&c, &inputs).unwrap();
             let output = crt_inv_factor(&z, q);
             assert_eq!(output, expected);
@@ -1273,36 +1642,230 @@ mod bundle {
     }
 
     #[test]
+    fn test_shift_extend() {
+        let mut rng = thread_rng();
+        let nbits = 64;
+        let q = 1 << nbits;
+
+        for _ in 0..16 {
+            let shift_size = rng.gen_usize() % nbits;
+            let x = rng.gen_u128() % q;
+            let c = circuits::TestShiftExtend(nbits, shift_size);
+
+            let inputs = util::u128_to_bits(x, nbits);
+            let output = Dummy::eval(&c, &inputs).unwrap();
+            assert_eq!(util::u128_from_bits(&output), x << shift_size);
+        }
+    }
+
+    #[test]
     fn test_binary_addition() {
         let mut rng = thread_rng();
-        let n = 2 + (rng.gen_usize() % 10);
-        let q = util::product(&vec![2; n]);
-        let c = circuits::TestBinaryAddition(n);
+        let nbits = 64;
+        let q = 1 << 64;
+        let c = circuits::TestBinaryAddition(nbits);
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
             let y = rng.gen_u128() % q;
-            let expected_res = (x + y) % q;
-            let expected_carry = (x + y >= q) as u16;
-            let mut inputs = util::u128_to_bits(x, n);
-            inputs.extend(util::u128_to_bits(y, n));
+            let mut inputs = util::u128_to_bits(x, nbits);
+            inputs.extend(util::u128_to_bits(y, nbits));
             let output = Dummy::eval(&c, &inputs).unwrap();
-            assert_eq!(util::u128_from_bits(&output[1..]), expected_res);
-            assert_eq!(output[0], expected_carry);
+            assert_eq!(util::u128_from_bits(&output[1..]), (x + y) % q);
+            assert_eq!(output[0], (x + y >= q) as u16);
+        }
+    }
+
+    #[test]
+    fn test_binary_subtraction() {
+        let mut rng = thread_rng();
+        let nbits = 64;
+        let q = 1 << nbits;
+        let c = circuits::TestBinarySubtraction(nbits);
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let mut inputs = util::u128_to_bits(x, nbits);
+            inputs.extend(util::u128_to_bits(y, nbits));
+            let output = Dummy::eval(&c, &inputs).unwrap();
+            assert_eq!(
+                util::u128_from_bits(&output[1..]),
+                x.overflowing_sub(y).0 % q
+            );
+            assert_eq!(output[0], (y != 0 && x >= y) as u16);
+        }
+    }
+
+    #[test]
+    fn test_binary_lt() {
+        let mut rng = thread_rng();
+        let nbits = 64;
+        let q = 1 << nbits;
+        let c = circuits::TestBinaryLessThan(nbits);
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let mut inputs = util::u128_to_bits(x, nbits);
+            inputs.extend(util::u128_to_bits(y, nbits));
+            let output = Dummy::eval(&c, &inputs).unwrap();
+            assert_eq!(util::u128_from_bits(&output) > 0, x < y);
+        }
+    }
+
+    #[test]
+    fn test_binary_lt_signed() {
+        let mut rng = thread_rng();
+        let nbits = 16;
+        let q = 1 << nbits;
+        let c = circuits::TestBinaryLessThanSigned(nbits);
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let mut inputs = util::u128_to_bits(x, nbits);
+            inputs.extend(util::u128_to_bits(y, nbits));
+            let output = Dummy::eval(&c, &inputs).unwrap();
+            assert_eq!(output.len(), 1);
+            assert_eq!(output[0] > 0, (x as i16) < (y as i16));
+        }
+    }
+
+    #[test]
+    fn test_binary_multiplication_lower_half() {
+        let mut rng = thread_rng();
+        let nbits = 64;
+        let q = 1 << nbits;
+        let c = circuits::TestBinaryMultiplicationLowerHalf(nbits);
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let mut inputs = util::u128_to_bits(x, nbits);
+            inputs.extend(util::u128_to_bits(y, nbits));
+            let output = Dummy::eval(&c, &inputs).unwrap();
+            assert_eq!(util::u128_from_bits(&output), (x * y) % q);
+        }
+    }
+
+    #[test]
+    fn test_binary_multiplication() {
+        let mut rng = thread_rng();
+        let nbits = 64;
+        let q = 1 << 64;
+        let c = circuits::TestBinaryMultiplication(nbits);
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let mut inputs = util::u128_to_bits(x, nbits);
+            inputs.extend(util::u128_to_bits(y, nbits));
+            let output = Dummy::eval(&c, &inputs).unwrap();
+            assert_eq!(util::u128_from_bits(&output), x * y);
+        }
+    }
+
+    #[test]
+    fn test_binary_division() {
+        let mut rng = thread_rng();
+        let nbits = 64;
+        let q = 1 << nbits;
+        let c = circuits::TestBinaryDivision(nbits);
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let mut y = rng.gen_u128() % q;
+            while y == 0 {
+                y = rng.gen_u128() % q;
+            }
+            let mut inputs = util::u128_to_bits(x, nbits);
+            inputs.extend(util::u128_to_bits(y, nbits));
+            let output = Dummy::eval(&c, &inputs).unwrap();
+            assert_eq!(util::u128_from_bits(&output), x / y);
+        }
+    }
+
+    #[test]
+    fn test_bin_abs() {
+        let mut rng = thread_rng();
+        let nbits = 64;
+        let q = 1 << nbits;
+        let c = circuits::TestBinaryAbs(nbits);
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let output = Dummy::eval(&c, &util::u128_to_bits(x, nbits)).unwrap();
+            assert_eq!(
+                util::u128_from_bits(&output),
+                if x >> (nbits - 1) > 0 {
+                    ((!x) + 1) & ((1 << nbits) - 1)
+                } else {
+                    x
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn test_binary_eq() {
+        let mut rng = thread_rng();
+        let nbits = 64;
+        let q = 1 << nbits;
+        let c = circuits::TestBinaryEqBundles(nbits);
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let y = rng.gen_u128() % q;
+            let mut inputs = util::u128_to_bits(x, nbits);
+            inputs.extend(util::u128_to_bits(y, nbits));
+            let output = Dummy::eval(&c, &inputs).unwrap();
+            assert_eq!(output[0], (x == y) as u16);
+        }
+    }
+
+    #[test]
+    fn test_binary_rsa() {
+        let mut rng = thread_rng();
+        let nbits = 64;
+        let q = 1 << nbits;
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let shift_size = rng.gen_usize() % nbits;
+            let c = circuits::TestBinaryArithmeticRightShift(nbits, shift_size);
+            let output = Dummy::eval(&c, &util::u128_to_bits(x, nbits)).unwrap();
+            assert_eq!(
+                util::u128_from_bits(&output) as i64,
+                (x as i64) >> shift_size
+            );
+        }
+    }
+
+    #[test]
+    fn test_binary_rsl() {
+        let mut rng = thread_rng();
+        let nbits = 64;
+        let q = 1 << nbits;
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let shift_size = rng.gen_usize() % nbits;
+            let c = circuits::TestBinaryLogicalRightShift(nbits, shift_size);
+            let output = Dummy::eval(&c, &util::u128_to_bits(x, nbits)).unwrap();
+            assert_eq!(util::u128_from_bits(&output), x >> shift_size);
         }
     }
 
     #[test]
     fn test_bin_demux() {
         let mut rng = thread_rng();
-        let nbits = 1 + (rng.gen_usize() % 7);
-        let q: u128 = 1 << nbits as u128;
+        let nbits = 8;
+        let q = 1 << nbits;
         let c = circuits::TestBinaryDemux(nbits);
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
-            let mut expected = vec![0; q as usize];
-            expected[x as usize] = 1;
             let output = Dummy::eval(&c, &util::u128_to_bits(x, nbits)).unwrap();
             for (i, y) in output.into_iter().enumerate() {
                 if i as u128 == x {
@@ -1311,6 +1874,42 @@ mod bundle {
                     assert_eq!(y, 0);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_bin_twos_complement() {
+        let mut rng = thread_rng();
+        let nbits = 64;
+        let q = 1 << nbits;
+        let c = circuits::TestBinaryTwosComplement(nbits);
+
+        for _ in 0..16 {
+            let x = rng.gen_u128() % q;
+            let output = Dummy::eval(&c, &util::u128_to_bits(x, nbits)).unwrap();
+            assert_eq!(util::u128_from_bits(&output), (((!x) % q) + 1) % q);
+        }
+    }
+
+    #[test]
+    fn test_binary_max() {
+        let mut rng = thread_rng();
+        let n = 10;
+        let nbits = 16;
+        let q = 1 << nbits;
+        let c = circuits::TestBinaryMax(nbits, n);
+
+        for _ in 0..16 {
+            let inputs = (0..n).map(|_| rng.gen_u128() % q).collect::<Vec<_>>();
+            let expected = *inputs.iter().max().unwrap();
+
+            let inputs = inputs
+                .into_iter()
+                .flat_map(|x| util::u128_to_bits(x, nbits))
+                .collect::<Vec<_>>();
+            let z = Dummy::eval(&c, &inputs).unwrap();
+            let output = util::u128_from_bits(&z);
+            assert_eq!(output, expected);
         }
     }
 }
