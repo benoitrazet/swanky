@@ -116,22 +116,7 @@ impl FancyBinary for CircuitAnalyzer {
             depth: max(x.depth, y.depth) + 1,
         })
     }
-    fn or(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        _: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        self.nands += 1;
-        self.nnegs += 3;
-        // Fancy binary's AND gate calls the underlying arithmetic multiplication
-        self.nmuls += 1;
-        Ok(AnalyzerItem {
-            modulus: x.modulus,
-            // This is because OR in swanky invokes an AND gate
-            depth: max(x.depth, y.depth) + 1,
-        })
-    }
+
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         self.nnegs += 1;
 
