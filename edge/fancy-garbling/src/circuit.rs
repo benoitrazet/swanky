@@ -113,8 +113,7 @@ pub fn eval_plain<C: CircuitExecutor<Dummy>>(
     Ok(outputs.iter().map(|x| x.val()).collect())
 }
 
-#[cfg(test)]
-pub(crate) mod circuits {
+pub mod circuits {
     //! A collection of test circuits.
 
     use crate::{
@@ -125,7 +124,8 @@ pub(crate) mod circuits {
     use swanky_channel::Channel;
     use swanky_error::Result;
 
-    pub(crate) struct TestAndGateFanN(pub(crate) usize);
+    /// Circuit for testing [`FancyBinary::and_many`].
+    pub struct TestAndGateFanN(pub usize);
     impl<F: FancyBinary> CircuitExecutor<F> for TestAndGateFanN {
         fn execute(
             &self,
@@ -147,7 +147,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestOrGateFanN(pub(crate) usize);
+    /// Circuit for testing [`FancyBinary::or_many`].
+    pub struct TestOrGateFanN(pub usize);
     impl<F: FancyBinary> CircuitExecutor<F> for TestOrGateFanN {
         fn execute(
             &self,
@@ -169,7 +170,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestAddition(pub(crate) u16);
+    /// Circuit for testing [`FancyArithmetic::add`].
+    pub struct TestAddition(pub u16);
     impl<F: FancyArithmetic> CircuitExecutor<F> for TestAddition {
         fn execute(
             &self,
@@ -190,7 +192,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestAddMany(pub(crate) u16, pub(crate) usize);
+    /// Circuit for testing [`FancyArithmetic::add_many`].
+    pub struct TestAddMany(pub u16, pub usize);
     impl<F: FancyArithmetic> CircuitExecutor<F> for TestAddMany {
         fn execute(
             &self,
@@ -212,7 +215,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestSubtraction(pub(crate) u16);
+    /// Circuit for testing [`FancyArithmetic::sub`].
+    pub struct TestSubtraction(pub u16);
     impl<F: FancyArithmetic> CircuitExecutor<F> for TestSubtraction {
         fn execute(
             &self,
@@ -233,7 +237,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestAndGate;
+    /// Circuit for testing [`FancyBinary::and`].
+    pub struct TestAndGate;
     impl<F: FancyBinary> CircuitExecutor<F> for TestAndGate {
         fn execute(
             &self,
@@ -255,7 +260,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestMulGate(pub(crate) u16);
+    /// Circuit for testing [`FancyArithmetic::mul`].
+    pub struct TestMulGate(pub u16);
     impl<F: FancyArithmetic> CircuitExecutor<F> for TestMulGate {
         fn execute(
             &self,
@@ -277,7 +283,9 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestMulGateUnequalMods(pub(crate) [u16; 2]);
+    /// Circuit for testing [`FancyArithmetic::mul`] using two different moduli
+    /// for the inputs.
+    pub struct TestMulGateUnequalMods(pub [u16; 2]);
     impl<F: FancyArithmetic> CircuitExecutor<F> for TestMulGateUnequalMods {
         fn execute(
             &self,
@@ -299,7 +307,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestCmul(pub(crate) u16, pub(crate) u16);
+    /// Circuit for testing [`FancyArithmetic::cmul`].
+    pub struct TestCmul(pub u16, pub u16);
     impl<F: FancyArithmetic> CircuitExecutor<F> for TestCmul {
         fn execute(
             &self,
@@ -321,7 +330,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestProj(pub(crate) u16);
+    /// Circuit for testing [`FancyProj::proj`].
+    pub struct TestProj(pub u16);
     impl<F: FancyProj> CircuitExecutor<F> for TestProj {
         fn execute(
             &self,
@@ -344,7 +354,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestProjRand(pub(crate) u16, pub(crate) Vec<u16>);
+    /// Circuit for testing [`FancyProj::proj`] using a custom truth table.
+    pub struct TestProjRand(pub u16, pub Vec<u16>);
     impl<F: FancyProj> CircuitExecutor<F> for TestProjRand {
         fn execute(
             &self,
@@ -366,7 +377,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestModChange(pub(crate) u16, pub(crate) u16);
+    /// Circuit for testing [`FancyProj::mod_change`].
+    pub struct TestModChange(pub u16, pub u16);
     impl<F: FancyProj> CircuitExecutor<F> for TestModChange {
         fn execute(
             &self,
@@ -389,7 +401,9 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestAddManyModChange(pub(crate) usize);
+    /// Circuit for testing [`FancyProj::mod_change`] followed by
+    /// [`FancyArithmetic::add_many`].
+    pub struct TestAddManyModChange(pub usize);
     impl<F: FancyProj + FancyArithmetic> CircuitExecutor<F> for TestAddManyModChange {
         fn execute(
             &self,
@@ -415,7 +429,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestConstants(pub(crate) u16, pub(crate) u16);
+    /// Circuit for testing constant gates.
+    pub struct TestConstants(pub u16, pub u16);
     impl<F: FancyArithmetic> CircuitExecutor<F> for TestConstants {
         fn execute(
             &self,
@@ -438,7 +453,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestBundleInputOutput(pub(crate) Vec<u16>);
+    /// Circuit for testing [`CrtBundle`]s.
+    pub struct TestBundleInputOutput(pub Vec<u16>);
     impl<F: BundleGadgets> CircuitExecutor<F> for TestBundleInputOutput {
         fn execute(
             &self,
@@ -460,7 +476,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestCrtAddition(pub(crate) Vec<u16>);
+    /// Circuit for testing [`CrtGadgets::crt_add`].
+    pub struct TestCrtAddition(pub Vec<u16>);
     impl<F: CrtGadgets> CircuitExecutor<F> for TestCrtAddition {
         fn execute(
             &self,
@@ -484,7 +501,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestCrtSubtraction(pub(crate) Vec<u16>);
+    /// Circuit for testing [`CrtGadgets::crt_sub`].
+    pub struct TestCrtSubtraction(pub Vec<u16>);
     impl<F: CrtGadgets> CircuitExecutor<F> for TestCrtSubtraction {
         fn execute(
             &self,
@@ -508,7 +526,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestCrtCmul(pub(crate) Vec<u16>, pub(crate) u128);
+    /// Circuit for testing [`CrtGadgets::crt_cmul`].
+    pub struct TestCrtCmul(pub Vec<u16>, pub u128);
     impl<F: CrtGadgets> CircuitExecutor<F> for TestCrtCmul {
         fn execute(
             &self,
@@ -531,7 +550,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestCrtMultiplication(pub(crate) Vec<u16>);
+    /// Circuit for testing [`ArithmeticBundleGadgets::mul_bundles`].
+    pub struct TestCrtMultiplication(pub Vec<u16>);
     impl<F: ArithmeticBundleGadgets> CircuitExecutor<F> for TestCrtMultiplication {
         fn execute(
             &self,
@@ -555,7 +575,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestCrtCexp(pub(crate) Vec<u16>, pub(crate) u16);
+    /// Circuit for testing [`CrtProjGadgets::crt_cexp`].
+    pub struct TestCrtCexp(pub Vec<u16>, pub u16);
     impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtCexp {
         fn execute(
             &self,
@@ -578,7 +599,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestCrtRemainder(pub(crate) Vec<u16>, pub(crate) u16);
+    /// Circuit for testing [`CrtProjGadgets::crt_rem`].
+    pub struct TestCrtRemainder(pub Vec<u16>, pub u16);
     impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtRemainder {
         fn execute(
             &self,
@@ -601,7 +623,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestEqBundles(pub(crate) Vec<u16>);
+    /// Circuit for testing [`ArithmeticProjBundleGadgets::eq_bundles`].
+    pub struct TestEqBundles(pub Vec<u16>);
     impl<F: ArithmeticProjBundleGadgets> CircuitExecutor<F> for TestEqBundles {
         fn execute(
             &self,
@@ -625,7 +648,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestComplexGadget(pub(crate) Vec<u16>, pub(crate) usize);
+    /// Circuit for testing multiple CRT operations.
+    pub struct TestComplexGadget(pub Vec<u16>, pub usize);
     impl<F: CrtProjGadgets> CircuitExecutor<F> for TestComplexGadget {
         fn execute(
             &self,
@@ -661,8 +685,9 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestMixedRadixAddition(pub(crate) Vec<u16>, pub(crate) usize);
-    impl<F: CrtProjGadgets> CircuitExecutor<F> for TestMixedRadixAddition {
+    /// Circuit for testing [`ArithmeticProjBundleGadgets::mixed_radix_addition`].
+    pub struct TestMixedRadixAddition(pub Vec<u16>, pub usize);
+    impl<F: ArithmeticProjBundleGadgets> CircuitExecutor<F> for TestMixedRadixAddition {
         fn execute(
             &self,
             backend: &mut F,
@@ -687,7 +712,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestRelu(pub(crate) Vec<u16>);
+    /// Circuit for testing [`CrtProjGadgets::crt_relu`].
+    pub struct TestRelu(pub Vec<u16>);
     impl<F: CrtProjGadgets> CircuitExecutor<F> for TestRelu {
         fn execute(
             &self,
@@ -710,7 +736,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestSgn(pub(crate) Vec<u16>);
+    /// Circuit for testing [`CrtProjGadgets::crt_sgn`].
+    pub struct TestSgn(pub Vec<u16>);
     impl<F: CrtProjGadgets> CircuitExecutor<F> for TestSgn {
         fn execute(
             &self,
@@ -733,7 +760,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestLeq(pub(crate) Vec<u16>);
+    /// Circuit for testing [`CrtProjGadgets::crt_lt`].
+    pub struct TestLeq(pub Vec<u16>);
     impl<F: CrtProjGadgets> CircuitExecutor<F> for TestLeq {
         fn execute(
             &self,
@@ -757,7 +785,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestMax(pub(crate) Vec<u16>, pub(crate) usize);
+    /// Circuit for testing [`CrtProjGadgets::crt_max`].
+    pub struct TestMax(pub Vec<u16>, pub usize);
     impl<F: CrtProjGadgets> CircuitExecutor<F> for TestMax {
         fn execute(
             &self,
@@ -783,7 +812,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestBinaryAddition(pub(crate) usize);
+    /// Circuit for testing [`BinaryGadgets::bin_addition`].
+    pub struct TestBinaryAddition(pub usize);
     impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryAddition {
         fn execute(
             &self,
@@ -808,7 +838,8 @@ pub(crate) mod circuits {
         }
     }
 
-    pub(crate) struct TestBinaryDemux(pub(crate) usize);
+    /// Circuit for testing [`BinaryGadgets::bin_demux`].
+    pub struct TestBinaryDemux(pub usize);
     impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryDemux {
         fn execute(
             &self,
