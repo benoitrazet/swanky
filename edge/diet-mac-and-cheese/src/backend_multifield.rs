@@ -1008,13 +1008,11 @@ where
 
             Instance(_, out) => {
                 self.memory.allocate_possibly(out.0, out.1);
-                let mut curr_out = out.0;
-                for instance in instances.unwrap() {
+                for (curr_out, instance) in (out.0..).zip(instances.unwrap()) {
                     let v = self
                         .backend
                         .input_public(B::FieldElement::from_number(&instance)?)?;
                     self.memory.set(curr_out, &v);
-                    curr_out += 1;
                 }
             }
 
@@ -1168,7 +1166,7 @@ where
                         let values = self.backend.ram_read(ram_id, &addr)?;
                         debug_assert_eq!(values.len(), *value_count);
 
-                        for (w, value) in (outputs[0].0..=outputs[0].1).zip(values.into_iter()) {
+                        for (w, value) in (outputs[0].0..=outputs[0].1).zip(values) {
                             self.memory.set(w, &value);
                         }
                     }

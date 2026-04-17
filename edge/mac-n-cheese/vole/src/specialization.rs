@@ -118,7 +118,7 @@ fn generic_spsvole_sender_compute_va<
         // TODO: fix the side-channel attack here
         if u != VF::ZERO {
             // TODO[fullfield]: what to do here?
-            for (x, y) in x_stars.iter_mut().zip(chi.decompose::<VF>().into_iter()) {
+            for (x, y) in x_stars.iter_mut().zip(chi.decompose::<VF>()) {
                 *x += u * y;
             }
         }

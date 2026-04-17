@@ -632,10 +632,8 @@ where
         let frame = self.get_frame_mut();
 
         if frame.callframe_is_vector {
-            let mut idx = start as usize;
-            for i in 0..(count as isize) {
+            for (idx, i) in (start as usize..).zip(0..(count as isize)) {
                 frame.callframe_vector[idx] = wire_ptr.incr(i);
-                idx += 1;
             }
         } else if allow_allocation {
             frame
@@ -761,10 +759,8 @@ where
                     //println!("callframe is vector");
                     new_slice = wire_ptr;
                     let last_frame = self.get_frame_mut();
-                    let mut idx = start as usize;
-                    for i in 0..(count as isize) {
+                    for (idx, i) in (start as usize..).zip(0..(count as isize)) {
                         last_frame.callframe_vector[idx] = new_slice.incr(i);
-                        idx += 1;
                     }
                 } else {
                     let last_frame = self.get_frame_mut();

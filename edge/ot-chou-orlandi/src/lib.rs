@@ -67,7 +67,7 @@ impl OtSender for Sender {
             })
             .collect::<Result<Vec<(Block, Block)>, Error>>()?;
         self.counter += inputs.len() as u128;
-        for (input, k) in inputs.iter().zip(ks.into_iter()) {
+        for (input, k) in inputs.iter().zip(ks) {
             let c0 = k.0 ^ input.0;
             let c1 = k.1 ^ input.1;
             channel.write_block(&c0)?;

@@ -188,7 +188,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                             .zip(incoming_data.chunks_exact(Self::SIZES.comms_2r))
                             .zip(outgoing_data.chunks_exact_mut(Self::SIZES.comms_3s))
                             .zip(output.chunks_exact_mut(Self::SIZES.voles_outputted))
-                            .zip(states.into_iter())
+                            .zip(states)
                     {
                         new_states.push(state.stage2(
                             self.initial.as_ref().into_inner(e),
@@ -217,7 +217,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                             .zip(incoming_data.chunks_exact(Self::SIZES.comms_4r))
                             .zip(outgoing_data.chunks_exact_mut(Self::SIZES.comms_5s))
                             .zip(output.chunks_exact_mut(Self::SIZES.voles_outputted))
-                            .zip(states.into_iter())
+                            .zip(states)
                     {
                         state.stage3(
                             self.initial.as_ref().into_inner(e),
@@ -244,7 +244,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                             .zip(incoming_data.chunks_exact(Self::SIZES.comms_3s))
                             .zip(outgoing_data.chunks_exact_mut(Self::SIZES.comms_4r))
                             .zip(output.chunks_exact_mut(Self::SIZES.voles_outputted))
-                            .zip(states.into_iter())
+                            .zip(states)
                     {
                         new_states.push(state.stage2(
                             self.initial.as_ref().into_inner(e),
@@ -271,7 +271,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                         .copied()
                         .zip(incoming_data.chunks_exact(Self::SIZES.comms_5s))
                         .zip(output.chunks_exact_mut(Self::SIZES.voles_outputted))
-                        .zip(states.into_iter())
+                        .zip(states)
                     {
                         state.stage3(
                             self.initial.as_ref().into_inner(e),

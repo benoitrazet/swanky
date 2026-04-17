@@ -189,9 +189,10 @@ impl Plugin for IterV0 {
 
         if enumerated {
             let counter_type = f_input_counts[num_env as usize].0;
-            let mut counter_wire = first_unused_wire_id(output_counts, input_counts);
 
-            for i in 0..iter_count {
+            for (counter_wire, i) in
+                (first_unused_wire_id(output_counts, input_counts)..).zip(0..iter_count)
+            {
                 gates.push(GateM::Constant(
                     counter_type,
                     counter_wire,
@@ -224,8 +225,6 @@ impl Plugin for IterV0 {
 
                 let fun_id = fun_store.name_to_fun_id(func_name)?;
                 gates.push(GateM::Call(Box::new((fun_id, outs, ins))));
-
-                counter_wire += 1;
             }
         } else {
             for i in 0..iter_count {

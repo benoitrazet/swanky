@@ -3,7 +3,7 @@ use std::{
     io::{BufRead, BufReader, Read, Seek},
 };
 
-use crypto_bigint::{CheckedAdd, CheckedMul, Limb, U64, Uint};
+use crypto_bigint::{CheckedAdd, Limb, U64, Uint};
 use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
 
 use crate::{

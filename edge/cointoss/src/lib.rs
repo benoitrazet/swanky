@@ -76,7 +76,7 @@ pub fn receive<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<V
         channel.write_block(seed)?;
     }
     channel.flush()?;
-    for (seed, com) in seeds.iter().zip(coms.into_iter()) {
+    for (seed, com) in seeds.iter().zip(coms) {
         let seed_ = channel.read_block()?;
         let mut rng_ = SwankyRng::from_seed(seed_);
         let mut check = Block::default();
