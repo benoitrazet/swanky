@@ -736,6 +736,33 @@ pub mod circuits {
         }
     }
 
+    /// Circuit for testing [`ArithmeticProjBundleGadgets::mixed_radix_addition_msb_only`].
+    pub struct TestMixedRadixAdditionMSBOnly(pub Vec<u16>, pub usize);
+    impl<F: ArithmeticProjBundleGadgets> CircuitExecutor<F> for TestMixedRadixAdditionMSBOnly {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let xs = inputs
+                .chunks_exact(self.0.len())
+                .map(|v| Bundle::new(v.to_vec()))
+                .collect::<Vec<_>>();
+            let z = backend.mixed_radix_addition_msb_only(&xs, channel)?;
+            backend.output(&z, channel)?;
+            Ok(vec![z])
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len() * self.1
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i % self.0.len()]
+        }
+    }
+
     /// Circuit for testing [`CrtProjGadgets::crt_relu`].
     pub struct TestRelu(pub Vec<u16>);
     impl<F: CrtProjGadgets> CircuitExecutor<F> for TestRelu {
@@ -1233,6 +1260,80 @@ pub mod circuits {
             2
         }
     }
+
+    /// Circuit for testing [`CrtProjGadgets::crt_to_pmr`].
+    pub struct TestCrtToPmr(pub Vec<u16>);
+    impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtToPmr {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = CrtBundle::new(inputs.to_vec());
+            let z = backend.crt_to_pmr(&x, channel)?;
+            backend.output_bundle(&z, channel)?;
+            Ok(z.wires().to_vec())
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len()
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i]
+        }
+    }
+
+    /// Circuit for testing [`CrtProjGadgets::pmr_lt`].
+    pub struct TestPmrLessThan(pub Vec<u16>);
+    impl<F: CrtProjGadgets> CircuitExecutor<F> for TestPmrLessThan {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
+            let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
+            let z = backend.pmr_lt(&x, &y, channel)?;
+            backend.output(&z, channel)?;
+            Ok(vec![z])
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len() * 2
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i % self.0.len()]
+        }
+    }
+
+    /// Circuit for testing [`CrtProjGadgets::pmr_geq`].
+    pub struct TestPmrGreaterThanOrEqual(pub Vec<u16>);
+    impl<F: CrtProjGadgets> CircuitExecutor<F> for TestPmrGreaterThanOrEqual {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[<F as crate::Fancy>::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+            let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
+            let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
+            let z = backend.pmr_geq(&x, &y, channel)?;
+            backend.output(&z, channel)?;
+            Ok(vec![z])
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len() * 2
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i % self.0.len()]
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1538,7 +1639,7 @@ mod bundle {
     fn test_mixed_radix_addition() {
         let mut rng = thread_rng();
         let nargs = 2 + rng.gen_usize() % 100;
-        let moduli = (0..7).map(|_| rng.gen_modulus()).collect_vec();
+        let moduli = (0..7).map(|_| rng.gen_modulus()).collect::<Vec<_>>();
         let q: u128 = moduli.iter().map(|&q| q as u128).product();
         let circ = circuits::TestMixedRadixAddition(moduli.clone(), nargs);
 
@@ -1564,6 +1665,44 @@ mod bundle {
             }
             let output = Dummy::eval(&circ, &inputs).unwrap();
             assert_eq!(util::from_mixed_radix(&output, &moduli), expected);
+        }
+    }
+
+    #[test]
+    fn test_mixed_radix_addition_msb_only() {
+        let mut rng = thread_rng();
+        let nargs = 2 + rng.gen_usize() % 10;
+        let moduli = (0..7).map(|_| rng.gen_modulus()).collect::<Vec<_>>();
+        let q = util::product(&moduli);
+        let circ = circuits::TestMixedRadixAdditionMSBOnly(moduli.clone(), nargs);
+
+        // Test maximum overflow.
+        let mut inputs = Vec::new();
+        for _ in 0..nargs {
+            inputs.extend(util::as_mixed_radix(q - 1, &moduli).iter());
+        }
+        let output = Dummy::eval(&circ, &inputs).unwrap()[0];
+        assert_eq!(
+            output,
+            *util::as_mixed_radix((q - 1) * (nargs as u128) % q, &moduli)
+                .last()
+                .unwrap()
+        );
+
+        // Test random values.
+        for _ in 0..4 {
+            let mut expected = 0;
+            let mut inputs = Vec::new();
+            for _ in 0..nargs {
+                let x = rng.gen_u128() % q;
+                expected = (expected + x) % q;
+                inputs.extend(util::as_mixed_radix(x, &moduli).iter());
+            }
+            let output = Dummy::eval(&circ, &inputs).unwrap()[0];
+            assert_eq!(
+                output,
+                *util::as_mixed_radix(expected, &moduli).last().unwrap()
+            );
         }
     }
 
@@ -1910,6 +2049,76 @@ mod bundle {
             let z = Dummy::eval(&c, &inputs).unwrap();
             let output = util::u128_from_bits(&z);
             assert_eq!(output, expected);
+        }
+    }
+
+    #[test]
+    fn test_crt_to_pmr() {
+        fn to_pmr_pt(x: u128, ps: &[u16]) -> Vec<u16> {
+            let mut ds = vec![0; ps.len()];
+            let mut q = 1;
+            for i in 0..ps.len() {
+                let p = ps[i] as u128;
+                ds[i] = ((x / q) % p) as u16;
+                q *= p;
+            }
+            ds
+        }
+
+        let mut rng = rand::thread_rng();
+        for _ in 0..8 {
+            let ps = rng.gen_usable_factors();
+            let q = util::product(&ps);
+
+            let input = rng.gen_u128() % q;
+            let expected = to_pmr_pt(input, &ps);
+            let c = circuits::TestCrtToPmr(ps);
+            let output = Dummy::eval(&c, &crt_factor(input, q)).unwrap();
+            assert_eq!(output, expected);
+        }
+    }
+
+    #[test]
+    fn test_pmr_lt() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..8 {
+            let qs = rng.gen_usable_factors();
+            let n = qs.len();
+            let q = crate::util::product(&qs);
+            let q_ = crate::util::product(&qs[..n - 1]);
+            let pt_x = rng.gen_u128() % q_;
+            let pt_y = rng.gen_u128() % q_;
+            let c = circuits::TestPmrLessThan(qs);
+            let mut inputs = crt_factor(pt_x, q);
+            inputs.extend(crt_factor(pt_y, q));
+            let output = Dummy::eval(&c, &inputs).unwrap()[0];
+            if pt_x < pt_y {
+                assert_eq!(output, 1);
+            } else {
+                assert_eq!(output, 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_pmr_geq() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..8 {
+            let qs = rng.gen_usable_factors();
+            let n = qs.len();
+            let q = crate::util::product(&qs);
+            let q_ = crate::util::product(&qs[..n - 1]);
+            let pt_x = rng.gen_u128() % q_;
+            let pt_y = rng.gen_u128() % q_;
+            let c = circuits::TestPmrGreaterThanOrEqual(qs);
+            let mut inputs = crt_factor(pt_x, q);
+            inputs.extend(crt_factor(pt_y, q));
+            let output = Dummy::eval(&c, &inputs).unwrap()[0];
+            if pt_x >= pt_y {
+                assert_eq!(output, 1);
+            } else {
+                assert_eq!(output, 0);
+            }
         }
     }
 }
