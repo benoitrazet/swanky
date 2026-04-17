@@ -87,32 +87,6 @@ impl<C: CircuitExecutor<Informer<Dummy>>> CircuitInfo for C {
     }
 }
 
-/// Evaluate the circuit in plaintext.
-///
-/// # Panics
-/// Panics if `inputs.len()` does not equal the circuit's expected number of
-/// inputs.
-pub fn eval_plain<C: CircuitExecutor<Dummy>>(
-    circuit: &C,
-    inputs: &[u16],
-) -> swanky_error::Result<Vec<u16>> {
-    assert_eq!(inputs.len(), circuit.ninputs());
-
-    let mut dummy = crate::dummy::Dummy::new();
-
-    // encode inputs as DummyVals
-    let inputs = inputs
-        .iter()
-        .enumerate()
-        .map(|(i, x)| DummyVal::new(*x, circuit.modulus(i)))
-        .collect::<Vec<_>>();
-
-    let outputs = Channel::with(std::io::empty(), |c| {
-        circuit.execute(&mut dummy, &inputs, c)
-    })?;
-    Ok(outputs.iter().map(|x| x.val()).collect())
-}
-
 pub mod circuits {
     //! A collection of test circuits.
 
@@ -953,7 +927,7 @@ mod plaintext {
         for _ in 0..16 {
             let inputs = (0..n).map(|_| rng.gen_bool() as u16).collect::<Vec<_>>();
             let expected = inputs.iter().fold(1, |acc, &x| x & acc);
-            let output = eval_plain(&c, &inputs).unwrap()[0];
+            let output = Dummy::eval(&c, &inputs).unwrap()[0];
             assert_eq!(output, expected);
         }
     }
@@ -967,7 +941,7 @@ mod plaintext {
         for _ in 0..16 {
             let inputs = (0..n).map(|_| rng.gen_bool() as u16).collect::<Vec<_>>();
             let expected = inputs.iter().fold(0, |acc, &x| x | acc);
-            let output = eval_plain(&c, &inputs).unwrap()[0];
+            let output = Dummy::eval(&c, &inputs).unwrap()[0];
             assert_eq!(output, expected);
         }
     }
@@ -980,7 +954,7 @@ mod plaintext {
         for _ in 0..16 {
             let x = rng.gen_bool() as u16;
             let y = rng.gen_bool() as u16;
-            let output = eval_plain(&c, &[x, y]).unwrap()[0];
+            let output = Dummy::eval(&c, &[x, y]).unwrap()[0];
             assert_eq!(output, x * y % 2);
         }
     }
@@ -994,7 +968,7 @@ mod plaintext {
         for _ in 0..16 {
             let x = rng.gen_u16() % q;
             let y = rng.gen_u16() % q;
-            let output = eval_plain(&c, &[x, y]).unwrap()[0];
+            let output = Dummy::eval(&c, &[x, y]).unwrap()[0];
             assert_eq!(output, x * y % q);
         }
     }
@@ -1008,7 +982,7 @@ mod plaintext {
 
         for _ in 0..16 {
             let x = rng.gen_u16() % p;
-            let output = eval_plain(&c, &[x]).unwrap()[0];
+            let output = Dummy::eval(&c, &[x]).unwrap()[0];
             assert_eq!(output, x % q);
         }
     }
@@ -1030,7 +1004,7 @@ mod plaintext {
                     })
                     .collect::<Vec<_>>();
             let expected: u16 = inputs.iter().sum();
-            let output = eval_plain(&c, &inputs).unwrap()[0];
+            let output = Dummy::eval(&c, &inputs).unwrap()[0];
             assert_eq!(output, expected);
         }
     }
@@ -1044,7 +1018,7 @@ mod plaintext {
 
         for _ in 0..64 {
             let x = rng.gen_u16() % q;
-            let output = eval_plain(&circ, &[x]).unwrap()[0];
+            let output = Dummy::eval(&circ, &[x]).unwrap()[0];
             assert_eq!(output, (x + c) % q);
         }
     }
@@ -1065,7 +1039,7 @@ mod bundle {
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
-            let y = eval_plain(&c, &crt_factor(x, q)).unwrap();
+            let y = Dummy::eval(&c, &crt_factor(x, q)).unwrap();
             let output = crt_inv_factor(&y, q);
             assert_eq!(output, x);
         }
@@ -1082,7 +1056,7 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let mut inputs = crt_factor(x, q);
             inputs.extend(crt_factor(y, q));
-            let z = eval_plain(&c, &inputs).unwrap();
+            let z = Dummy::eval(&c, &inputs).unwrap();
             let output = crt_inv_factor(&z, q);
             assert_eq!(output, (x + y) % q);
         }
@@ -1099,7 +1073,7 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let mut inputs = crt_factor(x, q);
             inputs.extend(crt_factor(y, q));
-            let z = eval_plain(&c, &inputs).unwrap();
+            let z = Dummy::eval(&c, &inputs).unwrap();
             let output = crt_inv_factor(&z, q);
             assert_eq!(output, (x + q - y) % q);
         }
@@ -1114,7 +1088,7 @@ mod bundle {
 
         for _ in 0..16 {
             let x = rng.gen_u128() % q;
-            let z = eval_plain(&c, &crt_factor(x, q)).unwrap();
+            let z = Dummy::eval(&c, &crt_factor(x, q)).unwrap();
             let output = crt_inv_factor(&z, q);
             assert_eq!(output, (x * y) % q);
         }
@@ -1131,7 +1105,7 @@ mod bundle {
             let y = rng.gen_u64() as u128 % q;
             let mut inputs = crt_factor(x, q);
             inputs.extend(crt_factor(y, q));
-            let z = eval_plain(&c, &inputs).unwrap();
+            let z = Dummy::eval(&c, &inputs).unwrap();
             let output = crt_inv_factor(&z, q);
             assert_eq!(output, (x * y) % q);
         }
@@ -1146,7 +1120,7 @@ mod bundle {
 
         for _ in 0..64 {
             let x = rng.gen_u16() as u128 % q;
-            let z = eval_plain(&c, &crt_factor(x, q)).unwrap();
+            let z = Dummy::eval(&c, &crt_factor(x, q)).unwrap();
             let output = crt_inv_factor(&z, q);
             assert_eq!(output, x.pow(y as u32) % q);
         }
@@ -1162,7 +1136,7 @@ mod bundle {
 
         for _ in 0..64 {
             let x = rng.gen_u128() % q;
-            let z = eval_plain(&c, &crt_factor(x, q)).unwrap();
+            let z = Dummy::eval(&c, &crt_factor(x, q)).unwrap();
             let output = crt_inv_factor(&z, q);
             assert_eq!(output, x % p as u128);
         }
@@ -1178,7 +1152,7 @@ mod bundle {
         let x = rng.gen_u128() % q;
         let mut inputs = crt_factor(x, q);
         inputs.extend(crt_factor(x, q));
-        let output = eval_plain(&c, &inputs).unwrap()[0];
+        let output = Dummy::eval(&c, &inputs).unwrap()[0];
         assert_eq!(output, (x == x) as u16);
 
         for _ in 0..64 {
@@ -1186,7 +1160,7 @@ mod bundle {
             let y = rng.gen_u128() % q;
             let mut inputs = crt_factor(x, q);
             inputs.extend(crt_factor(y, q));
-            let output = eval_plain(&c, &inputs).unwrap()[0];
+            let output = Dummy::eval(&c, &inputs).unwrap()[0];
             assert_eq!(output, (x == y) as u16);
         }
     }
@@ -1204,7 +1178,7 @@ mod bundle {
         for _ in 0..nargs {
             inputs.extend(util::as_mixed_radix(q - 1, &moduli).iter());
         }
-        let output = eval_plain(&circ, &inputs).unwrap();
+        let output = Dummy::eval(&circ, &inputs).unwrap();
         assert_eq!(
             util::from_mixed_radix(&output, &moduli),
             (q - 1) * (nargs as u128) % q
@@ -1219,7 +1193,7 @@ mod bundle {
                 expected = (expected + x) % q;
                 inputs.extend(util::as_mixed_radix(x, &moduli).iter());
             }
-            let output = eval_plain(&circ, &inputs).unwrap();
+            let output = Dummy::eval(&circ, &inputs).unwrap();
             assert_eq!(util::from_mixed_radix(&output, &moduli), expected);
         }
     }
@@ -1233,7 +1207,7 @@ mod bundle {
         for _ in 0..128 {
             let input = rng.gen_u128() % q;
             let expected = if input < q / 2 { input } else { 0 };
-            let z = eval_plain(&c, &crt_factor(input, q)).unwrap();
+            let z = Dummy::eval(&c, &crt_factor(input, q)).unwrap();
             let output = crt_inv_factor(&z, q);
             assert_eq!(output, expected);
         }
@@ -1248,7 +1222,7 @@ mod bundle {
         for _ in 0..128 {
             let input = rng.gen_u128() % q;
             let expected = if input < q / 2 { 1 } else { q - 1 };
-            let z = eval_plain(&c, &crt_factor(input, q)).unwrap();
+            let z = Dummy::eval(&c, &crt_factor(input, q)).unwrap();
             let output = crt_inv_factor(&z, q);
             assert_eq!(output, expected);
         }
@@ -1264,7 +1238,7 @@ mod bundle {
         let x = rng.gen_u128() % q / 2;
         let mut inputs = crt_factor(x, q);
         inputs.extend(crt_factor(x, q));
-        let output = eval_plain(&c, &inputs).unwrap()[0];
+        let output = Dummy::eval(&c, &inputs).unwrap()[0];
         assert_eq!(output, (x < x) as u16);
 
         for _ in 0..64 {
@@ -1272,7 +1246,7 @@ mod bundle {
             let y = rng.gen_u128() % q / 2;
             let mut inputs = crt_factor(x, q);
             inputs.extend(crt_factor(y, q));
-            let output = eval_plain(&c, &inputs).unwrap()[0];
+            let output = Dummy::eval(&c, &inputs).unwrap()[0];
             assert_eq!(output, (x < y) as u16);
         }
     }
@@ -1292,7 +1266,7 @@ mod bundle {
                 .into_iter()
                 .flat_map(|x| crt_factor(x, q))
                 .collect_vec();
-            let z = eval_plain(&c, &inputs).unwrap();
+            let z = Dummy::eval(&c, &inputs).unwrap();
             let output = crt_inv_factor(&z, q);
             assert_eq!(output, expected);
         }
@@ -1312,7 +1286,7 @@ mod bundle {
             let expected_carry = (x + y >= q) as u16;
             let mut inputs = util::u128_to_bits(x, n);
             inputs.extend(util::u128_to_bits(y, n));
-            let output = eval_plain(&c, &inputs).unwrap();
+            let output = Dummy::eval(&c, &inputs).unwrap();
             assert_eq!(util::u128_from_bits(&output[1..]), expected_res);
             assert_eq!(output[0], expected_carry);
         }
@@ -1329,7 +1303,7 @@ mod bundle {
             let x = rng.gen_u128() % q;
             let mut expected = vec![0; q as usize];
             expected[x as usize] = 1;
-            let output = eval_plain(&c, &util::u128_to_bits(x, nbits)).unwrap();
+            let output = Dummy::eval(&c, &util::u128_to_bits(x, nbits)).unwrap();
             for (i, y) in output.into_iter().enumerate() {
                 if i as u128 == x {
                     assert_eq!(y, 1);

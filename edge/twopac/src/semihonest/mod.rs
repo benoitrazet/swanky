@@ -12,7 +12,7 @@ mod tests {
     use fancy_garbling::{
         AllWire, CrtBundle, CrtGadgets, CrtProjGadgets, Fancy, FancyArithmetic, FancyBinary,
         FancyProj, WireLabel, WireMod2,
-        circuit::{BinaryCircuit, CircuitExecutor, CircuitInfo, eval_plain},
+        circuit::{BinaryCircuit, CircuitExecutor, CircuitInfo},
         dummy::Dummy,
         util::RngExt,
     };
@@ -159,7 +159,7 @@ mod tests {
         )
         .unwrap();
 
-        let target = eval_plain(&circ, &vec![0_u16; 256]).unwrap();
+        let target = Dummy::eval(&circ, &vec![0; 256]).unwrap();
         assert_eq!(out, target);
     }
 

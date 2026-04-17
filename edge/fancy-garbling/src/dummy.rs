@@ -8,11 +8,12 @@ use swanky_error::ErrorKind;
 
 use crate::{
     FancyArithmetic, FancyBinary, FancyProj, check_binary,
+    circuit::CircuitExecutor,
     fancy::{Fancy, HasModulus},
 };
 
 /// Simple struct that performs the fancy computation over `u16`.
-pub struct Dummy {}
+pub struct Dummy;
 
 /// Wrapper around `u16`.
 #[derive(Clone, Debug)]
@@ -43,6 +44,32 @@ impl Dummy {
     /// Create a new Dummy.
     pub fn new() -> Dummy {
         Dummy {}
+    }
+
+    /// Evaluate `circuit` in plaintext.
+    ///
+    /// # Panics
+    /// Panics if `inputs.len()` does not equal the circuit's expected number of
+    /// inputs.
+    pub fn eval<C: CircuitExecutor<Dummy>>(
+        circuit: &C,
+        inputs: &[u16],
+    ) -> swanky_error::Result<Vec<u16>> {
+        assert_eq!(inputs.len(), circuit.ninputs());
+
+        let mut dummy = crate::dummy::Dummy::new();
+
+        // encode inputs as DummyVals
+        let inputs = inputs
+            .iter()
+            .enumerate()
+            .map(|(i, x)| DummyVal::new(*x, circuit.modulus(i)))
+            .collect::<Vec<_>>();
+
+        let outputs = Channel::with(std::io::empty(), |c| {
+            circuit.execute(&mut dummy, &inputs, c)
+        })?;
+        Ok(outputs.iter().map(|x| x.val()).collect())
     }
 }
 
