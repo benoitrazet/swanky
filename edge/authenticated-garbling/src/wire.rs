@@ -2,12 +2,15 @@
 
 use fancy_garbling::{HasModulus, WireMod2};
 use swanky_authenticated_bits::authshares::AuthShare;
+use swanky_field_binary::F2;
 use swanky_party::GenericParty;
 
 /// The [`AuthenticatedWireMod2`] structure extends a [`WireMod2`] to include the wire's
 /// authenticated [`AndTriple`], authenticated [`AuthShare`], and the wire's current index.
 #[derive(Clone)]
 pub struct AuthenticatedWireMod2<P: GenericParty> {
+    /// value
+    pub value: Option<F2>,
     /// The wire label.
     pub wire_label: WireMod2,
     /// The authenticated share associated with the wire.
@@ -21,6 +24,7 @@ impl<P: GenericParty> AuthenticatedWireMod2<P> {
     /// authenticated share [`AuthShare`] and an index.
     pub fn new(wire_label: WireMod2, auth_share: AuthShare<P>, index: usize) -> Self {
         AuthenticatedWireMod2 {
+            value: None, 
             wire_label,
             auth_share: Some(auth_share),
             index,
@@ -29,10 +33,31 @@ impl<P: GenericParty> AuthenticatedWireMod2<P> {
     /// This [`AuthenticatedWireMod2`]'s constructor takes a  [`WireMod2`] and index only.
     pub fn new_without_share(wire_label: WireMod2, index: usize) -> Self {
         AuthenticatedWireMod2 {
+            value: None, 
             wire_label,
             auth_share: None,
             index,
         }
+    }
+        /// The [`AuthenticatedWireMod2`]'s constructor takes a  [`WireMod2`], an
+    /// authenticated share [`AuthShare`] and an index.
+    pub fn new_with_value(value: F2, wire_label: WireMod2, auth_share: AuthShare<P>, index: usize) -> Self {
+        AuthenticatedWireMod2 {
+            value: Some(value), 
+            wire_label,
+            auth_share: Some(auth_share),
+            index,
+        }
+    }
+    /// Returns the value/masked value associated with the current [`AuthenticatedWireMod2`]
+    /// 
+    /// Panics if there is no value associated with this wire
+    pub fn value(&self) -> F2 {
+        self.value.unwrap()
+    }
+    /// Sets the value associated with the current [`AuthenticatedWireMod2`]
+    pub fn set_value(&mut self, value: F2) {
+        self.value = Some(value);
     }
     /// Returns the wire label of type [`WireMod2`] associated with the current [`AuthenticatedWireMod2`]
     pub fn wire_label(&self) -> WireMod2 {

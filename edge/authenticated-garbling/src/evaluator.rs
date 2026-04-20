@@ -29,7 +29,6 @@ pub struct Evaluator<RNG> {
     current_wire_index: usize,
     preprocessed_wires_map: HashMap<usize, PreProcessedWire<PartyEvaluator>>,
     known_triples_map: HashMap<usize, PreProcessedWire<PartyEvaluator>>,
-    pub(crate) values: Vec<F2>,
     pub(crate) rng: RNG,
 }
 
@@ -46,7 +45,6 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
             authentication_delta,
             preprocessed_wires_map: HashMap::new(),
             known_triples_map: HashMap::new(),
-            values: Vec::new(),
             current_wire_index: 0,
             rng,
         })
@@ -67,7 +65,7 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
     ) -> swanky_error::Result<()> {
         let mut and_generator =
             AndTripleGenerator::new_with_delta(self.delta(), channel, &mut self.rng)?;
-        let (preprocessed_wires_map, known_triples_map, nwires) = f_preprocessing(
+        let (preprocessed_wires_map, known_triples_map) = f_preprocessing(
             &circuit,
             &mut and_generator,
             input_size,
@@ -77,7 +75,6 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
         self.preprocessed_wires_map = preprocessed_wires_map;
         self.known_triples_map = known_triples_map;
         self.authentication_delta = and_generator.delta();
-        self.values = Vec::with_capacity(nwires);
         Ok(())
     }
 
@@ -99,14 +96,6 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
     fn get_current_wire_triple(&mut self, index: usize) -> AuthShare<PartyEvaluator> {
         self.known_triples_map[&index].into_auth_share()
     }
-    /// Returns the underlying value associated with the wire index
-    fn get_value(&mut self, index: usize) -> F2 {
-        self.values[index]
-    }
-    /// Sets the underlying associated with the wire index
-    pub(crate) fn insert_value(&mut self, index: usize, value: F2) {
-        self.values[index] = value;
-    }
     /// Read a Wire from the reader.
     pub fn read_wire(
         &mut self,
@@ -127,13 +116,11 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        let index = self.current_wire_index();
-        let current_value = self.get_value(x.index()) + self.get_value(y.index());
-        self.insert_value(index, current_value);
-        AuthenticatedWireMod2::new(
+        AuthenticatedWireMod2::new_with_value(
+             x.value() + y.value(),
             x.wire_label() + y.wire_label(),
             x.auth_share() ^ y.auth_share(),
-            index,
+            self.current_wire_index(),
         )
     }
 
@@ -174,10 +161,10 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
 
         // z_α + λ_α, where z_α is the actual wire value of the input
         // wire with label L_α and λ_α is the mask of that value
-        let la_value = self.get_value(la.index());
+        let la_value = la.value();
         // z_β + λ_β, where z_β is the actual wire value of the input
         // wire with label L_β and λ_β is the mask of that value
-        let lb_value = self.get_value(lb.index());
+        let lb_value = lb.value();
 
         // This is the value (z_α + λ_α)Gate_0
         let gate0_muxed = mux(la_value, 0.into(), gate0);
@@ -192,8 +179,8 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
         // The current masked value of the wire is:
         // z_γ + λ_γ := b_γ + lsb(L_{γ, z_γ + λ_γ})
         let current_value = F128b::from(lc).lsb() + bit_c;
-        self.insert_value(index, current_value);
-        Ok(AuthenticatedWireMod2::new(
+        Ok(AuthenticatedWireMod2::new_with_value(
+            current_value,
             WireMod2::from_repr(lc, 2),
             lc_share,
             index,
@@ -221,7 +208,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
                 // when the evaluator received the garbler's input labels.
                 // This value is the following in the paper:
                 // y_w + λ_w := y_w ⊕ s_w ⊕ r_w
-                let value_f2 = F2::from(values[i]) + self.values[index_shift + i];
+                let value_f2 = F2::from(values[i]);
                 // The evaluator sends that value to the garbler
                 let _ = channel.write(&value_f2);
                 // The evaluator receives the wire label associated with their masked value.
@@ -270,11 +257,6 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
             .map(|i| {
                 // The evaluator increments the counter for its own inputs
                 let index = self.current_wire_index();
-                // The evaluator stores the masks that they will later use
-                // to mask their inputs. There is an assumption being made
-                // here that the garbler and evaluator have the same number
-                // of input wires.
-                self.insert_value(index, masks[i]);
 
                 // The evaluator receives the garbler's masked inputs.
                 // The values are called the following in the paper:
@@ -333,7 +315,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         AuthShareGenerator::open_with_delta(&auth_shares, self.delta(), &mut masks, channel)?;
         let mut outputs = Vec::with_capacity(x.len());
         for i in 0..x.len() {
-            outputs.push((masks[i] + self.get_value(x[i].index())).into());
+            outputs.push((masks[i] + x[i].value()).into());
         }
         Ok(Some(outputs))
     }

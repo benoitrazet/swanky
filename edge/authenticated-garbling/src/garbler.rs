@@ -23,7 +23,6 @@ pub struct Garbler<RNG> {
     current_wire_index: usize,
     preprocessed_wires_map: HashMap<usize, PreProcessedWire<PartyGarbler>>,
     known_triples_map: HashMap<usize, PreProcessedWire<PartyGarbler>>,
-    input_masked_values: Vec<F2>,
     rng: RNG,
 }
 
@@ -43,7 +42,6 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             current_wire_index: 0,
             preprocessed_wires_map: HashMap::new(),
             known_triples_map: HashMap::new(),
-            input_masked_values: Vec::new(),
             rng,
         })
     }
@@ -88,7 +86,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     ) -> swanky_error::Result<()> {
         let mut and_generator =
             AndTripleGenerator::new_with_delta(self.delta_u8x16(), channel, &mut self.rng)?;
-        let (preprocessed_wires_map, known_triples_map, _) = f_preprocessing(
+        let (preprocessed_wires_map, known_triples_map) = f_preprocessing(
             &circuit,
             &mut and_generator,
             input_size,
@@ -288,8 +286,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
             .zip(masks.iter())
             .map(|(val, mask)| val + mask)
             .collect();
-        // Save the masked values for the finalization step
-        self.input_masked_values.extend(masked_values.clone());
+
         // Garbler encodes the masked values as wire labels and sends them to the evaluator
         let encoded = self.encode_many_wires(&masked_values, &zeroes)?;
         for wire in encoded.iter() {
@@ -316,8 +313,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
                 channel.read().unwrap()
             })
             .collect();
-        // Save the masked values for the finalization step
-        self.input_masked_values.extend(masked_values.clone());
+
         // The garbler encodes the evaluators masked values as wire labels:
         // L_{w,y_w ⊕λ_w}
         let encoded = self.encode_many_wires(&masked_values, &zeroes)?;

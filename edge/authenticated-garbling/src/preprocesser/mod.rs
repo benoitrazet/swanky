@@ -64,7 +64,6 @@ pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
 ) -> swanky_error::Result<(
     HashMap<usize, PreProcessedWire<P>>,
     HashMap<usize, PreProcessedWire<P>>,
-    usize,
 )> {
     // First Analyze the circuit gates by simulating both parties
     let mut circuit_analyzer = CircuitExecutor::new_analyzer();
@@ -73,7 +72,6 @@ pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
     let nands = circuit_analyzer.analyzer().nands();
     let ninputs = circuit_analyzer.analyzer().ninputs();
     let nconstants = circuit_analyzer.analyzer().nconstants();
-    let nxors = circuit_analyzer.analyzer().nxors();
 
     // Create as many random and triples as there are AND gates
     let mut rand_and_triples = Vec::with_capacity(nands);
@@ -109,7 +107,6 @@ pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
     Ok((
         wire_preprocessor.into_indexed_auth_shares(),
         known_triple_map,
-        nxors + nconstants + nands + ninputs,
     ))
 }
 
