@@ -55,13 +55,11 @@
 //! assert_eq!(bits_a, bits_b);
 //! # Ok(())
 //! # }
-
 //! ```
-
-use std::{iter::Copied, slice::Iter};
 
 use crate::authbits::{AuthBit, AuthBitGenerator};
 use rand::{CryptoRng, Rng};
+use std::{iter::Copied, slice::Iter};
 use swanky_channel::Channel;
 use swanky_field_binary::F2;
 use swanky_party::{
@@ -349,28 +347,7 @@ impl<P: GenericParty> AuthShareGenerator<P> {
     ///
     /// This reveals _this_ party's shares to the other party.
     pub fn open_my_shares(
-        &self,
         shares: &[AuthShare<P>],
-        outputs: PartyPrivate<Party1<P>, Party0<P>, &mut Vec<F2>>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<()> {
-        AuthShareGenerator::open_my_shares_with_delta(
-            shares,
-            PartyPrivateCopy::new(self.delta()),
-            outputs,
-            channel,
-        )
-    }
-
-    /// Open this party's shares using a supplied $`\Delta`$ value.
-    ///
-    /// See [`AuthShareGenerator::open_my_shares`] for details.
-    ///
-    /// This reveals _this_ party's shares to the other party.
-    pub fn open_my_shares_with_delta(
-        shares: &[AuthShare<P>],
-        delta: PartyPrivateCopy<Party1<P>, Party0<P>, U8x16>,
-        outputs: PartyPrivate<Party1<P>, Party0<P>, &mut Vec<F2>>,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
         match P::GENERIC_WHICH {
@@ -379,8 +356,8 @@ impl<P: GenericParty> AuthShareGenerator<P> {
                     .iter()
                     .map(|share| share.party_a.into_inner(ev))
                     .collect::<Vec<_>>(),
-                delta,
-                outputs,
+                PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
+                PartyPrivate::empty(Witness::EQUAL_TYPES),
                 channel,
             ),
             GenericWhichParty::Party1(ev) => AuthBitGenerator::open_with_delta(
@@ -388,8 +365,8 @@ impl<P: GenericParty> AuthShareGenerator<P> {
                     .iter()
                     .map(|share| share.party_b.into_inner(ev))
                     .collect::<Vec<_>>(),
-                delta,
-                outputs,
+                PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
+                PartyPrivate::empty(Witness::EQUAL_TYPES),
                 channel,
             ),
         }
@@ -401,15 +378,10 @@ impl<P: GenericParty> AuthShareGenerator<P> {
     pub fn open_their_shares(
         &self,
         shares: &[AuthShare<P>],
-        outputs: PartyPrivate<Party1<P>, Party1<P>, &mut Vec<F2>>,
+        outputs: &mut Vec<F2>,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
-        AuthShareGenerator::open_their_shares_with_delta(
-            shares,
-            PartyPrivateCopy::new(self.delta()),
-            outputs,
-            channel,
-        )
+        AuthShareGenerator::open_their_shares_with_delta(shares, self.delta(), outputs, channel)
     }
 
     /// Open the other party's shares using a supplied $`\Delta`$ value.
@@ -417,8 +389,8 @@ impl<P: GenericParty> AuthShareGenerator<P> {
     /// See [`AuthShareGenerator::open_their_shares`] for details.
     pub fn open_their_shares_with_delta(
         shares: &[AuthShare<P>],
-        delta: PartyPrivateCopy<Party1<P>, Party1<P>, U8x16>,
-        outputs: PartyPrivate<Party1<P>, Party1<P>, &mut Vec<F2>>,
+        delta: U8x16,
+        outputs: &mut Vec<F2>,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
         match P::GENERIC_WHICH {
@@ -427,8 +399,8 @@ impl<P: GenericParty> AuthShareGenerator<P> {
                     .iter()
                     .map(|share| share.party_b.into_inner(ev))
                     .collect::<Vec<_>>(),
-                delta,
-                outputs,
+                PartyPrivateCopy::new(delta),
+                PartyPrivate::new(outputs),
                 channel,
             ),
             GenericWhichParty::Party1(ev) => AuthBitGenerator::open_with_delta(
@@ -436,8 +408,8 @@ impl<P: GenericParty> AuthShareGenerator<P> {
                     .iter()
                     .map(|share| share.party_a.into_inner(ev))
                     .collect::<Vec<_>>(),
-                delta,
-                outputs,
+                PartyPrivateCopy::new(delta),
+                PartyPrivate::new(outputs),
                 channel,
             ),
         }
@@ -589,33 +561,21 @@ mod tests {
         );
         let (output_bits_a, output_bits_b) = swanky_channel::local::local_channel_pair(
             |channel| {
-                generator_a
-                    .open_my_shares(
-                        &shares_a,
-                        PartyPrivate::empty(Witness::EQUAL_TYPES),
-                        channel,
-                    )
-                    .unwrap();
+                AuthShareGenerator::open_my_shares(&shares_a, channel).unwrap();
 
                 let mut outputs = vec![];
                 generator_a
-                    .open_their_shares(&shares_a, PartyPrivate::new(&mut outputs), channel)
+                    .open_their_shares(&shares_a, &mut outputs, channel)
                     .unwrap();
                 Ok(outputs)
             },
             |channel| {
                 let mut outputs = vec![];
                 generator_b
-                    .open_their_shares(&shares_b, PartyPrivate::new(&mut outputs), channel)
+                    .open_their_shares(&shares_b, &mut outputs, channel)
                     .unwrap();
 
-                generator_b
-                    .open_my_shares(
-                        &shares_b,
-                        PartyPrivate::empty(Witness::EQUAL_TYPES),
-                        channel,
-                    )
-                    .unwrap();
+                AuthShareGenerator::open_my_shares(&shares_b, channel).unwrap();
                 Ok(outputs)
             },
         )
