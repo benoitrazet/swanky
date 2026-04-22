@@ -29,6 +29,7 @@ pub struct Evaluator<RNG> {
     current_wire_index: usize,
     preprocessed_wires_map: HashMap<usize, PreProcessedWire<PartyEvaluator>>,
     known_triples_map: HashMap<usize, PreProcessedWire<PartyEvaluator>>,
+    their_input_size: usize,
     pub(crate) rng: RNG,
 }
 
@@ -46,6 +47,7 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
             preprocessed_wires_map: HashMap::new(),
             known_triples_map: HashMap::new(),
             current_wire_index: 0,
+            their_input_size: 0,
             rng,
         })
     }
@@ -60,15 +62,19 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
             &mut Channel,
         )
             -> swanky_error::Result<BinaryBundle<CircuitExecutorItem<PartyEvaluator>>>,
-        input_size: usize,
+        my_input_size: usize,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
+       // The garbler and evaluator exchange their input sizes
+        let _ = channel.write(&my_input_size);
+        self.their_input_size = channel.read().unwrap();
+
         let mut and_generator =
             AndTripleGenerator::new_with_delta(self.delta(), channel, &mut self.rng)?;
         let (preprocessed_wires_map, known_triples_map) = f_preprocessing(
             &circuit,
             &mut and_generator,
-            input_size,
+            my_input_size + self.their_input_size,
             channel,
             &mut self.rng,
         )?;

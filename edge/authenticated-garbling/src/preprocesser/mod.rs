@@ -58,7 +58,7 @@ pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
         &mut Channel,
     ) -> swanky_error::Result<BinaryBundle<CircuitExecutorItem<P>>>,
     and_generator: &mut AndTripleGenerator<P>,
-    input_size: usize,
+    total_input_size: usize,
     channel: &mut Channel,
     rng: &mut RNG,
 ) -> swanky_error::Result<(
@@ -67,7 +67,7 @@ pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
 )> {
     // First Analyze the circuit gates by simulating both parties
     let mut circuit_analyzer = CircuitExecutor::new_analyzer();
-    circuit_analyzer.mock_circuit(&circuit, input_size, channel)?;
+    circuit_analyzer.mock_circuit(&circuit, total_input_size, channel)?;
 
     let nands = circuit_analyzer.analyzer().nands();
     let ninputs = circuit_analyzer.analyzer().ninputs();
@@ -86,7 +86,7 @@ pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
         rng,
     )?;
     let mut wire_preprocessor = CircuitExecutor::new_preprocessing_wires(auth_shares);
-    wire_preprocessor.mock_circuit(&circuit, input_size, channel)?;
+    wire_preprocessor.mock_circuit(&circuit, total_input_size, channel)?;
 
     let (left_wires, right_wires, indices) = wire_preprocessor.and_gate_input_shares();
     let mut known_triples_out = Vec::with_capacity(rand_and_triples.len());
