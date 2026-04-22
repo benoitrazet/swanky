@@ -284,14 +284,15 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
     }
     fn constant(
         &mut self,
-        _: u16,
-        q: u16,
+        value: u16,
+        _q: u16,
         channel: &mut Channel,
     ) -> swanky_error::Result<AuthenticatedWire> {
         let index = self.current_wire_index();
-        let wire_label = self.read_wire(q, channel)?;
+        let wire_label = WireMod2::from_repr(channel.read().unwrap(), 2);
 
-        Ok(AuthenticatedWireMod2::new(
+        Ok(AuthenticatedWireMod2::new_with_value(
+            F2::from(value),
             wire_label,
             self.get_current_wire_share(index),
             index,
