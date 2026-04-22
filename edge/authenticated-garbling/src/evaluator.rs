@@ -30,6 +30,9 @@ pub struct Evaluator<RNG> {
     preprocessed_wires_map: HashMap<usize, PreProcessedWire<PartyEvaluator>>,
     known_triples_map: HashMap<usize, PreProcessedWire<PartyEvaluator>>,
     their_input_size: usize,
+    // TODO: Get ride of this once when refactor the
+    // encode/receive methods of the ev/gb
+    values: Vec<F2>,
     pub(crate) rng: RNG,
 }
 
@@ -48,6 +51,9 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
             known_triples_map: HashMap::new(),
             current_wire_index: 0,
             their_input_size: 0,
+            // TODO: Get ride of this once when refactor the
+            // encode/receive methods of the ev/gb
+            values: Vec::new(),
             rng,
         })
     }
@@ -83,7 +89,13 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
         self.authentication_delta = and_generator.delta();
         Ok(())
     }
-
+    /// Set the input values of the Evaluator
+    /// 
+    /// TODO: Get ride of this once when refactor the
+    /// encode/receive methods of the ev/gb
+    pub fn set_values(&mut self, values: Vec<F2>){
+        self.values = values;
+    }
     /// Get the deltas, consuming the Evaluator
     pub fn delta(&self) -> U8x16 {
         self.authentication_delta
@@ -102,15 +114,6 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
     fn get_current_wire_triple(&mut self, index: usize) -> AuthShare<PartyEvaluator> {
         self.known_triples_map[&index].into_auth_share()
     }
-    /// Read a Wire from the reader.
-    pub fn read_wire(
-        &mut self,
-        _modulus: u16,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<WireMod2> {
-        let bytes = channel.read()?;
-        Ok(WireMod2::from_repr(bytes, 2))
-    }
 }
 
 impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
@@ -123,7 +126,7 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         AuthenticatedWireMod2::new_with_value(
-             x.value() + y.value(),
+            x.value() + y.value(),
             x.wire_label() + y.wire_label(),
             x.auth_share() ^ y.auth_share(),
             self.current_wire_index(),
@@ -199,34 +202,11 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
 
     fn encode_many(
         &mut self,
-        values: &[u16],
+        _values: &[u16],
         _moduli: &[u16],
-        channel: &mut Channel,
+        _channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        // There is an assumption being made here that the garbler and evaluator have the same number
-        // of input wires. Since the evaluator inputs come after the garbler's, we need to shift their
-        // indices !
-        let index_shift = values.len();
-
-        Ok((0..values.len())
-            .map(|i| {
-                // First we mask the values, remember that we had stored the masks in "self.values"
-                // when the evaluator received the garbler's input labels.
-                // This value is the following in the paper:
-                // y_w + λ_w := y_w ⊕ s_w ⊕ r_w
-                let value_f2 = F2::from(values[i]);
-                // The evaluator sends that value to the garbler
-                let _ = channel.write(&value_f2);
-                // The evaluator receives the wire label associated with their masked value.
-                // This value is the following in the paper:
-                // L_{w,y_w ⊕λ_w}
-                let wire_label = channel.read().unwrap();
-                AuthenticatedWireMod2::new_without_share(
-                    WireMod2::from_repr(wire_label, 2),
-                    index_shift + i,
-                )
-            })
-            .collect())
+        unimplemented!("Evaluator cannot encode wire labels");
     }
 
     fn receive_many(
@@ -234,53 +214,69 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         moduli: &[u16],
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        // Evaluator starts by getting authenticated shares for the Garbler's
-        // inputs.
-        let mut auth_wires = Vec::with_capacity(moduli.len());
-        for _ in 0..moduli.len() {
+        // The Evaluator retrieves authenticated shares for their own inputs first.
+        // This means that we are assuming that those inputs will be indexed first.
+        let my_auth_shares: Vec<AuthShare<PartyEvaluator>> = (0..moduli.len()).map(|_i|{        
             let index = self.current_wire_index();
-            auth_wires.push(AuthenticatedWireMod2::new(
-                WireMod2::from_repr(0.into(), 2),
-                self.get_current_wire_share(index),
-                index,
-            ));
-        }
-        // Both parties open their input shares to each reach the bit mask that they will use
-        // to hide their inputs.
-        // The masks are called λ_w in the paper
-        let mut masks = Vec::with_capacity(moduli.len());
-        AuthShareGenerator::open_with_delta(
-            &auth_wires
-                .iter()
-                .map(|auth_wire| auth_wire.auth_share())
-                .collect::<Vec<AuthShare<PartyEvaluator>>>(),
+            self.get_current_wire_share(index)} 
+        ).collect();
+        // The Evaluator retrieves authenticated shares for the garbler's inputs.
+        let their_auth_shares: Vec<AuthShare<PartyEvaluator>> = (0..self.their_input_size).map(|_i|{        
+                let index = self.current_wire_index();
+                self.get_current_wire_share(index)} 
+            ).collect();
+
+        let mut their_bits = Vec::with_capacity(self.their_input_size);
+
+        // The Evaluator opens and receives the garblers share [r_w].
+        // Because this is effectively being used to compute the
+        // Evaluator's input labels, we use the Evaluator's 
+        // authenticated shares
+        AuthShareGenerator::open_their_shares_with_delta(
+            &my_auth_shares,
             self.delta(),
-            &mut masks,
+            &mut their_bits,
             channel,
         )?;
 
-        (0..moduli.len())
-            .map(|i| {
-                // The evaluator increments the counter for its own inputs
-                let index = self.current_wire_index();
+        // TODO: Change how the evaluator retrieves their values and possibly
+        // move this part all together when we refactor EV/GB
+        let mut my_masked_values : Vec<F2>= Vec::with_capacity(self.values.len());
+        for (i, b) in their_bits.iter().enumerate(){
+            // Evaluator computes their masked values y_w + λ_w := y_w ⊕ s_w ⊕ r_w
+            my_masked_values[i] = b + my_auth_shares[i].bit() + F2::from(self.values[i]);
+            // Evaluator sends y_w + λ_w  to the Garbler
+            let _ = channel.write(&my_masked_values[i]);
+        }
+        
 
-                // The evaluator receives the garbler's masked inputs.
-                // The values are called the following in the paper:
-                // L_{w,x_w ⊕ λ_w}
-                let received_value = channel.read()?;
-                // We are making an assumption here that the garbler's inputs
-                // will be the very first thing to be given an index in the circuit.
-                // This is why the index of this wire is i.
-                // Moreover, the input wires on the evaluator side do not need an authenticated
-                // share: The evaluator only uses share when opening the input wire bit masks
-                //        (which we already did), and for each output gate wire.
-                let wire = AuthenticatedWireMod2::new_without_share(
-                    WireMod2::from_repr(received_value, 2),
-                    i,
-                );
-                Ok(wire)
-            })
-            .collect()
+        let mut my_auth_wires: Vec<AuthenticatedWire> = Vec::with_capacity(self.values.len());
+        for (i, masked_value) in my_masked_values.iter().enumerate(){
+            // The Evaluator retrieves the wire labels for their own input
+            let wire_label = WireMod2::from_repr(channel.read().unwrap(), 2);
+            // The Evaluator constructs authenticated values for all their input wires
+            my_auth_wires.push(AuthenticatedWireMod2 { value: Some(*masked_value), wire_label, auth_share: Some(my_auth_shares[i]), index: i });
+        }
+
+        AuthShareGenerator::open_my_shares(
+            &their_auth_shares,
+            channel,
+        )?;  
+
+        let mut their_auth_wires: Vec<AuthenticatedWire> = Vec::with_capacity(self.values.len());
+        // We need to offset the authenticated wire indices of the garbler because they come second
+        let index_offset = self.values.len();
+
+        // The Evaluator receives the wire labels and masked values of the Garbler and uses these values
+        // to construct the garbler's authenticated wires
+        for (i, share) in their_auth_shares.iter().enumerate(){
+            let their_wire_label = WireMod2::from_repr(channel.read().unwrap(), 2);
+            let their_masked_value: F2 = channel.read().unwrap();
+            their_auth_wires.push(AuthenticatedWireMod2 { value: Some(their_masked_value), wire_label: their_wire_label, auth_share: Some(*share), index: i + index_offset });
+        }       
+        // The Evaluator concatenates both inputs stating with the evaluator's and returns the results.
+        my_auth_wires.extend(their_auth_wires.into_iter());
+        Ok(my_auth_wires)
     }
     fn constant(
         &mut self,
