@@ -168,10 +168,10 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
         // This is the value H(L_{β, z_β + λ_β}, γ)
         let h_lb = lb.wire_label().hash(index as u128);
 
-        // z_α + λ_α, where z_α is the actual wire value of the input
+        // z'α := z_α + λ_α, where z_α is the actual wire value of the input
         // wire with label L_α and λ_α is the mask of that value
         let la_value = la.value();
-        // z_β + λ_β, where z_β is the actual wire value of the input
+        // z'γ := z_β + λ_β, where z_β is the actual wire value of the input
         // wire with label L_β and λ_β is the mask of that value
         let lb_value = lb.value();
 
@@ -183,17 +183,39 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
         // This the value:
         //  L_{γ, z_γ + λ_γ} := H(L_{α, z_α + λ_α}, γ) + H(L_{β, z_β + λ_β}, γ) + M[s_γ]
         //                      + M[s*_γ] + (z_α + λ_α)Gate_0 + (z_β + λ_β)(Gate_1 + L_{α, z_α + λ_α})
-        let lc = h_la + h_lb + mac_share + mac_triple + gate0_muxed + gate1_muxed;
+        let lc_label = h_la + h_lb + mac_share + mac_triple + gate0_muxed + gate1_muxed;
 
         // The current masked value of the wire is:
-        // z_γ + λ_γ := b_γ + lsb(L_{γ, z_γ + λ_γ})
-        let current_value = F128b::from(lc).lsb() + bit_c;
-        Ok(AuthenticatedWireMod2::new_with_value(
-            current_value,
-            WireMod2::from_repr(lc, 2),
+        // z'γ := z_γ + λ_γ := b_γ + lsb(L_{γ, z_γ + λ_γ})
+        let lc_value = F128b::from(lc_label).lsb() + bit_c;
+        let mut lc = AuthenticatedWireMod2::new_with_value(
+            lc_value,
+            WireMod2::from_repr(lc_label, 2),
             lc_share,
             index,
-        ))
+        );
+        // The Evaluator computes its share of the validation bit 
+        // c_γ :=  (z'α ⊕ λ_α) ∧ (z'β ⊕ λ_β ) ∧ (z'γ ⊕ λ_γ )
+        // If we expand this we get:
+        //  z'α ∧ z'β ∧ z'γ (which can be added when c_γ is opened, this makes it easier to directly send this)
+        let validation_share = 
+                        // ⊕ z'α ∧ z'β ∧ s_β 
+                        la_value * lc_value * lb.bit()
+                        // ⊕ z'β ∧ z'γ ∧ s_α
+                        + lb_value * lc_value * la.bit()
+                        // ⊕ z'γ ∧ s*_γ
+                        + lc_value * lc_triple.bit()
+                        // ⊕ z'α ∧ z'β ∧ s_γ
+                        + la_value * lb_value * lc.bit()
+                        // ⊕ z'α ∧ s_β ∧ s_γ
+                        + la_value * lb.bit() * lc.bit()
+                        // ⊕ z'β ∧ s_α ∧ s_γ
+                        + lb_value * la.bit()* lc.bit()
+                        // s*_γ ∧ s_γ
+                        + lc_triple.bit() * lc.bit();
+
+        lc.set_validation_share(validation_share);
+        Ok(lc)
     }
 }
 
@@ -255,7 +277,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
             // The Evaluator retrieves the wire labels for their own input
             let wire_label = WireMod2::from_repr(channel.read().unwrap(), 2);
             // The Evaluator constructs authenticated values for all their input wires
-            my_auth_wires.push(AuthenticatedWireMod2 { value: Some(*masked_value), wire_label, auth_share: Some(my_auth_shares[i]), index: i });
+            my_auth_wires.push(AuthenticatedWireMod2::new_with_value(*masked_value, wire_label, my_auth_shares[i], i));
         }
 
         AuthShareGenerator::open_my_shares(
@@ -272,7 +294,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         for (i, share) in their_auth_shares.iter().enumerate(){
             let their_wire_label = WireMod2::from_repr(channel.read().unwrap(), 2);
             let their_masked_value: F2 = channel.read().unwrap();
-            their_auth_wires.push(AuthenticatedWireMod2 { value: Some(their_masked_value), wire_label: their_wire_label, auth_share: Some(*share), index: i + index_offset });
+            their_auth_wires.push(AuthenticatedWireMod2::new_with_value(their_masked_value, their_wire_label, *share, i + index_offset ));
         }       
         // The Evaluator concatenates both inputs stating with the evaluator's and returns the results.
         my_auth_wires.extend(their_auth_wires.into_iter());
