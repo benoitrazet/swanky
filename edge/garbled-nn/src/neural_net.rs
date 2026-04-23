@@ -182,12 +182,12 @@ impl NeuralNet {
     }
 
     /// Encode an input so it can be evaluated by a boolean [`NeuralNet`].
-    pub fn encode_input_boolean<W: HasModulus + Clone, F: Fancy<Item = W> + BinaryGadgets>(
+    pub fn encode_input_boolean<F: BinaryGadgets>(
         f: &mut F,
         input: &Array3<i64>,
         first_layer_bitwidth: usize,
         channel: &mut Channel,
-    ) -> Result<Vec<BinaryBundle<W>>> {
+    ) -> Result<Vec<BinaryBundle<F::Item>>> {
         input
             .iter()
             .map(|&x| {
@@ -198,12 +198,12 @@ impl NeuralNet {
     }
 
     /// Receive an input so it can be evaluated by a boolean [`NeuralNet`].
-    pub fn receive_input_boolean<W: HasModulus + Clone, F: Fancy<Item = W> + BinaryGadgets>(
+    pub fn receive_input_boolean<F: BinaryGadgets>(
         f: &mut F,
         input: &Array3<i64>,
         first_layer_bitwidth: usize,
         channel: &mut Channel,
-    ) -> Result<Vec<BinaryBundle<W>>> {
+    ) -> Result<Vec<BinaryBundle<F::Item>>> {
         input
             .iter()
             .map(|_| f.bin_receive(first_layer_bitwidth, channel))
@@ -211,12 +211,12 @@ impl NeuralNet {
     }
 
     /// Encode an input so it can be evaluated by an arithmetic [`NeuralNet`].
-    pub fn encode_input_arith<W: HasModulus + Clone, F: Fancy<Item = W> + CrtGadgets>(
+    pub fn encode_input_arith<F: CrtGadgets>(
         f: &mut F,
         input: &Array3<i64>,
         modulus: u128,
         channel: &mut Channel,
-    ) -> Result<Vec<CrtBundle<W>>> {
+    ) -> Result<Vec<CrtBundle<F::Item>>> {
         input
             .iter()
             .map(|&x| f.crt_encode(util::to_mod_q(x, modulus), modulus, channel))
@@ -224,12 +224,12 @@ impl NeuralNet {
     }
 
     /// Receive an input so it can be evaluated by an arithmetic [`NeuralNet`].
-    pub fn receive_input_arith<W: HasModulus + Clone, F: Fancy<Item = W> + CrtGadgets>(
+    pub fn receive_input_arith<F: CrtGadgets>(
         f: &mut F,
         input: &Array3<i64>,
         modulus: u128,
         channel: &mut Channel,
-    ) -> Result<Vec<CrtBundle<W>>> {
+    ) -> Result<Vec<CrtBundle<F::Item>>> {
         input
             .iter()
             .map(|_| f.crt_receive(modulus, channel))
@@ -237,9 +237,9 @@ impl NeuralNet {
     }
 
     /// Decode a boolean output of a [`NeuralNet`] evaluation.
-    pub fn decode_output_boolean<W: HasModulus + Clone, F: Fancy<Item = W>>(
+    pub fn decode_output_boolean<F: Fancy>(
         f: &mut F,
-        output: &[BinaryBundle<W>],
+        output: &[BinaryBundle<F::Item>],
         channel: &mut Channel,
     ) -> Result<Option<Vec<i64>>> {
         let mut result = Vec::with_capacity(output.len());
@@ -260,9 +260,9 @@ impl NeuralNet {
     }
 
     /// Decode an arithmetic output of a [`NeuralNet`] evaluation.
-    pub fn decode_output_arith<W: HasModulus + Clone, F: Fancy<Item = W>>(
+    pub fn decode_output_arith<F: Fancy>(
         f: &mut F,
-        output: &[CrtBundle<W>],
+        output: &[CrtBundle<F::Item>],
         modulus: u128,
         channel: &mut Channel,
     ) -> Result<Option<Vec<i64>>> {
@@ -289,20 +289,16 @@ impl NeuralNet {
     /// Panics if `moduli.len()` is not equal to `self.nlayers() + 1`, or if
     /// `circuit_inputs` does not match the dimensions of the input layer.
     #[allow(clippy::too_many_arguments)]
-    pub fn eval_arith<W, F>(
+    pub fn eval_arith<F: CrtProjGadgets>(
         &self,
         f: &mut F,
-        circuit_inputs: &[CrtBundle<W>],
+        circuit_inputs: &[CrtBundle<F::Item>],
         moduli: &[u128], // CRT moduli for each layer's operations
         secret_weights: bool,
         secret_weights_owned: bool,
         accuracy: &Accuracy,
         channel: &mut Channel,
-    ) -> Result<Vec<CrtBundle<W>>>
-    where
-        W: HasModulus + Clone,
-        F: Fancy<Item = W> + FancyArithmetic<Item = W> + CrtProjGadgets<Item = W>,
-    {
+    ) -> Result<Vec<CrtBundle<F::Item>>> {
         assert_eq!(
             moduli.len(),
             self.nlayers() + 1,
@@ -340,19 +336,15 @@ impl NeuralNet {
     /// # Panics
     /// This panics if `bitwidth.len()` does not equal `self.nlayers() + 1`, or
     /// if `circuit_inputs` does not match the dimensions of the input layer.
-    pub fn eval_boolean<W, F>(
+    pub fn eval_boolean<F: FancyBinary>(
         &self,
         f: &mut F,
-        circuit_inputs: &[BinaryBundle<W>],
+        circuit_inputs: &[BinaryBundle<F::Item>],
         bitwidth: &[usize],
         secret_weights: bool,
         secret_weights_owned: bool,
         channel: &mut Channel,
-    ) -> Result<Vec<BinaryBundle<W>>>
-    where
-        W: Clone + HasModulus,
-        F: Fancy<Item = W> + FancyBinary<Item = W>,
-    {
+    ) -> Result<Vec<BinaryBundle<F::Item>>> {
         assert_eq!(
             bitwidth.len(),
             self.nlayers() + 1,
@@ -1001,7 +993,7 @@ impl NeuralNet {
                     *moduli.first().unwrap(),
                     channel,
                 )?;
-                let outputs = self.eval_arith::<_, _>(
+                let outputs = self.eval_arith(
                     &mut gb,
                     &inps,
                     moduli,
@@ -1029,7 +1021,7 @@ impl NeuralNet {
                     *moduli.first().unwrap(),
                     channel,
                 )?;
-                let outputs = self.eval_arith::<_, _>(
+                let outputs = self.eval_arith(
                     &mut ev,
                     &inps,
                     moduli,
