@@ -20,6 +20,14 @@ pub struct AnalyzerItem {
     depth: usize,
 }
 
+impl AnalyzerItem {
+    /// Create a new [`AnalyzerItem`] with the provided modulus and a depth of
+    /// zero.
+    pub fn new(modulus: u16) -> Self {
+        Self { modulus, depth: 0 }
+    }
+}
+
 impl HasModulus for AnalyzerItem {
     fn modulus(&self) -> u16 {
         self.modulus

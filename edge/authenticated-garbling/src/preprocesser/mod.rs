@@ -27,15 +27,18 @@
 //!
 use std::collections::HashMap;
 
-use fancy_garbling::BinaryBundle;
+use fancy_garbling::{
+    Fancy,
+    circuit::CircuitExecutor,
+    circuit_analyzer::{AnalyzerItem, CircuitAnalyzer},
+};
 use rand::{CryptoRng, Rng};
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_channel::Channel;
 use swanky_party::GenericParty;
 
 pub mod wire;
-use crate::preprocesser::wire::{IndexedWire, PreProcessedWire};
-use crate::unifier::{CircuitExecutor, CircuitExecutorItem};
+use crate::preprocesser::wire::{IndexedWire, PreProcessedWire, WirePreProcessor};
 
 /// Pre-process a circuit for authenticated garbling.
 ///
@@ -43,35 +46,28 @@ use crate::unifier::{CircuitExecutor, CircuitExecutorItem};
 /// This function generates the correct number of such triples and shares for a given circuit of interest and returns
 /// the delta value used for that generation. This delta value is party specific, and in the case of the Garbler will
 /// be used as the free-XOR delta.
-/// The circuit is provided as a closure which takes in a fancy object (in this case an [`CircuitAnalyzer`]) and circuit inputs
-/// written as [`BinaryBundle`] over fancy items (in this case [`AnalyzerItem`]), and triples and shares are
-/// generated using the provided [`AndTripleGenerator`].
-///
-/// Note that the fancy circuit passed to this function is generic in the size of the input,
-/// this is why we need to pass the input size separately. This fancy circuit is the same one that will
-/// be later used for garbling.
-pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
-    circuit: &impl Fn(
-        &mut CircuitExecutor<P, RNG>,
-        BinaryBundle<CircuitExecutorItem<P>>,
-        BinaryBundle<CircuitExecutorItem<P>>,
-        &mut Channel,
-    ) -> swanky_error::Result<BinaryBundle<CircuitExecutorItem<P>>>,
+pub fn f_preprocessing<P: GenericParty, C, RNG: CryptoRng + Rng>(
+    circuit: &C,
     and_generator: &mut AndTripleGenerator<P>,
-    total_input_size: usize,
     channel: &mut Channel,
     rng: &mut RNG,
 ) -> swanky_error::Result<(
     HashMap<usize, PreProcessedWire<P>>,
     HashMap<usize, PreProcessedWire<P>>,
-)> {
+)>
+where
+    C: CircuitExecutor<CircuitAnalyzer> + CircuitExecutor<WirePreProcessor<P>>,
+{
     // First Analyze the circuit gates by simulating both parties
-    let mut circuit_analyzer = CircuitExecutor::new_analyzer();
-    circuit_analyzer.mock_circuit(&circuit, total_input_size, channel)?;
+    let mut circuit_analyzer = CircuitAnalyzer::new();
+    let inputs = (0..<C as CircuitExecutor<CircuitAnalyzer>>::ninputs(circuit))
+        .map(|i| AnalyzerItem::new(<C as CircuitExecutor<CircuitAnalyzer>>::modulus(circuit, i)))
+        .collect::<Vec<_>>();
+    circuit.execute(&mut circuit_analyzer, &inputs, channel)?;
 
-    let nands = circuit_analyzer.analyzer().nands();
-    let ninputs = circuit_analyzer.analyzer().ninputs();
-    let nconstants = circuit_analyzer.analyzer().nconstants();
+    let nands = circuit_analyzer.nands();
+    let ninputs = circuit_analyzer.ninputs();
+    let nconstants = circuit_analyzer.nconstants();
 
     // Create as many random and triples as there are AND gates
     let mut rand_and_triples = Vec::with_capacity(nands);
@@ -85,8 +81,12 @@ pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
         channel,
         rng,
     )?;
-    let mut wire_preprocessor = CircuitExecutor::new_preprocessing_wires(auth_shares);
-    wire_preprocessor.mock_circuit(&circuit, total_input_size, channel)?;
+    let mut wire_preprocessor = WirePreProcessor::new(auth_shares);
+    let inputs = wire_preprocessor.receive_many(
+        &vec![2; <C as CircuitExecutor<WirePreProcessor<P>>>::ninputs(circuit)],
+        channel,
+    )?;
+    circuit.execute(&mut wire_preprocessor, &inputs, channel)?;
 
     let (left_wires, right_wires, indices) = wire_preprocessor.and_gate_input_shares();
     let mut known_triples_out = Vec::with_capacity(rand_and_triples.len());
@@ -113,7 +113,7 @@ pub fn f_preprocessing<P: GenericParty, RNG: CryptoRng + Rng>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fancy_garbling::{BinaryGadgets, Fancy, FancyBinary};
+    use fancy_garbling::circuit::circuits;
     use swanky_party::party_system;
     use swanky_rng::SwankyRng;
 
@@ -135,28 +135,18 @@ mod tests {
     /// This is a type-alias for [`PartyB`] and is useful to clarify the role of a
     /// authenticated shares and and triples.
     pub type Evaluator = PartyB;
-    fn fancy_sum<F>(
-        f: &mut F,
-        garbler_wires: BinaryBundle<F::Item>,
-        evaluator_wires: BinaryBundle<F::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<BinaryBundle<F::Item>>
-    where
-        F: Fancy + BinaryGadgets + FancyBinary,
-    {
-        f.bin_addition_no_carry(&garbler_wires, &evaluator_wires, channel)
-    }
+
     #[test]
     fn test_preprocessing_fancy_sum() {
         let input_size = 800;
+        let circuit = circuits::TestBinaryAddition(input_size);
         let (_shares_gb, _shares_ev) = swanky_channel::local::local_channel_pair(
             |c| {
                 let mut rng = SwankyRng::new();
                 let mut generator_and_triples = AndTripleGenerator::<Garbler>::new(c, &mut rng)?;
                 Ok(f_preprocessing(
-                    &fancy_sum,
+                    &circuit,
                     &mut generator_and_triples,
-                    input_size,
                     c,
                     &mut rng,
                 ))
@@ -165,9 +155,8 @@ mod tests {
                 let mut rng = SwankyRng::new();
                 let mut generator_and_triples = AndTripleGenerator::<Evaluator>::new(c, &mut rng)?;
                 Ok(f_preprocessing(
-                    &fancy_sum,
+                    &circuit,
                     &mut generator_and_triples,
-                    input_size,
                     c,
                     &mut rng,
                 ))

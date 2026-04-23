@@ -2,7 +2,10 @@
 
 use std::collections::HashMap;
 
-use fancy_garbling::{BinaryBundle, Fancy, FancyBinary, WireLabel, WireMod2};
+use fancy_garbling::{
+    Fancy, FancyBinary, WireLabel, WireMod2, circuit::CircuitExecutor,
+    circuit_analyzer::CircuitAnalyzer,
+};
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::{
     and_triples::AndTripleGenerator,
@@ -15,9 +18,11 @@ use vectoreyes::U8x16;
 
 use crate::{
     mux,
-    preprocesser::{f_preprocessing, wire::PreProcessedWire},
+    preprocesser::{
+        f_preprocessing,
+        wire::{PreProcessedWire, WirePreProcessor},
+    },
     ps::PartyEvaluator,
-    unifier::{CircuitExecutor, CircuitExecutorItem},
     wire::AuthenticatedWireMod2,
 };
 
@@ -59,31 +64,17 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
     }
 
     /// Pre-process the passed circuit
-    pub fn preprocess_circuit(
+    pub fn preprocess_circuit<
+        C: CircuitExecutor<CircuitAnalyzer> + CircuitExecutor<WirePreProcessor<PartyEvaluator>>,
+    >(
         &mut self,
-        circuit: &impl Fn(
-            &mut CircuitExecutor<PartyEvaluator, RNG>,
-            BinaryBundle<CircuitExecutorItem<PartyEvaluator>>,
-            BinaryBundle<CircuitExecutorItem<PartyEvaluator>>,
-            &mut Channel,
-        )
-            -> swanky_error::Result<BinaryBundle<CircuitExecutorItem<PartyEvaluator>>>,
-        my_input_size: usize,
+        circuit: &C,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
-        // The garbler and evaluator exchange their input sizes
-        let _ = channel.write(&my_input_size);
-        self.their_input_size = channel.read().unwrap();
-
         let mut and_generator =
             AndTripleGenerator::new_with_delta(self.delta(), channel, &mut self.rng)?;
-        let (preprocessed_wires_map, known_triples_map) = f_preprocessing(
-            &circuit,
-            &mut and_generator,
-            my_input_size + self.their_input_size,
-            channel,
-            &mut self.rng,
-        )?;
+        let (preprocessed_wires_map, known_triples_map) =
+            f_preprocessing(circuit, &mut and_generator, channel, &mut self.rng)?;
         self.preprocessed_wires_map = preprocessed_wires_map;
         self.known_triples_map = known_triples_map;
         self.authentication_delta = and_generator.delta();

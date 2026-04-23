@@ -1,10 +1,12 @@
 //! Garbler in Authenticated Garbling
 use crate::mux;
+use crate::preprocesser::wire::WirePreProcessor;
 use crate::preprocesser::{f_preprocessing, wire::PreProcessedWire};
 use crate::ps::PartyGarbler;
-use crate::unifier::{CircuitExecutor, CircuitExecutorItem};
 use crate::wire::AuthenticatedWireMod2;
-use fancy_garbling::{BinaryBundle, Fancy, FancyBinary, WireLabel, WireMod2};
+use fancy_garbling::circuit::CircuitExecutor;
+use fancy_garbling::circuit_analyzer::CircuitAnalyzer;
+use fancy_garbling::{Fancy, FancyBinary, WireLabel, WireMod2};
 
 use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
@@ -74,31 +76,17 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     }
 
     /// Pre-process the passed circuit
-    pub fn preprocess_circuit(
+    pub fn preprocess_circuit<
+        C: CircuitExecutor<CircuitAnalyzer> + CircuitExecutor<WirePreProcessor<PartyGarbler>>,
+    >(
         &mut self,
-        circuit: &impl Fn(
-            &mut CircuitExecutor<PartyGarbler, RNG>,
-            BinaryBundle<CircuitExecutorItem<PartyGarbler>>,
-            BinaryBundle<CircuitExecutorItem<PartyGarbler>>,
-            &mut Channel,
-        )
-            -> swanky_error::Result<BinaryBundle<CircuitExecutorItem<PartyGarbler>>>,
-        my_input_size: usize,
+        circuit: &C,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
-        // The garbler and evaluator exchange their input sizes
-        self.their_input_size = channel.read().unwrap();
-        let _ = channel.write(&my_input_size);
-
         let mut and_generator =
             AndTripleGenerator::new_with_delta(self.delta_u8x16(), channel, &mut self.rng)?;
-        let (preprocessed_wires_map, known_triples_map) = f_preprocessing(
-            &circuit,
-            &mut and_generator,
-            self.their_input_size + my_input_size,
-            channel,
-            &mut self.rng,
-        )?;
+        let (preprocessed_wires_map, known_triples_map) =
+            f_preprocessing(circuit, &mut and_generator, channel, &mut self.rng)?;
         self.preprocessed_wires_map = preprocessed_wires_map;
         self.known_triples_map = known_triples_map;
         Ok(())

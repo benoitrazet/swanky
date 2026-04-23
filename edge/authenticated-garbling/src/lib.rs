@@ -10,7 +10,6 @@ pub mod evaluator;
 pub mod garbler;
 pub mod preprocesser;
 mod tests;
-pub mod unifier;
 pub mod wire;
 
 /// Mux over bit: if the bit is 0, returns value0, otherwise value1
