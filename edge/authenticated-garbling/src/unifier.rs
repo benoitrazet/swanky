@@ -73,8 +73,10 @@ impl<P: GenericParty, RNG: CryptoRng + RngCore> CircuitExecutor<P, RNG> {
         total_input_size: usize,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
-        let dummy_wires_1 = self.bin_encode(0, total_input_size/2, channel).unwrap();
-        let dummy_wires_2 = self.bin_encode(0, total_input_size- total_input_size/2, channel).unwrap();
+        let dummy_wires_1 = self.bin_encode(0, total_input_size / 2, channel).unwrap();
+        let dummy_wires_2 = self
+            .bin_encode(0, total_input_size - total_input_size / 2, channel)
+            .unwrap();
         circuit(self, dummy_wires_1, dummy_wires_2, channel)?;
         Ok(())
     }

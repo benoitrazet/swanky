@@ -213,7 +213,7 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
                         // s*_γ ∧ s_γ
                         + lc_triple.bit() * lc.bit();
 
-        // The evaluator sends out the masked bit z'γ 
+        // The evaluator sends out the masked bit z'γ
         channel.write(&lc_value)?;
         // The evaluator sends their part of the validation bit
         channel.write(&my_validation_share)?;
@@ -342,13 +342,13 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
             self.delta(),
             &mut their_masked_value,
             channel,
-        )?;   
+        )?;
         let masked_value = F2::from(value) + their_masked_value[0] + my_masked_value;
         channel.write(&masked_value)?;
         let wire_label = WireMod2::from_repr(channel.read().unwrap(), 2);
-        
+
         Ok(AuthenticatedWireMod2::new_with_value(
-            masked_value, 
+            masked_value,
             wire_label,
             current_share,
             index,

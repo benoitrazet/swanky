@@ -242,18 +242,18 @@ where
                         + lc0_triple.bit() * lc0_share.bit();
 
         // The garbler receives the evaluator's part of the validation bit
-        let their_validation_share: F2 = channel.read().unwrap();  
+        let their_validation_share: F2 = channel.read().unwrap();
         // The evaluator sends their part of the validation bit
         channel.write(&my_validation_share)?;
         // The garbler adds the last part of the validation bit z'α ∧ z'β ∧ z'γ
-        my_validation_share += their_validation_share + la_value * lb_value * lc_value;           
+        my_validation_share += their_validation_share + la_value * lb_value * lc_value;
 
         // The garbler aborts if the validation is bit is not equal to 0
         assert_eq!(
             my_validation_share,
             0.into(),
             "Garbler's authentication validation check failed at index {index}"
-        );          
+        );
         Ok(AuthenticatedWireMod2::new_with_value(
             lc_value,
             WireMod2::from_repr(lc0, 2),
@@ -280,7 +280,12 @@ where
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        AuthenticatedWireMod2::new_with_value(x.masked_value() + F2::from(1),x.wire_label() + self.zero, x.auth_share(), x.index())
+        AuthenticatedWireMod2::new_with_value(
+            x.masked_value() + F2::from(1),
+            x.wire_label() + self.zero,
+            x.auth_share(),
+            x.index(),
+        )
     }
 }
 
@@ -416,10 +421,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         // Constant wires get their own dedicated authenticated share just like
         // an input wire.
         let current_share = self.get_current_wire_share(index);
-        AuthShareGenerator::open_my_shares(
-            &[current_share],
-            channel,
-        )?;   
+        AuthShareGenerator::open_my_shares(&[current_share], channel)?;
 
         let zero = WireMod2::rand(&mut self.rng, 2);
         // The garbler receives the masked value from the evaluator
@@ -428,7 +430,12 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         let wire_label = zero + self.delta() * u16::from(masked_value);
         channel.write(&wire_label.to_repr())?;
 
-        Ok(AuthenticatedWireMod2::new_with_value(masked_value, wire_label, current_share, index))
+        Ok(AuthenticatedWireMod2::new_with_value(
+            masked_value,
+            wire_label,
+            current_share,
+            index,
+        ))
     }
 
     fn output(
