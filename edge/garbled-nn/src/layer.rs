@@ -1,8 +1,8 @@
 //! The lowest level of a [`NeuralNet`](crate::NeuralNet) is a [`Layer`].
 
 use crate::util;
+use fancy_garbling::util as numbers;
 use fancy_garbling::{BinaryBundle, BinaryGadgets, CrtBundle, CrtProjGadgets, Fancy, HasModulus};
-use fancy_garbling::{FancyArithmetic, util as numbers};
 use itertools::iproduct;
 use ndarray::Array3;
 use std::marker::PhantomData;
@@ -396,21 +396,17 @@ impl Layer {
     /// # Panics
     /// Panics if `self.input_dims()` does not equal `input.dims()`.
     #[allow(clippy::too_many_arguments)]
-    pub fn as_arith<F, W>(
+    pub fn as_arith<F: CrtProjGadgets>(
         &self,
         f: &mut F,
         input_modulus: u128,
         output_modulus: u128,
-        input: &Array3<CrtBundle<W>>,
+        input: &Array3<CrtBundle<F::Item>>,
         secret_weights: bool,
         secret_weights_owned: bool,
         accuracy: &Accuracy,
         channel: &mut Channel,
-    ) -> Result<Array3<CrtBundle<W>>>
-    where
-        W: Clone + HasModulus,
-        F: Fancy<Item = W> + FancyArithmetic<Item = W> + CrtProjGadgets<Item = W>,
-    {
+    ) -> Result<Array3<CrtBundle<F::Item>>> {
         let relu_accuracy = accuracy.relu.clone();
         let sign_accuracy = accuracy.sign.clone();
         let max_accuracy = accuracy.max.clone();
@@ -461,8 +457,8 @@ impl Layer {
                     ))
                 }
             },
-            max: |b: &mut F, xs: &[CrtBundle<W>], channel| b.crt_max(xs, &max_accuracy, channel),
-            act: |b: &mut F, a, x: &CrtBundle<W>, channel| match a {
+            max: |b: &mut F, xs: &[CrtBundle<_>], channel| b.crt_max(xs, &max_accuracy, channel),
+            act: |b: &mut F, a, x: &CrtBundle<_>, channel| match a {
                 ActivationFunction::Sign => b.crt_sgn(x, &sign_accuracy, Some(&output_ps), channel),
                 ActivationFunction::Relu => {
                     b.crt_relu(x, &relu_accuracy, Some(&output_ps), channel)

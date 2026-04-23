@@ -12,7 +12,7 @@ pub use binary_and::BinaryWireLabel;
 mod nonstreaming {
     use crate::{
         AllWire, Evaluator, Garbler, WireLabel, WireMod2,
-        circuit::{CircuitExecutor, circuits, eval_plain},
+        circuit::{CircuitExecutor, circuits},
         classic::GarbledCircuit,
         dummy::Dummy,
         util::RngExt,
@@ -47,7 +47,7 @@ mod nonstreaming {
                 let decoded = output_mapping.to_outputs(&wirelabels).unwrap();
 
                 // Run the dummy evaluator.
-                let should_be = eval_plain(circuit, &inputs).unwrap();
+                let should_be = Dummy::eval(circuit, &inputs).unwrap();
                 assert_eq!(decoded, should_be);
             }
         }
