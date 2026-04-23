@@ -188,7 +188,7 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
         // The current masked value of the wire is:
         // z'γ := z_γ + λ_γ := b_γ + lsb(L_{γ, z_γ + λ_γ})
         let lc_value = F128b::from(lc_label).lsb() + bit_c;
-        let mut lc = AuthenticatedWireMod2::new_with_value(
+        let lc = AuthenticatedWireMod2::new_with_value(
             lc_value,
             WireMod2::from_repr(lc_label, 2),
             lc_share,
@@ -257,6 +257,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
                 self.get_current_wire_share(index)
             })
             .collect();
+
         // The Evaluator retrieves authenticated shares for the garbler's inputs.
         let their_auth_shares: Vec<AuthShare<PartyEvaluator>> = (0..self.their_input_size)
             .map(|_i| {
@@ -265,8 +266,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
             })
             .collect();
 
-        let mut their_bits = Vec::with_capacity(self.their_input_size);
-
+        let mut their_bits = Vec::with_capacity(moduli.len());
         // The Evaluator opens and receives the garblers share [r_w].
         // Because this is effectively being used to compute the
         // Evaluator's input labels, we use the Evaluator's
@@ -276,14 +276,16 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
             self.delta(),
             &mut their_bits,
             channel,
-        )?;
+        )
+        .unwrap();
 
         // TODO: Change how the evaluator retrieves their values and possibly
         // move this part all together when we refactor EV/GB
         let mut my_masked_values: Vec<F2> = Vec::with_capacity(self.values.len());
         for (i, b) in their_bits.iter().enumerate() {
             // Evaluator computes their masked values y_w + λ_w := y_w ⊕ s_w ⊕ r_w
-            my_masked_values[i] = b + my_auth_shares[i].bit() + F2::from(self.values[i]);
+            my_masked_values[i] = b + my_auth_shares[i].bit() + self.values[i];
+
             // Evaluator sends y_w + λ_w  to the Garbler
             let _ = channel.write(&my_masked_values[i]);
         }
@@ -320,7 +322,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
             ));
         }
         // The Evaluator concatenates both inputs stating with the evaluator's and returns the results.
-        my_auth_wires.extend(their_auth_wires.into_iter());
+        my_auth_wires.extend(their_auth_wires);
         Ok(my_auth_wires)
     }
     fn constant(

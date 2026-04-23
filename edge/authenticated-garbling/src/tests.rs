@@ -60,13 +60,15 @@ mod tests {
             |c| {
                 let rng = SwankyRng::new();
                 let mut gb = Garbler::new(rng, c).unwrap();
-                gb.preprocess_circuit(&mut fancy_sum, gb_input_size ,c).unwrap();
+                gb.preprocess_circuit(&mut fancy_sum, gb_input_size, c)
+                    .unwrap();
                 gb.encode_many(&vec![0; gb_input_size], &vec![2; gb_input_size], c)
             },
             |c| {
                 let rng = SwankyRng::new();
                 let mut ev = Evaluator::new(c, rng).unwrap();
-                ev.preprocess_circuit(&mut fancy_sum, ev_input_size, c).unwrap();
+                ev.preprocess_circuit(&mut fancy_sum, ev_input_size, c)
+                    .unwrap();
                 ev.set_values(vec![F2::from(0); ev_input_size]);
                 ev.receive_many(&vec![2; ev_input_size], c)
             },

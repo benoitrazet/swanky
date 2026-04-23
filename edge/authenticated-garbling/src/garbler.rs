@@ -35,7 +35,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             2,
         );
         let zero = WireMod2::rand(&mut rng, 2);
-        let one = zero.clone() + delta.clone();
+        let one = zero + delta;
         channel.write(&one.to_repr())?;
         Ok(Garbler {
             delta,
@@ -397,7 +397,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         }
 
         // The Garbler concatenated both inputs stating with the evaluator's and returns the results.
-        their_auth_wires.extend(my_auth_wires.into_iter());
+        their_auth_wires.extend(my_auth_wires);
         Ok(their_auth_wires)
     }
 
@@ -411,7 +411,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
 
     fn constant(
         &mut self,
-        x: u16,
+        _x: u16,
         _q: u16,
         channel: &mut Channel,
     ) -> swanky_error::Result<AuthenticatedWire> {
