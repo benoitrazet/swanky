@@ -165,10 +165,6 @@ impl WireLabel for WireModQ {
         w
     }
 
-    fn digits(&self) -> Vec<u16> {
-        self.ds.clone()
-    }
-
     fn to_repr(&self) -> U8x16 {
         // This function converts a [`WireMod3`] into its [`Block`] representation.
         // The values stored in [`WireModQ`] are repacked depending on q
