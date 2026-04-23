@@ -34,10 +34,6 @@ pub struct Evaluator<RNG> {
     current_wire_index: usize,
     preprocessed_wires_map: HashMap<usize, PreProcessedWire<PartyEvaluator>>,
     known_triples_map: HashMap<usize, PreProcessedWire<PartyEvaluator>>,
-    their_input_size: usize,
-    // TODO: Get ride of this once when refactor the
-    // encode/receive methods of the ev/gb
-    values: Vec<F2>,
     pub(crate) rng: RNG,
 }
 
@@ -55,10 +51,6 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
             preprocessed_wires_map: HashMap::new(),
             known_triples_map: HashMap::new(),
             current_wire_index: 0,
-            their_input_size: 0,
-            // TODO: Get ride of this once when refactor the
-            // encode/receive methods of the ev/gb
-            values: Vec::new(),
             rng,
         })
     }
@@ -79,13 +71,6 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
         self.known_triples_map = known_triples_map;
         self.authentication_delta = and_generator.delta();
         Ok(())
-    }
-    /// Set the input values of the Evaluator
-    ///
-    /// TODO: Get ride of this once when refactor the
-    /// encode/receive methods of the ev/gb
-    pub fn set_values(&mut self, values: Vec<F2>) {
-        self.values = values;
     }
     /// Get the deltas, consuming the Evaluator
     pub fn delta(&self) -> U8x16 {
@@ -228,29 +213,13 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
 
     fn encode_many(
         &mut self,
-        _values: &[u16],
-        _moduli: &[u16],
-        _channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        unimplemented!("Evaluator cannot encode wire labels");
-    }
-
-    fn receive_many(
-        &mut self,
+        values: &[u16],
         moduli: &[u16],
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
         // The Evaluator retrieves authenticated shares for their own inputs first.
         // This means that we are assuming that those inputs will be indexed first.
         let my_auth_shares: Vec<AuthShare<PartyEvaluator>> = (0..moduli.len())
-            .map(|_i| {
-                let index = self.current_wire_index();
-                self.get_current_wire_share(index)
-            })
-            .collect();
-
-        // The Evaluator retrieves authenticated shares for the garbler's inputs.
-        let their_auth_shares: Vec<AuthShare<PartyEvaluator>> = (0..self.their_input_size)
             .map(|_i| {
                 let index = self.current_wire_index();
                 self.get_current_wire_share(index)
@@ -272,19 +241,19 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
 
         // TODO: Change how the evaluator retrieves their values and possibly
         // move this part all together when we refactor EV/GB
-        let mut my_masked_values: Vec<F2> = Vec::with_capacity(self.values.len());
+        let mut my_masked_values: Vec<F2> = Vec::with_capacity(values.len());
         for (i, b) in their_bits.iter().enumerate() {
             // Evaluator computes their masked values y_w + λ_w := y_w ⊕ s_w ⊕ r_w
-            my_masked_values[i] = b + my_auth_shares[i].bit() + self.values[i];
+            my_masked_values.push(b + my_auth_shares[i].bit() + F2::from(values[i]));
 
             // Evaluator sends y_w + λ_w  to the Garbler
-            let _ = channel.write(&my_masked_values[i]);
+            channel.write(&my_masked_values[i])?;
         }
 
-        let mut my_auth_wires: Vec<AuthenticatedWire> = Vec::with_capacity(self.values.len());
+        let mut my_auth_wires: Vec<AuthenticatedWire> = Vec::with_capacity(values.len());
         for (i, masked_value) in my_masked_values.iter().enumerate() {
             // The Evaluator retrieves the wire labels for their own input
-            let wire_label = WireMod2::from_repr(channel.read().unwrap(), 2);
+            let wire_label = WireMod2::from_repr(channel.read()?, 2);
             // The Evaluator constructs authenticated values for all their input wires
             my_auth_wires.push(AuthenticatedWireMod2::new_with_value(
                 *masked_value,
@@ -294,17 +263,33 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
             ));
         }
 
+        Ok(my_auth_wires)
+    }
+
+    fn receive_many(
+        &mut self,
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        // The Evaluator retrieves authenticated shares for the garbler's inputs.
+        let their_auth_shares: Vec<AuthShare<PartyEvaluator>> = (0..moduli.len())
+            .map(|_i| {
+                let index = self.current_wire_index();
+                self.get_current_wire_share(index)
+            })
+            .collect();
+
         AuthShareGenerator::open_my_shares(&their_auth_shares, channel)?;
 
-        let mut their_auth_wires: Vec<AuthenticatedWire> = Vec::with_capacity(self.values.len());
+        let mut their_auth_wires: Vec<AuthenticatedWire> = Vec::with_capacity(moduli.len());
         // We need to offset the authenticated wire indices of the garbler because they come second
-        let index_offset = self.values.len();
+        let index_offset = moduli.len();
 
         // The Evaluator receives the wire labels and masked values of the Garbler and uses these values
         // to construct the garbler's authenticated wires
         for (i, share) in their_auth_shares.iter().enumerate() {
-            let their_wire_label = WireMod2::from_repr(channel.read().unwrap(), 2);
-            let their_masked_value: F2 = channel.read().unwrap();
+            let their_wire_label = WireMod2::from_repr(channel.read()?, 2);
+            let their_masked_value = channel.read()?;
             their_auth_wires.push(AuthenticatedWireMod2::new_with_value(
                 their_masked_value,
                 their_wire_label,
@@ -312,9 +297,8 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
                 i + index_offset,
             ));
         }
-        // The Evaluator concatenates both inputs stating with the evaluator's and returns the results.
-        my_auth_wires.extend(their_auth_wires);
-        Ok(my_auth_wires)
+
+        Ok(their_auth_wires)
     }
     fn constant(
         &mut self,

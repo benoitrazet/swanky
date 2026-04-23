@@ -203,11 +203,11 @@ impl<P: GenericParty> Fancy for WirePreProcessor<P> {
     type Item = PreProcessedWire<P>;
     fn receive_many(
         &mut self,
-        _moduli: &[u16],
+        moduli: &[u16],
         _channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        let mut wires: Vec<PreProcessedWire<P>> = Vec::with_capacity(_moduli.len());
-        for _i in 0..wires.len() {
+        let mut wires: Vec<PreProcessedWire<P>> = Vec::with_capacity(moduli.len());
+        for _ in 0..moduli.len() {
             let index = self.current_index();
             let auth_share = self.pop_auth_share();
             let wire = PreProcessedWire::new(index, auth_share);
@@ -224,7 +224,7 @@ impl<P: GenericParty> Fancy for WirePreProcessor<P> {
         _channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
         let mut wires: Vec<PreProcessedWire<P>> = Vec::with_capacity(values.len());
-        for _i in 0..values.len() {
+        for _ in 0..values.len() {
             let index = self.current_index();
             let auth_share = self.pop_auth_share();
             let wire = PreProcessedWire::new(index, auth_share);
