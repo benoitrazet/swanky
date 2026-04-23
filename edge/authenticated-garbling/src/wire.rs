@@ -10,9 +10,7 @@ use swanky_party::GenericParty;
 #[derive(Clone)]
 pub struct AuthenticatedWireMod2<P: GenericParty> {
     /// value
-    pub value: Option<F2>,
-    /// The party's share of the validation bit c_γ
-    pub validation_share: Option<F2>,
+    pub masked_value: Option<F2>,
     /// The wire label.
     pub wire_label: WireMod2,
     /// The authenticated share associated with the wire.
@@ -26,8 +24,7 @@ impl<P: GenericParty> AuthenticatedWireMod2<P> {
     /// authenticated share [`AuthShare`] and an index.
     pub fn new(wire_label: WireMod2, auth_share: AuthShare<P>, index: usize) -> Self {
         AuthenticatedWireMod2 {
-            value: None, 
-            validation_share: None,
+            masked_value: None,
             wire_label,
             auth_share: Some(auth_share),
             index,
@@ -36,41 +33,36 @@ impl<P: GenericParty> AuthenticatedWireMod2<P> {
     /// This [`AuthenticatedWireMod2`]'s constructor takes a  [`WireMod2`] and index only.
     pub fn new_without_share(wire_label: WireMod2, index: usize) -> Self {
         AuthenticatedWireMod2 {
-            value: None, 
-            validation_share: None,
+            masked_value: None,
             wire_label,
             auth_share: None,
             index,
         }
     }
-    /// The [`AuthenticatedWireMod2`]'s constructor takes a wire value, [`WireMod2`], an authenticated share 
+    /// The [`AuthenticatedWireMod2`]'s constructor takes a wire value, [`WireMod2`], an authenticated share
     /// [`AuthShare`] and an index.
-    pub fn new_with_value(value: F2, wire_label: WireMod2, auth_share: AuthShare<P>, index: usize) -> Self {
+    pub fn new_with_value(
+        masked_value: F2,
+        wire_label: WireMod2,
+        auth_share: AuthShare<P>,
+        index: usize,
+    ) -> Self {
         AuthenticatedWireMod2 {
-            value: Some(value),
-            validation_share: None, 
+            masked_value: Some(masked_value),
             wire_label,
             auth_share: Some(auth_share),
             index,
         }
     }
-    /// Returns the value/masked value associated with the current [`AuthenticatedWireMod2`]
-    /// 
+    /// Returns the masked value associated with the current [`AuthenticatedWireMod2`]
+    ///
     /// Panics if there is no value associated with this wire
-    pub fn value(&self) -> F2 {
-        self.value.unwrap()
+    pub fn masked_value(&self) -> F2 {
+        self.masked_value.unwrap()
     }
     /// Sets the value associated with the current [`AuthenticatedWireMod2`]
-    pub fn set_value(&mut self, value: F2) {
-        self.value = Some(value);
-    }
-    /// Returns the validation share associated with the current [`AuthenticatedWireMod2`]
-    pub fn validation_share(&mut self) -> F2 {
-        self.validation_share.unwrap()
-    }
-    /// Sets the value associated with the current [`AuthenticatedWireMod2`]
-    pub fn set_validation_share(&mut self, validation_share: F2) {
-        self.validation_share = Some(validation_share);
+    pub fn set_masked_value(&mut self, value: F2) {
+        self.masked_value = Some(value);
     }
     /// Returns the wire label of type [`WireMod2`] associated with the current [`AuthenticatedWireMod2`]
     pub fn wire_label(&self) -> WireMod2 {

@@ -7,7 +7,6 @@ use swanky_party::party_system;
 use vectoreyes::U8x16;
 
 pub mod evaluator;
-pub mod finalizer;
 pub mod garbler;
 pub mod preprocesser;
 mod tests;

@@ -71,7 +71,7 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
         my_input_size: usize,
         channel: &mut Channel,
     ) -> swanky_error::Result<()> {
-       // The garbler and evaluator exchange their input sizes
+        // The garbler and evaluator exchange their input sizes
         let _ = channel.write(&my_input_size);
         self.their_input_size = channel.read().unwrap();
 
@@ -90,10 +90,10 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
         Ok(())
     }
     /// Set the input values of the Evaluator
-    /// 
+    ///
     /// TODO: Get ride of this once when refactor the
     /// encode/receive methods of the ev/gb
-    pub fn set_values(&mut self, values: Vec<F2>){
+    pub fn set_values(&mut self, values: Vec<F2>) {
         self.values = values;
     }
     /// Get the deltas, consuming the Evaluator
@@ -126,7 +126,7 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         AuthenticatedWireMod2::new_with_value(
-            x.value() + y.value(),
+            x.masked_value() + y.masked_value(),
             x.wire_label() + y.wire_label(),
             x.auth_share() ^ y.auth_share(),
             self.current_wire_index(),
@@ -170,10 +170,10 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
 
         // z'α := z_α + λ_α, where z_α is the actual wire value of the input
         // wire with label L_α and λ_α is the mask of that value
-        let la_value = la.value();
+        let la_value = la.masked_value();
         // z'γ := z_β + λ_β, where z_β is the actual wire value of the input
         // wire with label L_β and λ_β is the mask of that value
-        let lb_value = lb.value();
+        let lb_value = lb.masked_value();
 
         // This is the value (z_α + λ_α)Gate_0
         let gate0_muxed = mux(la_value, 0.into(), gate0);
@@ -194,12 +194,11 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
             lc_share,
             index,
         );
-        // The Evaluator computes its share of the validation bit 
+        // The Evaluator computes its share of the validation bit
         // c_γ :=  (z'α ⊕ λ_α) ∧ (z'β ⊕ λ_β ) ∧ (z'γ ⊕ λ_γ )
         // If we expand this we get:
-        //  z'α ∧ z'β ∧ z'γ (which can be added when c_γ is opened, this makes it easier to directly send this)
-        let validation_share = 
-                        // ⊕ z'α ∧ z'β ∧ s_β 
+        //  z'α ∧ z'β ∧ z'γ (which can be added when c_γ is opened so that the parties don't add it twice)
+        let mut my_validation_share = // ⊕ z'α ∧ z'β ∧ s_β 
                         la_value * lc_value * lb.bit()
                         // ⊕ z'β ∧ z'γ ∧ s_α
                         + lb_value * lc_value * la.bit()
@@ -214,7 +213,21 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
                         // s*_γ ∧ s_γ
                         + lc_triple.bit() * lc.bit();
 
-        lc.set_validation_share(validation_share);
+        // The evaluator sends out the masked bit z'γ 
+        channel.write(&lc_value)?;
+        // The evaluator sends their part of the validation bit
+        channel.write(&my_validation_share)?;
+        // The evaluator receives the garbler's part of the validation bit
+        let their_validation_share: F2 = channel.read().unwrap();
+        // The evaluator adds the last part of the validation bit z'α ∧ z'β ∧ z'γ
+        my_validation_share += their_validation_share + la_value * lb_value * lc_value;
+
+        // The evaluator aborts if the validation is bit is not equal to 0
+        assert_eq!(
+            my_validation_share,
+            0.into(),
+            "Evaluator's authentication validation check failed at index {index}"
+        );
         Ok(lc)
     }
 }
@@ -238,21 +251,25 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
     ) -> swanky_error::Result<Vec<Self::Item>> {
         // The Evaluator retrieves authenticated shares for their own inputs first.
         // This means that we are assuming that those inputs will be indexed first.
-        let my_auth_shares: Vec<AuthShare<PartyEvaluator>> = (0..moduli.len()).map(|_i|{        
-            let index = self.current_wire_index();
-            self.get_current_wire_share(index)} 
-        ).collect();
-        // The Evaluator retrieves authenticated shares for the garbler's inputs.
-        let their_auth_shares: Vec<AuthShare<PartyEvaluator>> = (0..self.their_input_size).map(|_i|{        
+        let my_auth_shares: Vec<AuthShare<PartyEvaluator>> = (0..moduli.len())
+            .map(|_i| {
                 let index = self.current_wire_index();
-                self.get_current_wire_share(index)} 
-            ).collect();
+                self.get_current_wire_share(index)
+            })
+            .collect();
+        // The Evaluator retrieves authenticated shares for the garbler's inputs.
+        let their_auth_shares: Vec<AuthShare<PartyEvaluator>> = (0..self.their_input_size)
+            .map(|_i| {
+                let index = self.current_wire_index();
+                self.get_current_wire_share(index)
+            })
+            .collect();
 
         let mut their_bits = Vec::with_capacity(self.their_input_size);
 
         // The Evaluator opens and receives the garblers share [r_w].
         // Because this is effectively being used to compute the
-        // Evaluator's input labels, we use the Evaluator's 
+        // Evaluator's input labels, we use the Evaluator's
         // authenticated shares
         AuthShareGenerator::open_their_shares_with_delta(
             &my_auth_shares,
@@ -263,27 +280,28 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
 
         // TODO: Change how the evaluator retrieves their values and possibly
         // move this part all together when we refactor EV/GB
-        let mut my_masked_values : Vec<F2>= Vec::with_capacity(self.values.len());
-        for (i, b) in their_bits.iter().enumerate(){
+        let mut my_masked_values: Vec<F2> = Vec::with_capacity(self.values.len());
+        for (i, b) in their_bits.iter().enumerate() {
             // Evaluator computes their masked values y_w + λ_w := y_w ⊕ s_w ⊕ r_w
             my_masked_values[i] = b + my_auth_shares[i].bit() + F2::from(self.values[i]);
             // Evaluator sends y_w + λ_w  to the Garbler
             let _ = channel.write(&my_masked_values[i]);
         }
-        
 
         let mut my_auth_wires: Vec<AuthenticatedWire> = Vec::with_capacity(self.values.len());
-        for (i, masked_value) in my_masked_values.iter().enumerate(){
+        for (i, masked_value) in my_masked_values.iter().enumerate() {
             // The Evaluator retrieves the wire labels for their own input
             let wire_label = WireMod2::from_repr(channel.read().unwrap(), 2);
             // The Evaluator constructs authenticated values for all their input wires
-            my_auth_wires.push(AuthenticatedWireMod2::new_with_value(*masked_value, wire_label, my_auth_shares[i], i));
+            my_auth_wires.push(AuthenticatedWireMod2::new_with_value(
+                *masked_value,
+                wire_label,
+                my_auth_shares[i],
+                i,
+            ));
         }
 
-        AuthShareGenerator::open_my_shares(
-            &their_auth_shares,
-            channel,
-        )?;  
+        AuthShareGenerator::open_my_shares(&their_auth_shares, channel)?;
 
         let mut their_auth_wires: Vec<AuthenticatedWire> = Vec::with_capacity(self.values.len());
         // We need to offset the authenticated wire indices of the garbler because they come second
@@ -291,11 +309,16 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
 
         // The Evaluator receives the wire labels and masked values of the Garbler and uses these values
         // to construct the garbler's authenticated wires
-        for (i, share) in their_auth_shares.iter().enumerate(){
+        for (i, share) in their_auth_shares.iter().enumerate() {
             let their_wire_label = WireMod2::from_repr(channel.read().unwrap(), 2);
             let their_masked_value: F2 = channel.read().unwrap();
-            their_auth_wires.push(AuthenticatedWireMod2::new_with_value(their_masked_value, their_wire_label, *share, i + index_offset ));
-        }       
+            their_auth_wires.push(AuthenticatedWireMod2::new_with_value(
+                their_masked_value,
+                their_wire_label,
+                *share,
+                i + index_offset,
+            ));
+        }
         // The Evaluator concatenates both inputs stating with the evaluator's and returns the results.
         my_auth_wires.extend(their_auth_wires.into_iter());
         Ok(my_auth_wires)
@@ -306,13 +329,28 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         _q: u16,
         channel: &mut Channel,
     ) -> swanky_error::Result<AuthenticatedWire> {
+        // We haven't implemented a way to take advantage of constant wires
+        // in FancyBinary. So they need to be treated as input wires.
         let index = self.current_wire_index();
-        let wire_label = WireMod2::from_repr(channel.read().unwrap(), 2);
+        let current_share = self.get_current_wire_share(index);
 
+        let my_masked_value = current_share.bit();
+        let mut their_masked_value = Vec::with_capacity(1);
+
+        AuthShareGenerator::open_their_shares_with_delta(
+            &[current_share],
+            self.delta(),
+            &mut their_masked_value,
+            channel,
+        )?;   
+        let masked_value = F2::from(value) + their_masked_value[0] + my_masked_value;
+        channel.write(&masked_value)?;
+        let wire_label = WireMod2::from_repr(channel.read().unwrap(), 2);
+        
         Ok(AuthenticatedWireMod2::new_with_value(
-            F2::from(value),
+            masked_value, 
             wire_label,
-            self.get_current_wire_share(index),
+            current_share,
             index,
         ))
     }
@@ -340,7 +378,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         AuthShareGenerator::open_with_delta(&auth_shares, self.delta(), &mut masks, channel)?;
         let mut outputs = Vec::with_capacity(x.len());
         for i in 0..x.len() {
-            outputs.push((masks[i] + x[i].value()).into());
+            outputs.push((masks[i] + x[i].masked_value()).into());
         }
         Ok(Some(outputs))
     }
