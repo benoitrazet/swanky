@@ -27,11 +27,7 @@
 //!
 use std::collections::HashMap;
 
-use fancy_garbling::{
-    Fancy,
-    circuit::CircuitExecutor,
-    circuit_analyzer::{AnalyzerItem, CircuitAnalyzer},
-};
+use fancy_garbling::{Fancy, circuit::CircuitExecutor, circuit_analyzer::CircuitAnalyzer};
 use rand::{CryptoRng, Rng};
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_channel::Channel;
@@ -60,10 +56,7 @@ where
 {
     // First Analyze the circuit gates by simulating both parties
     let mut circuit_analyzer = CircuitAnalyzer::new();
-    let inputs = (0..<C as CircuitExecutor<CircuitAnalyzer>>::ninputs(circuit))
-        .map(|i| AnalyzerItem::new(<C as CircuitExecutor<CircuitAnalyzer>>::modulus(circuit, i)))
-        .collect::<Vec<_>>();
-    circuit.execute(&mut circuit_analyzer, &inputs, channel)?;
+    circuit_analyzer.eval(circuit)?;
 
     let nands = circuit_analyzer.nands();
     let ninputs = circuit_analyzer.ninputs();
@@ -76,7 +69,7 @@ where
     // Create as many authenticated shares as there are AND, Constant and Input gates.
     let mut auth_shares = Vec::with_capacity(nands + ninputs + nconstants);
     and_generator.auth_share_generator_mut().generate(
-        nands + ninputs,
+        nands + ninputs + nconstants,
         &mut auth_shares,
         channel,
         rng,
