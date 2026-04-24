@@ -99,12 +99,6 @@ impl WireLabel for WireMod2 {
         w
     }
 
-    fn digits(&self) -> Vec<u16> {
-        (0..128)
-            .map(|i| ((u128::from(self.val) >> i) as u16) & 1)
-            .collect()
-    }
-
     fn to_repr(&self) -> U8x16 {
         // This function converts a [`WireMod2`] into its [`U8x16`] representation.
         // Since the value of a [`WireMod2`] is a 128b value, its directly returned
