@@ -49,6 +49,10 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         })
     }
 
+    fn reset(&mut self) {
+        self.current_wire_index = 0;
+    }
+
     /// Retrieve the garbler's delta
     pub fn delta(&mut self) -> WireMod2 {
         self.delta
@@ -88,6 +92,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             f_preprocessing(circuit, &mut and_generator, channel, &mut self.rng)?;
         self.preprocessed_wires_map = preprocessed_wires_map;
         self.known_triples_map = known_triples_map;
+        self.reset();
         Ok(())
     }
 
@@ -212,7 +217,7 @@ where
         let la_value = la0.masked_value();
         let lb_value = lb0.masked_value();
 
-        let lc_value: F2 = channel.read().unwrap();
+        let lc_value: F2 = channel.read()?;
         let mut my_validation_share = // ⊕ z'α ∧ z'β ∧ s_β 
                         la_value * lc_value * lc0_share.bit()
                         // ⊕ z'β ∧ z'γ ∧ s_α
@@ -229,7 +234,7 @@ where
                         + lc0_triple.bit() * lc0_share.bit();
 
         // The garbler receives the evaluator's part of the validation bit
-        let their_validation_share: F2 = channel.read().unwrap();
+        let their_validation_share: F2 = channel.read()?;
         // The evaluator sends their part of the validation bit
         channel.write(&my_validation_share)?;
         // The garbler adds the last part of the validation bit z'α ∧ z'β ∧ z'γ

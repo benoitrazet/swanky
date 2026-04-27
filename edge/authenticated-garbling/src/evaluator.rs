@@ -55,6 +55,10 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
         })
     }
 
+    fn reset(&mut self) {
+        self.current_wire_index = 0;
+    }
+
     /// Pre-process the passed circuit
     pub fn preprocess_circuit<
         C: CircuitExecutor<CircuitAnalyzer> + CircuitExecutor<WirePreProcessor<PartyEvaluator>>,
@@ -70,6 +74,7 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
         self.preprocessed_wires_map = preprocessed_wires_map;
         self.known_triples_map = known_triples_map;
         self.authentication_delta = and_generator.delta();
+        self.reset();
         Ok(())
     }
     /// Get the deltas, consuming the Evaluator
@@ -194,7 +199,7 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
         // The evaluator sends their part of the validation bit
         channel.write(&my_validation_share)?;
         // The evaluator receives the garbler's part of the validation bit
-        let their_validation_share: F2 = channel.read().unwrap();
+        let their_validation_share: F2 = channel.read()?;
         // The evaluator adds the last part of the validation bit z'α ∧ z'β ∧ z'γ
         my_validation_share += their_validation_share + la_value * lb_value * lc_value;
 
