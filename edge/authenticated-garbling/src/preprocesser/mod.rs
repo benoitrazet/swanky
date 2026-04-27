@@ -130,7 +130,7 @@ mod tests {
     pub type Evaluator = PartyB;
 
     #[test]
-    fn test_preprocessing_fancy_sum() {
+    fn test_preprocessing() {
         let input_size = 800;
         let circuit = circuits::TestBinaryAddition(input_size);
         let (_shares_gb, _shares_ev) = swanky_channel::local::local_channel_pair(

@@ -50,8 +50,7 @@ fn test_party_encoding_receiving_passes() {
             let mut gb = Garbler::new(rng, c)?;
             gb.preprocess_circuit(&circuit, c)?;
             gb.encode_many(&vec![0; input_size_gb], &vec![2; input_size_gb], c)?;
-            // TODO: this is failing!
-            // gb.receive_many(&vec![2; input_size_ev], c)?;
+            gb.receive_many(&vec![2; input_size_ev], c)?;
             Ok(())
         },
         |c| {
@@ -59,8 +58,7 @@ fn test_party_encoding_receiving_passes() {
             let mut ev = Evaluator::new(c, rng)?;
             ev.preprocess_circuit(&circuit, c)?;
             ev.receive_many(&vec![2; input_size_gb], c)?;
-            // TODO: this is failing!
-            // ev.encode_many(&vec![0; input_size_ev], &vec![2; input_size_ev], c)?;
+            ev.encode_many(&vec![0; input_size_ev], &vec![2; input_size_ev], c)?;
             Ok(())
         },
     )
