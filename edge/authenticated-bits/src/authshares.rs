@@ -139,6 +139,20 @@ impl<P: GenericParty> AuthShare<P> {
                 .into_inner(Witness::EQUAL_TYPES),
         }
     }
+
+    /// Compute $`c \cdot \langle x \rangle`$, where $`c`$ is a public constant.
+    pub fn mul_with_const(self, constant: F2) -> Self {
+        Self {
+            party_a: self.party_a.map(
+                |authbit| authbit.mul_with_const(constant),
+                |authbit| authbit.mul_with_const(constant),
+            ),
+            party_b: self.party_b.map(
+                |authbit| authbit.mul_with_const(constant),
+                |authbit| authbit.mul_with_const(constant),
+            ),
+        }
+    }
 }
 
 impl<P: GenericParty> core::ops::BitXor for AuthShare<P> {
@@ -439,25 +453,39 @@ impl<P: GenericParty> AuthShareGenerator<P> {
     /// This works by computing $`[x_2]_B \oplus c`$, where $`[x_2]_B`$ is the
     /// authenticated bit held by Party B.
     pub fn xor_with_const(&self, authshare: AuthShare<P>, bit: F2) -> AuthShare<P> {
+        Self::xor_with_const_with_delta(authshare, bit, self.delta())
+    }
+
+    /// Compute $`\langle x \rangle \oplus c`$, where $`c`$ is a public
+    /// constant, using a supplied $`\Delta`$ value.
+    ///
+    /// See [`AuthShareGenerator::xor_with_const`] for details.
+    pub fn xor_with_const_with_delta(
+        authshare: AuthShare<P>,
+        bit: F2,
+        delta: U8x16,
+    ) -> AuthShare<P> {
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(ev) => AuthShare {
                 party_a: authshare.party_a,
                 party_b: PartyEitherCopy::new(
                     ev,
-                    self.party_b
-                        .as_ref()
-                        .into_inner(ev)
-                        .xor_with_const(authshare.party_b.into_inner(ev), bit),
+                    AuthBitGenerator::xor_with_const_with_delta(
+                        authshare.party_b.into_inner(ev),
+                        bit,
+                        PartyPrivateCopy::new(delta),
+                    ),
                 ),
             },
             GenericWhichParty::Party1(ev) => AuthShare {
                 party_a: authshare.party_a,
                 party_b: PartyEitherCopy::new(
                     ev,
-                    self.party_b
-                        .as_ref()
-                        .into_inner(ev)
-                        .xor_with_const(authshare.party_b.into_inner(ev), bit),
+                    AuthBitGenerator::xor_with_const_with_delta(
+                        authshare.party_b.into_inner(ev),
+                        bit,
+                        PartyPrivateCopy::new(delta),
+                    ),
                 ),
             },
         }
@@ -675,6 +703,34 @@ mod tests {
                 prop_assert!(validation_b);
                 // The new authenticated share should equal `⟨x⟩ ⊕ c`.
                 prop_assert_eq!(a.bit() + b.bit() + bit, new_a.bit() + new_b.bit());
+            }
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+        #[test]
+        fn mul_with_const_works(constants in proptest::collection::vec(any::<bool>(), 1..1000),
+                                seed_party_a in any::<u128>(), seed_party_b in any::<u128>()) {
+            let mut rng_a = SwankyRng::from_seed(U8x16::from(seed_party_a));
+            let mut rng_b = SwankyRng::from_seed(U8x16::from(seed_party_b));
+            let constants: Vec<F2> = constants.into_iter().map(F2::from).collect();
+            let count = constants.len();
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (output_a, output_b) = generate(count, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            for ((a, b), bit) in output_a
+                .into_iter()
+                .zip(output_b.into_iter())
+                .zip(constants)
+            {
+                let new_a = a.mul_with_const(bit);
+                let new_b = b.mul_with_const(bit);
+                // The new authenticated share should still validate.
+                let ((validation_a, _), (validation_b, _)) = open(&generator_a, &generator_b, vec![new_a], vec![new_b]);
+                prop_assert!(validation_a);
+                prop_assert!(validation_b);
+                // The new authenticated share should equal `c · ⟨x⟩`.
+                prop_assert_eq!((a.bit() + b.bit()) * bit, new_a.bit() + new_b.bit());
             }
         }
     }

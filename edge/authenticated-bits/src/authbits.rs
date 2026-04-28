@@ -150,6 +150,34 @@ impl<P: GenericParty> AuthBit<P> {
     pub fn bit(&self) -> PartyPrivateCopy<Party0<P>, P, F2> {
         self.prover().map(|vab| vab.bit)
     }
+
+    /// Compute $`c \cdot [b]`$, where $`c`$ is a public constant.
+    ///
+    /// This maps the prover's values $`(b, M)`$ to $`(c \cdot b, c \cdot M)`$,
+    /// and maps the verifier's value $`K`$ to $`c \cdot K`$.
+    pub fn mul_with_const(&self, constant: F2) -> Self {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(ev) => {
+                let prover = self.prover().into_inner(ev);
+                Self(PartyEitherCopy::new(
+                    ev,
+                    ProverAuthBit {
+                        mac: (constant * F128b::from(prover.mac)).into(),
+                        bit: constant * prover.bit,
+                    },
+                ))
+            }
+            GenericWhichParty::Party1(ev) => {
+                let verifier = self.verifier().into_inner(ev);
+                Self(PartyEitherCopy::new(
+                    ev,
+                    VerifierAuthBit {
+                        key: (constant * F128b::from(verifier.key)).into(),
+                    },
+                ))
+            }
+        }
+    }
 }
 
 /// XOR two authenticated bits. Linear operations on authenticated bits are "free"
@@ -432,6 +460,18 @@ impl<P: GenericParty> AuthBitGenerator<P> {
     /// This maps the prover's values $`(b, M)`$ to $`(b \oplus c, M)`$,
     /// and maps the verifier's value $`K`$ to $`K \oplus c \Delta`$.
     pub fn xor_with_const(&self, authbit: AuthBit<P>, bit: F2) -> AuthBit<P> {
+        Self::xor_with_const_with_delta(authbit, bit, self.delta())
+    }
+
+    /// Compute $`[b] \oplus c`$, where $`c`$ is a public constant, using a
+    /// supplied $`\Delta`$ value.
+    ///
+    /// See [`AuthBitGenerator::xor_with_const`] for details.
+    pub fn xor_with_const_with_delta(
+        authbit: AuthBit<P>,
+        bit: F2,
+        delta: PartyPrivateCopy<Party1<P>, P, U8x16>,
+    ) -> AuthBit<P> {
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(ev) => AuthBit(PartyEitherCopy::new(
                 ev,
@@ -444,7 +484,7 @@ impl<P: GenericParty> AuthBitGenerator<P> {
                 ev,
                 VerifierAuthBit {
                     key: authbit.key().into_inner(ev)
-                        ^ U8x16::from(bit * F128b::from(self.delta().into_inner(ev))),
+                        ^ U8x16::from(bit * F128b::from(delta.into_inner(ev))),
                 },
             )),
         }
@@ -595,6 +635,43 @@ mod tests {
                     new_authbit_a.bit().into_inner(Witness::EQUAL_TYPES),
                     authbit_a.bit().into_inner(Witness::EQUAL_TYPES) + public_bit
                 );
+            }
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+        #[test]
+        fn mul_with_const_works(bits in proptest::collection::vec(any::<bool>(), 1..1000),
+                                public_bits in proptest::collection::vec(any::<bool>(), 1..1000),
+                                seed_party_a in any::<u128>(),
+                                seed_party_b in any::<u128>()) {
+            let mut rng_a = SwankyRng::from_seed(seed_party_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
+            let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
+            let public_bits: Vec<F2> = public_bits.into_iter().map(F2::from).collect();
+                        let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (output_a, output_b) = generate(&bits, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b, false, false);
+            for ((authbit_a, authbit_b), public_bit) in output_a
+                .into_iter()
+                .zip(output_b.into_iter())
+                .zip(public_bits.into_iter())
+            {
+                let new_authbit_a = authbit_a.mul_with_const(public_bit);
+                let new_authbit_b = authbit_b.mul_with_const(public_bit);
+                // The new authenticated bits should still validate.
+                let validation = validate(
+                    &[new_authbit_a],
+                    &[new_authbit_b],
+                    generator_b.delta().into_inner(Witness::EQUAL_TYPES),
+                );
+                prop_assert!(validation);
+                // The new authenticated bits should equal `bit * public_bit`.
+                prop_assert_eq!(
+                    new_authbit_a.bit().into_inner(Witness::EQUAL_TYPES),
+                    authbit_a.bit().into_inner(Witness::EQUAL_TYPES) * public_bit
+                );
+
             }
         }
     }
