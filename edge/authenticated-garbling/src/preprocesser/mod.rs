@@ -67,7 +67,7 @@ where
     // If we have too few AND gates, we need to generate at
     // least 320 AND triples in order for the protocol to be secure.
     if 0 < nands && nands < 320 {
-        nand_triples += 320;
+        nand_triples = 320;
     }
     // Create as many random and triples as there are AND gates
     let mut rand_and_triples = Vec::with_capacity(nand_triples);
@@ -76,6 +76,7 @@ where
     if nands > 0 {
         and_generator.generate(nand_triples, &mut rand_and_triples, channel, rng)?;
     }
+
     // Create as many authenticated shares as there are AND, Constant and Input gates.
     let mut auth_shares = Vec::with_capacity(nands + ninputs + nconstants);
     and_generator.auth_share_generator_mut().generate(
@@ -95,10 +96,10 @@ where
     // to begin with
     let mut known_triple_map = HashMap::new();
     if nands > 0 {
-        let mut known_triples_out = Vec::with_capacity(rand_and_triples.len());
+        let mut known_triples_out = Vec::with_capacity(nands);
         let (left_wires, right_wires, indices) = wire_preprocessor.and_gate_input_shares();
         and_generator.to_known_triple(
-            &rand_and_triples,
+            &rand_and_triples[..nands],
             &left_wires,
             &right_wires,
             &mut known_triples_out,
