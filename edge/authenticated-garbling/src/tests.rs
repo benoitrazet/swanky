@@ -14,7 +14,7 @@ fn test_party_construction_passes() {
     swanky_channel::local::local_channel_pair(
         |c| {
             let rng = SwankyRng::new();
-            Garbler::new(rng, c)
+            Garbler::new(c, rng)
         },
         |c| {
             let rng = SwankyRng::new();
@@ -30,7 +30,7 @@ fn test_party_preprocessing_passes() {
     swanky_channel::local::local_channel_pair(
         |c| {
             let rng = SwankyRng::new();
-            let mut gb = Garbler::new(rng, c).unwrap();
+            let mut gb = Garbler::new(c, rng).unwrap();
             gb.preprocess_circuit(&circuit, c)
         },
         |c| {
@@ -50,7 +50,7 @@ fn test_party_encoding_receiving_passes() {
     swanky_channel::local::local_channel_pair(
         |c| {
             let rng = SwankyRng::new();
-            let mut gb = Garbler::new(rng, c)?;
+            let mut gb = Garbler::new(c, rng)?;
             gb.preprocess_circuit(&circuit, c)?;
             gb.encode_many(&vec![0; input_size_gb], &vec![2; input_size_gb], c)?;
             gb.receive_many(&vec![2; input_size_ev], c)?;
@@ -77,7 +77,100 @@ fn test_and_gate_fan_n() {
     swanky_channel::local::local_channel_pair(
         |c| {
             let rng = SwankyRng::new();
-            let mut gb = Garbler::new(rng, c)?;
+            let mut gb = Garbler::new(c, rng)?;
+            gb.preprocess_circuit(&circuit, c)?;
+            let mut inputs = gb.encode_many(&vec![0; ninputs_gb], &vec![2; ninputs_gb], c)?;
+            let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
+            inputs.extend(theirs);
+            circuit.execute(&mut gb, &inputs, c)?;
+            Ok(())
+        },
+        |c| {
+            let rng = SwankyRng::new();
+            let mut ev = Evaluator::new(c, rng)?;
+            ev.preprocess_circuit(&circuit, c)?;
+            let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
+            let mine = ev.encode_many(&vec![0; ninputs_ev], &vec![2; ninputs_ev], c)?;
+            inputs.extend(mine);
+            circuit.execute(&mut ev, &inputs, c)?;
+            Ok(())
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn test_or_gate_fan_n() {
+    let ninputs_gb = 400;
+    let ninputs_ev = 400;
+    let circuit = circuits::TestOrGateFanN(ninputs_gb + ninputs_ev);
+
+    swanky_channel::local::local_channel_pair(
+        |c| {
+            let rng = SwankyRng::new();
+            let mut gb = Garbler::new(c, rng)?;
+            gb.preprocess_circuit(&circuit, c)?;
+            let mut inputs = gb.encode_many(&vec![0; ninputs_gb], &vec![2; ninputs_gb], c)?;
+            let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
+            inputs.extend(theirs);
+            circuit.execute(&mut gb, &inputs, c)?;
+            Ok(())
+        },
+        |c| {
+            let rng = SwankyRng::new();
+            let mut ev = Evaluator::new(c, rng)?;
+            ev.preprocess_circuit(&circuit, c)?;
+            let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
+            let mine = ev.encode_many(&vec![0; ninputs_ev], &vec![2; ninputs_ev], c)?;
+            inputs.extend(mine);
+            circuit.execute(&mut ev, &inputs, c)?;
+            Ok(())
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn test_binary_addition() {
+    let ninputs_gb = 400;
+    let ninputs_ev = 400;
+    let circuit = circuits::TestBinaryAddition(ninputs_gb + ninputs_ev);
+
+    swanky_channel::local::local_channel_pair(
+        |c| {
+            let rng = SwankyRng::new();
+            let mut gb = Garbler::new(c, rng)?;
+            gb.preprocess_circuit(&circuit, c)?;
+            let mut inputs = gb.encode_many(&vec![0; ninputs_gb], &vec![2; ninputs_gb], c)?;
+            let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
+            inputs.extend(theirs);
+            circuit.execute(&mut gb, &inputs, c)?;
+            Ok(())
+        },
+        |c| {
+            let rng = SwankyRng::new();
+            let mut ev = Evaluator::new(c, rng)?;
+            ev.preprocess_circuit(&circuit, c)?;
+            let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
+            let mine = ev.encode_many(&vec![0; ninputs_ev], &vec![2; ninputs_ev], c)?;
+            inputs.extend(mine);
+            circuit.execute(&mut ev, &inputs, c)?;
+            Ok(())
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn test_binary_subtraction() {
+    let ninputs_gb = 400;
+    let ninputs_ev = 400;
+    let circuit = circuits::TestBinarySubtraction(ninputs_gb + ninputs_ev);
+
+    swanky_channel::local::local_channel_pair(
+        |c| {
+            let rng = SwankyRng::new();
+            let mut gb = Garbler::new(c, rng)?;
             gb.preprocess_circuit(&circuit, c)?;
             let mut inputs = gb.encode_many(&vec![0; ninputs_gb], &vec![2; ninputs_gb], c)?;
             let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;

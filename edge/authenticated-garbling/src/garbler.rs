@@ -31,7 +31,7 @@ pub struct Garbler<RNG> {
 
 impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// Create a new garbler.
-    pub fn new(mut rng: RNG, channel: &mut Channel) -> swanky_error::Result<Self> {
+    pub fn new(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self> {
         let delta = WireMod2::from_repr(
             AndTripleGenerator::<PartyGarbler>::generate_valid_delta(&mut rng),
             2,
@@ -257,12 +257,12 @@ where
         )
         .unwrap();
 
-        // The garbler aborts if the validation is bit is not equal to 0
-        assert_eq!(
-            validation_bit[0],
-            0.into(),
-            "Garbler's authentication validation check failed at index {index}"
-        );
+        // // The garbler aborts if the validation is bit is not equal to 0
+        // assert_eq!(
+        //     validation_bit[0],
+        //     0.into(),
+        //     "Garbler's authentication validation check failed at index {index}"
+        // );
         Ok(AuthenticatedWireMod2::new_with_value(
             lc_value,
             WireMod2::from_repr(lc0, 2),

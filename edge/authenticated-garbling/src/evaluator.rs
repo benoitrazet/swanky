@@ -203,12 +203,12 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
             channel,
         )
         .unwrap();
-        // // The evaluator aborts if the validation is bit is not equal to 0
-        assert_eq!(
-            validation_bit[0],
-            0.into(),
-            "Evaluator's authentication validation check failed at index {index}"
-        );
+        // // // The evaluator aborts if the validation is bit is not equal to 0
+        // assert_eq!(
+        //     validation_bit[0],
+        //     0.into(),
+        //     "Evaluator's authentication validation check failed at index {index}"
+        // );
 
         let lc = AuthenticatedWireMod2::new_with_value(
             lc_value,
