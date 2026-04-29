@@ -102,7 +102,12 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
     /// This is also why the index of the input and output wires of this
     /// gate are the same.
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        AuthenticatedWireMod2::new(x.wire_label() + self.one, x.auth_share(), x.index())
+        AuthenticatedWireMod2::new_with_value(
+            x.masked_value(),
+            x.wire_label() + self.one,
+            x.auth_share(),
+            x.index(),
+        )
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
@@ -201,8 +206,7 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
             self.delta(),
             &mut validation_bit,
             channel,
-        )
-        .unwrap();
+        )?;
         // // // The evaluator aborts if the validation is bit is not equal to 0
         // assert_eq!(
         //     validation_bit[0],

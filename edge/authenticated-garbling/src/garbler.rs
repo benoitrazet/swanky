@@ -254,8 +254,7 @@ where
             self.delta_u8x16(),
             &mut validation_bit,
             channel,
-        )
-        .unwrap();
+        )?;
 
         // // The garbler aborts if the validation is bit is not equal to 0
         // assert_eq!(
@@ -290,7 +289,7 @@ where
     /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         AuthenticatedWireMod2::new_with_value(
-            x.masked_value() + F2::from(1),
+            x.masked_value(),
             x.wire_label() + self.zero,
             x.auth_share(),
             x.index(),

@@ -30,15 +30,7 @@ impl<P: GenericParty> AuthenticatedWireMod2<P> {
             index,
         }
     }
-    /// This [`AuthenticatedWireMod2`]'s constructor takes a  [`WireMod2`] and index only.
-    pub fn new_without_share(wire_label: WireMod2, index: usize) -> Self {
-        AuthenticatedWireMod2 {
-            masked_value: None,
-            wire_label,
-            auth_share: None,
-            index,
-        }
-    }
+
     /// The [`AuthenticatedWireMod2`]'s constructor takes a wire value, [`WireMod2`], an authenticated share
     /// [`AuthShare`] and an index.
     pub fn new_with_value(
