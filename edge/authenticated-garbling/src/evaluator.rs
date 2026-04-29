@@ -152,9 +152,13 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
         // z'α := z_α + λ_α, where z_α is the actual wire value of the input
         // wire with label L_α and λ_α is the mask of that value
         let la_value = la.masked_value();
-        // z'γ := z_β + λ_β, where z_β is the actual wire value of the input
+        // The Evaluator's authenticated share of λ_α
+        let la_lambda = la.auth_share();
+        // z'β := z_β + λ_β, where z_β is the actual wire value of the input
         // wire with label L_β and λ_β is the mask of that value
         let lb_value = lb.masked_value();
+        // The Evaluator's authenticated share of λ_β
+        let lb_lambda = lb.auth_share();
 
         // This is the value (z_α + λ_α)Gate_0
         let gate0_muxed = mux(la_value, 0.into(), gate0);
@@ -169,45 +173,48 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
         // The current masked value of the wire is:
         // z'γ := z_γ + λ_γ := b_γ + lsb(L_{γ, z_γ + λ_γ})
         let lc_value = F128b::from(lc_label).lsb() + bit_c;
+
+        // The Evaluator sends out the masked bit z'γ so that the Garbler
+        // can locally compute their share of c_γ
+        channel.write(&lc_value)?;
+
+        // The Evaluator computes its share of the validation bit
+        // c_γ :=  (z'α ⊕ λ_α) ∧ (z'β ⊕ λ_β ) ⊕ (z'γ ⊕ λ_γ )
+        //     := (z'α z'β ⊕ z'β λ_α ⊕ z'α λ_β ⊕ λ_α λ_β) ⊕ (z'γ ⊕ λ_γ )
+        //     := (z'α z'β ⊕ z'γ ) ⊕ (z'β λ_α ⊕ z'α λ_β ⊕ λ*_γ ⊕ λ_γ)
+
+        // The Evaluator first creates the constant share of (z'α z'β ⊕ z'γ )
+        let share_masks: AuthShare<PartyEvaluator> =
+            AuthShareGenerator::constant_with_delta(la_value * lb_value + lc_value, self.delta());
+        // Then they create their share of the validation bit
+        // c_γ := (z'α z'β ⊕ z'γ ) ⊕ (z'β λ_α ⊕ z'α λ_β ⊕ λ*_γ ⊕ λ_γ)
+        let validation_share = share_masks
+            ^ la_lambda.mul_with_const(lb_value)
+            ^ lb_lambda.mul_with_const(la_value)
+            ^ lc_triple
+            ^ lc_share;
+
+        let mut validation_bit = Vec::with_capacity(1);
+        // The parties then open the share c_γ
+        AuthShareGenerator::open_with_delta(
+            &[validation_share],
+            self.delta(),
+            &mut validation_bit,
+            channel,
+        )
+        .unwrap();
+        // // The evaluator aborts if the validation is bit is not equal to 0
+        assert_eq!(
+            validation_bit[0],
+            0.into(),
+            "Evaluator's authentication validation check failed at index {index}"
+        );
+
         let lc = AuthenticatedWireMod2::new_with_value(
             lc_value,
             WireMod2::from_repr(lc_label, 2),
             lc_share,
             index,
-        );
-        // The Evaluator computes its share of the validation bit
-        // c_γ :=  (z'α ⊕ λ_α) ∧ (z'β ⊕ λ_β ) ∧ (z'γ ⊕ λ_γ )
-        // If we expand this we get:
-        //  z'α ∧ z'β ∧ z'γ (which can be added when c_γ is opened so that the parties don't add it twice)
-        let mut my_validation_share = // ⊕ z'α ∧ z'β ∧ s_β 
-                        la_value * lc_value * lb.bit()
-                        // ⊕ z'β ∧ z'γ ∧ s_α
-                        + lb_value * lc_value * la.bit()
-                        // ⊕ z'γ ∧ s*_γ
-                        + lc_value * lc_triple.bit()
-                        // ⊕ z'α ∧ z'β ∧ s_γ
-                        + la_value * lb_value * lc.bit()
-                        // ⊕ z'α ∧ s_β ∧ s_γ
-                        + la_value * lb.bit() * lc.bit()
-                        // ⊕ z'β ∧ s_α ∧ s_γ
-                        + lb_value * la.bit()* lc.bit()
-                        // s*_γ ∧ s_γ
-                        + lc_triple.bit() * lc.bit();
-
-        // The evaluator sends out the masked bit z'γ
-        channel.write(&lc_value)?;
-        // The evaluator sends their part of the validation bit
-        channel.write(&my_validation_share)?;
-        // The evaluator receives the garbler's part of the validation bit
-        let their_validation_share: F2 = channel.read()?;
-        // The evaluator adds the last part of the validation bit z'α ∧ z'β ∧ z'γ
-        my_validation_share += their_validation_share + la_value * lb_value * lc_value;
-
-        // The evaluator aborts if the validation is bit is not equal to 0
-        assert_eq!(
-            my_validation_share,
-            0.into(),
-            "Evaluator's authentication validation check failed at index {index}"
         );
         Ok(lc)
     }

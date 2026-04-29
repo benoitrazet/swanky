@@ -160,9 +160,9 @@ where
         // This index is called γ in the paper
         let index = self.current_wire_index();
         // This is the share for wire label L_{γ,0}
-        let lc0_share = self.get_current_wire_share(index);
+        let lc_share = self.get_current_wire_share(index);
         // This is the and triple share for wire label L_{γ,0}
-        let lc0_triple = self.get_current_wire_triple(index);
+        let lc_triple = self.get_current_wire_triple(index);
 
         // Compute l1 from l0 for both inputs
         //
@@ -188,18 +188,18 @@ where
         // This is K[s_β] in the paper
         let key_b = lb0.auth_share().key();
         // This is K[s_γ] in the paper
-        let key_c = lc0_share.key();
+        let key_c = lc_share.key();
         // This is K[s*_γ] in the paper
-        let key_c_triple = lc0_triple.key();
+        let key_c_triple = lc_triple.key();
 
         // Compute Δ_rα := Δ x r_α: if r_α is 0, then this value is 0, otherwise its Δ
         let delta_bit_a = mux(la0.auth_share().bit(), 0.into(), self.delta_u8x16());
         // Compute Δ_rβ := Δ x r_β: if r_β is 0, then this value is 0, otherwise its Δ
         let delta_bit_b = mux(lb0.auth_share().bit(), 0.into(), self.delta_u8x16());
         // Compute Δ_rγ := Δ x r_γ: if r_γ is 0, then this value is 0, otherwise its Δ
-        let delta_bit_c = mux(lc0_share.bit(), 0.into(), self.delta_u8x16());
+        let delta_bit_c = mux(lc_share.bit(), 0.into(), self.delta_u8x16());
         // Compute Δ_r*γ := Δ x r*_γ: if r*_γ is 0, then this value is 0, otherwise its Δ
-        let delta_bit_c_triple = mux(lc0_triple.bit(), 0.into(), self.delta_u8x16());
+        let delta_bit_c_triple = mux(lc_triple.bit(), 0.into(), self.delta_u8x16());
 
         // Gate_{γ,0} = H(L_{α,0}, γ) + H(L_{α,1}, γ) + K[s_β] + Δ_rβ
         let gate0 = h_la0 + h_la1 + key_b + delta_bit_b;
@@ -214,42 +214,59 @@ where
         channel.write(&gate1)?;
         channel.write(&bit_c)?;
 
+        // z'α := z_α + λ_α, where z_α is the actual wire value of the input
+        // wire with label L_α and λ_α is the mask of that value
         let la_value = la0.masked_value();
+        // The Garbler's authenticated share of λ_α
+        let la_lambda = la0.auth_share();
+        // z'β := z_β + λ_β, where z_β is the actual wire value of the input
+        // wire with label L_β and λ_β is the mask of that value
         let lb_value = lb0.masked_value();
+        // The Garbler's authenticated share of λ_β
+        let lb_lambda = lb0.auth_share();
 
+        // The Garbler receives the value z'γ from the Evaluator so that
+        // they can locally compute their share of c_γ
         let lc_value: F2 = channel.read()?;
-        let mut my_validation_share = // ⊕ z'α ∧ z'β ∧ s_β 
-                        la_value * lc_value * lc0_share.bit()
-                        // ⊕ z'β ∧ z'γ ∧ s_α
-                        + lb_value * lc_value * lc0_share.bit()
-                        // ⊕ z'γ ∧ s*_γ
-                        + lc_value * lc0_triple.bit()
-                        // ⊕ z'α ∧ z'β ∧ s_γ
-                        + la_value * lb_value * lc0_share.bit()
-                        // ⊕ z'α ∧ s_β ∧ s_γ
-                        + la_value * lb0.bit() * lc0_share.bit()
-                        // ⊕ z'β ∧ s_α ∧ s_γ
-                        + lb_value * la0.bit()* lc0_share.bit()
-                        // s*_γ ∧ s_γ
-                        + lc0_triple.bit() * lc0_share.bit();
 
-        // The garbler receives the evaluator's part of the validation bit
-        let their_validation_share: F2 = channel.read()?;
-        // The evaluator sends their part of the validation bit
-        channel.write(&my_validation_share)?;
-        // The garbler adds the last part of the validation bit z'α ∧ z'β ∧ z'γ
-        my_validation_share += their_validation_share + la_value * lb_value * lc_value;
+        // The Garbler computes its share of the validation bit
+        // c_γ :=  (z'α ⊕ λ_α) ∧ (z'β ⊕ λ_β ) ⊕ (z'γ ⊕ λ_γ )
+        //     := (z'α z'β ⊕ z'β λ_α ⊕ z'α λ_β ⊕ λ_α λ_β) ⊕ (z'γ ⊕ λ_γ )
+        //     := (z'α z'β ⊕ z'γ ) ⊕ (z'β λ_α ⊕ z'α λ_β ⊕ λ*_γ ⊕ λ_γ)
+
+        // The Garbler first creates the constant share of (z'α z'β ⊕ z'γ )
+        let share_masks: AuthShare<PartyGarbler> = AuthShareGenerator::constant_with_delta(
+            la_value * lb_value + lc_value,
+            self.delta_u8x16(),
+        );
+        // Then they create their share of the validation bit
+        // c_γ := (z'α z'β ⊕ z'γ ) ⊕ (z'β λ_α ⊕ z'α λ_β ⊕ λ*_γ ⊕ λ_γ)
+        let validation_share = share_masks
+            ^ la_lambda.mul_with_const(lb_value)
+            ^ lb_lambda.mul_with_const(la_value)
+            ^ lc_triple
+            ^ lc_share;
+
+        let mut validation_bit = Vec::with_capacity(1);
+        // The parties then open the share c_γ
+        AuthShareGenerator::open_with_delta(
+            &[validation_share],
+            self.delta_u8x16(),
+            &mut validation_bit,
+            channel,
+        )
+        .unwrap();
 
         // The garbler aborts if the validation is bit is not equal to 0
         assert_eq!(
-            my_validation_share,
+            validation_bit[0],
             0.into(),
             "Garbler's authentication validation check failed at index {index}"
         );
         Ok(AuthenticatedWireMod2::new_with_value(
             lc_value,
             WireMod2::from_repr(lc0, 2),
-            lc0_share,
+            lc_share,
             index,
         ))
     }
