@@ -144,6 +144,28 @@ pub mod circuits {
         }
     }
 
+    /// Circuit for testing [`FancyBinary::xor_many`].
+    pub struct TestXorGateFanN(pub usize);
+    impl<F: FancyBinary> CircuitExecutor<F> for TestXorGateFanN {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[F::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<F::Item>> {
+            let output = backend.xor_many(inputs);
+            backend.output(&output, channel)?;
+            Ok(vec![output])
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
     /// Circuit for testing [`FancyArithmetic::add`].
     pub struct TestAddition(pub u16);
     impl<F: FancyArithmetic> CircuitExecutor<F> for TestAddition {
@@ -1364,6 +1386,20 @@ mod fancy_binary {
         for _ in 0..16 {
             let inputs = (0..n).map(|_| rng.gen_bool() as u16).collect::<Vec<_>>();
             let expected = inputs.iter().fold(0, |acc, &x| x | acc);
+            let output = Dummy::eval(&c, &inputs).unwrap()[0];
+            assert_eq!(output, expected);
+        }
+    }
+
+    #[test]
+    fn xor_gate_fan_n() {
+        let mut rng = thread_rng();
+        let n = 2 + (rng.gen_usize() % 200);
+        let c = circuits::TestXorGateFanN(n);
+
+        for _ in 0..16 {
+            let inputs = (0..n).map(|_| rng.gen_bool() as u16).collect::<Vec<_>>();
+            let expected = inputs.iter().fold(0, |acc, &x| x ^ acc);
             let output = Dummy::eval(&c, &inputs).unwrap()[0];
             assert_eq!(output, expected);
         }
