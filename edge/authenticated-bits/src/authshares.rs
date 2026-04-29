@@ -61,6 +61,7 @@ use crate::authbits::{AuthBit, AuthBitGenerator};
 use rand::{CryptoRng, Rng};
 use std::{iter::Copied, slice::Iter};
 use swanky_channel::Channel;
+use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_party::{
     GenericParty, GenericWhichParty, Party0, Party1,
@@ -492,12 +493,16 @@ impl<P: GenericParty> AuthShareGenerator<P> {
     }
 
     /// Compute $`\langle c \rangle`$, where $`c`$ is a public constant.
+    ///
+    /// This sets one party's share to $`c`$, and the other party's share to 0.
     pub fn constant(&self, constant: F2) -> AuthShare<P> {
         AuthShareGenerator::constant_with_delta(constant, self.delta())
     }
 
     /// Compute $`\langle c \rangle`$, where $`c`$ is a public constant, using
     /// the supplied $`\Delta`$ value.
+    ///
+    /// See [`AuthShareGenerator::constant`] for details.
     pub fn constant_with_delta(constant: F2, delta: U8x16) -> AuthShare<P> {
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(ev) => AuthShare {
@@ -510,7 +515,7 @@ impl<P: GenericParty> AuthShareGenerator<P> {
                 ),
                 party_b: PartyEitherCopy::new(
                     ev,
-                    AuthBitGenerator::constant_with_delta(constant, PartyPrivateCopy::new(delta)),
+                    AuthBitGenerator::constant_with_delta(F2::ZERO, PartyPrivateCopy::new(delta)),
                 ),
             },
             GenericWhichParty::Party1(ev) => AuthShare {
@@ -521,7 +526,7 @@ impl<P: GenericParty> AuthShareGenerator<P> {
                 party_b: PartyEitherCopy::new(
                     ev,
                     AuthBitGenerator::constant_with_delta(
-                        constant,
+                        F2::ZERO,
                         PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
                     ),
                 ),
