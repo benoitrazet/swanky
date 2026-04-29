@@ -38,7 +38,7 @@ pub(crate) fn round1<S: LinearSharing<F, N>, F: FiniteField, const N: usize>(
         sum += S::multiply_by_superfield(z, r);
         xs[i] = S::multiply_by_superfield(x, r);
         ys[i] = S::lift_into_superfield(y);
-        r *= r;
+        r *= challenge;
     }
     Round {
         xs,

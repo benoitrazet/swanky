@@ -118,8 +118,16 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        hashers::{Hashers, Party},
+        proof_single::{OpenedPartiesShares, OutputShares, UnopenedParty},
+        round::{Round, round_compress_finish, round_compress_start, round1},
+        secretsharing::{LinearSharing, SecretSharing},
+    };
+
     use super::*;
-    use rand::SeedableRng;
+    use rand::{Rng, SeedableRng};
+    use swanky_block::Block;
     use swanky_field_binary::F64b;
 
     const N: usize = 16;
@@ -154,4 +162,139 @@ mod tests {
     }
 
     test_serialization!(test_serialization_f64b, F64b);
+
+    /// See [GitHub Issue #44](https://github.com/GaloisInc/swanky/issues/44).
+    ///
+    /// Thanks to @rot256 for pointing this out!
+    #[test]
+    fn poc_frobenius_cancellation() {
+        use simple_arith_circuit::{Circuit, Op};
+        use swanky_field::FiniteRing;
+        use swanky_field_binary::F2;
+
+        type F = F64b;
+
+        let mut rng = SwankyRng::new();
+
+        // Build unsatisfiable circuit with 128 mult gates.
+        //
+        // Chain A (gates 0-63):   64 self-mults on input a  (x*x = x in GF(2))
+        // Chain B (gates 64-127): 64 self-mults on input b
+        // output = chain_A_end + a + 1 = a + a + 1 = 1  (always)
+        let mut ops: Vec<Op<F2>> = Vec::new();
+        ops.push(Op::Mul(0, 0));
+        for i in 1..64usize {
+            ops.push(Op::Mul(i + 1, i + 1));
+        }
+        ops.push(Op::Mul(1, 1));
+        for i in 1..64usize {
+            ops.push(Op::Mul(65 + i, 65 + i));
+        }
+        ops.push(Op::Add(65, 0));
+        ops.push(Op::Constant(F2::ONE));
+        ops.push(Op::Add(130, 131));
+        let circuit: Circuit<F2> = Circuit::new(2, 1, ops);
+
+        // Confirm unsatisfiability.
+        for a in [F2::ZERO, F2::ONE] {
+            for b in [F2::ZERO, F2::ONE] {
+                let mut w = Vec::new();
+                assert_eq!(circuit.eval(&[a, b], &mut w)[0], F2::ONE);
+            }
+        }
+
+        // --- Cheating prover ---
+        // Flip gate outputs at indices 0 and 64.
+        // Gate 0 flips chain A from 'a' to '1+a', making output 0.
+        // Gate 64 is in chain B (doesn't affect output) but cancels
+        // gate 0's error in the round1 linear combination.
+        let cheat: std::collections::HashSet<usize> = [0, 64].into_iter().collect();
+        let witness = [F2::ZERO; 2];
+
+        let nrounds = crate::utils::nrounds(&circuit, K);
+        let mut hashers = Hashers::<N>::new();
+        let mut commitments = Vec::with_capacity(nrounds + 2);
+
+        let seeds: [u128; N] = std::array::from_fn(|_| rng.r#gen::<u128>());
+        let mut rngs = seeds.map(|s| SwankyRng::from_seed(Block::from(s)));
+
+        let ws: Vec<SecretSharing<F2, N>> = witness
+            .iter()
+            .map(|w| SecretSharing::new(*w, &mut rngs))
+            .collect();
+
+        // Circuit evaluation with cheating on selected mult gates.
+        let (mut xs, mut ys, mut zs) = (vec![], vec![], vec![]);
+        let mut wires: Vec<SecretSharing<F2, N>> = ws.to_vec();
+        let mut gi = 0usize;
+        for op in circuit.iter() {
+            let v = match *op {
+                Op::Add(a, b) => wires[a] + wires[b],
+                Op::Sub(a, b) => wires[a] - wires[b],
+                Op::Mul(a, b) => {
+                    let mut z = wires[a].secret() * wires[b].secret();
+                    if cheat.contains(&gi) {
+                        z += F2::ONE;
+                    }
+                    let zsh = SecretSharing::<F2, N>::new(z, &mut rngs);
+                    xs.push(wires[a]);
+                    ys.push(wires[b]);
+                    zs.push(zsh);
+                    gi += 1;
+                    zsh
+                }
+                Op::Constant(f) => SecretSharing::new_non_random(f),
+                Op::Copy(a) => wires[a],
+            };
+            wires.push(v);
+        }
+        let output_share = *wires.last().unwrap();
+        assert_eq!(output_share.secret(), F2::ZERO, "cheat must yield output 0");
+
+        // Run the rest of the protocol honestly.
+        hashers.hash_circuit_sharing(&ws, &zs);
+        let ch: F = hashers.extract_challenge(Party::Prover);
+        commitments.push(hashers.hashes());
+
+        let cache = crate::cache::Cache::<F>::new(&circuit, K, true);
+        let mut round = round1(Round { xs, ys, z: None }, &zs, ch);
+        let (mut hs, mut rands) = (vec![], vec![]);
+        if nrounds > 0 {
+            for i in 0..=nrounds {
+                round = round_compress_start(
+                    round,
+                    K,
+                    i == nrounds,
+                    &cache,
+                    &mut hashers,
+                    &mut rands,
+                    &mut hs,
+                    &mut rngs,
+                );
+                let c: F = hashers.extract_challenge(Party::Prover);
+                commitments.push(hashers.hashes());
+                round = round_compress_finish(
+                    round,
+                    K,
+                    i == nrounds,
+                    &cache,
+                    c,
+                    &rands,
+                    hs.last().unwrap(),
+                );
+            }
+        }
+
+        let output = OutputShares::new(round, output_share);
+        let id = hashers.extract_unopened_party(Party::Prover, N);
+        let proof = ProofSingle::<F, N>::new(
+            output,
+            OpenedPartiesShares::new(id, ws, zs, hs, rands, seeds),
+            UnopenedParty::new(id, &commitments, hashers.hash_of_id(id)),
+        );
+
+        // The forged proof for this unsatisfiable circuit should not pass verification.
+        let cache_v = crate::cache::Cache::<F>::new(&circuit, K, false);
+        assert!(proof.verify(&circuit, K, &cache_v).is_err());
+    }
 }

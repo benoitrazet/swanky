@@ -49,9 +49,6 @@ pub trait WireLabel:
     + core::ops::Mul<u16, Output = Self>
     + core::ops::MulAssign<u16>
 {
-    /// The underlying digits encoded by the [`WireLabel`].
-    fn digits(&self) -> Vec<u16>;
-
     /// Converts a [`WireLabel`] into its [`U8x16`] representation.
     fn to_repr(&self) -> U8x16;
 
@@ -235,14 +232,6 @@ impl WireLabel for AllWire {
         }
     }
 
-    fn digits(&self) -> Vec<u16> {
-        match &self {
-            AllWire::Mod2(x) => x.digits(),
-            AllWire::Mod3(x) => x.digits(),
-            AllWire::ModN(x) => x.digits(),
-        }
-    }
-
     fn to_repr(&self) -> U8x16 {
         match &self {
             AllWire::Mod2(x) => x.to_repr(),
@@ -359,9 +348,9 @@ mod tests {
         for _ in 0..1000 {
             let q = 5 + (rng.gen_u16() % 110);
             let x = rng.gen_u128();
-            let w = AllWire::from_repr(U8x16::from(x), q);
+            let w = WireModQ::from_repr(U8x16::from(x), q);
             let should_be = util::as_base_q_u128(x, q);
-            assert_eq!(w.digits(), should_be, "x={} q={}", x, q);
+            assert_eq!(w.ds, should_be, "x={} q={}", x, q);
         }
     }
 
@@ -435,8 +424,8 @@ mod tests {
         let mut rng = thread_rng();
         for _ in 0..1024 {
             let q = rng.gen_modulus();
-            let x = AllWire::rand(&mut rng, q);
-            assert_eq!(x.digits().len(), util::digits_per_u128(q));
+            let x = WireModQ::rand(&mut rng, q);
+            assert_eq!(x.ds.len(), util::digits_per_u128(q));
         }
     }
 

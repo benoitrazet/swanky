@@ -169,12 +169,6 @@ impl WireLabel for WireMod3 {
         w
     }
 
-    fn digits(&self) -> Vec<u16> {
-        (0..64)
-            .map(|i| (((self.lsb >> i) as u16) & 1) & ((((self.msb >> i) as u16) & 1) << 1))
-            .collect()
-    }
-
     fn to_repr(&self) -> U8x16 {
         // This function converts a [`WireMod3`] into its [`Block`] representation.
         // The two 64b values stored in [`WireMod3`], i.e. the lsb and msb, and packed
