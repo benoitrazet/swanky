@@ -490,6 +490,44 @@ impl<P: GenericParty> AuthShareGenerator<P> {
             },
         }
     }
+
+    /// Compute $`\langle c \rangle`$, where $`c`$ is a public constant.
+    pub fn constant(&self, constant: F2) -> AuthShare<P> {
+        AuthShareGenerator::constant_with_delta(constant, self.delta())
+    }
+
+    /// Compute $`\langle c \rangle`$, where $`c`$ is a public constant, using
+    /// the supplied $`\Delta`$ value.
+    pub fn constant_with_delta(constant: F2, delta: U8x16) -> AuthShare<P> {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(ev) => AuthShare {
+                party_a: PartyEitherCopy::new(
+                    ev,
+                    AuthBitGenerator::constant_with_delta(
+                        constant,
+                        PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
+                    ),
+                ),
+                party_b: PartyEitherCopy::new(
+                    ev,
+                    AuthBitGenerator::constant_with_delta(constant, PartyPrivateCopy::new(delta)),
+                ),
+            },
+            GenericWhichParty::Party1(ev) => AuthShare {
+                party_a: PartyEitherCopy::new(
+                    ev,
+                    AuthBitGenerator::constant_with_delta(constant, PartyPrivateCopy::new(delta)),
+                ),
+                party_b: PartyEitherCopy::new(
+                    ev,
+                    AuthBitGenerator::constant_with_delta(
+                        constant,
+                        PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
+                    ),
+                ),
+            },
+        }
+    }
 }
 
 #[cfg(test)]
@@ -731,6 +769,28 @@ mod tests {
                 prop_assert!(validation_b);
                 // The new authenticated share should equal `c · ⟨x⟩`.
                 prop_assert_eq!((a.bit() + b.bit()) * bit, new_a.bit() + new_b.bit());
+            }
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+        #[test]
+        fn constant_works(constants in proptest::collection::vec(any::<bool>(), 1..1000),
+                          seed_party_a in any::<u128>(), seed_party_b in any::<u128>()) {
+            let mut rng_a = SwankyRng::from_seed(U8x16::from(seed_party_a));
+            let mut rng_b = SwankyRng::from_seed(U8x16::from(seed_party_b));
+            let constants: Vec<F2> = constants.into_iter().map(F2::from).collect();
+            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
+            for bit in constants {
+                let bit_a = generator_a.constant(bit);
+                let bit_b = generator_b.constant(bit);
+                // The new authenticated share should still validate.
+                let ((validation_a, _), (validation_b, _)) = open(&generator_a, &generator_b, vec![bit_a], vec![bit_b]);
+                prop_assert!(validation_a);
+                prop_assert!(validation_b);
+                // The new authenticated share should equal `bit`.
+                prop_assert_eq!(bit, bit_a.bit() + bit_b.bit());
             }
         }
     }

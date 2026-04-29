@@ -92,7 +92,7 @@ use swanky_party::{
     private::{PartyPrivate, PartyPrivateCopy},
 };
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
-use vectoreyes::U8x16;
+use vectoreyes::{SimdBase, U8x16};
 
 /// The prover's part of the authentication bit.
 ///
@@ -489,6 +489,40 @@ impl<P: GenericParty> AuthBitGenerator<P> {
             )),
         }
     }
+
+    /// Compute $`[c]`$, where $`c`$ is a public constant, using a supplied
+    /// $`\Delta`$ value.
+    ///
+    /// This sets the prover's values to $`(c, 0)`$ and the verifier's value to
+    /// $`c \cdot \Delta`$.
+    pub fn constant(&self, constant: F2) -> AuthBit<P> {
+        AuthBitGenerator::constant_with_delta(constant, self.delta)
+    }
+
+    /// Compute $`[c]`$, where $`c`$ is a public constant, using a supplied
+    /// $`\Delta`$ value.
+    ///
+    /// See [`AuthBitGenerator::constant`] for details.
+    pub fn constant_with_delta(
+        constant: F2,
+        delta: PartyPrivateCopy<Party1<P>, P, U8x16>,
+    ) -> AuthBit<P> {
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(ev) => AuthBit(PartyEitherCopy::new(
+                ev,
+                ProverAuthBit {
+                    mac: U8x16::ZERO,
+                    bit: constant,
+                },
+            )),
+            GenericWhichParty::Party1(ev) => AuthBit(PartyEitherCopy::new(
+                ev,
+                VerifierAuthBit {
+                    key: U8x16::from(constant * F128b::from(delta.into_inner(ev))),
+                },
+            )),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -650,7 +684,7 @@ mod tests {
             let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
             let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
             let public_bits: Vec<F2> = public_bits.into_iter().map(F2::from).collect();
-                        let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
             let (output_a, output_b) = generate(&bits, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b, false, false);
             for ((authbit_a, authbit_b), public_bit) in output_a
                 .into_iter()
@@ -672,6 +706,34 @@ mod tests {
                     authbit_a.bit().into_inner(Witness::EQUAL_TYPES) * public_bit
                 );
 
+            }
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+        #[test]
+        fn constant_works(public_bits in proptest::collection::vec(any::<bool>(), 1..1000),
+                          seed_party_a in any::<u128>(),
+                          seed_party_b in any::<u128>()) {
+            let mut rng_a = SwankyRng::from_seed(seed_party_a.into());
+            let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
+            let public_bits: Vec<F2> = public_bits.into_iter().map(F2::from).collect();
+            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
+            for bit in public_bits {
+                let bit_a = generator_a.constant(bit);
+                let bit_b = generator_b.constant(bit);
+                let validation = validate(
+                    &[bit_a],
+                    &[bit_b],
+                    generator_b.delta().into_inner(Witness::EQUAL_TYPES),
+                );
+                prop_assert!(validation);
+                // The new authenticated bits should equal `bit`.
+                prop_assert_eq!(
+                    bit_a.bit().into_inner(Witness::EQUAL_TYPES),
+                    bit
+                );
             }
         }
     }
