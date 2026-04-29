@@ -207,7 +207,7 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
             &mut validation_bit,
             channel,
         )?;
-        // // // The evaluator aborts if the validation is bit is not equal to 0
+        // // The evaluator aborts if the validation is bit is not equal to 0
         // assert_eq!(
         //     validation_bit[0],
         //     0.into(),
@@ -233,11 +233,12 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         moduli: &[u16],
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        // The Evaluator retrieves authenticated shares for their own inputs first.
-        // This means that we are assuming that those inputs will be indexed first.
+        // The Evaluator retrieves authenticated shares for their own inputs.
+        let mut indices = Vec::with_capacity(values.len());
         let my_auth_shares: Vec<AuthShare<PartyEvaluator>> = (0..moduli.len())
             .map(|_i| {
                 let index = self.current_wire_index();
+                indices.push(index);
                 self.get_current_wire_share(index)
             })
             .collect();
@@ -267,6 +268,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         }
 
         let mut my_auth_wires: Vec<AuthenticatedWire> = Vec::with_capacity(values.len());
+
         for (i, masked_value) in my_masked_values.iter().enumerate() {
             // The Evaluator retrieves the wire labels for their own input
             let wire_label = WireMod2::from_repr(channel.read()?, 2);
@@ -275,7 +277,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
                 *masked_value,
                 wire_label,
                 my_auth_shares[i],
-                i,
+                indices[i],
             ));
         }
 
@@ -288,9 +290,11 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
         // The Evaluator retrieves authenticated shares for the garbler's inputs.
+        let mut indices = Vec::with_capacity(moduli.len());
         let their_auth_shares: Vec<AuthShare<PartyEvaluator>> = (0..moduli.len())
             .map(|_i| {
                 let index = self.current_wire_index();
+                indices.push(index);
                 self.get_current_wire_share(index)
             })
             .collect();
@@ -298,8 +302,6 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         AuthShareGenerator::open_my_shares(&their_auth_shares, channel)?;
 
         let mut their_auth_wires: Vec<AuthenticatedWire> = Vec::with_capacity(moduli.len());
-        // We need to offset the authenticated wire indices of the garbler because they come second
-        let index_offset = moduli.len();
 
         // The Evaluator receives the wire labels and masked values of the Garbler and uses these values
         // to construct the garbler's authenticated wires
@@ -310,7 +312,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
                 their_masked_value,
                 their_wire_label,
                 *share,
-                i + index_offset,
+                indices[i],
             ));
         }
 
