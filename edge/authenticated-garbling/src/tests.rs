@@ -69,6 +69,37 @@ fn test_party_encoding_receiving_passes() {
 }
 
 #[test]
+fn test_single_and_gate() {
+    let ninputs_gb = 1;
+    let ninputs_ev = 1;
+    let circuit = circuits::TestAndGateFanN(ninputs_gb + ninputs_ev);
+
+    swanky_channel::local::local_channel_pair(
+        |c| {
+            let rng = SwankyRng::new();
+            let mut gb = Garbler::new(c, rng)?;
+            gb.preprocess_circuit(&circuit, c)?;
+            let mut inputs = gb.encode_many(&vec![0; ninputs_gb], &vec![2; ninputs_gb], c)?;
+            let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
+            inputs.extend(theirs);
+            circuit.execute(&mut gb, &inputs, c)?;
+            Ok(())
+        },
+        |c| {
+            let rng = SwankyRng::new();
+            let mut ev = Evaluator::new(c, rng)?;
+            ev.preprocess_circuit(&circuit, c)?;
+            let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
+            let mine = ev.encode_many(&vec![0; ninputs_ev], &vec![2; ninputs_ev], c)?;
+            inputs.extend(mine);
+            circuit.execute(&mut ev, &inputs, c)?;
+            Ok(())
+        },
+    )
+    .unwrap();
+}
+
+#[test]
 fn test_and_gate_fan_n() {
     let ninputs_gb = 400;
     let ninputs_ev = 400;
