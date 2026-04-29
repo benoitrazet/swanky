@@ -62,10 +62,20 @@ where
     let ninputs = circuit_analyzer.ninputs();
     let nconstants = circuit_analyzer.nconstants();
 
-    // Create as many random and triples as there are AND gates
-    let mut rand_and_triples = Vec::with_capacity(nands);
-    and_generator.generate(nands, &mut rand_and_triples, channel, rng)?;
+    let mut nand_triples = nands;
 
+    // If we have too few AND gates, we need to generate at
+    // least 320 AND triples in order for the protocol to be secure.
+    if 0 < nands && nands < 320 {
+        nand_triples += 320;
+    }
+    // Create as many random and triples as there are AND gates
+    let mut rand_and_triples = Vec::with_capacity(nand_triples);
+    // We only generate AND triples if there are any AND gates in the circuit
+    // to begin with
+    if nands > 0 {
+        and_generator.generate(nand_triples, &mut rand_and_triples, channel, rng)?;
+    }
     // Create as many authenticated shares as there are AND, Constant and Input gates.
     let mut auth_shares = Vec::with_capacity(nands + ninputs + nconstants);
     and_generator.auth_share_generator_mut().generate(
@@ -81,20 +91,23 @@ where
     )?;
     circuit.execute(&mut wire_preprocessor, &inputs, channel)?;
 
-    let (left_wires, right_wires, indices) = wire_preprocessor.and_gate_input_shares();
-    let mut known_triples_out = Vec::with_capacity(rand_and_triples.len());
-    and_generator.to_known_triple(
-        &rand_and_triples,
-        &left_wires,
-        &right_wires,
-        &mut known_triples_out,
-        channel,
-    )?;
-
+    // We only correlate the generated AND triples if there are any AND gates in the circuit
+    // to begin with
     let mut known_triple_map = HashMap::new();
-    for (index, auth_share) in indices.iter().zip(known_triples_out) {
-        let wire = PreProcessedWire::new(*index, auth_share);
-        known_triple_map.insert(wire.to_index(), wire);
+    if nands > 0 {
+        let mut known_triples_out = Vec::with_capacity(rand_and_triples.len());
+        let (left_wires, right_wires, indices) = wire_preprocessor.and_gate_input_shares();
+        and_generator.to_known_triple(
+            &rand_and_triples,
+            &left_wires,
+            &right_wires,
+            &mut known_triples_out,
+            channel,
+        )?;
+        for (index, auth_share) in indices.iter().zip(known_triples_out) {
+            let wire = PreProcessedWire::new(*index, auth_share);
+            known_triple_map.insert(wire.to_index(), wire);
+        }
     }
 
     Ok((
