@@ -166,6 +166,32 @@ pub mod circuits {
             2
         }
     }
+
+    /// Circuit for testing [`FancyBinary::xor_many`].
+    pub struct TestBinaryConstant();
+    impl<F: FancyBinary> CircuitExecutor<F> for TestBinaryConstant {
+        fn execute(
+            &self,
+            backend: &mut F,
+            _inputs: &[F::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<F::Item>> {
+            let outputs = vec![
+                backend.constant(0, 2, channel)?,
+                backend.constant(1, 2, channel)?,
+            ];
+            backend.outputs(&outputs, channel)?;
+            Ok(outputs)
+        }
+
+        fn ninputs(&self) -> usize {
+            2
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
     /// Circuit for testing [`FancyArithmetic::add`].
     pub struct TestAddition(pub u16);
     impl<F: FancyArithmetic> CircuitExecutor<F> for TestAddition {
@@ -1375,6 +1401,18 @@ mod fancy_binary {
             let output = Dummy::eval(&c, &inputs).unwrap()[0];
             assert_eq!(output, expected);
         }
+    }
+
+    #[test]
+    fn binary_constant_gates() {
+        let c = circuits::TestBinaryConstant();
+        let inputs = [0, 0];
+        let expected_0 = 0;
+        let output_0: u16 = Dummy::eval(&c, &inputs).unwrap()[0];
+        assert_eq!(output_0, expected_0);
+        let expected_1 = 1;
+        let output_1 = Dummy::eval(&c, &inputs).unwrap()[1];
+        assert_eq!(output_1, expected_1);
     }
 
     #[test]
