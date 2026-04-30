@@ -190,6 +190,44 @@ fn test_single_and_gate() {
 }
 
 #[test]
+fn test_constant_gates() {
+    let circuit = circuits::TestBinaryConstant();
+
+    let inputs_gb: Vec<u16> = vec![0];
+    let inputs_ev: Vec<u16> = vec![0];
+
+    let inputs = [inputs_gb.clone(), inputs_ev.clone()].concat();
+    let expected = Dummy::eval(&circuit, &inputs).unwrap();
+
+    let (outputs_gb, outputs_ev) = swanky_channel::local::local_channel_pair(
+        |c| {
+            let rng = SwankyRng::new();
+            let mut gb = Garbler::new(c, rng)?;
+            gb.preprocess_circuit(&circuit, c)?;
+            let mut inputs = gb.encode_many(&inputs_gb, &[0; 1], c)?;
+            let theirs = gb.receive_many(&[2; 1], c)?;
+            inputs.extend(theirs);
+            let outputs = circuit.execute(&mut gb, &inputs, c)?;
+            gb.outputs(&outputs, c)
+        },
+        |c| {
+            let rng = SwankyRng::new();
+            let mut ev = Evaluator::new(c, rng)?;
+            ev.preprocess_circuit(&circuit, c)?;
+            let mut inputs = ev.receive_many(&[2; 1], c)?;
+            let mine = ev.encode_many(&inputs_ev, &[0; 1], c)?;
+            inputs.extend(mine);
+            let outputs = circuit.execute(&mut ev, &inputs, c)?;
+            ev.outputs(&outputs, c)
+        },
+    )
+    .unwrap();
+    assert!(outputs_gb.is_none());
+    let outputs = outputs_ev.unwrap();
+    assert_eq!(outputs, expected)
+}
+
+#[test]
 fn test_and_gate_fan_n() {
     let ninputs_gb = 400;
     let ninputs_ev = 400;
