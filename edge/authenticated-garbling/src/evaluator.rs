@@ -91,8 +91,8 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
 impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         AuthenticatedWireMod2::new_with_value(
-            x.masked_value(),
-            x.wire_label() + self.one,
+            x.masked_value() + F2::from(1),
+            WireMod2::from_repr(x.wire_label().to_repr() ^ self.one.to_repr(), 2),
             x.auth_share(),
             x.index(),
         )

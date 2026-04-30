@@ -37,7 +37,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             2,
         );
         let zero = WireMod2::rand(&mut rng, 2);
-        let one = zero + delta;
+        let one = WireMod2::from_repr(zero.to_repr() ^ delta.to_repr(), 2);
         channel.write(&one.to_repr())?;
         Ok(Garbler {
             delta,
@@ -275,8 +275,8 @@ where
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         AuthenticatedWireMod2::new_with_value(
-            x.masked_value(),
-            x.wire_label() + self.zero + self.delta(),
+            x.masked_value() + F2::from(1),
+            WireMod2::from_repr(x.wire_label().to_repr() ^ self.zero.to_repr(), 2),
             x.auth_share(),
             x.index(),
         )

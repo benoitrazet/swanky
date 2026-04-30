@@ -191,8 +191,8 @@ fn test_single_and_gate() {
 
 #[test]
 fn test_and_gate_fan_n() {
-    let ninputs_gb = 10;
-    let ninputs_ev = 0;
+    let ninputs_gb = 400;
+    let ninputs_ev = 400;
     let circuit = circuits::TestAndGateFanN(ninputs_gb + ninputs_ev);
 
     let mut rng = SwankyRng::new();
@@ -240,7 +240,7 @@ fn test_or_gate_fan_n() {
     let inputs_gb: Vec<u16> = (0..ninputs_gb).map(|_| rng.r#gen::<u16>() % 2).collect();
     let inputs_ev: Vec<u16> = (0..ninputs_ev).map(|_| rng.r#gen::<u16>() % 2).collect();
 
-    let inputs = [inputs_ev.clone(), inputs_gb.clone()].concat();
+    let inputs = [inputs_gb.clone(), inputs_ev.clone()].concat();
     let expected = Dummy::eval(&circuit, &inputs).unwrap();
 
     let (outputs_gb, outputs_ev) = swanky_channel::local::local_channel_pair(
