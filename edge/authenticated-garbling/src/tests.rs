@@ -223,8 +223,10 @@ fn test_or_gate_fan_n() {
     let ninputs_gb = 400;
     let ninputs_ev = 400;
     let circuit = circuits::TestOrGateFanN(ninputs_gb + ninputs_ev);
+    let inputs = vec![0; ninputs_gb + ninputs_ev];
+    let expected = Dummy::eval(&circuit, &inputs).unwrap();
 
-    swanky_channel::local::local_channel_pair(
+    let (outputs_gb, outputs_ev) = swanky_channel::local::local_channel_pair(
         |c| {
             let rng = SwankyRng::new();
             let mut gb = Garbler::new(c, rng)?;
@@ -232,8 +234,8 @@ fn test_or_gate_fan_n() {
             let mut inputs = gb.encode_many(&vec![0; ninputs_gb], &vec![2; ninputs_gb], c)?;
             let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
             inputs.extend(theirs);
-            circuit.execute(&mut gb, &inputs, c)?;
-            Ok(())
+            let outputs = circuit.execute(&mut gb, &inputs, c)?;
+            gb.outputs(&outputs, c)
         },
         |c| {
             let rng = SwankyRng::new();
@@ -242,11 +244,14 @@ fn test_or_gate_fan_n() {
             let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
             let mine = ev.encode_many(&vec![0; ninputs_ev], &vec![2; ninputs_ev], c)?;
             inputs.extend(mine);
-            circuit.execute(&mut ev, &inputs, c)?;
-            Ok(())
+            let outputs = circuit.execute(&mut ev, &inputs, c)?;
+            ev.outputs(&outputs, c)
         },
     )
     .unwrap();
+    assert!(outputs_gb.is_none());
+    let outputs = outputs_ev.unwrap();
+    assert_eq!(outputs, expected)
 }
 
 #[test]
@@ -254,8 +259,10 @@ fn test_xor_gate_fan_n() {
     let ninputs_gb = 400;
     let ninputs_ev = 400;
     let circuit = circuits::TestXorGateFanN(ninputs_gb + ninputs_ev);
+    let inputs = vec![0; ninputs_gb + ninputs_ev];
+    let expected = Dummy::eval(&circuit, &inputs).unwrap();
 
-    swanky_channel::local::local_channel_pair(
+    let (outputs_gb, outputs_ev) = swanky_channel::local::local_channel_pair(
         |c| {
             let rng = SwankyRng::new();
             let mut gb = Garbler::new(c, rng)?;
@@ -263,8 +270,8 @@ fn test_xor_gate_fan_n() {
             let mut inputs = gb.encode_many(&vec![0; ninputs_gb], &vec![2; ninputs_gb], c)?;
             let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
             inputs.extend(theirs);
-            circuit.execute(&mut gb, &inputs, c)?;
-            Ok(())
+            let outputs = circuit.execute(&mut gb, &inputs, c)?;
+            gb.outputs(&outputs, c)
         },
         |c| {
             let rng = SwankyRng::new();
@@ -273,19 +280,24 @@ fn test_xor_gate_fan_n() {
             let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
             let mine = ev.encode_many(&vec![0; ninputs_ev], &vec![2; ninputs_ev], c)?;
             inputs.extend(mine);
-            circuit.execute(&mut ev, &inputs, c)?;
-            Ok(())
+            let outputs = circuit.execute(&mut ev, &inputs, c)?;
+            ev.outputs(&outputs, c)
         },
     )
     .unwrap();
+    assert!(outputs_gb.is_none());
+    let outputs = outputs_ev.unwrap();
+    assert_eq!(outputs, expected)
 }
 
 #[test]
 fn test_binary_addition() {
     let ninputs = 400;
     let circuit = circuits::TestBinaryAddition(ninputs);
+    let inputs = vec![0; ninputs * 2];
+    let expected = Dummy::eval(&circuit, &inputs).unwrap();
 
-    swanky_channel::local::local_channel_pair(
+    let (outputs_gb, outputs_ev) = swanky_channel::local::local_channel_pair(
         |c| {
             let rng = SwankyRng::new();
             let mut gb = Garbler::new(c, rng)?;
@@ -293,8 +305,8 @@ fn test_binary_addition() {
             let mut inputs = gb.encode_many(&vec![0; ninputs], &vec![2; ninputs], c)?;
             let theirs = gb.receive_many(&vec![2; ninputs], c)?;
             inputs.extend(theirs);
-            circuit.execute(&mut gb, &inputs, c)?;
-            Ok(())
+            let outputs = circuit.execute(&mut gb, &inputs, c)?;
+            gb.outputs(&outputs, c)
         },
         |c| {
             let rng = SwankyRng::new();
@@ -303,19 +315,24 @@ fn test_binary_addition() {
             let mut inputs = ev.receive_many(&vec![2; ninputs], c)?;
             let mine = ev.encode_many(&vec![0; ninputs], &vec![2; ninputs], c)?;
             inputs.extend(mine);
-            circuit.execute(&mut ev, &inputs, c)?;
-            Ok(())
+            let outputs = circuit.execute(&mut ev, &inputs, c)?;
+            ev.outputs(&outputs, c)
         },
     )
     .unwrap();
+    assert!(outputs_gb.is_none());
+    let outputs = outputs_ev.unwrap();
+    assert_eq!(outputs, expected)
 }
 
 #[test]
 fn test_binary_subtraction() {
     let ninputs = 400;
     let circuit = circuits::TestBinarySubtraction(ninputs);
+    let inputs = vec![0; ninputs * 2];
+    let expected = Dummy::eval(&circuit, &inputs).unwrap();
 
-    swanky_channel::local::local_channel_pair(
+    let (outputs_gb, outputs_ev) = swanky_channel::local::local_channel_pair(
         |c| {
             let rng = SwankyRng::new();
             let mut gb = Garbler::new(c, rng)?;
@@ -323,8 +340,8 @@ fn test_binary_subtraction() {
             let mut inputs = gb.encode_many(&vec![0; ninputs], &vec![2; ninputs], c)?;
             let theirs = gb.receive_many(&vec![2; ninputs], c)?;
             inputs.extend(theirs);
-            circuit.execute(&mut gb, &inputs, c)?;
-            Ok(())
+            let outputs = circuit.execute(&mut gb, &inputs, c)?;
+            gb.outputs(&outputs, c)
         },
         |c| {
             let rng = SwankyRng::new();
@@ -333,9 +350,12 @@ fn test_binary_subtraction() {
             let mut inputs = ev.receive_many(&vec![2; ninputs], c)?;
             let mine = ev.encode_many(&vec![0; ninputs], &vec![2; ninputs], c)?;
             inputs.extend(mine);
-            circuit.execute(&mut ev, &inputs, c)?;
-            Ok(())
+            let outputs = circuit.execute(&mut ev, &inputs, c)?;
+            ev.outputs(&outputs, c)
         },
     )
     .unwrap();
+    assert!(outputs_gb.is_none());
+    let outputs = outputs_ev.unwrap();
+    assert_eq!(outputs, expected)
 }
