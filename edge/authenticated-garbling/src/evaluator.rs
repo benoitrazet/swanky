@@ -18,10 +18,7 @@ use vectoreyes::U8x16;
 
 use crate::{
     mux,
-    preprocesser::{
-        f_preprocessing,
-        wire::{PreProcessedWire, WirePreProcessor},
-    },
+    preprocesser::{f_preprocessing, wire::WirePreProcessor},
     ps::PartyEvaluator,
     wire::AuthenticatedWireMod2,
 };
@@ -32,9 +29,9 @@ pub struct Evaluator<RNG> {
     one: WireMod2,
     authentication_delta: U8x16,
     current_wire_index: usize,
-    preprocessed_wires_map: HashMap<usize, PreProcessedWire<PartyEvaluator>>,
-    known_triples_map: HashMap<usize, PreProcessedWire<PartyEvaluator>>,
-    pub(crate) rng: RNG,
+    preprocessed_wires_map: HashMap<usize, AuthShare<PartyEvaluator>>,
+    known_triples_map: HashMap<usize, AuthShare<PartyEvaluator>>,
+    rng: RNG,
 }
 
 impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
@@ -55,10 +52,6 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
         })
     }
 
-    fn reset(&mut self) {
-        self.current_wire_index = 0;
-    }
-
     /// Pre-process the passed circuit
     pub fn preprocess_circuit<
         C: CircuitExecutor<CircuitAnalyzer> + CircuitExecutor<WirePreProcessor<PartyEvaluator>>,
@@ -73,8 +66,6 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
             f_preprocessing(circuit, &mut and_generator, channel, &mut self.rng)?;
         self.preprocessed_wires_map = preprocessed_wires_map;
         self.known_triples_map = known_triples_map;
-        self.authentication_delta = and_generator.delta();
-        self.reset();
         Ok(())
     }
     /// Get the deltas, consuming the Evaluator
@@ -89,18 +80,15 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
     }
     /// Returns the [`AuthShare`] associated with the current wire
     fn get_current_wire_share(&mut self, index: usize) -> AuthShare<PartyEvaluator> {
-        self.preprocessed_wires_map[&index].into_auth_share()
+        self.preprocessed_wires_map[&index]
     }
     /// Returns the [`AuthShare`] associated with the current wire
     fn get_current_wire_triple(&mut self, index: usize) -> AuthShare<PartyEvaluator> {
-        self.known_triples_map[&index].into_auth_share()
+        self.known_triples_map[&index]
     }
 }
 
 impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
-    /// Overriding `negate` to be a noop: entirely handled on garbler's end.
-    /// This is also why the index of the input and output wires of this
-    /// gate are the same.
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         AuthenticatedWireMod2::new_with_value(
             x.masked_value(),
@@ -214,13 +202,12 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
         //     "Evaluator's authentication validation check failed at index {index}"
         // );
 
-        let lc = AuthenticatedWireMod2::new_with_value(
+        Ok(AuthenticatedWireMod2::new_with_value(
             lc_value,
             WireMod2::from_repr(lc_label, 2),
             lc_share,
             index,
-        );
-        Ok(lc)
+        ))
     }
 }
 
@@ -260,11 +247,13 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         // move this part all together when we refactor EV/GB
         let mut my_masked_values: Vec<F2> = Vec::with_capacity(values.len());
         for (i, b) in their_bits.iter().enumerate() {
-            // Evaluator computes their masked values y_w + λ_w := y_w ⊕ s_w ⊕ r_w
-            my_masked_values.push(b + my_auth_shares[i].bit() + F2::from(values[i]));
+            // Evaluator computes their masked values y_w + λ_w := y_w ⊕ s_w ⊕
+            // r_w
+            let masked_value = b + my_auth_shares[i].bit() + F2::from(values[i]);
+            my_masked_values.push(masked_value);
 
             // Evaluator sends y_w + λ_w  to the Garbler
-            channel.write(&my_masked_values[i])?;
+            channel.write(&masked_value)?;
         }
 
         let mut my_auth_wires: Vec<AuthenticatedWire> = Vec::with_capacity(values.len());
@@ -305,19 +294,20 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
 
         // The Evaluator receives the wire labels and masked values of the Garbler and uses these values
         // to construct the garbler's authenticated wires
-        for (i, share) in their_auth_shares.iter().enumerate() {
+        for (i, share) in indices.into_iter().zip(their_auth_shares) {
             let their_wire_label = WireMod2::from_repr(channel.read()?, 2);
             let their_masked_value = channel.read()?;
             their_auth_wires.push(AuthenticatedWireMod2::new_with_value(
                 their_masked_value,
                 their_wire_label,
-                *share,
-                indices[i],
+                share,
+                i,
             ));
         }
 
         Ok(their_auth_wires)
     }
+
     fn constant(
         &mut self,
         value: u16,

@@ -29,12 +29,12 @@ use std::collections::HashMap;
 
 use fancy_garbling::{Fancy, circuit::CircuitExecutor, circuit_analyzer::CircuitAnalyzer};
 use rand::{CryptoRng, Rng};
-use swanky_authenticated_bits::and_triples::AndTripleGenerator;
+use swanky_authenticated_bits::{and_triples::AndTripleGenerator, authshares::AuthShare};
 use swanky_channel::Channel;
 use swanky_party::GenericParty;
 
 pub mod wire;
-use crate::preprocesser::wire::{IndexedWire, PreProcessedWire, WirePreProcessor};
+use crate::preprocesser::wire::WirePreProcessor;
 
 /// Pre-process a circuit for authenticated garbling.
 ///
@@ -47,10 +47,7 @@ pub fn f_preprocessing<P: GenericParty, C, RNG: CryptoRng + Rng>(
     and_generator: &mut AndTripleGenerator<P>,
     channel: &mut Channel,
     rng: &mut RNG,
-) -> swanky_error::Result<(
-    HashMap<usize, PreProcessedWire<P>>,
-    HashMap<usize, PreProcessedWire<P>>,
-)>
+) -> swanky_error::Result<(HashMap<usize, AuthShare<P>>, HashMap<usize, AuthShare<P>>)>
 where
     C: CircuitExecutor<CircuitAnalyzer> + CircuitExecutor<WirePreProcessor<P>>,
 {
@@ -106,8 +103,7 @@ where
             channel,
         )?;
         for (index, auth_share) in indices.iter().zip(known_triples_out) {
-            let wire = PreProcessedWire::new(*index, auth_share);
-            known_triple_map.insert(wire.to_index(), wire);
+            known_triple_map.insert(*index, auth_share);
         }
     }
 

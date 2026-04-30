@@ -1,7 +1,7 @@
 //! Garbler in Authenticated Garbling
 use crate::mux;
+use crate::preprocesser::f_preprocessing;
 use crate::preprocesser::wire::WirePreProcessor;
-use crate::preprocesser::{f_preprocessing, wire::PreProcessedWire};
 use crate::ps::PartyGarbler;
 use crate::wire::AuthenticatedWireMod2;
 use fancy_garbling::circuit::CircuitExecutor;
@@ -19,13 +19,13 @@ use vectoreyes::U8x16;
 
 type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 
-/// Streams garbled circuit ciphertexts through a callback.
+/// The authenticated garbling's garbler.
 pub struct Garbler<RNG> {
-    delta: WireMod2, // delta wire-label.
-    zero: WireMod2,  // delta wire-label.
+    delta: WireMod2,
+    zero: WireMod2,
     current_wire_index: usize,
-    preprocessed_wires_map: HashMap<usize, PreProcessedWire<PartyGarbler>>,
-    known_triples_map: HashMap<usize, PreProcessedWire<PartyGarbler>>,
+    preprocessed_wires_map: HashMap<usize, AuthShare<PartyGarbler>>,
+    known_triples_map: HashMap<usize, AuthShare<PartyGarbler>>,
     rng: RNG,
 }
 
@@ -49,17 +49,13 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         })
     }
 
-    fn reset(&mut self) {
-        self.current_wire_index = 0;
-    }
-
     /// Retrieve the garbler's delta
-    pub fn delta(&mut self) -> WireMod2 {
+    fn delta(&mut self) -> WireMod2 {
         self.delta
     }
 
     /// Return the garbler's delta as U8x16
-    pub fn delta_u8x16(&mut self) -> U8x16 {
+    fn delta_u8x16(&mut self) -> U8x16 {
         self.delta().to_repr()
     }
 
@@ -71,11 +67,11 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     }
     /// Returns the [`AuthShare`] associated with the current wire
     fn get_current_wire_share(&mut self, index: usize) -> AuthShare<PartyGarbler> {
-        self.preprocessed_wires_map[&index].into_auth_share()
+        self.preprocessed_wires_map[&index]
     }
     /// Returns the [`AuthShare`] associated with the current wire
     fn get_current_wire_triple(&mut self, index: usize) -> AuthShare<PartyGarbler> {
-        self.known_triples_map[&index].into_auth_share()
+        self.known_triples_map[&index]
     }
 
     /// Pre-process the passed circuit
@@ -92,7 +88,6 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             f_preprocessing(circuit, &mut and_generator, channel, &mut self.rng)?;
         self.preprocessed_wires_map = preprocessed_wires_map;
         self.known_triples_map = known_triples_map;
-        self.reset();
         Ok(())
     }
 
@@ -111,12 +106,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         &mut self,
         nbits: usize,
     ) -> swanky_error::Result<Vec<AuthenticatedWire>> {
-        let mut gb_wires = Vec::with_capacity(nbits);
-        for _ in 0..nbits {
-            let gb_wire = self.encode_auth_zero()?;
-            gb_wires.push(gb_wire);
-        }
-        Ok(gb_wires)
+        (0..nbits).map(|_| self.encode_auth_zero()).collect()
     }
     /// Encode the wire label that the [`Garbler`] sends to the Evaluator
     pub fn encode_wire(
@@ -125,7 +115,8 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         zero: WireMod2,
     ) -> swanky_error::Result<WireMod2> {
         let delta = self.delta();
-        let ev_wire_label = zero + delta * u16::from(masked_val);
+        let ev_wire_label =
+            zero + WireMod2::from_repr(mux(masked_val, 0.into(), delta.to_repr()), 2);
         Ok(ev_wire_label)
     }
     /// The [`Garbler`] encodes several masked values for the Evaluator
@@ -138,12 +129,12 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         zeroes: &[WireMod2],
     ) -> swanky_error::Result<Vec<WireMod2>> {
         assert_eq!(masked_vals.len(), zeroes.len());
-        let mut ev_wires = Vec::with_capacity(masked_vals.len());
-        for (x, zero) in masked_vals.iter().zip(zeroes.iter()) {
-            let ev_wire_label = self.encode_wire(*x, *zero)?;
-            ev_wires.push(ev_wire_label);
-        }
-        Ok(ev_wires)
+
+        masked_vals
+            .iter()
+            .zip(zeroes.iter())
+            .map(|(x, zero)| self.encode_wire(*x, *zero))
+            .collect()
     }
 }
 
@@ -271,7 +262,6 @@ where
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        let index = self.current_wire_index();
         AuthenticatedWireMod2::new_with_value(
             x.masked_value() + y.masked_value(),
             // L_{γ,0} = L_{α,0} + L_{β,0}
@@ -279,14 +269,10 @@ where
             // TODO: This is already computed in preprocessing, maybe re-use it?
             //       although i am not sure if the storage is worth it.
             x.auth_share() ^ y.auth_share(),
-            index,
+            self.current_wire_index(),
         )
     }
 
-    /// We can negate by having garbler xor wire with Delta
-    ///
-    /// Since we treat all garbler wires as zero,
-    /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         AuthenticatedWireMod2::new_with_value(
             x.masked_value(),
@@ -451,7 +437,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         let auth_share: AuthShare<PartyGarbler> = x.auth_share();
         let mut out = Vec::with_capacity(1);
         AuthShareGenerator::open_with_delta(&[auth_share], self.delta_u8x16(), &mut out, channel)?;
-        Ok(Some(u16::from(out[0])))
+        Ok(None)
     }
     // Preferable function when processing multiple outputs!
     // It can efficiently batch opening bits.
@@ -469,6 +455,6 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
             &mut outputs,
             channel,
         )?;
-        Ok(Some(outputs.iter().map(|o| u16::from(*o)).collect()))
+        Ok(None)
     }
 }
