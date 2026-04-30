@@ -1,5 +1,4 @@
 //! Garbler in Authenticated Garbling
-use crate::mux;
 use crate::preprocesser::f_preprocessing;
 use crate::preprocesser::wire::WirePreProcessor;
 use crate::ps::PartyGarbler;
@@ -14,6 +13,7 @@ use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use vectoreyes::U8x16;
 
@@ -116,7 +116,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     ) -> swanky_error::Result<WireMod2> {
         let delta = self.delta();
         let ev_wire_label =
-            zero + WireMod2::from_repr(mux(masked_val, 0.into(), delta.to_repr()), 2);
+            zero + WireMod2::from_repr(U8x16::from(masked_val * F128b::from(delta.to_repr())), 2);
         Ok(ev_wire_label)
     }
     /// The [`Garbler`] encodes several masked values for the Evaluator
@@ -184,20 +184,20 @@ where
         let key_c_triple = lc_triple.key();
 
         // Compute Δ_rα := Δ x r_α: if r_α is 0, then this value is 0, otherwise its Δ
-        let delta_bit_a = mux(la0.auth_share().bit(), 0.into(), self.delta_u8x16());
+        let delta_bit_a = U8x16::from(la0.auth_share().bit() * F128b::from(self.delta_u8x16()));
         // Compute Δ_rβ := Δ x r_β: if r_β is 0, then this value is 0, otherwise its Δ
-        let delta_bit_b = mux(lb0.auth_share().bit(), 0.into(), self.delta_u8x16());
+        let delta_bit_b = U8x16::from(lb0.auth_share().bit() * F128b::from(self.delta_u8x16()));
         // Compute Δ_rγ := Δ x r_γ: if r_γ is 0, then this value is 0, otherwise its Δ
-        let delta_bit_c = mux(lc_share.bit(), 0.into(), self.delta_u8x16());
+        let delta_bit_c = U8x16::from(lc_share.bit() * F128b::from(self.delta_u8x16()));
         // Compute Δ_r*γ := Δ x r*_γ: if r*_γ is 0, then this value is 0, otherwise its Δ
-        let delta_bit_c_triple = mux(lc_triple.bit(), 0.into(), self.delta_u8x16());
+        let delta_bit_c_triple = U8x16::from(lc_triple.bit() * F128b::from(self.delta_u8x16()));
 
         // Gate_{γ,0} = H(L_{α,0}, γ) + H(L_{α,1}, γ) + K[s_β] + Δ_rβ
-        let gate0 = h_la0 + h_la1 + key_b + delta_bit_b;
+        let gate0 = h_la0 ^ h_la1 ^ key_b ^ delta_bit_b;
         // Gate_{γ,1} = H(L_{β,0}, γ) + H(L_{β,1}, γ) + K[s_α] + Δ_rα + L_{α,0}
-        let gate1 = h_lb0 + h_lb1 + key_a + delta_bit_a + la0.wire_label().to_repr();
+        let gate1 = h_lb0 ^ h_lb1 ^ key_a ^ delta_bit_a ^ la0.wire_label().to_repr();
         // L_{γ,0} = H(L_{α,0}, γ) + H(L_{β,0}, γ) + K[s_γ] + Δ_rγ + K[s*_γ] + Δ_r*γ
-        let lc0 = h_la0 + h_lb0 + key_c + delta_bit_c + key_c_triple + delta_bit_c_triple;
+        let lc0 = h_la0 ^ h_lb0 ^ key_c ^ delta_bit_c ^ key_c_triple ^ delta_bit_c_triple;
         // b_γ = lsb(L_{γ,0})
         let bit_c = F128b::from(lc0).lsb();
 
@@ -247,12 +247,12 @@ where
             channel,
         )?;
 
-        // // The garbler aborts if the validation is bit is not equal to 0
-        // assert_eq!(
-        //     validation_bit[0],
-        //     0.into(),
-        //     "Garbler's authentication validation check failed at index {index}"
-        // );
+        assert_eq!(
+            validation_bit[0],
+            F2::ZERO,
+            "Garbler's authentication validation check failed at index {index}"
+        );
+
         Ok(AuthenticatedWireMod2::new_with_value(
             lc_value,
             WireMod2::from_repr(lc0, 2),
@@ -335,8 +335,8 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
 
         // The Garbler sends out the labels L_{x_w + λ_w}  and x_w + λ_w to the Evaluator
         for (i, wire) in my_wire_labels.iter().enumerate() {
-            let _ = channel.write(&wire.to_repr());
-            let _ = channel.write(&my_masked_values[i]);
+            channel.write(&wire.to_repr())?;
+            channel.write(&my_masked_values[i])?;
         }
 
         // The Garbler stores their own masked values for later use in the final authentication

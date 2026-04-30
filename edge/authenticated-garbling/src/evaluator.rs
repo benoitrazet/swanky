@@ -13,11 +13,11 @@ use swanky_authenticated_bits::{
 };
 use swanky_channel::Channel;
 
+use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use vectoreyes::U8x16;
 
 use crate::{
-    mux,
     preprocesser::{f_preprocessing, wire::WirePreProcessor},
     ps::PartyEvaluator,
     wire::AuthenticatedWireMod2,
@@ -133,9 +133,9 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
         let bit_c: F2 = channel.read()?;
 
         // This is the value: Gate_0 = Gate_{γ,0} + M[s_β]
-        let gate0 = gate_c0 + lb.auth_share().mac();
+        let gate0 = gate_c0 ^ lb.auth_share().mac();
         // This is the value: Gate_1 = Gate_{γ,1} + M[s_α]
-        let gate1 = gate_c1 + la.auth_share().mac();
+        let gate1 = gate_c1 ^ la.auth_share().mac();
 
         // This is the value H(L_{α, z_α + λ_α}, γ)
         let h_la = la.wire_label().hash(index as u128);
@@ -154,14 +154,14 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
         let lb_lambda = lb.auth_share();
 
         // This is the value (z_α + λ_α)Gate_0
-        let gate0_muxed = mux(la_value, 0.into(), gate0);
+        let gate0_muxed = U8x16::from(la_value * F128b::from(gate0));
         // This is the value (z_β + λ_β)(Gate_1 + L_{α, z_α + λ_α})
-        let gate1_muxed = mux(lb_value, 0.into(), gate1 + la.wire_label().to_repr());
+        let gate1_muxed = U8x16::from(lb_value * F128b::from(gate1 ^ la.wire_label().to_repr()));
 
         // This the value:
         //  L_{γ, z_γ + λ_γ} := H(L_{α, z_α + λ_α}, γ) + H(L_{β, z_β + λ_β}, γ) + M[s_γ]
         //                      + M[s*_γ] + (z_α + λ_α)Gate_0 + (z_β + λ_β)(Gate_1 + L_{α, z_α + λ_α})
-        let lc_label = h_la + h_lb + mac_share + mac_triple + gate0_muxed + gate1_muxed;
+        let lc_label = h_la ^ h_lb ^ mac_share ^ mac_triple ^ gate0_muxed ^ gate1_muxed;
 
         // The current masked value of the wire is:
         // z'γ := z_γ + λ_γ := b_γ + lsb(L_{γ, z_γ + λ_γ})
@@ -195,12 +195,12 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
             &mut validation_bit,
             channel,
         )?;
-        // // The evaluator aborts if the validation is bit is not equal to 0
-        // assert_eq!(
-        //     validation_bit[0],
-        //     0.into(),
-        //     "Evaluator's authentication validation check failed at index {index}"
-        // );
+
+        assert_eq!(
+            validation_bit[0],
+            F2::ZERO,
+            "Evaluator's authentication validation check failed at index {index}"
+        );
 
         Ok(AuthenticatedWireMod2::new_with_value(
             lc_value,
