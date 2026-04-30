@@ -282,17 +282,16 @@ fn test_xor_gate_fan_n() {
 
 #[test]
 fn test_binary_addition() {
-    let ninputs_gb = 400;
-    let ninputs_ev = 400;
-    let circuit = circuits::TestBinaryAddition(ninputs_gb + ninputs_ev);
+    let ninputs = 400;
+    let circuit = circuits::TestBinaryAddition(ninputs);
 
     swanky_channel::local::local_channel_pair(
         |c| {
             let rng = SwankyRng::new();
             let mut gb = Garbler::new(c, rng)?;
             gb.preprocess_circuit(&circuit, c)?;
-            let mut inputs = gb.encode_many(&vec![0; ninputs_gb], &vec![2; ninputs_gb], c)?;
-            let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
+            let mut inputs = gb.encode_many(&vec![0; ninputs], &vec![2; ninputs], c)?;
+            let theirs = gb.receive_many(&vec![2; ninputs], c)?;
             inputs.extend(theirs);
             circuit.execute(&mut gb, &inputs, c)?;
             Ok(())
@@ -301,8 +300,8 @@ fn test_binary_addition() {
             let rng = SwankyRng::new();
             let mut ev = Evaluator::new(c, rng)?;
             ev.preprocess_circuit(&circuit, c)?;
-            let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
-            let mine = ev.encode_many(&vec![0; ninputs_ev], &vec![2; ninputs_ev], c)?;
+            let mut inputs = ev.receive_many(&vec![2; ninputs], c)?;
+            let mine = ev.encode_many(&vec![0; ninputs], &vec![2; ninputs], c)?;
             inputs.extend(mine);
             circuit.execute(&mut ev, &inputs, c)?;
             Ok(())
@@ -313,17 +312,16 @@ fn test_binary_addition() {
 
 #[test]
 fn test_binary_subtraction() {
-    let ninputs_gb = 400;
-    let ninputs_ev = 400;
-    let circuit = circuits::TestBinarySubtraction(ninputs_gb + ninputs_ev);
+    let ninputs = 400;
+    let circuit = circuits::TestBinarySubtraction(ninputs);
 
     swanky_channel::local::local_channel_pair(
         |c| {
             let rng = SwankyRng::new();
             let mut gb = Garbler::new(c, rng)?;
             gb.preprocess_circuit(&circuit, c)?;
-            let mut inputs = gb.encode_many(&vec![0; ninputs_gb], &vec![2; ninputs_gb], c)?;
-            let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
+            let mut inputs = gb.encode_many(&vec![0; ninputs], &vec![2; ninputs], c)?;
+            let theirs = gb.receive_many(&vec![2; ninputs], c)?;
             inputs.extend(theirs);
             circuit.execute(&mut gb, &inputs, c)?;
             Ok(())
@@ -332,8 +330,8 @@ fn test_binary_subtraction() {
             let rng = SwankyRng::new();
             let mut ev = Evaluator::new(c, rng)?;
             ev.preprocess_circuit(&circuit, c)?;
-            let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
-            let mine = ev.encode_many(&vec![0; ninputs_ev], &vec![2; ninputs_ev], c)?;
+            let mut inputs = ev.receive_many(&vec![2; ninputs], c)?;
+            let mine = ev.encode_many(&vec![0; ninputs], &vec![2; ninputs], c)?;
             inputs.extend(mine);
             circuit.execute(&mut ev, &inputs, c)?;
             Ok(())
