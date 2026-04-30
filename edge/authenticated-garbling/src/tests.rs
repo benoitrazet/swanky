@@ -8,6 +8,7 @@ use fancy_garbling::{
     circuit::{CircuitExecutor, circuits},
     dummy::Dummy,
 };
+use rand::Rng;
 use swanky_rng::SwankyRng;
 
 #[test]
@@ -68,11 +69,91 @@ fn test_party_encoding_receiving_passes() {
     )
     .unwrap();
 }
+#[test]
+fn test_party_gb_encoding_ev_receiving_correct() {
+    let input_size_gb = 400;
+    let input_size_ev = 400;
+    let circuit = circuits::TestAndGateFanN(input_size_gb + input_size_ev);
+    let mut rng = SwankyRng::new();
+    let inputs: Vec<u16> = (0..input_size_ev).map(|_| rng.r#gen::<u16>() % 2).collect();
+    let (gb_wires, ev_wires) = swanky_channel::local::local_channel_pair(
+        |c| {
+            let rng = SwankyRng::new();
+            let mut gb = Garbler::new(c, rng)?;
+            gb.preprocess_circuit(&circuit, c)?;
+            let res = gb.encode_many(&inputs, &vec![2; input_size_gb], c)?;
+            Ok(res)
+        },
+        |c| {
+            let rng = SwankyRng::new();
+            let mut ev = Evaluator::new(c, rng)?;
+            ev.preprocess_circuit(&circuit, c)?;
+            let res = ev.receive_many(&vec![2; input_size_gb], c)?;
+
+            Ok(res)
+        },
+    )
+    .unwrap();
+    for (i, (w_gb, w_ev)) in gb_wires.iter().zip(ev_wires).enumerate() {
+        let mask = w_gb.auth_share().bit() + w_ev.auth_share().bit();
+        assert_eq!(
+            w_gb.masked_value() + mask,
+            inputs[i].into(),
+            "The Garbler's value is incorrectly masked"
+        );
+        assert_eq!(
+            w_ev.masked_value() + mask,
+            inputs[i].into(),
+            "The Evaluator received a wrong masked value from the Garbler"
+        );
+    }
+}
+
+#[test]
+fn test_party_ev_encoding_gb_receiving_correct() {
+    let input_size_gb = 400;
+    let input_size_ev = 400;
+    let circuit = circuits::TestAndGateFanN(input_size_gb + input_size_ev);
+    let mut rng = SwankyRng::new();
+    let inputs: Vec<u16> = (0..input_size_ev).map(|_| rng.r#gen::<u16>() % 2).collect();
+
+    let (gb_wires, ev_wires) = swanky_channel::local::local_channel_pair(
+        |c| {
+            let rng = SwankyRng::new();
+            let mut gb = Garbler::new(c, rng)?;
+            gb.preprocess_circuit(&circuit, c)?;
+            let res = gb.receive_many(&vec![2; input_size_gb], c)?;
+            Ok(res)
+        },
+        |c| {
+            let rng = SwankyRng::new();
+            let mut ev = Evaluator::new(c, rng)?;
+            ev.preprocess_circuit(&circuit, c)?;
+            let res = ev.encode_many(&inputs, &vec![2; input_size_gb], c)?;
+
+            Ok(res)
+        },
+    )
+    .unwrap();
+    for (i, (w_gb, w_ev)) in gb_wires.iter().zip(ev_wires).enumerate() {
+        let mask = w_gb.auth_share().bit() + w_ev.auth_share().bit();
+        assert_eq!(
+            w_gb.masked_value() + mask,
+            inputs[i].into(),
+            "The Garbler received a wrong masked value from the Evaluator"
+        );
+        assert_eq!(
+            w_ev.masked_value() + mask,
+            inputs[i].into(),
+            "The Evaluator's value is incorrectly masked"
+        );
+    }
+}
 
 #[test]
 fn test_single_and_gate() {
-    let ninputs_gb = 1;
-    let ninputs_ev = 1;
+    let ninputs_gb = 5;
+    let ninputs_ev = 5;
     let circuit = circuits::TestAndGateFanN(ninputs_gb + ninputs_ev);
 
     swanky_channel::local::local_channel_pair(
