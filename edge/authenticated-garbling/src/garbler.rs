@@ -276,7 +276,7 @@ where
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         AuthenticatedWireMod2::new_with_value(
             x.masked_value(),
-            x.wire_label() + self.zero,
+            x.wire_label() + self.zero + self.delta(),
             x.auth_share(),
             x.index(),
         )
