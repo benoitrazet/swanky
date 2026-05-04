@@ -24,7 +24,7 @@ pub struct Garbler<RNG> {
     delta: WireMod2,
     zero: WireMod2,
     current_wire_index: usize,
-    preprocessed_wires_map: HashMap<usize, AuthShare<PartyGarbler>>,
+    preprocessed_wires: Vec<AuthShare<PartyGarbler>>,
     known_triples_map: HashMap<usize, AuthShare<PartyGarbler>>,
     rng: RNG,
 }
@@ -43,7 +43,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             delta,
             zero,
             current_wire_index: 0,
-            preprocessed_wires_map: HashMap::new(),
+            preprocessed_wires: Vec::new(),
             known_triples_map: HashMap::new(),
             rng,
         })
@@ -67,7 +67,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     }
     /// Returns the [`AuthShare`] associated with the current wire
     fn get_current_wire_share(&mut self, index: usize) -> AuthShare<PartyGarbler> {
-        self.preprocessed_wires_map[&index]
+        self.preprocessed_wires[index]
     }
     /// Returns the [`AuthShare`] associated with the current wire
     fn get_current_wire_triple(&mut self, index: usize) -> AuthShare<PartyGarbler> {
@@ -84,9 +84,9 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     ) -> swanky_error::Result<()> {
         let mut and_generator =
             AndTripleGenerator::new_with_delta(self.delta_u8x16(), channel, &mut self.rng)?;
-        let (preprocessed_wires_map, known_triples_map) =
+        let (preprocessed_wires, known_triples_map) =
             f_preprocessing(circuit, &mut and_generator, channel, &mut self.rng)?;
-        self.preprocessed_wires_map = preprocessed_wires_map;
+        self.preprocessed_wires = preprocessed_wires;
         self.known_triples_map = known_triples_map;
         Ok(())
     }

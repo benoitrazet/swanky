@@ -47,7 +47,7 @@ pub fn f_preprocessing<P: GenericParty, C, RNG: CryptoRng + Rng>(
     and_generator: &mut AndTripleGenerator<P>,
     channel: &mut Channel,
     rng: &mut RNG,
-) -> swanky_error::Result<(HashMap<usize, AuthShare<P>>, HashMap<usize, AuthShare<P>>)>
+) -> swanky_error::Result<(Vec<AuthShare<P>>, HashMap<usize, AuthShare<P>>)>
 where
     C: CircuitExecutor<CircuitAnalyzer> + CircuitExecutor<WirePreProcessor<P>>,
 {
@@ -107,10 +107,7 @@ where
         }
     }
 
-    Ok((
-        wire_preprocessor.into_indexed_auth_shares(),
-        known_triple_map,
-    ))
+    Ok((wire_preprocessor.into_auth_shares(), known_triple_map))
 }
 
 #[cfg(test)]

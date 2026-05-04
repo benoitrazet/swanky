@@ -1,7 +1,7 @@
 //! `Informer` runs a fancy computation and learns information from it.
 
 use fancy_garbling::{Fancy, FancyBinary, HasModulus};
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use swanky_authenticated_bits::authshares::AuthShare;
 use swanky_channel::Channel;
 use swanky_party::GenericParty;
@@ -10,7 +10,7 @@ use swanky_party::GenericParty;
 /// an authenticated garbling circuit. The main feature of this wire is that
 /// it has an index and that it keeps track of the wire's authenticated share. The
 /// later part is especially important because one of the assumptions that
-/// [KRRW18] makes and does not explicitly state is that once the authenticate shares
+/// KRRW18 makes and does not explicitly state is that once the authenticate shares
 /// are generated during pre-processing, the garbler has to construct the authenticated
 /// share of XOR and Negation gates during pre-processing in order to correctly produce known and gates.
 #[derive(Clone, Copy)]
@@ -39,7 +39,7 @@ impl<P: GenericParty> HasModulus for PreProcessedWire<P> {
 #[derive(Clone)]
 pub struct WirePreProcessor<P: GenericParty> {
     auth_shares: VecDeque<AuthShare<P>>,
-    indexed_auth_shares: HashMap<usize, AuthShare<P>>,
+    wires: Vec<AuthShare<P>>,
     and_triples_corrolation: Vec<(usize, usize, usize)>,
     current_index: usize,
 }
@@ -49,7 +49,7 @@ impl<P: GenericParty> WirePreProcessor<P> {
     pub(crate) fn new(auth_shares: Vec<AuthShare<P>>) -> WirePreProcessor<P> {
         WirePreProcessor {
             auth_shares: VecDeque::from(auth_shares),
-            indexed_auth_shares: HashMap::new(),
+            wires: Vec::new(),
             and_triples_corrolation: Vec::new(),
             current_index: 0,
         }
@@ -58,37 +58,28 @@ impl<P: GenericParty> WirePreProcessor<P> {
     /// These shares are split according to whether they are the left or right
     /// wires of a gate.
     pub(crate) fn and_gate_input_shares(
-        &mut self,
+        &self,
     ) -> (Vec<AuthShare<P>>, Vec<AuthShare<P>>, Vec<usize>) {
         let mut lefts = Vec::new();
         let mut rights = Vec::new();
         let mut indices = Vec::new();
         for (left, right, index) in &self.and_triples_corrolation {
-            lefts.push(self.retrieve_auth_share(*left));
-            rights.push(self.retrieve_auth_share(*right));
+            lefts.push(self.wires[*left]);
+            rights.push(self.wires[*right]);
             indices.push(*index)
         }
         (lefts, rights, indices)
     }
-    /// Returns the hash map of [`AuthShare`] with their wire index
-    pub(crate) fn into_indexed_auth_shares(self) -> HashMap<usize, AuthShare<P>> {
-        self.indexed_auth_shares
+
+    pub(crate) fn into_auth_shares(self) -> Vec<AuthShare<P>> {
+        self.wires
     }
+
     /// Pops an [`AuthShare<P>`] from the vector of authenticated shares.
     fn pop_auth_share(&mut self) -> AuthShare<P> {
         self.auth_shares
             .pop_front()
             .expect("there should be enough authenticated shares generated during preprocessing")
-    }
-
-    /// Returns the [`AuthShare`] associated with a specific index
-    fn retrieve_auth_share(&self, index: usize) -> AuthShare<P> {
-        self.indexed_auth_shares[&index]
-    }
-
-    /// Insert a [`PreProcessedWire`] into the [`WirePreProcessor`]'s HashMap of indexed wires.
-    fn insert_wire(&mut self, wire: PreProcessedWire<P>) {
-        self.indexed_auth_shares.insert(wire.index, wire.auth_share);
     }
 
     /// Inserts the indices of the left, right and output wire of an AND gate into the
@@ -97,6 +88,7 @@ impl<P: GenericParty> WirePreProcessor<P> {
         self.and_triples_corrolation
             .push((left, right, and_triple_index));
     }
+
     /// Returns the current wire's index.
     fn current_index(&mut self) -> usize {
         let current = self.current_index;
@@ -122,7 +114,7 @@ impl<P: GenericParty> FancyBinary for WirePreProcessor<P> {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         let index = self.current_index();
         let result = PreProcessedWire::new(index, x.auth_share ^ y.auth_share);
-        self.insert_wire(result);
+        self.wires.push(result.auth_share);
         result
     }
 
@@ -137,7 +129,7 @@ impl<P: GenericParty> FancyBinary for WirePreProcessor<P> {
 
         let result = PreProcessedWire::new(index, authshare);
         self.insert_index_corrolation(x.index, y.index, index);
-        self.insert_wire(result);
+        self.wires.push(result.auth_share);
         Ok(result)
     }
     /// Double check later that negation does not affect the authentication shares
@@ -148,6 +140,7 @@ impl<P: GenericParty> FancyBinary for WirePreProcessor<P> {
 
 impl<P: GenericParty> Fancy for WirePreProcessor<P> {
     type Item = PreProcessedWire<P>;
+
     fn receive_many(
         &mut self,
         moduli: &[u16],
@@ -158,7 +151,7 @@ impl<P: GenericParty> Fancy for WirePreProcessor<P> {
             let index = self.current_index();
             let auth_share = self.pop_auth_share();
             let wire = PreProcessedWire::new(index, auth_share);
-            self.insert_wire(wire);
+            self.wires.push(wire.auth_share);
             wires.push(wire);
         }
         Ok(wires)
@@ -172,6 +165,7 @@ impl<P: GenericParty> Fancy for WirePreProcessor<P> {
     ) -> swanky_error::Result<Vec<Self::Item>> {
         unimplemented!("Preprocessor cannot encode values");
     }
+
     fn constant(
         &mut self,
         _val: u16,
@@ -181,7 +175,7 @@ impl<P: GenericParty> Fancy for WirePreProcessor<P> {
         let index = self.current_index();
         let authshare = self.pop_auth_share();
         let result = PreProcessedWire::new(index, authshare);
-        self.insert_wire(result);
+        self.wires.push(result.auth_share);
         Ok(result)
     }
 
@@ -190,6 +184,6 @@ impl<P: GenericParty> Fancy for WirePreProcessor<P> {
         _x: &Self::Item,
         _channel: &mut Channel,
     ) -> swanky_error::Result<Option<u16>> {
-        Ok(Some(0))
+        Ok(None)
     }
 }
