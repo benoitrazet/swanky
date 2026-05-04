@@ -1,38 +1,45 @@
-//! Authenticated Wires
+//! Wirelabel representation for authenticated garbling.
 
 use fancy_garbling::{HasModulus, WireMod2};
 use swanky_authenticated_bits::authshares::AuthShare;
 use swanky_field_binary::F2;
 use swanky_party::GenericParty;
 
-/// The [`AuthenticatedWireMod2`] structure extends a [`WireMod2`] to include the wire's
-/// authenticated [`AndTriple`], authenticated [`AuthShare`], and the wire's current index.
+/// Wirelabel representation for authenticated garbling.
+///
+/// An authenticated garbling wirelabel is a wirelabel $`L`$ alongside (1) an
+/// [`AuthShare`] $`\lambda`$ of $`L`$s color bit, and (2) an optional value
+/// representing the masked value $`w \oplus \lambda`$, where $`w`$ is the
+/// actual bit represented by the wirelabel.
 #[derive(Clone)]
 pub struct AuthenticatedWireMod2<P: GenericParty> {
-    /// value
+    /// Masked value $`w \oplus \lambda`$.
     masked_value: Option<F2>,
-    /// The wire label.
+    /// The wirelabel $`L`$.
     wire_label: WireMod2,
-    /// The authenticated share associated with the wire.
-    auth_share: Option<AuthShare<P>>,
-    /// The wire's index.
+    /// Sharing of the color bit $`\lambda`$.
+    auth_share: AuthShare<P>,
+    /// The index of this wire in the circuit.
+    // TODO: May not be needed!
     index: usize,
 }
 
 impl<P: GenericParty> AuthenticatedWireMod2<P> {
-    /// The [`AuthenticatedWireMod2`]'s constructor takes a  [`WireMod2`], an
-    /// authenticated share [`AuthShare`] and an index.
+    /// Create a new `AuthenticatedWireMod2` given an underlying wirelabel
+    /// $`L`$, its associated color bit share $`\langle \lambda \rangle`$, and
+    /// the index of this wire in the circuit.
     pub(crate) fn new(wire_label: WireMod2, auth_share: AuthShare<P>, index: usize) -> Self {
         AuthenticatedWireMod2 {
             masked_value: None,
             wire_label,
-            auth_share: Some(auth_share),
+            auth_share,
             index,
         }
     }
 
-    /// The [`AuthenticatedWireMod2`]'s constructor takes a wire value, [`WireMod2`], an authenticated share
-    /// [`AuthShare`] and an index.
+    /// Create a new `AuthenticatedWireMod2` as in
+    /// [`AuthenticatedWireMod2::new`], but additionally provide the masked
+    /// value $`w \oplus \lambda`$.
     pub(crate) fn new_with_value(
         masked_value: F2,
         wire_label: WireMod2,
@@ -42,29 +49,36 @@ impl<P: GenericParty> AuthenticatedWireMod2<P> {
         AuthenticatedWireMod2 {
             masked_value: Some(masked_value),
             wire_label,
-            auth_share: Some(auth_share),
+            auth_share,
             index,
         }
     }
-    /// Returns the masked value associated with the current [`AuthenticatedWireMod2`]
+
+    /// The masked value associated with this wire.
     ///
-    /// Panics if there is no value associated with this wire
+    /// # Panics
+    /// This panics if there is no masked value associated with the wire.
     pub(crate) fn masked_value(&self) -> F2 {
         self.masked_value.unwrap()
     }
-    /// Sets the value associated with the current [`AuthenticatedWireMod2`]
+
+    /// Sets the masked value of this wire.
     pub(crate) fn set_masked_value(&mut self, value: F2) {
         self.masked_value = Some(value);
     }
-    /// Returns the wire label of type [`WireMod2`] associated with the current [`AuthenticatedWireMod2`]
+
+    /// The wirelabel $`L`$ associated with this wire.
     pub(crate) fn wire_label(&self) -> WireMod2 {
         self.wire_label
     }
-    /// Returns the [`AuthShare`] associated with the current [`AuthenticatedWireMod2`]
+
+    /// The authenticated share $`\langle \lambda \rangle`$ associated with this
+    /// wire.
     pub(crate) fn auth_share(&self) -> AuthShare<P> {
-        self.auth_share.unwrap()
+        self.auth_share
     }
-    /// Returns the index associated with the current [`AuthenticatedWireMod2`]
+
+    /// The circuit index associated with this wire.
     pub(crate) fn index(&self) -> usize {
         self.index
     }

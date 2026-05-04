@@ -7,7 +7,8 @@ pub mod evaluator;
 pub mod garbler;
 pub mod preprocesser;
 mod tests;
-pub mod wire;
+mod wire;
+pub use wire::AuthenticatedWireMod2;
 
 party_system! {
     mod ps {
