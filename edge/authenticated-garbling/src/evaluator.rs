@@ -28,7 +28,8 @@ pub struct Evaluator<RNG> {
     one: WireMod2,
     authentication_delta: U8x16,
     current_wire_index: usize,
-    preprocessed_wires: Vec<AuthShare<PartyEvaluator>>,
+    auth_shares: Vec<AuthShare<PartyEvaluator>>,
+    auth_shares_index: usize,
     known_triples: Vec<AuthShare<PartyEvaluator>>,
     known_triples_index: usize,
     rng: RNG,
@@ -45,7 +46,8 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
         Ok(Evaluator {
             one: WireMod2::from_repr(one, 2),
             authentication_delta,
-            preprocessed_wires: Vec::new(),
+            auth_shares: Vec::new(),
+            auth_shares_index: 0,
             known_triples: Vec::new(),
             known_triples_index: 0,
             current_wire_index: 0,
@@ -63,9 +65,9 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
     ) -> swanky_error::Result<()> {
         let mut and_generator =
             AndTripleGenerator::new_with_delta(self.delta(), channel, &mut self.rng)?;
-        let (preprocessed_wires, known_triples) =
+        let (auth_shares, known_triples) =
             f_preprocessing(circuit, &mut and_generator, channel, &mut self.rng)?;
-        self.preprocessed_wires = preprocessed_wires;
+        self.auth_shares = auth_shares;
         self.known_triples = known_triples;
         Ok(())
     }
@@ -79,9 +81,11 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
         self.current_wire_index += 1;
         current
     }
-    /// Returns the [`AuthShare`] associated with the current wire
-    fn get_current_wire_share(&mut self, index: usize) -> AuthShare<PartyEvaluator> {
-        self.preprocessed_wires[index]
+
+    fn get_next_auth_share(&mut self) -> AuthShare<PartyEvaluator> {
+        let share = self.auth_shares[self.auth_shares_index];
+        self.auth_shares_index += 1;
+        share
     }
 
     fn get_next_known_triple(&mut self) -> AuthShare<PartyEvaluator> {
@@ -119,7 +123,7 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
         // This index is called γ in the paper
         let index = self.current_wire_index();
         // This is the current wire's authenticated share
-        let lc_share = self.get_current_wire_share(index);
+        let lc_share = self.get_next_auth_share();
         // This is the current wire's authenticated triple
         let lc_triple = self.get_next_known_triple();
 
@@ -229,7 +233,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
             .map(|_i| {
                 let index = self.current_wire_index();
                 indices.push(index);
-                self.get_current_wire_share(index)
+                self.get_next_auth_share()
             })
             .collect();
 
@@ -287,7 +291,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
             .map(|_i| {
                 let index = self.current_wire_index();
                 indices.push(index);
-                self.get_current_wire_share(index)
+                self.get_next_auth_share()
             })
             .collect();
 
@@ -320,7 +324,7 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         // We haven't implemented a way to take advantage of constant wires
         // in FancyBinary. So they need to be treated as input wires.
         let index = self.current_wire_index();
-        let current_share = self.get_current_wire_share(index);
+        let current_share = self.get_next_auth_share();
 
         let my_masked_value = current_share.bit();
         let mut their_masked_value = Vec::with_capacity(1);

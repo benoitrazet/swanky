@@ -80,7 +80,7 @@ where
         channel,
         rng,
     )?;
-    let mut wire_preprocessor = WirePreProcessor::new(auth_shares);
+    let mut wire_preprocessor = WirePreProcessor::new(auth_shares.clone());
     let inputs = wire_preprocessor.receive_many(
         &vec![2; <C as CircuitExecutor<WirePreProcessor<P>>>::ninputs(circuit)],
         channel,
@@ -101,7 +101,7 @@ where
         )?;
     }
 
-    Ok((wire_preprocessor.into_auth_shares(), known_triples))
+    Ok((auth_shares, known_triples))
 }
 
 #[cfg(test)]

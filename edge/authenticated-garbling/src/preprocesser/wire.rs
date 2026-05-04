@@ -40,7 +40,7 @@ impl<P: GenericParty> HasModulus for PreProcessedWire<P> {
 pub struct WirePreProcessor<P: GenericParty> {
     auth_shares: VecDeque<AuthShare<P>>,
     wires: Vec<AuthShare<P>>,
-    and_triples_corrolation: Vec<(usize, usize, usize)>,
+    and_triple_input_indices: Vec<(usize, usize)>,
     current_index: usize,
 }
 
@@ -50,7 +50,7 @@ impl<P: GenericParty> WirePreProcessor<P> {
         WirePreProcessor {
             auth_shares: VecDeque::from(auth_shares),
             wires: Vec::new(),
-            and_triples_corrolation: Vec::new(),
+            and_triple_input_indices: Vec::new(),
             current_index: 0,
         }
     }
@@ -60,15 +60,11 @@ impl<P: GenericParty> WirePreProcessor<P> {
     pub(crate) fn and_gate_input_shares(&self) -> (Vec<AuthShare<P>>, Vec<AuthShare<P>>) {
         let mut lefts = Vec::new();
         let mut rights = Vec::new();
-        for (left, right, _) in &self.and_triples_corrolation {
+        for (left, right) in &self.and_triple_input_indices {
             lefts.push(self.wires[*left]);
             rights.push(self.wires[*right]);
         }
         (lefts, rights)
-    }
-
-    pub(crate) fn into_auth_shares(self) -> Vec<AuthShare<P>> {
-        self.wires
     }
 
     /// Pops an [`AuthShare<P>`] from the vector of authenticated shares.
@@ -80,9 +76,8 @@ impl<P: GenericParty> WirePreProcessor<P> {
 
     /// Inserts the indices of the left, right and output wire of an AND gate into the
     /// [`WirePreProcessor`]'s HashMap.
-    fn insert_index_corrolation(&mut self, left: usize, right: usize, and_triple_index: usize) {
-        self.and_triples_corrolation
-            .push((left, right, and_triple_index));
+    fn insert_index_corrolation(&mut self, left: usize, right: usize) {
+        self.and_triple_input_indices.push((left, right));
     }
 
     /// Returns the current wire's index.
@@ -95,11 +90,10 @@ impl<P: GenericParty> WirePreProcessor<P> {
 
 impl<P: GenericParty> std::fmt::Display for WirePreProcessor<P> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for (left, right, and_triple_index) in &self.and_triples_corrolation {
+        for (left, right) in &self.and_triple_input_indices {
             writeln!(
                 f,
-                "Current Known AND Triple has index {}, and is correlated with left input {} and right input {}",
-                and_triple_index, left, right
+                "Current Known AND Triple is correlated with left input {left} and right input {right}",
             )?;
         }
         Ok(())
@@ -124,7 +118,7 @@ impl<P: GenericParty> FancyBinary for WirePreProcessor<P> {
         let authshare = self.pop_auth_share();
 
         let result = PreProcessedWire::new(index, authshare);
-        self.insert_index_corrolation(x.index, y.index, index);
+        self.insert_index_corrolation(x.index, y.index);
         self.wires.push(result.auth_share);
         Ok(result)
     }

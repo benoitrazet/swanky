@@ -23,7 +23,8 @@ pub struct Garbler<RNG> {
     delta: WireMod2,
     zero: WireMod2,
     current_wire_index: usize,
-    preprocessed_wires: Vec<AuthShare<PartyGarbler>>,
+    auth_shares: Vec<AuthShare<PartyGarbler>>,
+    auth_shares_index: usize,
     known_triples: Vec<AuthShare<PartyGarbler>>,
     known_triples_index: usize,
     rng: RNG,
@@ -43,7 +44,8 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             delta,
             zero,
             current_wire_index: 0,
-            preprocessed_wires: Vec::new(),
+            auth_shares: Vec::new(),
+            auth_shares_index: 0,
             known_triples: Vec::new(),
             known_triples_index: 0,
             rng,
@@ -66,9 +68,11 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         self.current_wire_index += 1;
         current
     }
-    /// Returns the [`AuthShare`] associated with the current wire
-    fn get_current_wire_share(&mut self, index: usize) -> AuthShare<PartyGarbler> {
-        self.preprocessed_wires[index]
+
+    fn get_next_auth_share(&mut self) -> AuthShare<PartyGarbler> {
+        let share = self.auth_shares[self.auth_shares_index];
+        self.auth_shares_index += 1;
+        share
     }
 
     fn get_next_known_triple(&mut self) -> AuthShare<PartyGarbler> {
@@ -87,9 +91,9 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     ) -> swanky_error::Result<()> {
         let mut and_generator =
             AndTripleGenerator::new_with_delta(self.delta_u8x16(), channel, &mut self.rng)?;
-        let (preprocessed_wires, known_triples) =
+        let (auth_shares, known_triples) =
             f_preprocessing(circuit, &mut and_generator, channel, &mut self.rng)?;
-        self.preprocessed_wires = preprocessed_wires;
+        self.auth_shares = auth_shares;
         self.known_triples = known_triples;
         Ok(())
     }
@@ -99,8 +103,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         let zero = WireMod2::rand(&mut self.rng, 2);
         let index = self.current_wire_index();
 
-        let gb_auth_zero_wire =
-            AuthenticatedWireMod2::new(zero, self.get_current_wire_share(index), index);
+        let gb_auth_zero_wire = AuthenticatedWireMod2::new(zero, self.get_next_auth_share(), index);
         Ok(gb_auth_zero_wire)
     }
 
@@ -154,7 +157,7 @@ where
         // This index is called γ in the paper
         let index = self.current_wire_index();
         // This is the share for wire label L_{γ,0}
-        let lc_share = self.get_current_wire_share(index);
+        let lc_share = self.get_next_auth_share();
         // This is the and triple share for wire label L_{γ,0}
         let lc_triple = self.get_next_known_triple();
 
@@ -414,7 +417,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         let index = self.current_wire_index();
         // Constant wires get their own dedicated authenticated share just like
         // an input wire.
-        let current_share = self.get_current_wire_share(index);
+        let current_share = self.get_next_auth_share();
         AuthShareGenerator::open_my_shares(&[current_share], channel)?;
 
         let zero = WireMod2::rand(&mut self.rng, 2);
