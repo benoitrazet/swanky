@@ -71,10 +71,12 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
         self.known_triples = known_triples;
         Ok(())
     }
-    /// Get the deltas, consuming the Evaluator
+
+    /// The evaluator's $`\Delta`$.
     pub fn delta(&self) -> U8x16 {
         self.authentication_delta
     }
+
     /// The current output index of the garbling computation.
     fn current_wire_index(&mut self) -> usize {
         let current = self.current_wire_index;
@@ -101,7 +103,6 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
             x.masked_value() + F2::from(1),
             WireMod2::from_repr(x.wire_label().to_repr() ^ self.one.to_repr(), 2),
             x.auth_share(),
-            x.index(),
         )
     }
 
@@ -110,7 +111,6 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
             x.masked_value() + y.masked_value(),
             x.wire_label() + y.wire_label(),
             x.auth_share() ^ y.auth_share(),
-            self.current_wire_index(),
         )
     }
 
@@ -213,7 +213,6 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
             lc_value,
             WireMod2::from_repr(lc_label, 2),
             lc_share,
-            index,
         ))
     }
 }
@@ -228,13 +227,8 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
         // The Evaluator retrieves authenticated shares for their own inputs.
-        let mut indices = Vec::with_capacity(values.len());
         let my_auth_shares: Vec<AuthShare<PartyEvaluator>> = (0..moduli.len())
-            .map(|_i| {
-                let index = self.current_wire_index();
-                indices.push(index);
-                self.get_next_auth_share()
-            })
+            .map(|_i| self.get_next_auth_share())
             .collect();
 
         let mut their_bits = Vec::with_capacity(moduli.len());
@@ -273,7 +267,6 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
                 *masked_value,
                 wire_label,
                 my_auth_shares[i],
-                indices[i],
             ));
         }
 
@@ -286,13 +279,8 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
         // The Evaluator retrieves authenticated shares for the garbler's inputs.
-        let mut indices = Vec::with_capacity(moduli.len());
         let their_auth_shares: Vec<AuthShare<PartyEvaluator>> = (0..moduli.len())
-            .map(|_i| {
-                let index = self.current_wire_index();
-                indices.push(index);
-                self.get_next_auth_share()
-            })
+            .map(|_i| self.get_next_auth_share())
             .collect();
 
         AuthShareGenerator::open_my_shares(&their_auth_shares, channel)?;
@@ -301,14 +289,13 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
 
         // The Evaluator receives the wire labels and masked values of the Garbler and uses these values
         // to construct the garbler's authenticated wires
-        for (i, share) in indices.into_iter().zip(their_auth_shares) {
+        for share in their_auth_shares {
             let their_wire_label = WireMod2::from_repr(channel.read()?, 2);
             let their_masked_value = channel.read()?;
             their_auth_wires.push(AuthenticatedWireMod2::new_with_value(
                 their_masked_value,
                 their_wire_label,
                 share,
-                i,
             ));
         }
 
@@ -321,9 +308,6 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         _q: u16,
         channel: &mut Channel,
     ) -> swanky_error::Result<AuthenticatedWire> {
-        // We haven't implemented a way to take advantage of constant wires
-        // in FancyBinary. So they need to be treated as input wires.
-        let index = self.current_wire_index();
         let current_share = self.get_next_auth_share();
 
         let my_masked_value = current_share.bit();
@@ -343,7 +327,6 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
             masked_value,
             wire_label,
             current_share,
-            index,
         ))
     }
 

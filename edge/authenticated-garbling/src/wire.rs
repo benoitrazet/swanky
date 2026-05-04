@@ -19,21 +19,17 @@ pub struct AuthenticatedWireMod2<P: GenericParty> {
     wire_label: WireMod2,
     /// Sharing of the color bit $`\lambda`$.
     auth_share: AuthShare<P>,
-    /// The index of this wire in the circuit.
-    // TODO: May not be needed!
-    index: usize,
 }
 
 impl<P: GenericParty> AuthenticatedWireMod2<P> {
     /// Create a new `AuthenticatedWireMod2` given an underlying wirelabel
     /// $`L`$, its associated color bit share $`\langle \lambda \rangle`$, and
     /// the index of this wire in the circuit.
-    pub(crate) fn new(wire_label: WireMod2, auth_share: AuthShare<P>, index: usize) -> Self {
+    pub(crate) fn new(wire_label: WireMod2, auth_share: AuthShare<P>) -> Self {
         AuthenticatedWireMod2 {
             masked_value: None,
             wire_label,
             auth_share,
-            index,
         }
     }
 
@@ -44,13 +40,11 @@ impl<P: GenericParty> AuthenticatedWireMod2<P> {
         masked_value: F2,
         wire_label: WireMod2,
         auth_share: AuthShare<P>,
-        index: usize,
     ) -> Self {
         AuthenticatedWireMod2 {
             masked_value: Some(masked_value),
             wire_label,
             auth_share,
-            index,
         }
     }
 
@@ -76,11 +70,6 @@ impl<P: GenericParty> AuthenticatedWireMod2<P> {
     /// wire.
     pub(crate) fn auth_share(&self) -> AuthShare<P> {
         self.auth_share
-    }
-
-    /// The circuit index associated with this wire.
-    pub(crate) fn index(&self) -> usize {
-        self.index
     }
 }
 

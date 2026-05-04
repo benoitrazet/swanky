@@ -101,10 +101,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// Encode an authenticated wire representing the zero wire for the [`Garbler`].
     pub fn encode_auth_zero(&mut self) -> swanky_error::Result<AuthenticatedWire> {
         let zero = WireMod2::rand(&mut self.rng, 2);
-        let index = self.current_wire_index();
-
-        let gb_auth_zero_wire = AuthenticatedWireMod2::new(zero, self.get_next_auth_share(), index);
-        Ok(gb_auth_zero_wire)
+        Ok(AuthenticatedWireMod2::new(zero, self.get_next_auth_share()))
     }
 
     /// Encode many authenticate zero wires for the [`Garbler`].
@@ -263,7 +260,6 @@ where
             lc_value,
             WireMod2::from_repr(lc0, 2),
             lc_share,
-            index,
         ))
     }
 
@@ -275,7 +271,6 @@ where
             // TODO: This is already computed in preprocessing, maybe re-use it?
             //       although i am not sure if the storage is worth it.
             x.auth_share() ^ y.auth_share(),
-            self.current_wire_index(),
         )
     }
 
@@ -284,7 +279,6 @@ where
             x.masked_value() + F2::from(1),
             WireMod2::from_repr(x.wire_label().to_repr() ^ self.zero.to_repr(), 2),
             x.auth_share(),
-            x.index(),
         )
     }
 }
@@ -412,9 +406,6 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         _q: u16,
         channel: &mut Channel,
     ) -> swanky_error::Result<AuthenticatedWire> {
-        // We haven't implemented a way to take advantage of constant wires
-        // in FancyBinary. So they need to be treated as input wires.
-        let index = self.current_wire_index();
         // Constant wires get their own dedicated authenticated share just like
         // an input wire.
         let current_share = self.get_next_auth_share();
@@ -431,7 +422,6 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
             masked_value,
             wire_label,
             current_share,
-            index,
         ))
     }
 

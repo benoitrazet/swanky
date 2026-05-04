@@ -122,7 +122,7 @@ impl<P: GenericParty> FancyBinary for WirePreProcessor<P> {
         self.wires.push(result.auth_share);
         Ok(result)
     }
-    /// Double check later that negation does not affect the authentication shares
+
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         *x
     }
