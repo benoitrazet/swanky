@@ -1,7 +1,5 @@
 //! Evaluator for Authenticated Garbling
 
-use std::collections::HashMap;
-
 use fancy_garbling::{
     Fancy, FancyBinary, WireLabel, WireMod2, circuit::CircuitExecutor,
     circuit_analyzer::CircuitAnalyzer,
@@ -24,13 +22,15 @@ use crate::{
 };
 
 type AuthenticatedWire = AuthenticatedWireMod2<PartyEvaluator>;
-/// The authenticated garbling's evaluator
+
+/// The authenticated evaluator.
 pub struct Evaluator<RNG> {
     one: WireMod2,
     authentication_delta: U8x16,
     current_wire_index: usize,
     preprocessed_wires: Vec<AuthShare<PartyEvaluator>>,
-    known_triples_map: HashMap<usize, AuthShare<PartyEvaluator>>,
+    known_triples: Vec<AuthShare<PartyEvaluator>>,
+    known_triples_index: usize,
     rng: RNG,
 }
 
@@ -46,7 +46,8 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
             one: WireMod2::from_repr(one, 2),
             authentication_delta,
             preprocessed_wires: Vec::new(),
-            known_triples_map: HashMap::new(),
+            known_triples: Vec::new(),
+            known_triples_index: 0,
             current_wire_index: 0,
             rng,
         })
@@ -62,10 +63,10 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
     ) -> swanky_error::Result<()> {
         let mut and_generator =
             AndTripleGenerator::new_with_delta(self.delta(), channel, &mut self.rng)?;
-        let (preprocessed_wires, known_triples_map) =
+        let (preprocessed_wires, known_triples) =
             f_preprocessing(circuit, &mut and_generator, channel, &mut self.rng)?;
         self.preprocessed_wires = preprocessed_wires;
-        self.known_triples_map = known_triples_map;
+        self.known_triples = known_triples;
         Ok(())
     }
     /// Get the deltas, consuming the Evaluator
@@ -82,9 +83,11 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
     fn get_current_wire_share(&mut self, index: usize) -> AuthShare<PartyEvaluator> {
         self.preprocessed_wires[index]
     }
-    /// Returns the [`AuthShare`] associated with the current wire
-    fn get_current_wire_triple(&mut self, index: usize) -> AuthShare<PartyEvaluator> {
-        self.known_triples_map[&index]
+
+    fn get_next_known_triple(&mut self) -> AuthShare<PartyEvaluator> {
+        let share = self.known_triples[self.known_triples_index];
+        self.known_triples_index += 1;
+        share
     }
 }
 
@@ -118,7 +121,7 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
         // This is the current wire's authenticated share
         let lc_share = self.get_current_wire_share(index);
         // This is the current wire's authenticated triple
-        let lc_triple = self.get_current_wire_triple(index);
+        let lc_triple = self.get_next_known_triple();
 
         // This is the MAC associated with the current wire's authenticated share: M[s_γ]
         let mac_share = lc_share.mac();

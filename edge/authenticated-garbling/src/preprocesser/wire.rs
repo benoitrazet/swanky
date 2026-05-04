@@ -57,18 +57,14 @@ impl<P: GenericParty> WirePreProcessor<P> {
     /// Returns the [`AuthShare`] associated with the input wires of AND gates.
     /// These shares are split according to whether they are the left or right
     /// wires of a gate.
-    pub(crate) fn and_gate_input_shares(
-        &self,
-    ) -> (Vec<AuthShare<P>>, Vec<AuthShare<P>>, Vec<usize>) {
+    pub(crate) fn and_gate_input_shares(&self) -> (Vec<AuthShare<P>>, Vec<AuthShare<P>>) {
         let mut lefts = Vec::new();
         let mut rights = Vec::new();
-        let mut indices = Vec::new();
-        for (left, right, index) in &self.and_triples_corrolation {
+        for (left, right, _) in &self.and_triples_corrolation {
             lefts.push(self.wires[*left]);
             rights.push(self.wires[*right]);
-            indices.push(*index)
         }
-        (lefts, rights, indices)
+        (lefts, rights)
     }
 
     pub(crate) fn into_auth_shares(self) -> Vec<AuthShare<P>> {

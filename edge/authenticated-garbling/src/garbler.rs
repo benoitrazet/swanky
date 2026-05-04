@@ -8,7 +8,6 @@ use fancy_garbling::circuit_analyzer::CircuitAnalyzer;
 use fancy_garbling::{Fancy, FancyBinary, WireLabel, WireMod2};
 
 use rand::{CryptoRng, RngCore};
-use std::collections::HashMap;
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
@@ -25,7 +24,8 @@ pub struct Garbler<RNG> {
     zero: WireMod2,
     current_wire_index: usize,
     preprocessed_wires: Vec<AuthShare<PartyGarbler>>,
-    known_triples_map: HashMap<usize, AuthShare<PartyGarbler>>,
+    known_triples: Vec<AuthShare<PartyGarbler>>,
+    known_triples_index: usize,
     rng: RNG,
 }
 
@@ -44,7 +44,8 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             zero,
             current_wire_index: 0,
             preprocessed_wires: Vec::new(),
-            known_triples_map: HashMap::new(),
+            known_triples: Vec::new(),
+            known_triples_index: 0,
             rng,
         })
     }
@@ -69,9 +70,11 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     fn get_current_wire_share(&mut self, index: usize) -> AuthShare<PartyGarbler> {
         self.preprocessed_wires[index]
     }
-    /// Returns the [`AuthShare`] associated with the current wire
-    fn get_current_wire_triple(&mut self, index: usize) -> AuthShare<PartyGarbler> {
-        self.known_triples_map[&index]
+
+    fn get_next_known_triple(&mut self) -> AuthShare<PartyGarbler> {
+        let share = self.known_triples[self.known_triples_index];
+        self.known_triples_index += 1;
+        share
     }
 
     /// Pre-process the passed circuit
@@ -84,10 +87,10 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     ) -> swanky_error::Result<()> {
         let mut and_generator =
             AndTripleGenerator::new_with_delta(self.delta_u8x16(), channel, &mut self.rng)?;
-        let (preprocessed_wires, known_triples_map) =
+        let (preprocessed_wires, known_triples) =
             f_preprocessing(circuit, &mut and_generator, channel, &mut self.rng)?;
         self.preprocessed_wires = preprocessed_wires;
-        self.known_triples_map = known_triples_map;
+        self.known_triples = known_triples;
         Ok(())
     }
 
@@ -153,7 +156,7 @@ where
         // This is the share for wire label L_{γ,0}
         let lc_share = self.get_current_wire_share(index);
         // This is the and triple share for wire label L_{γ,0}
-        let lc_triple = self.get_current_wire_triple(index);
+        let lc_triple = self.get_next_known_triple();
 
         // Compute l1 from l0 for both inputs
         //

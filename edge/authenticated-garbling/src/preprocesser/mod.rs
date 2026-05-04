@@ -24,8 +24,6 @@
 //! [^1]: J. Katz, S. Ranellucci, M. Rosulek, X. Wang. "Optimizing Authenticated
 //! Garbling for Faster Secure Two-Party Computation".
 //! <https://eprint.iacr.org/2018/578.pdf>
-//!
-use std::collections::HashMap;
 
 use fancy_garbling::{Fancy, circuit::CircuitExecutor, circuit_analyzer::CircuitAnalyzer};
 use rand::{CryptoRng, Rng};
@@ -38,20 +36,20 @@ use crate::preprocesser::wire::WirePreProcessor;
 
 /// Pre-process a circuit for authenticated garbling.
 ///
-/// Authenticated garbling utilizes pre-computed [`AndTriple`]s and [`AuthShare`]s in its "online" portion.
-/// This function generates the correct number of such triples and shares for a given circuit of interest and returns
-/// the delta value used for that generation. This delta value is party specific, and in the case of the Garbler will
-/// be used as the free-XOR delta.
+/// Authenticated garbling utilizes pre-computed
+/// [`AndTriple`](swanky_authenticated_bits::and_triples::AndTriple)s and
+/// [`AuthShare`]s in its "online" portion. This function returns the (1) wire
+/// shares and (2) triple output shares for the given circuit of interest.
 pub fn f_preprocessing<P: GenericParty, C, RNG: CryptoRng + Rng>(
     circuit: &C,
     and_generator: &mut AndTripleGenerator<P>,
     channel: &mut Channel,
     rng: &mut RNG,
-) -> swanky_error::Result<(Vec<AuthShare<P>>, HashMap<usize, AuthShare<P>>)>
+) -> swanky_error::Result<(Vec<AuthShare<P>>, Vec<AuthShare<P>>)>
 where
     C: CircuitExecutor<CircuitAnalyzer> + CircuitExecutor<WirePreProcessor<P>>,
 {
-    // First Analyze the circuit gates by simulating both parties
+    // First count the number of gate types.
     let mut circuit_analyzer = CircuitAnalyzer::new();
     circuit_analyzer.eval(circuit)?;
 
@@ -90,24 +88,20 @@ where
     circuit.execute(&mut wire_preprocessor, &inputs, channel)?;
 
     // We only correlate the generated AND triples if there are any AND gates in the circuit
-    // to begin with
-    let mut known_triple_map = HashMap::new();
+    // to begin with.
+    let mut known_triples = Vec::with_capacity(nands);
     if nands > 0 {
-        let mut known_triples_out = Vec::with_capacity(nands);
-        let (left_wires, right_wires, indices) = wire_preprocessor.and_gate_input_shares();
+        let (left_wires, right_wires) = wire_preprocessor.and_gate_input_shares();
         and_generator.to_known_triple(
             &rand_and_triples[..nands],
             &left_wires,
             &right_wires,
-            &mut known_triples_out,
+            &mut known_triples,
             channel,
         )?;
-        for (index, auth_share) in indices.iter().zip(known_triples_out) {
-            known_triple_map.insert(*index, auth_share);
-        }
     }
 
-    Ok((wire_preprocessor.into_auth_shares(), known_triple_map))
+    Ok((wire_preprocessor.into_auth_shares(), known_triples))
 }
 
 #[cfg(test)]
