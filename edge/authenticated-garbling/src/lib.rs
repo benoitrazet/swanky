@@ -3,8 +3,10 @@
 
 use swanky_party::party_system;
 
-pub mod evaluator;
-pub mod garbler;
+mod evaluator;
+pub use evaluator::Evaluator;
+mod garbler;
+pub use garbler::Garbler;
 pub mod preprocesser;
 mod tests;
 mod wire;

@@ -14,7 +14,7 @@ use swanky_party::GenericParty;
 #[derive(Clone)]
 pub struct AuthenticatedWireMod2<P: GenericParty> {
     /// Masked value $`w \oplus \lambda`$.
-    masked_value: Option<F2>,
+    masked_value: F2,
     /// The wirelabel $`L`$.
     wire_label: WireMod2,
     /// Sharing of the color bit $`\lambda`$.
@@ -22,27 +22,11 @@ pub struct AuthenticatedWireMod2<P: GenericParty> {
 }
 
 impl<P: GenericParty> AuthenticatedWireMod2<P> {
-    /// Create a new `AuthenticatedWireMod2` given an underlying wirelabel
-    /// $`L`$, its associated color bit share $`\langle \lambda \rangle`$, and
-    /// the index of this wire in the circuit.
-    pub(crate) fn new(wire_label: WireMod2, auth_share: AuthShare<P>) -> Self {
+    /// Create a new `AuthenticatedWireMod2` given a masked value, the underlying wirelabel
+    /// $`L`$, and its associated color bit share $`\langle \lambda \rangle`$.
+    pub(crate) fn new(masked_value: F2, wire_label: WireMod2, auth_share: AuthShare<P>) -> Self {
         AuthenticatedWireMod2 {
-            masked_value: None,
-            wire_label,
-            auth_share,
-        }
-    }
-
-    /// Create a new `AuthenticatedWireMod2` as in
-    /// [`AuthenticatedWireMod2::new`], but additionally provide the masked
-    /// value $`w \oplus \lambda`$.
-    pub(crate) fn new_with_value(
-        masked_value: F2,
-        wire_label: WireMod2,
-        auth_share: AuthShare<P>,
-    ) -> Self {
-        AuthenticatedWireMod2 {
-            masked_value: Some(masked_value),
+            masked_value,
             wire_label,
             auth_share,
         }
@@ -53,12 +37,7 @@ impl<P: GenericParty> AuthenticatedWireMod2<P> {
     /// # Panics
     /// This panics if there is no masked value associated with the wire.
     pub(crate) fn masked_value(&self) -> F2 {
-        self.masked_value.unwrap()
-    }
-
-    /// Sets the masked value of this wire.
-    pub(crate) fn set_masked_value(&mut self, value: F2) {
-        self.masked_value = Some(value);
+        self.masked_value
     }
 
     /// The wirelabel $`L`$ associated with this wire.

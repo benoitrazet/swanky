@@ -1,5 +1,3 @@
-//! Evaluator for Authenticated Garbling
-
 use fancy_garbling::{
     Fancy, FancyBinary, WireLabel, WireMod2, circuit::CircuitExecutor,
     circuit_analyzer::CircuitAnalyzer,
@@ -91,7 +89,7 @@ impl Evaluator {
 
 impl FancyBinary for Evaluator {
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        AuthenticatedWireMod2::new_with_value(
+        AuthenticatedWireMod2::new(
             x.masked_value() + F2::from(1),
             WireMod2::from_repr(x.wire_label().to_repr() ^ self.one.to_repr(), 2),
             x.auth_share(),
@@ -99,7 +97,7 @@ impl FancyBinary for Evaluator {
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        AuthenticatedWireMod2::new_with_value(
+        AuthenticatedWireMod2::new(
             x.masked_value() + y.masked_value(),
             x.wire_label() + y.wire_label(),
             x.auth_share() ^ y.auth_share(),
@@ -201,7 +199,7 @@ impl FancyBinary for Evaluator {
             "Evaluator's authentication validation check failed at index {index}"
         );
 
-        Ok(AuthenticatedWireMod2::new_with_value(
+        Ok(AuthenticatedWireMod2::new(
             lc_value,
             WireMod2::from_repr(lc_label, 2),
             lc_share,
@@ -256,7 +254,7 @@ impl Fancy for Evaluator {
             // The Evaluator retrieves the wire labels for their own input
             let wire_label = WireMod2::from_repr(channel.read()?, 2);
             // The Evaluator constructs authenticated values for all their input wires
-            my_auth_wires.push(AuthenticatedWireMod2::new_with_value(
+            my_auth_wires.push(AuthenticatedWireMod2::new(
                 masked_value,
                 wire_label,
                 auth_share,
@@ -280,12 +278,15 @@ impl Fancy for Evaluator {
 
         let mut their_auth_wires: Vec<AuthenticatedWire> = Vec::with_capacity(moduli.len());
 
+        let their_masked_values = (0..moduli.len())
+            .map(|_| channel.read::<F2>())
+            .collect::<swanky_error::Result<Vec<_>>>()?;
+
         // The Evaluator receives the wire labels and masked values of the Garbler and uses these values
         // to construct the garbler's authenticated wires
-        for share in their_auth_shares {
+        for (their_masked_value, share) in their_masked_values.into_iter().zip(their_auth_shares) {
             let their_wire_label = WireMod2::from_repr(channel.read()?, 2);
-            let their_masked_value = channel.read()?;
-            their_auth_wires.push(AuthenticatedWireMod2::new_with_value(
+            their_auth_wires.push(AuthenticatedWireMod2::new(
                 their_masked_value,
                 their_wire_label,
                 share,
@@ -316,7 +317,7 @@ impl Fancy for Evaluator {
         channel.write(&masked_value)?;
         let wire_label = WireMod2::from_repr(channel.read().unwrap(), 2);
 
-        Ok(AuthenticatedWireMod2::new_with_value(
+        Ok(AuthenticatedWireMod2::new(
             masked_value,
             wire_label,
             current_share,
