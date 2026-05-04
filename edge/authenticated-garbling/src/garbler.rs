@@ -286,8 +286,6 @@ where
 impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
     type Item = AuthenticatedWire;
 
-    /// Encodes several bits as authenticated shares.
-    ///
     fn encode_many(
         &mut self,
         values: &[u16],

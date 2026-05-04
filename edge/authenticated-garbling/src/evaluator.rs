@@ -27,7 +27,7 @@ type AuthenticatedWire = AuthenticatedWireMod2<PartyEvaluator>;
 pub struct Evaluator<RNG> {
     one: WireMod2,
     authentication_delta: U8x16,
-    current_wire_index: usize,
+    and_wire_index: usize,
     auth_shares: Vec<AuthShare<PartyEvaluator>>,
     auth_shares_index: usize,
     known_triples: Vec<AuthShare<PartyEvaluator>>,
@@ -50,7 +50,7 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
             auth_shares_index: 0,
             known_triples: Vec::new(),
             known_triples_index: 0,
-            current_wire_index: 0,
+            and_wire_index: 0,
             rng,
         })
     }
@@ -78,9 +78,9 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
     }
 
     /// The current output index of the garbling computation.
-    fn current_wire_index(&mut self) -> usize {
-        let current = self.current_wire_index;
-        self.current_wire_index += 1;
+    fn next_and_wire_index(&mut self) -> usize {
+        let current = self.and_wire_index;
+        self.and_wire_index += 1;
         current
     }
 
@@ -121,7 +121,7 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item> {
         // This index is called γ in the paper
-        let index = self.current_wire_index();
+        let index = self.next_and_wire_index();
         // This is the current wire's authenticated share
         let lc_share = self.get_next_auth_share();
         // This is the current wire's authenticated triple
@@ -226,6 +226,8 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         moduli: &[u16],
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
+        assert_eq!(values.len(), moduli.len());
+
         // The Evaluator retrieves authenticated shares for their own inputs.
         let my_auth_shares: Vec<AuthShare<PartyEvaluator>> = (0..moduli.len())
             .map(|_i| self.get_next_auth_share())
@@ -258,15 +260,14 @@ impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
         }
 
         let mut my_auth_wires: Vec<AuthenticatedWire> = Vec::with_capacity(values.len());
-
-        for (i, masked_value) in my_masked_values.iter().enumerate() {
+        for (masked_value, auth_share) in my_masked_values.into_iter().zip(my_auth_shares) {
             // The Evaluator retrieves the wire labels for their own input
             let wire_label = WireMod2::from_repr(channel.read()?, 2);
             // The Evaluator constructs authenticated values for all their input wires
             my_auth_wires.push(AuthenticatedWireMod2::new_with_value(
-                *masked_value,
+                masked_value,
                 wire_label,
-                my_auth_shares[i],
+                auth_share,
             ));
         }
 
