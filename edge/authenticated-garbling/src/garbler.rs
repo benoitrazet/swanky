@@ -22,7 +22,7 @@ type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 pub struct Garbler<RNG> {
     delta: WireMod2,
     zero: WireMod2,
-    current_wire_index: usize,
+    and_wire_index: usize,
     auth_shares: Vec<AuthShare<PartyGarbler>>,
     auth_shares_index: usize,
     known_triples: Vec<AuthShare<PartyGarbler>>,
@@ -31,22 +31,30 @@ pub struct Garbler<RNG> {
 }
 
 impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
-    /// Create a new garbler.
-    pub fn new(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self> {
-        let delta = WireMod2::from_repr(
-            AndTripleGenerator::<PartyGarbler>::generate_valid_delta(&mut rng),
-            2,
-        );
+    /// Create a new garbler for a given circuit.
+    pub fn new<
+        C: CircuitExecutor<CircuitAnalyzer> + CircuitExecutor<WirePreProcessor<PartyGarbler>>,
+    >(
+        circuit: &C,
+        channel: &mut Channel,
+        mut rng: RNG,
+    ) -> swanky_error::Result<Self> {
+        let delta = AndTripleGenerator::<PartyGarbler>::generate_valid_delta(&mut rng);
         let zero = WireMod2::rand(&mut rng, 2);
-        let one = WireMod2::from_repr(zero.to_repr() ^ delta.to_repr(), 2);
+        let one = WireMod2::from_repr(zero.to_repr() ^ delta, 2);
+
+        let mut and_generator = AndTripleGenerator::new_with_delta(delta, channel, &mut rng)?;
+        let (auth_shares, known_triples) =
+            f_preprocessing(circuit, &mut and_generator, channel, &mut rng)?;
+
         channel.write(&one.to_repr())?;
         Ok(Garbler {
-            delta,
+            delta: WireMod2::from_repr(delta, 2),
             zero,
-            current_wire_index: 0,
-            auth_shares: Vec::new(),
+            and_wire_index: 0,
+            auth_shares,
             auth_shares_index: 0,
-            known_triples: Vec::new(),
+            known_triples,
             known_triples_index: 0,
             rng,
         })
@@ -63,9 +71,9 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     }
 
     /// The current output index of the garbling computation.
-    fn current_wire_index(&mut self) -> usize {
-        let current = self.current_wire_index;
-        self.current_wire_index += 1;
+    fn next_and_wire_index(&mut self) -> usize {
+        let current = self.and_wire_index;
+        self.and_wire_index += 1;
         current
     }
 
@@ -79,23 +87,6 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         let share = self.known_triples[self.known_triples_index];
         self.known_triples_index += 1;
         share
-    }
-
-    /// Pre-process the passed circuit
-    pub fn preprocess_circuit<
-        C: CircuitExecutor<CircuitAnalyzer> + CircuitExecutor<WirePreProcessor<PartyGarbler>>,
-    >(
-        &mut self,
-        circuit: &C,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<()> {
-        let mut and_generator =
-            AndTripleGenerator::new_with_delta(self.delta_u8x16(), channel, &mut self.rng)?;
-        let (auth_shares, known_triples) =
-            f_preprocessing(circuit, &mut and_generator, channel, &mut self.rng)?;
-        self.auth_shares = auth_shares;
-        self.known_triples = known_triples;
-        Ok(())
     }
 
     /// Encode an authenticated wire representing the zero wire for the [`Garbler`].
@@ -152,7 +143,7 @@ where
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item> {
         // This index is called γ in the paper
-        let index = self.current_wire_index();
+        let index = self.next_and_wire_index();
         // This is the share for wire label L_{γ,0}
         let lc_share = self.get_next_auth_share();
         // This is the and triple share for wire label L_{γ,0}

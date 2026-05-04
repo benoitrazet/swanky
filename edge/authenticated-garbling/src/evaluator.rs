@@ -24,7 +24,7 @@ use crate::{
 type AuthenticatedWire = AuthenticatedWireMod2<PartyEvaluator>;
 
 /// The authenticated evaluator.
-pub struct Evaluator<RNG> {
+pub struct Evaluator {
     one: WireMod2,
     authentication_delta: U8x16,
     and_wire_index: usize,
@@ -32,44 +32,36 @@ pub struct Evaluator<RNG> {
     auth_shares_index: usize,
     known_triples: Vec<AuthShare<PartyEvaluator>>,
     known_triples_index: usize,
-    rng: RNG,
 }
 
-impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
+impl Evaluator {
     /// Create a new `Evaluator`.
-    pub fn new(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self> {
+    pub fn new<
+        C: CircuitExecutor<CircuitAnalyzer> + CircuitExecutor<WirePreProcessor<PartyEvaluator>>,
+        RNG: CryptoRng + RngCore,
+    >(
+        circuit: &C,
+        channel: &mut Channel,
+        mut rng: RNG,
+    ) -> swanky_error::Result<Self> {
         // Receive the constant one wirelabel from the garbler. This is used to
         // make negation free.
-        let authentication_delta =
-            AndTripleGenerator::<PartyEvaluator>::generate_valid_delta(&mut rng);
+        let delta = AndTripleGenerator::<PartyEvaluator>::generate_valid_delta(&mut rng);
+
+        let mut and_generator = AndTripleGenerator::new_with_delta(delta, channel, &mut rng)?;
+        let (auth_shares, known_triples) =
+            f_preprocessing(circuit, &mut and_generator, channel, &mut rng)?;
+
         let one = channel.read::<U8x16>()?;
         Ok(Evaluator {
             one: WireMod2::from_repr(one, 2),
-            authentication_delta,
-            auth_shares: Vec::new(),
+            authentication_delta: delta,
+            auth_shares,
             auth_shares_index: 0,
-            known_triples: Vec::new(),
+            known_triples,
             known_triples_index: 0,
             and_wire_index: 0,
-            rng,
         })
-    }
-
-    /// Pre-process the passed circuit
-    pub fn preprocess_circuit<
-        C: CircuitExecutor<CircuitAnalyzer> + CircuitExecutor<WirePreProcessor<PartyEvaluator>>,
-    >(
-        &mut self,
-        circuit: &C,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<()> {
-        let mut and_generator =
-            AndTripleGenerator::new_with_delta(self.delta(), channel, &mut self.rng)?;
-        let (auth_shares, known_triples) =
-            f_preprocessing(circuit, &mut and_generator, channel, &mut self.rng)?;
-        self.auth_shares = auth_shares;
-        self.known_triples = known_triples;
-        Ok(())
     }
 
     /// The evaluator's $`\Delta`$.
@@ -97,7 +89,7 @@ impl<RNG: CryptoRng + RngCore> Evaluator<RNG> {
     }
 }
 
-impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
+impl FancyBinary for Evaluator {
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         AuthenticatedWireMod2::new_with_value(
             x.masked_value() + F2::from(1),
@@ -217,7 +209,7 @@ impl<RNG: CryptoRng + RngCore> FancyBinary for Evaluator<RNG> {
     }
 }
 
-impl<RNG: CryptoRng + RngCore> Fancy for Evaluator<RNG> {
+impl Fancy for Evaluator {
     type Item = AuthenticatedWire;
 
     fn encode_many(
