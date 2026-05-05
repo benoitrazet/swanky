@@ -83,8 +83,9 @@ impl<F: FancyNeuralNet> NeuralNetExecutor<F> for LayerMaxPooling2D {
         let shift_y = ((zero_rows as f32) / 2.0).floor() as usize;
         let shift_x = ((zero_cols as f32) / 2.0).floor() as usize;
 
-        // create windows
-        let mut windows = Vec::new();
+        let mut windows = Vec::with_capacity(
+            (height - pheight + zero_rows) / stride_y * (width - pwidth + zero_cols) / stride_x,
+        );
         let mut y = 0;
         while stride_y * y <= height - pheight + zero_rows {
             let mut x = 0;
@@ -101,7 +102,7 @@ impl<F: FancyNeuralNet> NeuralNetExecutor<F> for LayerMaxPooling2D {
                                     || (idx_y >= height + shift_y || idx_x >= width + shift_x));
 
                             let val = if pad_condition {
-                                backend.nn_zero(channel)?.clone()
+                                backend.nn_zero(channel)?
                             } else {
                                 inputs[(idx_y - shift_y, idx_x - shift_x, z)].clone()
                             };

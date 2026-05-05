@@ -9,13 +9,21 @@ use ndarray::Array3;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 
-pub struct BinaryNeuralNet<'a, F> {
+/// [`NeuralNet`] evaluator for binary circuit representations of the neural
+/// network.
+pub(crate) struct BinaryNeuralNet<'a, F> {
     backend: &'a mut F,
     bitwidths: &'a [usize],
     secret_weights_owned: bool,
 }
 
 impl<'a, F: BinaryGadgets> BinaryNeuralNet<'a, F> {
+    /// Create a new `BinaryNeuralNet` for the provided backend and using the
+    /// specified bitwidths for each layer of the neural net.
+    ///
+    /// The `secret_weights_owned` argument denotes whether this evaluator
+    /// "owns" the secret weights or not. Generally, the owner is the garbled
+    /// circuit garbler, and the non-owner is the garbled circuit evaluator.
     pub(crate) fn new(
         backend: &'a mut F,
         bitwidths: &'a [usize],
@@ -27,6 +35,7 @@ impl<'a, F: BinaryGadgets> BinaryNeuralNet<'a, F> {
             secret_weights_owned,
         }
     }
+
     /// Encode an input so it can be evaluated by a boolean [`NeuralNet`].
     pub(crate) fn encode_input(
         &mut self,
@@ -77,7 +86,7 @@ impl<'a, F: BinaryGadgets> BinaryNeuralNet<'a, F> {
         Ok(result.into_iter().collect::<Option<_>>())
     }
 
-    /// Evaluate [`NeuralNet`] as a boolean garbled circuit.
+    /// Evaluate [`NeuralNet`] as a boolean circuit.
     ///
     /// # Panics
     /// This panics if `bitwidth.len()` does not equal `self.nlayers() + 1`, or
@@ -112,14 +121,21 @@ impl<'a, F: BinaryGadgets> BinaryNeuralNet<'a, F> {
     }
 }
 
-pub struct BinaryLayer<'a, F> {
+/// A neural network layer represented as a boolean circuit.
+struct BinaryLayer<'a, F> {
     backend: &'a mut F,
     nbits: usize,
     secret_weights_owned: bool,
 }
 
 impl<'a, F: BinaryGadgets> BinaryLayer<'a, F> {
-    pub(crate) fn new(backend: &'a mut F, nbits: usize, secret_weights_owned: bool) -> Self {
+    /// Create a new `BinaryLayer`, with the max bitwidth of the layer provided
+    /// by `nbits`.
+    ///
+    /// The `secret_weights_owned` argument denotes whether this evaluator
+    /// "owns" the secret weights or not. Generally, the owner is the garbled
+    /// circuit garbler, and the non-owner is the garbled circuit evaluator.
+    fn new(backend: &'a mut F, nbits: usize, secret_weights_owned: bool) -> Self {
         Self {
             backend,
             nbits,

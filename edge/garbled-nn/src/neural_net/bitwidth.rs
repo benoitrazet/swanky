@@ -4,43 +4,39 @@ use ndarray::Array3;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
-pub(crate) struct BitwidthNeuralNet {
+/// Evaluate a [`NeuralNet`] over a plaintext input, outputting a vector
+/// containing the maximum bitwidths required for each layer of the neural
+/// network.
+pub(crate) fn eval(nn: &NeuralNet, inputs: &Array3<i64>) -> Result<Vec<usize>> {
+    let mut max_nbits: Vec<usize> = vec![0; nn.layers.len()];
+
+    Channel::with(std::io::empty(), |channel| {
+        let mut acc = inputs.clone();
+        for (i, layer) in nn.layers.iter().enumerate() {
+            let mut backend = BitwidthLayer { max: 0 };
+            acc = layer.eval(&mut backend, acc, false, channel)?;
+            let new_max_val = backend.max;
+
+            let nbits = if new_max_val < 0 {
+                (1.0 + ((-new_max_val) as f64).log2().ceil()) as usize
+            } else {
+                (new_max_val as f64).log2().ceil() as usize
+            };
+
+            if nbits > max_nbits[i] {
+                max_nbits[i] = nbits;
+            }
+        }
+        Ok(())
+    })?;
+    Ok(max_nbits)
+}
+
+struct BitwidthLayer {
     max: i64,
 }
 
-impl BitwidthNeuralNet {
-    pub(crate) fn new() -> Self {
-        Self { max: 0 }
-    }
-
-    pub(crate) fn eval(nn: &NeuralNet, inputs: &Array3<i64>) -> Result<Vec<usize>> {
-        let mut max_nbits: Vec<usize> = vec![0; nn.layers.len()];
-        let mut backend = BitwidthNeuralNet::new();
-
-        Channel::with(std::io::empty(), |channel| {
-            let mut acc = inputs.clone();
-            for (i, layer) in nn.layers.iter().enumerate() {
-                acc = layer.eval(&mut backend, acc, false, channel)?;
-                let new_max_val = backend.max;
-                backend.max = 0;
-
-                let nbits = if new_max_val < 0 {
-                    (1.0 + ((-new_max_val) as f64).log2().ceil()) as usize
-                } else {
-                    (new_max_val as f64).log2().ceil() as usize
-                };
-
-                if nbits > max_nbits[i] {
-                    max_nbits[i] = nbits;
-                }
-            }
-            Ok(())
-        })?;
-        Ok(max_nbits)
-    }
-}
-
-impl FancyNeuralNet for BitwidthNeuralNet {
+impl FancyNeuralNet for BitwidthLayer {
     type Item = i64;
 
     fn nn_encode(&mut self, value: i64, _: &mut Channel) -> Result<Self::Item> {

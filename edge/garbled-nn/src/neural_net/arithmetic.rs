@@ -9,13 +9,21 @@ use ndarray::Array3;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 
-pub struct ArithmeticNeuralNet<'a, F> {
+/// [`NeuralNet`] evaluator for arithmetic circuit representations of the neural
+/// network.
+pub(crate) struct ArithmeticNeuralNet<'a, F> {
     backend: &'a mut F,
     moduli: &'a [u128],
     secret_weights_owned: bool,
 }
 
 impl<'a, F: CrtProjGadgets> ArithmeticNeuralNet<'a, F> {
+    /// Create a new `ArithmeticNeuralNet` for the provided backend and using
+    /// the specified moduli for each layer of the neural net.
+    ///
+    /// The `secret_weights_owned` argument denotes whether this evaluator
+    /// "owns" the secret weights or not. Generally, the owner is the garbled
+    /// circuit garbler, and the non-owner is the garbled circuit evaluator.
     pub(crate) fn new(backend: &'a mut F, moduli: &'a [u128], secret_weights_owned: bool) -> Self {
         Self {
             backend,
@@ -25,7 +33,7 @@ impl<'a, F: CrtProjGadgets> ArithmeticNeuralNet<'a, F> {
     }
 
     /// Encode an input so it can be evaluated by an arithmetic [`NeuralNet`].
-    pub fn encode_input(
+    pub(crate) fn encode_input(
         &mut self,
         input: &Array3<i64>,
         channel: &mut Channel,
@@ -40,7 +48,7 @@ impl<'a, F: CrtProjGadgets> ArithmeticNeuralNet<'a, F> {
     }
 
     /// Receive an input so it can be evaluated by an arithmetic [`NeuralNet`].
-    pub fn receive_input(
+    pub(crate) fn receive_input(
         &mut self,
         input: &Array3<i64>,
         channel: &mut Channel,
@@ -52,7 +60,7 @@ impl<'a, F: CrtProjGadgets> ArithmeticNeuralNet<'a, F> {
     }
 
     /// Decode an arithmetic output of a [`NeuralNet`] evaluation.
-    pub fn decode_output(
+    pub(crate) fn decode_output(
         &mut self,
         output: &[CrtBundle<F::Item>],
         channel: &mut Channel,
@@ -74,12 +82,12 @@ impl<'a, F: CrtProjGadgets> ArithmeticNeuralNet<'a, F> {
         Ok(result.into_iter().collect::<Option<_>>())
     }
 
-    /// Evaluate [`NeuralNet`] as an arithmetic garbled circuit.
+    /// Evaluate [`NeuralNet`] as an arithmetic circuit.
     ///
     /// # Panics
     /// Panics if `moduli.len()` is not equal to `self.nlayers() + 1`, or if
     /// `circuit_inputs` does not match the dimensions of the input layer.
-    pub fn eval(
+    pub(crate) fn eval(
         &mut self,
         nn: &NeuralNet,
         circuit_inputs: &[CrtBundle<F::Item>],
@@ -114,7 +122,8 @@ impl<'a, F: CrtProjGadgets> ArithmeticNeuralNet<'a, F> {
     }
 }
 
-pub struct ArithmeticLayer<'a, F> {
+/// A neural network layer represented as an arithmetic circuit.
+struct ArithmeticLayer<'a, F> {
     backend: &'a mut F,
     input_modulus: u128,
     output_modulus: u128,
@@ -123,7 +132,16 @@ pub struct ArithmeticLayer<'a, F> {
 }
 
 impl<'a, F> ArithmeticLayer<'a, F> {
-    pub(crate) fn new(
+    /// Create a new `ArithmeticLayer`, specifying the input and output moduli
+    /// of this layer.
+    ///
+    /// The `secret_weights_owned` argument denotes whether this evaluator
+    /// "owns" the secret weights or not. Generally, the owner is the garbled
+    /// circuit garbler, and the non-owner is the garbled circuit evaluator.
+    ///
+    /// The `accuracy` argument specifies the accuracy of various internal
+    /// operations. See [`Accuracy`] for more details.
+    fn new(
         backend: &'a mut F,
         input_modulus: u128,
         output_modulus: u128,

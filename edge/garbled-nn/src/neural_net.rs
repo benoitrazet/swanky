@@ -4,10 +4,7 @@ use crate::{
         convolutional::LayerConvolutional, dense::LayerDense, flatten::LayerFlatten,
         max_pooling_2d::LayerMaxPooling2D,
     },
-    neural_net::{
-        arithmetic::ArithmeticNeuralNet, binary::BinaryNeuralNet, bitwidth::BitwidthNeuralNet,
-        plaintext::PlaintextNeuralNet,
-    },
+    neural_net::{arithmetic::ArithmeticNeuralNet, binary::BinaryNeuralNet},
     util,
 };
 use fancy_garbling::{
@@ -248,7 +245,7 @@ impl NeuralNet {
             // TODO: Remove this `println`, use some logging infrastructure instead?
             println!("Current bitwidth ({}): {max_nbits:?}", i + 1);
 
-            let new_max_nbits = BitwidthNeuralNet::eval(self, input)?;
+            let new_max_nbits = bitwidth::eval(self, input)?;
             for (a, b) in max_nbits.iter_mut().zip(new_max_nbits) {
                 if b > *a {
                     *a = b;
@@ -1011,9 +1008,7 @@ impl NeuralNet {
                 errors,
                 100.0 * (1.0 - errors as f32 / img_num as f32)
             );
-            let res = PlaintextNeuralNet::eval(self, img)?
-                .into_iter()
-                .collect::<Vec<_>>();
+            let res = plaintext::eval(self, img)?.into_iter().collect::<Vec<_>>();
 
             if util::index_of_max(&res) != util::index_of_max(label) {
                 errors += 1;
@@ -1072,9 +1067,7 @@ mod tests {
     #![allow(non_upper_case_globals)]
     #![allow(non_snake_case)]
 
-    use crate::{
-        Accuracy, NeuralNet, io::read_tests, neural_net::plaintext::PlaintextNeuralNet, util,
-    };
+    use crate::{Accuracy, NeuralNet, io::read_tests, neural_net::plaintext, util};
     use fancy_garbling::WireMod2;
     use ndarray::Array3;
     use std::path::Path;
@@ -1102,7 +1095,7 @@ mod tests {
 
     fn binary_and_plaintext_match_for_dir(dir: &Path, bitwidths: &[usize]) {
         let (nn, test) = get_nn_and_test(dir);
-        let plaintext_output = PlaintextNeuralNet::eval(&nn, &test).unwrap();
+        let plaintext_output = plaintext::eval(&nn, &test).unwrap();
 
         let gc_output = nn.eval_roundtrip_binary(&test, bitwidths, false).unwrap();
         for (a, b) in plaintext_output.iter().zip(gc_output.iter()) {
@@ -1120,7 +1113,7 @@ mod tests {
 
         println!("{nn:?}");
 
-        let plaintext_output = PlaintextNeuralNet::eval(&nn, &test).unwrap();
+        let plaintext_output = plaintext::eval(&nn, &test).unwrap();
         let gc_output = nn
             .eval_roundtrip_arith(&test, moduli, false, &accuracy)
             .unwrap();
@@ -1143,7 +1136,7 @@ mod tests {
         // Map the output wirelabels to values.
         let output = output_map.to_outputs(&outputs).unwrap();
 
-        let expected = PlaintextNeuralNet::eval(&nn, &test).unwrap();
+        let expected = plaintext::eval(&nn, &test).unwrap();
         for (a, b) in expected.iter().zip(output.iter()) {
             assert_eq!(a, b);
         }

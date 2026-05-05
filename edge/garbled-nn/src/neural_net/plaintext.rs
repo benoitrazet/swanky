@@ -3,22 +3,25 @@ use ndarray::Array3;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
-/// Object for evaluating a [`NeuralNet`] over plaintext values.
-pub(crate) struct PlaintextNeuralNet;
-
-impl PlaintextNeuralNet {
-    /// Evaluate a [`NeuralNet`] over plaintext values.
-    pub fn eval(nn: &NeuralNet, input: &Array3<i64>) -> Result<Array3<i64>> {
-        let mut backend = PlaintextNeuralNet;
-        Channel::with(std::io::empty(), |channel| {
-            nn.layers.iter().try_fold(input.clone(), |acc, layer| {
-                layer.eval(&mut backend, acc, false, channel)
-            })
-        })
-    }
+/// Evaluate a [`NeuralNet`] over a plaintext input.
+///
+/// Evaluation is done over `i64` values, and neither secret weights nor
+/// projection gates are supported.
+pub fn eval(nn: &NeuralNet, input: &Array3<i64>) -> Result<Array3<i64>> {
+    Channel::with(std::io::empty(), |channel| {
+        let mut acc = input.clone();
+        for layer in nn.layers.iter() {
+            let mut backend = PlaintextLayer;
+            acc = layer.eval(&mut backend, acc, false, channel)?;
+        }
+        Ok(acc)
+    })
 }
 
-impl FancyNeuralNet for PlaintextNeuralNet {
+/// A neural network layer for plaintext computations.
+struct PlaintextLayer;
+
+impl FancyNeuralNet for PlaintextLayer {
     type Item = i64;
 
     fn nn_encode(&mut self, value: i64, _: &mut Channel) -> Result<i64> {

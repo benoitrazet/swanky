@@ -69,7 +69,8 @@ impl TryFrom<&str> for ActivationFunction {
     }
 }
 
-pub enum Layers {
+/// An enum of the supported neural network layers.
+pub(crate) enum Layers {
     Dense(LayerDense),
     Convolutional(LayerConvolutional),
     MaxPooling2D(LayerMaxPooling2D),
@@ -78,7 +79,10 @@ pub enum Layers {
 }
 
 impl Layers {
-    /// Evaluate the layer.
+    /// Evaluate the layer on the provided backend.
+    ///
+    /// The `secret_weights` argument denotes whether the neural net weights are
+    /// secret to the garbler or not.
     pub(crate) fn eval<F: FancyNeuralNet>(
         &self,
         backend: &mut F,
