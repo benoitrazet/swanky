@@ -96,7 +96,7 @@ impl<P: GenericParty> AndTripleGenerator<P> {
     /// Create a new [`AndTripleGenerator`].
     pub fn new<RNG: CryptoRng + Rng>(
         channel: &mut Channel,
-        rng: RNG,
+        rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
         let leaky_generator = LeakyAndTripleGenerator::new(channel, rng)?;
         Ok(Self { leaky_generator })
@@ -118,7 +118,7 @@ impl<P: GenericParty> AndTripleGenerator<P> {
     pub fn new_with_delta<RNG: CryptoRng + Rng>(
         delta: U8x16,
         channel: &mut Channel,
-        rng: RNG,
+        rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
         let leaky_generator = LeakyAndTripleGenerator::new_with_delta(delta, channel, rng)?;
         Ok(Self { leaky_generator })

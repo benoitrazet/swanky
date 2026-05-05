@@ -10,7 +10,7 @@ use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
-use swanky_error::Result;
+use swanky_error::{ErrorKind, Result, ensure};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use vectoreyes::U8x16;
@@ -93,7 +93,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     // corresponding `AuthenticatedWireMod2` values.
     //
     // This corresponds to pieces of Steps 3 and 4 in Figure 3 of the paper.
-    fn encode_inputs(
+    fn encode_wirelabels(
         &mut self,
         masked_values: Vec<F2>,
         auth_shares: Vec<AuthShare<PartyGarbler>>,
@@ -213,7 +213,7 @@ where
         //     := (z'α z'β ⊕ z'γ ) ⊕ (z'β λ_α ⊕ z'α λ_β ⊕ λ*_γ ⊕ λ_γ)
 
         // The Garbler first creates the constant share of (z'α z'β ⊕ z'γ )
-        let share_masks: AuthShare<PartyGarbler> = AuthShareGenerator::constant_with_delta(
+        let share_masks = AuthShareGenerator::constant_with_delta(
             la_value * lb_value + lc_value,
             self.delta.to_repr(),
         );
@@ -234,9 +234,9 @@ where
             channel,
         )?;
 
-        assert_eq!(
-            validation_bit[0],
-            F2::ZERO,
+        ensure!(
+            validation_bit[0] == F2::ZERO,
+            ErrorKind::OtherError,
             "Garbler's authentication validation check failed at index {index}"
         );
 
@@ -250,17 +250,14 @@ where
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         AuthenticatedWireMod2::new(
             x.masked_value() + y.masked_value(),
-            // L_{γ,0} = L_{α,0} + L_{β,0}
             x.wire_label() + y.wire_label(),
-            // TODO: This is already computed in preprocessing, maybe re-use it?
-            //       although i am not sure if the storage is worth it.
             x.auth_share() ^ y.auth_share(),
         )
     }
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         AuthenticatedWireMod2::new(
-            x.masked_value() + F2::from(1),
+            x.masked_value() + F2::ONE,
             WireMod2::from_repr(x.wire_label().to_repr() ^ self.zero.to_repr(), 2),
             x.auth_share(),
         )
@@ -304,7 +301,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
             channel.write(masked_value)?;
         }
 
-        self.encode_inputs(my_masked_values, my_auth_shares, channel)
+        self.encode_wirelabels(my_masked_values, my_auth_shares, channel)
     }
 
     fn receive_many(
@@ -325,7 +322,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
             .map(|_| channel.read())
             .collect::<Result<Vec<_>>>()?;
 
-        self.encode_inputs(their_masked_values, my_auth_shares, channel)
+        self.encode_wirelabels(their_masked_values, my_auth_shares, channel)
     }
 
     fn constant(
