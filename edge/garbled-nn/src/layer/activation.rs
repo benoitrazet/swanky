@@ -42,7 +42,7 @@ impl<F: FancyNeuralNet> NeuralNetExecutor<F> for LayerActivation {
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Array3<F::Item>,
+        inputs: Array3<F::Item>,
         _secret_weights: bool,
         channel: &mut Channel,
     ) -> Result<Array3<F::Item>> {

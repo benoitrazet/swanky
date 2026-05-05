@@ -108,7 +108,7 @@ impl<'a, F: CrtProjGadgets> ArithmeticNeuralNet<'a, F> {
                 self.secret_weights_owned,
                 accuracy.clone(),
             );
-            acc = layer.eval(&mut backend, &acc, secret_weights, channel)?;
+            acc = layer.eval(&mut backend, acc, secret_weights, channel)?;
         }
         Ok(acc.into_raw_vec())
     }

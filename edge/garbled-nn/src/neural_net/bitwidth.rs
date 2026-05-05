@@ -20,7 +20,7 @@ impl BitwidthNeuralNet {
         Channel::with(std::io::empty(), |channel| {
             let mut acc = inputs.clone();
             for (i, layer) in nn.layers.iter().enumerate() {
-                acc = layer.eval(&mut backend, &acc, false, channel)?;
+                acc = layer.eval(&mut backend, acc, false, channel)?;
                 let new_max_val = backend.max;
                 backend.max = 0;
 

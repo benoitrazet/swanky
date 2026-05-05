@@ -69,7 +69,7 @@ impl<F: FancyNeuralNet> NeuralNetExecutor<F> for LayerConvolutional {
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Array3<F::Item>,
+        inputs: Array3<F::Item>,
         secret_weights: bool,
         channel: &mut Channel,
     ) -> Result<Array3<F::Item>> {

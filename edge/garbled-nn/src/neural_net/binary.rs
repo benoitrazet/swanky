@@ -106,7 +106,7 @@ impl<'a, F: BinaryGadgets> BinaryNeuralNet<'a, F> {
         for (i, layer) in nn.layers.iter().enumerate() {
             let mut backend =
                 BinaryLayer::new(self.backend, self.bitwidths[i], self.secret_weights_owned);
-            acc = layer.eval(&mut backend, &acc, secret_weights, channel)?;
+            acc = layer.eval(&mut backend, acc, secret_weights, channel)?;
         }
         Ok(acc.into_raw_vec())
     }

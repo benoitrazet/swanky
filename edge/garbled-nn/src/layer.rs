@@ -82,7 +82,7 @@ impl Layers {
     pub(crate) fn eval<F: FancyNeuralNet>(
         &self,
         backend: &mut F,
-        input: &Array3<F::Item>,
+        input: Array3<F::Item>,
         secret_weights: bool,
         channel: &mut Channel,
     ) -> Result<Array3<F::Item>> {

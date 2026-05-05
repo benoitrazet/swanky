@@ -12,7 +12,7 @@ impl PlaintextNeuralNet {
         let mut backend = PlaintextNeuralNet;
         Channel::with(std::io::empty(), |channel| {
             nn.layers.iter().try_fold(input.clone(), |acc, layer| {
-                layer.eval(&mut backend, &acc, false, channel)
+                layer.eval(&mut backend, acc, false, channel)
             })
         })
     }

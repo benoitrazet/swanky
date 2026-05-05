@@ -39,14 +39,12 @@ impl<F: FancyNeuralNet> NeuralNetExecutor<F> for LayerFlatten {
     fn execute(
         &self,
         _: &mut F,
-        inputs: &Array3<F::Item>,
+        inputs: Array3<F::Item>,
         _: bool,
         _: &mut Channel,
     ) -> Result<Array3<F::Item>> {
-        let output = inputs.map(|v| Option::Some(v.clone()));
-        let output = output
+        inputs
             .into_shape(self.output_shape)
-            .wrap_err(ErrorKind::OtherError, "Invalid output shape")?;
-        Ok(output.mapv(|elem| elem.unwrap()))
+            .wrap_err(ErrorKind::OtherError, "Invalid output shape")
     }
 }
