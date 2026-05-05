@@ -1406,7 +1406,7 @@ mod fancy_binary {
     #[test]
     fn binary_constant_gates() {
         let c = circuits::TestBinaryConstant();
-        let inputs = [0, 0];
+        let inputs = [];
         let expected_0 = 0;
         let output_0: u16 = Dummy::eval(&c, &inputs).unwrap()[0];
         assert_eq!(output_0, expected_0);
