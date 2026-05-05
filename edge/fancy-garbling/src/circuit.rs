@@ -92,7 +92,7 @@ pub mod circuits {
 
     use crate::{
         ArithmeticBundleGadgets, ArithmeticProjBundleGadgets, BinaryBundle, BinaryGadgets, Bundle,
-        BundleGadgets, CrtBundle, CrtGadgets, CrtProjGadgets, FancyArithmetic, FancyBinary,
+        BundleGadgets, CrtBundle, CrtGadgets, CrtProjGadgets, Fancy, FancyArithmetic, FancyBinary,
         FancyProj, circuit::CircuitExecutor,
     };
     use swanky_channel::Channel;
@@ -167,9 +167,9 @@ pub mod circuits {
         }
     }
 
-    /// Circuit for testing [`FancyBinary::xor_many`].
+    /// Circuit for testing [`Fancy::constant`].
     pub struct TestBinaryConstant();
-    impl<F: FancyBinary> CircuitExecutor<F> for TestBinaryConstant {
+    impl<F: Fancy> CircuitExecutor<F> for TestBinaryConstant {
         fn execute(
             &self,
             backend: &mut F,
@@ -185,7 +185,7 @@ pub mod circuits {
         }
 
         fn ninputs(&self) -> usize {
-            2
+            0
         }
 
         fn modulus(&self, _: usize) -> u16 {
