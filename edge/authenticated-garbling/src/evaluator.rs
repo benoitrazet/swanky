@@ -309,7 +309,7 @@ impl Fancy for Evaluator {
         )?;
         let masked_value = F2::from(value) + their_masked_value[0] + my_masked_value;
         channel.write(&masked_value)?;
-        let wire_label = WireMod2::from_repr(channel.read().unwrap(), 2);
+        let wire_label = WireMod2::from_repr(channel.read()?, 2);
 
         Ok(AuthenticatedWire::new(
             masked_value,
