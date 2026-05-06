@@ -98,7 +98,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         masked_values: Vec<F2>,
         auth_shares: Vec<AuthShare<PartyGarbler>>,
         channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<AuthenticatedWireMod2<PartyGarbler>>> {
+    ) -> swanky_error::Result<Vec<AuthenticatedWire>> {
         // Compute zero wirelabels `L_{w,0}`.
         let zeros = (0..masked_values.len())
             .map(|_| WireMod2::rand(&mut self.rng, 2))
@@ -119,7 +119,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             .into_iter()
             .zip(zeros.into_iter().zip(auth_shares))
             .map(|(masked_value, (zero, auth_share))| {
-                AuthenticatedWireMod2::new(masked_value, zero, auth_share)
+                AuthenticatedWire::new(masked_value, zero, auth_share)
             })
             .collect())
     }
@@ -240,7 +240,7 @@ where
             "Garbler's authentication validation check failed at index {index}"
         );
 
-        Ok(AuthenticatedWireMod2::new(
+        Ok(AuthenticatedWire::new(
             lc_value,
             WireMod2::from_repr(lc0, 2),
             lc_share,
@@ -248,7 +248,7 @@ where
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        AuthenticatedWireMod2::new(
+        AuthenticatedWire::new(
             x.masked_value() + y.masked_value(),
             x.wire_label() + y.wire_label(),
             x.auth_share() ^ y.auth_share(),
@@ -256,7 +256,7 @@ where
     }
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        AuthenticatedWireMod2::new(
+        AuthenticatedWire::new(
             x.masked_value() + F2::ONE,
             WireMod2::from_repr(x.wire_label().to_repr() ^ self.zero.to_repr(), 2),
             x.auth_share(),
@@ -343,7 +343,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         let wire_label = zero + self.delta * u16::from(masked_value);
         channel.write(&wire_label.to_repr())?;
 
-        Ok(AuthenticatedWireMod2::new(
+        Ok(AuthenticatedWire::new(
             masked_value,
             wire_label,
             current_share,

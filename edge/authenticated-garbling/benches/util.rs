@@ -2,8 +2,7 @@ use fancy_garbling::{
     Fancy, circuit::CircuitExecutor, circuit_analyzer::CircuitAnalyzer, dummy::Dummy,
 };
 use swanky_authenticated_garbling::{
-    Evaluator, Garbler,
-    preprocesser::WirePreProcessor,
+    Evaluator, Garbler, WirePreProcessor,
     ps::{PartyEvaluator, PartyGarbler},
 };
 use swanky_rng::SwankyRng;

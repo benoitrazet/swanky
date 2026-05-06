@@ -1,3 +1,8 @@
+use crate::{
+    preprocesser::{WirePreProcessor, f_preprocessing},
+    ps::PartyEvaluator,
+    wire::AuthenticatedWireMod2,
+};
 use fancy_garbling::{
     Fancy, FancyBinary, WireLabel, WireMod2, circuit::CircuitExecutor,
     circuit_analyzer::CircuitAnalyzer,
@@ -8,17 +13,10 @@ use swanky_authenticated_bits::{
     authshares::{AuthShare, AuthShareGenerator},
 };
 use swanky_channel::Channel;
-
 use swanky_error::{ErrorKind, ensure};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use vectoreyes::U8x16;
-
-use crate::{
-    preprocesser::{WirePreProcessor, f_preprocessing},
-    ps::PartyEvaluator,
-    wire::AuthenticatedWireMod2,
-};
 
 type AuthenticatedWire = AuthenticatedWireMod2<PartyEvaluator>;
 
@@ -101,17 +99,13 @@ impl Evaluator {
         masked_values: Vec<F2>,
         auth_shares: Vec<AuthShare<PartyEvaluator>>,
         channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<AuthenticatedWireMod2<PartyEvaluator>>> {
+    ) -> swanky_error::Result<Vec<AuthenticatedWire>> {
         let mut wires: Vec<AuthenticatedWire> = Vec::with_capacity(masked_values.len());
         for (masked_value, auth_share) in masked_values.into_iter().zip(auth_shares) {
             // The Evaluator retrieves the wire labels for their own input
             let wire_label = WireMod2::from_repr(channel.read()?, 2);
             // The Evaluator constructs authenticated values for all their input wires
-            wires.push(AuthenticatedWireMod2::new(
-                masked_value,
-                wire_label,
-                auth_share,
-            ));
+            wires.push(AuthenticatedWire::new(masked_value, wire_label, auth_share));
         }
         Ok(wires)
     }
@@ -119,7 +113,7 @@ impl Evaluator {
 
 impl FancyBinary for Evaluator {
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        AuthenticatedWireMod2::new(
+        AuthenticatedWire::new(
             x.masked_value() + F2::ONE,
             WireMod2::from_repr(x.wire_label().to_repr() ^ self.one.to_repr(), 2),
             x.auth_share(),
@@ -127,7 +121,7 @@ impl FancyBinary for Evaluator {
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        AuthenticatedWireMod2::new(
+        AuthenticatedWire::new(
             x.masked_value() + y.masked_value(),
             x.wire_label() + y.wire_label(),
             x.auth_share() ^ y.auth_share(),
@@ -229,7 +223,7 @@ impl FancyBinary for Evaluator {
             "Evaluator's authentication validation check failed at index {index}"
         );
 
-        Ok(AuthenticatedWireMod2::new(
+        Ok(AuthenticatedWire::new(
             lc_value,
             WireMod2::from_repr(lc_label, 2),
             lc_share,
@@ -317,7 +311,7 @@ impl Fancy for Evaluator {
         channel.write(&masked_value)?;
         let wire_label = WireMod2::from_repr(channel.read().unwrap(), 2);
 
-        Ok(AuthenticatedWireMod2::new(
+        Ok(AuthenticatedWire::new(
             masked_value,
             wire_label,
             current_share,

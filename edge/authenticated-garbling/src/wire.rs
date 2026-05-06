@@ -33,9 +33,6 @@ impl<P: GenericParty> AuthenticatedWireMod2<P> {
     }
 
     /// The masked value associated with this wire.
-    ///
-    /// # Panics
-    /// This panics if there is no masked value associated with the wire.
     pub(crate) fn masked_value(&self) -> F2 {
         self.masked_value
     }
