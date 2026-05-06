@@ -300,28 +300,14 @@ impl Fancy for Evaluator {
         _q: u16,
         channel: &mut Channel,
     ) -> swanky_error::Result<AuthenticatedWire> {
-        let current_share = self.next_auth_share();
+        assert!(value == 0 || value == 1);
 
-        let my_masked_value = current_share.bit();
-        let mut their_masked_value = Vec::with_capacity(1);
+        let constant = F2::try_from(value).unwrap(); // `unwrap` will never fail due to `assert` above.
+        let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
 
-        AuthShareGenerator::open_their_shares_with_delta(
-            &[current_share],
-            self.delta,
-            &mut their_masked_value,
-            channel,
-        )?;
-        let value = F2::try_from(value)
-            .wrap_err(ErrorKind::OtherError, "Invalid value, must be boolean")?;
-        let masked_value = value + their_masked_value[0] + my_masked_value;
-        channel.write(&masked_value)?;
-        let wire_label = WireMod2::from_repr(channel.read()?, 2);
+        let wirelabel = WireMod2::from_repr(channel.read()?, 2);
 
-        Ok(AuthenticatedWire::new(
-            masked_value,
-            wire_label,
-            current_share,
-        ))
+        Ok(AuthenticatedWire::new(constant, wirelabel, share))
     }
 
     fn output(
@@ -329,26 +315,29 @@ impl Fancy for Evaluator {
         x: &AuthenticatedWire,
         channel: &mut Channel,
     ) -> swanky_error::Result<Option<u16>> {
-        let auth_share: AuthShare<PartyEvaluator> = x.auth_share();
-        let mut out = Vec::with_capacity(1);
-        AuthShareGenerator::open_with_delta(&[auth_share], self.delta, &mut out, channel)?;
-        Ok(Some(u16::from(out[0])))
+        Ok(self
+            .outputs(core::slice::from_ref(x), channel)?
+            .map(|xs| xs[0]))
     }
-    // Preferable function when processing multiple outputs!
-    // It can efficiently batch opening bits.
+
     fn outputs(
         &mut self,
         x: &[AuthenticatedWire],
         channel: &mut Channel,
     ) -> swanky_error::Result<Option<Vec<u16>>> {
-        let auth_shares: Vec<AuthShare<PartyEvaluator>> =
-            x.iter().map(|wire| wire.auth_share()).collect();
+        let auth_shares = x.iter().map(|wire| wire.auth_share()).collect::<Vec<_>>();
         let mut masks = Vec::with_capacity(x.len());
-        AuthShareGenerator::open_with_delta(&auth_shares, self.delta, &mut masks, channel)?;
-        let mut outputs = Vec::with_capacity(x.len());
-        for i in 0..x.len() {
-            outputs.push((masks[i] + x[i].masked_value()).into());
-        }
+        AuthShareGenerator::open_their_shares_with_delta(
+            &auth_shares,
+            self.delta,
+            &mut masks,
+            channel,
+        )?;
+        let outputs = masks
+            .into_iter()
+            .zip(x)
+            .map(|(mask, out)| (mask + out.masked_value() + out.auth_share().bit()).into())
+            .collect::<Vec<_>>();
         Ok(Some(outputs))
     }
 }

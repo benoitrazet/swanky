@@ -332,27 +332,20 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
 
     fn constant(
         &mut self,
-        _x: u16,
+        value: u16,
         _q: u16,
         channel: &mut Channel,
     ) -> swanky_error::Result<AuthenticatedWire> {
-        // Constant wires get their own dedicated authenticated share just like
-        // an input wire.
-        let current_share = self.next_auth_share();
-        AuthShareGenerator::open_my_shares(&[current_share], channel)?;
+        assert!(value == 0 || value == 1);
+
+        let constant = F2::try_from(value).unwrap(); // `unwrap` will never fail due to `assert` above.
+        let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());
 
         let zero = WireMod2::rand(&mut self.rng, 2);
-        // The garbler receives the masked value from the evaluator
-        let masked_value = channel.read()?;
-        // The garbler sends the wire label associated with the masked value to the evaluator
-        let wire_label = zero + self.delta * u16::from(masked_value);
-        channel.write(&wire_label.to_repr())?;
+        let wirelabel = zero + self.delta * value;
+        channel.write(&wirelabel.to_repr())?;
 
-        Ok(AuthenticatedWire::new(
-            masked_value,
-            wire_label,
-            current_share,
-        ))
+        Ok(AuthenticatedWire::new(constant, zero, share))
     }
 
     fn output(
@@ -360,32 +353,18 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         x: &AuthenticatedWire,
         channel: &mut Channel,
     ) -> swanky_error::Result<Option<u16>> {
-        let auth_share: AuthShare<PartyGarbler> = x.auth_share();
-        let mut out = Vec::with_capacity(1);
-        AuthShareGenerator::open_with_delta(
-            &[auth_share],
-            self.delta.to_repr(),
-            &mut out,
-            channel,
-        )?;
-        Ok(None)
+        Ok(self
+            .outputs(core::slice::from_ref(x), channel)?
+            .map(|xs| xs[0]))
     }
-    // Preferable function when processing multiple outputs!
-    // It can efficiently batch opening bits.
+
     fn outputs(
         &mut self,
         x: &[AuthenticatedWire],
         channel: &mut Channel,
     ) -> swanky_error::Result<Option<Vec<u16>>> {
-        let auth_shares: Vec<AuthShare<PartyGarbler>> =
-            x.iter().map(|wire| wire.auth_share()).collect();
-        let mut outputs = Vec::with_capacity(x.len());
-        AuthShareGenerator::open_with_delta(
-            &auth_shares,
-            self.delta.to_repr(),
-            &mut outputs,
-            channel,
-        )?;
+        let auth_shares = x.iter().map(|wire| wire.auth_share()).collect::<Vec<_>>();
+        AuthShareGenerator::open_my_shares(&auth_shares, channel)?;
         Ok(None)
     }
 }
