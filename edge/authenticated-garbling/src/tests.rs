@@ -80,12 +80,12 @@ fn test_party_gb_encoding_ev_receiving_correct() {
         let mask = w_gb.auth_share().bit() + w_ev.auth_share().bit();
         assert_eq!(
             w_gb.masked_value() + mask,
-            inputs[i].into(),
+            inputs[i].try_into().unwrap(),
             "The Garbler's value is incorrectly masked"
         );
         assert_eq!(
             w_ev.masked_value() + mask,
-            inputs[i].into(),
+            inputs[i].try_into().unwrap(),
             "The Evaluator received a wrong masked value from the Garbler"
         );
     }
@@ -118,12 +118,12 @@ fn test_party_ev_encoding_gb_receiving_correct() {
         let mask = w_gb.auth_share().bit() + w_ev.auth_share().bit();
         assert_eq!(
             w_gb.masked_value() + mask,
-            inputs[i].into(),
+            inputs[i].try_into().unwrap(),
             "The Garbler received a wrong masked value from the Evaluator"
         );
         assert_eq!(
             w_ev.masked_value() + mask,
-            inputs[i].into(),
+            inputs[i].try_into().unwrap(),
             "The Evaluator's value is incorrectly masked"
         );
     }

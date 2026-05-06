@@ -13,7 +13,7 @@ use swanky_authenticated_bits::{
     authshares::{AuthShare, AuthShareGenerator},
 };
 use swanky_channel::Channel;
-use swanky_error::{ErrorKind, ensure};
+use swanky_error::{ErrorKind, WrapErr, ensure};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use vectoreyes::U8x16;
@@ -260,8 +260,12 @@ impl Fancy for Evaluator {
         let my_masked_values = their_bits
             .into_iter()
             .zip(my_auth_shares.iter().zip(values.iter()))
-            .map(|(theirs, (mine, value))| theirs + mine.bit() + F2::from(*value))
-            .collect::<Vec<_>>();
+            .map(|(theirs, (mine, value))| {
+                F2::try_from(*value)
+                    .wrap_err(ErrorKind::OtherError, "Invalid value, must be boolean")
+                    .map(|value| theirs + mine.bit() + value)
+            })
+            .collect::<swanky_error::Result<Vec<_>>>()?;
         for masked_value in my_masked_values.iter() {
             channel.write(masked_value)?;
         }
@@ -307,7 +311,9 @@ impl Fancy for Evaluator {
             &mut their_masked_value,
             channel,
         )?;
-        let masked_value = F2::from(value) + their_masked_value[0] + my_masked_value;
+        let value = F2::try_from(value)
+            .wrap_err(ErrorKind::OtherError, "Invalid value, must be boolean")?;
+        let masked_value = value + their_masked_value[0] + my_masked_value;
         channel.write(&masked_value)?;
         let wire_label = WireMod2::from_repr(channel.read()?, 2);
 

@@ -35,19 +35,6 @@ impl From<F2> for bool {
     }
 }
 
-impl From<u16> for F2 {
-    #[inline(always)]
-    fn from(x: u16) -> Self {
-        F2(x as u8)
-    }
-}
-impl From<F2> for u16 {
-    #[inline(always)]
-    fn from(x: F2) -> Self {
-        x.0.into()
-    }
-}
-
 impl ConstantTimeEq for F2 {
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)
@@ -150,6 +137,18 @@ impl TryFrom<u8> for F2 {
     }
 }
 
+impl TryFrom<u16> for F2 {
+    type Error = BiggerThanModulus;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        if value < MODULUS as u16 {
+            Ok(F2(value as u8))
+        } else {
+            Err(BiggerThanModulus)
+        }
+    }
+}
+
 impl TryFrom<u128> for F2 {
     type Error = BiggerThanModulus;
 
@@ -169,6 +168,13 @@ impl From<F2> for u8 {
     #[inline]
     fn from(x: F2) -> Self {
         x.0
+    }
+}
+
+impl From<F2> for u16 {
+    #[inline(always)]
+    fn from(x: F2) -> Self {
+        x.0.into()
     }
 }
 

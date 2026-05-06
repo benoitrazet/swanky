@@ -10,6 +10,7 @@ use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
+use swanky_error::WrapErr;
 use swanky_error::{ErrorKind, Result, ensure};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
@@ -293,8 +294,12 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         let my_masked_values = their_bits
             .into_iter()
             .zip(my_auth_shares.iter().zip(values.iter()))
-            .map(|(theirs, (mine, value))| theirs + mine.bit() + F2::from(*value))
-            .collect::<Vec<_>>();
+            .map(|(theirs, (mine, value))| {
+                F2::try_from(*value)
+                    .wrap_err(ErrorKind::OtherError, "Invalid value, must be boolean")
+                    .map(|value| theirs + mine.bit() + value)
+            })
+            .collect::<Result<Vec<_>>>()?;
 
         // Send `x_w ⊕ λ_w` to the evaluator.
         for masked_value in my_masked_values.iter() {
