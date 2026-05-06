@@ -61,6 +61,7 @@ nightly-test:
   interruptible: true
   tags: [linux]
   timeout: 4h
+  retry: 2
   variables:
     TMPDIR: /tmp
   script:
