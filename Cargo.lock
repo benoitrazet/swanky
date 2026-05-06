@@ -2549,6 +2549,7 @@ dependencies = [
 name = "swanky-authenticated-garbling"
 version = "0.6.0"
 dependencies = [
+ "criterion",
  "fancy-garbling",
  "itertools 0.14.0",
  "proptest",

@@ -12,9 +12,12 @@ mod tests;
 mod wire;
 pub use wire::AuthenticatedWireMod2;
 
+// Party system type aliases for the garbler and evaluator
 party_system! {
-    mod ps {
+    pub mod ps {
+        ///Type alias for the Garbler
         PartyGarbler,
+        ///Type alias for the Evaluator
         PartyEvaluator,
     }
 }
