@@ -3,7 +3,7 @@ use fancy_garbling::{
 };
 use swanky_authenticated_garbling::{
     Evaluator, Garbler,
-    preprocesser::wire::WirePreProcessor,
+    preprocesser::WirePreProcessor,
     ps::{PartyEvaluator, PartyGarbler},
 };
 use swanky_rng::SwankyRng;

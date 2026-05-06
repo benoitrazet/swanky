@@ -1,28 +1,25 @@
-//! `Informer` runs a fancy computation and learns information from it.
-
 use fancy_garbling::{Fancy, FancyBinary, HasModulus};
-use std::collections::VecDeque;
 use swanky_authenticated_bits::authshares::AuthShare;
 use swanky_channel::Channel;
 use swanky_party::GenericParty;
 
-/// A struct which defines a wire that can be used for pre-processing
-/// an authenticated garbling circuit. The main feature of this wire is that
-/// it has an index and that it keeps track of the wire's authenticated share. The
-/// later part is especially important because one of the assumptions that
-/// KRRW18 makes and does not explicitly state is that once the authenticate shares
-/// are generated during pre-processing, the garbler has to construct the authenticated
-/// share of XOR and Negation gates during pre-processing in order to correctly produce known and gates.
+/// A thin wrapper around an [`AuthShare`] for use as a [`Fancy`] object.
+///
+/// This is used to determine the [`AuthShare`] inputs to AND gates. This is
+/// important because one of the assumptions that KRRW18 makes and does not
+/// explicitly state is that once the authenticate shares are generated during
+/// pre-processing, the garbler has to construct the authenticated share of XOR
+/// and Negation gates during pre-processing in order to correctly produce known
+/// AND gates.
 #[derive(Clone, Copy)]
 pub struct PreProcessedWire<P: GenericParty> {
-    index: usize,
     auth_share: AuthShare<P>,
 }
 
 impl<P: GenericParty> PreProcessedWire<P> {
-    /// Construct a new [`PreProcessedWire`] from an index and an authenticated share
-    pub(crate) fn new(index: usize, auth_share: AuthShare<P>) -> Self {
-        PreProcessedWire { index, auth_share }
+    /// Construct a new [`PreProcessedWire`] from an authenticated share.
+    pub(crate) fn new(auth_share: AuthShare<P>) -> Self {
+        PreProcessedWire { auth_share }
     }
 }
 
@@ -38,74 +35,42 @@ impl<P: GenericParty> HasModulus for PreProcessedWire<P> {
 /// figure out which pairs of wires need to be correlated together.
 #[derive(Clone)]
 pub struct WirePreProcessor<P: GenericParty> {
-    auth_shares: VecDeque<AuthShare<P>>,
-    wires: Vec<AuthShare<P>>,
-    and_triple_input_indices: Vec<(usize, usize)>,
-    current_index: usize,
+    auth_shares: Vec<AuthShare<P>>,
+    auth_shares_index: usize,
+    and_gate_left_inputs: Vec<AuthShare<P>>,
+    and_gate_right_inputs: Vec<AuthShare<P>>,
 }
 
 impl<P: GenericParty> WirePreProcessor<P> {
-    /// Construct a new [`WirePreProcessor`] using a vector of [`AuthShare`]
+    /// Construct a new [`WirePreProcessor`] using a vector of [`AuthShare`]s
+    /// which equals the number of AND, Input, and Constant gates in the
+    /// circuit.
     pub(crate) fn new(auth_shares: Vec<AuthShare<P>>) -> WirePreProcessor<P> {
         WirePreProcessor {
-            auth_shares: VecDeque::from(auth_shares),
-            wires: Vec::new(),
-            and_triple_input_indices: Vec::new(),
-            current_index: 0,
+            auth_shares,
+            auth_shares_index: 0,
+            and_gate_left_inputs: Vec::new(),
+            and_gate_right_inputs: Vec::new(),
         }
     }
-    /// Returns the [`AuthShare`] associated with the input wires of AND gates.
-    /// These shares are split according to whether they are the left or right
-    /// wires of a gate.
-    pub(crate) fn and_gate_input_shares(&self) -> (Vec<AuthShare<P>>, Vec<AuthShare<P>>) {
-        let mut lefts = Vec::new();
-        let mut rights = Vec::new();
-        for (left, right) in &self.and_triple_input_indices {
-            lefts.push(self.wires[*left]);
-            rights.push(self.wires[*right]);
-        }
-        (lefts, rights)
+    /// Return the [`AuthShare`]s associated with the input wires of each AND
+    /// gate, consuming itself. These shares are split according to whether they
+    /// are the left or right wires of a gate.
+    pub(crate) fn into_and_gate_input_shares(self) -> (Vec<AuthShare<P>>, Vec<AuthShare<P>>) {
+        (self.and_gate_left_inputs, self.and_gate_right_inputs)
     }
 
-    /// Pops an [`AuthShare<P>`] from the vector of authenticated shares.
-    fn pop_auth_share(&mut self) -> AuthShare<P> {
-        self.auth_shares
-            .pop_front()
-            .expect("there should be enough authenticated shares generated during preprocessing")
-    }
-
-    /// Inserts the indices of the left, right and output wire of an AND gate into the
-    /// [`WirePreProcessor`]'s HashMap.
-    fn insert_index_corrolation(&mut self, left: usize, right: usize) {
-        self.and_triple_input_indices.push((left, right));
-    }
-
-    /// Returns the current wire's index.
-    fn current_index(&mut self) -> usize {
-        let current = self.current_index;
-        self.current_index += 1;
-        current
-    }
-}
-
-impl<P: GenericParty> std::fmt::Display for WirePreProcessor<P> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for (left, right) in &self.and_triple_input_indices {
-            writeln!(
-                f,
-                "Current Known AND Triple is correlated with left input {left} and right input {right}",
-            )?;
-        }
-        Ok(())
+    /// Return the next [`AuthShare`] from the vector of authenticated shares.
+    fn next_auth_share(&mut self) -> AuthShare<P> {
+        let authshare = self.auth_shares[self.auth_shares_index];
+        self.auth_shares_index += 1;
+        authshare
     }
 }
 
 impl<P: GenericParty> FancyBinary for WirePreProcessor<P> {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        let index = self.current_index();
-        let result = PreProcessedWire::new(index, x.auth_share ^ y.auth_share);
-        self.wires.push(result.auth_share);
-        result
+        PreProcessedWire::new(x.auth_share ^ y.auth_share)
     }
 
     fn and(
@@ -114,13 +79,11 @@ impl<P: GenericParty> FancyBinary for WirePreProcessor<P> {
         y: &Self::Item,
         _channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item> {
-        let index = self.current_index();
-        let authshare = self.pop_auth_share();
+        self.and_gate_left_inputs.push(x.auth_share);
+        self.and_gate_right_inputs.push(y.auth_share);
 
-        let result = PreProcessedWire::new(index, authshare);
-        self.insert_index_corrolation(x.index, y.index);
-        self.wires.push(result.auth_share);
-        Ok(result)
+        let authshare = self.next_auth_share();
+        Ok(PreProcessedWire::new(authshare))
     }
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
@@ -136,15 +99,12 @@ impl<P: GenericParty> Fancy for WirePreProcessor<P> {
         moduli: &[u16],
         _: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        let mut wires: Vec<PreProcessedWire<P>> = Vec::with_capacity(moduli.len());
-        for _ in 0..moduli.len() {
-            let index = self.current_index();
-            let auth_share = self.pop_auth_share();
-            let wire = PreProcessedWire::new(index, auth_share);
-            self.wires.push(wire.auth_share);
-            wires.push(wire);
-        }
-        Ok(wires)
+        Ok((0..moduli.len())
+            .map(|_| {
+                let auth_share = self.next_auth_share();
+                PreProcessedWire::new(auth_share)
+            })
+            .collect())
     }
 
     fn encode_many(
@@ -156,24 +116,12 @@ impl<P: GenericParty> Fancy for WirePreProcessor<P> {
         unimplemented!("Preprocessor cannot encode values");
     }
 
-    fn constant(
-        &mut self,
-        _val: u16,
-        _q: u16,
-        _channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        let index = self.current_index();
-        let authshare = self.pop_auth_share();
-        let result = PreProcessedWire::new(index, authshare);
-        self.wires.push(result.auth_share);
-        Ok(result)
+    fn constant(&mut self, _: u16, _: u16, _: &mut Channel) -> swanky_error::Result<Self::Item> {
+        let authshare = self.next_auth_share();
+        Ok(PreProcessedWire::new(authshare))
     }
 
-    fn output(
-        &mut self,
-        _x: &Self::Item,
-        _channel: &mut Channel,
-    ) -> swanky_error::Result<Option<u16>> {
+    fn output(&mut self, _: &Self::Item, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
         Ok(None)
     }
 }

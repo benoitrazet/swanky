@@ -31,8 +31,8 @@ use swanky_authenticated_bits::{and_triples::AndTripleGenerator, authshares::Aut
 use swanky_channel::Channel;
 use swanky_party::GenericParty;
 
-pub mod wire;
-use crate::preprocesser::wire::WirePreProcessor;
+mod wire;
+pub use crate::preprocesser::wire::WirePreProcessor;
 
 /// Pre-process a circuit for authenticated garbling.
 ///
@@ -40,7 +40,7 @@ use crate::preprocesser::wire::WirePreProcessor;
 /// [`AndTriple`](swanky_authenticated_bits::and_triples::AndTriple)s and
 /// [`AuthShare`]s in its "online" portion. This function returns the (1) wire
 /// shares and (2) triple output shares for the given circuit of interest.
-pub fn f_preprocessing<P: GenericParty, C, RNG: CryptoRng + Rng>(
+pub(crate) fn f_preprocessing<P: GenericParty, C, RNG: CryptoRng + Rng>(
     circuit: &C,
     and_generator: &mut AndTripleGenerator<P>,
     channel: &mut Channel,
@@ -91,7 +91,7 @@ where
     // to begin with.
     let mut known_triples = Vec::with_capacity(nands);
     if nands > 0 {
-        let (left_wires, right_wires) = wire_preprocessor.and_gate_input_shares();
+        let (left_wires, right_wires) = wire_preprocessor.into_and_gate_input_shares();
         and_generator.to_known_triple(
             &rand_and_triples[..nands],
             &left_wires,

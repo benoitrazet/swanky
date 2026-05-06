@@ -1,5 +1,5 @@
+use crate::preprocesser::WirePreProcessor;
 use crate::preprocesser::f_preprocessing;
-use crate::preprocesser::wire::WirePreProcessor;
 use crate::ps::PartyGarbler;
 use crate::wire::AuthenticatedWireMod2;
 use fancy_garbling::circuit::CircuitExecutor;

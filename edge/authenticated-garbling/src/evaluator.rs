@@ -15,7 +15,7 @@ use swanky_field_binary::{F2, F128b};
 use vectoreyes::U8x16;
 
 use crate::{
-    preprocesser::{f_preprocessing, wire::WirePreProcessor},
+    preprocesser::{WirePreProcessor, f_preprocessing},
     ps::PartyEvaluator,
     wire::AuthenticatedWireMod2,
 };
@@ -58,18 +58,18 @@ impl Evaluator {
         let delta = AndTripleGenerator::<PartyEvaluator>::generate_valid_delta(rng);
 
         let mut and_generator = AndTripleGenerator::new_with_delta(delta, channel, rng)?;
-        let (auth_shares, known_triples) =
+        let (auth_shares, and_auth_shares) =
             f_preprocessing(circuit, &mut and_generator, channel, rng)?;
 
         let one = channel.read::<U8x16>()?;
         Ok(Evaluator {
-            one: WireMod2::from_repr(one, 2),
             delta,
+            one: WireMod2::from_repr(one, 2),
+            and_wire_index: 0,
             auth_shares,
             auth_shares_index: 0,
-            and_auth_shares: known_triples,
+            and_auth_shares,
             and_auth_shares_index: 0,
-            and_wire_index: 0,
         })
     }
 

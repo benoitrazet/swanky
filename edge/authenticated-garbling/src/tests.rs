@@ -2,7 +2,7 @@
 
 use crate::garbler::Garbler;
 use crate::ps::{PartyEvaluator, PartyGarbler};
-use crate::{evaluator::Evaluator, preprocesser::wire::WirePreProcessor};
+use crate::{evaluator::Evaluator, preprocesser::WirePreProcessor};
 
 use fancy_garbling::{
     Fancy,
