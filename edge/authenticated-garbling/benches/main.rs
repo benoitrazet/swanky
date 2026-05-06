@@ -1,7 +1,10 @@
-use std::time::Duration;
+use std::{fs::File, io::BufReader, time::Duration};
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use fancy_garbling::{Fancy, circuit::circuits};
+use fancy_garbling::{
+    Fancy,
+    circuit::{BinaryCircuit, circuits},
+};
 use rand::Rng;
 use swanky_authenticated_garbling::{Evaluator, Garbler};
 use swanky_rng::SwankyRng;
@@ -178,12 +181,34 @@ fn bench_binary_subtraction(c: &mut Criterion) {
     );
 }
 
+fn bench_aes(c: &mut Criterion) {
+    let mut rng_gb = SwankyRng::new();
+    let mut rng_ev = SwankyRng::new();
+    let inputs_gb = (0..128)
+        .map(|_| rng_gb.r#gen::<u16>() % 2)
+        .collect::<Vec<_>>();
+    let inputs_ev = (0..128)
+        .map(|_| rng_gb.r#gen::<u16>() % 2)
+        .collect::<Vec<_>>();
+
+    let circuit = BinaryCircuit::parse(BufReader::new(
+        File::open("../fancy-garbling/circuits/AES-non-expanded.txt").unwrap(),
+    ))
+    .unwrap();
+    c.bench_function("aes", move |b| {
+        b.iter(|| {
+            test_circuit(&inputs_gb, &inputs_ev, rng_gb.fork(), &mut rng_ev, &circuit);
+        })
+    });
+}
+
 criterion_group! {
     name = authenticated_garbling;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
     targets = bench_party_construction, bench_party_encoding_receiving,
     bench_and_gate_fan_n, bench_binary_addition,bench_binary_subtraction,
-    bench_constant_gates,bench_or_gate_fan_n,bench_single_and_gate,bench_xor_gate_fan_n
+    bench_constant_gates,bench_or_gate_fan_n,bench_single_and_gate,bench_xor_gate_fan_n,
+    bench_aes
 }
 
 criterion_main!(authenticated_garbling);
