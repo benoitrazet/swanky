@@ -15,19 +15,13 @@ fancy-garbling.workspace = true
 swanky-authenticated-bits.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true
-swanky-f-rand.workspace = true
 swanky-channel.workspace = true
 swanky-party.workspace = true
-swanky-ot-traits.workspace = true
-swanky-adversary.workspace = true
 swanky-rng.workspace = true
 swanky-error.workspace = true
-swanky-ot-alsz-kos.workspace = true
-
 vectoreyes.workspace = true
+
 rand.workspace = true
-itertools.workspace = true
-proptest.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
