@@ -1,0 +1,240 @@
+#![cfg(test)]
+
+use crate::garbler::Garbler;
+use crate::ps::{PartyEvaluator, PartyGarbler};
+use crate::{evaluator::Evaluator, preprocesser::WirePreProcessor};
+
+use fancy_garbling::{
+    Fancy,
+    circuit::{CircuitExecutor, circuits},
+    circuit_analyzer::CircuitAnalyzer,
+    dummy::Dummy,
+};
+use rand::Rng;
+use swanky_rng::SwankyRng;
+
+#[test]
+fn test_party_construction_passes() {
+    let input_size = 400;
+    let circuit = circuits::TestAndGateFanN(input_size);
+    swanky_channel::local::local_channel_pair(
+        |c| {
+            let rng = SwankyRng::new();
+            Garbler::new(&circuit, c, rng)
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            Evaluator::new(&circuit, c, &mut rng)
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn test_party_encoding_receiving_passes() {
+    let input_size_gb = 400;
+    let input_size_ev = 400;
+    let circuit = circuits::TestAndGateFanN(input_size_gb + input_size_ev);
+
+    swanky_channel::local::local_channel_pair(
+        |c| {
+            let rng = SwankyRng::new();
+            let mut gb = Garbler::new(&circuit, c, rng)?;
+            gb.encode_many(&vec![0; input_size_gb], &vec![2; input_size_gb], c)?;
+            gb.receive_many(&vec![2; input_size_ev], c)?;
+            Ok(())
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut ev = Evaluator::new(&circuit, c, &mut rng)?;
+            ev.receive_many(&vec![2; input_size_gb], c)?;
+            ev.encode_many(&vec![0; input_size_ev], &vec![2; input_size_ev], c)?;
+            Ok(())
+        },
+    )
+    .unwrap();
+}
+#[test]
+fn test_party_gb_encoding_ev_receiving_correct() {
+    let input_size_gb = 400;
+    let circuit = circuits::TestAndGateFanN(input_size_gb);
+    let mut rng = SwankyRng::new();
+    let inputs: Vec<u16> = (0..input_size_gb).map(|_| rng.r#gen::<u16>() % 2).collect();
+    let (gb_wires, ev_wires) = swanky_channel::local::local_channel_pair(
+        |c| {
+            let rng = SwankyRng::new();
+            let mut gb = Garbler::new(&circuit, c, rng)?;
+            let res = gb.encode_many(&inputs, &vec![2; input_size_gb], c)?;
+            Ok(res)
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut ev = Evaluator::new(&circuit, c, &mut rng)?;
+            let res = ev.receive_many(&vec![2; input_size_gb], c)?;
+
+            Ok(res)
+        },
+    )
+    .unwrap();
+    for (i, (w_gb, w_ev)) in gb_wires.iter().zip(ev_wires).enumerate() {
+        let mask = w_gb.auth_share().bit() + w_ev.auth_share().bit();
+        assert_eq!(
+            w_gb.masked_value() + mask,
+            inputs[i].try_into().unwrap(),
+            "The Garbler's value is incorrectly masked"
+        );
+        assert_eq!(
+            w_ev.masked_value() + mask,
+            inputs[i].try_into().unwrap(),
+            "The Evaluator received a wrong masked value from the Garbler"
+        );
+    }
+}
+
+#[test]
+fn test_party_ev_encoding_gb_receiving_correct() {
+    let ninputs_ev = 400;
+    let circuit = circuits::TestAndGateFanN(ninputs_ev);
+    let mut rng = SwankyRng::new();
+    let inputs: Vec<u16> = (0..ninputs_ev).map(|_| rng.r#gen::<u16>() % 2).collect();
+
+    let (gb_wires, ev_wires) = swanky_channel::local::local_channel_pair(
+        |c| {
+            let rng = SwankyRng::new();
+            let mut gb = Garbler::new(&circuit, c, rng)?;
+            let res = gb.receive_many(&vec![2; ninputs_ev], c)?;
+            Ok(res)
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut ev = Evaluator::new(&circuit, c, &mut rng)?;
+            let res = ev.encode_many(&inputs, &vec![2; ninputs_ev], c)?;
+
+            Ok(res)
+        },
+    )
+    .unwrap();
+    for (i, (w_gb, w_ev)) in gb_wires.iter().zip(ev_wires).enumerate() {
+        let mask = w_gb.auth_share().bit() + w_ev.auth_share().bit();
+        assert_eq!(
+            w_gb.masked_value() + mask,
+            inputs[i].try_into().unwrap(),
+            "The Garbler received a wrong masked value from the Evaluator"
+        );
+        assert_eq!(
+            w_ev.masked_value() + mask,
+            inputs[i].try_into().unwrap(),
+            "The Evaluator's value is incorrectly masked"
+        );
+    }
+}
+
+fn test_circuit<
+    C: CircuitExecutor<CircuitAnalyzer>
+        + CircuitExecutor<WirePreProcessor<PartyGarbler>>
+        + CircuitExecutor<WirePreProcessor<PartyEvaluator>>
+        + CircuitExecutor<Garbler<SwankyRng>>
+        + CircuitExecutor<Evaluator>
+        + CircuitExecutor<Dummy>
+        + Sync,
+>(
+    ninputs_gb: usize,
+    ninputs_ev: usize,
+    circuit: &C,
+) {
+    assert_eq!(
+        ninputs_gb + ninputs_ev,
+        <C as CircuitExecutor<Dummy>>::ninputs(circuit)
+    );
+
+    let mut rng = SwankyRng::new();
+    let inputs_gb: Vec<u16> = (0..ninputs_gb).map(|_| rng.r#gen::<u16>() % 2).collect();
+    let inputs_ev: Vec<u16> = (0..ninputs_ev).map(|_| rng.r#gen::<u16>() % 2).collect();
+
+    let inputs = [inputs_gb.clone(), inputs_ev.clone()].concat();
+    let expected = Dummy::eval(circuit, &inputs).unwrap();
+
+    let (outputs_gb, outputs_ev) = swanky_channel::local::local_channel_pair(
+        |c| {
+            let rng = SwankyRng::new();
+            let mut gb = Garbler::new(circuit, c, rng)?;
+            let mut inputs = gb.encode_many(&inputs_gb, &vec![2; ninputs_gb], c)?;
+            let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
+            inputs.extend(theirs);
+            let outputs = circuit.execute(&mut gb, &inputs, c)?;
+            gb.outputs(&outputs, c)
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut ev = Evaluator::new(circuit, c, &mut rng)?;
+            let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
+            let mine = ev.encode_many(&inputs_ev, &vec![2; ninputs_ev], c)?;
+            inputs.extend(mine);
+            let outputs = circuit.execute(&mut ev, &inputs, c)?;
+            ev.outputs(&outputs, c)
+        },
+    )
+    .unwrap();
+    assert!(outputs_gb.is_none());
+    let outputs = outputs_ev.unwrap();
+    assert_eq!(outputs, expected)
+}
+
+#[test]
+fn test_single_and_gate() {
+    let ninputs_gb = 1;
+    let ninputs_ev = 1;
+    let circuit = circuits::TestAndGateFanN(ninputs_gb + ninputs_ev);
+
+    test_circuit(ninputs_gb, ninputs_ev, &circuit);
+}
+
+#[test]
+fn test_constant_gates() {
+    let circuit = circuits::TestBinaryConstant();
+
+    test_circuit(0, 0, &circuit);
+}
+
+#[test]
+fn test_and_gate_fan_n() {
+    let ninputs_gb = 400;
+    let ninputs_ev = 400;
+    let circuit = circuits::TestAndGateFanN(ninputs_gb + ninputs_ev);
+
+    test_circuit(ninputs_gb, ninputs_ev, &circuit);
+}
+
+#[test]
+fn test_or_gate_fan_n() {
+    let ninputs_gb = 400;
+    let ninputs_ev = 400;
+    let circuit = circuits::TestOrGateFanN(ninputs_gb + ninputs_ev);
+
+    test_circuit(ninputs_gb, ninputs_ev, &circuit);
+}
+
+#[test]
+fn test_xor_gate_fan_n() {
+    let ninputs_gb = 400;
+    let ninputs_ev = 400;
+    let circuit = circuits::TestXorGateFanN(ninputs_gb + ninputs_ev);
+
+    test_circuit(ninputs_gb, ninputs_ev, &circuit);
+}
+
+#[test]
+fn test_binary_addition() {
+    let ninputs = 400;
+    let circuit = circuits::TestBinaryAddition(ninputs);
+
+    test_circuit(ninputs, ninputs, &circuit);
+}
+
+#[test]
+fn test_binary_subtraction() {
+    let ninputs = 400;
+    let circuit = circuits::TestBinaryAddition(ninputs);
+
+    test_circuit(ninputs, ninputs, &circuit);
+}

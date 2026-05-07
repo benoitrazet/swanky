@@ -92,7 +92,7 @@ pub mod circuits {
 
     use crate::{
         ArithmeticBundleGadgets, ArithmeticProjBundleGadgets, BinaryBundle, BinaryGadgets, Bundle,
-        BundleGadgets, CrtBundle, CrtGadgets, CrtProjGadgets, FancyArithmetic, FancyBinary,
+        BundleGadgets, CrtBundle, CrtGadgets, CrtProjGadgets, Fancy, FancyArithmetic, FancyBinary,
         FancyProj, circuit::CircuitExecutor,
     };
     use swanky_channel::Channel;
@@ -144,6 +144,54 @@ pub mod circuits {
         }
     }
 
+    /// Circuit for testing [`FancyBinary::xor_many`].
+    pub struct TestXorGateFanN(pub usize);
+    impl<F: FancyBinary> CircuitExecutor<F> for TestXorGateFanN {
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &[F::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<F::Item>> {
+            let output = backend.xor_many(inputs);
+            backend.output(&output, channel)?;
+            Ok(vec![output])
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
+    /// Circuit for testing [`Fancy::constant`].
+    pub struct TestBinaryConstant();
+    impl<F: Fancy> CircuitExecutor<F> for TestBinaryConstant {
+        fn execute(
+            &self,
+            backend: &mut F,
+            _inputs: &[F::Item],
+            channel: &mut Channel,
+        ) -> Result<Vec<F::Item>> {
+            let outputs = vec![
+                backend.constant(0, 2, channel)?,
+                backend.constant(1, 2, channel)?,
+            ];
+            backend.outputs(&outputs, channel)?;
+            Ok(outputs)
+        }
+
+        fn ninputs(&self) -> usize {
+            0
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
     /// Circuit for testing [`FancyArithmetic::add`].
     pub struct TestAddition(pub u16);
     impl<F: FancyArithmetic> CircuitExecutor<F> for TestAddition {
@@ -1356,6 +1404,18 @@ mod fancy_binary {
     }
 
     #[test]
+    fn binary_constant_gates() {
+        let c = circuits::TestBinaryConstant();
+        let inputs = [];
+        let expected_0 = 0;
+        let output_0: u16 = Dummy::eval(&c, &inputs).unwrap()[0];
+        assert_eq!(output_0, expected_0);
+        let expected_1 = 1;
+        let output_1 = Dummy::eval(&c, &inputs).unwrap()[1];
+        assert_eq!(output_1, expected_1);
+    }
+
+    #[test]
     fn or_gate_fan_n() {
         let mut rng = thread_rng();
         let n = 2 + (rng.gen_usize() % 200);
@@ -1364,6 +1424,20 @@ mod fancy_binary {
         for _ in 0..16 {
             let inputs = (0..n).map(|_| rng.gen_bool() as u16).collect::<Vec<_>>();
             let expected = inputs.iter().fold(0, |acc, &x| x | acc);
+            let output = Dummy::eval(&c, &inputs).unwrap()[0];
+            assert_eq!(output, expected);
+        }
+    }
+
+    #[test]
+    fn xor_gate_fan_n() {
+        let mut rng = thread_rng();
+        let n = 2 + (rng.gen_usize() % 200);
+        let c = circuits::TestXorGateFanN(n);
+
+        for _ in 0..16 {
+            let inputs = (0..n).map(|_| rng.gen_bool() as u16).collect::<Vec<_>>();
+            let expected = inputs.iter().fold(0, |acc, &x| x ^ acc);
             let output = Dummy::eval(&c, &inputs).unwrap()[0];
             assert_eq!(output, expected);
         }
