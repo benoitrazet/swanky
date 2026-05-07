@@ -115,7 +115,7 @@ impl FancyBinary for Evaluator {
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         AuthenticatedWire::new(
             x.masked_value() + F2::ONE,
-            WireMod2::from_repr(x.wire_label().to_repr() ^ self.one.to_repr(), 2),
+            x.wire_label() + self.one,
             x.auth_share(),
         )
     }
