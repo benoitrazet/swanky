@@ -1,7 +1,10 @@
 use fancy_garbling::{Fancy, FancyBinary, HasModulus};
-use swanky_authenticated_bits::authshares::AuthShare;
+use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 use swanky_party::GenericParty;
+use vectoreyes::U8x16;
 
 /// A thin wrapper around an [`AuthShare`] for use as a [`Fancy`] object.
 ///
@@ -39,18 +42,20 @@ pub struct WirePreProcessor<P: GenericParty> {
     auth_shares_index: usize,
     and_gate_left_inputs: Vec<AuthShare<P>>,
     and_gate_right_inputs: Vec<AuthShare<P>>,
+    delta: U8x16,
 }
 
 impl<P: GenericParty> WirePreProcessor<P> {
     /// Construct a new [`WirePreProcessor`] using a vector of [`AuthShare`]s
     /// which equals the number of AND, Input, and Constant gates in the
     /// circuit.
-    pub(crate) fn new(auth_shares: Vec<AuthShare<P>>) -> WirePreProcessor<P> {
+    pub(crate) fn new(auth_shares: Vec<AuthShare<P>>, delta: U8x16) -> WirePreProcessor<P> {
         WirePreProcessor {
             auth_shares,
             auth_shares_index: 0,
             and_gate_left_inputs: Vec::new(),
             and_gate_right_inputs: Vec::new(),
+            delta,
         }
     }
     /// Return the [`AuthShare`]s associated with the input wires of each AND
@@ -116,8 +121,16 @@ impl<P: GenericParty> Fancy for WirePreProcessor<P> {
         unimplemented!("Preprocessor cannot encode values");
     }
 
-    fn constant(&mut self, _: u16, _: u16, _: &mut Channel) -> swanky_error::Result<Self::Item> {
-        let authshare = self.next_auth_share();
+    fn constant(
+        &mut self,
+        value: u16,
+        modulus: u16,
+        _: &mut Channel,
+    ) -> swanky_error::Result<Self::Item> {
+        assert!(value == 0 || value == 1);
+        assert_eq!(modulus, 2);
+
+        let authshare = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
         Ok(PreProcessedWire::new(authshare))
     }
 

@@ -80,7 +80,7 @@ where
         channel,
         rng,
     )?;
-    let mut wire_preprocessor = WirePreProcessor::new(auth_shares.clone());
+    let mut wire_preprocessor = WirePreProcessor::new(auth_shares.clone(), and_generator.delta());
     let inputs = wire_preprocessor.receive_many(
         &vec![2; <C as CircuitExecutor<WirePreProcessor<P>>>::ninputs(circuit)],
         channel,
