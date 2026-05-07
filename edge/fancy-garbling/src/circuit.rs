@@ -97,6 +97,28 @@ pub mod circuits {
         use swanky_channel::Channel;
         use swanky_error::Result;
 
+        /// Circuit for testing [`Fancy::outputs`].
+        pub struct TestBinaryOutputs(pub usize);
+        impl<F: Fancy> CircuitExecutor<F> for TestBinaryOutputs {
+            fn execute(
+                &self,
+                backend: &mut F,
+                inputs: &[<F as Fancy>::Item],
+                channel: &mut Channel,
+            ) -> Result<Vec<<F as Fancy>::Item>> {
+                backend.outputs(inputs, channel)?;
+                Ok(inputs.to_vec())
+            }
+
+            fn ninputs(&self) -> usize {
+                self.0
+            }
+
+            fn modulus(&self, _: usize) -> u16 {
+                2
+            }
+        }
+
         /// Circuit for testing [`Fancy::constant`].
         pub struct TestBinaryConstant;
         impl<F: Fancy> CircuitExecutor<F> for TestBinaryConstant {
@@ -1488,6 +1510,8 @@ pub mod circuits {
                 inputs: &[<F as crate::Fancy>::Item],
                 channel: &mut Channel,
             ) -> Result<Vec<<F as crate::Fancy>::Item>> {
+                assert_eq!(inputs.len(), <Self as CircuitExecutor<F>>::ninputs(self));
+
                 let x = BinaryBundle::new(inputs.to_vec());
                 let z = backend.bin_twos_complement(&x, channel)?;
                 backend.output_bundle(&z, channel)?;
