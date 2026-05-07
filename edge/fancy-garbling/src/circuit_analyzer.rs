@@ -251,7 +251,7 @@ mod tests {
     #[test]
     fn single_and_gate_count_is_correct() {
         let nbits = 64;
-        let test = circuits::TestBinaryAnd(nbits);
+        let test = circuits::binary_gadgets::TestBinaryAnd(nbits);
         let mut analyzer = CircuitAnalyzer::new();
         analyzer.eval(&test).unwrap();
 
@@ -265,7 +265,7 @@ mod tests {
     #[test]
     fn binary_addition_counts_are_correct() {
         let nbits = 64;
-        let test = circuits::TestBinaryAddition(nbits);
+        let test = circuits::binary_gadgets::TestBinaryAddition(nbits);
         let mut analyzer = CircuitAnalyzer::new();
         analyzer.eval(&test).unwrap();
 
@@ -283,7 +283,7 @@ mod tests {
     #[test]
     fn binary_multiplication_counts_are_correct() {
         let nbits = 64;
-        let test = circuits::TestBinaryMultiplication(nbits);
+        let test = circuits::binary_gadgets::TestBinaryMultiplication(nbits);
         let mut analyzer = CircuitAnalyzer::new();
         analyzer.eval(&test).unwrap();
 
@@ -305,7 +305,7 @@ mod tests {
     #[test]
     fn binary_twos_complement_counts_are_correct() {
         let nbits = 64;
-        let test = circuits::TestBinaryTwosComplement(nbits);
+        let test = circuits::binary_gadgets::TestBinaryTwosComplement(nbits);
         let mut analyzer = CircuitAnalyzer::new();
         analyzer.eval(&test).unwrap();
 

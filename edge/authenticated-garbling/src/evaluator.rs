@@ -13,7 +13,7 @@ use swanky_authenticated_bits::{
     authshares::{AuthShare, AuthShareGenerator},
 };
 use swanky_channel::Channel;
-use swanky_error::{ErrorKind, WrapErr, ensure};
+use swanky_error::{ErrorKind, ensure};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use vectoreyes::U8x16;
@@ -115,7 +115,7 @@ impl FancyBinary for Evaluator {
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         AuthenticatedWire::new(
             x.masked_value() + F2::ONE,
-            WireMod2::from_repr(x.wire_label().to_repr() ^ self.one.to_repr(), 2),
+            x.wire_label() + self.one,
             x.auth_share(),
         )
     }
@@ -244,7 +244,7 @@ impl Fancy for Evaluator {
 
         // Grab authenticated shares for each of the inputs.
         let my_auth_shares = (0..moduli.len())
-            .map(|_i| self.next_auth_share())
+            .map(|_| self.next_auth_share())
             .collect::<Vec<_>>();
 
         // Open the garbler's shares `[r_w]`.
@@ -261,11 +261,9 @@ impl Fancy for Evaluator {
             .into_iter()
             .zip(my_auth_shares.iter().zip(values.iter()))
             .map(|(theirs, (mine, value))| {
-                F2::try_from(*value)
-                    .wrap_err(ErrorKind::OtherError, "Invalid value, must be boolean")
-                    .map(|value| theirs + mine.bit() + value)
+                F2::try_from(*value).expect("Invalid value, must be boolean") + mine.bit() + theirs
             })
-            .collect::<swanky_error::Result<Vec<_>>>()?;
+            .collect::<Vec<_>>();
         for masked_value in my_masked_values.iter() {
             channel.write(masked_value)?;
         }
@@ -283,7 +281,7 @@ impl Fancy for Evaluator {
             .map(|_i| self.next_auth_share())
             .collect::<Vec<_>>();
 
-        // Open these shares `[s_w]`.
+        // Open the evaluator's shares `[s_w]`.
         AuthShareGenerator::open_my_shares(&my_auth_shares, channel)?;
 
         // Receive `x_w ⊕ λ_w` from the garbler.
@@ -300,9 +298,7 @@ impl Fancy for Evaluator {
         _q: u16,
         channel: &mut Channel,
     ) -> swanky_error::Result<AuthenticatedWire> {
-        assert!(value == 0 || value == 1);
-
-        let constant = F2::try_from(value).unwrap(); // `unwrap` will never fail due to `assert` above.
+        let constant = F2::try_from(value).expect("constant must be boolean");
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
 
         let wirelabel = WireMod2::from_repr(channel.read()?, 2);

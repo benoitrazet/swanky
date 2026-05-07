@@ -16,7 +16,7 @@ use swanky_rng::SwankyRng;
 #[test]
 fn test_party_construction_passes() {
     let input_size = 400;
-    let circuit = circuits::TestAndGateFanN(input_size);
+    let circuit = circuits::binary::TestAndGateFanN(input_size);
     swanky_channel::local::local_channel_pair(
         |c| {
             let rng = SwankyRng::new();
@@ -28,105 +28,6 @@ fn test_party_construction_passes() {
         },
     )
     .unwrap();
-}
-
-#[test]
-fn test_party_encoding_receiving_passes() {
-    let input_size_gb = 400;
-    let input_size_ev = 400;
-    let circuit = circuits::TestAndGateFanN(input_size_gb + input_size_ev);
-
-    swanky_channel::local::local_channel_pair(
-        |c| {
-            let rng = SwankyRng::new();
-            let mut gb = Garbler::new(&circuit, c, rng)?;
-            gb.encode_many(&vec![0; input_size_gb], &vec![2; input_size_gb], c)?;
-            gb.receive_many(&vec![2; input_size_ev], c)?;
-            Ok(())
-        },
-        |c| {
-            let mut rng = SwankyRng::new();
-            let mut ev = Evaluator::new(&circuit, c, &mut rng)?;
-            ev.receive_many(&vec![2; input_size_gb], c)?;
-            ev.encode_many(&vec![0; input_size_ev], &vec![2; input_size_ev], c)?;
-            Ok(())
-        },
-    )
-    .unwrap();
-}
-#[test]
-fn test_party_gb_encoding_ev_receiving_correct() {
-    let input_size_gb = 400;
-    let circuit = circuits::TestAndGateFanN(input_size_gb);
-    let mut rng = SwankyRng::new();
-    let inputs: Vec<u16> = (0..input_size_gb).map(|_| rng.r#gen::<u16>() % 2).collect();
-    let (gb_wires, ev_wires) = swanky_channel::local::local_channel_pair(
-        |c| {
-            let rng = SwankyRng::new();
-            let mut gb = Garbler::new(&circuit, c, rng)?;
-            let res = gb.encode_many(&inputs, &vec![2; input_size_gb], c)?;
-            Ok(res)
-        },
-        |c| {
-            let mut rng = SwankyRng::new();
-            let mut ev = Evaluator::new(&circuit, c, &mut rng)?;
-            let res = ev.receive_many(&vec![2; input_size_gb], c)?;
-
-            Ok(res)
-        },
-    )
-    .unwrap();
-    for (i, (w_gb, w_ev)) in gb_wires.iter().zip(ev_wires).enumerate() {
-        let mask = w_gb.auth_share().bit() + w_ev.auth_share().bit();
-        assert_eq!(
-            w_gb.masked_value() + mask,
-            inputs[i].try_into().unwrap(),
-            "The Garbler's value is incorrectly masked"
-        );
-        assert_eq!(
-            w_ev.masked_value() + mask,
-            inputs[i].try_into().unwrap(),
-            "The Evaluator received a wrong masked value from the Garbler"
-        );
-    }
-}
-
-#[test]
-fn test_party_ev_encoding_gb_receiving_correct() {
-    let ninputs_ev = 400;
-    let circuit = circuits::TestAndGateFanN(ninputs_ev);
-    let mut rng = SwankyRng::new();
-    let inputs: Vec<u16> = (0..ninputs_ev).map(|_| rng.r#gen::<u16>() % 2).collect();
-
-    let (gb_wires, ev_wires) = swanky_channel::local::local_channel_pair(
-        |c| {
-            let rng = SwankyRng::new();
-            let mut gb = Garbler::new(&circuit, c, rng)?;
-            let res = gb.receive_many(&vec![2; ninputs_ev], c)?;
-            Ok(res)
-        },
-        |c| {
-            let mut rng = SwankyRng::new();
-            let mut ev = Evaluator::new(&circuit, c, &mut rng)?;
-            let res = ev.encode_many(&inputs, &vec![2; ninputs_ev], c)?;
-
-            Ok(res)
-        },
-    )
-    .unwrap();
-    for (i, (w_gb, w_ev)) in gb_wires.iter().zip(ev_wires).enumerate() {
-        let mask = w_gb.auth_share().bit() + w_ev.auth_share().bit();
-        assert_eq!(
-            w_gb.masked_value() + mask,
-            inputs[i].try_into().unwrap(),
-            "The Garbler received a wrong masked value from the Evaluator"
-        );
-        assert_eq!(
-            w_ev.masked_value() + mask,
-            inputs[i].try_into().unwrap(),
-            "The Evaluator's value is incorrectly masked"
-        );
-    }
 }
 
 fn test_circuit<
@@ -181,17 +82,62 @@ fn test_circuit<
 }
 
 #[test]
-fn test_single_and_gate() {
+fn test_input_output_garbler() {
+    let ninputs_gb = 128;
+    let ninputs_ev = 0;
+    let circuit = circuits::fancy::TestBinaryOutputs(ninputs_gb + ninputs_ev);
+
+    test_circuit(ninputs_gb, ninputs_ev, &circuit);
+}
+
+#[test]
+fn test_input_output_evaluator() {
+    let ninputs_gb = 0;
+    let ninputs_ev = 128;
+    let circuit = circuits::fancy::TestBinaryOutputs(ninputs_gb + ninputs_ev);
+
+    test_circuit(ninputs_gb, ninputs_ev, &circuit);
+}
+
+#[test]
+fn test_input_output() {
+    let ninputs_gb = 128;
+    let ninputs_ev = 128;
+    let circuit = circuits::fancy::TestBinaryOutputs(ninputs_gb + ninputs_ev);
+
+    test_circuit(ninputs_gb, ninputs_ev, &circuit);
+}
+
+#[test]
+fn test_and_gate() {
     let ninputs_gb = 1;
     let ninputs_ev = 1;
-    let circuit = circuits::TestAndGateFanN(ninputs_gb + ninputs_ev);
+    let circuit = circuits::binary::TestAndGate;
+
+    test_circuit(ninputs_gb, ninputs_ev, &circuit);
+}
+
+#[test]
+fn test_negate_gate_garbler() {
+    let ninputs_gb = 1;
+    let ninputs_ev = 0;
+    let circuit = circuits::binary::TestNegateGate;
+
+    test_circuit(ninputs_gb, ninputs_ev, &circuit);
+}
+
+#[test]
+fn test_negate_gate_evaluator() {
+    let ninputs_gb = 0;
+    let ninputs_ev = 1;
+    let circuit = circuits::binary::TestNegateGate;
 
     test_circuit(ninputs_gb, ninputs_ev, &circuit);
 }
 
 #[test]
 fn test_constant_gates() {
-    let circuit = circuits::TestBinaryConstant();
+    let circuit = circuits::fancy::TestBinaryConstant;
 
     test_circuit(0, 0, &circuit);
 }
@@ -200,7 +146,7 @@ fn test_constant_gates() {
 fn test_and_gate_fan_n() {
     let ninputs_gb = 400;
     let ninputs_ev = 400;
-    let circuit = circuits::TestAndGateFanN(ninputs_gb + ninputs_ev);
+    let circuit = circuits::binary::TestAndGateFanN(ninputs_gb + ninputs_ev);
 
     test_circuit(ninputs_gb, ninputs_ev, &circuit);
 }
@@ -209,7 +155,7 @@ fn test_and_gate_fan_n() {
 fn test_or_gate_fan_n() {
     let ninputs_gb = 400;
     let ninputs_ev = 400;
-    let circuit = circuits::TestOrGateFanN(ninputs_gb + ninputs_ev);
+    let circuit = circuits::binary::TestOrGateFanN(ninputs_gb + ninputs_ev);
 
     test_circuit(ninputs_gb, ninputs_ev, &circuit);
 }
@@ -218,7 +164,7 @@ fn test_or_gate_fan_n() {
 fn test_xor_gate_fan_n() {
     let ninputs_gb = 400;
     let ninputs_ev = 400;
-    let circuit = circuits::TestXorGateFanN(ninputs_gb + ninputs_ev);
+    let circuit = circuits::binary::TestXorGateFanN(ninputs_gb + ninputs_ev);
 
     test_circuit(ninputs_gb, ninputs_ev, &circuit);
 }
@@ -226,15 +172,54 @@ fn test_xor_gate_fan_n() {
 #[test]
 fn test_binary_addition() {
     let ninputs = 400;
-    let circuit = circuits::TestBinaryAddition(ninputs);
+    let circuit = circuits::binary_gadgets::TestBinaryAddition(ninputs);
 
     test_circuit(ninputs, ninputs, &circuit);
 }
 
 #[test]
+fn test_binary_negate() {
+    let ninputs = 64;
+    let circuit = circuits::binary::TestBinaryNegate(ninputs);
+
+    test_circuit(ninputs / 2, ninputs / 2, &circuit);
+}
+
+#[test]
+fn test_constant_bundle() {
+    let circuit = circuits::binary_gadgets::TestConstantBundle(1, 64);
+
+    test_circuit(0, 0, &circuit);
+}
+
+#[test]
+fn test_bin_addition_no_carry() {
+    let ninputs = 64;
+    let circuit = circuits::binary_gadgets::TestBinaryAdditionNoCarry(ninputs);
+
+    test_circuit(ninputs, ninputs, &circuit);
+}
+
+#[test]
+fn test_bin_twos_complement() {
+    let ninputs = 64;
+    let circuit = circuits::binary_gadgets::TestBinaryTwosComplement(ninputs);
+
+    test_circuit(ninputs, 0, &circuit);
+}
+
+#[test]
 fn test_binary_subtraction() {
-    let ninputs = 400;
-    let circuit = circuits::TestBinaryAddition(ninputs);
+    let ninputs = 64;
+    let circuit = circuits::binary_gadgets::TestBinarySubtraction(ninputs);
+
+    test_circuit(ninputs, ninputs, &circuit);
+}
+
+#[test]
+fn test_binary_multiplication() {
+    let ninputs = 64;
+    let circuit = circuits::binary_gadgets::TestBinaryMultiplication(ninputs);
 
     test_circuit(ninputs, ninputs, &circuit);
 }

@@ -336,9 +336,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         _q: u16,
         channel: &mut Channel,
     ) -> swanky_error::Result<AuthenticatedWire> {
-        assert!(value == 0 || value == 1);
-
-        let constant = F2::try_from(value).unwrap(); // `unwrap` will never fail due to `assert` above.
+        let constant = F2::try_from(value).expect("constant must be boolean");
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());
 
         let zero = WireMod2::rand(&mut self.rng, 2);
