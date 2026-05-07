@@ -133,7 +133,7 @@ mod tests {
     #[test]
     fn test_preprocessing() {
         let input_size = 800;
-        let circuit = circuits::TestBinaryAddition(input_size);
+        let circuit = circuits::binary_gadgets::TestBinaryAddition(input_size);
         let (_shares_gb, _shares_ev) = swanky_channel::local::local_channel_pair(
             |c| {
                 let mut rng = SwankyRng::new();
