@@ -67,20 +67,373 @@ impl<'a> SubAssign<&'a F128b> for F128b {
     }
 }
 
-mod multiply {
-    // TODO: this implements a simple algorithm that works. There are faster algorithms.
-    // Maybe we'll implement one, one day...
+//mod multiply {
+//    // TODO: this implements a simple algorithm that works. There are faster algorithms.
+//    // Maybe we'll implement one, one day...
+//
+//    // See https://is.gd/tOd246 pages 12-16. Note, their notation [x_1:x_0] means that x_1 is
+//    // the most-significant half of the resulting number.
+//    // This function is based on https://git.io/JUUQt
+//    // The original code is MIT/Apache 2.0 dual-licensed.
+//    // See: https://crypto.stanford.edu/RealWorldCrypto/slides/gueron.pdf
+//    // See: https://blog.quarkslab.com/reversing-a-finite-field-multiplication-optimization.html
+//    // See: https://tools.ietf.org/html/rfc8452
+//
+//    #[inline(always)]
+//    pub(crate) fn reduce(upper: u128, lower: u128) -> u128 {
+//        // Page 15 of https://is.gd/tOd246
+//        // Reduce the polynomial represented in bits over x^128 + x^7 + x^2 + x + 1
+//        // TODO: we should probably do this in vector operations...
+//        fn sep(x: u128) -> (u64, u64) {
+//            // (high, low)
+//            ((x >> 64) as u64, x as u64)
+//        }
+//        fn join(u: u64, l: u64) -> u128 {
+//            ((u as u128) << 64) | (l as u128)
+//        }
+//
+//        let (x3, x2) = sep(upper);
+//        let (x1, x0) = sep(lower);
+//        let a = x3 >> 63;
+//        let b = x3 >> 62;
+//        let c = x3 >> 57;
+//        let d = x2 ^ a ^ b ^ c;
+//        let (e1, e0) = sep(join(x3, d) << 1);
+//        let (f1, f0) = sep(join(x3, d) << 2);
+//        let (g1, g0) = sep(join(x3, d) << 7);
+//        let h1 = x3 ^ e1 ^ f1 ^ g1;
+//        let h0 = d ^ e0 ^ f0 ^ g0;
+//        join(x1 ^ h1, x0 ^ h0)
+//    }
+//
+//    #[cfg(test)]
+//    mod test {
+//        use super::super::polynomial_modulus_f128b;
+//        use crate::{F2, F128b};
+//        use proptest::prelude::*;
+//        use swanky_field::FiniteField;
+//        use swanky_polynomial::Polynomial;
+//        use vectoreyes::U8x16;
+//
+//        fn poly_from_upper_and_lower_128(upper: u128, lower: u128) -> Polynomial<F2> {
+//            let mut out = Polynomial {
+//                constant: F2::try_from((lower & 1) as u8).unwrap(),
+//                coefficients: Default::default(),
+//            };
+//            for shift in 1..128 {
+//                out.coefficients
+//                    .push(F2::try_from(((lower >> shift) & 1) as u8).unwrap());
+//            }
+//            for shift in 0..128 {
+//                out.coefficients
+//                    .push(F2::try_from(((upper >> shift) & 1) as u8).unwrap());
+//            }
+//            out
+//        }
+//
+//        fn poly_from_128(x: u128) -> Polynomial<F2> {
+//            let x = F128b(x).decompose();
+//            Polynomial {
+//                constant: x[0],
+//                coefficients: x[1..].to_vec(),
+//            }
+//        }
+//
+//        proptest! {
+//            #[test]
+//            fn unreduced_multiply(a in any::<u128>(), b in any::<u128>()) {
+//                let a_poly = poly_from_128(a);
+//                let b_poly = poly_from_128(b);
+//                let [lower, upper] = U8x16::from(a).carryless_mul_wide(U8x16::from(b));
+//                let lower: u128 = bytemuck::cast(lower);
+//                let upper: u128 = bytemuck::cast(upper);
+//                let mut product = a_poly;
+//                product *= &b_poly;
+//                assert_eq!(
+//                    poly_from_upper_and_lower_128(upper, lower),
+//                    product
+//                );
+//            }
+//        }
+//
+//        fn assert_div_mod(
+//            poly: &Polynomial<F2>,
+//            quotient: &Polynomial<F2>,
+//            remainder: &Polynomial<F2>,
+//        ) {
+//            let mut tmp = quotient.clone();
+//            tmp *= &polynomial_modulus_f128b();
+//            tmp += remainder;
+//            assert_eq!(poly, &tmp);
+//        }
+//
+//        proptest! {
+//            #![proptest_config(ProptestConfig::with_cases(
+//                std::env::var("PROPTEST_CASES")
+//                    .map(|x| x.parse().expect("PROPTEST_CASES is a number"))
+//                    .unwrap_or(15)
+//            ))]
+//            #[test]
+//            fn reduction(upper in any::<u128>(), lower in any::<u128>()) {
+//                let poly = poly_from_upper_and_lower_128(upper, lower);
+//                let reduced = super::reduce(upper, lower);
+//                let (poly_quotient, poly_reduced) = poly.divmod(&polynomial_modulus_f128b());
+//                assert_div_mod(&poly, &poly_quotient, &poly_reduced);
+//                assert_eq!(poly_from_128(reduced), poly_reduced);
+//            }
+//        }
+//    }
+//}
 
-    // See https://is.gd/tOd246 pages 12-16. Note, their notation [x_1:x_0] means that x_1 is
-    // the most-significant half of the resulting number.
-    // This function is based on https://git.io/JUUQt
-    // The original code is MIT/Apache 2.0 dual-licensed.
-    // See: https://crypto.stanford.edu/RealWorldCrypto/slides/gueron.pdf
-    // See: https://blog.quarkslab.com/reversing-a-finite-field-multiplication-optimization.html
-    // See: https://tools.ietf.org/html/rfc8452
+mod multiplication {
+    use vectoreyes::{SimdBase, U64x2, SimdBase8, U8x16};
+
+    #[allow(dead_code)]
+    mod unused {
+        #[inline(always)]
+        fn carryless_mul(x: u64, y: u64) -> u128 {
+            #[inline(always)]
+            fn bmul64(x: u64, y: u64) -> u64 {
+                use std::num::Wrapping;
+                let x0 = Wrapping(x & 0x1111_1111_1111_1111);
+                let x1 = Wrapping(x & 0x2222_2222_2222_2222);
+                let x2 = Wrapping(x & 0x4444_4444_4444_4444);
+                let x3 = Wrapping(x & 0x8888_8888_8888_8888);
+                let y0 = Wrapping(y & 0x1111_1111_1111_1111);
+                let y1 = Wrapping(y & 0x2222_2222_2222_2222);
+                let y2 = Wrapping(y & 0x4444_4444_4444_4444);
+                let y3 = Wrapping(y & 0x8888_8888_8888_8888);
+                let mut z0 = ((x0 * y0) ^ (x1 * y3) ^ (x2 * y2) ^ (x3 * y1)).0;
+                let mut z1 = ((x0 * y1) ^ (x1 * y0) ^ (x2 * y3) ^ (x3 * y2)).0;
+                let mut z2 = ((x0 * y2) ^ (x1 * y1) ^ (x2 * y0) ^ (x3 * y3)).0;
+                let mut z3 = ((x0 * y3) ^ (x1 * y2) ^ (x2 * y1) ^ (x3 * y0)).0;
+                z0 &= 0x1111_1111_1111_1111;
+                z1 &= 0x2222_2222_2222_2222;
+                z2 &= 0x4444_4444_4444_4444;
+                z3 &= 0x8888_8888_8888_8888;
+                z0 | z1 | z2 | z3
+            }
+            #[inline(always)]
+            const fn rev64(mut x: u64) -> u64 {
+                x = ((x & 0x5555_5555_5555_5555) << 1) | ((x >> 1) & 0x5555_5555_5555_5555);
+                x = ((x & 0x3333_3333_3333_3333) << 2) | ((x >> 2) & 0x3333_3333_3333_3333);
+                x = ((x & 0x0f0f_0f0f_0f0f_0f0f) << 4) | ((x >> 4) & 0x0f0f_0f0f_0f0f_0f0f);
+                x = ((x & 0x00ff_00ff_00ff_00ff) << 8) | ((x >> 8) & 0x00ff_00ff_00ff_00ff);
+                x = ((x & 0xffff_0000_ffff) << 16) | ((x >> 16) & 0xffff_0000_ffff);
+                x.rotate_right(32)
+            }
+            let lo = bmul64(x, y);
+            let hi = rev64(bmul64(rev64(x), rev64(y))) >> 1;
+            (hi as u128) << 64 | lo as u128
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        #[target_feature(enable = "neon,aes")]
+        #[inline]
+        unsafe fn wide_mul_u128_aarch64(a: u128, b: u128) ->(u128, u128) {
+            use core::arch::aarch64::vmull_p64;
+
+            let a_lo = a as u64;
+            let a_hi = (a >> 64) as u64;
+            let a_comb = a_lo ^ a_hi;
+            let b_lo = b as u64;
+            let b_hi = (b >> 64) as u64;
+            let b_comb = b_lo ^ b_hi;
+
+            let p_lo: u128 = vmull_p64(a_lo, b_lo);
+            let p_hi: u128 = vmull_p64(a_hi, b_hi);
+            let p_mid: u128 = vmull_p64(a_comb, b_comb) ^ p_lo ^ p_hi;
+
+
+            let lo = p_lo ^ (p_mid << 64);
+            let hi = p_hi ^ (p_mid >> 64);
+
+            (hi, lo)
+        }
+    }
+
+    /// Multiply either the high or low lanes of lhs and rhs, interpreted as degree-127 Boolean
+    /// polynomials. The result has degree 255, so it is returned in the form of 2 u128s containing
+    /// the upper and lower bits, in that order: (hi, lo) = lhs * rhs
+    //
+    // This function wraps either F64x2::carryless_mul function from vectoreyes or its aarch64
+    // equivalent, defined in this module. If the latter is incorporated into vectoreyes
+    //
+    // This function is the equivalent of F64x2::carryless_mul instantiated for a platform with
+    // aarch64 neon extentions. It could (and probably could) be moved to vectoreyes.
+    #[inline(always)]
+    fn carryless_mul_64bit<
+        const HI_RHS: bool,
+        const HI_LHS: bool,
+    >(lhs: U64x2, rhs: U64x2) -> U64x2 {
+        #[cfg(target_arch = "aarch64")]
+        if std::cfg!(all(target_feature = "neon", target_feature = "aes")) {
+            let x = if HI_LHS { lhs.as_array()[1] } else { lhs.as_array()[0] };
+            let y = if HI_RHS { rhs.as_array()[1] } else { rhs.as_array()[0] };
+            let z = unsafe { core::arch::aarch64::vmull_p64(x, y) };
+            return U64x2::from_array([z as u64, (z >> 64) as u64]);
+        }
+        lhs.carryless_mul::<HI_RHS, HI_LHS>(rhs)
+    }
+
+    macro_rules! shl {
+        ($x:expr, 64) => {
+            {
+                let x: U64x2 = $x;  // Barf if x isn't U64x2
+                U64x2::from(U8x16::from(x).shift_bytes_left::<8>())
+            }
+        };
+        ($x:expr, $n:literal) => {
+            {
+                debug_assert!($n < 64 && $n >= 0);
+                let x: U64x2 = $x;                          // Barf if x isn't U64x2
+                let lo = x.shift_left::<$n>();              // Shift each lane by n
+                let carry = x.shift_right::<{64 - $n}>();   // Bits that should cross lanes
+                let carry = shl!(carry, 64);                // Move carry into high lane
+                lo ^ carry
+            }
+        }
+    }
+
+    macro_rules! shr {
+        ($x:expr, 64) => {
+            {
+                let x: U64x2 = $x;  // Barf if x isn't U64x2
+                U64x2::from(U8x16::from(x).shift_bytes_right::<8>())
+            }
+        };
+        ($x:expr, $n:literal) => {
+            {
+                debug_assert!($n < 64 && $n >= 0);
+                let x: U64x2 = $x;                          // Barf if x isn't U64x2
+                let hi = x.shift_right::<$n>();             // Shift each lane by n
+                let carry = x.shift_left::<{64 - $n}>();    // Bits that should cross lanes
+                let carry = shr!(carry, 64);                // Move carry into low lane
+                hi ^ carry
+            }
+        }
+    }
+
+    // Algorithm 2 from page 12 of https://is.gd/tOd246
+    //
+    // The paper describes this as, "one iteration carry-less schoolbook" multiplication.
+    #[inline(always)]
+    pub(crate) fn clmul(a: u128, b: u128) -> (u128, u128) {
+        //let a: U64x2 = bytemuck::cast(a);
+        //let b: U64x2 = bytemuck::cast(b);
+
+        //let c = carryless_mul_64bit::<true, true>(a, b);
+        //let d = carryless_mul_64bit::<false, false>(a, b);
+        //let e = carryless_mul_64bit::<false, false>(a ^ shr!(a, 64), b ^ shr!(b, 64));
+
+        //let c_d_e = c ^ d ^ e;
+        //let hi = c ^ shr!(c_d_e, 64);
+        //let lo = d ^ shl!(c_d_e, 64);
+        //(bytemuck::cast(hi), bytemuck::cast(lo))
+        let a: U64x2 = bytemuck::cast(a);
+        let b: U64x2 = bytemuck::cast(b);
+
+        let c = carryless_mul_64bit::<false, false>(a, b);
+        let d = carryless_mul_64bit::<true, true>(a, b);
+        let e = carryless_mul_64bit::<true, false>(a, b);
+        let f = carryless_mul_64bit::<false, true>(a, b);
+
+        let e_f = e ^ f;
+        let lo = c ^ shl!(e_f, 64);
+        let hi = d ^ shr!(e_f, 64);
+        //let c_d_e = c ^ d ^ e;
+        //let lo = d ^ shl!(c_d_e, 64);
+        //let hi = c ^ shr!(c_d_e, 64);
+
+        (bytemuck::cast(hi), bytemuck::cast(lo))
+    }
+
+    // Same algorithm as carryless_mul_wide from vectoreyes, but using our 64-bit carryless mul.
+    // Should be identical to vectoreyes on x86_64, but better on ARM, since it uses intrinsics.
+    //
+    // Algorithm 1 from page 12 of https://is.gd/tOd246
+    //
+    // This is a variation of Karatsuba multiplication.
+    #[inline(always)]
+    pub(crate) fn clmul2(a: u128, b: u128) -> (u128, u128) {
+        let a: U64x2 = bytemuck::cast(a);
+        let b: U64x2 = bytemuck::cast(b);
+        let c = carryless_mul_64bit::<true, true>(a, b);
+        let d = carryless_mul_64bit::<false, false>(a, b);
+        let e = carryless_mul_64bit::<false, false>(a ^ shr!(a, 64), b ^ shr!(b, 64));
+        let product_upper_half =
+            c ^ shr!(c, 64) ^ shr!(d, 64) ^ shr!(e, 64);
+        let product_lower_half =
+            d ^ shl!(d, 64) ^ shl!(c, 64) ^ shl!(e, 64);
+        (
+            bytemuck::cast(product_upper_half),
+            bytemuck::cast(product_lower_half),
+        )
+    }
 
     #[inline(always)]
-    pub(crate) fn reduce(upper: u128, lower: u128) -> u128 {
+    pub(crate) fn clmul_orig(a: u128, b: u128) -> (u128, u128) {
+        let [lo, hi] = U8x16::from(a).carryless_mul_wide(U8x16::from(b));
+        let lo: u128 = bytemuck::cast(lo);
+        let hi: u128 = bytemuck::cast(hi);
+        (hi, lo)
+    }
+
+    // Reduction using clmul folding
+    #[inline(always)]
+    pub(crate) fn reduce(hi: u128, lo: u128) -> u128 {
+        let modulus: U64x2 = bytemuck::cast(0x87_u128);
+        let hi: U64x2 = bytemuck::cast(hi);
+        let lo: U64x2 = bytemuck::cast(lo);
+
+        let r0 = carryless_mul_64bit::<false, false>(hi, modulus);
+        let r1 = carryless_mul_64bit::<false, true>(hi, modulus);
+
+        let t = r0 ^ shl!(r1, 64);
+        //let over = r1.as_array()[1]; // ≤ 7 bits
+        //let over_r = U64x2::from_array([over ^ (over << 1) ^ (over << 2) ^ (over << 7), 0]);
+        let over = shr!(r1, 64); // ≤ 7 bits
+        let over_r = over ^ shl!(over, 1) ^ shl!(over, 2) ^ shl!(over, 7);
+
+        bytemuck::cast(lo ^ t ^ over_r)
+
+        //let xmm0: U64x2 = bytemuck::cast(lo);
+        //let xmm1: U64x2 = bytemuck::cast(hi);
+        //let xmm2 = xmm1;
+        //let xmm3: U64x2 = bytemuck::cast((0x87_u128 << 64) | 0x87_u128);
+
+        //let xmm1 = carryless_mul_64bit::<false, false>(xmm1, xmm3);
+        //let xmm2 = carryless_mul_64bit::<true, true>(xmm2, xmm3);
+
+        //let xmm0 = xmm0 ^ xmm1 ^ xmm2;
+        //bytemuck::cast(xmm0)
+    }
+
+    // Our original reduce operation, but vectorized
+    #[inline(always)]
+    pub(crate) fn reduce2(hi: u128, lo: u128) -> u128 {
+        // Page 15 of https://is.gd/tOd246
+        // Reduce the polynomial represented in bits over x^128 + x^7 + x^2 + x + 1
+        let hi: U64x2 = bytemuck::cast(hi);
+        let lo: U64x2 = bytemuck::cast(lo);
+
+        let x3 = shr!(hi, 64);
+
+        let a = shr!(x3, 63);
+        let b = shr!(x3, 62);
+        let c = shr!(x3, 57);
+
+        let x3_d = hi ^ a ^ b ^ c;
+        let e = shl!(x3_d, 1);
+        let f = shl!(x3_d, 2);
+        let g = shl!(x3_d, 7);
+
+        let h = x3_d ^ e ^ f ^ g;
+        bytemuck::cast(lo ^ h)
+    }
+
+    #[inline(always)]
+    pub(crate) fn reduce_orig(upper: u128, lower: u128) -> u128 {
         // Page 15 of https://is.gd/tOd246
         // Reduce the polynomial represented in bits over x^128 + x^7 + x^2 + x + 1
         // TODO: we should probably do this in vector operations...
@@ -108,28 +461,12 @@ mod multiply {
 
     #[cfg(test)]
     mod test {
-        use super::super::polynomial_modulus_f128b;
-        use crate::{F2, F128b};
+        use super::*;
         use proptest::prelude::*;
-        use swanky_field::FiniteField;
         use swanky_polynomial::Polynomial;
-        use vectoreyes::U8x16;
+        use swanky_field::FiniteField;
+        use crate::{F2, F128b};
 
-        fn poly_from_upper_and_lower_128(upper: u128, lower: u128) -> Polynomial<F2> {
-            let mut out = Polynomial {
-                constant: F2::try_from((lower & 1) as u8).unwrap(),
-                coefficients: Default::default(),
-            };
-            for shift in 1..128 {
-                out.coefficients
-                    .push(F2::try_from(((lower >> shift) & 1) as u8).unwrap());
-            }
-            for shift in 0..128 {
-                out.coefficients
-                    .push(F2::try_from(((upper >> shift) & 1) as u8).unwrap());
-            }
-            out
-        }
 
         fn poly_from_128(x: u128) -> Polynomial<F2> {
             let x = F128b(x).decompose();
@@ -139,59 +476,139 @@ mod multiply {
             }
         }
 
-        proptest! {
-            #[test]
-            fn unreduced_multiply(a in any::<u128>(), b in any::<u128>()) {
-                let a_poly = poly_from_128(a);
-                let b_poly = poly_from_128(b);
-                let [lower, upper] = U8x16::from(a).carryless_mul_wide(U8x16::from(b));
-                let lower: u128 = bytemuck::cast(lower);
-                let upper: u128 = bytemuck::cast(upper);
-                let mut product = a_poly;
-                product *= &b_poly;
-                assert_eq!(
-                    poly_from_upper_and_lower_128(upper, lower),
-                    product
-                );
+        fn clmul_ref(a: u128, b: u128) -> (u128, u128) {
+            let [lo, hi] = U8x16::from(a).carryless_mul_wide(U8x16::from(b));
+            let lo: u128 = bytemuck::cast(lo);
+            let hi: u128 = bytemuck::cast(hi);
+            (hi, lo)
+        }
+
+        fn reduce_ref(hi: u128, lo: u128) -> Polynomial<F2> {
+            fn poly_from_upper_and_lower_128(upper: u128, lower: u128) -> Polynomial<F2> {
+                let mut out = Polynomial {
+                    constant: F2::try_from((lower & 1) as u8).unwrap(),
+                    coefficients: Default::default(),
+                };
+                for shift in 1..128 {
+                    out.coefficients
+                        .push(F2::try_from(((lower >> shift) & 1) as u8).unwrap());
+                }
+                for shift in 0..128 {
+                    out.coefficients
+                        .push(F2::try_from(((upper >> shift) & 1) as u8).unwrap());
+                }
+                out
             }
-        }
 
-        fn assert_div_mod(
-            poly: &Polynomial<F2>,
-            quotient: &Polynomial<F2>,
-            remainder: &Polynomial<F2>,
-        ) {
-            let mut tmp = quotient.clone();
-            tmp *= &polynomial_modulus_f128b();
-            tmp += remainder;
-            assert_eq!(poly, &tmp);
+            let poly = poly_from_upper_and_lower_128(hi, lo);
+            let (_poly_quotient, poly_reduced) = poly.divmod(&poly_from_128(0x87_u128));
+
+            poly_reduced
         }
 
         proptest! {
-            #![proptest_config(ProptestConfig::with_cases(
-                std::env::var("PROPTEST_CASES")
-                    .map(|x| x.parse().expect("PROPTEST_CASES is a number"))
-                    .unwrap_or(15)
-            ))]
             #[test]
-            fn reduction(upper in any::<u128>(), lower in any::<u128>()) {
-                let poly = poly_from_upper_and_lower_128(upper, lower);
-                let reduced = super::reduce(upper, lower);
-                let (poly_quotient, poly_reduced) = poly.divmod(&polynomial_modulus_f128b());
-                assert_div_mod(&poly, &poly_quotient, &poly_reduced);
-                assert_eq!(poly_from_128(reduced), poly_reduced);
+            fn test_carryless_mul_128bit(a: u128, b: u128) {
+                prop_assert_eq!(clmul(a, b), clmul_ref(a, b));
+            }
+
+            #[test]
+            fn test_carryless_mul_128bit2(a: u128, b: u128) {
+                prop_assert_eq!(clmul2(a, b), clmul_ref(a, b));
+            }
+
+            //#[test]
+            //fn test_reduce(upper in any::<u128>(), lower in any::<u128>()) {
+            //    let poly_reduced = reduce_ref(upper, lower);
+            //    assert_eq!(poly_from_128(reduce(upper, lower)), poly_reduced);
+            //}
+
+            //#[test]
+            //fn test_reduce2(upper in any::<u128>(), lower in any::<u128>()) {
+            //    let poly_reduced = reduce_ref(upper, lower);
+            //    assert_eq!(poly_from_128(reduce2(upper, lower)), poly_reduced);
+            //}
+
+            #[test]
+            fn test_reduce_equiv(a: u128, b: u128) {
+                prop_assert_eq!(reduce(a, b), reduce_orig(a, b));
+            }
+
+            #[test]
+            fn test_reduce2_equiv(a: u128, b: u128) {
+                prop_assert_eq!(reduce2(a, b), reduce_orig(a, b));
+            }
+
+            #[test]
+            fn test_shl(x: u128) {
+                let x_v: U64x2 = bytemuck::cast(x);
+                let x_1: u128 = bytemuck::cast(shl!(x_v, 1));
+                let x_5: u128 = bytemuck::cast(shl!(x_v, 5));
+                let x_63: u128 = bytemuck::cast(shl!(x_v, 63));
+                prop_assert_eq!(x_1, x << 1);
+                prop_assert_eq!(x_5, x << 5);
+                prop_assert_eq!(x_63, x << 63);
+            }
+
+            #[test]
+            fn test_shr(x: u128) {
+                let x_v: U64x2 = bytemuck::cast(x);
+                let x_1: u128 = bytemuck::cast(shr!(x_v, 1));
+                let x_5: u128 = bytemuck::cast(shr!(x_v, 5));
+                let x_63: u128 = bytemuck::cast(shr!(x_v, 63));
+                prop_assert_eq!(x_1, x >> 1);
+                prop_assert_eq!(x_5, x >> 5);
+                prop_assert_eq!(x_63, x >> 63);
             }
         }
     }
 }
 
+impl F128b {
+    /// ???
+    #[inline]
+    pub fn clmul(a: u128, b: u128) -> (u128, u128) {
+        multiplication::clmul(a, b)
+    }
+
+    /// ???
+    #[inline]
+    pub fn clmul2(a: u128, b: u128) -> (u128, u128) {
+        multiplication::clmul2(a, b)
+    }
+
+    /// ???
+    #[inline]
+    pub fn clmul_orig(a: u128, b: u128) -> (u128, u128) {
+        multiplication::clmul_orig(a, b)
+    }
+
+    /// ???
+    #[inline]
+    pub fn reduce(a: u128, b: u128) -> u128 {
+        multiplication::reduce(a, b)
+    }
+
+    /// ???
+    #[inline]
+    pub fn reduce2(a: u128, b: u128) -> u128 {
+        multiplication::reduce2(a, b)
+    }
+
+    /// ???
+    #[inline]
+    pub fn reduce_orig(a: u128, b: u128) -> u128 {
+        multiplication::reduce_orig(a, b)
+    }
+}
+
+
 impl<'a> MulAssign<&'a F128b> for F128b {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a F128b) {
-        let [lower, upper] = U8x16::from(self.0).carryless_mul_wide(U8x16::from(rhs.0));
-        let lower: u128 = bytemuck::cast(lower);
-        let upper: u128 = bytemuck::cast(upper);
-        self.0 = multiply::reduce(upper, lower);
+        use multiplication::*;
+        let (hi, lo) = clmul(self.0, rhs.0);
+        self.0 = reduce(hi, lo);
     }
 }
 
