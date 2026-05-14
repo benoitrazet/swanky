@@ -4,6 +4,7 @@ use crate::garbler::Garbler;
 use crate::ps::{PartyEvaluator, PartyGarbler};
 use crate::{evaluator::Evaluator, preprocesser::WirePreProcessor};
 
+use fancy_garbling::circuit::Flatten;
 use fancy_garbling::{
     Fancy,
     circuit::{CircuitExecutor, circuits},
@@ -63,7 +64,7 @@ fn test_circuit<
             let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
             inputs.extend(theirs);
             let outputs = circuit.execute(&mut gb, &inputs, c)?;
-            gb.outputs(&outputs, c)
+            gb.outputs(&outputs.flatten(), c)
         },
         |c| {
             let mut rng = SwankyRng::new();
@@ -72,7 +73,7 @@ fn test_circuit<
             let mine = ev.encode_many(&inputs_ev, &vec![2; ninputs_ev], c)?;
             inputs.extend(mine);
             let outputs = circuit.execute(&mut ev, &inputs, c)?;
-            ev.outputs(&outputs, c)
+            ev.outputs(&outputs.flatten(), c)
         },
     )
     .unwrap();

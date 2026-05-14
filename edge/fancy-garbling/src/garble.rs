@@ -139,7 +139,7 @@ mod nonstreaming {
 
 #[cfg(test)]
 mod streaming {
-    use crate::circuit::circuits;
+    use crate::circuit::{Flatten, circuits};
     use crate::{
         AllWire, Evaluator, Fancy, Garbler, WireLabel, circuit::CircuitExecutor, dummy::Dummy,
         util::RngExt,
@@ -171,7 +171,7 @@ mod streaming {
             let mut dummy = Dummy::new();
             let inputs = dummy.encode_many(&inputs, &moduli, channel)?;
             let outputs = circuit.execute(&mut dummy, &inputs, channel)?;
-            Ok(dummy.outputs(&outputs, channel)?.unwrap())
+            Ok(dummy.outputs(&outputs.flatten(), channel)?.unwrap())
         })
         .unwrap();
 
@@ -180,14 +180,14 @@ mod streaming {
                 let mut gb = Garbler::new(rng, channel)?;
                 let zeros = gb.encode_many(&inputs, &moduli, channel)?;
                 let outputs = circuit.execute(&mut gb, &zeros, channel)?;
-                gb.outputs(&outputs, channel)?;
+                gb.outputs(&outputs.flatten(), channel)?;
                 Ok(())
             },
             |channel| {
                 let mut ev = Evaluator::new(channel)?;
                 let wires = ev.receive_many(&moduli, channel)?;
                 let outputs = circuit.execute(&mut ev, &wires, channel)?;
-                Ok(ev.outputs(&outputs, channel)?.unwrap())
+                Ok(ev.outputs(&outputs.flatten(), channel)?.unwrap())
             },
         )
         .unwrap();

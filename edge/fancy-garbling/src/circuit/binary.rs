@@ -1,5 +1,6 @@
 use crate::{FancyBinary, circuit::CircuitExecutor};
 use swanky_channel::Channel;
+use swanky_error::Result;
 
 /// Static representation of binary computation supported by fancy garbling.
 #[derive(Clone, Debug, PartialEq)]
@@ -13,12 +14,14 @@ pub struct BinaryCircuit {
 }
 
 impl<F: FancyBinary> CircuitExecutor<F> for BinaryCircuit {
+    type Output = Vec<F::Item>;
+
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &[<F as crate::Fancy>::Item],
+        inputs: &[F::Item],
         channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<<F as crate::Fancy>::Item>> {
+    ) -> Result<Self::Output> {
         assert_eq!(
             inputs.len(),
             <BinaryCircuit as CircuitExecutor<F>>::ninputs(self)

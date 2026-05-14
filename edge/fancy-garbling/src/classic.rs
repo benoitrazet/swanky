@@ -3,7 +3,7 @@
 
 use crate::{
     Fancy, WireLabel,
-    circuit::CircuitExecutor,
+    circuit::{CircuitExecutor, Flatten},
     garble::{Evaluator, Garbler},
     util::output_tweak,
 };
@@ -65,6 +65,7 @@ impl GarbledCircuit {
             // First, garble the circuit, outputting the zero wirelabels
             // associated with the output.
             let zeros = c.execute(&mut garbler, &inputs, channel)?;
+            let zeros = zeros.flatten();
             // Next, map the zero output wirelabels to the set of valid outputs.
             // This is needed for evaluators that don't use the output
             // mapping provided as output; in that case, we need the channel to
@@ -103,7 +104,7 @@ impl GarbledCircuit {
         let wirelabels = Channel::with(GarbledChannel::from(self), |channel| {
             let mut evaluator = Evaluator::new(channel)?;
             let wirelabels = c.execute(&mut evaluator, inputs, channel)?;
-            Ok(wirelabels)
+            Ok(wirelabels.flatten())
         })?;
         Ok(wirelabels)
     }

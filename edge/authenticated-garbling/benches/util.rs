@@ -1,5 +1,8 @@
 use fancy_garbling::{
-    Fancy, circuit::CircuitExecutor, circuit_analyzer::CircuitAnalyzer, dummy::Dummy,
+    Fancy,
+    circuit::{CircuitExecutor, Flatten},
+    circuit_analyzer::CircuitAnalyzer,
+    dummy::Dummy,
 };
 use swanky_authenticated_garbling::{
     Evaluator, Garbler, WirePreProcessor,
@@ -30,7 +33,7 @@ pub fn test_circuit<
             let theirs = gb.receive_many(&vec![2; inputs_ev.len()], c)?;
             inputs.extend(theirs);
             let outputs = circuit.execute(&mut gb, &inputs, c)?;
-            gb.outputs(&outputs, c)
+            gb.outputs(&outputs.flatten(), c)
         },
         |c| {
             let mut ev = Evaluator::new(circuit, c, rng_ev)?;
@@ -38,7 +41,7 @@ pub fn test_circuit<
             let mine = ev.encode_many(inputs_ev, &vec![2; inputs_ev.len()], c)?;
             inputs.extend(mine);
             let outputs = circuit.execute(&mut ev, &inputs, c)?;
-            ev.outputs(&outputs, c)
+            ev.outputs(&outputs.flatten(), c)
         },
     )
     .unwrap();

@@ -84,12 +84,14 @@ const MIXED_OP_NUM_OPS: usize = 100_000;
 
 struct MixedOp;
 impl<F: FancyBinary> CircuitExecutor<F> for MixedOp {
+    type Output = F::Item;
+
     fn execute(
         &self,
         backend: &mut F,
         inputs: &[F::Item],
         channel: &mut Channel,
-    ) -> Result<Vec<F::Item>> {
+    ) -> Result<Self::Output> {
         let mut x = inputs[0].clone();
         for step in 0..MIXED_OP_NUM_OPS {
             if step % 2 == 1 {
@@ -98,7 +100,7 @@ impl<F: FancyBinary> CircuitExecutor<F> for MixedOp {
                 x = backend.xor(&x, &x);
             }
         }
-        Ok(vec![x])
+        Ok(x)
     }
 
     fn ninputs(&self) -> usize {
@@ -112,12 +114,14 @@ impl<F: FancyBinary> CircuitExecutor<F> for MixedOp {
 
 struct MixedOpArith(u16);
 impl<F: FancyArithmetic> CircuitExecutor<F> for MixedOpArith {
+    type Output = F::Item;
+
     fn execute(
         &self,
         backend: &mut F,
         inputs: &[F::Item],
         channel: &mut Channel,
-    ) -> Result<Vec<F::Item>> {
+    ) -> Result<Self::Output> {
         let mut x = inputs[0].clone();
         for step in 0..MIXED_OP_NUM_OPS {
             if step % 2 == 1 {
@@ -126,7 +130,7 @@ impl<F: FancyArithmetic> CircuitExecutor<F> for MixedOpArith {
                 x = backend.add(&x, &x);
             }
         }
-        Ok(vec![x])
+        Ok(x)
     }
 
     fn ninputs(&self) -> usize {
@@ -140,12 +144,14 @@ impl<F: FancyArithmetic> CircuitExecutor<F> for MixedOpArith {
 
 struct Proj(u16, Vec<u16>);
 impl<F: FancyProj> CircuitExecutor<F> for Proj {
+    type Output = Vec<F::Item>;
+
     fn execute(
         &self,
         backend: &mut F,
         inputs: &[<F as fancy_garbling::Fancy>::Item],
         channel: &mut Channel,
-    ) -> Result<Vec<<F as fancy_garbling::Fancy>::Item>> {
+    ) -> Result<Self::Output> {
         for _ in 0..1000 {
             let _ = backend.proj(&inputs[0], self.0, Some(self.1.clone()), channel)?;
         }
@@ -163,12 +169,14 @@ impl<F: FancyProj> CircuitExecutor<F> for Proj {
 
 struct Mul(u16);
 impl<F: FancyArithmetic> CircuitExecutor<F> for Mul {
+    type Output = Vec<F::Item>;
+
     fn execute(
         &self,
         backend: &mut F,
         inputs: &[<F as fancy_garbling::Fancy>::Item],
         channel: &mut Channel,
-    ) -> Result<Vec<<F as fancy_garbling::Fancy>::Item>> {
+    ) -> Result<Self::Output> {
         for _ in 0..1000 {
             let _ = backend.mul(&inputs[0], &inputs[0], channel)?;
         }

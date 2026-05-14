@@ -8,7 +8,7 @@ use swanky_error::ErrorKind;
 
 use crate::{
     FancyArithmetic, FancyBinary, FancyProj, check_binary,
-    circuit::CircuitExecutor,
+    circuit::{CircuitExecutor, Flatten},
     fancy::{Fancy, HasModulus},
 };
 
@@ -69,6 +69,7 @@ impl Dummy {
         let outputs = Channel::with(std::io::empty(), |c| {
             circuit.execute(&mut dummy, &inputs, c)
         })?;
+        let outputs = outputs.flatten();
         Ok(outputs.iter().map(|x| x.val()).collect())
     }
 }
