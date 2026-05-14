@@ -132,7 +132,6 @@ pub mod circuits {
                     backend.constant(0, 2, channel)?,
                     backend.constant(1, 2, channel)?,
                 ];
-                backend.outputs(&outputs, channel)?;
                 Ok(outputs)
             }
 
@@ -149,7 +148,7 @@ pub mod circuits {
     pub mod binary {
         //! Circuits that test [`FancyBinary`].
 
-        use crate::{BinaryBundle, BundleGadgets, FancyBinary, circuit::CircuitExecutor};
+        use crate::{BinaryBundle, FancyBinary, circuit::CircuitExecutor};
         use swanky_channel::Channel;
         use swanky_error::Result;
 
@@ -186,7 +185,6 @@ pub mod circuits {
                 channel: &mut Channel,
             ) -> Result<Vec<F::Item>> {
                 let output = backend.and(&inputs[0], &inputs[1], channel)?;
-                backend.output(&output, channel)?;
                 Ok(vec![output])
             }
 
@@ -209,7 +207,6 @@ pub mod circuits {
                 channel: &mut Channel,
             ) -> Result<Vec<F::Item>> {
                 let output = backend.and_many(inputs, channel)?;
-                backend.output(&output, channel)?;
                 Ok(vec![output])
             }
 
@@ -232,7 +229,6 @@ pub mod circuits {
                 channel: &mut Channel,
             ) -> Result<Vec<F::Item>> {
                 let output = backend.or_many(inputs, channel)?;
-                backend.output(&output, channel)?;
                 Ok(vec![output])
             }
 
@@ -252,10 +248,9 @@ pub mod circuits {
                 &self,
                 backend: &mut F,
                 inputs: &[F::Item],
-                channel: &mut Channel,
+                _: &mut Channel,
             ) -> Result<Vec<F::Item>> {
                 let output = backend.xor_many(inputs);
-                backend.output(&output, channel)?;
                 Ok(vec![output])
             }
 
@@ -275,11 +270,10 @@ pub mod circuits {
                 &self,
                 backend: &mut F,
                 inputs: &[<F as crate::Fancy>::Item],
-                channel: &mut Channel,
+                _: &mut Channel,
             ) -> Result<Vec<<F as crate::Fancy>::Item>> {
                 let not =
                     BinaryBundle::new(inputs.iter().map(|x| backend.negate(x)).collect::<Vec<_>>());
-                backend.output_bundle(&not, channel)?;
                 Ok(not.wires().to_vec())
             }
 
@@ -329,10 +323,9 @@ pub mod circuits {
                 &self,
                 backend: &mut F,
                 inputs: &[F::Item],
-                channel: &mut Channel,
+                _: &mut Channel,
             ) -> Result<Vec<F::Item>> {
                 let output = backend.add_many(inputs);
-                backend.output(&output, channel)?;
                 Ok(vec![output])
             }
 
@@ -377,7 +370,6 @@ pub mod circuits {
                 channel: &mut Channel,
             ) -> Result<Vec<F::Item>> {
                 let output = backend.mul(&inputs[0], &inputs[1], channel)?;
-                backend.output(&output, channel)?;
                 Ok(vec![output])
             }
 
@@ -401,7 +393,6 @@ pub mod circuits {
                 channel: &mut Channel,
             ) -> Result<Vec<F::Item>> {
                 let output = backend.mul(&inputs[0], &inputs[1], channel)?;
-                backend.output(&output, channel)?;
                 Ok(vec![output])
             }
 
@@ -421,10 +412,9 @@ pub mod circuits {
                 &self,
                 backend: &mut F,
                 inputs: &[<F as crate::Fancy>::Item],
-                channel: &mut Channel,
+                _: &mut Channel,
             ) -> Result<Vec<<F as crate::Fancy>::Item>> {
                 let output = backend.cmul(&inputs[0], self.1);
-                backend.output(&output, channel)?;
                 Ok(vec![output])
             }
 
@@ -448,7 +438,6 @@ pub mod circuits {
             ) -> Result<Vec<F::Item>> {
                 let constant = backend.constant(self.1, self.0, channel)?;
                 let output = backend.add(&inputs[0], &constant);
-                backend.output(&output, channel)?;
                 Ok(vec![output])
             }
 
@@ -480,7 +469,6 @@ pub mod circuits {
             ) -> Result<Vec<<F as crate::Fancy>::Item>> {
                 let tab = (0..self.0).map(|i| (i + 1) % self.0).collect();
                 let output = backend.proj(&inputs[0], self.0, Some(tab), channel)?;
-                backend.output(&output, channel)?;
                 Ok(vec![output])
             }
 
@@ -503,7 +491,6 @@ pub mod circuits {
                 channel: &mut Channel,
             ) -> Result<Vec<<F as crate::Fancy>::Item>> {
                 let output = backend.proj(&inputs[0], self.0, Some(self.1.clone()), channel)?;
-                backend.output(&output, channel)?;
                 Ok(vec![output])
             }
 
@@ -527,7 +514,6 @@ pub mod circuits {
             ) -> Result<Vec<F::Item>> {
                 let y = backend.mod_change(&inputs[0], self.1, channel)?;
                 let z = backend.mod_change(&y, self.0, channel)?;
-                backend.output(&z, channel)?;
                 Ok(vec![z])
             }
 
@@ -555,7 +541,6 @@ pub mod circuits {
                     .map(|x| backend.mod_change(x, self.0 as u16 + 1, channel))
                     .collect::<Result<Vec<_>>>()?;
                 let output = backend.add_many(&wires);
-                backend.output(&output, channel)?;
                 Ok(vec![output])
             }
 
@@ -581,12 +566,11 @@ pub mod circuits {
         impl<F: BundleGadgets> CircuitExecutor<F> for TestBundleInputOutput {
             fn execute(
                 &self,
-                backend: &mut F,
+                _backend: &mut F,
                 inputs: &[F::Item],
-                channel: &mut Channel,
+                _: &mut Channel,
             ) -> Result<Vec<F::Item>> {
                 let output = CrtBundle::new(inputs.to_vec());
-                backend.output_bundle(&output, channel)?;
                 Ok(output.wires().to_vec())
             }
 
@@ -610,7 +594,6 @@ pub mod circuits {
             ) -> Result<Vec<<F as crate::Fancy>::Item>> {
                 let x = BinaryBundle::new(inputs.to_vec());
                 let z = backend.shift_extend(&x, self.1, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -638,12 +621,11 @@ pub mod circuits {
                 &self,
                 backend: &mut F,
                 inputs: &[F::Item],
-                channel: &mut Channel,
+                _: &mut Channel,
             ) -> Result<Vec<F::Item>> {
                 let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
                 let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
                 let z = backend.crt_add(&x, &y);
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -663,12 +645,11 @@ pub mod circuits {
                 &self,
                 backend: &mut F,
                 inputs: &[F::Item],
-                channel: &mut Channel,
+                _: &mut Channel,
             ) -> Result<Vec<F::Item>> {
                 let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
                 let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
                 let z = backend.crt_sub(&x, &y);
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -688,11 +669,10 @@ pub mod circuits {
                 &self,
                 backend: &mut F,
                 inputs: &[F::Item],
-                channel: &mut Channel,
+                _: &mut Channel,
             ) -> Result<Vec<F::Item>> {
                 let x = CrtBundle::new(inputs.to_vec());
                 let z = backend.crt_cmul(&x, self.1);
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -709,7 +689,7 @@ pub mod circuits {
     pub mod arithmetic_bundle_gadgets {
         //! Circuits that test [`ArithmeticBundleGadgets`].
 
-        use crate::{ArithmeticBundleGadgets, BundleGadgets, CrtBundle, circuit::CircuitExecutor};
+        use crate::{ArithmeticBundleGadgets, CrtBundle, circuit::CircuitExecutor};
         use swanky_channel::Channel;
         use swanky_error::Result;
 
@@ -725,7 +705,6 @@ pub mod circuits {
                 let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
                 let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
                 let z = backend.mul_bundles(&x, &y, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -750,7 +729,6 @@ pub mod circuits {
                 let b = &inputs[0];
                 let x = CrtBundle::new(inputs[1..self.0.len() + 1].to_vec());
                 let z = backend.mask(b, &x, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -782,7 +760,6 @@ pub mod circuits {
             ) -> Result<Vec<F::Item>> {
                 let x = CrtBundle::new(inputs.to_vec());
                 let z = backend.crt_cexp(&x, self.1, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -807,7 +784,6 @@ pub mod circuits {
                 let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
                 let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
                 let z = backend.crt_div(&x, &y, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -831,7 +807,6 @@ pub mod circuits {
             ) -> Result<Vec<F::Item>> {
                 let x = CrtBundle::new(inputs.to_vec());
                 let z = backend.crt_rem(&x, self.1, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -864,7 +839,6 @@ pub mod circuits {
                     let z = backend.crt_relu(&y, "100%", None, channel)?;
                     outputs.push(z);
                 }
-                backend.crt_outputs(&outputs, channel)?;
                 Ok(outputs
                     .iter()
                     .map(|out| out.wires().to_vec())
@@ -892,7 +866,6 @@ pub mod circuits {
             ) -> Result<Vec<<F as crate::Fancy>::Item>> {
                 let x = CrtBundle::new(inputs.to_vec());
                 let z = backend.crt_relu(&x, "100%", None, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -916,7 +889,6 @@ pub mod circuits {
             ) -> Result<Vec<<F as crate::Fancy>::Item>> {
                 let x = CrtBundle::new(inputs.to_vec());
                 let z = backend.crt_sgn(&x, "100%", None, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -941,7 +913,6 @@ pub mod circuits {
                 let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
                 let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
                 let z = backend.crt_lt(&x, &y, "100%", channel)?;
-                backend.output(&z, channel)?;
                 Ok(vec![z])
             }
 
@@ -968,7 +939,6 @@ pub mod circuits {
                     .map(|v| CrtBundle::new(v.to_vec()))
                     .collect::<Vec<_>>();
                 let z = backend.crt_max(&xs, "100%", channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -992,7 +962,6 @@ pub mod circuits {
             ) -> Result<Vec<<F as crate::Fancy>::Item>> {
                 let x = CrtBundle::new(inputs.to_vec());
                 let z = backend.crt_to_pmr(&x, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -1017,7 +986,6 @@ pub mod circuits {
                 let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
                 let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
                 let z = backend.pmr_lt(&x, &y, channel)?;
-                backend.output(&z, channel)?;
                 Ok(vec![z])
             }
 
@@ -1042,7 +1010,6 @@ pub mod circuits {
                 let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
                 let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
                 let z = backend.pmr_geq(&x, &y, channel)?;
-                backend.output(&z, channel)?;
                 Ok(vec![z])
             }
 
@@ -1059,9 +1026,7 @@ pub mod circuits {
     pub mod arithmetic_proj_bundle_gadgets {
         //! Circuits for testing [`ArithmeticProjBundleGadgets`].
 
-        use crate::{
-            ArithmeticProjBundleGadgets, Bundle, BundleGadgets, CrtBundle, circuit::CircuitExecutor,
-        };
+        use crate::{ArithmeticProjBundleGadgets, Bundle, CrtBundle, circuit::CircuitExecutor};
         use swanky_channel::Channel;
         use swanky_error::Result;
 
@@ -1077,7 +1042,6 @@ pub mod circuits {
                 let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
                 let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
                 let z = backend.eq_bundles(&x, &y, channel)?;
-                backend.output(&z, channel)?;
                 Ok(vec![z])
             }
 
@@ -1104,7 +1068,6 @@ pub mod circuits {
                     .map(|v| Bundle::new(v.to_vec()))
                     .collect::<Vec<_>>();
                 let z = backend.mixed_radix_addition(&xs, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -1131,7 +1094,6 @@ pub mod circuits {
                     .map(|v| Bundle::new(v.to_vec()))
                     .collect::<Vec<_>>();
                 let z = backend.mixed_radix_addition_msb_only(&xs, channel)?;
-                backend.output(&z, channel)?;
                 Ok(vec![z])
             }
 
@@ -1162,7 +1124,6 @@ pub mod circuits {
                 channel: &mut Channel,
             ) -> Result<Vec<<F as crate::Fancy>::Item>> {
                 let value = backend.bin_constant_bundle(self.0, self.1, channel)?;
-                backend.output_bundle(&value, channel)?;
                 Ok(value.wires().to_vec())
             }
 
@@ -1187,7 +1148,6 @@ pub mod circuits {
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
                 let z = backend.bin_and(&x, &y, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -1212,8 +1172,6 @@ pub mod circuits {
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
                 let (z, carry) = backend.bin_addition(&x, &y, channel)?;
-                backend.output(&carry, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok([vec![carry], z.wires().to_vec()].concat())
             }
 
@@ -1238,7 +1196,6 @@ pub mod circuits {
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
                 let z = backend.bin_addition_no_carry(&x, &y, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -1265,8 +1222,6 @@ pub mod circuits {
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
                 let (z, underflow) = backend.bin_subtraction(&x, &y, channel)?;
-                backend.output(&underflow, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok([vec![underflow], z.wires().to_vec()].concat())
             }
 
@@ -1291,7 +1246,6 @@ pub mod circuits {
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
                 let z = backend.bin_mul(&x, &y, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -1316,7 +1270,6 @@ pub mod circuits {
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
                 let z = backend.bin_multiplication_lower_half(&x, &y, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -1341,7 +1294,6 @@ pub mod circuits {
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
                 let z = backend.bin_div(&x, &y, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -1366,7 +1318,6 @@ pub mod circuits {
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
                 let z = backend.bin_lt(&x, &y, channel)?;
-                backend.output(&z, channel)?;
                 Ok(vec![z])
             }
 
@@ -1391,7 +1342,6 @@ pub mod circuits {
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
                 let z = backend.bin_lt_signed(&x, &y, channel)?;
-                backend.output(&z, channel)?;
                 Ok(vec![z])
             }
 
@@ -1411,11 +1361,10 @@ pub mod circuits {
                 &self,
                 backend: &mut F,
                 inputs: &[<F as crate::Fancy>::Item],
-                channel: &mut Channel,
+                _: &mut Channel,
             ) -> Result<Vec<<F as crate::Fancy>::Item>> {
                 let x = BinaryBundle::new(inputs.to_vec());
                 let z = backend.bin_rsa(&x, self.1);
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -1439,7 +1388,6 @@ pub mod circuits {
             ) -> Result<Vec<<F as crate::Fancy>::Item>> {
                 let x = BinaryBundle::new(inputs.to_vec());
                 let z = backend.bin_rsl(&x, self.1, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -1464,7 +1412,6 @@ pub mod circuits {
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
                 let z = backend.bin_eq_bundles(&x, &y, channel)?;
-                backend.output(&z, channel)?;
                 Ok(vec![z])
             }
 
@@ -1488,7 +1435,6 @@ pub mod circuits {
             ) -> Result<Vec<<F as crate::Fancy>::Item>> {
                 let x = BinaryBundle::new(inputs.to_vec());
                 let z = backend.bin_abs(&x, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -1514,7 +1460,6 @@ pub mod circuits {
 
                 let x = BinaryBundle::new(inputs.to_vec());
                 let z = backend.bin_twos_complement(&x, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
@@ -1538,7 +1483,6 @@ pub mod circuits {
             ) -> Result<Vec<<F as crate::Fancy>::Item>> {
                 let x = BinaryBundle::new(inputs.to_vec());
                 let output = backend.bin_demux(&x, channel)?;
-                backend.outputs(&output, channel)?;
                 Ok(output)
             }
 
@@ -1565,7 +1509,6 @@ pub mod circuits {
                     .map(|v| BinaryBundle::new(v.to_vec()))
                     .collect::<Vec<_>>();
                 let z = backend.bin_max(&xs, channel)?;
-                backend.output_bundle(&z, channel)?;
                 Ok(z.wires().to_vec())
             }
 
