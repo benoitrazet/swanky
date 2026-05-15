@@ -51,7 +51,7 @@ fn bench_eval_binary_ex<
             .collect::<Vec<u16>>();
         let xs = encoder.encode_inputs(&inputs);
         bench.iter(|| {
-            let ys = gc.eval_to_wirelabels(&ex, &xs).unwrap();
+            let ys = gc.eval_to_wirelabels(&ex, xs.clone()).unwrap();
             black_box(ys);
         })
     });
@@ -74,7 +74,7 @@ fn bench_eval_arith_ex<
             .collect::<Vec<u16>>();
         let xs = encoder.encode_inputs(&inputs);
         bench.iter(|| {
-            let ys = gc.eval_to_wirelabels(&ex, &xs).unwrap();
+            let ys = gc.eval_to_wirelabels(&ex, xs.clone()).unwrap();
             black_box(ys);
         })
     });
@@ -104,7 +104,7 @@ impl<F: FancyBinary> CircuitExecutor<F> for MixedOp {
         Ok(x)
     }
 
-    fn map(&self, inputs: &[F::Item]) -> Self::Input {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 1);
         inputs[0].clone()
     }
@@ -140,7 +140,7 @@ impl<F: FancyArithmetic> CircuitExecutor<F> for MixedOpArith {
         Ok(x)
     }
 
-    fn map(&self, inputs: &[F::Item]) -> Self::Input {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 1);
         inputs[0].clone()
     }
@@ -171,7 +171,7 @@ impl<F: FancyProj> CircuitExecutor<F> for Proj {
         Ok(vec![])
     }
 
-    fn map(&self, inputs: &[F::Item]) -> Self::Input {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 1);
         inputs[0].clone()
     }
@@ -202,7 +202,7 @@ impl<F: FancyArithmetic> CircuitExecutor<F> for Mul {
         Ok(vec![])
     }
 
-    fn map(&self, inputs: &[F::Item]) -> Self::Input {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 1);
         inputs[0].clone()
     }

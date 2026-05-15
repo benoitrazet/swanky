@@ -87,7 +87,7 @@ where
     )?;
     circuit.execute(
         &mut wire_preprocessor,
-        &<C as CircuitExecutor<WirePreProcessor<P>>>::map(circuit, &inputs),
+        &<C as CircuitExecutor<WirePreProcessor<P>>>::map(circuit, inputs),
         channel,
     )?;
 

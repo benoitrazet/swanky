@@ -41,7 +41,7 @@ mod tests {
                             &mut gb,
                             &<TestAddition as CircuitExecutor<
                                 Garbler<SwankyRng, ChouOrlandiSender, _>,
-                            >>::map(&circuit, &[x, y]),
+                            >>::map(&circuit, [x, y].to_vec()),
                             channel,
                         )?;
                         let result = gb.output(&outputs, channel)?;
@@ -59,7 +59,7 @@ mod tests {
                             &mut ev,
                             &<TestAddition as CircuitExecutor<
                                 Evaluator<SwankyRng, ChouOrlandiReceiver, _>,
-                            >>::map(&circuit, &[x, y]),
+                            >>::map(&circuit, [x, y].to_vec()),
                             channel,
                         )?;
                         let result = ev.output(&output, channel)?;
@@ -154,7 +154,7 @@ mod tests {
                 xs.extend(ys);
                 let outputs = circ.execute(
                     &mut gb,
-                    &<CIRC as CircuitExecutor<GB<_>>>::map(&circ, &xs),
+                    &<CIRC as CircuitExecutor<GB<_>>>::map(&circ, xs),
                     channel,
                 )?;
                 gb.outputs(&outputs.flatten(), channel)?;
@@ -168,7 +168,7 @@ mod tests {
                 xs.extend(ys);
                 let wirelabels = circ.execute(
                     &mut ev,
-                    &<CIRC as CircuitExecutor<EV<_>>>::map(&circ, &xs),
+                    &<CIRC as CircuitExecutor<EV<_>>>::map(&circ, xs),
                     channel,
                 )?;
                 let out = ev.outputs(&wirelabels.flatten(), channel)?;

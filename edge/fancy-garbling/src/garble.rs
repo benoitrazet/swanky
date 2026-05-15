@@ -43,7 +43,7 @@ mod nonstreaming {
                 }
                 // Run the garbled circuit evaluator.
                 let xs = en.encode_inputs(&inputs);
-                let wirelabels = ev.eval_to_wirelabels(circuit, &xs).unwrap();
+                let wirelabels = ev.eval_to_wirelabels(circuit, xs).unwrap();
                 let decoded = output_mapping.to_outputs(&wirelabels).unwrap();
 
                 // Run the dummy evaluator.
@@ -172,7 +172,7 @@ mod streaming {
             let inputs = dummy.encode_many(&inputs, &moduli, channel)?;
             let outputs = circuit.execute(
                 &mut dummy,
-                &<Ex as CircuitExecutor<Dummy>>::map(circuit, &inputs),
+                &<Ex as CircuitExecutor<Dummy>>::map(circuit, inputs),
                 channel,
             )?;
             Ok(dummy.outputs(&outputs.flatten(), channel)?.unwrap())
@@ -185,7 +185,7 @@ mod streaming {
                 let zeros = gb.encode_many(&inputs, &moduli, channel)?;
                 let outputs = circuit.execute(
                     &mut gb,
-                    &<Ex as CircuitExecutor<Garbler<_, _>>>::map(circuit, &zeros),
+                    &<Ex as CircuitExecutor<Garbler<_, _>>>::map(circuit, zeros),
                     channel,
                 )?;
                 gb.outputs(&outputs.flatten(), channel)?;
@@ -196,7 +196,7 @@ mod streaming {
                 let wires = ev.receive_many(&moduli, channel)?;
                 let outputs = circuit.execute(
                     &mut ev,
-                    &<Ex as CircuitExecutor<Evaluator<_>>>::map(circuit, &wires),
+                    &<Ex as CircuitExecutor<Evaluator<_>>>::map(circuit, wires),
                     channel,
                 )?;
                 Ok(ev.outputs(&outputs.flatten(), channel)?.unwrap())

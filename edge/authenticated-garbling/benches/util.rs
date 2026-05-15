@@ -34,7 +34,7 @@ pub fn test_circuit<
             inputs.extend(theirs);
             let outputs = circuit.execute(
                 &mut gb,
-                &<C as CircuitExecutor<Garbler<_>>>::map(circuit, &inputs),
+                &<C as CircuitExecutor<Garbler<_>>>::map(circuit, inputs),
                 c,
             )?;
             gb.outputs(&outputs.flatten(), c)
@@ -46,7 +46,7 @@ pub fn test_circuit<
             inputs.extend(mine);
             let outputs = circuit.execute(
                 &mut ev,
-                &<C as CircuitExecutor<Evaluator>>::map(circuit, &inputs),
+                &<C as CircuitExecutor<Evaluator>>::map(circuit, inputs),
                 c,
             )?;
             ev.outputs(&outputs.flatten(), c)

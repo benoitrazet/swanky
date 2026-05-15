@@ -30,9 +30,9 @@ impl<F: FancyBinary> CircuitExecutor<F> for BinaryCircuit {
         self.eval_to_wirelabels(backend, inputs, channel)
     }
 
-    fn map(&self, inputs: &[F::Item]) -> Self::Input {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), self.input_refs.len());
-        inputs.to_vec()
+        inputs
     }
 
     fn ninputs(&self) -> usize {

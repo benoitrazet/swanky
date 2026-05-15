@@ -127,7 +127,7 @@ pub trait CircuitExecutor<F: Fancy> {
     ///
     /// # Panics
     /// This panics of the number of inputs does not match the expected input size.
-    fn map(&self, inputs: &[F::Item]) -> Self::Input;
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input;
     /// The number of inputs to provide to [`CircuitExecutor::execute`].
     fn ninputs(&self) -> usize;
     /// The modulus for input `i`.
@@ -154,7 +154,7 @@ impl<C: CircuitExecutor<Informer<Dummy>>> CircuitInfo for C {
         })?;
 
         Channel::with(std::io::empty(), |c| {
-            self.execute(&mut informer, &self.map(&inputs), c)
+            self.execute(&mut informer, &self.map(inputs), c)
         })?;
         println!("{}", informer.stats());
         Ok(())
@@ -187,8 +187,9 @@ pub mod circuits {
                 Ok(inputs.to_vec())
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
-                inputs.to_vec()
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
+                assert_eq!(inputs.len(), self.0);
+                inputs
             }
 
             fn ninputs(&self) -> usize {
@@ -219,7 +220,7 @@ pub mod circuits {
                 Ok(outputs)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert!(inputs.is_empty());
             }
 
@@ -257,7 +258,7 @@ pub mod circuits {
                 Ok(output)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 1);
                 inputs[0].clone()
             }
@@ -286,7 +287,7 @@ pub mod circuits {
                 backend.and(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 2);
                 (inputs[0].clone(), inputs[1].clone())
             }
@@ -315,9 +316,9 @@ pub mod circuits {
                 backend.and_many(inputs, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
-                inputs.to_vec()
+                inputs
             }
 
             fn ninputs(&self) -> usize {
@@ -344,9 +345,9 @@ pub mod circuits {
                 backend.or_many(inputs, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
-                inputs.to_vec()
+                inputs
             }
 
             fn ninputs(&self) -> usize {
@@ -373,9 +374,9 @@ pub mod circuits {
                 Ok(backend.xor_many(inputs))
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
-                inputs.to_vec()
+                inputs
             }
 
             fn ninputs(&self) -> usize {
@@ -404,9 +405,9 @@ pub mod circuits {
                 ))
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
-                inputs.to_vec()
+                inputs
             }
 
             fn ninputs(&self) -> usize {
@@ -441,7 +442,7 @@ pub mod circuits {
                 Ok(backend.add(&inputs.0, &inputs.1))
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 2);
                 (inputs[0].clone(), inputs[1].clone())
             }
@@ -470,9 +471,9 @@ pub mod circuits {
                 Ok(backend.add_many(inputs))
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.1);
-                inputs.to_vec()
+                inputs
             }
 
             fn ninputs(&self) -> usize {
@@ -499,7 +500,7 @@ pub mod circuits {
                 Ok(backend.sub(&inputs.0, &inputs.1))
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 2);
                 (inputs[0].clone(), inputs[1].clone())
             }
@@ -528,7 +529,7 @@ pub mod circuits {
                 backend.mul(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 2);
                 (inputs[0].clone(), inputs[1].clone())
             }
@@ -558,7 +559,7 @@ pub mod circuits {
                 backend.mul(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 2);
                 (inputs[0].clone(), inputs[1].clone())
             }
@@ -587,7 +588,7 @@ pub mod circuits {
                 Ok(backend.cmul(input, self.1))
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 1);
                 inputs[0].clone()
             }
@@ -617,7 +618,7 @@ pub mod circuits {
                 Ok(backend.add(input, &constant))
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 1);
                 inputs[0].clone()
             }
@@ -655,7 +656,7 @@ pub mod circuits {
                 backend.proj(input, self.0, Some(tab), channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 1);
                 inputs[0].clone()
             }
@@ -684,7 +685,7 @@ pub mod circuits {
                 backend.proj(input, self.0, Some(self.1.clone()), channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 1);
                 inputs[0].clone()
             }
@@ -714,7 +715,7 @@ pub mod circuits {
                 backend.mod_change(&y, self.0, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 1);
                 inputs[0].clone()
             }
@@ -748,9 +749,9 @@ pub mod circuits {
                 Ok(backend.add_many(&wires))
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
-                inputs.to_vec()
+                inputs
             }
 
             fn ninputs(&self) -> usize {
@@ -785,9 +786,9 @@ pub mod circuits {
                 Ok(input.clone())
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len());
-                CrtBundle::new(inputs.to_vec())
+                CrtBundle::new(inputs)
             }
 
             fn ninputs(&self) -> usize {
@@ -814,9 +815,9 @@ pub mod circuits {
                 backend.shift_extend(input, self.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
-                BinaryBundle::new(inputs.to_vec())
+                BinaryBundle::new(inputs)
             }
 
             fn ninputs(&self) -> usize {
@@ -851,11 +852,12 @@ pub mod circuits {
                 Ok(backend.crt_add(&inputs.0, &inputs.1))
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * 2);
                 let length = self.0.len();
-                let x = CrtBundle::new(inputs[..length].to_vec());
-                let y = CrtBundle::new(inputs[length..].to_vec());
+                let (x, y) = inputs.split_at(length);
+                let x = CrtBundle::new(x.to_vec());
+                let y = CrtBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -883,11 +885,12 @@ pub mod circuits {
                 Ok(backend.crt_sub(&inputs.0, &inputs.1))
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * 2);
                 let length = self.0.len();
-                let x = CrtBundle::new(inputs[..length].to_vec());
-                let y = CrtBundle::new(inputs[length..].to_vec());
+                let (x, y) = inputs.split_at(length);
+                let x = CrtBundle::new(x.to_vec());
+                let y = CrtBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -915,9 +918,9 @@ pub mod circuits {
                 Ok(backend.crt_cmul(input, self.1))
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len());
-                CrtBundle::new(inputs.to_vec())
+                CrtBundle::new(inputs)
             }
 
             fn ninputs(&self) -> usize {
@@ -952,11 +955,12 @@ pub mod circuits {
                 backend.mul_bundles(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * 2);
                 let length = self.0.len();
-                let x = CrtBundle::new(inputs[..length].to_vec());
-                let y = CrtBundle::new(inputs[length..].to_vec());
+                let (x, y) = inputs.split_at(length);
+                let x = CrtBundle::new(x.to_vec());
+                let y = CrtBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -984,7 +988,7 @@ pub mod circuits {
                 backend.mask(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() + 1);
                 (inputs[0].clone(), CrtBundle::new(inputs[1..].to_vec()))
             }
@@ -1021,9 +1025,9 @@ pub mod circuits {
                 backend.crt_cexp(input, self.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len());
-                CrtBundle::new(inputs.to_vec())
+                CrtBundle::new(inputs)
             }
 
             fn ninputs(&self) -> usize {
@@ -1050,11 +1054,12 @@ pub mod circuits {
                 backend.crt_div(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * 2);
                 let length = self.0.len();
-                let x = CrtBundle::new(inputs[..length / 2].to_vec());
-                let y = CrtBundle::new(inputs[length / 2..].to_vec());
+                let (x, y) = inputs.split_at(length);
+                let x = CrtBundle::new(x.to_vec());
+                let y = CrtBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -1082,9 +1087,9 @@ pub mod circuits {
                 backend.crt_rem(input, self.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len());
-                CrtBundle::new(inputs.to_vec())
+                CrtBundle::new(inputs)
             }
 
             fn ninputs(&self) -> usize {
@@ -1118,7 +1123,7 @@ pub mod circuits {
                 Ok(outputs)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * self.1);
                 inputs
                     .chunks_exact(self.0.len())
@@ -1150,9 +1155,9 @@ pub mod circuits {
                 backend.crt_relu(input, "100%", None, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len());
-                CrtBundle::new(inputs.to_vec())
+                CrtBundle::new(inputs)
             }
 
             fn ninputs(&self) -> usize {
@@ -1179,9 +1184,9 @@ pub mod circuits {
                 backend.crt_sgn(input, "100%", None, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len());
-                CrtBundle::new(inputs.to_vec())
+                CrtBundle::new(inputs)
             }
 
             fn ninputs(&self) -> usize {
@@ -1208,11 +1213,11 @@ pub mod circuits {
                 backend.crt_lt(&inputs.0, &inputs.1, "100%", channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * 2);
-                let length = self.0.len();
-                let x = CrtBundle::new(inputs[..length].to_vec());
-                let y = CrtBundle::new(inputs[length..].to_vec());
+                let (x, y) = inputs.split_at(self.0.len());
+                let x = CrtBundle::new(x.to_vec());
+                let y = CrtBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -1240,7 +1245,7 @@ pub mod circuits {
                 backend.crt_max(inputs, "100%", channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * self.1);
                 inputs
                     .chunks_exact(self.0.len())
@@ -1272,9 +1277,9 @@ pub mod circuits {
                 backend.crt_to_pmr(input, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len());
-                CrtBundle::new(inputs.to_vec())
+                CrtBundle::new(inputs)
             }
 
             fn ninputs(&self) -> usize {
@@ -1301,11 +1306,11 @@ pub mod circuits {
                 backend.pmr_lt(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * 2);
-                let length = self.0.len();
-                let x = CrtBundle::new(inputs[..length].to_vec());
-                let y = CrtBundle::new(inputs[length..].to_vec());
+                let (x, y) = inputs.split_at(self.0.len());
+                let x = CrtBundle::new(x.to_vec());
+                let y = CrtBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -1333,11 +1338,11 @@ pub mod circuits {
                 backend.pmr_geq(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * 2);
-                let length = self.0.len();
-                let x = CrtBundle::new(inputs[..length].to_vec());
-                let y = CrtBundle::new(inputs[length..].to_vec());
+                let (x, y) = inputs.split_at(self.0.len());
+                let x = CrtBundle::new(x.to_vec());
+                let y = CrtBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -1373,11 +1378,11 @@ pub mod circuits {
                 backend.eq_bundles(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * 2);
-                let length = self.0.len();
-                let x = CrtBundle::new(inputs[..length].to_vec());
-                let y = CrtBundle::new(inputs[length..].to_vec());
+                let (x, y) = inputs.split_at(self.0.len());
+                let x = CrtBundle::new(x.to_vec());
+                let y = CrtBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -1405,7 +1410,7 @@ pub mod circuits {
                 backend.mixed_radix_addition(inputs, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 inputs
                     .chunks_exact(self.0.len())
                     .map(|v| Bundle::new(v.to_vec()))
@@ -1436,7 +1441,7 @@ pub mod circuits {
                 backend.mixed_radix_addition_msb_only(inputs, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 inputs
                     .chunks_exact(self.0.len())
                     .map(|v| Bundle::new(v.to_vec()))
@@ -1475,7 +1480,7 @@ pub mod circuits {
                 backend.bin_constant_bundle(self.0, self.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert!(inputs.is_empty());
             }
 
@@ -1503,10 +1508,11 @@ pub mod circuits {
                 backend.bin_and(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0 * 2);
-                let x = BinaryBundle::new(inputs[..self.0].to_vec());
-                let y = BinaryBundle::new(inputs[self.0..].to_vec());
+                let (x, y) = inputs.split_at(self.0);
+                let x = BinaryBundle::new(x.to_vec());
+                let y = BinaryBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -1535,10 +1541,11 @@ pub mod circuits {
                 Ok((carry, z))
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0 * 2);
-                let x = BinaryBundle::new(inputs[..self.0].to_vec());
-                let y = BinaryBundle::new(inputs[self.0..].to_vec());
+                let (x, y) = inputs.split_at(self.0);
+                let x = BinaryBundle::new(x.to_vec());
+                let y = BinaryBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -1566,10 +1573,11 @@ pub mod circuits {
                 backend.bin_addition_no_carry(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0 * 2);
-                let x = BinaryBundle::new(inputs[..self.0].to_vec());
-                let y = BinaryBundle::new(inputs[self.0..].to_vec());
+                let (x, y) = inputs.split_at(self.0);
+                let x = BinaryBundle::new(x.to_vec());
+                let y = BinaryBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -1598,10 +1606,11 @@ pub mod circuits {
                 Ok((underflow, z))
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0 * 2);
-                let x = BinaryBundle::new(inputs[..self.0].to_vec());
-                let y = BinaryBundle::new(inputs[self.0..].to_vec());
+                let (x, y) = inputs.split_at(self.0);
+                let x = BinaryBundle::new(x.to_vec());
+                let y = BinaryBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -1629,10 +1638,11 @@ pub mod circuits {
                 backend.bin_mul(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0 * 2);
-                let x = BinaryBundle::new(inputs[..self.0].to_vec());
-                let y = BinaryBundle::new(inputs[self.0..].to_vec());
+                let (x, y) = inputs.split_at(self.0);
+                let x = BinaryBundle::new(x.to_vec());
+                let y = BinaryBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -1660,10 +1670,11 @@ pub mod circuits {
                 backend.bin_multiplication_lower_half(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0 * 2);
-                let x = BinaryBundle::new(inputs[..self.0].to_vec());
-                let y = BinaryBundle::new(inputs[self.0..].to_vec());
+                let (x, y) = inputs.split_at(self.0);
+                let x = BinaryBundle::new(x.to_vec());
+                let y = BinaryBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -1690,10 +1701,11 @@ pub mod circuits {
                 backend.bin_div(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0 * 2);
-                let x = BinaryBundle::new(inputs[..self.0].to_vec());
-                let y = BinaryBundle::new(inputs[self.0..].to_vec());
+                let (x, y) = inputs.split_at(self.0);
+                let x = BinaryBundle::new(x.to_vec());
+                let y = BinaryBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -1721,10 +1733,11 @@ pub mod circuits {
                 backend.bin_lt(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0 * 2);
-                let x = BinaryBundle::new(inputs[..self.0].to_vec());
-                let y = BinaryBundle::new(inputs[self.0..].to_vec());
+                let (x, y) = inputs.split_at(self.0);
+                let x = BinaryBundle::new(x.to_vec());
+                let y = BinaryBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -1752,10 +1765,11 @@ pub mod circuits {
                 backend.bin_lt_signed(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0 * 2);
-                let x = BinaryBundle::new(inputs[..self.0].to_vec());
-                let y = BinaryBundle::new(inputs[self.0..].to_vec());
+                let (x, y) = inputs.split_at(self.0);
+                let x = BinaryBundle::new(x.to_vec());
+                let y = BinaryBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -1783,9 +1797,9 @@ pub mod circuits {
                 Ok(backend.bin_rsa(input, self.1))
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
-                BinaryBundle::new(inputs.to_vec())
+                BinaryBundle::new(inputs)
             }
 
             fn ninputs(&self) -> usize {
@@ -1812,9 +1826,9 @@ pub mod circuits {
                 backend.bin_rsl(input, self.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
-                BinaryBundle::new(inputs.to_vec())
+                BinaryBundle::new(inputs)
             }
 
             fn ninputs(&self) -> usize {
@@ -1841,10 +1855,11 @@ pub mod circuits {
                 backend.bin_eq_bundles(&inputs.0, &inputs.1, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0 * 2);
-                let x = BinaryBundle::new(inputs[..self.0].to_vec());
-                let y = BinaryBundle::new(inputs[self.0..].to_vec());
+                let (x, y) = inputs.split_at(self.0);
+                let x = BinaryBundle::new(x.to_vec());
+                let y = BinaryBundle::new(y.to_vec());
                 (x, y)
             }
 
@@ -1872,9 +1887,9 @@ pub mod circuits {
                 backend.bin_abs(input, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
-                BinaryBundle::new(inputs.to_vec())
+                BinaryBundle::new(inputs)
             }
 
             fn ninputs(&self) -> usize {
@@ -1901,9 +1916,9 @@ pub mod circuits {
                 backend.bin_twos_complement(input, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
-                BinaryBundle::new(inputs.to_vec())
+                BinaryBundle::new(inputs)
             }
 
             fn ninputs(&self) -> usize {
@@ -1930,9 +1945,9 @@ pub mod circuits {
                 backend.bin_demux(input, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
-                BinaryBundle::new(inputs.to_vec())
+                BinaryBundle::new(inputs)
             }
 
             fn ninputs(&self) -> usize {
@@ -1959,7 +1974,7 @@ pub mod circuits {
                 backend.bin_max(inputs, channel)
             }
 
-            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 inputs
                     .chunks_exact(self.0)
                     .map(|v| BinaryBundle::new(v.to_vec()))

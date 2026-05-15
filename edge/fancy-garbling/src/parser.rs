@@ -193,6 +193,6 @@ mod tests {
         let (encoder, gc, _) =
             GarbledCircuit::garble::<WireMod2, _, _>(&circ, SwankyRng::new()).unwrap();
         let inputs = encoder.encode_inputs(&vec![0u16; 256]);
-        gc.eval_to_wirelabels(&circ, &inputs).unwrap();
+        gc.eval_to_wirelabels(&circ, inputs).unwrap();
     }
 }

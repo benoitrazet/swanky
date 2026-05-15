@@ -23,7 +23,7 @@ fn bench_eval_aes_binary(c: &mut Criterion) {
     let (en, gc, _) = GarbledCircuit::garble::<WireMod2, _, _>(&circ, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0u16; 256]);
     c.bench_function("eval::aes-binary", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&circ, &inputs))
+        bench.iter(|| gc.eval_to_wirelabels(&circ, inputs.clone()))
     });
 }
 
@@ -39,7 +39,7 @@ fn bench_eval_sha_1_binary(c: &mut Criterion) {
     let (en, gc, _) = GarbledCircuit::garble::<WireMod2, _, _>(&circ, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0u16; 512]);
     c.bench_function("eval::sha-1-binary", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&circ, &inputs))
+        bench.iter(|| gc.eval_to_wirelabels(&circ, inputs.clone()))
     });
 }
 
@@ -55,7 +55,7 @@ fn bench_eval_sha_256_binary(c: &mut Criterion) {
     let (en, gc, _) = GarbledCircuit::garble::<WireMod2, _, _>(&circ, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0u16; 512]);
     c.bench_function("eval::sha-256-binary", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&circ, &inputs))
+        bench.iter(|| gc.eval_to_wirelabels(&circ, inputs.clone()))
     });
 }
 
@@ -71,7 +71,7 @@ fn bench_eval_aes_arithmetic(c: &mut Criterion) {
     let (en, gc, _) = GarbledCircuit::garble::<AllWire, _, _>(&circ, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0u16; 256]);
     c.bench_function("eval::aes-arithmetic", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&circ, &inputs))
+        bench.iter(|| gc.eval_to_wirelabels(&circ, inputs.clone()))
     });
 }
 
@@ -87,7 +87,7 @@ fn bench_eval_sha_1_arithmetic(c: &mut Criterion) {
     let (en, gc, _) = GarbledCircuit::garble::<AllWire, _, _>(&circ, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0u16; 512]);
     c.bench_function("eval::sha-1-arithmetic", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&circ, &inputs))
+        bench.iter(|| gc.eval_to_wirelabels(&circ, inputs.clone()))
     });
 }
 
@@ -103,7 +103,7 @@ fn bench_eval_sha_256_arithmetic(c: &mut Criterion) {
     let (en, gc, _) = GarbledCircuit::garble::<AllWire, _, _>(&circ, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0u16; 512]);
     c.bench_function("eval::sha-256-arithmetic", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&circ, &inputs))
+        bench.iter(|| gc.eval_to_wirelabels(&circ, inputs.clone()))
     });
 }
 
