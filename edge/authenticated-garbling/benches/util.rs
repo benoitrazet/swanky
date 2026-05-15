@@ -32,7 +32,11 @@ pub fn test_circuit<
             let mut inputs = gb.encode_many(inputs_gb, &vec![2; inputs_gb.len()], c)?;
             let theirs = gb.receive_many(&vec![2; inputs_ev.len()], c)?;
             inputs.extend(theirs);
-            let outputs = circuit.execute(&mut gb, &inputs, c)?;
+            let outputs = circuit.execute(
+                &mut gb,
+                &<C as CircuitExecutor<Garbler<_>>>::map(circuit, &inputs),
+                c,
+            )?;
             gb.outputs(&outputs.flatten(), c)
         },
         |c| {
@@ -40,7 +44,11 @@ pub fn test_circuit<
             let mut inputs = ev.receive_many(&vec![2; inputs_gb.len()], c)?;
             let mine = ev.encode_many(inputs_ev, &vec![2; inputs_ev.len()], c)?;
             inputs.extend(mine);
-            let outputs = circuit.execute(&mut ev, &inputs, c)?;
+            let outputs = circuit.execute(
+                &mut ev,
+                &<C as CircuitExecutor<Evaluator>>::map(circuit, &inputs),
+                c,
+            )?;
             ev.outputs(&outputs.flatten(), c)
         },
     )

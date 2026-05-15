@@ -2,10 +2,7 @@
 //! where you create a circuit for a computation then garble it.
 
 use crate::{
-    BinaryBundle, Bundle, CrtBundle, HasModulus,
-    dummy::{Dummy, DummyVal},
-    fancy::Fancy,
-    informer::Informer,
+    BinaryBundle, Bundle, CrtBundle, HasModulus, dummy::Dummy, fancy::Fancy, informer::Informer,
 };
 use itertools::Itertools;
 use swanky_channel::Channel;
@@ -114,6 +111,8 @@ impl<T: Clone + HasModulus> Flatten for (T, BinaryBundle<T>) {
 /// }
 /// ```
 pub trait CircuitExecutor<F: Fancy> {
+    /// The input type of the circuit.
+    type Input;
     /// The output type of the circuit.
     type Output: Flatten<Item = F::Item>;
 
@@ -121,9 +120,14 @@ pub trait CircuitExecutor<F: Fancy> {
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &[F::Item],
+        inputs: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output>;
+    /// Map a vector of inputs to [`Self::Input`].
+    ///
+    /// # Panics
+    /// This panics of the number of inputs does not match the expected input size.
+    fn map(&self, inputs: &[F::Item]) -> Self::Input;
     /// The number of inputs to provide to [`CircuitExecutor::execute`].
     fn ninputs(&self) -> usize;
     /// The modulus for input `i`.
@@ -136,22 +140,21 @@ pub trait CircuitExecutor<F: Fancy> {
 /// that can be evaluated with an `Informer`
 pub trait CircuitInfo {
     /// Print circuit info
-    fn print_info(&self) -> swanky_error::Result<()>;
+    fn print_info(&self) -> Result<()>;
 }
 
 impl<C: CircuitExecutor<Informer<Dummy>>> CircuitInfo for C {
-    fn print_info(&self) -> swanky_error::Result<()> {
+    fn print_info(&self) -> Result<()> {
         let mut informer = crate::informer::Informer::new(Dummy::new());
 
-        // encode inputs as InformerVals
         let inputs = Channel::with(std::io::empty(), |channel| {
             (0..self.ninputs())
                 .map(|i| informer.encode(0, self.modulus(i), channel))
-                .collect::<swanky_error::Result<Vec<DummyVal>>>()
+                .collect::<Result<Vec<_>>>()
         })?;
 
         Channel::with(std::io::empty(), |c| {
-            self.execute(&mut informer, &inputs, c)
+            self.execute(&mut informer, &self.map(&inputs), c)
         })?;
         println!("{}", informer.stats());
         Ok(())
@@ -171,16 +174,21 @@ pub mod circuits {
         /// Circuit for testing [`Fancy::outputs`].
         pub struct TestBinaryOutputs(pub usize);
         impl<F: Fancy> CircuitExecutor<F> for TestBinaryOutputs {
+            type Input = Vec<F::Item>;
             type Output = Vec<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[<F as Fancy>::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
                 backend.outputs(inputs, channel)?;
                 Ok(inputs.to_vec())
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                inputs.to_vec()
             }
 
             fn ninputs(&self) -> usize {
@@ -195,12 +203,13 @@ pub mod circuits {
         /// Circuit for testing [`Fancy::constant`].
         pub struct TestBinaryConstant;
         impl<F: Fancy> CircuitExecutor<F> for TestBinaryConstant {
+            type Input = ();
             type Output = Vec<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                _inputs: &[F::Item],
+                _inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
                 let outputs = vec![
@@ -208,6 +217,10 @@ pub mod circuits {
                     backend.constant(1, 2, channel)?,
                 ];
                 Ok(outputs)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert!(inputs.is_empty());
             }
 
             fn ninputs(&self) -> usize {
@@ -230,17 +243,23 @@ pub mod circuits {
         /// Circuit for testing [`FancyBinary::negate`].
         pub struct TestNegateGate;
         impl<F: FancyBinary> CircuitExecutor<F> for TestNegateGate {
+            type Input = F::Item;
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[<F as crate::Fancy>::Item],
+                input: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let output = backend.negate(&inputs[0]);
+                let output = backend.negate(input);
                 backend.output(&output, channel)?;
                 Ok(output)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), 1);
+                inputs[0].clone()
             }
 
             fn ninputs(&self) -> usize {
@@ -255,15 +274,21 @@ pub mod circuits {
         /// Circuit for testing [`FancyBinary::and`].
         pub struct TestAndGate;
         impl<F: FancyBinary> CircuitExecutor<F> for TestAndGate {
+            type Input = (F::Item, F::Item);
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                backend.and(&inputs[0], &inputs[1], channel)
+                backend.and(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), 2);
+                (inputs[0].clone(), inputs[1].clone())
             }
 
             fn ninputs(&self) -> usize {
@@ -278,15 +303,21 @@ pub mod circuits {
         /// Circuit for testing [`FancyBinary::and_many`].
         pub struct TestAndGateFanN(pub usize);
         impl<F: FancyBinary> CircuitExecutor<F> for TestAndGateFanN {
+            type Input = Vec<F::Item>;
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
                 backend.and_many(inputs, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0);
+                inputs.to_vec()
             }
 
             fn ninputs(&self) -> usize {
@@ -301,15 +332,21 @@ pub mod circuits {
         /// Circuit for testing [`FancyBinary::or_many`].
         pub struct TestOrGateFanN(pub usize);
         impl<F: FancyBinary> CircuitExecutor<F> for TestOrGateFanN {
+            type Input = Vec<F::Item>;
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
                 backend.or_many(inputs, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0);
+                inputs.to_vec()
             }
 
             fn ninputs(&self) -> usize {
@@ -324,15 +361,21 @@ pub mod circuits {
         /// Circuit for testing [`FancyBinary::xor_many`].
         pub struct TestXorGateFanN(pub usize);
         impl<F: FancyBinary> CircuitExecutor<F> for TestXorGateFanN {
+            type Input = Vec<F::Item>;
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 _: &mut Channel,
             ) -> Result<Self::Output> {
                 Ok(backend.xor_many(inputs))
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0);
+                inputs.to_vec()
             }
 
             fn ninputs(&self) -> usize {
@@ -347,17 +390,23 @@ pub mod circuits {
         /// Circuit for testing [`FancyBinary::negate`] over a [`BinaryBundle`].
         pub struct TestBinaryNegate(pub usize);
         impl<F: FancyBinary> CircuitExecutor<F> for TestBinaryNegate {
+            type Input = Vec<F::Item>;
             type Output = BinaryBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[<F as crate::Fancy>::Item],
+                inputs: &Self::Input,
                 _: &mut Channel,
             ) -> Result<Self::Output> {
                 Ok(BinaryBundle::new(
                     inputs.iter().map(|x| backend.negate(x)).collect::<Vec<_>>(),
                 ))
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0);
+                inputs.to_vec()
             }
 
             fn ninputs(&self) -> usize {
@@ -380,15 +429,21 @@ pub mod circuits {
         /// Circuit for testing [`FancyArithmetic::add`].
         pub struct TestAddition(pub u16);
         impl<F: FancyArithmetic> CircuitExecutor<F> for TestAddition {
+            type Input = (F::Item, F::Item);
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 _: &mut Channel,
             ) -> Result<Self::Output> {
-                Ok(backend.add(&inputs[0], &inputs[1]))
+                Ok(backend.add(&inputs.0, &inputs.1))
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), 2);
+                (inputs[0].clone(), inputs[1].clone())
             }
 
             fn ninputs(&self) -> usize {
@@ -403,15 +458,21 @@ pub mod circuits {
         /// Circuit for testing [`FancyArithmetic::add_many`].
         pub struct TestAddMany(pub u16, pub usize);
         impl<F: FancyArithmetic> CircuitExecutor<F> for TestAddMany {
+            type Input = Vec<F::Item>;
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 _: &mut Channel,
             ) -> Result<Self::Output> {
                 Ok(backend.add_many(inputs))
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.1);
+                inputs.to_vec()
             }
 
             fn ninputs(&self) -> usize {
@@ -426,15 +487,21 @@ pub mod circuits {
         /// Circuit for testing [`FancyArithmetic::sub`].
         pub struct TestSubtraction(pub u16);
         impl<F: FancyArithmetic> CircuitExecutor<F> for TestSubtraction {
+            type Input = (F::Item, F::Item);
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 _: &mut Channel,
             ) -> Result<Self::Output> {
-                Ok(backend.sub(&inputs[0], &inputs[1]))
+                Ok(backend.sub(&inputs.0, &inputs.1))
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), 2);
+                (inputs[0].clone(), inputs[1].clone())
             }
 
             fn ninputs(&self) -> usize {
@@ -449,15 +516,21 @@ pub mod circuits {
         /// Circuit for testing [`FancyArithmetic::mul`].
         pub struct TestMulGate(pub u16);
         impl<F: FancyArithmetic> CircuitExecutor<F> for TestMulGate {
+            type Input = (F::Item, F::Item);
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                backend.mul(&inputs[0], &inputs[1], channel)
+                backend.mul(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), 2);
+                (inputs[0].clone(), inputs[1].clone())
             }
 
             fn ninputs(&self) -> usize {
@@ -473,15 +546,21 @@ pub mod circuits {
         /// for the inputs.
         pub struct TestMulGateUnequalMods(pub [u16; 2]);
         impl<F: FancyArithmetic> CircuitExecutor<F> for TestMulGateUnequalMods {
+            type Input = (F::Item, F::Item);
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                backend.mul(&inputs[0], &inputs[1], channel)
+                backend.mul(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), 2);
+                (inputs[0].clone(), inputs[1].clone())
             }
 
             fn ninputs(&self) -> usize {
@@ -496,15 +575,21 @@ pub mod circuits {
         /// Circuit for testing [`FancyArithmetic::cmul`].
         pub struct TestCmul(pub u16, pub u16);
         impl<F: FancyArithmetic> CircuitExecutor<F> for TestCmul {
+            type Input = F::Item;
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[<F as crate::Fancy>::Item],
+                input: &Self::Input,
                 _: &mut Channel,
             ) -> Result<Self::Output> {
-                Ok(backend.cmul(&inputs[0], self.1))
+                Ok(backend.cmul(input, self.1))
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), 1);
+                inputs[0].clone()
             }
 
             fn ninputs(&self) -> usize {
@@ -519,16 +604,22 @@ pub mod circuits {
         /// Circuit for testing constant gates.
         pub struct TestConstants(pub u16, pub u16);
         impl<F: FancyArithmetic> CircuitExecutor<F> for TestConstants {
+            type Input = F::Item;
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                input: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
                 let constant = backend.constant(self.1, self.0, channel)?;
-                Ok(backend.add(&inputs[0], &constant))
+                Ok(backend.add(input, &constant))
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), 1);
+                inputs[0].clone()
             }
 
             fn ninputs(&self) -> usize {
@@ -551,16 +642,22 @@ pub mod circuits {
         /// Circuit for testing [`FancyProj::proj`].
         pub struct TestProj(pub u16);
         impl<F: FancyProj> CircuitExecutor<F> for TestProj {
+            type Input = F::Item;
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[<F as crate::Fancy>::Item],
+                input: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
                 let tab = (0..self.0).map(|i| (i + 1) % self.0).collect();
-                backend.proj(&inputs[0], self.0, Some(tab), channel)
+                backend.proj(input, self.0, Some(tab), channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), 1);
+                inputs[0].clone()
             }
 
             fn ninputs(&self) -> usize {
@@ -575,15 +672,21 @@ pub mod circuits {
         /// Circuit for testing [`FancyProj::proj`] using a custom truth table.
         pub struct TestProjRand(pub u16, pub Vec<u16>);
         impl<F: FancyProj> CircuitExecutor<F> for TestProjRand {
+            type Input = F::Item;
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[<F as crate::Fancy>::Item],
+                input: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                backend.proj(&inputs[0], self.0, Some(self.1.clone()), channel)
+                backend.proj(input, self.0, Some(self.1.clone()), channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), 1);
+                inputs[0].clone()
             }
 
             fn ninputs(&self) -> usize {
@@ -598,16 +701,22 @@ pub mod circuits {
         /// Circuit for testing [`FancyProj::mod_change`].
         pub struct TestModChange(pub u16, pub u16);
         impl<F: FancyProj> CircuitExecutor<F> for TestModChange {
+            type Input = F::Item;
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                input: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let y = backend.mod_change(&inputs[0], self.1, channel)?;
+                let y = backend.mod_change(input, self.1, channel)?;
                 backend.mod_change(&y, self.0, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), 1);
+                inputs[0].clone()
             }
 
             fn ninputs(&self) -> usize {
@@ -623,12 +732,13 @@ pub mod circuits {
         /// [`FancyArithmetic::add_many`].
         pub struct TestAddManyModChange(pub usize);
         impl<F: FancyProj + FancyArithmetic> CircuitExecutor<F> for TestAddManyModChange {
+            type Input = Vec<F::Item>;
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
                 let wires = inputs
@@ -636,6 +746,11 @@ pub mod circuits {
                     .map(|x| backend.mod_change(x, self.0 as u16 + 1, channel))
                     .collect::<Result<Vec<_>>>()?;
                 Ok(backend.add_many(&wires))
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0);
+                inputs.to_vec()
             }
 
             fn ninputs(&self) -> usize {
@@ -658,15 +773,21 @@ pub mod circuits {
         /// Circuit for testing [`CrtBundle`]s.
         pub struct TestBundleInputOutput(pub Vec<u16>);
         impl<F: BundleGadgets> CircuitExecutor<F> for TestBundleInputOutput {
+            type Input = CrtBundle<F::Item>;
             type Output = CrtBundle<F::Item>;
 
             fn execute(
                 &self,
-                _backend: &mut F,
-                inputs: &[F::Item],
+                _: &mut F,
+                input: &Self::Input,
                 _: &mut Channel,
             ) -> Result<Self::Output> {
-                Ok(CrtBundle::new(inputs.to_vec()))
+                Ok(input.clone())
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len());
+                CrtBundle::new(inputs.to_vec())
             }
 
             fn ninputs(&self) -> usize {
@@ -681,16 +802,21 @@ pub mod circuits {
         /// Circuit for testing [`BundleGadgets::shift_extend`].
         pub struct TestShiftExtend(pub usize, pub usize);
         impl<F: BundleGadgets> CircuitExecutor<F> for TestShiftExtend {
+            type Input = BinaryBundle<F::Item>;
             type Output = Bundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[<F as crate::Fancy>::Item],
+                input: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = BinaryBundle::new(inputs.to_vec());
-                backend.shift_extend(&x, self.1, channel)
+                backend.shift_extend(input, self.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0);
+                BinaryBundle::new(inputs.to_vec())
             }
 
             fn ninputs(&self) -> usize {
@@ -713,17 +839,24 @@ pub mod circuits {
         /// Circuit for testing [`CrtGadgets::crt_add`].
         pub struct TestCrtAddition(pub Vec<u16>);
         impl<F: CrtGadgets> CircuitExecutor<F> for TestCrtAddition {
+            type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
             type Output = CrtBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 _: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
-                let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
-                Ok(backend.crt_add(&x, &y))
+                Ok(backend.crt_add(&inputs.0, &inputs.1))
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len() * 2);
+                let length = self.0.len();
+                let x = CrtBundle::new(inputs[..length].to_vec());
+                let y = CrtBundle::new(inputs[length..].to_vec());
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -738,17 +871,24 @@ pub mod circuits {
         /// Circuit for testing [`CrtGadgets::crt_sub`].
         pub struct TestCrtSubtraction(pub Vec<u16>);
         impl<F: CrtGadgets> CircuitExecutor<F> for TestCrtSubtraction {
+            type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
             type Output = CrtBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 _: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
-                let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
-                Ok(backend.crt_sub(&x, &y))
+                Ok(backend.crt_sub(&inputs.0, &inputs.1))
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len() * 2);
+                let length = self.0.len();
+                let x = CrtBundle::new(inputs[..length].to_vec());
+                let y = CrtBundle::new(inputs[length..].to_vec());
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -763,16 +903,21 @@ pub mod circuits {
         /// Circuit for testing [`CrtGadgets::crt_cmul`].
         pub struct TestCrtCmul(pub Vec<u16>, pub u128);
         impl<F: CrtGadgets> CircuitExecutor<F> for TestCrtCmul {
+            type Input = CrtBundle<F::Item>;
             type Output = CrtBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                input: &Self::Input,
                 _: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = CrtBundle::new(inputs.to_vec());
-                Ok(backend.crt_cmul(&x, self.1))
+                Ok(backend.crt_cmul(input, self.1))
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len());
+                CrtBundle::new(inputs.to_vec())
             }
 
             fn ninputs(&self) -> usize {
@@ -795,17 +940,24 @@ pub mod circuits {
         /// Circuit for testing [`ArithmeticBundleGadgets::mul_bundles`].
         pub struct TestCrtMultiplication(pub Vec<u16>);
         impl<F: ArithmeticBundleGadgets> CircuitExecutor<F> for TestCrtMultiplication {
+            type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
             type Output = Bundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
-                let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
-                backend.mul_bundles(&x, &y, channel)
+                backend.mul_bundles(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len() * 2);
+                let length = self.0.len();
+                let x = CrtBundle::new(inputs[..length].to_vec());
+                let y = CrtBundle::new(inputs[length..].to_vec());
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -820,17 +972,21 @@ pub mod circuits {
         /// Circuit for testing [`ArithmeticBundleGadgets::mask`].
         pub struct TestMask(pub Vec<u16>);
         impl<F: ArithmeticBundleGadgets> CircuitExecutor<F> for TestMask {
+            type Input = (F::Item, CrtBundle<F::Item>);
             type Output = Bundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let b = &inputs[0];
-                let x = CrtBundle::new(inputs[1..self.0.len() + 1].to_vec());
-                backend.mask(b, &x, channel)
+                backend.mask(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len() + 1);
+                (inputs[0].clone(), CrtBundle::new(inputs[1..].to_vec()))
             }
 
             fn ninputs(&self) -> usize {
@@ -853,16 +1009,21 @@ pub mod circuits {
         /// Circuit for testing [`CrtProjGadgets::crt_cexp`].
         pub struct TestCrtCexp(pub Vec<u16>, pub u16);
         impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtCexp {
+            type Input = CrtBundle<F::Item>;
             type Output = CrtBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                input: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = CrtBundle::new(inputs.to_vec());
-                backend.crt_cexp(&x, self.1, channel)
+                backend.crt_cexp(input, self.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len());
+                CrtBundle::new(inputs.to_vec())
             }
 
             fn ninputs(&self) -> usize {
@@ -877,17 +1038,24 @@ pub mod circuits {
         /// Circuit for testing [`CrtProjGadgets::crt_div`].
         pub struct TestCrtDivision(pub Vec<u16>);
         impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtDivision {
+            type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
             type Output = CrtBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
-                let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
-                backend.crt_div(&x, &y, channel)
+                backend.crt_div(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len() * 2);
+                let length = self.0.len();
+                let x = CrtBundle::new(inputs[..length / 2].to_vec());
+                let y = CrtBundle::new(inputs[length / 2..].to_vec());
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -902,16 +1070,21 @@ pub mod circuits {
         /// Circuit for testing [`CrtProjGadgets::crt_rem`].
         pub struct TestCrtRemainder(pub Vec<u16>, pub u16);
         impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtRemainder {
+            type Input = CrtBundle<F::Item>;
             type Output = CrtBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                input: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = CrtBundle::new(inputs.to_vec());
-                backend.crt_rem(&x, self.1, channel)
+                backend.crt_rem(input, self.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len());
+                CrtBundle::new(inputs.to_vec())
             }
 
             fn ninputs(&self) -> usize {
@@ -926,18 +1099,15 @@ pub mod circuits {
         /// Circuit for testing multiple CRT operations.
         pub struct TestComplexGadget(pub Vec<u16>, pub usize);
         impl<F: CrtProjGadgets> CircuitExecutor<F> for TestComplexGadget {
+            type Input = Vec<CrtBundle<F::Item>>;
             type Output = Vec<CrtBundle<F::Item>>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let inputs = inputs
-                    .chunks_exact(self.0.len())
-                    .map(|x| CrtBundle::new(x.to_vec()))
-                    .collect::<Vec<_>>();
                 let mut outputs = Vec::with_capacity(inputs.len());
                 for x in inputs.iter() {
                     let c = backend.crt_constant_bundle(1, x.composite_modulus(), channel)?;
@@ -948,8 +1118,16 @@ pub mod circuits {
                 Ok(outputs)
             }
 
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len() * self.1);
+                inputs
+                    .chunks_exact(self.0.len())
+                    .map(|x| CrtBundle::new(x.to_vec()))
+                    .collect()
+            }
+
             fn ninputs(&self) -> usize {
-                self.1
+                self.0.len() * self.1
             }
 
             fn modulus(&self, i: usize) -> u16 {
@@ -960,16 +1138,21 @@ pub mod circuits {
         /// Circuit for testing [`CrtProjGadgets::crt_relu`].
         pub struct TestRelu(pub Vec<u16>);
         impl<F: CrtProjGadgets> CircuitExecutor<F> for TestRelu {
+            type Input = CrtBundle<F::Item>;
             type Output = CrtBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                input: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = CrtBundle::new(inputs.to_vec());
-                backend.crt_relu(&x, "100%", None, channel)
+                backend.crt_relu(input, "100%", None, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len());
+                CrtBundle::new(inputs.to_vec())
             }
 
             fn ninputs(&self) -> usize {
@@ -984,16 +1167,21 @@ pub mod circuits {
         /// Circuit for testing [`CrtProjGadgets::crt_sgn`].
         pub struct TestSgn(pub Vec<u16>);
         impl<F: CrtProjGadgets> CircuitExecutor<F> for TestSgn {
+            type Input = CrtBundle<F::Item>;
             type Output = CrtBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                input: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = CrtBundle::new(inputs.to_vec());
-                backend.crt_sgn(&x, "100%", None, channel)
+                backend.crt_sgn(input, "100%", None, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len());
+                CrtBundle::new(inputs.to_vec())
             }
 
             fn ninputs(&self) -> usize {
@@ -1008,17 +1196,24 @@ pub mod circuits {
         /// Circuit for testing [`CrtProjGadgets::crt_lt`].
         pub struct TestLeq(pub Vec<u16>);
         impl<F: CrtProjGadgets> CircuitExecutor<F> for TestLeq {
+            type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
-                let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
-                backend.crt_lt(&x, &y, "100%", channel)
+                backend.crt_lt(&inputs.0, &inputs.1, "100%", channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len() * 2);
+                let length = self.0.len();
+                let x = CrtBundle::new(inputs[..length].to_vec());
+                let y = CrtBundle::new(inputs[length..].to_vec());
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -1033,19 +1228,24 @@ pub mod circuits {
         /// Circuit for testing [`CrtProjGadgets::crt_max`].
         pub struct TestMax(pub Vec<u16>, pub usize);
         impl<F: CrtProjGadgets> CircuitExecutor<F> for TestMax {
+            type Input = Vec<CrtBundle<F::Item>>;
             type Output = CrtBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let xs = inputs
+                backend.crt_max(inputs, "100%", channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len() * self.1);
+                inputs
                     .chunks_exact(self.0.len())
-                    .map(|v| CrtBundle::new(v.to_vec()))
-                    .collect::<Vec<_>>();
-                backend.crt_max(&xs, "100%", channel)
+                    .map(|x| CrtBundle::new(x.to_vec()))
+                    .collect()
             }
 
             fn ninputs(&self) -> usize {
@@ -1060,16 +1260,21 @@ pub mod circuits {
         /// Circuit for testing [`CrtProjGadgets::crt_to_pmr`].
         pub struct TestCrtToPmr(pub Vec<u16>);
         impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtToPmr {
+            type Input = CrtBundle<F::Item>;
             type Output = Bundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                input: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = CrtBundle::new(inputs.to_vec());
-                backend.crt_to_pmr(&x, channel)
+                backend.crt_to_pmr(input, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len());
+                CrtBundle::new(inputs.to_vec())
             }
 
             fn ninputs(&self) -> usize {
@@ -1084,17 +1289,24 @@ pub mod circuits {
         /// Circuit for testing [`CrtProjGadgets::pmr_lt`].
         pub struct TestPmrLessThan(pub Vec<u16>);
         impl<F: CrtProjGadgets> CircuitExecutor<F> for TestPmrLessThan {
+            type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
-                let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
-                backend.pmr_lt(&x, &y, channel)
+                backend.pmr_lt(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len() * 2);
+                let length = self.0.len();
+                let x = CrtBundle::new(inputs[..length].to_vec());
+                let y = CrtBundle::new(inputs[length..].to_vec());
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -1109,17 +1321,24 @@ pub mod circuits {
         /// Circuit for testing [`CrtProjGadgets::pmr_geq`].
         pub struct TestPmrGreaterThanOrEqual(pub Vec<u16>);
         impl<F: CrtProjGadgets> CircuitExecutor<F> for TestPmrGreaterThanOrEqual {
+            type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
-                let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
-                backend.pmr_geq(&x, &y, channel)
+                backend.pmr_geq(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len() * 2);
+                let length = self.0.len();
+                let x = CrtBundle::new(inputs[..length].to_vec());
+                let y = CrtBundle::new(inputs[length..].to_vec());
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -1142,17 +1361,24 @@ pub mod circuits {
         /// Circuit for testing [`ArithmeticProjBundleGadgets::eq_bundles`].
         pub struct TestEqBundles(pub Vec<u16>);
         impl<F: ArithmeticProjBundleGadgets> CircuitExecutor<F> for TestEqBundles {
+            type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = CrtBundle::new(inputs[..self.0.len()].to_vec());
-                let y = CrtBundle::new(inputs[self.0.len()..].to_vec());
-                backend.eq_bundles(&x, &y, channel)
+                backend.eq_bundles(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0.len() * 2);
+                let length = self.0.len();
+                let x = CrtBundle::new(inputs[..length].to_vec());
+                let y = CrtBundle::new(inputs[length..].to_vec());
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -1167,19 +1393,23 @@ pub mod circuits {
         /// Circuit for testing [`ArithmeticProjBundleGadgets::mixed_radix_addition`].
         pub struct TestMixedRadixAddition(pub Vec<u16>, pub usize);
         impl<F: ArithmeticProjBundleGadgets> CircuitExecutor<F> for TestMixedRadixAddition {
+            type Input = Vec<Bundle<F::Item>>;
             type Output = Bundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let xs = inputs
+                backend.mixed_radix_addition(inputs, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                inputs
                     .chunks_exact(self.0.len())
                     .map(|v| Bundle::new(v.to_vec()))
-                    .collect::<Vec<_>>();
-                backend.mixed_radix_addition(&xs, channel)
+                    .collect()
             }
 
             fn ninputs(&self) -> usize {
@@ -1194,19 +1424,23 @@ pub mod circuits {
         /// Circuit for testing [`ArithmeticProjBundleGadgets::mixed_radix_addition_msb_only`].
         pub struct TestMixedRadixAdditionMSBOnly(pub Vec<u16>, pub usize);
         impl<F: ArithmeticProjBundleGadgets> CircuitExecutor<F> for TestMixedRadixAdditionMSBOnly {
+            type Input = Vec<Bundle<F::Item>>;
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let xs = inputs
+                backend.mixed_radix_addition_msb_only(inputs, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                inputs
                     .chunks_exact(self.0.len())
                     .map(|v| Bundle::new(v.to_vec()))
-                    .collect::<Vec<_>>();
-                backend.mixed_radix_addition_msb_only(&xs, channel)
+                    .collect()
             }
 
             fn ninputs(&self) -> usize {
@@ -1229,15 +1463,20 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_constant_bundle`].
         pub struct TestConstantBundle(pub u128, pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestConstantBundle {
+            type Input = ();
             type Output = BinaryBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                _inputs: &[F::Item],
+                _: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
                 backend.bin_constant_bundle(self.0, self.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert!(inputs.is_empty());
             }
 
             fn ninputs(&self) -> usize {
@@ -1252,17 +1491,23 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_and`].
         pub struct TestBinaryAnd(pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryAnd {
+            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
             type Output = BinaryBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
+                backend.bin_and(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0 * 2);
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
-                backend.bin_and(&x, &y, channel)
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -1277,18 +1522,24 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_addition`].
         pub struct TestBinaryAddition(pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryAddition {
+            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
             type Output = (F::Item, BinaryBundle<F::Item>);
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
+                let (z, carry) = backend.bin_addition(&inputs.0, &inputs.1, channel)?;
+                Ok((carry, z))
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0 * 2);
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
-                let (z, carry) = backend.bin_addition(&x, &y, channel)?;
-                Ok((carry, z))
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -1303,17 +1554,23 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_addition_no_carry`].
         pub struct TestBinaryAdditionNoCarry(pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryAdditionNoCarry {
+            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
             type Output = BinaryBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
+                backend.bin_addition_no_carry(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0 * 2);
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
-                backend.bin_addition_no_carry(&x, &y, channel)
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -1328,20 +1585,24 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_subtraction`].
         pub struct TestBinarySubtraction(pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinarySubtraction {
+            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
             type Output = (F::Item, BinaryBundle<F::Item>);
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                assert_eq!(inputs.len(), <Self as CircuitExecutor<F>>::ninputs(self));
+                let (z, underflow) = backend.bin_subtraction(&inputs.0, &inputs.1, channel)?;
+                Ok((underflow, z))
+            }
 
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0 * 2);
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
-                let (z, underflow) = backend.bin_subtraction(&x, &y, channel)?;
-                Ok((underflow, z))
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -1356,17 +1617,23 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_mul`].
         pub struct TestBinaryMultiplication(pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryMultiplication {
+            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
             type Output = BinaryBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
+                backend.bin_mul(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0 * 2);
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
-                backend.bin_mul(&x, &y, channel)
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -1381,17 +1648,23 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_multiplication_lower_half`].
         pub struct TestBinaryMultiplicationLowerHalf(pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryMultiplicationLowerHalf {
+            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
             type Output = BinaryBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
+                backend.bin_multiplication_lower_half(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0 * 2);
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
-                backend.bin_multiplication_lower_half(&x, &y, channel)
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -1406,16 +1679,22 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_div`].
         pub struct TestBinaryDivision(pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryDivision {
+            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
             type Output = BinaryBundle<F::Item>;
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
+                backend.bin_div(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0 * 2);
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
-                backend.bin_div(&x, &y, channel)
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -1430,17 +1709,23 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_lt`].
         pub struct TestBinaryLessThan(pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryLessThan {
+            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
+                backend.bin_lt(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0 * 2);
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
-                backend.bin_lt(&x, &y, channel)
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -1455,17 +1740,23 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_lt_signed`].
         pub struct TestBinaryLessThanSigned(pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryLessThanSigned {
+            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
+                backend.bin_lt_signed(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0 * 2);
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
-                backend.bin_lt_signed(&x, &y, channel)
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -1480,16 +1771,21 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_rsa`].
         pub struct TestBinaryArithmeticRightShift(pub usize, pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryArithmeticRightShift {
+            type Input = BinaryBundle<F::Item>;
             type Output = BinaryBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                input: &Self::Input,
                 _: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = BinaryBundle::new(inputs.to_vec());
-                Ok(backend.bin_rsa(&x, self.1))
+                Ok(backend.bin_rsa(input, self.1))
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0);
+                BinaryBundle::new(inputs.to_vec())
             }
 
             fn ninputs(&self) -> usize {
@@ -1504,16 +1800,21 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_rsl`].
         pub struct TestBinaryLogicalRightShift(pub usize, pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryLogicalRightShift {
+            type Input = BinaryBundle<F::Item>;
             type Output = BinaryBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                input: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = BinaryBundle::new(inputs.to_vec());
-                backend.bin_rsl(&x, self.1, channel)
+                backend.bin_rsl(input, self.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0);
+                BinaryBundle::new(inputs.to_vec())
             }
 
             fn ninputs(&self) -> usize {
@@ -1528,17 +1829,23 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_eq_bundles`].
         pub struct TestBinaryEqBundles(pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryEqBundles {
+            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
             type Output = F::Item;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
+                backend.bin_eq_bundles(&inputs.0, &inputs.1, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0 * 2);
                 let x = BinaryBundle::new(inputs[..self.0].to_vec());
                 let y = BinaryBundle::new(inputs[self.0..].to_vec());
-                backend.bin_eq_bundles(&x, &y, channel)
+                (x, y)
             }
 
             fn ninputs(&self) -> usize {
@@ -1553,16 +1860,21 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_abs`].
         pub struct TestBinaryAbs(pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryAbs {
+            type Input = BinaryBundle<F::Item>;
             type Output = BinaryBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                input: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = BinaryBundle::new(inputs.to_vec());
-                backend.bin_abs(&x, channel)
+                backend.bin_abs(input, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0);
+                BinaryBundle::new(inputs.to_vec())
             }
 
             fn ninputs(&self) -> usize {
@@ -1577,18 +1889,21 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_twos_complement`].
         pub struct TestBinaryTwosComplement(pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryTwosComplement {
+            type Input = BinaryBundle<F::Item>;
             type Output = BinaryBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                input: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                assert_eq!(inputs.len(), <Self as CircuitExecutor<F>>::ninputs(self));
+                backend.bin_twos_complement(input, channel)
+            }
 
-                let x = BinaryBundle::new(inputs.to_vec());
-                backend.bin_twos_complement(&x, channel)
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0);
+                BinaryBundle::new(inputs.to_vec())
             }
 
             fn ninputs(&self) -> usize {
@@ -1603,16 +1918,21 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_demux`].
         pub struct TestBinaryDemux(pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryDemux {
+            type Input = BinaryBundle<F::Item>;
             type Output = Vec<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                input: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let x = BinaryBundle::new(inputs.to_vec());
-                backend.bin_demux(&x, channel)
+                backend.bin_demux(input, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                assert_eq!(inputs.len(), self.0);
+                BinaryBundle::new(inputs.to_vec())
             }
 
             fn ninputs(&self) -> usize {
@@ -1627,19 +1947,23 @@ pub mod circuits {
         /// Circuit for testing [`BinaryGadgets::bin_max`].
         pub struct TestBinaryMax(pub usize, pub usize);
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryMax {
+            type Input = Vec<BinaryBundle<F::Item>>;
             type Output = BinaryBundle<F::Item>;
 
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &[F::Item],
+                inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let xs = inputs
+                backend.bin_max(inputs, channel)
+            }
+
+            fn map(&self, inputs: &[F::Item]) -> Self::Input {
+                inputs
                     .chunks_exact(self.0)
                     .map(|v| BinaryBundle::new(v.to_vec()))
-                    .collect::<Vec<_>>();
-                backend.bin_max(&xs, channel)
+                    .collect()
             }
 
             fn ninputs(&self) -> usize {
@@ -1858,7 +2182,7 @@ mod crt_gadgets {
     };
 
     #[test]
-    fn test_addition() {
+    fn test_crt_addition() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
         let c = circuits::crt_gadgets::TestCrtAddition(factor(q));
@@ -1875,7 +2199,7 @@ mod crt_gadgets {
     }
 
     #[test]
-    fn test_subtraction() {
+    fn test_crt_subtraction() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
         let c = circuits::crt_gadgets::TestCrtSubtraction(util::factor(q));
@@ -1918,7 +2242,7 @@ mod arithmetic_bundle_gadgets {
     };
 
     #[test]
-    fn test_multiplication() {
+    fn test_crt_multiplication() {
         let mut rng = thread_rng();
         let q = rng.gen_usable_composite_modulus();
         let c = circuits::arithmetic_bundle_gadgets::TestCrtMultiplication(factor(q));

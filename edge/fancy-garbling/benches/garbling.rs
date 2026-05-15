@@ -84,15 +84,16 @@ const MIXED_OP_NUM_OPS: usize = 100_000;
 
 struct MixedOp;
 impl<F: FancyBinary> CircuitExecutor<F> for MixedOp {
+    type Input = F::Item;
     type Output = F::Item;
 
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &[F::Item],
+        input: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let mut x = inputs[0].clone();
+        let mut x = input.clone();
         for step in 0..MIXED_OP_NUM_OPS {
             if step % 2 == 1 {
                 x = backend.and(&x, &x, channel)?;
@@ -101,6 +102,11 @@ impl<F: FancyBinary> CircuitExecutor<F> for MixedOp {
             }
         }
         Ok(x)
+    }
+
+    fn map(&self, inputs: &[F::Item]) -> Self::Input {
+        assert_eq!(inputs.len(), 1);
+        inputs[0].clone()
     }
 
     fn ninputs(&self) -> usize {
@@ -114,15 +120,16 @@ impl<F: FancyBinary> CircuitExecutor<F> for MixedOp {
 
 struct MixedOpArith(u16);
 impl<F: FancyArithmetic> CircuitExecutor<F> for MixedOpArith {
+    type Input = F::Item;
     type Output = F::Item;
 
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &[F::Item],
+        input: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let mut x = inputs[0].clone();
+        let mut x = input.clone();
         for step in 0..MIXED_OP_NUM_OPS {
             if step % 2 == 1 {
                 x = backend.mul(&x, &x, channel)?;
@@ -131,6 +138,11 @@ impl<F: FancyArithmetic> CircuitExecutor<F> for MixedOpArith {
             }
         }
         Ok(x)
+    }
+
+    fn map(&self, inputs: &[F::Item]) -> Self::Input {
+        assert_eq!(inputs.len(), 1);
+        inputs[0].clone()
     }
 
     fn ninputs(&self) -> usize {
@@ -144,18 +156,24 @@ impl<F: FancyArithmetic> CircuitExecutor<F> for MixedOpArith {
 
 struct Proj(u16, Vec<u16>);
 impl<F: FancyProj> CircuitExecutor<F> for Proj {
+    type Input = F::Item;
     type Output = Vec<F::Item>;
 
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &[<F as fancy_garbling::Fancy>::Item],
+        input: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         for _ in 0..1000 {
-            let _ = backend.proj(&inputs[0], self.0, Some(self.1.clone()), channel)?;
+            let _ = backend.proj(input, self.0, Some(self.1.clone()), channel)?;
         }
         Ok(vec![])
+    }
+
+    fn map(&self, inputs: &[F::Item]) -> Self::Input {
+        assert_eq!(inputs.len(), 1);
+        inputs[0].clone()
     }
 
     fn ninputs(&self) -> usize {
@@ -169,18 +187,24 @@ impl<F: FancyProj> CircuitExecutor<F> for Proj {
 
 struct Mul(u16);
 impl<F: FancyArithmetic> CircuitExecutor<F> for Mul {
+    type Input = F::Item;
     type Output = Vec<F::Item>;
 
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &[<F as fancy_garbling::Fancy>::Item],
+        input: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         for _ in 0..1000 {
-            let _ = backend.mul(&inputs[0], &inputs[0], channel)?;
+            let _ = backend.mul(input, input, channel)?;
         }
         Ok(vec![])
+    }
+
+    fn map(&self, inputs: &[F::Item]) -> Self::Input {
+        assert_eq!(inputs.len(), 1);
+        inputs[0].clone()
     }
 
     fn ninputs(&self) -> usize {

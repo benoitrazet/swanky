@@ -14,12 +14,13 @@ pub struct BinaryCircuit {
 }
 
 impl<F: FancyBinary> CircuitExecutor<F> for BinaryCircuit {
+    type Input = Vec<F::Item>;
     type Output = Vec<F::Item>;
 
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &[F::Item],
+        inputs: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         assert_eq!(
@@ -27,6 +28,11 @@ impl<F: FancyBinary> CircuitExecutor<F> for BinaryCircuit {
             <BinaryCircuit as CircuitExecutor<F>>::ninputs(self)
         );
         self.eval_to_wirelabels(backend, inputs, channel)
+    }
+
+    fn map(&self, inputs: &[F::Item]) -> Self::Input {
+        assert_eq!(inputs.len(), self.input_refs.len());
+        inputs.to_vec()
     }
 
     fn ninputs(&self) -> usize {

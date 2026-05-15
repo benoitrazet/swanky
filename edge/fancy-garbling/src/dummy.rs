@@ -67,7 +67,7 @@ impl Dummy {
             .collect::<Vec<_>>();
 
         let outputs = Channel::with(std::io::empty(), |c| {
-            circuit.execute(&mut dummy, &inputs, c)
+            circuit.execute(&mut dummy, &circuit.map(&inputs), c)
         })?;
         let outputs = outputs.flatten();
         Ok(outputs.iter().map(|x| x.val()).collect())

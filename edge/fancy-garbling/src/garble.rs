@@ -170,7 +170,11 @@ mod streaming {
         let should_be = Channel::with(std::io::empty(), |channel| {
             let mut dummy = Dummy::new();
             let inputs = dummy.encode_many(&inputs, &moduli, channel)?;
-            let outputs = circuit.execute(&mut dummy, &inputs, channel)?;
+            let outputs = circuit.execute(
+                &mut dummy,
+                &<Ex as CircuitExecutor<Dummy>>::map(circuit, &inputs),
+                channel,
+            )?;
             Ok(dummy.outputs(&outputs.flatten(), channel)?.unwrap())
         })
         .unwrap();
@@ -179,14 +183,22 @@ mod streaming {
             |channel| {
                 let mut gb = Garbler::new(rng, channel)?;
                 let zeros = gb.encode_many(&inputs, &moduli, channel)?;
-                let outputs = circuit.execute(&mut gb, &zeros, channel)?;
+                let outputs = circuit.execute(
+                    &mut gb,
+                    &<Ex as CircuitExecutor<Garbler<_, _>>>::map(circuit, &zeros),
+                    channel,
+                )?;
                 gb.outputs(&outputs.flatten(), channel)?;
                 Ok(())
             },
             |channel| {
                 let mut ev = Evaluator::new(channel)?;
                 let wires = ev.receive_many(&moduli, channel)?;
-                let outputs = circuit.execute(&mut ev, &wires, channel)?;
+                let outputs = circuit.execute(
+                    &mut ev,
+                    &<Ex as CircuitExecutor<Evaluator<_>>>::map(circuit, &wires),
+                    channel,
+                )?;
                 Ok(ev.outputs(&outputs.flatten(), channel)?.unwrap())
             },
         )

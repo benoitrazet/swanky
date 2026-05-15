@@ -12,7 +12,10 @@ mod tests {
     use fancy_garbling::{
         AllWire, CrtBundle, CrtGadgets, CrtProjGadgets, Fancy, FancyArithmetic, FancyBinary,
         FancyProj, WireLabel, WireMod2,
-        circuit::{BinaryCircuit, CircuitExecutor, CircuitInfo, Flatten},
+        circuit::{
+            BinaryCircuit, CircuitExecutor, CircuitInfo, Flatten,
+            circuits::arithmetic::TestAddition,
+        },
         dummy::Dummy,
         util::RngExt,
     };
@@ -24,7 +27,7 @@ mod tests {
     #[test]
     fn test_addition() {
         let modulus = 3;
-        let circuit = fancy_garbling::circuit::circuits::arithmetic::TestAddition(modulus);
+        let circuit = TestAddition(modulus);
         for a in 0..2 {
             for b in 0..2 {
                 let (_, output) = swanky_channel::local::local_channel_pair(
@@ -34,7 +37,13 @@ mod tests {
                             Garbler::<SwankyRng, ChouOrlandiSender, AllWire>::new(channel, rng)?;
                         let x = gb.encode(a, modulus, channel)?;
                         let y = gb.receive(modulus, channel)?;
-                        let outputs = circuit.execute(&mut gb, &[x, y], channel)?;
+                        let outputs = circuit.execute(
+                            &mut gb,
+                            &<TestAddition as CircuitExecutor<
+                                Garbler<SwankyRng, ChouOrlandiSender, _>,
+                            >>::map(&circuit, &[x, y]),
+                            channel,
+                        )?;
                         let result = gb.output(&outputs, channel)?;
                         assert!(result.is_none());
                         Ok(())
@@ -46,7 +55,13 @@ mod tests {
                         )?;
                         let x = ev.receive(modulus, channel)?;
                         let y = ev.encode(b, modulus, channel)?;
-                        let output = circuit.execute(&mut ev, &[x, y], channel)?;
+                        let output = circuit.execute(
+                            &mut ev,
+                            &<TestAddition as CircuitExecutor<
+                                Evaluator<SwankyRng, ChouOrlandiReceiver, _>,
+                            >>::map(&circuit, &[x, y]),
+                            channel,
+                        )?;
                         let result = ev.output(&output, channel)?;
                         Ok(result.unwrap())
                     },
@@ -137,7 +152,11 @@ mod tests {
                 let mut xs = gb.encode_many(&vec![0_u16; 128], &vec![2; 128], channel)?;
                 let ys = gb.receive_many(&vec![2; 128], channel)?;
                 xs.extend(ys);
-                let outputs = circ.execute(&mut gb, &xs, channel)?;
+                let outputs = circ.execute(
+                    &mut gb,
+                    &<CIRC as CircuitExecutor<GB<_>>>::map(&circ, &xs),
+                    channel,
+                )?;
                 gb.outputs(&outputs.flatten(), channel)?;
                 Ok(())
             },
@@ -147,7 +166,11 @@ mod tests {
                 let mut xs = ev.receive_many(&vec![2; 128], channel)?;
                 let ys = ev.encode_many(&vec![0_u16; 128], &vec![2; 128], channel)?;
                 xs.extend(ys);
-                let wirelabels = circ.execute(&mut ev, &xs, channel)?;
+                let wirelabels = circ.execute(
+                    &mut ev,
+                    &<CIRC as CircuitExecutor<EV<_>>>::map(&circ, &xs),
+                    channel,
+                )?;
                 let out = ev.outputs(&wirelabels.flatten(), channel)?;
                 Ok(out.unwrap())
             },

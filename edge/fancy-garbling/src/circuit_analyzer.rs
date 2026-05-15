@@ -111,7 +111,7 @@ impl CircuitAnalyzer {
             let inputs = (0..circuit.ninputs())
                 .map(|i| self.receive(circuit.modulus(i), channel))
                 .collect::<Result<Vec<_>>>()?;
-            circuit.execute(self, &inputs, channel)?;
+            circuit.execute(self, &circuit.map(&inputs), channel)?;
             Ok(())
         })
     }

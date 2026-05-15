@@ -85,7 +85,11 @@ where
         &vec![2; <C as CircuitExecutor<WirePreProcessor<P>>>::ninputs(circuit)],
         channel,
     )?;
-    circuit.execute(&mut wire_preprocessor, &inputs, channel)?;
+    circuit.execute(
+        &mut wire_preprocessor,
+        &<C as CircuitExecutor<WirePreProcessor<P>>>::map(circuit, &inputs),
+        channel,
+    )?;
 
     // We only correlate the generated AND triples if there are any AND gates in the circuit
     // to begin with.
