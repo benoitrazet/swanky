@@ -91,6 +91,9 @@ impl<T: Clone + HasModulus> Flatten for (T, BinaryBundle<T>) {
 /// # use swanky_error::Result;
 /// struct AddCircuit(u16);
 /// impl<F: FancyArithmetic> CircuitExecutor<F> for AddCircuit {
+///     type Input = (F::Item, F::Item);
+///     type Output = F::Item;
+///
 ///     fn execute(
 ///         &self,
 ///         backend: &mut F,
@@ -99,6 +102,11 @@ impl<T: Clone + HasModulus> Flatten for (T, BinaryBundle<T>) {
 ///     ) -> Result<Vec<F::Item>> {
 ///         let output = backend.add(&inputs[0], &inputs[1]);
 ///         Ok(vec![output])
+///     }
+///
+///     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
+///         assert_eq!(inputs.len(), 2);
+///         (inputs[0], inputs[1])
 ///     }
 ///
 ///     fn ninputs(&self) -> usize {
