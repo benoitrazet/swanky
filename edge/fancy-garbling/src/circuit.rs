@@ -97,16 +97,15 @@ impl<T: Clone + HasModulus> Flatten for (T, BinaryBundle<T>) {
 ///     fn execute(
 ///         &self,
 ///         backend: &mut F,
-///         inputs: &[F::Item],
+///         inputs: &Self::Input,
 ///         channel: &mut Channel,
-///     ) -> Result<Vec<F::Item>> {
-///         let output = backend.add(&inputs[0], &inputs[1]);
-///         Ok(vec![output])
+///     ) -> Result<Self::Output> {
+///         Ok(backend.add(&inputs.0, &inputs.1))
 ///     }
 ///
 ///     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
 ///         assert_eq!(inputs.len(), 2);
-///         (inputs[0], inputs[1])
+///         (inputs[0].clone(), inputs[1].clone())
 ///     }
 ///
 ///     fn ninputs(&self) -> usize {
