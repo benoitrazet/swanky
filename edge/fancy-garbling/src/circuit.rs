@@ -179,11 +179,10 @@ pub mod circuits {
 
             fn execute(
                 &self,
-                backend: &mut F,
+                _: &mut F,
                 inputs: &Self::Input,
-                channel: &mut Channel,
+                _: &mut Channel,
             ) -> Result<Self::Output> {
-                backend.outputs(inputs, channel)?;
                 Ok(inputs.to_vec())
             }
 
@@ -251,11 +250,9 @@ pub mod circuits {
                 &self,
                 backend: &mut F,
                 input: &Self::Input,
-                channel: &mut Channel,
+                _: &mut Channel,
             ) -> Result<Self::Output> {
-                let output = backend.negate(input);
-                backend.output(&output, channel)?;
-                Ok(output)
+                Ok(backend.negate(input))
             }
 
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
