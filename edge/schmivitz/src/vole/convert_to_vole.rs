@@ -1,18 +1,11 @@
 /*!
 Convert vector commitments to VOLEs.
 */
-#![allow(clippy::needless_range_loop)]
 use crate::vole::crypto_primitives::{IV, Seed};
 use rand::Rng;
 use swanky_field_binary::F2;
 use swanky_field_binary::F8b;
 use swanky_rng::SwankyRng;
-use swanky_serialization::CanonicalSerialize;
-
-fn u8_to_f8b(x: u8) -> F8b {
-    // Safe to unwrap here
-    F8b::from_bytes(&[x].into()).unwrap()
-}
 
 /// This function converts seeds to voles.
 ///
@@ -32,19 +25,12 @@ pub(crate) fn convert_to_vole(
     let mut u_res = Vec::with_capacity(l_hat);
     let mut v_res = Vec::with_capacity(l_hat);
 
-    // // u64 packs 64 bits/booleans.
-    let mut prgss: [Option<SwankyRng>; 256] = core::array::from_fn(|_| None);
-    for (idx, seed) in seeds.iter().enumerate() {
-        if idx == 0 && !is_prover {
-            // NOTE: the verifier is slightly faster here because it calls a dummy PRG.
-            prgss[idx] = None;
-        } else {
-            prgss[idx] = Some(SwankyRng::from_seed_and_iv(
-                (*seed).into(),
-                u128::from_le_bytes(iv),
-            ));
-        }
-    }
+    let mut prgs: [SwankyRng; 256] = seeds
+        .iter()
+        .map(|seed| SwankyRng::from_seed_and_iv((*seed).into(), u128::from_le_bytes(iv)))
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap(); // This `unwrap` never fails since the `assert` above guarantees that `seeds.len() == 256`.
 
     // `r` is only the last 2 layers of the original structure from the spec.
     // Only 2 layers are used using a swap operation in the loop.
@@ -54,24 +40,21 @@ pub(crate) fn convert_to_vole(
     let mut remaining = l_hat;
 
     // precompute an array of 2*i indices and another array for 2*i+1
-    let mut i2_arr = [0usize; 128];
-    let mut i2_plus_1_arr = [0usize; 128];
-    for i in 0..i2_arr.len() {
-        i2_arr[i] = i * 2;
-        i2_plus_1_arr[i] = i * 2 + 1;
-    }
+    let i2_arr: [usize; 128] = core::array::from_fn(|i| i * 2);
+    let i2_plus_1_arr: [usize; 128] = core::array::from_fn(|i| i * 2 + 1);
 
     for _ in 0..(l_hat / 64) + 1 {
         // possibly more but does not matter for performance.
 
         let mut v = [0; 8];
-        for x in 0..256 {
-            if let Some(rng) = &mut prgss[x] {
-                r0[x] = rng.r#gen::<u64>();
+        for i in 0..256 {
+            if i != 0 || is_prover {
+                r0[i] = prgs[i].r#gen::<u64>();
             }
         }
         let mut i_bound = 128;
         // the bound for the loop is 8 = log(256)
+        #[allow(clippy::needless_range_loop)]
         for j in 0..8 {
             for i in 0..i_bound {
                 v[j] ^= r0[i2_plus_1_arr[i]];
@@ -89,7 +72,7 @@ pub(crate) fn convert_to_vole(
         // many are remaining for the next 64 steps.
         if remaining >= 64 {
             for i in 0..64 {
-                u_res.push(((u >> i & 1_u64) == 1).into());
+                u_res.push(((u >> i & 1) == 1).into());
                 let mut x = 0u8;
                 x |= (v[0] >> i & 1) as u8;
                 x |= ((v[1] >> i & 1) as u8) << 1;
@@ -99,13 +82,13 @@ pub(crate) fn convert_to_vole(
                 x |= ((v[5] >> i & 1) as u8) << 5;
                 x |= ((v[6] >> i & 1) as u8) << 6;
                 x |= ((v[7] >> i & 1) as u8) << 7;
-                v_res.push(u8_to_f8b(x));
+                v_res.push(F8b::from(x));
             }
             remaining -= 64;
         } else {
             // otherwise let's check one by one
             for i in 0..64 {
-                u_res.push(((u >> i & 1_u64) == 1).into());
+                u_res.push(((u >> i & 1) == 1).into());
                 let mut x = 0u8;
                 x |= (v[0] >> i & 1) as u8;
                 x |= ((v[1] >> i & 1) as u8) << 1;
@@ -115,17 +98,19 @@ pub(crate) fn convert_to_vole(
                 x |= ((v[5] >> i & 1) as u8) << 5;
                 x |= ((v[6] >> i & 1) as u8) << 6;
                 x |= ((v[7] >> i & 1) as u8) << 7;
-                v_res.push(u8_to_f8b(x));
+                v_res.push(F8b::from(x));
 
                 remaining -= 1;
                 if remaining == 0 {
                     debug_assert_eq!(u_res.len(), l_hat);
+                    debug_assert_eq!(v_res.len(), l_hat);
                     return (u_res, v_res);
                 }
             }
         }
     }
     debug_assert_eq!(u_res.len(), l_hat);
+    debug_assert_eq!(v_res.len(), l_hat);
     (u_res, v_res)
 }
 
@@ -154,7 +139,7 @@ fn convert_to_vole_prover_naive(seeds: &[Seed], iv: IV, l_hat: usize) -> (Vec<F2
             }
         }
         v.truncate(l_hat);
-        let i_f8b: F8b = u8_to_f8b(i);
+        let i_f8b = F8b::from(i);
         for (j, r) in v.iter().enumerate() {
             u_res[j] += r;
             v_res[j] += *r * i_f8b;
@@ -216,8 +201,8 @@ fn convert_to_vole_verifier_naive(seeds: &[Seed], iv: IV, l_hat: usize, delta: u
             }
             v.truncate(l_hat);
 
-            let i_f8b: F8b = u8_to_f8b(i);
-            let delta_f8b: F8b = u8_to_f8b(delta);
+            let i_f8b = F8b::from(i);
+            let delta_f8b = F8b::from(delta);
             for (j, r) in v.iter().enumerate() {
                 v_res[j] += *r * (delta_f8b - i_f8b);
             }
@@ -232,9 +217,7 @@ fn convert_to_vole_verifier_naive(seeds: &[Seed], iv: IV, l_hat: usize, delta: u
 
 #[cfg(test)]
 mod test {
-    use super::{
-        convert_to_vole, convert_to_vole_prover_naive, convert_to_vole_verifier_naive, u8_to_f8b,
-    };
+    use super::{convert_to_vole, convert_to_vole_prover_naive, convert_to_vole_verifier_naive};
     use crate::vole::crypto_primitives::Seed;
     use rand::{Rng, RngCore, thread_rng};
     use swanky_field_binary::F8b;
@@ -259,7 +242,7 @@ mod test {
         let qs = convert_to_vole_verifier_naive(&seeds_verifier, iv, how_many, delta);
 
         for ((u, v), q) in u.iter().zip(vs.iter()).zip(qs.iter()) {
-            let delta_f8b: F8b = u8_to_f8b(delta);
+            let delta_f8b = F8b::from(delta);
             assert_eq!(*q, (*u * delta_f8b) - *v);
         }
     }
@@ -300,7 +283,7 @@ mod test {
         assert_eq!(qs, qs_xor);
 
         for ((u, v), q) in u.iter().zip(vs.iter()).zip(qs.iter()) {
-            let delta_f8b: F8b = u8_to_f8b(delta);
+            let delta_f8b = F8b::from(delta);
             assert_eq!(*q, (*u * delta_f8b) - *v);
         }
     }
