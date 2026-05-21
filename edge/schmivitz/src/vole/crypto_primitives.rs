@@ -2,16 +2,11 @@
 use crate::parameters::SECURITY_PARAM;
 use crate::vole::commit_reconstruct::{Corrections, corrections_to_bytes};
 use aes::Aes128;
-use aes::cipher::{
-    BlockEncrypt, KeyInit,
-    generic_array::{GenericArray, typenum::U16},
-};
+use aes::cipher::{BlockEncrypt, KeyInit, generic_array::GenericArray};
 use sha3::{
     Shake128,
     digest::{ExtendableOutput, Update, XofReader},
 };
-#[cfg(test)]
-use swanky_field_binary::F2;
 use swanky_field_binary::F128b;
 use swanky_serialization::CanonicalSerialize;
 
@@ -53,62 +48,6 @@ impl PRG {
         self.counter.to_le_bytes()
     }
 
-    /// Function that returns two random keys.
-    /// There has no associated decrypt function, it is used for its PRG properties.
-    /// This function corresponds to `PRG.encrypt` in the spec.
-    pub(crate) fn encrypt_double(&mut self) -> (Key, Key) {
-        const BLOCKS: usize = 2;
-        let block = GenericArray::from([0u8; 16]);
-        let mut blocks = [block; BLOCKS];
-
-        // encrypt blocks in place
-        for block in blocks.iter_mut() {
-            *block = GenericArray::from(self.counter_to_bytes());
-            self.incr();
-        }
-        self.aes0.encrypt_blocks(&mut blocks);
-
-        let k1 = blocks[0].into();
-        let k2 = blocks[1].into();
-        (k1, k2)
-    }
-
-    /// Function that returns a pseudo-random vector of F2 values
-    #[cfg(test)]
-    pub(crate) fn prg(mut self, l: usize) -> Vec<F2> {
-        let mut res = Vec::with_capacity(l);
-
-        let mut remaining: i64 = l.try_into().unwrap();
-
-        const BLOCKS: usize = 16;
-        let block = GenericArray::from([0u8; 16]);
-        let mut blocks = [block; BLOCKS];
-        while remaining > 0 {
-            // encrypt blocks in place
-            for block in blocks.iter_mut() {
-                *block = GenericArray::from(self.counter_to_bytes());
-                self.incr();
-            }
-            self.aes0.encrypt_blocks(&mut blocks);
-
-            // converting blocks to F2 values and pushing them into the vector.
-            for block in blocks.iter() {
-                for u in block.iter() {
-                    for i in 0..8u8 {
-                        if remaining <= 0 {
-                            return res;
-                        }
-
-                        res.push(((u >> i & 1_u8) == 1).into());
-                        remaining -= 1;
-                    }
-                }
-            }
-        }
-
-        res
-    }
-
     /// Pseudo-random generate seeds to initialize other pseudo-random generators.
     ///
     /// This is mostly a convenience function as it could be derived from [`PRG`].
@@ -126,134 +65,40 @@ impl PRG {
     }
 }
 
-/// Constant defining the number of blocks used by the PRG stream structure.
-const NUM_BLOCKS: usize = 8;
-
-#[allow(clippy::upper_case_acronyms)]
-#[allow(non_camel_case_types)]
-/// Pseudo random generator stream structure.
-///
-/// The bits are packed into `u64`. If the last `u64` has a capacity to contain more
-/// bits than requested with `l` then the user of this function is in charge to ignore
-/// the bits.
-pub(crate) struct PRG_Stream {
-    aes0: Aes128,
-    counter: u128,
-    blocks: [GenericArray<u8, U16>; NUM_BLOCKS],
-    block_number: usize,
-    pos_in_block: usize,
-    is_dummy: bool,
-}
-
-impl Default for PRG_Stream {
-    fn default() -> Self {
-        PRG_Stream::new_dummy([0u8; 16], [0u8; 16])
-    }
-}
-
-impl PRG_Stream {
-    /// Create a PRG from an an initialization vector `iv`.
-    pub(crate) fn new(seed: IV, iv: IV) -> Self {
-        let key: GenericArray<u8, _> = GenericArray::from(seed);
-        let aes0 = Aes128::new(&key);
-
-        let counter = u128::from_le_bytes(iv);
-        Self {
-            aes0,
-            counter,
-            block_number: NUM_BLOCKS, // starting at the max instead of 0 so that `next()` triggers a refill
-            blocks: [GenericArray::from([0u8; 16]); NUM_BLOCKS],
-            pos_in_block: 0,
-            is_dummy: false,
-        }
-    }
-
-    /// Create a dummy prg that always returns 0s.
-    pub(crate) fn new_dummy(seed: IV, iv: IV) -> Self {
-        let key: GenericArray<u8, _> = GenericArray::from(seed);
-        let aes0 = Aes128::new(&key);
-
-        let counter = u128::from_le_bytes(iv);
-        Self {
-            aes0,
-            counter,
-            block_number: NUM_BLOCKS,
-            blocks: [GenericArray::from([0u8; 16]); NUM_BLOCKS],
-            pos_in_block: 0,
-            is_dummy: true,
-        }
-    }
-
-    fn incr(&mut self) {
-        self.counter += 1;
-    }
-
-    fn counter_to_bytes(&self) -> [u8; 16] {
-        self.counter.to_le_bytes()
-    }
-
-    /// Returns the next 64 pseudo-random bits from the stream as a little-endian u64,
-    /// refilling the AES-backed block buffer as needed.
-    pub(crate) fn prg_next(&mut self) -> u64 {
-        // When the PRG is dummy it always return 0s.
-        if self.is_dummy {
-            return 0u64;
-        }
-        if self.block_number == NUM_BLOCKS {
-            self.prg_refill();
-        }
-        let mut t: [u8; 8] = Default::default();
-        let block = &self.blocks[self.block_number];
-        if self.pos_in_block == 0 {
-            t.clone_from_slice(&block[0..8]);
-            self.pos_in_block = 8;
-        } else {
-            t.clone_from_slice(&block[8..16]);
-            // move to next block
-            // it is possible that the next block does not exist but that will
-            // be fixed at the next call
-            self.pos_in_block = 0;
-            self.block_number += 1;
-        };
-        u64::from_le_bytes(t)
-    }
-
-    #[inline(always)]
-    fn prg_refill(&mut self) {
-        // encrypt blocks in place
-        for i in 0..NUM_BLOCKS {
-            self.blocks[i] = GenericArray::from(self.counter_to_bytes());
-            self.incr();
-        }
-        self.block_number = 0;
-        self.pos_in_block = 0; // done elsewhere
-
-        // NOTE: this encryption here is a bottleneck,
-        // delete this line and you would see the performance of convert_to_vole improve dramatically, say 10x .
-        self.aes0.encrypt_blocks(&mut self.blocks);
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{IV, PRG, PRG_Stream};
+    use super::IV;
+    use rand::Rng;
     use swanky_field_binary::F2;
+    use swanky_rng::SwankyRng;
 
     #[test]
-    fn prg_matches_stream_bits() {
+    fn swanky_prg_matches_stream_bits() {
         let seed: IV = [5u8; 16];
         let iv: IV = [11u8; 16];
 
         let lengths = [
-            1usize, 7, 8, 63, 64, 65, 127, 128, 129, 511, 512, 513, 1023, 1024, 1025, 2047, 2048,
-            2049, 100000, 1048575, 1048576, 1048577,
+            1, 7, 8, 63, 64, 65, 127, 128, 129, 511, 512, 513, 1023, 1024, 1025, 2047, 2048, 2049,
+            100000, 1048575, 1048576, 1048577,
         ];
         for &l in &lengths {
-            let expected_bits = PRG::new(seed, iv).prg(l);
-            let mut stream = PRG_Stream::new(seed, iv);
+            let mut rng = SwankyRng::from_seed_and_iv(seed.into(), u128::from_le_bytes(iv));
+            let randoms = (0..l / 64 + 1)
+                .map(|_| rng.r#gen::<u64>())
+                .collect::<Vec<_>>();
+            let mut expected_bits = Vec::with_capacity(l);
+            for block in randoms {
+                for i in 0..64 {
+                    let bit = ((block >> i) & 1) == 1;
+                    expected_bits.push(F2::from(bit));
+                }
+            }
+            expected_bits.truncate(l);
+            let mut stream = SwankyRng::from_seed_and_iv(seed.into(), u128::from_le_bytes(iv));
+            // let mut stream = PRG_Stream::new(seed, iv);
             let mut stream_bits = Vec::with_capacity(l);
             while stream_bits.len() < l {
-                let block = stream.prg_next();
+                let block = stream.r#gen::<u64>();
                 for i in 0..64 {
                     if stream_bits.len() == l {
                         break;

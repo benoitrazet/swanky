@@ -24,8 +24,10 @@ We assume the $`\lambda`$ security parameter in the spec to be 128 as set in
 
 For convenience we abbreviate "all-but-one vector commitment" to "1-VC".
 */
-use crate::vole::crypto_primitives::{Com, H1, IV, Key, PRG, Seed, h0};
+use crate::vole::crypto_primitives::{Com, H1, IV, Key, Seed, h0};
+use rand::{Rng, SeedableRng};
 use swanky_error::{ErrorKind, Result, bail};
+use swanky_rng::SwankyRng;
 
 /// Hash function hashing a sequence of [`Com`]mitments and returns a hash [`H1`].
 ///
@@ -99,8 +101,8 @@ fn tree(iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) {
     for d in 1..depth + 1 {
         let n_previous_level = 1 << (d - 1);
         for j in 0..n_previous_level {
-            let mut prg = PRG::new(ks.get(d - 1, j), iv);
-            let (t1, t2) = prg.encrypt_double();
+            let mut prg = SwankyRng::from_seed(ks.get(d - 1, j).into());
+            let (t1, t2) = prg.r#gen();
             ks.set(d, j * 2, t1);
             ks.set(d, j * 2 + 1, t2);
         }
