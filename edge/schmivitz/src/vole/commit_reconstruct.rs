@@ -6,13 +6,16 @@ Implementation of algorithms to commit, open and reconstruct VOLEs.
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::all_but_one_vc::{Decom, Pdecom, commit, open, reconstruct};
 use crate::vole::convert_to_vole::{convert_to_vole, convert_to_vole_verifier};
-use crate::vole::crypto_primitives::{Chall3, Com, H1, H1_LENGTH, IV, PRG};
+use crate::vole::crypto_primitives::{Chall3, Com, H1, H1_LENGTH, IV, Seed};
 use generic_array::{GenericArray, arr, typenum::U16};
+use rand::Rng;
 use rayon::iter::*;
 use std::{sync::mpsc::channel, thread};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b};
+use swanky_rng::SwankyRng;
 use swanky_serialization::CanonicalSerialize;
+use vectoreyes::U8x16;
 
 use super::consistency_check::HashConsistency;
 
@@ -73,8 +76,9 @@ pub(crate) struct Commit {
 /// This corresponds to Figure 5.4 of the FAEST spec.
 /// This function relies on multithreading to improve the time performance.
 #[inline(never)]
-pub(crate) fn vole_commit(r: IV, iv: IV, l_hat: usize) -> Commit {
-    let prg_seeds = PRG::new(r, iv).generate_prg_seeds(REPETITION_PARAM);
+pub(crate) fn vole_commit(r: Seed, iv: IV, l_hat: usize) -> Commit {
+    let mut rng = SwankyRng::from_seed_and_iv(U8x16::from(r), u128::from_le_bytes(iv));
+    let prg_seeds: [Seed; REPETITION_PARAM] = core::array::from_fn(|_| rng.r#gen::<Seed>());
     let mut u = Vec::with_capacity(REPETITION_PARAM);
     let mut v = Vec::with_capacity(REPETITION_PARAM);
     let mut decom: [Decom; REPETITION_PARAM] = Default::default();
