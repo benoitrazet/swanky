@@ -78,53 +78,39 @@ pub(crate) struct Commit {
 #[inline(never)]
 pub(crate) fn vole_commit(r: Seed, iv: IV, l_hat: usize) -> Commit {
     let mut rng = SwankyRng::from_seed_and_iv(U8x16::from(r), u128::from_le_bytes(iv));
-    let prg_seeds: [Seed; REPETITION_PARAM] = core::array::from_fn(|_| rng.r#gen::<Seed>());
-    let mut u = Vec::with_capacity(REPETITION_PARAM);
+    let mut u: Vec<Vec<F2>> = Vec::with_capacity(REPETITION_PARAM);
     let mut v = Vec::with_capacity(REPETITION_PARAM);
     let mut decom: [Decom; REPETITION_PARAM] = Default::default();
     let mut com = Vec::with_capacity(REPETITION_PARAM);
 
+    let t = std::time::Instant::now();
+
     // Without multithreading: this is > 5x slower than with multithreading
-    /*
-    for i in 0..REPETITION_PARAM {
-        let (com_i, decom_i, seeds) = commit(prg_seeds[i], iv, 8);
-        let (u_i, v_i) = convert_to_vole(&seeds, iv, l_hat, true);
-        com.push(com_i);
-        decom[i] = decom_i;
-        u.push(u_i);
-        v.push(v_i)
-    }
-    */
+    // for i in 0..REPETITION_PARAM {
+    //     let seed = rng.r#gen::<Seed>();
+    //     let (com_i, decom_i, seeds) = commit(seed, iv, 8);
+    //     let (u_i, v_i) = convert_to_vole(&seeds, iv, l_hat, true);
+    //     com.push(com_i);
+    //     decom[i] = decom_i;
+    //     u.push(u_i);
+    //     v.push(v_i)
+    // }
 
     // With multithreading
-    let t = std::time::Instant::now();
-    let mut txs = Vec::with_capacity(REPETITION_PARAM);
-    let mut rxs = Vec::with_capacity(REPETITION_PARAM);
-    for _ in 0..REPETITION_PARAM {
-        let (tx, rx) = channel();
-        txs.push(tx);
-        rxs.push(rx);
-    }
-    let mut handles = Vec::new();
-
-    for i in 0..REPETITION_PARAM {
-        let tx = txs[i].clone();
-
-        let prg_seed = prg_seeds[i];
-        let handle = thread::spawn(move || {
+    let handles: [_; REPETITION_PARAM] = core::array::from_fn(|_| {
+        let seed = rng.r#gen::<Seed>();
+        thread::spawn(move || {
             // for smaller circuits the `commit/reconstruct` part is not negligeable compared to the
             // `convert_to_vole` part, therefore it is more efficient to execute both in
             // threads
-            let (com_i, decom_i, seeds) = commit(prg_seed, iv, 8);
+            let (com_i, decom_i, seeds) = commit(seed, iv, 8);
             let (u_i, v_i) = convert_to_vole(&seeds, iv, l_hat, true);
+            (com_i, decom_i, u_i, v_i)
+        })
+    });
 
-            tx.send((com_i, decom_i, u_i, v_i)).unwrap();
-        });
-        handles.push(handle);
-    }
-
-    for i in 0..REPETITION_PARAM {
-        let (com_i, decom_i, u_i, v_i) = rxs[i].recv().unwrap();
+    for (i, handle) in handles.into_iter().enumerate() {
+        let (com_i, decom_i, u_i, v_i) = handle.join().unwrap();
         com.push(com_i);
         decom[i] = decom_i;
         u.push(u_i);
@@ -143,15 +129,13 @@ pub(crate) fn vole_commit(r: Seed, iv: IV, l_hat: usize) -> Commit {
     let mut corr: [Vec<F2>; REPETITION_PARAM - 1] = Default::default();
     for i in 1..REPETITION_PARAM {
         debug_assert_eq!(l_hat, u_0.len());
-        let u_i = &u[i];
         let ci: Vec<F2> = (0..l_hat)
             .into_par_iter()
-            .map(|j| u_0[j] + u_i[j])
+            .map(|j| u_0[j] + u[i][j])
             .collect();
         corr[i - 1] = ci;
     }
     log::info!("corrections running time: {:?}", t.elapsed());
-    debug_assert_eq!(corr.len(), REPETITION_PARAM - 1);
 
     // Convert to a row-wise, fixed-size representation.
     let t = std::time::Instant::now();
