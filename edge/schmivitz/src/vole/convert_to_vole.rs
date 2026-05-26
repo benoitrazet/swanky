@@ -23,12 +23,7 @@ pub(crate) fn convert_to_vole(
     let mut u_res = Vec::with_capacity(l_hat);
     let mut v_res = Vec::with_capacity(l_hat);
 
-    let mut prgs: [Prg; 256] = seeds
-        .iter()
-        .map(|seed| Prg::new(*seed, iv))
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap(); // This `unwrap` never fails since the `assert` above guarantees that `seeds.len() == 256`.
+    let mut prgs: [_; 256] = core::array::from_fn(|i| Prg::new(seeds[i], iv));
 
     // `r` is only the last 2 layers of the original structure from the spec.
     // Only 2 layers are used using a swap operation in the loop.
@@ -41,7 +36,7 @@ pub(crate) fn convert_to_vole(
     let i2_arr: [usize; 128] = core::array::from_fn(|i| i * 2);
     let i2_plus_1_arr: [usize; 128] = core::array::from_fn(|i| i * 2 + 1);
 
-    for _ in 0..(l_hat / 64) + 1 {
+    for _ in 0..=l_hat / 64 {
         // possibly more but does not matter for performance.
 
         let mut v = [0; 8];
@@ -66,45 +61,22 @@ pub(crate) fn convert_to_vole(
         }
 
         let u = r0[0];
-        // if there are more than 64 then we dont have to check how
-        // many are remaining for the next 64 steps.
-        if remaining >= 64 {
-            for i in 0..64 {
-                u_res.push(((u >> i & 1) == 1).into());
-                let mut x = 0u8;
-                x |= (v[0] >> i & 1) as u8;
-                x |= ((v[1] >> i & 1) as u8) << 1;
-                x |= ((v[2] >> i & 1) as u8) << 2;
-                x |= ((v[3] >> i & 1) as u8) << 3;
-                x |= ((v[4] >> i & 1) as u8) << 4;
-                x |= ((v[5] >> i & 1) as u8) << 5;
-                x |= ((v[6] >> i & 1) as u8) << 6;
-                x |= ((v[7] >> i & 1) as u8) << 7;
-                v_res.push(F8b::from(x));
-            }
-            remaining -= 64;
-        } else {
-            // otherwise let's check one by one
-            for i in 0..64 {
-                u_res.push(((u >> i & 1) == 1).into());
-                let mut x = 0u8;
-                x |= (v[0] >> i & 1) as u8;
-                x |= ((v[1] >> i & 1) as u8) << 1;
-                x |= ((v[2] >> i & 1) as u8) << 2;
-                x |= ((v[3] >> i & 1) as u8) << 3;
-                x |= ((v[4] >> i & 1) as u8) << 4;
-                x |= ((v[5] >> i & 1) as u8) << 5;
-                x |= ((v[6] >> i & 1) as u8) << 6;
-                x |= ((v[7] >> i & 1) as u8) << 7;
-                v_res.push(F8b::from(x));
-
-                remaining -= 1;
-                if remaining == 0 {
-                    debug_assert_eq!(u_res.len(), l_hat);
-                    debug_assert_eq!(v_res.len(), l_hat);
-                    return (u_res, v_res);
-                }
-            }
+        for i in 0..core::cmp::min(64, remaining) {
+            u_res.push(((u >> i & 1) == 1).into());
+            let mut x = 0u8;
+            x |= (v[0] >> i & 1) as u8;
+            x |= ((v[1] >> i & 1) as u8) << 1;
+            x |= ((v[2] >> i & 1) as u8) << 2;
+            x |= ((v[3] >> i & 1) as u8) << 3;
+            x |= ((v[4] >> i & 1) as u8) << 4;
+            x |= ((v[5] >> i & 1) as u8) << 5;
+            x |= ((v[6] >> i & 1) as u8) << 6;
+            x |= ((v[7] >> i & 1) as u8) << 7;
+            v_res.push(F8b::from(x));
+        }
+        remaining -= core::cmp::min(64, remaining);
+        if remaining == 0 {
+            break;
         }
     }
     debug_assert_eq!(u_res.len(), l_hat);
