@@ -1,11 +1,9 @@
 /*!
 Convert vector commitments to VOLEs.
 */
-use crate::vole::crypto_primitives::{IV, Seed};
+use crate::vole::crypto_primitives::{IV, Prg, Seed};
 use rand::Rng;
-use swanky_field_binary::F2;
-use swanky_field_binary::F8b;
-use swanky_rng::SwankyRng;
+use swanky_field_binary::{F2, F8b};
 
 /// This function converts seeds to voles.
 ///
@@ -25,9 +23,9 @@ pub(crate) fn convert_to_vole(
     let mut u_res = Vec::with_capacity(l_hat);
     let mut v_res = Vec::with_capacity(l_hat);
 
-    let mut prgs: [SwankyRng; 256] = seeds
+    let mut prgs: [Prg; 256] = seeds
         .iter()
-        .map(|seed| SwankyRng::from_seed_and_iv((*seed).into(), u128::from_le_bytes(iv)))
+        .map(|seed| Prg::new(*seed, iv))
         .collect::<Vec<_>>()
         .try_into()
         .unwrap(); // This `unwrap` never fails since the `assert` above guarantees that `seeds.len() == 256`.
@@ -125,7 +123,7 @@ fn convert_to_vole_prover_naive(seeds: &[Seed], iv: IV, l_hat: usize) -> (Vec<F2
 
     let mut i = 0u8;
     for seed in seeds.iter() {
-        let mut prg = SwankyRng::from_seed_and_iv((*seed).into(), u128::from_le_bytes(iv));
+        let mut prg = Prg::new(*seed, iv);
 
         // Generate u64 items to match the use in `convert_to_vole`.
         let randoms = (0..l_hat / 64 + 1)
@@ -186,7 +184,7 @@ fn convert_to_vole_verifier_naive(seeds: &[Seed], iv: IV, l_hat: usize, delta: u
 
     for (j, seed) in seeds.iter().enumerate() {
         if j != delta as usize {
-            let mut prg = SwankyRng::from_seed_and_iv((*seed).into(), u128::from_le_bytes(iv));
+            let mut prg = Prg::new(*seed, iv);
 
             // Generate u64 items to match the use in `convert_to_vole`.
             let randoms = (0..l_hat / 64 + 1)
