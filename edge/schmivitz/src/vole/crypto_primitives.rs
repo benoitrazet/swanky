@@ -23,7 +23,6 @@ pub(crate) type Seed = [u8; SECURITY_PARAM / 8];
 ///
 /// This is a thin wrapper around [`SwankyRng`], which itself implements a
 /// AES-CTR-based PRG as defined in the FAEST spec.
-#[derive(Debug)]
 pub(crate) struct Prg(SwankyRng);
 
 impl Prg {
