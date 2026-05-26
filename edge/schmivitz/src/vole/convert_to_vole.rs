@@ -13,17 +13,15 @@ use swanky_field_binary::{F2, F8b};
 /// algorithm by relying exclusively on xor operations on packed binary
 /// field values.
 pub(crate) fn convert_to_vole(
-    seeds: &[Seed],
+    seeds: [Seed; 256],
     iv: IV,
     l_hat: usize,
     is_prover: bool,
 ) -> (Vec<F2>, Vec<F8b>) {
-    // even if one seed can be bottom, it expects 256 of them.
-    assert!(seeds.len() == 256);
     let mut u_res = Vec::with_capacity(l_hat);
     let mut v_res = Vec::with_capacity(l_hat);
 
-    let mut prgs: [_; 256] = core::array::from_fn(|i| Prg::new(seeds[i], iv));
+    let mut prgs = seeds.map(|seed| Prg::new(seed, iv));
 
     // `r` is only the last 2 layers of the original structure from the spec.
     // Only 2 layers are used using a swap operation in the loop.
@@ -87,15 +85,15 @@ pub(crate) fn convert_to_vole(
 #[cfg(test)]
 /// This function is the naive version of [`convert_to_vole`] that does not
 /// operate on packed boolean field values.
-fn convert_to_vole_prover_naive(seeds: &[Seed], iv: IV, l_hat: usize) -> (Vec<F2>, Vec<F8b>) {
+fn convert_to_vole_prover_naive(seeds: [Seed; 256], iv: IV, l_hat: usize) -> (Vec<F2>, Vec<F8b>) {
     use swanky_field::FiniteRing;
-    assert!(seeds.len() == 256);
+
     let mut u_res = vec![F2::ZERO; l_hat];
     let mut v_res = vec![F8b::ZERO; l_hat];
 
     let mut i = 0u8;
-    for seed in seeds.iter() {
-        let mut prg = Prg::new(*seed, iv);
+    for seed in seeds {
+        let mut prg = Prg::new(seed, iv);
 
         // Generate u64 items to match the use in `convert_to_vole`.
         let randoms = (0..l_hat / 64 + 1)
@@ -124,37 +122,37 @@ fn convert_to_vole_prover_naive(seeds: &[Seed], iv: IV, l_hat: usize) -> (Vec<F2
 ///
 /// It permutes `seeds` according `delta` before calling [`convert_to_vole`].
 pub(crate) fn convert_to_vole_verifier(
-    seeds: &[Seed],
+    seeds: [Seed; 256],
     iv: IV,
     l_hat: usize,
     delta: u8,
 ) -> Vec<F8b> {
     // Permutate the seeds according to `delta`, with the permutation
     // `i` -> `i xor delta`.
-    let mut seeds_permuted = [Seed::default(); 256];
-    for i in 0..=255 {
-        let idx: u8 = i ^ delta;
+    let seeds_permuted: [_; 256] = core::array::from_fn(|i| {
+        let idx: u8 = (i as u8) ^ delta;
         if i != 0 {
-            seeds_permuted[i as usize] = seeds[idx as usize];
+            seeds[idx as usize]
+        } else {
+            Seed::default()
         }
-    }
-
-    let (_, v) = convert_to_vole(&seeds_permuted, iv, l_hat, false);
+    });
+    let (_, v) = convert_to_vole(seeds_permuted, iv, l_hat, false);
     v
 }
 
 // NOTE: the return type is different than ConvertToVOLE in the paper, where is should be a Vec<Vec<F2>>
 #[cfg(test)]
-fn convert_to_vole_verifier_naive(seeds: &[Seed], iv: IV, l_hat: usize, delta: u8) -> Vec<F8b> {
+fn convert_to_vole_verifier_naive(seeds: [Seed; 256], iv: IV, l_hat: usize, delta: u8) -> Vec<F8b> {
     use swanky_field::FiniteRing;
-    assert_eq!(seeds.len(), 256);
+
     let mut v_res = vec![F8b::ZERO; l_hat];
 
     let mut i = 0u8;
 
-    for (j, seed) in seeds.iter().enumerate() {
+    for (j, seed) in seeds.into_iter().enumerate() {
         if j != delta as usize {
-            let mut prg = Prg::new(*seed, iv);
+            let mut prg = Prg::new(seed, iv);
 
             // Generate u64 items to match the use in `convert_to_vole`.
             let randoms = (0..l_hat / 64 + 1)
@@ -175,7 +173,7 @@ fn convert_to_vole_verifier_naive(seeds: &[Seed], iv: IV, l_hat: usize, delta: u
                 v_res[j] += *r * (delta_f8b - i_f8b);
             }
         } else {
-            assert_eq!(*seed, Seed::default());
+            assert_eq!(seed, Seed::default());
         }
         i = i.wrapping_add(1);
     }
@@ -186,20 +184,20 @@ fn convert_to_vole_verifier_naive(seeds: &[Seed], iv: IV, l_hat: usize, delta: u
 #[cfg(test)]
 mod test {
     use super::{convert_to_vole, convert_to_vole_prover_naive, convert_to_vole_verifier_naive};
-    use crate::vole::crypto_primitives::Seed;
-    use rand::{Rng, RngCore, thread_rng};
+    use crate::vole::crypto_primitives::{IV, Seed};
+    use rand::{Rng, thread_rng};
     use swanky_field_binary::F8b;
 
     #[test]
     fn test_convert_to_vole_naive() {
         let rng = &mut thread_rng();
 
-        let seeds = (0..256).map(|_| rng.r#gen::<Seed>()).collect::<Vec<_>>();
+        let seeds: [_; 256] = core::array::from_fn(|_| rng.r#gen::<Seed>());
         let iv = rng.r#gen();
 
         let delta = 3u8;
         let how_many = 1027;
-        let (u, vs) = convert_to_vole_prover_naive(seeds.as_slice(), iv, how_many);
+        let (u, vs) = convert_to_vole_prover_naive(seeds, iv, how_many);
 
         let mut seeds_verifier = [Seed::default(); 256];
         for i in 0..256 {
@@ -207,7 +205,7 @@ mod test {
                 seeds_verifier[i] = seeds[i];
             }
         }
-        let qs = convert_to_vole_verifier_naive(&seeds_verifier, iv, how_many, delta);
+        let qs = convert_to_vole_verifier_naive(seeds_verifier, iv, how_many, delta);
 
         for ((u, v), q) in u.iter().zip(vs.iter()).zip(qs.iter()) {
             let delta_f8b = F8b::from(delta);
@@ -217,24 +215,17 @@ mod test {
 
     #[test]
     fn test_convert_to_vole() {
-        let mut seeds: Vec<Seed> = vec![];
         let rng = &mut thread_rng();
 
-        let mut arr = [0u8; 16];
-        for _ in 0..256 {
-            rng.try_fill_bytes(&mut arr).unwrap();
-            seeds.push(arr);
-        }
-
-        rng.try_fill_bytes(&mut arr).unwrap();
-        let iv = arr;
+        let seeds: [_; 256] = core::array::from_fn(|_| rng.r#gen::<Seed>());
+        let iv = rng.r#gen::<IV>();
 
         let delta = 3u8;
         let how_many = 1027;
-        let (u, vs) = convert_to_vole_prover_naive(seeds.as_slice(), iv, how_many);
+        let (u, vs) = convert_to_vole_prover_naive(seeds, iv, how_many);
 
         /* This test checks the equivalence between convert_to_vole and its naive version */
-        let (u_xor, v_xor) = convert_to_vole(&seeds, iv, how_many, true);
+        let (u_xor, v_xor) = convert_to_vole(seeds, iv, how_many, true);
         assert_eq!(u_xor, u);
         assert_eq!(v_xor, vs);
 
@@ -244,10 +235,10 @@ mod test {
                 seeds_verifier[i] = seeds[i];
             }
         }
-        let qs = convert_to_vole_verifier_naive(&seeds_verifier, iv, how_many, delta);
+        let qs = convert_to_vole_verifier_naive(seeds_verifier, iv, how_many, delta);
 
         /* This test was to test the correspondance between the two functions */
-        let qs_xor = super::convert_to_vole_verifier(&seeds, iv, how_many, delta);
+        let qs_xor = super::convert_to_vole_verifier(seeds, iv, how_many, delta);
         assert_eq!(qs, qs_xor);
 
         for ((u, v), q) in u.iter().zip(vs.iter()).zip(qs.iter()) {

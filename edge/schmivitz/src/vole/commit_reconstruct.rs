@@ -102,7 +102,12 @@ pub(crate) fn vole_commit(r: Seed, iv: IV, l_hat: usize) -> Commit {
             // `convert_to_vole` part, therefore it is more efficient to execute both in
             // threads
             let (com_i, decom_i, seeds) = commit(seed, iv, 8);
-            let (u_i, v_i) = convert_to_vole(&seeds, iv, l_hat, true);
+            let (u_i, v_i) = convert_to_vole(
+                seeds.try_into().unwrap(), // The depth in `commit` above is hardcoded to `8`, so this will never fail.
+                iv,
+                l_hat,
+                true,
+            );
             (com_i, decom_i, u_i, v_i)
         })
     });
@@ -232,7 +237,12 @@ pub(crate) fn vole_reconstruct(
             // `convert_to_vole` part, therefore it is more efficient to execute both in
             // threads
             let (com_i, seeds) = reconstruct(pdecom, delta.clone(), iv);
-            let q_i = convert_to_vole_verifier(&seeds, iv, l_hat, bools_to_u8(&delta));
+            let q_i = convert_to_vole_verifier(
+                seeds.try_into().unwrap(), // The depth is hardcoded to 8, so this will never fail.
+                iv,
+                l_hat,
+                bools_to_u8(&delta),
+            );
             tx.send((com_i, q_i)).unwrap();
         });
         handles.push(handle);
