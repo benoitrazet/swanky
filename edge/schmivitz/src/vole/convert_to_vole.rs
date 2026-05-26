@@ -120,25 +120,23 @@ fn convert_to_vole_prover_naive(seeds: &[Seed], iv: IV, l_hat: usize) -> (Vec<F2
     (u_res, v_res)
 }
 
-/// This function is the verifier version of [`convert_to_vole`].
+/// Verifier version of [`convert_to_vole`].
 ///
-/// It permutes the `seeds` according to `delta` before calling [`convert_to_vole`].
+/// It permutes `seeds` according `delta` before calling [`convert_to_vole`].
 pub(crate) fn convert_to_vole_verifier(
     seeds: &[Seed],
     iv: IV,
     l_hat: usize,
     delta: u8,
 ) -> Vec<F8b> {
-    // let's permutate the seeds according to delta, with the permutation
-    // i -> i xor delta
+    // Permutate the seeds according to `delta`, with the permutation
+    // `i` -> `i xor delta`.
     let mut seeds_permuted = [Seed::default(); 256];
-    let mut i = 0u8;
-    for _ in 0u32..256 {
+    for i in 0..=255 {
         let idx: u8 = i ^ delta;
         if i != 0 {
-            seeds_permuted[i as usize] = seeds[(idx) as usize];
+            seeds_permuted[i as usize] = seeds[idx as usize];
         }
-        i = i.wrapping_add(1);
     }
 
     let (_, v) = convert_to_vole(&seeds_permuted, iv, l_hat, false);
