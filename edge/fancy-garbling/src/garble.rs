@@ -12,9 +12,9 @@ pub use binary_and::BinaryWireLabel;
 mod nonstreaming {
     use crate::{
         AllWire, Evaluator, Garbler, WireLabel, WireMod2,
-        circuit::{CircuitExecutor, circuits},
+        circuit::{CircuitExecutor, Flatten, circuits},
         classic::GarbledCircuit,
-        dummy::Dummy,
+        dummy::{Dummy, DummyVal},
         util::RngExt,
     };
     use rand::thread_rng;
@@ -35,20 +35,31 @@ mod nonstreaming {
             let (en, ev, output_mapping) =
                 GarbledCircuit::garble::<W, _, _>(circuit, SwankyRng::new()).unwrap();
             for _ in 0..16 {
-                let mut inputs = Vec::new();
-                for i in 0..<Ex as CircuitExecutor<Dummy>>::ninputs(circuit) {
-                    let q = <Ex as CircuitExecutor<Dummy>>::modulus(circuit, i);
-                    let x = rng.gen_u16() % q;
-                    inputs.push(x);
-                }
+                let inputs = (0..<Ex as CircuitExecutor<Dummy>>::ninputs(circuit))
+                    .map(|i| {
+                        let q = <Ex as CircuitExecutor<Dummy>>::modulus(circuit, i);
+                        let x = rng.gen_u16() % q;
+                        DummyVal::new(x, q)
+                    })
+                    .collect::<Vec<_>>();
+                let plaintext = inputs.iter().map(|x| x.val()).collect::<Vec<_>>();
                 // Run the garbled circuit evaluator.
-                let xs = en.encode_inputs(&inputs);
+                let xs = en.encode_inputs(&plaintext);
                 let wirelabels = ev.eval_to_wirelabels(circuit, xs).unwrap();
                 let decoded = output_mapping.to_outputs(&wirelabels).unwrap();
 
                 // Run the dummy evaluator.
-                let should_be = Dummy::eval(circuit, &inputs).unwrap();
-                assert_eq!(decoded, should_be);
+                let expected = Dummy::eval(
+                    circuit,
+                    &<Ex as CircuitExecutor<Dummy>>::map(circuit, inputs),
+                )
+                .unwrap();
+                let expected = expected
+                    .flatten()
+                    .iter()
+                    .map(|x| x.val())
+                    .collect::<Vec<_>>();
+                assert_eq!(decoded, expected);
             }
         }
     }

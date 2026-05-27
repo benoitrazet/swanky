@@ -16,7 +16,7 @@ mod tests {
             BinaryCircuit, CircuitExecutor, CircuitInfo, Flatten,
             circuits::arithmetic::TestAddition,
         },
-        dummy::Dummy,
+        dummy::{Dummy, DummyVal},
         util::RngExt,
     };
     use itertools::Itertools;
@@ -133,9 +133,9 @@ mod tests {
     type GB<Wire> = Garbler<SwankyRng, ChouOrlandiSender, Wire>;
     type EV<Wire> = Evaluator<SwankyRng, ChouOrlandiReceiver, Wire>;
 
-    fn test_circuit<CIRC, Wire: WireLabel + Send>(circ: CIRC)
+    fn test_circuit<C, Wire: WireLabel + Send>(circ: C)
     where
-        CIRC: CircuitExecutor<Dummy>
+        C: CircuitExecutor<Dummy>
             + CircuitExecutor<GB<Wire>>
             + CircuitExecutor<EV<Wire>>
             + CircuitInfo
@@ -154,7 +154,7 @@ mod tests {
                 xs.extend(ys);
                 let outputs = circ.execute(
                     &mut gb,
-                    &<CIRC as CircuitExecutor<GB<_>>>::map(&circ, xs),
+                    &<C as CircuitExecutor<GB<_>>>::map(&circ, xs),
                     channel,
                 )?;
                 gb.outputs(&outputs.flatten(), channel)?;
@@ -168,7 +168,7 @@ mod tests {
                 xs.extend(ys);
                 let wirelabels = circ.execute(
                     &mut ev,
-                    &<CIRC as CircuitExecutor<EV<_>>>::map(&circ, xs),
+                    &<C as CircuitExecutor<EV<_>>>::map(&circ, xs),
                     channel,
                 )?;
                 let out = ev.outputs(&wirelabels.flatten(), channel)?;
@@ -177,7 +177,16 @@ mod tests {
         )
         .unwrap();
 
-        let target = Dummy::eval(&circ, &vec![0; 256]).unwrap();
+        let target = Dummy::eval(
+            &circ,
+            &<C as CircuitExecutor<Dummy>>::map(&circ, vec![DummyVal::new(0, 2); 256]),
+        )
+        .unwrap();
+        let target = target
+            .flatten()
+            .into_iter()
+            .map(|x| x.val())
+            .collect::<Vec<_>>();
         assert_eq!(out, target);
     }
 

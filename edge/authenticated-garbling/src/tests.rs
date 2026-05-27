@@ -5,6 +5,7 @@ use crate::ps::{PartyEvaluator, PartyGarbler};
 use crate::{evaluator::Evaluator, preprocesser::WirePreProcessor};
 
 use fancy_garbling::circuit::Flatten;
+use fancy_garbling::dummy::DummyVal;
 use fancy_garbling::{
     Fancy,
     circuit::{CircuitExecutor, circuits},
@@ -53,8 +54,26 @@ fn test_circuit<
     let inputs_gb: Vec<u16> = (0..ninputs_gb).map(|_| rng.r#gen::<u16>() % 2).collect();
     let inputs_ev: Vec<u16> = (0..ninputs_ev).map(|_| rng.r#gen::<u16>() % 2).collect();
 
-    let inputs = [inputs_gb.clone(), inputs_ev.clone()].concat();
-    let expected = Dummy::eval(circuit, &inputs).unwrap();
+    let dummy_inputs_gb = inputs_gb
+        .iter()
+        .map(|x| DummyVal::new(*x, 2))
+        .collect::<Vec<_>>();
+    let dummy_inputs_ev = inputs_ev
+        .iter()
+        .map(|x| DummyVal::new(*x, 2))
+        .collect::<Vec<_>>();
+
+    let dummy_inputs = [dummy_inputs_gb, dummy_inputs_ev].concat();
+    let expected = Dummy::eval(
+        circuit,
+        &<C as CircuitExecutor<Dummy>>::map(circuit, dummy_inputs),
+    )
+    .unwrap();
+    let expected = expected
+        .flatten()
+        .into_iter()
+        .map(|x| x.val())
+        .collect::<Vec<_>>();
 
     let (outputs_gb, outputs_ev) = swanky_channel::local::local_channel_pair(
         |c| {
