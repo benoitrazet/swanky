@@ -45,7 +45,12 @@ mod nonstreaming {
                 let plaintext = inputs.iter().map(|x| x.val()).collect::<Vec<_>>();
                 // Run the garbled circuit evaluator.
                 let xs = en.encode_inputs(&plaintext);
-                let wirelabels = ev.eval_to_wirelabels(circuit, xs).unwrap();
+                let wirelabels = ev
+                    .eval_to_wirelabels(
+                        circuit,
+                        &<Ex as CircuitExecutor<Evaluator<W>>>::map(circuit, xs),
+                    )
+                    .unwrap();
                 let decoded = output_mapping.to_outputs(&wirelabels).unwrap();
 
                 // Run the dummy evaluator.

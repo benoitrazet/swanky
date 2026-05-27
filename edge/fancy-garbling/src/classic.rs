@@ -84,26 +84,26 @@ impl GarbledCircuit {
 
     /// Evaluate the garbled circuit on the provided inputs, mapping the output
     /// wirelabels to their associated values.
-    pub fn eval<Wire: WireLabel, Ex: CircuitExecutor<Evaluator<Wire>>>(
+    pub fn eval<Wire: WireLabel, C: CircuitExecutor<Evaluator<Wire>>>(
         &self,
-        c: &Ex,
-        inputs: Vec<Wire>,
+        circuit: &C,
+        inputs: &C::Input,
         output_mapping: &OutputMapping,
     ) -> swanky_error::Result<Vec<u16>> {
-        let wirelabels = self.eval_to_wirelabels(c, inputs)?;
+        let wirelabels = self.eval_to_wirelabels(circuit, inputs)?;
         output_mapping.to_outputs(&wirelabels)
     }
 
     /// Evaluate the garbled circuit on the provided inputs, returning the
     /// output wirelabels.
-    pub fn eval_to_wirelabels<Wire: WireLabel, Ex: CircuitExecutor<Evaluator<Wire>>>(
+    pub fn eval_to_wirelabels<Wire: WireLabel, C: CircuitExecutor<Evaluator<Wire>>>(
         &self,
-        c: &Ex,
-        inputs: Vec<Wire>,
+        circuit: &C,
+        inputs: &C::Input,
     ) -> swanky_error::Result<Vec<Wire>> {
         let wirelabels = Channel::with(GarbledChannel::from(self), |channel| {
             let mut evaluator = Evaluator::new(channel)?;
-            let wirelabels = c.execute(&mut evaluator, &c.map(inputs), channel)?;
+            let wirelabels = circuit.execute(&mut evaluator, inputs, channel)?;
             Ok(wirelabels.flatten())
         })?;
         Ok(wirelabels)

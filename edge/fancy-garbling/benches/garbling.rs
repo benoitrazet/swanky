@@ -51,7 +51,12 @@ fn bench_eval_binary_ex<
             .collect::<Vec<u16>>();
         let xs = encoder.encode_inputs(&inputs);
         bench.iter(|| {
-            let ys = gc.eval_to_wirelabels(&ex, xs.clone()).unwrap();
+            let ys = gc
+                .eval_to_wirelabels(
+                    &ex,
+                    &<Ex as CircuitExecutor<Evaluator<_>>>::map(&ex, xs.clone()),
+                )
+                .unwrap();
             black_box(ys);
         })
     });
@@ -74,7 +79,12 @@ fn bench_eval_arith_ex<
             .collect::<Vec<u16>>();
         let xs = encoder.encode_inputs(&inputs);
         bench.iter(|| {
-            let ys = gc.eval_to_wirelabels(&ex, xs.clone()).unwrap();
+            let ys = gc
+                .eval_to_wirelabels(
+                    &ex,
+                    &<Ex as CircuitExecutor<Evaluator<_>>>::map(&ex, xs.clone()),
+                )
+                .unwrap();
             black_box(ys);
         })
     });

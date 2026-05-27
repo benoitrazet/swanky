@@ -143,8 +143,8 @@ impl BinaryCircuit {
 #[cfg(test)]
 mod tests {
     use crate::{
-        WireMod2,
-        circuit::BinaryCircuit as Circuit,
+        Evaluator, WireMod2,
+        circuit::{BinaryCircuit as Circuit, CircuitExecutor},
         classic::GarbledCircuit,
         dummy::{Dummy, DummyVal},
     };
@@ -208,6 +208,10 @@ mod tests {
         let (encoder, gc, _) =
             GarbledCircuit::garble::<WireMod2, _, _>(&circ, SwankyRng::new()).unwrap();
         let inputs = encoder.encode_inputs(&vec![0u16; 256]);
-        gc.eval_to_wirelabels(&circ, inputs).unwrap();
+        gc.eval_to_wirelabels(
+            &circ,
+            &<Circuit as CircuitExecutor<Evaluator<WireMod2>>>::map(&circ, inputs),
+        )
+        .unwrap();
     }
 }

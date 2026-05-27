@@ -1,13 +1,15 @@
 //! Benchmark code of garbling / evaluating using Nigel's circuits.
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use fancy_garbling::{AllWire, WireMod2, circuit::BinaryCircuit, classic::GarbledCircuit};
+use fancy_garbling::{
+    AllWire, Evaluator, WireMod2,
+    circuit::{BinaryCircuit, CircuitExecutor},
+    classic::GarbledCircuit,
+};
 use std::{fs::File, io::BufReader, time::Duration};
 use swanky_rng::SwankyRng;
 
 fn circuit(fname: &str) -> BinaryCircuit {
-    // println!("{}", fname);
-    // circ.print_info().unwrap();
     BinaryCircuit::parse(BufReader::new(File::open(fname).unwrap())).unwrap()
 }
 
@@ -23,7 +25,12 @@ fn bench_eval_aes_binary(c: &mut Criterion) {
     let (en, gc, _) = GarbledCircuit::garble::<WireMod2, _, _>(&circ, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0u16; 256]);
     c.bench_function("eval::aes-binary", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&circ, inputs.clone()))
+        bench.iter(|| {
+            gc.eval_to_wirelabels(
+                &circ,
+                &<BinaryCircuit as CircuitExecutor<Evaluator<_>>>::map(&circ, inputs.clone()),
+            )
+        })
     });
 }
 
@@ -39,7 +46,12 @@ fn bench_eval_sha_1_binary(c: &mut Criterion) {
     let (en, gc, _) = GarbledCircuit::garble::<WireMod2, _, _>(&circ, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0u16; 512]);
     c.bench_function("eval::sha-1-binary", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&circ, inputs.clone()))
+        bench.iter(|| {
+            gc.eval_to_wirelabels(
+                &circ,
+                &<BinaryCircuit as CircuitExecutor<Evaluator<_>>>::map(&circ, inputs.clone()),
+            )
+        })
     });
 }
 
@@ -55,7 +67,12 @@ fn bench_eval_sha_256_binary(c: &mut Criterion) {
     let (en, gc, _) = GarbledCircuit::garble::<WireMod2, _, _>(&circ, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0u16; 512]);
     c.bench_function("eval::sha-256-binary", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&circ, inputs.clone()))
+        bench.iter(|| {
+            gc.eval_to_wirelabels(
+                &circ,
+                &<BinaryCircuit as CircuitExecutor<Evaluator<_>>>::map(&circ, inputs.clone()),
+            )
+        })
     });
 }
 
@@ -71,7 +88,12 @@ fn bench_eval_aes_arithmetic(c: &mut Criterion) {
     let (en, gc, _) = GarbledCircuit::garble::<AllWire, _, _>(&circ, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0u16; 256]);
     c.bench_function("eval::aes-arithmetic", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&circ, inputs.clone()))
+        bench.iter(|| {
+            gc.eval_to_wirelabels(
+                &circ,
+                &<BinaryCircuit as CircuitExecutor<Evaluator<_>>>::map(&circ, inputs.clone()),
+            )
+        })
     });
 }
 
@@ -87,7 +109,12 @@ fn bench_eval_sha_1_arithmetic(c: &mut Criterion) {
     let (en, gc, _) = GarbledCircuit::garble::<AllWire, _, _>(&circ, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0u16; 512]);
     c.bench_function("eval::sha-1-arithmetic", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&circ, inputs.clone()))
+        bench.iter(|| {
+            gc.eval_to_wirelabels(
+                &circ,
+                &<BinaryCircuit as CircuitExecutor<Evaluator<_>>>::map(&circ, inputs.clone()),
+            )
+        })
     });
 }
 
@@ -103,7 +130,12 @@ fn bench_eval_sha_256_arithmetic(c: &mut Criterion) {
     let (en, gc, _) = GarbledCircuit::garble::<AllWire, _, _>(&circ, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0u16; 512]);
     c.bench_function("eval::sha-256-arithmetic", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&circ, inputs.clone()))
+        bench.iter(|| {
+            gc.eval_to_wirelabels(
+                &circ,
+                &<BinaryCircuit as CircuitExecutor<Evaluator<_>>>::map(&circ, inputs.clone()),
+            )
+        })
     });
 }
 
