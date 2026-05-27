@@ -12,11 +12,9 @@ mod tests {
     use fancy_garbling::{
         AllWire, CrtBundle, CrtGadgets, CrtProjGadgets, Fancy, FancyArithmetic, FancyBinary,
         FancyProj, WireLabel, WireMod2,
-        circuit::{
-            BinaryCircuit, CircuitExecutor, CircuitInfo, Flatten,
-            circuits::arithmetic::TestAddition,
-        },
+        circuit::{BinaryCircuit, CircuitExecutor, Flatten, circuits::arithmetic::TestAddition},
         dummy::{Dummy, DummyVal},
+        informer::Informer,
         util::RngExt,
     };
     use itertools::Itertools;
@@ -136,14 +134,14 @@ mod tests {
     fn test_circuit<C, Wire: WireLabel + Send>(circ: C)
     where
         C: CircuitExecutor<Dummy>
+            + CircuitExecutor<Informer<Dummy>>
             + CircuitExecutor<GB<Wire>>
             + CircuitExecutor<EV<Wire>>
-            + CircuitInfo
             + Send
             + Sync
             + 'static,
     {
-        circ.print_info().unwrap();
+        Informer::print_stats(&circ).unwrap();
 
         let (_, out) = swanky_channel::local::local_channel_pair(
             |channel| {

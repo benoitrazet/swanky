@@ -1,9 +1,7 @@
 //! DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,
 //! where you create a circuit for a computation then garble it.
 
-use crate::{
-    BinaryBundle, Bundle, CrtBundle, HasModulus, dummy::Dummy, fancy::Fancy, informer::Informer,
-};
+use crate::{BinaryBundle, Bundle, CrtBundle, HasModulus, fancy::Fancy};
 use itertools::Itertools;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -139,33 +137,6 @@ pub trait CircuitExecutor<F: Fancy> {
     fn ninputs(&self) -> usize;
     /// The modulus for input `i`.
     fn modulus(&self, i: usize) -> u16;
-}
-
-/// Trait to display circuit evaluation costs
-///
-/// Blanket implementation available for all circuits
-/// that can be evaluated with an `Informer`
-pub trait CircuitInfo {
-    /// Print circuit info
-    fn print_info(&self) -> Result<()>;
-}
-
-impl<C: CircuitExecutor<Informer<Dummy>>> CircuitInfo for C {
-    fn print_info(&self) -> Result<()> {
-        let mut informer = crate::informer::Informer::new(Dummy::new());
-
-        let inputs = Channel::with(std::io::empty(), |channel| {
-            (0..self.ninputs())
-                .map(|i| informer.encode(0, self.modulus(i), channel))
-                .collect::<Result<Vec<_>>>()
-        })?;
-
-        Channel::with(std::io::empty(), |c| {
-            self.execute(&mut informer, &self.map(inputs), c)
-        })?;
-        println!("{}", informer.stats());
-        Ok(())
-    }
 }
 
 pub mod circuits {
