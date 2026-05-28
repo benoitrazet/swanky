@@ -6,10 +6,8 @@ use aes::cipher::{
     BlockEncrypt, KeyInit,
     generic_array::{GenericArray, typenum::U16},
 };
-use sha3::{
-    Shake128,
-    digest::{ExtendableOutput, Update, XofReader},
-};
+use sha3::digest::{ExtendableOutput, Update, XofReader};
+use shake::Shake128;
 #[cfg(test)]
 use swanky_field_binary::F2;
 use swanky_field_binary::F128b;

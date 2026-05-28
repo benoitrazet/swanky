@@ -15,7 +15,8 @@ use crate::vole::crypto_primitives::{Chall1, Chall3, Com, H1, H3, IV, Seed, h2_c
 use generic_array::GenericArray;
 use generic_array::typenum::U16;
 use rayon::prelude::*;
-use sha3::{Shake128, digest::Update};
+use sha3::digest::Update;
+use shake::Shake128;
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b, F128b};
 
@@ -339,8 +340,8 @@ mod test {
     use crate::vole::functionality::compute_chall_3;
     use rand::thread_rng;
     use rayon::prelude::*;
-    use sha3::Shake128;
     use sha3::digest::{ExtendableOutput, Update, XofReader};
+    use shake::Shake128;
     use swanky_field::{FiniteRing, IsSubFieldOf};
     use swanky_field_binary::F2;
     use swanky_field_binary::{F8b, F128b};
