@@ -41,5 +41,3 @@ pub use binary_greater_than_or_equal::test::TestBinaryGreaterThanOrEqual;
 mod binary_equality;
 pub use binary_equality::BinaryEquality;
 pub use binary_equality::test::TestBinaryEquality;
-
-
