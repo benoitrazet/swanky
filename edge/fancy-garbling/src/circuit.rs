@@ -91,7 +91,7 @@ impl<T: Clone + HasModulus> Flatten for (BinaryBundle<T>, T) {
     }
 }
 
-/// Trait for executing computations directly over a [`Fancy`] object.
+/// Trait for defining circuits that can be executed by [`Fancy`] objects.
 ///
 /// # Example
 /// Below is a simple example of computing an add gate over an arbitrary
@@ -100,11 +100,11 @@ impl<T: Clone + HasModulus> Flatten for (BinaryBundle<T>, T) {
 /// many inputs the computation takes, and the moduli of those inputs; these are
 /// given in the `ninputs` and `modulus` methods, respectively.
 /// ```
-/// # use fancy_garbling::{FancyArithmetic, circuit::CircuitExecutor};
+/// # use fancy_garbling::{FancyArithmetic, circuit::{Circuit, CircuitExecutor}};
 /// # use swanky_channel::Channel;
 /// # use swanky_error::Result;
 /// struct AddCircuit(u16);
-/// impl<F: FancyArithmetic> CircuitExecutor<F> for AddCircuit {
+/// impl<F: FancyArithmetic> Circuit<F> for AddCircuit {
 ///     type Input = (F::Item, F::Item);
 ///     type Output = F::Item;
 ///
@@ -116,7 +116,8 @@ impl<T: Clone + HasModulus> Flatten for (BinaryBundle<T>, T) {
 ///     ) -> Result<Self::Output> {
 ///         Ok(backend.add(&inputs.0, &inputs.1))
 ///     }
-///
+/// }
+/// impl<F: FancyArithmetic> CircuitExecutor<F> for AddCircuit {
 ///     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
 ///         assert_eq!(inputs.len(), 2);
 ///         (inputs[0].clone(), inputs[1].clone())
@@ -144,6 +145,32 @@ pub trait CircuitExecutor<F: Fancy>: Circuit<F> {
 }
 
 /// Trait for defining arbitrary [`Fancy`] circuits.
+///
+/// To execute a [`Circuit`], it needs to also implement [`CircuitExecutor`].
+///
+/// # Example
+/// Below is a simple example of computing an add gate over an arbitrary
+/// modulus. The computation is defined in `execute` by directly calling
+/// operations on the underlying [`Fancy`] backend.
+/// ```
+/// # use fancy_garbling::{FancyArithmetic, circuit::Circuit};
+/// # use swanky_channel::Channel;
+/// # use swanky_error::Result;
+/// struct AddCircuit(u16);
+/// impl<F: FancyArithmetic> Circuit<F> for AddCircuit {
+///     type Input = (F::Item, F::Item);
+///     type Output = F::Item;
+///
+///     fn execute(
+///         &self,
+///         backend: &mut F,
+///         inputs: &Self::Input,
+///         channel: &mut Channel,
+///     ) -> Result<Self::Output> {
+///         Ok(backend.add(&inputs.0, &inputs.1))
+///     }
+/// }
+/// ```
 pub trait Circuit<F: Fancy> {
     /// The input type of the circuit.
     type Input;
