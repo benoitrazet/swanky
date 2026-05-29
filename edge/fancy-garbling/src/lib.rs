@@ -5,6 +5,7 @@
 
 pub mod circuit;
 pub mod circuit_analyzer;
+pub mod circuits;
 pub mod classic;
 pub mod dummy;
 mod fancy;

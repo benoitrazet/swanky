@@ -1,0 +1,97 @@
+use crate::{FancyBinary, circuit::Circuit};
+use swanky_channel::Channel;
+use swanky_error::Result;
+
+/// Binary adder.
+///
+/// For input bits `x` and `y` and optional carry bit `c`, return `(x + y + c,
+/// c')`, where `c'` is the new carry bit.
+pub struct BinaryAdder;
+
+impl<F: FancyBinary> Circuit<F> for BinaryAdder {
+    type Input = (F::Item, F::Item, Option<F::Item>);
+    type Output = (F::Item, F::Item);
+
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: &Self::Input,
+        channel: &mut Channel,
+    ) -> Result<Self::Output> {
+        let (x, y, carry_in) = inputs;
+        if let Some(c) = carry_in {
+            let z1 = backend.xor(x, y);
+            let z2 = backend.xor(&z1, c);
+            let z3 = backend.xor(x, c);
+            let z4 = backend.and(&z1, &z3, channel)?;
+            let carry = backend.xor(&z4, x);
+            Ok((z2, carry))
+        } else {
+            let z = backend.xor(x, y);
+            let carry = backend.and(x, y, channel)?;
+            Ok((z, carry))
+        }
+    }
+}
+
+pub mod test {
+    use super::*;
+    use crate::circuit::CircuitExecutor;
+
+    /// Circuit for testing [`BinaryAdder`].
+    pub struct TestBinaryAdder;
+    impl<F: FancyBinary> Circuit<F> for TestBinaryAdder {
+        type Input = <BinaryAdder as Circuit<F>>::Input;
+        type Output = <BinaryAdder as Circuit<F>>::Output;
+
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &Self::Input,
+            channel: &mut Channel,
+        ) -> Result<Self::Output> {
+            BinaryAdder.execute(backend, inputs, channel)
+        }
+    }
+
+    impl<F: FancyBinary> CircuitExecutor<F> for TestBinaryAdder {
+        fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
+            assert_eq!(inputs.len(), 3);
+            (
+                inputs[0].clone(),
+                inputs[1].clone(),
+                Some(inputs[2].clone()),
+            )
+        }
+
+        fn ninputs(&self) -> usize {
+            3
+        }
+
+        fn modulus(&self, _: usize) -> u16 {
+            2
+        }
+    }
+
+    #[test]
+    fn binary_adder() {
+        use crate::dummy::{Dummy, DummyVal};
+
+        let circuit = TestBinaryAdder;
+        let zero = DummyVal::new(0, 2);
+        let one = DummyVal::new(1, 2);
+
+        let output = Dummy::eval(&circuit, &(zero, zero, None)).unwrap();
+        assert_eq!(output.0, zero);
+        assert_eq!(output.1, zero);
+        let output = Dummy::eval(&circuit, &(zero, one, None)).unwrap();
+        assert_eq!(output.0, one);
+        assert_eq!(output.1, zero);
+        let output = Dummy::eval(&circuit, &(one, zero, None)).unwrap();
+        assert_eq!(output.0, one);
+        assert_eq!(output.1, zero);
+        let output = Dummy::eval(&circuit, &(one, one, None)).unwrap();
+        assert_eq!(output.0, zero);
+        assert_eq!(output.1, one);
+    }
+}

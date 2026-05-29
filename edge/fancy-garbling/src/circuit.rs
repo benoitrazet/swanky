@@ -35,6 +35,14 @@ impl<T: Clone + HasModulus> Flatten for T {
     }
 }
 
+impl<T: Clone + HasModulus> Flatten for (T, T) {
+    type Item = T;
+
+    fn flatten(self) -> Vec<Self::Item> {
+        vec![self.0]
+    }
+}
+
 impl<T: Clone + HasModulus> Flatten for Bundle<T> {
     type Item = T;
 
@@ -1555,40 +1563,6 @@ pub mod circuits {
             }
         }
 
-        /// Circuit for testing [`BinaryGadgets::bin_addition`].
-        pub struct TestBinaryAddition(pub usize);
-        impl<F: BinaryGadgets> Circuit<F> for TestBinaryAddition {
-            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
-            type Output = (F::Item, BinaryBundle<F::Item>);
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                let (z, carry) = backend.bin_addition(&inputs.0, &inputs.1, channel)?;
-                Ok((carry, z))
-            }
-        }
-        impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryAddition {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0 * 2);
-                let (x, y) = inputs.split_at(self.0);
-                let x = BinaryBundle::new(x.to_vec());
-                let y = BinaryBundle::new(y.to_vec());
-                (x, y)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0 * 2
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
-
         /// Circuit for testing [`BinaryGadgets::bin_addition_no_carry`].
         pub struct TestBinaryAdditionNoCarry(pub usize);
         impl<F: BinaryGadgets> Circuit<F> for TestBinaryAdditionNoCarry {
@@ -2046,22 +2020,6 @@ mod fancy_binary {
         util::RngExt,
     };
     use rand::thread_rng;
-
-    #[test]
-    fn and_gate_fan_n() {
-        let mut rng = thread_rng();
-        let n = 2 + (rng.gen_usize() % 200);
-        let c = circuits::binary::TestAndGateFanN(n);
-
-        for _ in 0..16 {
-            let inputs = (0..n)
-                .map(|_| DummyVal::rand_bool(&mut rng))
-                .collect::<Vec<_>>();
-            let expected = inputs.iter().fold(1, |acc, &x| x.val() & acc);
-            let output = Dummy::eval(&c, &inputs).unwrap();
-            assert_eq!(output.val(), expected);
-        }
-    }
 
     #[test]
     fn binary_constant_gates() {
@@ -2688,24 +2646,6 @@ mod binary_gadgets {
         dummy::{Dummy, DummyVal},
         util::RngExt,
     };
-
-    #[test]
-    fn test_binary_addition() {
-        let mut rng = thread_rng();
-        let nbits = 64;
-        let q = 1 << 64;
-        let c = circuits::binary_gadgets::TestBinaryAddition(nbits);
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let y = rng.gen_u128() % q;
-            let x_input = DummyVal::to_binary(x, nbits);
-            let y_input = DummyVal::to_binary(y, nbits);
-            let outputs = Dummy::eval(&c, &(x_input, y_input)).unwrap();
-            assert_eq!(DummyVal::from_binary(&outputs.1), (x + y) % q);
-            assert_eq!(outputs.0.val(), (x + y >= q) as u16);
-        }
-    }
 
     #[test]
     fn test_binary_subtraction() {

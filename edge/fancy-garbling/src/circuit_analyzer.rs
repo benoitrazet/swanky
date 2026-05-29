@@ -265,7 +265,7 @@ mod tests {
     #[test]
     fn binary_addition_counts_are_correct() {
         let nbits = 64;
-        let test = circuits::binary_gadgets::TestBinaryAddition(nbits);
+        let test = crate::circuits::binary::TestBinaryAddition(nbits);
         let mut analyzer = CircuitAnalyzer::new();
         analyzer.eval(&test).unwrap();
 

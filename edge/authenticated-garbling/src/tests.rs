@@ -173,7 +173,7 @@ fn test_xor_gate_fan_n() {
 #[test]
 fn test_binary_addition() {
     let ninputs = 400;
-    let circuit = circuits::binary_gadgets::TestBinaryAddition(ninputs);
+    let circuit = fancy_garbling::circuits::binary::TestBinaryAddition(ninputs);
 
     test_circuit(ninputs, ninputs, &circuit);
 }

@@ -4,6 +4,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     Fancy,
     circuit::{BinaryCircuit, circuits},
+    circuits::binary::TestBinaryAddition,
 };
 use rand::Rng;
 use swanky_authenticated_garbling::{Evaluator, Garbler};
@@ -147,7 +148,7 @@ fn bench_xor_gate_fan_n(c: &mut Criterion) {
 
 fn bench_binary_addition(c: &mut Criterion) {
     let ninputs = 400;
-    let circuit = circuits::binary_gadgets::TestBinaryAddition(ninputs);
+    let circuit = TestBinaryAddition(ninputs);
 
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
