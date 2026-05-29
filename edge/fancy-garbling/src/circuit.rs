@@ -1596,40 +1596,6 @@ pub mod circuits {
             }
         }
 
-        /// Circuit for testing [`BinaryGadgets::bin_subtraction`].
-        pub struct TestBinarySubtraction(pub usize);
-        impl<F: BinaryGadgets> Circuit<F> for TestBinarySubtraction {
-            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
-            type Output = (F::Item, BinaryBundle<F::Item>);
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                let (z, underflow) = backend.bin_subtraction(&inputs.0, &inputs.1, channel)?;
-                Ok((underflow, z))
-            }
-        }
-        impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinarySubtraction {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0 * 2);
-                let (x, y) = inputs.split_at(self.0);
-                let x = BinaryBundle::new(x.to_vec());
-                let y = BinaryBundle::new(y.to_vec());
-                (x, y)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0 * 2
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
-
         /// Circuit for testing [`BinaryGadgets::bin_mul`].
         pub struct TestBinaryMultiplication(pub usize);
         impl<F: BinaryGadgets> Circuit<F> for TestBinaryMultiplication {
@@ -1712,39 +1678,6 @@ pub mod circuits {
             }
         }
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryDivision {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0 * 2);
-                let (x, y) = inputs.split_at(self.0);
-                let x = BinaryBundle::new(x.to_vec());
-                let y = BinaryBundle::new(y.to_vec());
-                (x, y)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0 * 2
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
-
-        /// Circuit for testing [`BinaryGadgets::bin_lt`].
-        pub struct TestBinaryLessThan(pub usize);
-        impl<F: BinaryGadgets> Circuit<F> for TestBinaryLessThan {
-            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
-            type Output = F::Item;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.bin_lt(&inputs.0, &inputs.1, channel)
-            }
-        }
-        impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryLessThan {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0 * 2);
                 let (x, y) = inputs.split_at(self.0);
@@ -2646,44 +2579,6 @@ mod binary_gadgets {
         dummy::{Dummy, DummyVal},
         util::RngExt,
     };
-
-    #[test]
-    fn test_binary_subtraction() {
-        let mut rng = thread_rng();
-        let nbits = 64;
-        let q = 1 << nbits;
-        let c = circuits::binary_gadgets::TestBinarySubtraction(nbits);
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let y = rng.gen_u128() % q;
-            let x_input = DummyVal::to_binary(x, nbits);
-            let y_input = DummyVal::to_binary(y, nbits);
-            let outputs = Dummy::eval(&c, &(x_input, y_input)).unwrap();
-            assert_eq!(
-                DummyVal::from_binary(&outputs.1),
-                x.overflowing_sub(y).0 % q
-            );
-            assert_eq!(outputs.0.val(), (y != 0 && x >= y) as u16);
-        }
-    }
-
-    #[test]
-    fn test_binary_lt() {
-        let mut rng = thread_rng();
-        let nbits = 64;
-        let q = 1 << nbits;
-        let c = circuits::binary_gadgets::TestBinaryLessThan(nbits);
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let y = rng.gen_u128() % q;
-            let x_input = DummyVal::to_binary(x, nbits);
-            let y_input = DummyVal::to_binary(y, nbits);
-            let output = Dummy::eval(&c, &(x_input, y_input)).unwrap();
-            assert_eq!(output.val() > 0, x < y);
-        }
-    }
 
     #[test]
     fn test_binary_lt_signed() {

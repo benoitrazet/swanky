@@ -18,6 +18,18 @@ mod binary_addition;
 pub use binary_addition::BinaryAddition;
 pub use binary_addition::test::TestBinaryAddition;
 
+mod binary_subtraction;
+pub use binary_subtraction::BinarySubtraction;
+pub use binary_subtraction::test::TestBinarySubtraction;
+
+mod binary_less_than;
+pub use binary_less_than::BinaryLessThan;
+pub use binary_less_than::test::TestBinaryLessThan;
+
+mod binary_greater_than_or_equal;
+pub use binary_greater_than_or_equal::BinaryGreaterThanOrEqual;
+pub use binary_greater_than_or_equal::test::TestBinaryGreaterThanOrEqual;
+
 /// Pairwise AND of two bitvectors.
 pub struct PairwiseAnd;
 

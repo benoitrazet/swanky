@@ -212,7 +212,7 @@ fn test_bin_twos_complement() {
 #[test]
 fn test_binary_subtraction() {
     let ninputs = 64;
-    let circuit = circuits::binary_gadgets::TestBinarySubtraction(ninputs);
+    let circuit = fancy_garbling::circuits::binary::TestBinarySubtraction(ninputs);
 
     test_circuit(ninputs, ninputs, &circuit);
 }

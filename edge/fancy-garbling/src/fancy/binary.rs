@@ -515,17 +515,6 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         self.and(&xy_neq_0, &ngeq, channel)
     }
 
-    /// Returns 1 if `x >= y`.
-    fn bin_geq(
-        &mut self,
-        x: &BinaryBundle<Self::Item>,
-        y: &BinaryBundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        let z = self.bin_lt(x, y, channel)?;
-        Ok(self.negate(&z))
-    }
-
     /// Compute the maximum bundle in `xs`.
     ///
     /// # Panics
