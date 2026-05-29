@@ -1,4 +1,7 @@
-use crate::{FancyBinary, circuit::CircuitExecutor};
+use crate::{
+    FancyBinary,
+    circuit::{Circuit, CircuitExecutor},
+};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -13,7 +16,7 @@ pub struct BinaryCircuit {
     pub(crate) num_nonfree_gates: usize,
 }
 
-impl<F: FancyBinary> CircuitExecutor<F> for BinaryCircuit {
+impl<F: FancyBinary> Circuit<F> for BinaryCircuit {
     type Input = Vec<F::Item>;
     type Output = Vec<F::Item>;
 
@@ -23,13 +26,11 @@ impl<F: FancyBinary> CircuitExecutor<F> for BinaryCircuit {
         inputs: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        assert_eq!(
-            inputs.len(),
-            <BinaryCircuit as CircuitExecutor<F>>::ninputs(self)
-        );
         self.eval_to_wirelabels(backend, inputs, channel)
     }
+}
 
+impl<F: FancyBinary> CircuitExecutor<F> for BinaryCircuit {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), self.input_refs.len());
         inputs

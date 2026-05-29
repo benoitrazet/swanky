@@ -1,7 +1,9 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     Evaluator, FancyArithmetic, FancyBinary, FancyProj, Garbler, WireMod2, WireModQ,
-    circuit::CircuitExecutor, classic::GarbledCircuit, util::RngExt,
+    circuit::{Circuit, CircuitExecutor},
+    classic::GarbledCircuit,
+    util::RngExt,
 };
 use std::{hint::black_box, time::Duration};
 use swanky_channel::Channel;
@@ -93,7 +95,7 @@ fn bench_eval_arith_ex<
 const MIXED_OP_NUM_OPS: usize = 100_000;
 
 struct MixedOp;
-impl<F: FancyBinary> CircuitExecutor<F> for MixedOp {
+impl<F: FancyBinary> Circuit<F> for MixedOp {
     type Input = F::Item;
     type Output = F::Item;
 
@@ -113,7 +115,9 @@ impl<F: FancyBinary> CircuitExecutor<F> for MixedOp {
         }
         Ok(x)
     }
+}
 
+impl<F: FancyBinary> CircuitExecutor<F> for MixedOp {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 1);
         inputs[0].clone()
@@ -129,7 +133,7 @@ impl<F: FancyBinary> CircuitExecutor<F> for MixedOp {
 }
 
 struct MixedOpArith(u16);
-impl<F: FancyArithmetic> CircuitExecutor<F> for MixedOpArith {
+impl<F: FancyArithmetic> Circuit<F> for MixedOpArith {
     type Input = F::Item;
     type Output = F::Item;
 
@@ -149,7 +153,9 @@ impl<F: FancyArithmetic> CircuitExecutor<F> for MixedOpArith {
         }
         Ok(x)
     }
+}
 
+impl<F: FancyArithmetic> CircuitExecutor<F> for MixedOpArith {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 1);
         inputs[0].clone()
@@ -165,7 +171,7 @@ impl<F: FancyArithmetic> CircuitExecutor<F> for MixedOpArith {
 }
 
 struct Proj(u16, Vec<u16>);
-impl<F: FancyProj> CircuitExecutor<F> for Proj {
+impl<F: FancyProj> Circuit<F> for Proj {
     type Input = F::Item;
     type Output = Vec<F::Item>;
 
@@ -180,7 +186,9 @@ impl<F: FancyProj> CircuitExecutor<F> for Proj {
         }
         Ok(vec![])
     }
+}
 
+impl<F: FancyProj> CircuitExecutor<F> for Proj {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 1);
         inputs[0].clone()
@@ -196,7 +204,7 @@ impl<F: FancyProj> CircuitExecutor<F> for Proj {
 }
 
 struct Mul(u16);
-impl<F: FancyArithmetic> CircuitExecutor<F> for Mul {
+impl<F: FancyArithmetic> Circuit<F> for Mul {
     type Input = F::Item;
     type Output = Vec<F::Item>;
 
@@ -211,7 +219,9 @@ impl<F: FancyArithmetic> CircuitExecutor<F> for Mul {
         }
         Ok(vec![])
     }
+}
 
+impl<F: FancyArithmetic> CircuitExecutor<F> for Mul {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 1);
         inputs[0].clone()

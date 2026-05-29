@@ -91,7 +91,7 @@ impl GarbledCircuit {
         output_mapping: &OutputMapping,
     ) -> swanky_error::Result<Vec<u16>> {
         let wirelabels = self.eval_to_wirelabels(circuit, inputs)?;
-        output_mapping.to_outputs(&wirelabels)
+        output_mapping.to_outputs(&wirelabels.flatten())
     }
 
     /// Evaluate the garbled circuit on the provided inputs, returning the
@@ -100,18 +100,13 @@ impl GarbledCircuit {
         &self,
         circuit: &C,
         inputs: &C::Input,
-    ) -> swanky_error::Result<Vec<Wire>> {
-        let wirelabels = Channel::with(GarbledChannel::from(self), |channel| {
+    ) -> swanky_error::Result<C::Output> {
+        Channel::with(GarbledChannel::from(self), |channel| {
             let mut evaluator = Evaluator::new(channel)?;
-            let wirelabels = circuit.execute(&mut evaluator, inputs, channel)?;
-            Ok(wirelabels.flatten())
-        })?;
-        Ok(wirelabels)
+            circuit.execute(&mut evaluator, inputs, channel)
+        })
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// Encoder
 
 /// Encoder for input wirelabels.
 #[derive(Debug)]

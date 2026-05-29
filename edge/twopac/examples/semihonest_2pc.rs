@@ -1,18 +1,18 @@
 use fancy_garbling::{
     Fancy, WireMod2,
-    circuit::{BinaryCircuit as Circuit, CircuitExecutor},
+    circuit::{BinaryCircuit, Circuit},
 };
 use std::{fs::File, io::BufReader, time::SystemTime};
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
-fn circuit(fname: &str) -> Circuit {
+fn circuit(fname: &str) -> BinaryCircuit {
     println!("* Circuit: {}", fname);
-    Circuit::parse(BufReader::new(File::open(fname).unwrap())).unwrap()
+    BinaryCircuit::parse(BufReader::new(File::open(fname).unwrap())).unwrap()
 }
 
-fn run_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
+fn run_circuit(circ: &mut BinaryCircuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
     let circ_ = circ.clone();
     let n_gb_inputs = gb_inputs.len();
     let n_ev_inputs = ev_inputs.len();

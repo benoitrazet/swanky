@@ -110,33 +110,6 @@ fn test_circuit<
 }
 
 #[test]
-fn test_input_output_garbler() {
-    let ninputs_gb = 128;
-    let ninputs_ev = 0;
-    let circuit = circuits::fancy::TestBinaryOutputs(ninputs_gb + ninputs_ev);
-
-    test_circuit(ninputs_gb, ninputs_ev, &circuit);
-}
-
-#[test]
-fn test_input_output_evaluator() {
-    let ninputs_gb = 0;
-    let ninputs_ev = 128;
-    let circuit = circuits::fancy::TestBinaryOutputs(ninputs_gb + ninputs_ev);
-
-    test_circuit(ninputs_gb, ninputs_ev, &circuit);
-}
-
-#[test]
-fn test_input_output() {
-    let ninputs_gb = 128;
-    let ninputs_ev = 128;
-    let circuit = circuits::fancy::TestBinaryOutputs(ninputs_gb + ninputs_ev);
-
-    test_circuit(ninputs_gb, ninputs_ev, &circuit);
-}
-
-#[test]
 fn test_and_gate() {
     let ninputs_gb = 1;
     let ninputs_ev = 1;

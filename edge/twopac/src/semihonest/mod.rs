@@ -12,7 +12,9 @@ mod tests {
     use fancy_garbling::{
         AllWire, CrtBundle, CrtGadgets, CrtProjGadgets, Fancy, FancyArithmetic, FancyBinary,
         FancyProj, WireLabel, WireMod2,
-        circuit::{BinaryCircuit, CircuitExecutor, Flatten, circuits::arithmetic::TestAddition},
+        circuit::{
+            BinaryCircuit, Circuit, CircuitExecutor, Flatten, circuits::arithmetic::TestAddition,
+        },
         dummy::{Dummy, DummyVal},
         informer::Informer,
         util::RngExt,

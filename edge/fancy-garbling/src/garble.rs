@@ -51,7 +51,7 @@ mod nonstreaming {
                         &<Ex as CircuitExecutor<Evaluator<W>>>::map(circuit, xs),
                     )
                     .unwrap();
-                let decoded = output_mapping.to_outputs(&wirelabels).unwrap();
+                let decoded = output_mapping.to_outputs(&wirelabels.flatten()).unwrap();
 
                 // Run the dummy evaluator.
                 let expected = Dummy::eval(
