@@ -1788,39 +1788,6 @@ pub mod circuits {
             }
         }
 
-        /// Circuit for testing [`BinaryGadgets::bin_eq_bundles`].
-        pub struct TestBinaryEqBundles(pub usize);
-        impl<F: BinaryGadgets> Circuit<F> for TestBinaryEqBundles {
-            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
-            type Output = F::Item;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.bin_eq_bundles(&inputs.0, &inputs.1, channel)
-            }
-        }
-        impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryEqBundles {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0 * 2);
-                let (x, y) = inputs.split_at(self.0);
-                let x = BinaryBundle::new(x.to_vec());
-                let y = BinaryBundle::new(y.to_vec());
-                (x, y)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0 * 2
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
-
         /// Circuit for testing [`BinaryGadgets::bin_abs`].
         pub struct TestBinaryAbs(pub usize);
         impl<F: BinaryGadgets> Circuit<F> for TestBinaryAbs {
@@ -2669,23 +2636,6 @@ mod binary_gadgets {
                     x
                 }
             );
-        }
-    }
-
-    #[test]
-    fn test_binary_eq() {
-        let mut rng = thread_rng();
-        let nbits = 64;
-        let q = 1 << nbits;
-        let c = circuits::binary_gadgets::TestBinaryEqBundles(nbits);
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let y = rng.gen_u128() % q;
-            let x_input = DummyVal::to_binary(x, nbits);
-            let y_input = DummyVal::to_binary(y, nbits);
-            let output = Dummy::eval(&c, &(x_input, y_input)).unwrap();
-            assert_eq!(output.val(), (x == y) as u16);
         }
     }
 

@@ -612,25 +612,4 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
 
         BinaryBundle::new(wires)
     }
-    /// Compute `x == y` for binary bundles.
-    fn bin_eq_bundles(
-        &mut self,
-        x: &BinaryBundle<Self::Item>,
-        y: &BinaryBundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        // compute (x^y == 0) for each residue
-        let zs = x
-            .wires()
-            .iter()
-            .zip_eq(y.wires().iter())
-            .map(|(x, y)| {
-                let xy = self.xor(x, y);
-                self.negate(&xy)
-            })
-            .collect::<Vec<_>>();
-        // and_many will return 1 only if all outputs of xnor are 1
-        // indicating equality
-        self.and_many(&zs, channel)
-    }
 }

@@ -9,6 +9,7 @@ use aes_gcm::{
 
 use fancy_garbling::{
     AllWire, BinaryBundle, BinaryBundleGadgets, BinaryGadgets, Fancy, FancyBinary,
+    circuit::Circuit, circuits::binary::BinaryEquality,
 };
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
@@ -414,9 +415,12 @@ fn fancy_compute_intersection<F: Fancy + BinaryBundleGadgets>(
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            f.bin_eq_bundles(
-                &BinaryBundle::new(xs.to_vec()),
-                &BinaryBundle::new(ys.to_vec()),
+            BinaryEquality.execute(
+                f,
+                &(
+                    BinaryBundle::new(xs.to_vec()),
+                    BinaryBundle::new(ys.to_vec()),
+                ),
                 channel,
             )
         })
@@ -436,9 +440,12 @@ fn fancy_compute_cardinality<F: Fancy + BinaryBundleGadgets + FancyBinary>(
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            f.bin_eq_bundles(
-                &BinaryBundle::new(xs.to_vec()),
-                &BinaryBundle::new(ys.to_vec()),
+            BinaryEquality.execute(
+                f,
+                &(
+                    BinaryBundle::new(xs.to_vec()),
+                    BinaryBundle::new(ys.to_vec()),
+                ),
                 channel,
             )
         })

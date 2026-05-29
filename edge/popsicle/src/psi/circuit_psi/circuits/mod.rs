@@ -1,6 +1,9 @@
 //! Various fancy circuits
 use crate::circuit_psi::*;
-use fancy_garbling::{BinaryBundle, BinaryGadgets, Fancy, FancyBinary};
+use fancy_garbling::{
+    BinaryBundle, BinaryGadgets, Fancy, FancyBinary, circuit::Circuit,
+    circuits::binary::BinaryEquality,
+};
 use itertools::Itertools;
 use swanky_channel::Channel;
 
@@ -28,9 +31,12 @@ where
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            f.bin_eq_bundles(
-                &BinaryBundle::new(xs.to_vec()),
-                &BinaryBundle::new(ys.to_vec()),
+            BinaryEquality.execute(
+                f,
+                &(
+                    BinaryBundle::new(xs.to_vec()),
+                    BinaryBundle::new(ys.to_vec()),
+                ),
                 channel,
             )
         })

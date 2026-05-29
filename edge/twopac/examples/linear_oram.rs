@@ -1,7 +1,7 @@
 //! An example that secretly retrieves an element from an ORAM in a binary garbled circuit
 //! using fancy-garbling.
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, util,
+    AllWire, BinaryBundle, BinaryGadgets, Fancy, circuit::Circuit, circuits::LinearOram, util,
 };
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
@@ -27,11 +27,11 @@ fn gb_linear_oram(rng: SwankyRng, channel: &mut Channel, inputs: &[u128]) {
     // of input wires. We note that every element of the RAM has a fixed size of 128 bits.
     let _ = channel.write(&inputs.len());
     // (2)
-    let circuit_wires = gb_set_fancy_inputs(&mut gb, inputs, channel);
+    let inputs = gb_set_fancy_inputs(&mut gb, inputs, channel);
     // (3)
-    let query =
-        fancy_linear_oram::<Garbler<SwankyRng, OtSender, AllWire>>(&mut gb, circuit_wires, channel)
-            .unwrap();
+    let query = (LinearOram::<128>)
+        .execute(&mut gb, &(inputs.ram, inputs.query), channel)
+        .unwrap();
     // (4)
     gb.outputs(query.wires(), channel).unwrap();
 }
@@ -63,14 +63,11 @@ fn ev_linear_oram(rng: SwankyRng, channel: &mut Channel, input: u128) -> u128 {
     let mut ev = Evaluator::<SwankyRng, OtReceiver, AllWire>::new(channel, rng).unwrap();
     let ram_size = channel.read::<usize>().unwrap();
     // (2)
-    let circuit_wires = ev_set_fancy_inputs(&mut ev, input, ram_size, channel);
+    let inputs = ev_set_fancy_inputs(&mut ev, input, ram_size, channel);
     // (3)
-    let query = fancy_linear_oram::<Evaluator<SwankyRng, OtReceiver, AllWire>>(
-        &mut ev,
-        circuit_wires,
-        channel,
-    )
-    .unwrap();
+    let query = (LinearOram::<128>)
+        .execute(&mut ev, &(inputs.ram, inputs.query), channel)
+        .unwrap();
     // (4)
     let query_binary = ev
         .outputs(query.wires(), channel)
@@ -97,39 +94,6 @@ where
     let query: BinaryBundle<F::Item> = ev.bin_encode(input, nbits, channel).unwrap();
 
     ORAMInputs { ram, query }
-}
-
-/// The main fancy function which describes the garbled circuit for linear ORAM.
-fn fancy_linear_oram<F>(
-    f: &mut F,
-    wire_inputs: ORAMInputs<F::Item>,
-    channel: &mut Channel,
-) -> swanky_error::Result<BinaryBundle<F::Item>>
-where
-    F: Fancy + BinaryGadgets + FancyBinary + FancyArithmetic,
-{
-    let ram: Vec<BinaryBundle<_>> = wire_inputs.ram;
-    let index: BinaryBundle<_> = wire_inputs.query;
-
-    let mut result = f.bin_constant_bundle(0, 128, channel)?;
-    let zero = f.bin_constant_bundle(0, 128, channel)?;
-
-    // We traverse the garbler's RAM one element at a time, and multiplex
-    // the result based on whether the evaluator's query matches the current
-    // index.
-    for (i, item) in ram.iter().enumerate() {
-        // The current index is turned into a binary constant bundle.
-        let current_index = f.bin_constant_bundle(i as u128, 128, channel)?;
-        // We check if the evaluator's query matches the current index obliviously.
-        let mux_bit = f.bin_eq_bundles(&index, &current_index, channel)?;
-        // We use the result of the prior equality check to multiplex by either adding 0 to
-        // the result of the computation and keeping it as is, or adding RAM[i] to it
-        // and updating it. The evaluator's query can only correspond to a single index.
-        let mux = f.bin_multiplex(&mux_bit, &zero, item, channel)?;
-        result = f.bin_addition_no_carry(&result, &mux, channel)?;
-    }
-
-    Ok(result)
 }
 
 fn ram_in_clear(index: usize, ram: &[u128]) -> u128 {

@@ -2,7 +2,10 @@
 //! using fancy-garbling.
 
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, util,
+    AllWire, BinaryBundle, BinaryGadgets, Fancy,
+    circuit::Circuit,
+    circuits::binary::{BinaryEquality, BinarySubtraction},
+    util,
 };
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
@@ -122,7 +125,7 @@ fn fancy_gcd<F>(
     channel: &mut Channel,
 ) -> swanky_error::Result<BinaryBundle<F::Item>>
 where
-    F: Fancy + BinaryGadgets + FancyBinary + FancyArithmetic,
+    F: BinaryGadgets,
 {
     let mut a: BinaryBundle<_> = wire_inputs.garbler_wires;
     let mut b: BinaryBundle<_> = wire_inputs.evaluator_wires;
@@ -144,12 +147,14 @@ where
         // updating our variables and find the result of the computation gcd(a,b).
         //
         // We compute a := a - b and check for an underflow that will help determine if "a > b";
-        let (r_1, mut underflow_r_1) = f.bin_subtraction(&a, &b, channel)?;
+        let (r_1, mut underflow_r_1) =
+            BinarySubtraction.execute(f, &(a.to_owned(), b.to_owned()), channel)?;
         // And compute b := b - a and check for an underflow that will help determine if "b > a";
-        let (r_2, mut underflow_r_2) = f.bin_subtraction(&b, &a, channel)?;
+        let (r_2, mut underflow_r_2) =
+            BinarySubtraction.execute(f, &(b.to_owned(), a.to_owned()), channel)?;
 
         // We compute "a == b"
-        let check_equality = f.bin_eq_bundles(&a, &b, channel)?;
+        let check_equality = BinaryEquality.execute(f, &(a.to_owned(), b.to_owned()), channel)?;
         let zero = f.constant(0, 2, channel)?;
 
         // The `underflow` bits act as dual purpose multiplexing bits:
