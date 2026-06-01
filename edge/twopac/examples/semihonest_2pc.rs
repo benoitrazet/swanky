@@ -1,7 +1,7 @@
 use fancy_garbling::{
     Fancy, WireMod2,
     circuit::CircuitExecutor,
-    circuits::{aes::test::TestAesNonExpanded, sha::test::TestSha256CompressionFunction},
+    circuits::{aes::test::TestAesNonExpanded, sha::test::TestSha256CompressionFunctionFixedIV},
 };
 use std::time::SystemTime;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
@@ -93,6 +93,6 @@ fn run_circuit<
 fn main() {
     let circ = TestAesNonExpanded::new();
     run_circuit(&circ, vec![0; 128], vec![0; 128]);
-    let circ = TestSha256CompressionFunction::new();
+    let circ = TestSha256CompressionFunctionFixedIV::new();
     run_circuit(&circ, vec![0; 512], vec![]);
 }

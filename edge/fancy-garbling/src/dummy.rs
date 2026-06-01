@@ -10,7 +10,7 @@ use swanky_error::{ErrorKind, Result};
 use crate::{
     BinaryBundle, BinaryGadgets, Bundle, CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary,
     FancyProj, check_binary,
-    circuit::CircuitExecutor,
+    circuit::Circuit,
     fancy::{Fancy, HasModulus},
     util::{as_mixed_radix, crt_inv_factor, u128_from_bits},
 };
@@ -127,7 +127,7 @@ impl Dummy {
     }
 
     /// Evaluate `circuit` in plaintext.
-    pub fn eval<C: CircuitExecutor<Dummy>>(circuit: &C, inputs: &C::Input) -> Result<C::Output> {
+    pub fn eval<C: Circuit<Dummy>>(circuit: &C, inputs: &C::Input) -> Result<C::Output> {
         let mut dummy = Dummy::new();
         Channel::with(std::io::empty(), |c| circuit.execute(&mut dummy, inputs, c))
     }

@@ -5,7 +5,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     Fancy, WireMod2,
     circuit::CircuitExecutor,
-    circuits::{aes::test::TestAesNonExpanded, sha::test::TestSha256CompressionFunction},
+    circuits::{aes::test::TestAesNonExpanded, sha::test::TestSha256CompressionFunctionFixedIV},
 };
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 use swanky_rng::SwankyRng;
@@ -68,7 +68,7 @@ fn bench_aes_binary(c: &mut Criterion) {
 }
 
 fn bench_sha_256_binary(c: &mut Criterion) {
-    let circ = TestSha256CompressionFunction::new();
+    let circ = TestSha256CompressionFunctionFixedIV::new();
     c.bench_function("twopac::semi-honest (SHA-256-binary)", move |bench| {
         bench.iter(|| bench_circuit(&circ, vec![0u16; 512], vec![]))
     });

@@ -4,7 +4,7 @@ use core::time::Duration;
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     AllWire, WireMod2,
-    circuits::{aes::test::TestAesNonExpanded, sha::test::TestSha256CompressionFunction},
+    circuits::{aes::test::TestAesNonExpanded, sha::test::TestSha256CompressionFunctionFixedIV},
     classic::GarbledCircuit,
 };
 use swanky_rng::SwankyRng;
@@ -28,14 +28,14 @@ fn bench_eval_aes_binary(c: &mut Criterion) {
 }
 
 fn bench_garble_sha_256_binary(c: &mut Criterion) {
-    let sha256 = TestSha256CompressionFunction::new();
+    let sha256 = TestSha256CompressionFunctionFixedIV::new();
     c.bench_function("garble::sha-256-binary", move |bench| {
         bench.iter(|| GarbledCircuit::garble::<WireMod2, _, _>(&sha256, SwankyRng::new()));
     });
 }
 
 fn bench_eval_sha_256_binary(c: &mut Criterion) {
-    let sha256 = TestSha256CompressionFunction::new();
+    let sha256 = TestSha256CompressionFunctionFixedIV::new();
     let (en, gc, _) = GarbledCircuit::garble::<WireMod2, _, _>(&sha256, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0; 512]);
     let block = inputs.try_into().unwrap();
@@ -64,14 +64,14 @@ fn bench_eval_aes_arithmetic(c: &mut Criterion) {
 }
 
 fn bench_garble_sha_256_arithmetic(c: &mut Criterion) {
-    let sha256 = TestSha256CompressionFunction::new();
+    let sha256 = TestSha256CompressionFunctionFixedIV::new();
     c.bench_function("garble::sha-256-arithmetic", move |bench| {
         bench.iter(|| GarbledCircuit::garble::<AllWire, _, _>(&sha256, SwankyRng::new()));
     });
 }
 
 fn bench_eval_sha_256_arithmetic(c: &mut Criterion) {
-    let sha256 = TestSha256CompressionFunction::new();
+    let sha256 = TestSha256CompressionFunctionFixedIV::new();
     let (en, gc, _) = GarbledCircuit::garble::<AllWire, _, _>(&sha256, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0; 512]);
     let block: [_; 512] = inputs.try_into().unwrap();
