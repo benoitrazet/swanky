@@ -2,12 +2,12 @@
 
 use crate::{
     FancyBinary,
-    circuit::{BinaryCircuit, Circuit},
+    circuit::{BinaryCircuit, Circuit, CircuitExecutor},
     circuits::binary::BinaryConstant,
 };
 use std::io::Cursor;
 use swanky_channel::Channel;
-use swanky_error::{Error, ErrorKind, Result};
+use swanky_error::Result;
 
 /// Circuit for the SHA-256 compression function, where the chaining values are
 /// fixed to the SHA-256 IV.
@@ -50,6 +50,21 @@ impl<F: FancyBinary> Circuit<F> for Sha256CompressionFunctionFixedIV {
         Ok(output
             .try_into()
             .expect("SHA-256 compression function output should always be 256 elements"))
+    }
+}
+
+impl<F: FancyBinary> CircuitExecutor<F> for Sha256CompressionFunctionFixedIV {
+    fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
+        assert_eq!(inputs.len(), 512);
+        inputs.try_into().unwrap()
+    }
+
+    fn ninputs(&self) -> usize {
+        512
+    }
+
+    fn modulus(&self, _: usize) -> u16 {
+        2
     }
 }
 
@@ -100,35 +115,60 @@ impl<F: FancyBinary> Circuit<F> for Sha256CompressionFunction {
     }
 }
 
-/// Circuit for a single block SHA-256 hash function.
-///
-/// # Limitations
-/// This implementation can only handle messages up to 447 bits in length, as it
-/// uses a single-block SHA-256 compression function that has the SHA-256 IV
-/// hardcoded. Messages longer than 447 bits would require multiple blocks and
-/// chaining values from previous blocks, which the underlying circuit does not
-/// support.
-pub struct Sha256SingleBlock(Sha256CompressionFunctionFixedIV);
+impl<F: FancyBinary> CircuitExecutor<F> for Sha256CompressionFunction {
+    fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
+        assert_eq!(inputs.len(), 768);
+        let (block, chain) = inputs.split_at(512);
+        (
+            block.to_vec().try_into().unwrap(),
+            chain.to_vec().try_into().unwrap(),
+        )
+    }
 
-impl Sha256SingleBlock {
-    /// Create a new [`Sha256SingleBlock`] circuit.
-    ///
-    /// # Performance Note!
-    /// This involves parsing a Bristol Format file, and thus is not cheap!
-    /// Hence, it is best to reuse this circuit if possible versus calling
-    /// [`Sha256SingleBlock::new`] every time this circuit is needed.
-    pub fn new() -> Self {
-        Self(Sha256CompressionFunctionFixedIV::new())
+    fn ninputs(&self) -> usize {
+        768
+    }
+
+    fn modulus(&self, _: usize) -> u16 {
+        2
     }
 }
 
-impl Default for Sha256SingleBlock {
+/// Circuit for SHA-256 hash function supporting arbitrary length messages.
+///
+/// This implementation uses the SHA-256 compression function to process multiple
+/// 512-bit blocks, properly chaining the outputs for multi-block messages.
+pub struct Sha256 {
+    compression: Sha256CompressionFunction,
+}
+
+impl Sha256 {
+    /// Create a new [`Sha256`] circuit.
+    ///
+    /// # Performance Note!
+    /// This involves parsing a Bristol Fashion file, and thus is not cheap!
+    /// Hence, it is best to reuse this circuit if possible versus calling
+    /// [`Sha256::new`] every time this circuit is needed.
+    pub fn new() -> Self {
+        Self {
+            compression: Sha256CompressionFunction::new(),
+        }
+    }
+
+    /// SHA-256 initialization vector (IV).
+    const IV: &'static str = "0110101000001001111001100110011110111011011001111010111010000101\
+                               001111000110111011110011011100101010010101001111111101010011101\
+                               001010001000011100101001001111111100110110000010101101000100011\
+                               000001111110000011110110011010101101011011111000001100110100011001";
+}
+
+impl Default for Sha256 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<F: FancyBinary> Circuit<F> for Sha256SingleBlock {
+impl<F: FancyBinary> Circuit<F> for Sha256 {
     type Input = Vec<F::Item>;
     type Output = [F::Item; 256];
 
@@ -140,97 +180,66 @@ impl<F: FancyBinary> Circuit<F> for Sha256SingleBlock {
     ) -> Result<Self::Output> {
         let message_len = inputs.len();
 
-        // Check that the message fits in a single block after padding.
-        // A 512-bit block contains: message + '1' bit + padding zeros + 64-bit length.
-        // So we need: `message_len + 1 + padding + 64 ≤ 512`.
-        // Which means: `message_len ≤ 447`.
-        if message_len > 447 {
-            return Err(Error::new(
-                ErrorKind::UnsupportedError,
-                "Message too long for single-block SHA-256 (max 447 bits)",
-                None,
-            ));
-        }
-
         let one = backend.constant(1, 2, channel)?;
         let zero = backend.constant(0, 2, channel)?;
 
+        // Initialize the hash with SHA-256 IV.
+        let mut chain: [F::Item; 256] = Self::IV
+            .chars()
+            .map(|c| if c == '1' { one.clone() } else { zero.clone() })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+
+        // Pad the input message.
         let mut padded = inputs.clone();
         padded.push(one.clone());
 
-        // Calculate how many '0' bits we need to reach 448 (= 512 - 64) bits.
-        let zeros_needed = 448 - padded.len();
+        // Calculate padding: we need to reach a length ≡ 448 (mod 512)
+        let current_len = padded.len();
+        let target_len = if current_len <= 448 {
+            448
+        } else {
+            (current_len + 64).div_ceil(512) * 512 - 64
+        };
+        let zeros_needed = target_len - current_len;
         for _ in 0..zeros_needed {
             padded.push(zero.clone());
         }
 
-        let mut bundle =
-            BinaryConstant::new_with_constants(message_len as u128, 64, Some(zero), Some(one))
-                .execute(backend, &(), channel)?;
+        // Append the original message length as a 64-bit big-endian integer.
+        let mut length_bundle = BinaryConstant::new_with_constants(
+            message_len as u128,
+            64,
+            Some(zero.clone()),
+            Some(one.clone()),
+        )
+        .execute(backend, &(), channel)?;
         // Constants are represented in little-endian, but here we need message
         // length to be in big-endian. So we reverse the bundle before using it.
-        bundle.reverse();
-        padded.extend_from_slice(bundle.wires());
+        length_bundle.reverse();
+        padded.extend_from_slice(length_bundle.wires());
 
-        let padded = padded
-            .try_into()
-            .expect("Padded message should contain 512 elements");
+        // Process each 512-bit block.
+        for chunk in padded.chunks(512) {
+            let block: [F::Item; 512] =
+                chunk.to_vec().try_into().expect("Chunk should be 512 bits");
 
-        self.0.execute(backend, &padded, channel)
+            chain = self
+                .compression
+                .execute(backend, &(block, chain), channel)?;
+        }
+
+        Ok(chain)
     }
 }
 
-/// Circuits for testing SHA.
-pub mod test {
-    use super::*;
-    use crate::circuit::CircuitExecutor;
-    #[cfg(test)]
+#[cfg(test)]
+mod test {
+    use crate::circuits::sha::{
+        Sha256, Sha256CompressionFunction, Sha256CompressionFunctionFixedIV,
+    };
     use crate::dummy::{Dummy, DummyVal};
-
-    /// Circuit for testing [`Sha256CompressionFunctionFixedIV`].
-    pub struct TestSha256CompressionFunctionFixedIV(Sha256CompressionFunctionFixedIV);
-
-    impl TestSha256CompressionFunctionFixedIV {
-        /// Create a new [`TestSha256CompressionFunctionFixedIV`] circuit.
-        pub fn new() -> Self {
-            Self(Sha256CompressionFunctionFixedIV::new())
-        }
-    }
-
-    impl Default for TestSha256CompressionFunctionFixedIV {
-        fn default() -> Self {
-            Self::new()
-        }
-    }
-
-    impl<F: FancyBinary> Circuit<F> for TestSha256CompressionFunctionFixedIV {
-        type Input = <Sha256CompressionFunctionFixedIV as Circuit<F>>::Input;
-        type Output = <Sha256CompressionFunctionFixedIV as Circuit<F>>::Output;
-
-        fn execute(
-            &self,
-            backend: &mut F,
-            inputs: &Self::Input,
-            channel: &mut Channel,
-        ) -> Result<Self::Output> {
-            self.0.execute(backend, inputs, channel)
-        }
-    }
-
-    impl<F: FancyBinary> CircuitExecutor<F> for TestSha256CompressionFunctionFixedIV {
-        fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
-            assert_eq!(inputs.len(), 512);
-            inputs.try_into().unwrap() // This `unwrap` will never fail: we check in the assert above that the input is of the right length.
-        }
-
-        fn ninputs(&self) -> usize {
-            512
-        }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
-    }
 
     #[cfg(test)]
     fn string_to_bool_vec(str: &str) -> Vec<DummyVal> {
@@ -241,45 +250,6 @@ pub mod test {
                 _ => panic!("Unexpected character in boolean string"),
             })
             .collect()
-    }
-
-    /// Circuit for testing [`Sha256SingleBlock`].
-    pub struct TestSha256(usize, Sha256SingleBlock);
-
-    impl TestSha256 {
-        /// Create a new [`TestSha256`] circuit.
-        pub fn new(length: usize) -> Self {
-            assert!(length <= 447);
-            Self(length, Sha256SingleBlock::new())
-        }
-    }
-
-    impl<F: FancyBinary> Circuit<F> for TestSha256 {
-        type Input = <Sha256SingleBlock as Circuit<F>>::Input;
-        type Output = <Sha256SingleBlock as Circuit<F>>::Output;
-
-        fn execute(
-            &self,
-            backend: &mut F,
-            inputs: &Self::Input,
-            channel: &mut Channel,
-        ) -> Result<Self::Output> {
-            self.1.execute(backend, inputs, channel)
-        }
-    }
-
-    impl<F: FancyBinary> CircuitExecutor<F> for TestSha256 {
-        fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
-            inputs
-        }
-
-        fn ninputs(&self) -> usize {
-            self.0
-        }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
     }
 
     #[test]
@@ -352,7 +322,7 @@ pub mod test {
         // Test SHA-256 with empty string input.
         // Expected output: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 
-        let sha256 = TestSha256::new(0);
+        let sha256 = Sha256::new();
         let input = vec![];
         let output = Dummy::eval(&sha256, &input).unwrap();
         assert_eq!(
@@ -369,7 +339,7 @@ pub mod test {
         // Test SHA-256 with "abc" input.
         // Expected output: ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
 
-        let sha256 = TestSha256::new(8 * 3);
+        let sha256 = Sha256::new();
 
         // "abc" in binary (ASCII encoding)
         // 'a' = 0x61 = 01100001
@@ -383,6 +353,45 @@ pub mod test {
                 .map(|i| i.val().to_string())
                 .collect::<String>(),
             "1011101001111000000101101011111110001111000000011100111111101010010000010100000101000000110111100101110110101110001000100010001110110000000000110110000110100011100101100001011101111010100111001011010000010000111111110110000111110010000000000001010110101101"
+        );
+    }
+
+    #[test]
+    fn sha256_two_blocks() {
+        // Test SHA-256 with a message that requires 2 blocks (> 447 bits).
+        // Message: 448 bits of zeros (requires 2 blocks after padding).
+
+        let sha256 = Sha256::new();
+        let input = vec![DummyVal::new_bool(false); 448];
+        let output = Dummy::eval(&sha256, &input).unwrap();
+        assert_eq!(
+            output
+                .iter()
+                .map(|i| i.val().to_string())
+                .collect::<String>(),
+            "1101010010000001011110101010010101001001011101100010100011100111110001110111111001101011011000000110000100000111000001000010101110111011101000110001001100001000100010001100010111110100011110100011011101011110011000010111100110111110011110001001111110111011"
+        );
+    }
+
+    #[test]
+    fn sha256_three_blocks() {
+        // Test SHA-256 with a 3-block message (> 1024 bits).
+        // Message: "abcd" repeated 32 times = 1024 bits = 128 bytes.
+
+        let sha256 = Sha256::new();
+        // "abcd" = 01100001 01100010 01100011 01100100
+        let abcd = string_to_bool_vec("01100001011000100110001101100100");
+        let mut input = Vec::with_capacity(1024);
+        for _ in 0..32 {
+            input.extend_from_slice(&abcd);
+        }
+        let output = Dummy::eval(&sha256, &input).unwrap();
+        assert_eq!(
+            output
+                .iter()
+                .map(|i| i.val().to_string())
+                .collect::<String>(),
+            "0100010100110010111011110111001100010001000010011001001010000110000001011001101010111101100001011101010011000000011001110101011111111001011011010010010001001000101100100101100111111001010100011001001000100010101100101010110001101001101101011110101111110011"
         );
     }
 }

@@ -3,7 +3,7 @@
 
 use crate::{
     Fancy, WireLabel,
-    circuit::{CircuitExecutor, Flatten},
+    circuit::{Circuit, CircuitExecutor, Flatten},
     garble::{Evaluator, Garbler},
     util::output_tweak,
 };
@@ -84,7 +84,7 @@ impl GarbledCircuit {
 
     /// Evaluate the garbled circuit on the provided inputs, mapping the output
     /// wirelabels to their associated values.
-    pub fn eval<Wire: WireLabel, C: CircuitExecutor<Evaluator<Wire>>>(
+    pub fn eval<Wire: WireLabel, C: Circuit<Evaluator<Wire>>>(
         &self,
         circuit: &C,
         inputs: &C::Input,
@@ -96,7 +96,7 @@ impl GarbledCircuit {
 
     /// Evaluate the garbled circuit on the provided inputs, returning the
     /// output wirelabels.
-    pub fn eval_to_wirelabels<Wire: WireLabel, C: CircuitExecutor<Evaluator<Wire>>>(
+    pub fn eval_to_wirelabels<Wire: WireLabel, C: Circuit<Evaluator<Wire>>>(
         &self,
         circuit: &C,
         inputs: &C::Input,
