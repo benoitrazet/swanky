@@ -2,7 +2,7 @@
 
 use crate::{
     FancyBinary,
-    circuit::{BinaryCircuit, Circuit},
+    circuit::{BinaryCircuit, Circuit, CircuitExecutor},
 };
 use std::io::Cursor;
 use swanky_channel::Channel;
@@ -59,70 +59,34 @@ impl<F: FancyBinary> Circuit<F> for AesNonExpanded {
     }
 }
 
-/// Circuits for testing AES.
-pub mod test {
+impl<F: FancyBinary> CircuitExecutor<F> for AesNonExpanded {
+    fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
+        assert_eq!(inputs.len(), 256);
+        let (key, block) = inputs.split_at(128);
+        (
+            key.to_vec().try_into().unwrap(),
+            block.to_vec().try_into().unwrap(),
+        )
+    }
+
+    fn ninputs(&self) -> usize {
+        256
+    }
+
+    fn modulus(&self, _: usize) -> u16 {
+        2
+    }
+}
+
+#[cfg(test)]
+mod test {
     use super::*;
-    use crate::circuit::CircuitExecutor;
-
-    /// Circuit for testing [`AesNonExpanded`].
-    pub struct TestAesNonExpanded(AesNonExpanded);
-
-    impl TestAesNonExpanded {
-        /// Create a new [`TestAesNonExpanded`] circuit.
-        pub fn new() -> Self {
-            Self(AesNonExpanded::new())
-        }
-    }
-
-    impl Default for TestAesNonExpanded {
-        fn default() -> Self {
-            Self::new()
-        }
-    }
-
-    impl<F: FancyBinary> Circuit<F> for TestAesNonExpanded {
-        type Input = <AesNonExpanded as Circuit<F>>::Input;
-        type Output = <AesNonExpanded as Circuit<F>>::Output;
-
-        fn execute(
-            &self,
-            backend: &mut F,
-            inputs: &Self::Input,
-            channel: &mut Channel,
-        ) -> Result<Self::Output> {
-            self.0.execute(backend, inputs, channel)
-        }
-    }
-
-    impl<F: FancyBinary> CircuitExecutor<F> for TestAesNonExpanded {
-        fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
-            assert_eq!(inputs.len(), 256);
-            let (key, block) = inputs.split_at(128);
-            let key = key
-                .to_vec()
-                .try_into()
-                .expect("Key should contain 128 elements");
-            let block = block
-                .to_vec()
-                .try_into()
-                .expect("Block should contain 128 elements");
-            (key, block)
-        }
-
-        fn ninputs(&self) -> usize {
-            256
-        }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
-    }
 
     #[test]
     fn aes_non_expanded() {
         use crate::dummy::{Dummy, DummyVal};
 
-        let aes = TestAesNonExpanded::new();
+        let aes = AesNonExpanded::new();
 
         let key = [DummyVal::new(0, 2); 128];
         let block = [DummyVal::new(0, 2); 128];
@@ -178,7 +142,7 @@ pub mod test {
         use crate::{WireMod2, classic::GarbledCircuit};
         use swanky_rng::SwankyRng;
 
-        let aes = TestAesNonExpanded::new();
+        let aes = AesNonExpanded::new();
 
         let (encoder, gc, _) =
             GarbledCircuit::garble::<WireMod2, _, _>(&aes, SwankyRng::new()).unwrap();

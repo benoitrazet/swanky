@@ -4,20 +4,20 @@ use core::time::Duration;
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     AllWire, WireMod2,
-    circuits::{aes::test::TestAesNonExpanded, sha::Sha256CompressionFunctionFixedIV},
+    circuits::{aes::AesNonExpanded, sha::Sha256CompressionFunctionFixedIV},
     classic::GarbledCircuit,
 };
 use swanky_rng::SwankyRng;
 
 fn bench_garble_aes_binary(c: &mut Criterion) {
-    let aes = TestAesNonExpanded::new();
+    let aes = AesNonExpanded::new();
     c.bench_function("garble::aes-binary", move |bench| {
         bench.iter(|| GarbledCircuit::garble::<WireMod2, _, _>(&aes, SwankyRng::new()));
     });
 }
 
 fn bench_eval_aes_binary(c: &mut Criterion) {
-    let aes = TestAesNonExpanded::new();
+    let aes = AesNonExpanded::new();
     let (en, gc, _) = GarbledCircuit::garble::<WireMod2, _, _>(&aes, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0; 256]);
     let key = inputs[..128].try_into().unwrap();
@@ -45,14 +45,14 @@ fn bench_eval_sha_256_binary(c: &mut Criterion) {
 }
 
 fn bench_garble_aes_arithmetic(c: &mut Criterion) {
-    let aes = TestAesNonExpanded::new();
+    let aes = AesNonExpanded::new();
     c.bench_function("garble::aes-arithmetic", move |bench| {
         bench.iter(|| GarbledCircuit::garble::<AllWire, _, _>(&aes, SwankyRng::new()));
     });
 }
 
 fn bench_eval_aes_arithmetic(c: &mut Criterion) {
-    let aes = TestAesNonExpanded::new();
+    let aes = AesNonExpanded::new();
     let (en, gc, _) = GarbledCircuit::garble::<AllWire, _, _>(&aes, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0; 256]);
     let key: [_; 128] = inputs[..128].to_vec().try_into().unwrap();

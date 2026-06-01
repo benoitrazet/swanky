@@ -13,7 +13,7 @@ mod tests {
         AllWire, CrtBundle, CrtGadgets, CrtProjGadgets, Fancy, FancyArithmetic, FancyBinary,
         FancyProj, WireLabel, WireMod2,
         circuit::{Circuit, CircuitExecutor, Flatten, circuits::arithmetic::TestAddition},
-        circuits::aes::test::TestAesNonExpanded,
+        circuits::aes::AesNonExpanded,
         dummy::{Dummy, DummyVal},
         informer::Informer,
         util::RngExt,
@@ -191,13 +191,13 @@ mod tests {
 
     #[test]
     fn test_aes_arithmetic() {
-        let aes = TestAesNonExpanded::new();
+        let aes = AesNonExpanded::new();
         test_aes::<_, AllWire>(&aes);
     }
 
     #[test]
     fn test_aes_binary() {
-        let aes = TestAesNonExpanded::new();
+        let aes = AesNonExpanded::new();
         test_aes::<_, WireMod2>(&aes);
     }
 }

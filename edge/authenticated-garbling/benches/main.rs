@@ -5,7 +5,7 @@ use fancy_garbling::{
     Fancy,
     circuit::circuits,
     circuits::{
-        aes::test::TestAesNonExpanded,
+        aes::AesNonExpanded,
         binary::{TestBinaryAddition, TestBinarySubtraction},
     },
 };
@@ -195,7 +195,7 @@ fn bench_aes(c: &mut Criterion) {
         .map(|_| rng_gb.r#gen::<u16>() % 2)
         .collect::<Vec<_>>();
 
-    let circuit = TestAesNonExpanded::new();
+    let circuit = AesNonExpanded::new();
     c.bench_function("aes", move |b| {
         b.iter(|| {
             test_circuit(&inputs_gb, &inputs_ev, rng_gb.fork(), &mut rng_ev, &circuit);
