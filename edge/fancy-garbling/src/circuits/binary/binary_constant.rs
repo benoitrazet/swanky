@@ -76,7 +76,7 @@ pub mod test {
 
         let mut rng = rand::thread_rng();
         for _ in 0..16 {
-            let nbits = rng.r#gen::<usize>() % 128;
+            let nbits = 1 + rng.r#gen::<usize>() % 127;
             let value = rng.r#gen::<u128>() % (nbits as u128);
             let c = TestBinaryConstant(value, nbits);
             let output = Dummy::eval(&c, &()).unwrap();
