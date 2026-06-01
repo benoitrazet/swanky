@@ -193,7 +193,7 @@ pub mod test {
             .collect()
     }
 
-    /// Circuit for testing [`Sha256`].
+    /// Circuit for testing [`Sha256SingleBlock`].
     pub struct TestSha256(usize, Sha256SingleBlock);
 
     impl TestSha256 {
