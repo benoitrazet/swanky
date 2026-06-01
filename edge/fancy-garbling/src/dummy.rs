@@ -40,6 +40,14 @@ impl DummyVal {
         }
     }
 
+    /// Create a new boolean [`DummyVal`].
+    pub fn new_bool(val: bool) -> Self {
+        Self {
+            val: val as u16,
+            modulus: 2,
+        }
+    }
+
     /// Extract the value.
     pub fn val(&self) -> u16 {
         self.val

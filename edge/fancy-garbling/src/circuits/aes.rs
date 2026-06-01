@@ -16,9 +16,10 @@ pub struct AesNonExpanded(BinaryCircuit);
 impl AesNonExpanded {
     /// Create a new [`AesNonExpanded`] circuit.
     ///
-    /// # Performance note
-    /// This involves parsing a Bristol Format file, and thus is not cheap! Thus
-    /// it is best to reuse this circuit if possible.
+    /// # Performance Note!
+    /// This involves parsing a Bristol Format file, and thus is not cheap! Hence,
+    /// it is best to reuse this circuit if possible versus calling
+    /// [`AesNonExpanded::new`] every time this circuit is needed.
     pub fn new() -> Self {
         let circuit = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
             include_bytes!("../../circuits/AES-non-expanded.txt"),
