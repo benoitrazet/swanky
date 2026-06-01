@@ -29,7 +29,7 @@ pub mod test {
     use super::*;
     use crate::circuit::CircuitExecutor;
 
-    /// Circuit for testing [`BinaryAddition`].
+    /// Circuit for testing [`BinarySubtraction`].
     pub struct TestBinarySubtraction(pub usize);
     impl<F: FancyBinary> Circuit<F> for TestBinarySubtraction {
         type Input = <BinarySubtraction as Circuit<F>>::Input;

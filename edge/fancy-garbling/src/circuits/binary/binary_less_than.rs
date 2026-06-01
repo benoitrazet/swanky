@@ -53,7 +53,7 @@ pub mod test {
     use super::*;
     use crate::circuit::CircuitExecutor;
 
-    /// Circuit for testing [`BinaryAddition`].
+    /// Circuit for testing [`BinaryLessThan`].
     pub struct TestBinaryLessThan(pub usize);
     impl<F: FancyBinary> Circuit<F> for TestBinaryLessThan {
         type Input = <BinaryLessThan as Circuit<F>>::Input;
