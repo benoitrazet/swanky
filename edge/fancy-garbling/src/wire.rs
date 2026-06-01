@@ -40,6 +40,7 @@ pub trait ArithmeticWire: Clone {}
 /// those encoded values.
 pub trait WireLabel:
     Clone
+    + core::fmt::Debug
     + HasModulus
     + core::ops::Add<Output = Self>
     + core::ops::AddAssign

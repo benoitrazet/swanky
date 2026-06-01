@@ -31,6 +31,15 @@ impl<P: GenericParty> HasModulus for PreProcessedWire<P> {
         2
     }
 }
+
+impl<P: GenericParty> core::fmt::Debug for PreProcessedWire<P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PreProcessedWire")
+            .field("auth_share", &())
+            .finish()
+    }
+}
+
 /// A struct which allows us to correctly correlate the indices
 /// of the input wires of an AND gate, to the index of the output
 /// wire of that gate. This is required in order to figure out how

@@ -44,7 +44,7 @@ pub trait HasModulus {
 /// [`FancyProj`] extension traits, respectively.
 pub trait Fancy {
     /// The underlying wirelabel representation of this [`Fancy`] object.
-    type Item: Clone + HasModulus;
+    type Item: Clone + core::fmt::Debug + HasModulus;
 
     /// Encode many wirelabels for known values.
     ///

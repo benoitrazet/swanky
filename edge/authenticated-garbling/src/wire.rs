@@ -54,3 +54,13 @@ impl<P: GenericParty> HasModulus for AuthenticatedWireMod2<P> {
         2
     }
 }
+
+impl<P: GenericParty> core::fmt::Debug for AuthenticatedWireMod2<P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AuthenticatedWireMod2")
+            .field("masked_value", &self.masked_value)
+            .field("wire_label", &self.wire_label)
+            .field("auth_share", &())
+            .finish()
+    }
+}
