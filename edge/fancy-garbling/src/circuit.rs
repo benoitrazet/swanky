@@ -91,6 +91,14 @@ impl<T: Clone + HasModulus> Flatten for (BinaryBundle<T>, T) {
     }
 }
 
+impl<T: Clone + HasModulus, const N: usize> Flatten for [T; N] {
+    type Item = T;
+
+    fn flatten(self) -> Vec<Self::Item> {
+        self.to_vec()
+    }
+}
+
 /// Trait for defining circuits that can be executed by [`Fancy`] objects.
 ///
 /// # Example

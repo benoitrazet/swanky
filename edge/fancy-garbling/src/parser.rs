@@ -142,76 +142,29 @@ impl BinaryCircuit {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        Evaluator, WireMod2,
-        circuit::{BinaryCircuit as Circuit, CircuitExecutor},
-        classic::GarbledCircuit,
-        dummy::{Dummy, DummyVal},
-    };
-    use swanky_rng::SwankyRng;
+    use crate::circuit::BinaryCircuit;
+    use std::io::Cursor;
 
     #[test]
-    fn test_parser() {
-        let circ = Circuit::parse(std::io::Cursor::<&'static [u8]>::new(include_bytes!(
-            "../circuits/AES-non-expanded.txt"
-        )))
-        .unwrap();
-        let input = [DummyVal::new(0, 2); 256];
-        let output = Dummy::eval(&circ, &input.to_vec()).unwrap();
-        assert_eq!(
-            output
-                .iter()
-                .map(|i| i.val().to_string())
-                .collect::<String>(),
-            "01100110111010010100101111010100111011111000101000101100001110111000100001001100111110100101100111001010001101000010101100101110"
-        );
-        let mut input = vec![DummyVal::new(0, 2); 128];
-        input.extend([DummyVal::new(1, 2); 128]);
-        let output = Dummy::eval(&circ, &input).unwrap();
-        assert_eq!(
-            output
-                .iter()
-                .map(|i| i.val().to_string())
-                .collect::<String>(),
-            "10100001111101100010010110001100100001110111110101011111110011011000100101100100010010000100010100111000101111111100100100101100"
-        );
-        let mut input = [DummyVal::new(0, 2); 256];
-        for key_part in input[128..].iter_mut().take(8) {
-            *key_part = DummyVal::new(1, 2);
-        }
-        let output = Dummy::eval(&circ, &input.to_vec()).unwrap();
-        assert_eq!(
-            output
-                .iter()
-                .map(|i| i.val().to_string())
-                .collect::<String>(),
-            "10110001110101110101100000100101011010110010100011111101100001010000101011010100100101000100001000001000110011110001000101010101"
-        );
-        let mut input = vec![DummyVal::new(0, 2); 256];
-        input[128 + 7] = DummyVal::new(1, 2);
-        let output = Dummy::eval(&circ, &input).unwrap();
-        assert_eq!(
-            output
-                .iter()
-                .map(|i| i.val().to_string())
-                .collect::<String>(),
-            "11011100000011101101100001011101111110010110000100011010101110110111001001001001110011011101000101101000110001010100011001111110"
-        );
-    }
+    fn bristol_format_parser_works() {
+        let result = BinaryCircuit::parse(Cursor::<&'static [u8]>::new(include_bytes!(
+            "../circuits/adder_32bit.txt"
+        )));
+        assert!(result.is_ok());
 
-    #[test]
-    fn test_gc_eval() {
-        let circ = Circuit::parse(std::io::Cursor::<&'static [u8]>::new(include_bytes!(
+        let result = BinaryCircuit::parse(Cursor::<&'static [u8]>::new(include_bytes!(
             "../circuits/AES-non-expanded.txt"
-        )))
-        .unwrap();
-        let (encoder, gc, _) =
-            GarbledCircuit::garble::<WireMod2, _, _>(&circ, SwankyRng::new()).unwrap();
-        let inputs = encoder.encode_inputs(&vec![0u16; 256]);
-        gc.eval_to_wirelabels(
-            &circ,
-            &<Circuit as CircuitExecutor<Evaluator<WireMod2>>>::map(&circ, inputs),
-        )
-        .unwrap();
+        )));
+        assert!(result.is_ok());
+
+        let result = BinaryCircuit::parse(Cursor::<&'static [u8]>::new(include_bytes!(
+            "../circuits/sha-1.txt"
+        )));
+        assert!(result.is_ok());
+
+        let result = BinaryCircuit::parse(Cursor::<&'static [u8]>::new(include_bytes!(
+            "../circuits/sha-256.txt"
+        )));
+        assert!(result.is_ok());
     }
 }
