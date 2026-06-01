@@ -246,7 +246,7 @@ impl Fancy for CircuitAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::circuit::circuits;
+    use crate::{circuit::circuits, circuits::binary::TestBinaryTwosComplement};
 
     #[test]
     fn single_and_gate_count_is_correct() {
@@ -305,7 +305,7 @@ mod tests {
     #[test]
     fn binary_twos_complement_counts_are_correct() {
         let nbits = 64;
-        let test = circuits::binary_gadgets::TestBinaryTwosComplement(nbits);
+        let test = TestBinaryTwosComplement(nbits);
         let mut analyzer = CircuitAnalyzer::new();
         analyzer.eval(&test).unwrap();
 

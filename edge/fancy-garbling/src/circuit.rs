@@ -1528,35 +1528,6 @@ pub mod circuits {
         use swanky_channel::Channel;
         use swanky_error::Result;
 
-        /// Circuit for testing [`BinaryGadgets::bin_constant_bundle`].
-        pub struct TestConstantBundle(pub u128, pub usize);
-        impl<F: BinaryGadgets> Circuit<F> for TestConstantBundle {
-            type Input = ();
-            type Output = BinaryBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                _: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.bin_constant_bundle(self.0, self.1, channel)
-            }
-        }
-        impl<F: BinaryGadgets> CircuitExecutor<F> for TestConstantBundle {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert!(inputs.is_empty());
-            }
-
-            fn ninputs(&self) -> usize {
-                0
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
-
         /// Circuit for testing [`BinaryGadgets::bin_and`].
         pub struct TestBinaryAnd(pub usize);
         impl<F: BinaryGadgets> Circuit<F> for TestBinaryAnd {
@@ -1831,36 +1802,6 @@ pub mod circuits {
             }
         }
         impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryAbs {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0);
-                BinaryBundle::new(inputs)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
-
-        /// Circuit for testing [`BinaryGadgets::bin_twos_complement`].
-        pub struct TestBinaryTwosComplement(pub usize);
-        impl<F: BinaryGadgets> Circuit<F> for TestBinaryTwosComplement {
-            type Input = BinaryBundle<F::Item>;
-            type Output = BinaryBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                input: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.bin_twos_complement(input, channel)
-            }
-        }
-        impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryTwosComplement {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
                 BinaryBundle::new(inputs)
@@ -2717,21 +2658,6 @@ mod binary_gadgets {
                     assert_eq!(y.val(), 0);
                 }
             }
-        }
-    }
-
-    #[test]
-    fn test_bin_twos_complement() {
-        let mut rng = thread_rng();
-        let nbits = 64;
-        let q = 1 << nbits;
-        let c = circuits::binary_gadgets::TestBinaryTwosComplement(nbits);
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let x_input = DummyVal::to_binary(x, nbits);
-            let output = Dummy::eval(&c, &x_input).unwrap();
-            assert_eq!(DummyVal::from_binary(&output), (((!x) % q) + 1) % q);
         }
     }
 

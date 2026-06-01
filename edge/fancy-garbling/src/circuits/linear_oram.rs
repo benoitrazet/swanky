@@ -1,11 +1,13 @@
 use crate::{
-    BinaryBundle, BinaryGadgets, FancyBinary, circuit::Circuit, circuits::binary::BinaryEquality,
+    BinaryBundle, BinaryGadgets, FancyBinary,
+    circuit::Circuit,
+    circuits::binary::{BinaryConstant, BinaryEquality},
 };
 
 /// Circuit for running linear ORAM.
 ///
 /// For a vector of [`BinaryBundle`]s and a single [`BinaryBundle`] query,
-/// output either 0 if no match was found, or the index that matches.
+/// output either 0 if no match was found, or the index that matches the query.
 pub struct LinearOram<const N: usize>;
 
 impl<F: FancyBinary, const N: usize> Circuit<F> for LinearOram<N> {
@@ -20,15 +22,15 @@ impl<F: FancyBinary, const N: usize> Circuit<F> for LinearOram<N> {
     ) -> swanky_error::Result<Self::Output> {
         let (ram, index) = inputs;
 
-        let mut result = backend.bin_constant_bundle(0, N, channel)?;
-        let zero = backend.bin_constant_bundle(0, N, channel)?;
+        let mut result = BinaryConstant::new(0, N).execute(backend, &(), channel)?;
+        let zero = BinaryConstant::new(0, N).execute(backend, &(), channel)?;
 
         // We traverse the garbler's RAM one element at a time, and multiplex
         // the result based on whether the evaluator's query matches the current
         // index.
         for (i, item) in ram.iter().enumerate() {
             // The current index is turned into a binary constant bundle.
-            let current_index = backend.bin_constant_bundle(i as u128, N, channel)?;
+            let current_index = BinaryConstant::new(i as u128, N).execute(backend, &(), channel)?;
             // We check if the evaluator's query matches the current index obliviously.
             let mux_bit =
                 BinaryEquality.execute(backend, &(index.to_owned(), current_index), channel)?;

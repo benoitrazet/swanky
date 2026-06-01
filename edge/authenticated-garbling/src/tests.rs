@@ -110,6 +110,13 @@ fn test_circuit<
 }
 
 #[test]
+fn test_constant_bundle() {
+    let circuit = fancy_garbling::circuits::binary::TestBinaryConstant(1, 64);
+
+    test_circuit(0, 0, &circuit);
+}
+
+#[test]
 fn test_and_gate() {
     let ninputs_gb = 1;
     let ninputs_ev = 1;
@@ -187,13 +194,6 @@ fn test_binary_negate() {
 }
 
 #[test]
-fn test_constant_bundle() {
-    let circuit = circuits::binary_gadgets::TestConstantBundle(1, 64);
-
-    test_circuit(0, 0, &circuit);
-}
-
-#[test]
 fn test_bin_addition_no_carry() {
     let ninputs = 64;
     let circuit = circuits::binary_gadgets::TestBinaryAdditionNoCarry(ninputs);
@@ -204,7 +204,7 @@ fn test_bin_addition_no_carry() {
 #[test]
 fn test_bin_twos_complement() {
     let ninputs = 64;
-    let circuit = circuits::binary_gadgets::TestBinaryTwosComplement(ninputs);
+    let circuit = fancy_garbling::circuits::binary::TestBinaryTwosComplement(ninputs);
 
     test_circuit(ninputs, 0, &circuit);
 }

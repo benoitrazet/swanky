@@ -22,6 +22,10 @@ mod binary_adder;
 pub use binary_adder::BinaryAdder;
 pub use binary_adder::test::TestBinaryAdder;
 
+mod binary_constant;
+pub use binary_constant::BinaryConstant;
+pub use binary_constant::test::TestBinaryConstant;
+
 mod binary_addition;
 pub use binary_addition::BinaryAddition;
 pub use binary_addition::test::TestBinaryAddition;
@@ -41,3 +45,7 @@ pub use binary_greater_than_or_equal::test::TestBinaryGreaterThanOrEqual;
 mod binary_equality;
 pub use binary_equality::BinaryEquality;
 pub use binary_equality::test::TestBinaryEquality;
+
+mod binary_twos_complement;
+pub use binary_twos_complement::BinaryTwosComplement;
+pub use binary_twos_complement::test::TestBinaryTwosComplement;
