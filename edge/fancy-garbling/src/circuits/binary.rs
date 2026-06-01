@@ -1,3 +1,5 @@
+//! Circuits for operating over binary values.
+
 mod pairwise_xor;
 pub use pairwise_xor::PairwiseXor;
 pub use pairwise_xor::test::TestPairwiseXor;

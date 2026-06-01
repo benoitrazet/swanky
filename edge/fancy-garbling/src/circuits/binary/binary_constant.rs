@@ -5,19 +5,37 @@ use swanky_error::Result;
 ///
 /// For `(value, nbits)`, return a [`BinaryBundle`] containing `value` in its
 /// bit representation.
-pub struct BinaryConstant {
+pub struct BinaryConstant<F: Fancy> {
     value: u128,
     nbits: usize,
+    zero: Option<F::Item>,
+    one: Option<F::Item>,
 }
 
-impl BinaryConstant {
+impl<F: Fancy> BinaryConstant<F> {
     /// Create a new [`BinaryConstant`] circuit for `value % 2^nbits`.
     pub fn new(value: u128, nbits: usize) -> Self {
-        Self { value, nbits }
+        Self::new_with_constants(value, nbits, None, None)
+    }
+
+    /// Create a new [`BinaryConstant`] circuit for `value % 2^nbits`, using the
+    /// provided zero and one constants.
+    pub fn new_with_constants(
+        value: u128,
+        nbits: usize,
+        zero: Option<F::Item>,
+        one: Option<F::Item>,
+    ) -> Self {
+        Self {
+            value,
+            nbits,
+            zero,
+            one,
+        }
     }
 }
 
-impl<F: Fancy> Circuit<F> for BinaryConstant {
+impl<F: Fancy> Circuit<F> for BinaryConstant<F> {
     type Input = ();
     type Output = BinaryBundle<F::Item>;
 
@@ -29,7 +47,13 @@ impl<F: Fancy> Circuit<F> for BinaryConstant {
     ) -> Result<Self::Output> {
         let xs = u128_to_bits(self.value, self.nbits);
         xs.into_iter()
-            .map(|x| backend.constant(x, 2, channel))
+            .map(|x| match x != 0 {
+                true => Ok(self.one.clone().unwrap_or(backend.constant(1, 2, channel)?)),
+                false => Ok(self
+                    .zero
+                    .clone()
+                    .unwrap_or(backend.constant(0, 2, channel)?)),
+            })
             .collect::<Result<_>>()
             .map(BinaryBundle::new)
     }
@@ -42,8 +66,8 @@ pub mod test {
     /// Circuit for testing [`BinaryConstant`].
     pub struct TestBinaryConstant(pub u128, pub usize);
     impl<F: Fancy> Circuit<F> for TestBinaryConstant {
-        type Input = <BinaryConstant as Circuit<F>>::Input;
-        type Output = <BinaryConstant as Circuit<F>>::Output;
+        type Input = <BinaryConstant<F> as Circuit<F>>::Input;
+        type Output = <BinaryConstant<F> as Circuit<F>>::Output;
 
         fn execute(
             &self,

@@ -3,6 +3,7 @@
 use crate::{
     FancyBinary,
     circuit::{BinaryCircuit, Circuit},
+    circuits::binary::BinaryConstant,
 };
 use std::io::Cursor;
 use swanky_channel::Channel;
@@ -103,28 +104,29 @@ impl<F: FancyBinary> Circuit<F> for Sha256SingleBlock {
             ));
         }
 
-        // Pad the input message to exactly 512 bits
-        let mut padded = inputs.clone();
+        let one = backend.constant(1, 2, channel)?;
+        let zero = backend.constant(0, 2, channel)?;
 
-        // Append a single '1' bit
-        padded.push(backend.constant(1, 2, channel)?);
+        let mut padded = inputs.clone();
+        padded.push(one.clone());
 
         // Calculate how many '0' bits we need to reach 448 (= 512 - 64) bits.
         let zeros_needed = 448 - padded.len();
         for _ in 0..zeros_needed {
-            padded.push(backend.constant(0, 2, channel)?);
+            padded.push(zero.clone());
         }
 
-        // Append the original message length as a 64-bit big-endian integer.
-        for i in (0..64).rev() {
-            let bit = ((message_len >> i) & 1) as u16;
-            padded.push(backend.constant(bit, 2, channel)?);
-        }
+        let mut bundle =
+            BinaryConstant::new_with_constants(message_len as u128, 64, Some(zero), Some(one))
+                .execute(backend, &(), channel)?;
+        // Constants are represented in little-endian, but here we need message
+        // length to be in big-endian. So we reverse the bundle before using it.
+        bundle.reverse();
+        padded.extend_from_slice(bundle.wires());
 
-        // padded should now be exactly 512 bits
-        assert_eq!(padded.len(), 512);
-
-        let padded = padded.try_into().unwrap();
+        let padded = padded
+            .try_into()
+            .expect("Padded message should contain 512 elements");
 
         self.0.execute(backend, &padded, channel)
     }

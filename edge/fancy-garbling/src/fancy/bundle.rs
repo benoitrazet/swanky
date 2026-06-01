@@ -25,7 +25,7 @@ impl<W: Clone + HasModulus> Bundle<W> {
     }
 
     /// Extract the wires from this bundle.
-    pub fn wires(&self) -> &[W] {
+    pub fn wires(&self) -> &Vec<W> {
         &self.0
     }
 

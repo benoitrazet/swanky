@@ -1,4 +1,8 @@
-use crate::{BinaryBundle, FancyBinary, circuit::Circuit, circuits::binary::BinarySubtraction};
+use crate::{
+    BinaryBundle, FancyBinary,
+    circuit::Circuit,
+    circuits::binary::{BinarySubtraction, OrMany},
+};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -28,11 +32,11 @@ impl<F: FancyBinary> Circuit<F> for BinaryLessThan {
         // Now we build a clause equal to (y == 0 || x >= y), which we can OR with
         // lhs to remove the y==0 aspect.
         // check if y==0
-        let y_contains_1 = backend.or_many(y.wires(), channel)?;
+        let y_contains_1 = OrMany.execute(backend, y.wires(), channel)?;
         let y_eq_0 = backend.negate(&y_contains_1);
 
         // if x != 0, then x >= y, ... assuming x is not negative
-        let x_contains_1 = backend.or_many(x.wires(), channel)?;
+        let x_contains_1 = OrMany.execute(backend, x.wires(), channel)?;
 
         // y == 0 && x >= y
         let rhs = backend.and(&y_eq_0, &x_contains_1, channel)?;
