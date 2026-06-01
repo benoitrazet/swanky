@@ -12,9 +12,8 @@ mod tests {
     use fancy_garbling::{
         AllWire, CrtBundle, CrtGadgets, CrtProjGadgets, Fancy, FancyArithmetic, FancyBinary,
         FancyProj, WireLabel, WireMod2,
-        circuit::{
-            BinaryCircuit, Circuit, CircuitExecutor, Flatten, circuits::arithmetic::TestAddition,
-        },
+        circuit::{Circuit, CircuitExecutor, Flatten, circuits::arithmetic::TestAddition},
+        circuits::aes::test::TestAesNonExpanded,
         dummy::{Dummy, DummyVal},
         informer::Informer,
         util::RngExt,
@@ -133,7 +132,7 @@ mod tests {
     type GB<Wire> = Garbler<SwankyRng, ChouOrlandiSender, Wire>;
     type EV<Wire> = Evaluator<SwankyRng, ChouOrlandiReceiver, Wire>;
 
-    fn test_circuit<C, Wire: WireLabel + Send>(circ: C)
+    fn test_aes<C, Wire: WireLabel + Send>(circ: &C)
     where
         C: CircuitExecutor<Dummy>
             + CircuitExecutor<Informer<Dummy>>
@@ -143,18 +142,18 @@ mod tests {
             + Sync
             + 'static,
     {
-        Informer::print_stats(&circ).unwrap();
+        Informer::print_stats(circ).unwrap();
 
         let (_, out) = swanky_channel::local::local_channel_pair(
             |channel| {
                 let rng = SwankyRng::new();
                 let mut gb = Garbler::<SwankyRng, ChouOrlandiSender, Wire>::new(channel, rng)?;
-                let mut xs = gb.encode_many(&vec![0_u16; 128], &vec![2; 128], channel)?;
+                let mut xs = gb.encode_many(&vec![0; 128], &vec![2; 128], channel)?;
                 let ys = gb.receive_many(&vec![2; 128], channel)?;
                 xs.extend(ys);
                 let outputs = circ.execute(
                     &mut gb,
-                    &<C as CircuitExecutor<GB<_>>>::map(&circ, xs),
+                    &<C as CircuitExecutor<GB<_>>>::map(circ, xs),
                     channel,
                 )?;
                 gb.outputs(&outputs.flatten(), channel)?;
@@ -164,11 +163,11 @@ mod tests {
                 let rng = SwankyRng::new();
                 let mut ev = Evaluator::<SwankyRng, ChouOrlandiReceiver, Wire>::new(channel, rng)?;
                 let mut xs = ev.receive_many(&vec![2; 128], channel)?;
-                let ys = ev.encode_many(&vec![0_u16; 128], &vec![2; 128], channel)?;
+                let ys = ev.encode_many(&vec![0; 128], &vec![2; 128], channel)?;
                 xs.extend(ys);
                 let wirelabels = circ.execute(
                     &mut ev,
-                    &<C as CircuitExecutor<EV<_>>>::map(&circ, xs),
+                    &<C as CircuitExecutor<EV<_>>>::map(circ, xs),
                     channel,
                 )?;
                 let out = ev.outputs(&wirelabels.flatten(), channel)?;
@@ -178,8 +177,8 @@ mod tests {
         .unwrap();
 
         let target = Dummy::eval(
-            &circ,
-            &<C as CircuitExecutor<Dummy>>::map(&circ, vec![DummyVal::new(0, 2); 256]),
+            circ,
+            &<C as CircuitExecutor<Dummy>>::map(circ, vec![DummyVal::new(0, 2); 256]),
         )
         .unwrap();
         let target = target
@@ -192,19 +191,13 @@ mod tests {
 
     #[test]
     fn test_aes_arithmetic() {
-        let circ = BinaryCircuit::parse_bristol_format(std::io::Cursor::<&'static [u8]>::new(include_bytes!(
-            "../../../fancy-garbling/circuits/AES-non-expanded.txt"
-        )))
-        .unwrap();
-        test_circuit::<_, AllWire>(circ);
+        let aes = TestAesNonExpanded::new();
+        test_aes::<_, AllWire>(&aes);
     }
 
     #[test]
     fn test_aes_binary() {
-        let circ = BinaryCircuit::parse_bristol_format(std::io::Cursor::<&'static [u8]>::new(include_bytes!(
-            "../../../fancy-garbling/circuits/AES-non-expanded.txt"
-        )))
-        .unwrap();
-        test_circuit::<_, WireMod2>(circ);
+        let aes = TestAesNonExpanded::new();
+        test_aes::<_, WireMod2>(&aes);
     }
 }
