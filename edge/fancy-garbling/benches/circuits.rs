@@ -10,7 +10,7 @@ use std::{fs::File, io::BufReader, time::Duration};
 use swanky_rng::SwankyRng;
 
 fn circuit(fname: &str) -> BinaryCircuit {
-    BinaryCircuit::parse(BufReader::new(File::open(fname).unwrap())).unwrap()
+    BinaryCircuit::parse_bristol_format(BufReader::new(File::open(fname).unwrap())).unwrap()
 }
 
 fn bench_garble_aes_binary(c: &mut Criterion) {

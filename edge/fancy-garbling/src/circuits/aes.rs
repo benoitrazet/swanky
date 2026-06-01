@@ -20,9 +20,9 @@ impl AesNonExpanded {
     /// This involves parsing a Bristol Format file, and thus is not cheap! Thus
     /// it is best to reuse this circuit if possible.
     pub fn new() -> Self {
-        let circuit = BinaryCircuit::parse(Cursor::<&'static [u8]>::new(include_bytes!(
-            "../../circuits/AES-non-expanded.txt"
-        )))
+        let circuit = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
+            include_bytes!("../../circuits/AES-non-expanded.txt"),
+        ))
         .expect("`AES-non-expanded.txt` file should always parse correctly");
         Self(circuit)
     }

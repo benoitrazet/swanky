@@ -9,7 +9,7 @@ use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 fn circuit(fname: &str) -> BinaryCircuit {
     println!("* Circuit: {}", fname);
-    BinaryCircuit::parse(BufReader::new(File::open(fname).unwrap())).unwrap()
+    BinaryCircuit::parse_bristol_format(BufReader::new(File::open(fname).unwrap())).unwrap()
 }
 
 fn run_circuit(circ: &mut BinaryCircuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {

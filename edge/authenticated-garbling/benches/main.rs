@@ -192,7 +192,7 @@ fn bench_aes(c: &mut Criterion) {
         .map(|_| rng_gb.r#gen::<u16>() % 2)
         .collect::<Vec<_>>();
 
-    let circuit = BinaryCircuit::parse(BufReader::new(
+    let circuit = BinaryCircuit::parse_bristol_format(BufReader::new(
         File::open("../fancy-garbling/circuits/AES-non-expanded.txt").unwrap(),
     ))
     .unwrap();

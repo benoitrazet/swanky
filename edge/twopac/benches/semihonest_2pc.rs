@@ -11,7 +11,7 @@ use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 fn circuit(fname: &str) -> BinaryCircuit {
-    BinaryCircuit::parse(BufReader::new(File::open(fname).unwrap())).unwrap()
+    BinaryCircuit::parse_bristol_format(BufReader::new(File::open(fname).unwrap())).unwrap()
 }
 
 fn _bench_circuit(circ: &BinaryCircuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {

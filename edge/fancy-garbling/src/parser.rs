@@ -1,9 +1,8 @@
-//! Functions for parsing and running a circuit file based on the format given
-//! here: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
+//! Functions for parsing and running a circuit file.
 
 use crate::circuit::{BinaryCircuit, BinaryGate};
 use regex::{Captures, Regex};
-use std::str::FromStr;
+use std::{io::BufRead, str::FromStr};
 use swanky_error::{ErrorKind, Result, WrapErr, swanky_error};
 
 enum GateType {
@@ -37,11 +36,10 @@ fn regex2captures<'t>(re: &Regex, line: &'t str) -> Result<Captures<'t>> {
 }
 
 impl BinaryCircuit {
-    /// Generates a new `Circuit` from file `filename`. The file must follow the
-    /// format given here: <https://homes.esat.kuleuven.be/~nsmart/MPC/old-circuits.html>,
-    /// (Bristol Format---the OLD format---not Bristol Fashion---the NEW format) otherwise
-    /// a `CircuitParserError` is returned.
-    pub fn parse(mut reader: impl std::io::BufRead) -> Result<Self> {
+    /// Generates a new [`BinaryCircuit`] from the provided [`BufRead`]er. The file
+    /// must follow the Bristol Format given here:
+    /// <https://nigelsmart.github.io/MPC-Circuits/old-circuits.html>.
+    pub fn parse_bristol_format(mut reader: impl BufRead) -> Result<Self> {
         // Parse first line: ngates nwires\n
         let mut line = String::new();
         reader
@@ -147,24 +145,26 @@ mod tests {
 
     #[test]
     fn bristol_format_parser_works() {
-        let result = BinaryCircuit::parse(Cursor::<&'static [u8]>::new(include_bytes!(
-            "../circuits/adder_32bit.txt"
-        )));
+        // Tests all the circuits in the `circuits` directory.
+
+        let result = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
+            include_bytes!("../circuits/adder_32bit.txt"),
+        ));
         assert!(result.is_ok());
 
-        let result = BinaryCircuit::parse(Cursor::<&'static [u8]>::new(include_bytes!(
-            "../circuits/AES-non-expanded.txt"
-        )));
+        let result = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
+            include_bytes!("../circuits/AES-non-expanded.txt"),
+        ));
         assert!(result.is_ok());
 
-        let result = BinaryCircuit::parse(Cursor::<&'static [u8]>::new(include_bytes!(
-            "../circuits/sha-1.txt"
-        )));
+        let result = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
+            include_bytes!("../circuits/sha-1.txt"),
+        ));
         assert!(result.is_ok());
 
-        let result = BinaryCircuit::parse(Cursor::<&'static [u8]>::new(include_bytes!(
-            "../circuits/sha-256.txt"
-        )));
+        let result = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
+            include_bytes!("../circuits/sha-256.txt"),
+        ));
         assert!(result.is_ok());
     }
 }

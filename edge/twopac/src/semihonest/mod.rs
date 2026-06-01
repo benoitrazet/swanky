@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn test_aes_arithmetic() {
-        let circ = BinaryCircuit::parse(std::io::Cursor::<&'static [u8]>::new(include_bytes!(
+        let circ = BinaryCircuit::parse_bristol_format(std::io::Cursor::<&'static [u8]>::new(include_bytes!(
             "../../../fancy-garbling/circuits/AES-non-expanded.txt"
         )))
         .unwrap();
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     fn test_aes_binary() {
-        let circ = BinaryCircuit::parse(std::io::Cursor::<&'static [u8]>::new(include_bytes!(
+        let circ = BinaryCircuit::parse_bristol_format(std::io::Cursor::<&'static [u8]>::new(include_bytes!(
             "../../../fancy-garbling/circuits/AES-non-expanded.txt"
         )))
         .unwrap();
