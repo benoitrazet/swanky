@@ -26,40 +26,9 @@ impl<F: FancyBinary> Circuit<F> for AndMany {
     }
 }
 
+#[cfg(test)]
 pub mod test {
-    use super::*;
-    use crate::circuit::CircuitExecutor;
-
-    /// Circuit for testing [`AndMany`].
-    pub struct TestAndMany(pub usize);
-    impl<F: FancyBinary> Circuit<F> for TestAndMany {
-        type Input = Vec<F::Item>;
-        type Output = F::Item;
-
-        fn execute(
-            &self,
-            backend: &mut F,
-            inputs: &Self::Input,
-            channel: &mut Channel,
-        ) -> Result<Self::Output> {
-            AndMany.execute(backend, inputs, channel)
-        }
-    }
-
-    impl<F: FancyBinary> CircuitExecutor<F> for TestAndMany {
-        fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-            assert_eq!(inputs.len(), self.0);
-            inputs
-        }
-
-        fn ninputs(&self) -> usize {
-            self.0
-        }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
-    }
+    use super::AndMany;
 
     #[test]
     fn and_many() {
@@ -67,15 +36,14 @@ pub mod test {
         use rand::Rng;
 
         let mut rng = rand::thread_rng();
-        let n = 2 + (rng.r#gen::<usize>() % 200);
-        let c = TestAndMany(n);
 
-        for _ in 0..16 {
+        for _ in 0..100 {
+            let n = 2 + (rng.r#gen::<usize>() % 200);
             let inputs = (0..n)
                 .map(|_| DummyVal::rand_bool(&mut rng))
                 .collect::<Vec<_>>();
             let expected = inputs.iter().fold(1, |acc, &x| x.val() & acc);
-            let output = Dummy::eval(&c, &inputs).unwrap();
+            let output = Dummy::eval(&AndMany, &inputs).unwrap();
             assert_eq!(output.val(), expected);
         }
     }

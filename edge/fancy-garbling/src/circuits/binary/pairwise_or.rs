@@ -24,41 +24,9 @@ impl<F: FancyBinary> Circuit<F> for PairwiseOr {
     }
 }
 
+#[cfg(test)]
 pub mod test {
-    use super::*;
-    use crate::circuit::CircuitExecutor;
-
-    /// Circuit for testing [`PairwiseOr`].
-    pub struct TestPairwiseOr(pub usize);
-    impl<F: FancyBinary> Circuit<F> for TestPairwiseOr {
-        type Input = <PairwiseOr as Circuit<F>>::Input;
-        type Output = <PairwiseOr as Circuit<F>>::Output;
-
-        fn execute(
-            &self,
-            backend: &mut F,
-            inputs: &Self::Input,
-            channel: &mut Channel,
-        ) -> Result<Self::Output> {
-            PairwiseOr.execute(backend, inputs, channel)
-        }
-    }
-
-    impl<F: FancyBinary> CircuitExecutor<F> for TestPairwiseOr {
-        fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
-            assert_eq!(inputs.len(), self.0 * 2);
-            let (x, y) = inputs.split_at(self.0);
-            (x.to_vec(), y.to_vec())
-        }
-
-        fn ninputs(&self) -> usize {
-            self.0 * 2
-        }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
-    }
+    use super::PairwiseOr;
 
     #[test]
     fn pairwise_or() {
@@ -66,10 +34,8 @@ pub mod test {
         use rand::Rng;
 
         let mut rng = rand::thread_rng();
-        let n = 1 + (rng.r#gen::<usize>() % 200);
-        let circuit = TestPairwiseOr(n);
-
         for _ in 0..100 {
+            let n = 1 + (rng.r#gen::<usize>() % 200);
             let x = (0..n)
                 .map(|_| DummyVal::rand_bool(&mut rng))
                 .collect::<Vec<_>>();
@@ -81,7 +47,7 @@ pub mod test {
                 .zip(y.iter())
                 .map(|(x, y)| DummyVal::new(x.val() | y.val(), 2))
                 .collect::<Vec<_>>();
-            let output = Dummy::eval(&circuit, &(x, y)).unwrap();
+            let output = Dummy::eval(&PairwiseOr, &(x, y)).unwrap();
             assert_eq!(output, expected);
         }
     }
