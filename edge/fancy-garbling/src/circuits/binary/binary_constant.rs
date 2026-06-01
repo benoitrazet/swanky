@@ -3,8 +3,8 @@ use swanky_error::Result;
 
 /// Binary constant.
 ///
-/// For `(value, nbits)`, return a [`Bundle`] containing `value` in its bit
-/// representation.
+/// For `(value, nbits)`, return a [`BinaryBundle`] containing `value` in its
+/// bit representation.
 pub struct BinaryConstant {
     value: u128,
     nbits: usize,
