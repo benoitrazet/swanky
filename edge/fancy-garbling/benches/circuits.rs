@@ -38,10 +38,9 @@ fn bench_eval_sha_256_binary(c: &mut Criterion) {
     let sha256 = TestSha256CompressionFunction::new();
     let (en, gc, _) = GarbledCircuit::garble::<WireMod2, _, _>(&sha256, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0; 512]);
-    let block = inputs[..256].try_into().unwrap();
-    let chain = inputs[256..].try_into().unwrap();
+    let block = inputs.try_into().unwrap();
     c.bench_function("eval::sha-256-binary", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&sha256, &(block, chain)))
+        bench.iter(|| gc.eval_to_wirelabels(&sha256, &block))
     });
 }
 
@@ -75,11 +74,10 @@ fn bench_eval_sha_256_arithmetic(c: &mut Criterion) {
     let sha256 = TestSha256CompressionFunction::new();
     let (en, gc, _) = GarbledCircuit::garble::<AllWire, _, _>(&sha256, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0; 512]);
-    let block: [_; 256] = inputs[..256].to_vec().try_into().unwrap();
-    let chain: [_; 256] = inputs[256..].to_vec().try_into().unwrap();
+    let block: [_; 512] = inputs.try_into().unwrap();
 
     c.bench_function("eval::sha-256-arithmetic", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&sha256, &(block.clone(), chain.clone())))
+        bench.iter(|| gc.eval_to_wirelabels(&sha256, &block.clone()))
     });
 }
 
