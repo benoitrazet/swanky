@@ -1,10 +1,13 @@
-use std::{fs::File, io::BufReader, time::Duration};
+use std::time::Duration;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     Fancy,
-    circuit::{BinaryCircuit, circuits},
-    circuits::binary::{TestBinaryAddition, TestBinarySubtraction},
+    circuit::circuits,
+    circuits::{
+        aes::test::TestAesNonExpanded,
+        binary::{TestBinaryAddition, TestBinarySubtraction},
+    },
 };
 use rand::Rng;
 use swanky_authenticated_garbling::{Evaluator, Garbler};
@@ -192,10 +195,7 @@ fn bench_aes(c: &mut Criterion) {
         .map(|_| rng_gb.r#gen::<u16>() % 2)
         .collect::<Vec<_>>();
 
-    let circuit = BinaryCircuit::parse_bristol_format(BufReader::new(
-        File::open("../fancy-garbling/circuits/AES-non-expanded.txt").unwrap(),
-    ))
-    .unwrap();
+    let circuit = TestAesNonExpanded::new();
     c.bench_function("aes", move |b| {
         b.iter(|| {
             test_circuit(&inputs_gb, &inputs_ev, rng_gb.fork(), &mut rng_ev, &circuit);

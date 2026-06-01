@@ -1,19 +1,23 @@
 use fancy_garbling::{
     Fancy, WireMod2,
-    circuit::{BinaryCircuit, Circuit},
+    circuit::CircuitExecutor,
+    circuits::{aes::test::TestAesNonExpanded, sha::test::TestSha256CompressionFunction},
 };
-use std::{fs::File, io::BufReader, time::SystemTime};
+use std::time::SystemTime;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
-fn circuit(fname: &str) -> BinaryCircuit {
-    println!("* Circuit: {}", fname);
-    BinaryCircuit::parse_bristol_format(BufReader::new(File::open(fname).unwrap())).unwrap()
-}
-
-fn run_circuit(circ: &mut BinaryCircuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {
-    let circ_ = circ.clone();
+fn run_circuit<
+    C: CircuitExecutor<Garbler<SwankyRng, OtSender, WireMod2>>
+        + CircuitExecutor<Evaluator<SwankyRng, OtReceiver, WireMod2>>
+        + Sync
+        + Send,
+>(
+    circ: &C,
+    gb_inputs: Vec<u16>,
+    ev_inputs: Vec<u16>,
+) {
     let n_gb_inputs = gb_inputs.len();
     let n_ev_inputs = ev_inputs.len();
 
@@ -38,7 +42,12 @@ fn run_circuit(circ: &mut BinaryCircuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16
                 start.elapsed().unwrap().as_millis()
             );
             let start = SystemTime::now();
-            circ_.execute(&mut gb, &xs, channel).unwrap();
+            circ.execute(
+                &mut gb,
+                &<C as CircuitExecutor<Garbler<SwankyRng, OtSender, WireMod2>>>::map(circ, xs),
+                channel,
+            )
+            .unwrap();
             println!(
                 "Garbler :: Circuit garbling: {} ms",
                 start.elapsed().unwrap().as_millis()
@@ -64,7 +73,12 @@ fn run_circuit(circ: &mut BinaryCircuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16
                 start.elapsed().unwrap().as_millis()
             );
             let start = SystemTime::now();
-            circ.execute(&mut ev, &xs, channel).unwrap();
+            circ.execute(
+                &mut ev,
+                &<C as CircuitExecutor<Evaluator<SwankyRng, OtReceiver, WireMod2>>>::map(circ, xs),
+                channel,
+            )
+            .unwrap();
             println!(
                 "Evaluator :: Circuit evaluation: {} ms",
                 start.elapsed().unwrap().as_millis()
@@ -77,10 +91,8 @@ fn run_circuit(circ: &mut BinaryCircuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16
 }
 
 fn main() {
-    let mut circ = circuit("circuits/AES-non-expanded.txt");
-    run_circuit(&mut circ, vec![0; 128], vec![0; 128]);
-    let mut circ = circuit("circuits/sha-1.txt");
-    run_circuit(&mut circ, vec![0; 512], vec![]);
-    let mut circ = circuit("circuits/sha-256.txt");
-    run_circuit(&mut circ, vec![0; 512], vec![]);
+    let circ = TestAesNonExpanded::new();
+    run_circuit(&circ, vec![0; 128], vec![0; 128]);
+    let circ = TestSha256CompressionFunction::new();
+    run_circuit(&circ, vec![0; 512], vec![]);
 }
