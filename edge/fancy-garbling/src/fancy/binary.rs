@@ -150,51 +150,6 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         Ok(zs.into_iter().collect())
     }
 
-    /// Xor the bits of two bundles together pairwise.
-    fn bin_xor(
-        &mut self,
-        x: &BinaryBundle<Self::Item>,
-        y: &BinaryBundle<Self::Item>,
-    ) -> BinaryBundle<Self::Item> {
-        BinaryBundle::new(
-            x.wires()
-                .iter()
-                .zip(y.wires().iter())
-                .map(|(x, y)| self.xor(x, y))
-                .collect::<Vec<Self::Item>>(),
-        )
-    }
-
-    /// And the bits of two bundles together pairwise.
-    fn bin_and(
-        &mut self,
-        x: &BinaryBundle<Self::Item>,
-        y: &BinaryBundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
-        x.wires()
-            .iter()
-            .zip(y.wires().iter())
-            .map(|(x, y)| self.and(x, y, channel))
-            .collect::<swanky_error::Result<Vec<Self::Item>>>()
-            .map(BinaryBundle::new)
-    }
-
-    /// Or the bits of two bundles together pairwise.
-    fn bin_or(
-        &mut self,
-        x: &BinaryBundle<Self::Item>,
-        y: &BinaryBundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
-        x.wires()
-            .iter()
-            .zip(y.wires().iter())
-            .map(|(x, y)| self.or(x, y, channel))
-            .collect::<swanky_error::Result<Vec<Self::Item>>>()
-            .map(BinaryBundle::new)
-    }
-
     /// Binary addition. Returns the result and the carry.
     ///
     /// # Panics
