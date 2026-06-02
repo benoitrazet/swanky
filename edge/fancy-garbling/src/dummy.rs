@@ -232,7 +232,6 @@ impl FancyProj for Dummy {
 impl Fancy for Dummy {
     type Item = DummyVal;
 
-    /// Encode a single dummy value.
     fn encode(
         &mut self,
         value: u16,
@@ -242,7 +241,6 @@ impl Fancy for Dummy {
         Ok(DummyVal::new(value, modulus))
     }
 
-    /// Encode a slice of inputs and a slice of moduli as DummyVals.
     fn encode_many(
         &mut self,
         xs: &[u16],
