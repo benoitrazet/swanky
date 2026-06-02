@@ -1,5 +1,8 @@
 //! Circuits for operating over binary values.
 
+mod mux;
+pub use mux::Mux;
+
 mod pairwise_xor;
 pub use pairwise_xor::PairwiseXor;
 
@@ -15,6 +18,9 @@ pub use and_many::AndMany;
 mod or_many;
 pub use or_many::OrMany;
 
+mod xor_many;
+pub use xor_many::XorMany;
+
 mod binary_adder;
 pub use binary_adder::BinaryAdder;
 
@@ -25,6 +31,10 @@ pub use binary_constant::test::TestBinaryConstant;
 mod binary_addition;
 pub use binary_addition::BinaryAddition;
 pub use binary_addition::test::TestBinaryAddition;
+
+mod binary_addition_no_carry;
+pub use binary_addition_no_carry::BinaryAdditionNoCarry;
+pub use binary_addition_no_carry::test::TestBinaryAdditionNoCarry;
 
 mod binary_subtraction;
 pub use binary_subtraction::BinarySubtraction;
@@ -45,3 +55,6 @@ pub use binary_equality::test::TestBinaryEquality;
 mod binary_twos_complement;
 pub use binary_twos_complement::BinaryTwosComplement;
 pub use binary_twos_complement::test::TestBinaryTwosComplement;
+
+mod binary_multiplex;
+pub use binary_multiplex::BinaryMultipex;

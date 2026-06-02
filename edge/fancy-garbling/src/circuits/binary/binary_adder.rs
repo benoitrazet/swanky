@@ -36,7 +36,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryAdder {
 
 #[cfg(test)]
 pub mod test {
-    use super::*;
+    use super::BinaryAdder;
 
     #[test]
     fn binary_adder() {

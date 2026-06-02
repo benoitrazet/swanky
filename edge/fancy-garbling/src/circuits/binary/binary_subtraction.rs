@@ -1,6 +1,7 @@
 use crate::{
-    BinaryBundle, BinaryGadgets, FancyBinary, circuit::Circuit,
-    circuits::binary::BinaryTwosComplement,
+    BinaryBundle, FancyBinary,
+    circuit::Circuit,
+    circuits::binary::{BinaryAddition, BinaryTwosComplement},
 };
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -24,7 +25,7 @@ impl<F: FancyBinary> Circuit<F> for BinarySubtraction {
         assert_eq!(inputs.0.moduli(), inputs.1.moduli());
         let (x, y) = inputs;
         let neg_y = BinaryTwosComplement.execute(backend, y, channel)?;
-        backend.bin_addition(x, &neg_y, channel)
+        BinaryAddition.execute(backend, &(x.clone(), neg_y), channel)
     }
 }
 

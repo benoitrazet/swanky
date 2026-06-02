@@ -1,7 +1,7 @@
 use crate::{
-    BinaryBundle, BinaryGadgets, FancyBinary,
+    BinaryBundle, FancyBinary,
     circuit::Circuit,
-    circuits::binary::{BinaryConstant, BinaryEquality},
+    circuits::binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality, BinaryMultipex},
 };
 
 /// Circuit for running linear ORAM.
@@ -37,8 +37,9 @@ impl<F: FancyBinary, const N: usize> Circuit<F> for LinearOram<N> {
             // We use the result of the prior equality check to multiplex by either adding 0 to
             // the result of the computation and keeping it as is, or adding RAM[i] to it
             // and updating it. The evaluator's query can only correspond to a single index.
-            let mux = backend.bin_multiplex(&mux_bit, &zero, item, channel)?;
-            result = backend.bin_addition_no_carry(&result, &mux, channel)?;
+            let mux =
+                BinaryMultipex.execute(backend, &(mux_bit, zero.clone(), item.clone()), channel)?;
+            result = BinaryAdditionNoCarry.execute(backend, &(result, mux), channel)?;
         }
 
         Ok(result)

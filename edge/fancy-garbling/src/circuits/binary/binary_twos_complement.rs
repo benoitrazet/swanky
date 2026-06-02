@@ -1,11 +1,15 @@
-use crate::{BinaryBundle, BinaryGadgets, circuit::Circuit, circuits::binary::BinaryConstant};
+use crate::{
+    BinaryBundle, BinaryGadgets, FancyBinary,
+    circuit::Circuit,
+    circuits::binary::{BinaryAdditionNoCarry, BinaryConstant},
+};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// Binary two's complement.
 pub struct BinaryTwosComplement;
 
-impl<F: BinaryGadgets> Circuit<F> for BinaryTwosComplement {
+impl<F: FancyBinary> Circuit<F> for BinaryTwosComplement {
     type Input = BinaryBundle<F::Item>;
     type Output = BinaryBundle<F::Item>;
 
@@ -23,7 +27,7 @@ impl<F: BinaryGadgets> Circuit<F> for BinaryTwosComplement {
                 .collect::<Vec<_>>(),
         );
         let one = BinaryConstant::new(1, input.size()).execute(backend, &(), channel)?;
-        backend.bin_addition_no_carry(&not_xs, &one, channel)
+        BinaryAdditionNoCarry.execute(backend, &(not_xs, one), channel)
     }
 }
 
