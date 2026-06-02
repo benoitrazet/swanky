@@ -7,4 +7,5 @@ pub use linear_oram::LinearOram;
 pub use linear_oram::test::TestLinearOram;
 
 pub mod aes;
+pub mod hmac;
 pub mod sha;
