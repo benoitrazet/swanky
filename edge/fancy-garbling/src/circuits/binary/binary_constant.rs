@@ -48,11 +48,20 @@ impl<F: Fancy> Circuit<F> for BinaryConstant<F> {
         let xs = u128_to_bits(self.value, self.nbits);
         xs.into_iter()
             .map(|x| match x != 0 {
-                true => Ok(self.one.clone().unwrap_or(backend.constant(1, 2, channel)?)),
-                false => Ok(self
-                    .zero
-                    .clone()
-                    .unwrap_or(backend.constant(0, 2, channel)?)),
+                true => {
+                    if let Some(one) = &self.one {
+                        Ok(one.clone())
+                    } else {
+                        backend.constant(1, 2, channel)
+                    }
+                }
+                false => {
+                    if let Some(zero) = &self.zero {
+                        Ok(zero.clone())
+                    } else {
+                        backend.constant(0, 2, channel)
+                    }
+                }
             })
             .collect::<Result<_>>()
             .map(BinaryBundle::new)
