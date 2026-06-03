@@ -25,7 +25,7 @@
 //! Garbling for Faster Secure Two-Party Computation".
 //! <https://eprint.iacr.org/2018/578.pdf>
 
-use fancy_garbling::{Fancy, circuit::CircuitExecutor, circuit_analyzer::CircuitAnalyzer};
+use fancy_garbling::{Fancy, circuit::CircuitInputMapper, circuit_analyzer::CircuitAnalyzer};
 use rand::{CryptoRng, Rng};
 use swanky_authenticated_bits::{and_triples::AndTripleGenerator, authshares::AuthShare};
 use swanky_channel::Channel;
@@ -47,7 +47,7 @@ pub(crate) fn f_preprocessing<P: GenericParty, C, RNG: CryptoRng + Rng>(
     rng: &mut RNG,
 ) -> swanky_error::Result<(Vec<AuthShare<P>>, Vec<AuthShare<P>>)>
 where
-    C: CircuitExecutor<CircuitAnalyzer> + CircuitExecutor<WirePreProcessor<P>>,
+    C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<P>>,
 {
     // First count the number of gate types.
     let mut circuit_analyzer = CircuitAnalyzer::new();
@@ -82,12 +82,12 @@ where
     )?;
     let mut wire_preprocessor = WirePreProcessor::new(auth_shares.clone(), and_generator.delta());
     let inputs = wire_preprocessor.receive_many(
-        &vec![2; <C as CircuitExecutor<WirePreProcessor<P>>>::ninputs(circuit)],
+        &vec![2; <C as CircuitInputMapper<WirePreProcessor<P>>>::ninputs(circuit)],
         channel,
     )?;
     circuit.execute(
         &mut wire_preprocessor,
-        &<C as CircuitExecutor<WirePreProcessor<P>>>::map(circuit, inputs),
+        &<C as CircuitInputMapper<WirePreProcessor<P>>>::map(circuit, inputs),
         channel,
     )?;
 

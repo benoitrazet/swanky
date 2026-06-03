@@ -99,14 +99,15 @@ impl<T: Clone + HasModulus, const N: usize> Flatten for [T; N] {
     }
 }
 
-/// Trait for defining circuits that can be executed by [`Fancy`] objects.
+/// Trait for defining input-size-dependent [`Circuit`]s.
+///
+/// A `CircuitInputMapper` can map vectors of inputs to the appropriate input
+/// type as required to run [`Circuit::execute`].
 ///
 /// # Example
-/// Below is a simple example of computing an add gate over an arbitrary
-/// modulus. The computation is defined in `execute` by directly calling
-/// operations on the underlying [`Fancy`] backend. We also need to track how
-/// many inputs the computation takes, and the moduli of those inputs; these are
-/// given in the `ninputs` and `modulus` methods, respectively.
+/// Below extends the `AddCircuit` example from the [`Circuit`] documentation to
+/// support mapping a vector of inputs into the appropriate input type for the
+/// given circuit.
 /// ```
 /// # use fancy_garbling::{FancyArithmetic, circuit::{Circuit, CircuitExecutor}};
 /// # use swanky_channel::Channel;
@@ -125,7 +126,7 @@ impl<T: Clone + HasModulus, const N: usize> Flatten for [T; N] {
 ///         Ok(backend.add(&inputs.0, &inputs.1))
 ///     }
 /// }
-/// impl<F: FancyArithmetic> CircuitExecutor<F> for AddCircuit {
+/// impl<F: FancyArithmetic> CircuitInputMapper<F> for AddCircuit {
 ///     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
 ///         assert_eq!(inputs.len(), 2);
 ///         (inputs[0].clone(), inputs[1].clone())
@@ -140,7 +141,7 @@ impl<T: Clone + HasModulus, const N: usize> Flatten for [T; N] {
 ///     }
 /// }
 /// ```
-pub trait CircuitExecutor<F: Fancy>: Circuit<F> {
+pub trait CircuitInputMapper<F: Fancy>: Circuit<F> {
     /// Map a vector of inputs to [`Circuit::Input`].
     ///
     /// # Panics
@@ -152,9 +153,14 @@ pub trait CircuitExecutor<F: Fancy>: Circuit<F> {
     fn modulus(&self, i: usize) -> u16;
 }
 
-/// Trait for defining arbitrary [`Fancy`] circuits.
+/// Trait for defining computations over [`Fancy`] objects.
 ///
-/// To execute a [`Circuit`], it needs to also implement [`CircuitExecutor`].
+/// A `Circuit` computation is defined by an [`Circuit::Input`] associated type,
+/// a [`Circuit::Output`] associated type, and a [`Circuit::execute`] method
+/// that maps a [`Circuit::Input`] to a [`Circuit::Output`].
+///
+/// For mapping arbitrary inputs into the correct `Circuit` input
+/// representation, use the [`CircuitInputMapper`] trait.
 ///
 /// # Example
 /// Below is a simple example of computing an add gate over an arbitrary
@@ -202,7 +208,7 @@ pub mod circuits {
 
         use crate::{
             Fancy,
-            circuit::{Circuit, CircuitExecutor},
+            circuit::{Circuit, CircuitInputMapper},
         };
         use swanky_channel::Channel;
         use swanky_error::Result;
@@ -226,7 +232,7 @@ pub mod circuits {
                 Ok(outputs)
             }
         }
-        impl<F: Fancy> CircuitExecutor<F> for TestBinaryConstant {
+        impl<F: Fancy> CircuitInputMapper<F> for TestBinaryConstant {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert!(inputs.is_empty());
             }
@@ -246,7 +252,7 @@ pub mod circuits {
 
         use crate::{
             BinaryBundle, FancyBinary,
-            circuit::{Circuit, CircuitExecutor},
+            circuit::{Circuit, CircuitInputMapper},
         };
         use swanky_channel::Channel;
         use swanky_error::Result;
@@ -266,7 +272,7 @@ pub mod circuits {
                 Ok(backend.negate(input))
             }
         }
-        impl<F: FancyBinary> CircuitExecutor<F> for TestNegateGate {
+        impl<F: FancyBinary> CircuitInputMapper<F> for TestNegateGate {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 1);
                 inputs[0].clone()
@@ -296,7 +302,7 @@ pub mod circuits {
                 backend.and(&inputs.0, &inputs.1, channel)
             }
         }
-        impl<F: FancyBinary> CircuitExecutor<F> for TestAndGate {
+        impl<F: FancyBinary> CircuitInputMapper<F> for TestAndGate {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 2);
                 (inputs[0].clone(), inputs[1].clone())
@@ -327,7 +333,7 @@ pub mod circuits {
             }
         }
 
-        impl<F: FancyBinary> CircuitExecutor<F> for TestAndGateFanN {
+        impl<F: FancyBinary> CircuitInputMapper<F> for TestAndGateFanN {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
                 inputs
@@ -357,7 +363,7 @@ pub mod circuits {
                 backend.or_many(inputs, channel)
             }
         }
-        impl<F: FancyBinary> CircuitExecutor<F> for TestOrGateFanN {
+        impl<F: FancyBinary> CircuitInputMapper<F> for TestOrGateFanN {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
                 inputs
@@ -387,7 +393,7 @@ pub mod circuits {
                 Ok(backend.xor_many(inputs))
             }
         }
-        impl<F: FancyBinary> CircuitExecutor<F> for TestXorGateFanN {
+        impl<F: FancyBinary> CircuitInputMapper<F> for TestXorGateFanN {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
                 inputs
@@ -419,7 +425,7 @@ pub mod circuits {
                 ))
             }
         }
-        impl<F: FancyBinary> CircuitExecutor<F> for TestBinaryNegate {
+        impl<F: FancyBinary> CircuitInputMapper<F> for TestBinaryNegate {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
                 inputs
@@ -440,7 +446,7 @@ pub mod circuits {
 
         use crate::{
             FancyArithmetic,
-            circuit::{Circuit, CircuitExecutor},
+            circuit::{Circuit, CircuitInputMapper},
         };
         use swanky_channel::Channel;
         use swanky_error::Result;
@@ -460,7 +466,7 @@ pub mod circuits {
                 Ok(backend.add(&inputs.0, &inputs.1))
             }
         }
-        impl<F: FancyArithmetic> CircuitExecutor<F> for TestAddition {
+        impl<F: FancyArithmetic> CircuitInputMapper<F> for TestAddition {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 2);
                 (inputs[0].clone(), inputs[1].clone())
@@ -490,7 +496,7 @@ pub mod circuits {
                 Ok(backend.add_many(inputs))
             }
         }
-        impl<F: FancyArithmetic> CircuitExecutor<F> for TestAddMany {
+        impl<F: FancyArithmetic> CircuitInputMapper<F> for TestAddMany {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.1);
                 inputs
@@ -520,7 +526,7 @@ pub mod circuits {
                 Ok(backend.sub(&inputs.0, &inputs.1))
             }
         }
-        impl<F: FancyArithmetic> CircuitExecutor<F> for TestSubtraction {
+        impl<F: FancyArithmetic> CircuitInputMapper<F> for TestSubtraction {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 2);
                 (inputs[0].clone(), inputs[1].clone())
@@ -550,7 +556,7 @@ pub mod circuits {
                 backend.mul(&inputs.0, &inputs.1, channel)
             }
         }
-        impl<F: FancyArithmetic> CircuitExecutor<F> for TestMulGate {
+        impl<F: FancyArithmetic> CircuitInputMapper<F> for TestMulGate {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 2);
                 (inputs[0].clone(), inputs[1].clone())
@@ -581,7 +587,7 @@ pub mod circuits {
                 backend.mul(&inputs.0, &inputs.1, channel)
             }
         }
-        impl<F: FancyArithmetic> CircuitExecutor<F> for TestMulGateUnequalMods {
+        impl<F: FancyArithmetic> CircuitInputMapper<F> for TestMulGateUnequalMods {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 2);
                 (inputs[0].clone(), inputs[1].clone())
@@ -611,7 +617,7 @@ pub mod circuits {
                 Ok(backend.cmul(input, self.1))
             }
         }
-        impl<F: FancyArithmetic> CircuitExecutor<F> for TestCmul {
+        impl<F: FancyArithmetic> CircuitInputMapper<F> for TestCmul {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 1);
                 inputs[0].clone()
@@ -642,7 +648,7 @@ pub mod circuits {
                 Ok(backend.add(input, &constant))
             }
         }
-        impl<F: FancyArithmetic> CircuitExecutor<F> for TestConstants {
+        impl<F: FancyArithmetic> CircuitInputMapper<F> for TestConstants {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 1);
                 inputs[0].clone()
@@ -663,7 +669,7 @@ pub mod circuits {
 
         use crate::{
             FancyArithmetic, FancyProj,
-            circuit::{Circuit, CircuitExecutor},
+            circuit::{Circuit, CircuitInputMapper},
         };
         use swanky_channel::Channel;
         use swanky_error::Result;
@@ -684,7 +690,7 @@ pub mod circuits {
                 backend.proj(input, self.0, Some(tab), channel)
             }
         }
-        impl<F: FancyProj> CircuitExecutor<F> for TestProj {
+        impl<F: FancyProj> CircuitInputMapper<F> for TestProj {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 1);
                 inputs[0].clone()
@@ -714,7 +720,7 @@ pub mod circuits {
                 backend.proj(input, self.0, Some(self.1.clone()), channel)
             }
         }
-        impl<F: FancyProj> CircuitExecutor<F> for TestProjRand {
+        impl<F: FancyProj> CircuitInputMapper<F> for TestProjRand {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 1);
                 inputs[0].clone()
@@ -745,7 +751,7 @@ pub mod circuits {
                 backend.mod_change(&y, self.0, channel)
             }
         }
-        impl<F: FancyProj> CircuitExecutor<F> for TestModChange {
+        impl<F: FancyProj> CircuitInputMapper<F> for TestModChange {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), 1);
                 inputs[0].clone()
@@ -780,7 +786,7 @@ pub mod circuits {
                 Ok(backend.add_many(&wires))
             }
         }
-        impl<F: FancyProj + FancyArithmetic> CircuitExecutor<F> for TestAddManyModChange {
+        impl<F: FancyProj + FancyArithmetic> CircuitInputMapper<F> for TestAddManyModChange {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
                 inputs
@@ -801,7 +807,7 @@ pub mod circuits {
 
         use crate::{
             BinaryBundle, Bundle, BundleGadgets, CrtBundle,
-            circuit::{Circuit, CircuitExecutor},
+            circuit::{Circuit, CircuitInputMapper},
         };
         use swanky_channel::Channel;
         use swanky_error::Result;
@@ -821,7 +827,7 @@ pub mod circuits {
                 Ok(input.clone())
             }
         }
-        impl<F: BundleGadgets> CircuitExecutor<F> for TestBundleInputOutput {
+        impl<F: BundleGadgets> CircuitInputMapper<F> for TestBundleInputOutput {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len());
                 CrtBundle::new(inputs)
@@ -851,7 +857,7 @@ pub mod circuits {
                 backend.shift_extend(input, self.1, channel)
             }
         }
-        impl<F: BundleGadgets> CircuitExecutor<F> for TestShiftExtend {
+        impl<F: BundleGadgets> CircuitInputMapper<F> for TestShiftExtend {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
                 BinaryBundle::new(inputs)
@@ -872,7 +878,7 @@ pub mod circuits {
 
         use crate::{
             CrtBundle, CrtGadgets,
-            circuit::{Circuit, CircuitExecutor},
+            circuit::{Circuit, CircuitInputMapper},
         };
         use swanky_channel::Channel;
         use swanky_error::Result;
@@ -892,7 +898,7 @@ pub mod circuits {
                 Ok(backend.crt_add(&inputs.0, &inputs.1))
             }
         }
-        impl<F: CrtGadgets> CircuitExecutor<F> for TestCrtAddition {
+        impl<F: CrtGadgets> CircuitInputMapper<F> for TestCrtAddition {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * 2);
                 let length = self.0.len();
@@ -926,7 +932,7 @@ pub mod circuits {
                 Ok(backend.crt_sub(&inputs.0, &inputs.1))
             }
         }
-        impl<F: CrtGadgets> CircuitExecutor<F> for TestCrtSubtraction {
+        impl<F: CrtGadgets> CircuitInputMapper<F> for TestCrtSubtraction {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * 2);
                 let length = self.0.len();
@@ -960,7 +966,7 @@ pub mod circuits {
                 Ok(backend.crt_cmul(input, self.1))
             }
         }
-        impl<F: CrtGadgets> CircuitExecutor<F> for TestCrtCmul {
+        impl<F: CrtGadgets> CircuitInputMapper<F> for TestCrtCmul {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len());
                 CrtBundle::new(inputs)
@@ -981,7 +987,7 @@ pub mod circuits {
 
         use crate::{
             ArithmeticBundleGadgets, Bundle, CrtBundle,
-            circuit::{Circuit, CircuitExecutor},
+            circuit::{Circuit, CircuitInputMapper},
         };
         use swanky_channel::Channel;
         use swanky_error::Result;
@@ -1001,7 +1007,7 @@ pub mod circuits {
                 backend.mul_bundles(&inputs.0, &inputs.1, channel)
             }
         }
-        impl<F: ArithmeticBundleGadgets> CircuitExecutor<F> for TestCrtMultiplication {
+        impl<F: ArithmeticBundleGadgets> CircuitInputMapper<F> for TestCrtMultiplication {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * 2);
                 let length = self.0.len();
@@ -1035,7 +1041,7 @@ pub mod circuits {
                 backend.mask(&inputs.0, &inputs.1, channel)
             }
         }
-        impl<F: ArithmeticBundleGadgets> CircuitExecutor<F> for TestMask {
+        impl<F: ArithmeticBundleGadgets> CircuitInputMapper<F> for TestMask {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() + 1);
                 (inputs[0].clone(), Bundle::new(inputs[1..].to_vec()))
@@ -1056,7 +1062,7 @@ pub mod circuits {
 
         use crate::{
             Bundle, CrtBundle, CrtProjGadgets,
-            circuit::{Circuit, CircuitExecutor},
+            circuit::{Circuit, CircuitInputMapper},
         };
         use swanky_channel::Channel;
         use swanky_error::Result;
@@ -1076,7 +1082,7 @@ pub mod circuits {
                 backend.crt_cexp(input, self.1, channel)
             }
         }
-        impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtCexp {
+        impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestCrtCexp {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len());
                 CrtBundle::new(inputs)
@@ -1106,7 +1112,7 @@ pub mod circuits {
                 backend.crt_div(&inputs.0, &inputs.1, channel)
             }
         }
-        impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtDivision {
+        impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestCrtDivision {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * 2);
                 let length = self.0.len();
@@ -1140,7 +1146,7 @@ pub mod circuits {
                 backend.crt_rem(input, self.1, channel)
             }
         }
-        impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtRemainder {
+        impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestCrtRemainder {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len());
                 CrtBundle::new(inputs)
@@ -1177,7 +1183,7 @@ pub mod circuits {
                 Ok(outputs)
             }
         }
-        impl<F: CrtProjGadgets> CircuitExecutor<F> for TestComplexGadget {
+        impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestComplexGadget {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * self.1);
                 inputs
@@ -1210,7 +1216,7 @@ pub mod circuits {
                 backend.crt_relu(input, "100%", None, channel)
             }
         }
-        impl<F: CrtProjGadgets> CircuitExecutor<F> for TestRelu {
+        impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestRelu {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len());
                 CrtBundle::new(inputs)
@@ -1240,7 +1246,7 @@ pub mod circuits {
                 backend.crt_sgn(input, "100%", None, channel)
             }
         }
-        impl<F: CrtProjGadgets> CircuitExecutor<F> for TestSgn {
+        impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestSgn {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len());
                 CrtBundle::new(inputs)
@@ -1270,7 +1276,7 @@ pub mod circuits {
                 backend.crt_lt(&inputs.0, &inputs.1, "100%", channel)
             }
         }
-        impl<F: CrtProjGadgets> CircuitExecutor<F> for TestLeq {
+        impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestLeq {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * 2);
                 let (x, y) = inputs.split_at(self.0.len());
@@ -1303,7 +1309,7 @@ pub mod circuits {
                 backend.crt_max(inputs, "100%", channel)
             }
         }
-        impl<F: CrtProjGadgets> CircuitExecutor<F> for TestMax {
+        impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestMax {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * self.1);
                 inputs
@@ -1336,7 +1342,7 @@ pub mod circuits {
                 backend.crt_to_pmr(input, channel)
             }
         }
-        impl<F: CrtProjGadgets> CircuitExecutor<F> for TestCrtToPmr {
+        impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestCrtToPmr {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len());
                 CrtBundle::new(inputs)
@@ -1366,7 +1372,7 @@ pub mod circuits {
                 backend.pmr_lt(&inputs.0, &inputs.1, channel)
             }
         }
-        impl<F: CrtProjGadgets> CircuitExecutor<F> for TestPmrLessThan {
+        impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestPmrLessThan {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * 2);
                 let (x, y) = inputs.split_at(self.0.len());
@@ -1399,7 +1405,7 @@ pub mod circuits {
                 backend.pmr_geq(&inputs.0, &inputs.1, channel)
             }
         }
-        impl<F: CrtProjGadgets> CircuitExecutor<F> for TestPmrGreaterThanOrEqual {
+        impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestPmrGreaterThanOrEqual {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * 2);
                 let (x, y) = inputs.split_at(self.0.len());
@@ -1423,7 +1429,7 @@ pub mod circuits {
 
         use crate::{
             ArithmeticProjBundleGadgets, Bundle, CrtBundle,
-            circuit::{Circuit, CircuitExecutor},
+            circuit::{Circuit, CircuitInputMapper},
         };
         use swanky_channel::Channel;
         use swanky_error::Result;
@@ -1443,7 +1449,7 @@ pub mod circuits {
                 backend.eq_bundles(&inputs.0, &inputs.1, channel)
             }
         }
-        impl<F: ArithmeticProjBundleGadgets> CircuitExecutor<F> for TestEqBundles {
+        impl<F: ArithmeticProjBundleGadgets> CircuitInputMapper<F> for TestEqBundles {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * 2);
                 let (x, y) = inputs.split_at(self.0.len());
@@ -1476,7 +1482,7 @@ pub mod circuits {
                 backend.mixed_radix_addition(inputs, channel)
             }
         }
-        impl<F: ArithmeticProjBundleGadgets> CircuitExecutor<F> for TestMixedRadixAddition {
+        impl<F: ArithmeticProjBundleGadgets> CircuitInputMapper<F> for TestMixedRadixAddition {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 inputs
                     .chunks_exact(self.0.len())
@@ -1508,7 +1514,7 @@ pub mod circuits {
                 backend.mixed_radix_addition_msb_only(inputs, channel)
             }
         }
-        impl<F: ArithmeticProjBundleGadgets> CircuitExecutor<F> for TestMixedRadixAdditionMSBOnly {
+        impl<F: ArithmeticProjBundleGadgets> CircuitInputMapper<F> for TestMixedRadixAdditionMSBOnly {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 inputs
                     .chunks_exact(self.0.len())
@@ -1531,7 +1537,7 @@ pub mod circuits {
 
         use crate::{
             BinaryBundle, BinaryGadgets,
-            circuit::{Circuit, CircuitExecutor},
+            circuit::{Circuit, CircuitInputMapper},
         };
         use swanky_channel::Channel;
         use swanky_error::Result;
@@ -1551,7 +1557,7 @@ pub mod circuits {
                 backend.bin_mul(&inputs.0, &inputs.1, channel)
             }
         }
-        impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryMultiplication {
+        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryMultiplication {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0 * 2);
                 let (x, y) = inputs.split_at(self.0);
@@ -1584,7 +1590,7 @@ pub mod circuits {
                 backend.bin_multiplication_lower_half(&inputs.0, &inputs.1, channel)
             }
         }
-        impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryMultiplicationLowerHalf {
+        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryMultiplicationLowerHalf {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0 * 2);
                 let (x, y) = inputs.split_at(self.0);
@@ -1617,7 +1623,7 @@ pub mod circuits {
                 backend.bin_div(&inputs.0, &inputs.1, channel)
             }
         }
-        impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryDivision {
+        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryDivision {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0 * 2);
                 let (x, y) = inputs.split_at(self.0);
@@ -1650,7 +1656,7 @@ pub mod circuits {
                 backend.bin_lt_signed(&inputs.0, &inputs.1, channel)
             }
         }
-        impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryLessThanSigned {
+        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryLessThanSigned {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0 * 2);
                 let (x, y) = inputs.split_at(self.0);
@@ -1683,7 +1689,7 @@ pub mod circuits {
                 Ok(backend.bin_rsa(input, self.1))
             }
         }
-        impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryArithmeticRightShift {
+        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryArithmeticRightShift {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
                 BinaryBundle::new(inputs)
@@ -1713,7 +1719,7 @@ pub mod circuits {
                 backend.bin_rsl(input, self.1, channel)
             }
         }
-        impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryLogicalRightShift {
+        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryLogicalRightShift {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
                 BinaryBundle::new(inputs)
@@ -1743,7 +1749,7 @@ pub mod circuits {
                 backend.bin_abs(input, channel)
             }
         }
-        impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryAbs {
+        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryAbs {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
                 BinaryBundle::new(inputs)
@@ -1773,7 +1779,7 @@ pub mod circuits {
                 backend.bin_demux(input, channel)
             }
         }
-        impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryDemux {
+        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryDemux {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
                 BinaryBundle::new(inputs)
@@ -1803,7 +1809,7 @@ pub mod circuits {
                 backend.bin_max(inputs, channel)
             }
         }
-        impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryMax {
+        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryMax {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 inputs
                     .chunks_exact(self.0)
@@ -1929,7 +1935,7 @@ mod fancy_arithmetic {
 #[cfg(test)]
 mod fancy_proj {
     use crate::{
-        circuit::{CircuitExecutor, circuits},
+        circuit::{CircuitInputMapper, circuits},
         dummy::{Dummy, DummyVal},
         util::RngExt,
     };
@@ -1957,10 +1963,10 @@ mod fancy_proj {
 
         for _ in 0..64 {
             let inputs = (0
-                ..<circuits::proj::TestAddManyModChange as CircuitExecutor<Dummy>>::ninputs(&c))
+                ..<circuits::proj::TestAddManyModChange as CircuitInputMapper<Dummy>>::ninputs(&c))
                 .map(|i| {
                     DummyVal::rand(
-                        <circuits::proj::TestAddManyModChange as CircuitExecutor<Dummy>>::modulus(
+                        <circuits::proj::TestAddManyModChange as CircuitInputMapper<Dummy>>::modulus(
                             &c, i,
                         ),
                         &mut rng,

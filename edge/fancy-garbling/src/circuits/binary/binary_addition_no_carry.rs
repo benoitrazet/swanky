@@ -58,7 +58,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryAdditionNoCarry {
 
 pub mod test {
     use super::*;
-    use crate::circuit::CircuitExecutor;
+    use crate::circuit::CircuitInputMapper;
 
     /// Circuit for testing [`BinaryAdditionNoCarry`].
     pub struct TestBinaryAdditionNoCarry(pub usize);
@@ -76,7 +76,7 @@ pub mod test {
         }
     }
 
-    impl<F: FancyBinary> CircuitExecutor<F> for TestBinaryAdditionNoCarry {
+    impl<F: FancyBinary> CircuitInputMapper<F> for TestBinaryAdditionNoCarry {
         fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0 * 2);
             let (x, y) = inputs.split_at(self.0);

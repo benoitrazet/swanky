@@ -1,6 +1,6 @@
 use crate::{
     FancyBinary,
-    circuit::{Circuit, CircuitExecutor},
+    circuit::{Circuit, CircuitInputMapper},
 };
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -30,7 +30,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryCircuit {
     }
 }
 
-impl<F: FancyBinary> CircuitExecutor<F> for BinaryCircuit {
+impl<F: FancyBinary> CircuitInputMapper<F> for BinaryCircuit {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), self.input_refs.len());
         inputs

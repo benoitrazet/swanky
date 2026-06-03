@@ -4,7 +4,7 @@ use crate::{
     wire::AuthenticatedWireMod2,
 };
 use fancy_garbling::{
-    Fancy, FancyBinary, WireLabel, WireMod2, circuit::CircuitExecutor,
+    Fancy, FancyBinary, WireLabel, WireMod2, circuit::CircuitInputMapper,
     circuit_analyzer::CircuitAnalyzer,
 };
 use rand::{CryptoRng, RngCore};
@@ -46,7 +46,7 @@ pub struct Evaluator {
 impl Evaluator {
     /// Create a new evaluator for the given circuit.
     pub fn new<
-        C: CircuitExecutor<CircuitAnalyzer> + CircuitExecutor<WirePreProcessor<PartyEvaluator>>,
+        C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>,
         RNG: CryptoRng + RngCore,
     >(
         circuit: &C,

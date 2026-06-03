@@ -1,6 +1,6 @@
 use fancy_garbling::{
     Fancy,
-    circuit::{CircuitExecutor, Flatten},
+    circuit::{CircuitInputMapper, Flatten},
     circuit_analyzer::CircuitAnalyzer,
     dummy::Dummy,
 };
@@ -12,12 +12,12 @@ use swanky_rng::SwankyRng;
 
 /// Circuit Runner
 pub fn test_circuit<
-    C: CircuitExecutor<CircuitAnalyzer>
-        + CircuitExecutor<WirePreProcessor<PartyGarbler>>
-        + CircuitExecutor<WirePreProcessor<PartyEvaluator>>
-        + CircuitExecutor<Garbler<SwankyRng>>
-        + CircuitExecutor<Evaluator>
-        + CircuitExecutor<Dummy>
+    C: CircuitInputMapper<CircuitAnalyzer>
+        + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
+        + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
+        + CircuitInputMapper<Garbler<SwankyRng>>
+        + CircuitInputMapper<Evaluator>
+        + CircuitInputMapper<Dummy>
         + Sync,
 >(
     inputs_gb: &[u16],
@@ -34,7 +34,7 @@ pub fn test_circuit<
             inputs.extend(theirs);
             let outputs = circuit.execute(
                 &mut gb,
-                &<C as CircuitExecutor<Garbler<_>>>::map(circuit, inputs),
+                &<C as CircuitInputMapper<Garbler<_>>>::map(circuit, inputs),
                 c,
             )?;
             gb.outputs(&outputs.flatten(), c)
@@ -46,7 +46,7 @@ pub fn test_circuit<
             inputs.extend(mine);
             let outputs = circuit.execute(
                 &mut ev,
-                &<C as CircuitExecutor<Evaluator>>::map(circuit, inputs),
+                &<C as CircuitInputMapper<Evaluator>>::map(circuit, inputs),
                 c,
             )?;
             ev.outputs(&outputs.flatten(), c)

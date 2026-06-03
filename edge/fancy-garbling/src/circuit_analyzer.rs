@@ -1,9 +1,7 @@
 //! Fancy object to profile a fancy circuit and compute stats such as the multiplicative depth
 //! or the number of boolean and arithmetic gates in a circuit.
 use crate::{
-    FancyArithmetic, FancyBinary, FancyProj,
-    circuit::CircuitExecutor,
-    fancy::{Fancy, HasModulus},
+    Fancy, FancyArithmetic, FancyBinary, FancyProj, HasModulus, circuit::CircuitInputMapper,
 };
 use std::cmp::max;
 use swanky_channel::Channel;
@@ -106,7 +104,7 @@ impl CircuitAnalyzer {
     }
 
     /// Evaluate `circuit` using [`CircuitAnalyzer`].
-    pub fn eval<C: CircuitExecutor<CircuitAnalyzer>>(&mut self, circuit: &C) -> Result<()> {
+    pub fn eval<C: CircuitInputMapper<CircuitAnalyzer>>(&mut self, circuit: &C) -> Result<()> {
         Channel::with(std::io::empty(), |channel| {
             let inputs = (0..circuit.ninputs())
                 .map(|i| self.receive(circuit.modulus(i), channel))

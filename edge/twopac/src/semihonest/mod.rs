@@ -11,8 +11,13 @@ mod tests {
     use super::*;
     use fancy_garbling::{
         AllWire, CrtBundle, CrtGadgets, CrtProjGadgets, Fancy, FancyArithmetic, FancyBinary,
+<<<<<<< HEAD
         FancyProj, WireLabel, WireMod2,
         circuit::{Circuit, CircuitExecutor, Flatten, circuits::arithmetic::TestAddition},
+=======
+        FancyOutput, FancyProj, WireLabel, WireMod2,
+        circuit::{Circuit, CircuitInputMapper, Flatten, circuits::arithmetic::TestAddition},
+>>>>>>> bc786538 (`fancy-garbling`: Rename `CircuitExecutor` -> `CircuitInputMapper`)
         circuits::aes::AesNonExpanded,
         dummy::{Dummy, DummyVal},
         informer::Informer,
@@ -38,7 +43,7 @@ mod tests {
                         let y = gb.receive(modulus, channel)?;
                         let outputs = circuit.execute(
                             &mut gb,
-                            &<TestAddition as CircuitExecutor<
+                            &<TestAddition as CircuitInputMapper<
                                 Garbler<SwankyRng, ChouOrlandiSender, _>,
                             >>::map(&circuit, [x, y].to_vec()),
                             channel,
@@ -56,7 +61,7 @@ mod tests {
                         let y = ev.encode(b, modulus, channel)?;
                         let output = circuit.execute(
                             &mut ev,
-                            &<TestAddition as CircuitExecutor<
+                            &<TestAddition as CircuitInputMapper<
                                 Evaluator<SwankyRng, ChouOrlandiReceiver, _>,
                             >>::map(&circuit, [x, y].to_vec()),
                             channel,
@@ -134,10 +139,10 @@ mod tests {
 
     fn test_aes<C, Wire: WireLabel + Send>(circ: &C)
     where
-        C: CircuitExecutor<Dummy>
-            + CircuitExecutor<Informer<Dummy>>
-            + CircuitExecutor<GB<Wire>>
-            + CircuitExecutor<EV<Wire>>
+        C: CircuitInputMapper<Dummy>
+            + CircuitInputMapper<Informer<Dummy>>
+            + CircuitInputMapper<GB<Wire>>
+            + CircuitInputMapper<EV<Wire>>
             + Send
             + Sync
             + 'static,
@@ -153,7 +158,7 @@ mod tests {
                 xs.extend(ys);
                 let outputs = circ.execute(
                     &mut gb,
-                    &<C as CircuitExecutor<GB<_>>>::map(circ, xs),
+                    &<C as CircuitInputMapper<GB<_>>>::map(circ, xs),
                     channel,
                 )?;
                 gb.outputs(&outputs.flatten(), channel)?;
@@ -167,7 +172,7 @@ mod tests {
                 xs.extend(ys);
                 let wirelabels = circ.execute(
                     &mut ev,
-                    &<C as CircuitExecutor<EV<_>>>::map(circ, xs),
+                    &<C as CircuitInputMapper<EV<_>>>::map(circ, xs),
                     channel,
                 )?;
                 let out = ev.outputs(&wirelabels.flatten(), channel)?;
@@ -178,7 +183,7 @@ mod tests {
 
         let target = Dummy::eval(
             circ,
-            &<C as CircuitExecutor<Dummy>>::map(circ, vec![DummyVal::new(0, 2); 256]),
+            &<C as CircuitInputMapper<Dummy>>::map(circ, vec![DummyVal::new(0, 2); 256]),
         )
         .unwrap();
         let target = target

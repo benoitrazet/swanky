@@ -1,10 +1,8 @@
 //! `Informer` runs a fancy computation and learns information from it.
 
 use crate::{
-    FancyArithmetic, FancyBinary, FancyProj,
-    circuit::CircuitExecutor,
+    Fancy, FancyArithmetic, FancyBinary, FancyProj, HasModulus, circuit::CircuitInputMapper,
     dummy::Dummy,
-    fancy::{Fancy, HasModulus},
 };
 use std::collections::{HashMap, HashSet};
 use swanky_channel::Channel;
@@ -196,7 +194,7 @@ impl<F: Fancy> Informer<F> {
 
 impl Informer<Dummy> {
     /// Print statistics about `circuit` to `stdout`.
-    pub fn print_stats<C: CircuitExecutor<Self>>(circuit: &C) -> Result<()> {
+    pub fn print_stats<C: CircuitInputMapper<Self>>(circuit: &C) -> Result<()> {
         let mut informer = Self::new(Dummy::new());
         Channel::with(std::io::empty(), |channel| {
             let inputs = (0..circuit.ninputs())

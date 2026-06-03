@@ -1,6 +1,6 @@
 use fancy_garbling::{
     Fancy, WireMod2,
-    circuit::CircuitExecutor,
+    circuit::CircuitInputMapper,
     circuits::{aes::AesNonExpanded, sha::Sha256CompressionFunctionFixedIV},
 };
 use std::time::SystemTime;
@@ -9,8 +9,8 @@ use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 fn run_circuit<
-    C: CircuitExecutor<Garbler<SwankyRng, OtSender, WireMod2>>
-        + CircuitExecutor<Evaluator<SwankyRng, OtReceiver, WireMod2>>
+    C: CircuitInputMapper<Garbler<SwankyRng, OtSender, WireMod2>>
+        + CircuitInputMapper<Evaluator<SwankyRng, OtReceiver, WireMod2>>
         + Sync
         + Send,
 >(
@@ -44,7 +44,7 @@ fn run_circuit<
             let start = SystemTime::now();
             circ.execute(
                 &mut gb,
-                &<C as CircuitExecutor<Garbler<SwankyRng, OtSender, WireMod2>>>::map(circ, xs),
+                &<C as CircuitInputMapper<Garbler<SwankyRng, OtSender, WireMod2>>>::map(circ, xs),
                 channel,
             )
             .unwrap();
@@ -75,7 +75,9 @@ fn run_circuit<
             let start = SystemTime::now();
             circ.execute(
                 &mut ev,
-                &<C as CircuitExecutor<Evaluator<SwankyRng, OtReceiver, WireMod2>>>::map(circ, xs),
+                &<C as CircuitInputMapper<Evaluator<SwankyRng, OtReceiver, WireMod2>>>::map(
+                    circ, xs,
+                ),
                 channel,
             )
             .unwrap();

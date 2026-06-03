@@ -12,7 +12,7 @@ pub use binary_and::BinaryWireLabel;
 mod nonstreaming {
     use crate::{
         AllWire, Evaluator, Garbler, WireLabel, WireMod2,
-        circuit::{CircuitExecutor, Flatten, circuits},
+        circuit::{CircuitInputMapper, Flatten, circuits},
         classic::GarbledCircuit,
         dummy::{Dummy, DummyVal},
         util::RngExt,
@@ -24,9 +24,9 @@ mod nonstreaming {
     // dummy evaluation of the same function.
     fn garble_test_helper<
         W: WireLabel,
-        Ex: CircuitExecutor<Dummy>
-            + CircuitExecutor<Garbler<SwankyRng, W>>
-            + CircuitExecutor<Evaluator<W>>,
+        Ex: CircuitInputMapper<Dummy>
+            + CircuitInputMapper<Garbler<SwankyRng, W>>
+            + CircuitInputMapper<Evaluator<W>>,
     >(
         circuit: &Ex,
     ) {
@@ -35,9 +35,9 @@ mod nonstreaming {
             let (en, ev, output_mapping) =
                 GarbledCircuit::garble::<W, _, _>(circuit, SwankyRng::new()).unwrap();
             for _ in 0..16 {
-                let inputs = (0..<Ex as CircuitExecutor<Dummy>>::ninputs(circuit))
+                let inputs = (0..<Ex as CircuitInputMapper<Dummy>>::ninputs(circuit))
                     .map(|i| {
-                        let q = <Ex as CircuitExecutor<Dummy>>::modulus(circuit, i);
+                        let q = <Ex as CircuitInputMapper<Dummy>>::modulus(circuit, i);
                         let x = rng.gen_u16() % q;
                         DummyVal::new(x, q)
                     })
@@ -48,7 +48,7 @@ mod nonstreaming {
                 let wirelabels = ev
                     .eval_to_wirelabels(
                         circuit,
-                        &<Ex as CircuitExecutor<Evaluator<W>>>::map(circuit, xs),
+                        &<Ex as CircuitInputMapper<Evaluator<W>>>::map(circuit, xs),
                     )
                     .unwrap();
                 let decoded = output_mapping.to_outputs(&wirelabels.flatten()).unwrap();
@@ -56,7 +56,7 @@ mod nonstreaming {
                 // Run the dummy evaluator.
                 let expected = Dummy::eval(
                     circuit,
-                    &<Ex as CircuitExecutor<Dummy>>::map(circuit, inputs),
+                    &<Ex as CircuitInputMapper<Dummy>>::map(circuit, inputs),
                 )
                 .unwrap();
                 let expected = expected
@@ -157,7 +157,7 @@ mod nonstreaming {
 mod streaming {
     use crate::circuit::{Flatten, circuits};
     use crate::{
-        AllWire, Evaluator, Fancy, Garbler, WireLabel, circuit::CircuitExecutor, dummy::Dummy,
+        AllWire, Evaluator, Fancy, Garbler, WireLabel, circuit::CircuitInputMapper, dummy::Dummy,
         util::RngExt,
     };
     use rand::thread_rng;
@@ -168,17 +168,17 @@ mod streaming {
     // evaluation of the same function.
     fn streaming_test_helper<
         W: WireLabel + Send,
-        Ex: CircuitExecutor<Dummy>
-            + CircuitExecutor<Garbler<SwankyRng, W>>
-            + CircuitExecutor<Evaluator<W>>
+        Ex: CircuitInputMapper<Dummy>
+            + CircuitInputMapper<Garbler<SwankyRng, W>>
+            + CircuitInputMapper<Evaluator<W>>
             + Send
             + Sync,
     >(
         circuit: &Ex,
     ) {
         let mut rng = SwankyRng::new();
-        let moduli = (0..<Ex as CircuitExecutor<Dummy>>::ninputs(circuit))
-            .map(|i| <Ex as CircuitExecutor<Dummy>>::modulus(circuit, i))
+        let moduli = (0..<Ex as CircuitInputMapper<Dummy>>::ninputs(circuit))
+            .map(|i| <Ex as CircuitInputMapper<Dummy>>::modulus(circuit, i))
             .collect::<Vec<_>>();
         let inputs = moduli.iter().map(|q| rng.gen_u16() % q).collect::<Vec<_>>();
 
@@ -188,7 +188,7 @@ mod streaming {
             let inputs = dummy.encode_many(&inputs, &moduli, channel)?;
             let outputs = circuit.execute(
                 &mut dummy,
-                &<Ex as CircuitExecutor<Dummy>>::map(circuit, inputs),
+                &<Ex as CircuitInputMapper<Dummy>>::map(circuit, inputs),
                 channel,
             )?;
             Ok(dummy.outputs(&outputs.flatten(), channel)?.unwrap())
@@ -201,7 +201,7 @@ mod streaming {
                 let zeros = gb.encode_many(&inputs, &moduli, channel)?;
                 let outputs = circuit.execute(
                     &mut gb,
-                    &<Ex as CircuitExecutor<Garbler<_, _>>>::map(circuit, zeros),
+                    &<Ex as CircuitInputMapper<Garbler<_, _>>>::map(circuit, zeros),
                     channel,
                 )?;
                 gb.outputs(&outputs.flatten(), channel)?;
@@ -212,7 +212,7 @@ mod streaming {
                 let wires = ev.receive_many(&moduli, channel)?;
                 let outputs = circuit.execute(
                     &mut ev,
-                    &<Ex as CircuitExecutor<Evaluator<_>>>::map(circuit, wires),
+                    &<Ex as CircuitInputMapper<Evaluator<_>>>::map(circuit, wires),
                     channel,
                 )?;
                 Ok(ev.outputs(&outputs.flatten(), channel)?.unwrap())

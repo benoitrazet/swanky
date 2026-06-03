@@ -2,7 +2,7 @@
 
 use crate::{
     FancyBinary,
-    circuit::{BinaryCircuit, Circuit, CircuitExecutor},
+    circuit::{BinaryCircuit, Circuit, CircuitInputMapper},
     circuits::binary::BinaryConstant,
 };
 use std::io::Cursor;
@@ -53,7 +53,7 @@ impl<F: FancyBinary> Circuit<F> for Sha256CompressionFunctionFixedIV {
     }
 }
 
-impl<F: FancyBinary> CircuitExecutor<F> for Sha256CompressionFunctionFixedIV {
+impl<F: FancyBinary> CircuitInputMapper<F> for Sha256CompressionFunctionFixedIV {
     fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 512);
         inputs.try_into().unwrap()
@@ -115,7 +115,7 @@ impl<F: FancyBinary> Circuit<F> for Sha256CompressionFunction {
     }
 }
 
-impl<F: FancyBinary> CircuitExecutor<F> for Sha256CompressionFunction {
+impl<F: FancyBinary> CircuitInputMapper<F> for Sha256CompressionFunction {
     fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 768);
         let (block, chain) = inputs.split_at(512);

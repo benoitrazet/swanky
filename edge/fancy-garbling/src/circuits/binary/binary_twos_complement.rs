@@ -32,7 +32,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryTwosComplement {
 }
 
 pub mod test {
-    use crate::circuit::CircuitExecutor;
+    use crate::circuit::CircuitInputMapper;
 
     use super::*;
 
@@ -52,7 +52,7 @@ pub mod test {
         }
     }
 
-    impl<F: BinaryGadgets> CircuitExecutor<F> for TestBinaryTwosComplement {
+    impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryTwosComplement {
         fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0);
             BinaryBundle::new(inputs)

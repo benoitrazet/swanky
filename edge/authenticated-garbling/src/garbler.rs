@@ -2,7 +2,7 @@ use crate::preprocesser::WirePreProcessor;
 use crate::preprocesser::f_preprocessing;
 use crate::ps::PartyGarbler;
 use crate::wire::AuthenticatedWireMod2;
-use fancy_garbling::circuit::CircuitExecutor;
+use fancy_garbling::circuit::CircuitInputMapper;
 use fancy_garbling::circuit_analyzer::CircuitAnalyzer;
 use fancy_garbling::{Fancy, FancyBinary, WireLabel, WireMod2};
 
@@ -44,7 +44,7 @@ pub struct Garbler<RNG> {
 impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// Create a new garbler for a given circuit.
     pub fn new<
-        C: CircuitExecutor<CircuitAnalyzer> + CircuitExecutor<WirePreProcessor<PartyGarbler>>,
+        C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyGarbler>>,
     >(
         circuit: &C,
         channel: &mut Channel,

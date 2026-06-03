@@ -3,7 +3,7 @@
 
 use crate::{
     Fancy, WireLabel,
-    circuit::{Circuit, CircuitExecutor, Flatten},
+    circuit::{Circuit, CircuitInputMapper, Flatten},
     garble::{Evaluator, Garbler},
     util::output_tweak,
 };
@@ -44,7 +44,7 @@ impl GarbledCircuit {
     ///    associated underlying values.
     pub fn garble<
         Wire: WireLabel,
-        C: CircuitExecutor<Garbler<RNG, Wire>>,
+        C: CircuitInputMapper<Garbler<RNG, Wire>>,
         RNG: CryptoRng + RngCore,
     >(
         circuit: &C,

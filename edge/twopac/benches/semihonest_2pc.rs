@@ -4,7 +4,7 @@ use core::time::Duration;
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     Fancy, WireMod2,
-    circuit::CircuitExecutor,
+    circuit::CircuitInputMapper,
     circuits::{aes::AesNonExpanded, sha::Sha256CompressionFunctionFixedIV},
 };
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
@@ -12,8 +12,8 @@ use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 fn bench_circuit<
-    C: CircuitExecutor<Garbler<SwankyRng, OtSender, WireMod2>>
-        + CircuitExecutor<Evaluator<SwankyRng, OtReceiver, WireMod2>>
+    C: CircuitInputMapper<Garbler<SwankyRng, OtSender, WireMod2>>
+        + CircuitInputMapper<Evaluator<SwankyRng, OtReceiver, WireMod2>>
         + Sync
         + Send,
 >(
@@ -34,7 +34,7 @@ fn bench_circuit<
             xs.extend(ys);
             circ.execute(
                 &mut gb,
-                &<C as CircuitExecutor<Garbler<SwankyRng, OtSender, WireMod2>>>::map(circ, xs),
+                &<C as CircuitInputMapper<Garbler<SwankyRng, OtSender, WireMod2>>>::map(circ, xs),
                 channel,
             )
             .unwrap();
@@ -50,7 +50,9 @@ fn bench_circuit<
             xs.extend(ys);
             circ.execute(
                 &mut ev,
-                &<C as CircuitExecutor<Evaluator<SwankyRng, OtReceiver, WireMod2>>>::map(circ, xs),
+                &<C as CircuitInputMapper<Evaluator<SwankyRng, OtReceiver, WireMod2>>>::map(
+                    circ, xs,
+                ),
                 channel,
             )
             .unwrap();

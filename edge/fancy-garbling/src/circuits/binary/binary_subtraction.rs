@@ -31,7 +31,7 @@ impl<F: FancyBinary> Circuit<F> for BinarySubtraction {
 
 pub mod test {
     use super::*;
-    use crate::circuit::CircuitExecutor;
+    use crate::circuit::CircuitInputMapper;
 
     /// Circuit for testing [`BinarySubtraction`].
     pub struct TestBinarySubtraction(pub usize);
@@ -49,7 +49,7 @@ pub mod test {
         }
     }
 
-    impl<F: FancyBinary> CircuitExecutor<F> for TestBinarySubtraction {
+    impl<F: FancyBinary> CircuitInputMapper<F> for TestBinarySubtraction {
         fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0 * 2);
             let (x, y) = inputs.split_at(self.0);

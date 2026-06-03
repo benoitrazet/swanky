@@ -9,7 +9,7 @@ use fancy_garbling::circuits::binary::TestBinaryAdditionNoCarry;
 use fancy_garbling::dummy::DummyVal;
 use fancy_garbling::{
     Fancy,
-    circuit::{CircuitExecutor, circuits},
+    circuit::{CircuitInputMapper, circuits},
     circuit_analyzer::CircuitAnalyzer,
     dummy::Dummy,
 };
@@ -34,12 +34,12 @@ fn test_party_construction_passes() {
 }
 
 fn test_circuit<
-    C: CircuitExecutor<CircuitAnalyzer>
-        + CircuitExecutor<WirePreProcessor<PartyGarbler>>
-        + CircuitExecutor<WirePreProcessor<PartyEvaluator>>
-        + CircuitExecutor<Garbler<SwankyRng>>
-        + CircuitExecutor<Evaluator>
-        + CircuitExecutor<Dummy>
+    C: CircuitInputMapper<CircuitAnalyzer>
+        + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
+        + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
+        + CircuitInputMapper<Garbler<SwankyRng>>
+        + CircuitInputMapper<Evaluator>
+        + CircuitInputMapper<Dummy>
         + Sync,
 >(
     ninputs_gb: usize,
@@ -48,7 +48,7 @@ fn test_circuit<
 ) {
     assert_eq!(
         ninputs_gb + ninputs_ev,
-        <C as CircuitExecutor<Dummy>>::ninputs(circuit)
+        <C as CircuitInputMapper<Dummy>>::ninputs(circuit)
     );
 
     let mut rng = SwankyRng::new();
@@ -67,7 +67,7 @@ fn test_circuit<
     let dummy_inputs = [dummy_inputs_gb, dummy_inputs_ev].concat();
     let expected = Dummy::eval(
         circuit,
-        &<C as CircuitExecutor<Dummy>>::map(circuit, dummy_inputs),
+        &<C as CircuitInputMapper<Dummy>>::map(circuit, dummy_inputs),
     )
     .unwrap();
     let expected = expected
@@ -85,7 +85,7 @@ fn test_circuit<
             inputs.extend(theirs);
             let outputs = circuit.execute(
                 &mut gb,
-                &<C as CircuitExecutor<Garbler<_>>>::map(circuit, inputs),
+                &<C as CircuitInputMapper<Garbler<_>>>::map(circuit, inputs),
                 c,
             )?;
             gb.outputs(&outputs.flatten(), c)
@@ -98,7 +98,7 @@ fn test_circuit<
             inputs.extend(mine);
             let outputs = circuit.execute(
                 &mut ev,
-                &<C as CircuitExecutor<Evaluator>>::map(circuit, inputs),
+                &<C as CircuitInputMapper<Evaluator>>::map(circuit, inputs),
                 c,
             )?;
             ev.outputs(&outputs.flatten(), c)

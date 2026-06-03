@@ -70,7 +70,7 @@ impl<F: Fancy> Circuit<F> for BinaryConstant<F> {
 
 pub mod test {
     use super::*;
-    use crate::circuit::CircuitExecutor;
+    use crate::circuit::CircuitInputMapper;
 
     /// Circuit for testing [`BinaryConstant`].
     pub struct TestBinaryConstant(pub u128, pub usize);
@@ -88,7 +88,7 @@ pub mod test {
         }
     }
 
-    impl<F: Fancy> CircuitExecutor<F> for TestBinaryConstant {
+    impl<F: Fancy> CircuitInputMapper<F> for TestBinaryConstant {
         fn map(&self, inputs: Vec<<F as Fancy>::Item>) -> Self::Input {
             assert!(inputs.is_empty());
         }
