@@ -1,8 +1,9 @@
 //! Various fancy circuits
 use crate::circuit_psi::*;
 use fancy_garbling::{
-    BinaryBundle, BinaryGadgets, Fancy, FancyBinary, circuit::Circuit,
-    circuits::binary::BinaryEquality,
+    BinaryBundle, BinaryGadgets, Fancy, FancyBinary,
+    circuit::Circuit,
+    circuits::binary::{BinaryEquality, PairwiseXor},
 };
 use itertools::Itertools;
 use swanky_channel::Channel;
@@ -59,6 +60,7 @@ pub fn fancy_unmask<F>(
     f: &mut F,
     elements: &[BinaryBundle<F::Item>],
     masks: &[BinaryBundle<F::Item>],
+    channel: &mut Channel,
 ) -> swanky_error::Result<Vec<BinaryBundle<F::Item>>>
 where
     F: Fancy + FancyBinary,
@@ -66,7 +68,12 @@ where
     let mut res = Vec::new();
 
     for i in 0..elements.len() {
-        res.push(f.bin_xor(&elements[i], &masks[i]));
+        let xor = PairwiseXor.execute(
+            f,
+            &(elements[i].wires().to_owned(), masks[i].wires().to_owned()),
+            channel,
+        )?;
+        res.push(BinaryBundle::new(xor));
     }
     Ok(res)
 }

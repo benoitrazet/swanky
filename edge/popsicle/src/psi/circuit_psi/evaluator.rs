@@ -86,7 +86,8 @@ where
         // (2)
         let primary_keys =
             bundle_primary_keys::<Evaluator<RNG, OtReceiver, WireMod2>>(&circuit_inputs)?;
-        let (sender_payloads, receiver_payloads) = bundle_payloads(&mut self.ev, &circuit_inputs)?;
+        let (sender_payloads, receiver_payloads) =
+            bundle_payloads(&mut self.ev, &circuit_inputs, channel)?;
 
         // (3)
         let existence_bit_vector = fancy_intersection_bit_vector(

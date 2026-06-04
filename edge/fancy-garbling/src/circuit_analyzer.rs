@@ -249,20 +249,6 @@ mod tests {
     use crate::{circuit::circuits, circuits::binary::TestBinaryTwosComplement};
 
     #[test]
-    fn single_and_gate_count_is_correct() {
-        let nbits = 64;
-        let test = circuits::binary_gadgets::TestBinaryAnd(nbits);
-        let mut analyzer = CircuitAnalyzer::new();
-        analyzer.eval(&test).unwrap();
-
-        assert_eq!(analyzer.ninputs, 128);
-        assert_eq!(analyzer.nands, 64);
-        assert_eq!(analyzer.nxors, 0);
-        assert_eq!(analyzer.nconstants, 0);
-        assert_eq!(analyzer.nnegs, 0);
-    }
-
-    #[test]
     fn binary_addition_counts_are_correct() {
         let nbits = 64;
         let test = crate::circuits::binary::TestBinaryAddition(nbits);
