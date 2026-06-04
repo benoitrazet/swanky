@@ -36,8 +36,6 @@ pub trait HasModulus {
 ///    [`Fancy::receive_many`]).
 /// 3. Creating a wirelabel for a fixed (public) constant value
 ///    ([`Fancy::constant`]).
-/// 4. Outputting a wirelabel as its underlying value ([`Fancy::output`] and
-///    [`Fancy::outputs`]).
 ///
 /// This trait can be further extended to support binary, arithmetic, and/or
 /// projections by using the [`FancyBinary`], [`FancyArithmetic`], or
