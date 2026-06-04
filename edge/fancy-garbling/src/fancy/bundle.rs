@@ -488,20 +488,4 @@ pub trait BundleGadgets: Fancy {
         }
         Ok(Bundle(ws))
     }
-
-    /// Shift residues, replacing them with zeros in the modulus of the least signifigant
-    /// residue. Output is extended with n elements.
-    fn shift_extend(
-        &mut self,
-        x: &Bundle<Self::Item>,
-        n: usize,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Bundle<Self::Item>> {
-        let mut ws = x.wires().to_vec();
-        let zero = self.constant(0, ws.last().unwrap().modulus(), channel)?;
-        for _ in 0..n {
-            ws.insert(0, zero.clone());
-        }
-        Ok(Bundle(ws))
-    }
 }

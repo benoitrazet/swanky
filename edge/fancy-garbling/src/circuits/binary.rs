@@ -40,6 +40,11 @@ mod binary_subtraction;
 pub use binary_subtraction::BinarySubtraction;
 pub use binary_subtraction::test::TestBinarySubtraction;
 
+mod binary_multiplication;
+pub use binary_multiplication::BinaryMultiplication;
+pub use binary_multiplication::BinaryMultiplicationLowerHalf;
+pub use binary_multiplication::TestBinaryMultiplication;
+
 mod binary_less_than;
 pub use binary_less_than::BinaryLessThan;
 pub use binary_less_than::BinaryLessThanSigned;
@@ -63,3 +68,7 @@ pub use binary_multiplex::BinaryMultiplex;
 
 mod binary_max;
 pub use binary_max::BinaryMax;
+
+mod binary_shift;
+pub use binary_shift::BinaryShift;
+pub use binary_shift::BinaryShiftExtend;

@@ -5,7 +5,9 @@ use crate::{
     util::{i64_from_bits, i64_to_twos_complement},
 };
 use fancy_garbling::{
-    BinaryBundle, BinaryGadgets, Fancy, circuit::Circuit, circuits::binary::BinaryMax,
+    BinaryBundle, BinaryGadgets, Fancy,
+    circuit::Circuit,
+    circuits::binary::{BinaryMax, BinaryMultiplicationLowerHalf},
 };
 use ndarray::Array3;
 use swanky_channel::Channel;
@@ -200,7 +202,7 @@ impl<'a, F: Fancy + BinaryGadgets> FancyNeuralNet for BinaryLayer<'a, F> {
         } else {
             self.backend.bin_receive(self.nbits, channel)?
         };
-        self.backend.bin_multiplication_lower_half(x, &w, channel)
+        BinaryMultiplicationLowerHalf.execute(self.backend, &(x.clone(), w), channel)
     }
 
     fn nn_max(

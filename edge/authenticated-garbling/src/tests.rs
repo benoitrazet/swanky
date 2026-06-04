@@ -5,7 +5,7 @@ use crate::ps::{PartyEvaluator, PartyGarbler};
 use crate::{evaluator::Evaluator, preprocesser::WirePreProcessor};
 
 use fancy_garbling::circuit::Flatten;
-use fancy_garbling::circuits::binary::TestBinaryAdditionNoCarry;
+use fancy_garbling::circuits::binary::{TestBinaryAdditionNoCarry, TestBinaryMultiplication};
 use fancy_garbling::dummy::DummyVal;
 use fancy_garbling::{
     Fancy,
@@ -221,7 +221,7 @@ fn test_binary_subtraction() {
 #[test]
 fn test_binary_multiplication() {
     let ninputs = 64;
-    let circuit = circuits::binary_gadgets::TestBinaryMultiplication(ninputs);
+    let circuit = TestBinaryMultiplication(ninputs);
 
     test_circuit(ninputs, ninputs, &circuit);
 }

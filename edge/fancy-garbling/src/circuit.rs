@@ -801,77 +801,6 @@ pub mod circuits {
         }
     }
 
-    pub mod bundle_gadgets {
-        //! Circuits that test [`BundleGadgets`].
-
-        use crate::{
-            BinaryBundle, Bundle, BundleGadgets, CrtBundle,
-            circuit::{Circuit, CircuitInputMapper},
-        };
-        use swanky_channel::Channel;
-        use swanky_error::Result;
-
-        /// Circuit for testing [`CrtBundle`]s.
-        pub struct TestBundleInputOutput(pub Vec<u16>);
-        impl<F: BundleGadgets> Circuit<F> for TestBundleInputOutput {
-            type Input = CrtBundle<F::Item>;
-            type Output = CrtBundle<F::Item>;
-
-            fn execute(
-                &self,
-                _: &mut F,
-                input: &Self::Input,
-                _: &mut Channel,
-            ) -> Result<Self::Output> {
-                Ok(input.clone())
-            }
-        }
-        impl<F: BundleGadgets> CircuitInputMapper<F> for TestBundleInputOutput {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0.len());
-                CrtBundle::new(inputs)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0.len()
-            }
-
-            fn modulus(&self, i: usize) -> u16 {
-                self.0[i]
-            }
-        }
-
-        /// Circuit for testing [`BundleGadgets::shift_extend`].
-        pub struct TestShiftExtend(pub usize, pub usize);
-        impl<F: BundleGadgets> Circuit<F> for TestShiftExtend {
-            type Input = BinaryBundle<F::Item>;
-            type Output = Bundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                input: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.shift_extend(input, self.1, channel)
-            }
-        }
-        impl<F: BundleGadgets> CircuitInputMapper<F> for TestShiftExtend {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0);
-                BinaryBundle::new(inputs)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
-    }
-
     pub mod crt_gadgets {
         //! Circuits that test [`CrtGadgets`].
 
@@ -1541,72 +1470,6 @@ pub mod circuits {
         use swanky_channel::Channel;
         use swanky_error::Result;
 
-        /// Circuit for testing [`BinaryGadgets::bin_mul`].
-        pub struct TestBinaryMultiplication(pub usize);
-        impl<F: BinaryGadgets> Circuit<F> for TestBinaryMultiplication {
-            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
-            type Output = BinaryBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.bin_mul(&inputs.0, &inputs.1, channel)
-            }
-        }
-        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryMultiplication {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0 * 2);
-                let (x, y) = inputs.split_at(self.0);
-                let x = BinaryBundle::new(x.to_vec());
-                let y = BinaryBundle::new(y.to_vec());
-                (x, y)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0 * 2
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
-
-        /// Circuit for testing [`BinaryGadgets::bin_multiplication_lower_half`].
-        pub struct TestBinaryMultiplicationLowerHalf(pub usize);
-        impl<F: BinaryGadgets> Circuit<F> for TestBinaryMultiplicationLowerHalf {
-            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
-            type Output = BinaryBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.bin_multiplication_lower_half(&inputs.0, &inputs.1, channel)
-            }
-        }
-        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryMultiplicationLowerHalf {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0 * 2);
-                let (x, y) = inputs.split_at(self.0);
-                let x = BinaryBundle::new(x.to_vec());
-                let y = BinaryBundle::new(y.to_vec());
-                (x, y)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0 * 2
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
-
         /// Circuit for testing [`BinaryGadgets::bin_div`].
         pub struct TestBinaryDivision(pub usize);
         impl<F: BinaryGadgets> Circuit<F> for TestBinaryDivision {
@@ -1910,48 +1773,6 @@ mod fancy_proj {
             let expected: u16 = inputs.iter().map(|x| x.val()).sum();
             let output = Dummy::eval(&c, &inputs).unwrap();
             assert_eq!(output.val(), expected);
-        }
-    }
-}
-
-#[cfg(test)]
-mod bundle_gadgets {
-    use crate::{
-        circuit::circuits,
-        dummy::{Dummy, DummyVal},
-        util::{RngExt, factor},
-    };
-    use rand::{Rng, thread_rng};
-
-    #[test]
-    fn test_bundle_input_output() {
-        let mut rng = thread_rng();
-        let q = rng.gen_usable_composite_modulus();
-        let c = circuits::bundle_gadgets::TestBundleInputOutput(factor(q));
-
-        for _ in 0..16 {
-            let x = rng.r#gen::<u128>() % q;
-            let input = DummyVal::to_crt(x, q);
-            let y = Dummy::eval(&c, &input).unwrap();
-            let output = DummyVal::from_crt(&y, q);
-            assert_eq!(output, x);
-        }
-    }
-
-    #[test]
-    fn test_shift_extend() {
-        let mut rng = thread_rng();
-        let nbits = 64;
-        let q = 1 << nbits;
-
-        for _ in 0..16 {
-            let shift_size = rng.gen_usize() % nbits;
-            let c = circuits::bundle_gadgets::TestShiftExtend(nbits, shift_size);
-
-            let x = rng.gen_u128() % q;
-            let input = DummyVal::to_binary(x, nbits);
-            let output = Dummy::eval(&c, &input).unwrap();
-            assert_eq!(DummyVal::from_binary(&output), x << shift_size);
         }
     }
 }
@@ -2396,40 +2217,6 @@ mod binary_gadgets {
         dummy::{Dummy, DummyVal},
         util::RngExt,
     };
-
-    #[test]
-    fn test_binary_multiplication_lower_half() {
-        let mut rng = thread_rng();
-        let nbits = 64;
-        let q = 1 << nbits;
-        let c = circuits::binary_gadgets::TestBinaryMultiplicationLowerHalf(nbits);
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let y = rng.gen_u128() % q;
-            let x_input = DummyVal::to_binary(x, nbits);
-            let y_input = DummyVal::to_binary(y, nbits);
-            let output = Dummy::eval(&c, &(x_input, y_input)).unwrap();
-            assert_eq!(DummyVal::from_binary(&output), (x * y) % q);
-        }
-    }
-
-    #[test]
-    fn test_binary_multiplication() {
-        let mut rng = thread_rng();
-        let nbits = 64;
-        let q = 1 << 64;
-        let c = circuits::binary_gadgets::TestBinaryMultiplication(nbits);
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let y = rng.gen_u128() % q;
-            let x_input = DummyVal::to_binary(x, nbits);
-            let y_input = DummyVal::to_binary(y, nbits);
-            let output = Dummy::eval(&c, &(x_input, y_input)).unwrap();
-            assert_eq!(DummyVal::from_binary(&output), x * y);
-        }
-    }
 
     #[test]
     fn test_binary_division() {
