@@ -108,7 +108,7 @@ impl<T: Clone + HasModulus, const N: usize> Flatten for [T; N] {
 /// support mapping a vector of inputs into the appropriate input type for the
 /// given circuit.
 /// ```
-/// # use fancy_garbling::{FancyArithmetic, circuit::{Circuit, CircuitExecutor}};
+/// # use fancy_garbling::{FancyArithmetic, circuit::{Circuit, CircuitInputMapper}};
 /// # use swanky_channel::Channel;
 /// # use swanky_error::Result;
 /// struct AddCircuit(u16);
