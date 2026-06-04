@@ -3,9 +3,9 @@ use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// For input `(b, xs, ys)`, output `xs` if `b == 0`, and `ys` otherwise.
-pub struct BinaryMultipex;
+pub struct BinaryMultiplex;
 
-impl<F: FancyBinary> Circuit<F> for BinaryMultipex {
+impl<F: FancyBinary> Circuit<F> for BinaryMultiplex {
     type Input = (F::Item, BinaryBundle<F::Item>, BinaryBundle<F::Item>);
     type Output = BinaryBundle<F::Item>;
 
@@ -27,7 +27,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryMultipex {
 
 #[cfg(test)]
 mod test {
-    use super::BinaryMultipex;
+    use super::BinaryMultiplex;
     use crate::dummy::{Dummy, DummyVal};
     use rand::Rng;
 
@@ -42,7 +42,7 @@ mod test {
 
         for b in 0..=1 {
             let output = Dummy::eval(
-                &BinaryMultipex,
+                &BinaryMultiplex,
                 &(DummyVal::new(b, 2), x_inputs.clone(), y_inputs.clone()),
             )
             .unwrap();

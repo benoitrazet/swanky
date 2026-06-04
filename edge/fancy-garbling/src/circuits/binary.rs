@@ -57,4 +57,4 @@ pub use binary_twos_complement::BinaryTwosComplement;
 pub use binary_twos_complement::test::TestBinaryTwosComplement;
 
 mod binary_multiplex;
-pub use binary_multiplex::BinaryMultipex;
+pub use binary_multiplex::BinaryMultiplex;

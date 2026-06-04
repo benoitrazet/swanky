@@ -1,7 +1,7 @@
 use crate::{
     BinaryBundle, FancyBinary,
     circuit::{Circuit, CircuitInputMapper},
-    circuits::binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality, BinaryMultipex},
+    circuits::binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality, BinaryMultiplex},
 };
 use swanky_error::Result;
 
@@ -52,7 +52,7 @@ impl<F: FancyBinary, const N: usize> Circuit<F> for LinearOram<N> {
             // .execute(backend, &(), channel)?;
             let index = BinaryConstant::new(i as u128, N).execute(backend, &(), channel)?;
             let is_equal = BinaryEquality.execute(backend, &(query.to_owned(), index), channel)?;
-            let mux = BinaryMultipex.execute(
+            let mux = BinaryMultiplex.execute(
                 backend,
                 &(is_equal, zero.clone(), item.clone()),
                 channel,
