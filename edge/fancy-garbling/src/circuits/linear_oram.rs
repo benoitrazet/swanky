@@ -1,8 +1,9 @@
 use crate::{
     BinaryBundle, FancyBinary,
     circuit::{Circuit, CircuitInputMapper},
-    circuits::binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality, BinaryMultiplex},
+    circuits::binary::{BinaryConstant, BinaryEquality, BinaryMultiplex, PairwiseXor},
 };
+use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// Circuit for running linear ORAM.
@@ -29,7 +30,7 @@ impl<F: FancyBinary, const N: usize> Circuit<F> for LinearOram<N> {
         &self,
         backend: &mut F,
         inputs: &Self::Input,
-        channel: &mut swanky_channel::Channel,
+        channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (ram, query) = inputs;
         let zero_bit = backend.constant(0, 2, channel)?;
@@ -56,7 +57,14 @@ impl<F: FancyBinary, const N: usize> Circuit<F> for LinearOram<N> {
                 &(is_equal, zero.clone(), item.clone()),
                 channel,
             )?;
-            result = BinaryAdditionNoCarry.execute(backend, &(result, mux), channel)?;
+            // Every `mux` but one will be zero, so we can use `PairwiseXor`
+            // instead of `BinaryAddition`.
+            let xor = PairwiseXor.execute(
+                backend,
+                &(result.wires().to_owned(), mux.wires().to_owned()),
+                channel,
+            )?;
+            result = BinaryBundle::new(xor);
         }
         Ok(result)
     }
