@@ -11,13 +11,8 @@ mod tests {
     use super::*;
     use fancy_garbling::{
         AllWire, CrtBundle, CrtGadgets, CrtProjGadgets, Fancy, FancyArithmetic, FancyBinary,
-<<<<<<< HEAD
         FancyProj, WireLabel, WireMod2,
-        circuit::{Circuit, CircuitExecutor, Flatten, circuits::arithmetic::TestAddition},
-=======
-        FancyOutput, FancyProj, WireLabel, WireMod2,
         circuit::{Circuit, CircuitInputMapper, Flatten, circuits::arithmetic::TestAddition},
->>>>>>> bc786538 (`fancy-garbling`: Rename `CircuitExecutor` -> `CircuitInputMapper`)
         circuits::aes::AesNonExpanded,
         dummy::{Dummy, DummyVal},
         informer::Informer,
