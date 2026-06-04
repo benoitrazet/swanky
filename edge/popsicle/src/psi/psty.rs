@@ -8,8 +8,9 @@ use aes_gcm::{
 };
 
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyBinary, circuit::Circuit,
-    circuits::binary::BinaryEquality,
+    AllWire, BinaryBundle, Fancy, FancyBinary,
+    circuit::Circuit,
+    circuits::binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality},
 };
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
@@ -451,17 +452,16 @@ fn fancy_compute_cardinality<F: FancyBinary>(
         })
         .collect::<swanky_error::Result<Vec<F::Item>>>()?;
 
-    let mut acc = f.bin_constant_bundle(0, HASH_SIZE * 8, channel)?;
+    let mut acc = BinaryConstant::new(0, HASH_SIZE * 8).execute(f, &(), channel)?;
+    let one = BinaryConstant::new(1, HASH_SIZE * 8).execute(f, &(), channel)?;
 
     for b in eqs.into_iter() {
-        let one = f.bin_constant_bundle(1, HASH_SIZE * 8, channel)?;
         let b_ws = one
             .iter()
             .map(|w| f.and(w, &b, channel))
             .collect::<Result<Vec<_>, _>>()?;
         let b_binary = BinaryBundle::new(b_ws);
-
-        acc = f.bin_addition_no_carry(&acc, &b_binary, channel)?;
+        acc = BinaryAdditionNoCarry.execute(f, &(acc, b_binary), channel)?;
     }
 
     Ok(acc)

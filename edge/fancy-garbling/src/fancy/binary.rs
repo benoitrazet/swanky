@@ -114,17 +114,6 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         Ok(buns)
     }
 
-    /// Create a constant bundle using base 2 inputs.
-    fn bin_constant_bundle(
-        &mut self,
-        val: u128,
-        nbits: usize,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
-        self.constant_bundle(&util::u128_to_bits(val, nbits), &vec![2; nbits], channel)
-            .map(BinaryBundle)
-    }
-
     /// Output a binary bundle and interpret the result as a `u128`.
     fn bin_output(
         &mut self,
@@ -148,97 +137,6 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
             zs.push(z);
         }
         Ok(zs.into_iter().collect())
-    }
-
-    /// Binary addition. Avoids creating extra gates for the final carry.
-    ///
-    /// # Panics
-    /// This panics if `xs` and `ys` do not have equal moduli.
-    fn bin_addition_no_carry(
-        &mut self,
-        xs: &BinaryBundle<Self::Item>,
-        ys: &BinaryBundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
-        assert_eq!(xs.moduli(), ys.moduli());
-        let xwires = xs.wires();
-        let ywires = ys.wires();
-        let (mut z, mut c) = self.adder(&xwires[0], &ywires[0], None, channel)?;
-        let mut bs = vec![z];
-        for i in 1..xwires.len() - 1 {
-            let res = self.adder(&xwires[i], &ywires[i], Some(&c), channel)?;
-            z = res.0;
-            c = res.1;
-            bs.push(z);
-        }
-        // xor instead of add
-        z = self.xor_many(&[
-            xwires.last().unwrap().clone(),
-            ywires.last().unwrap().clone(),
-            c,
-        ]);
-        bs.push(z);
-        Ok(BinaryBundle::new(bs))
-    }
-
-    /// If `x=0` return `c1` as a bundle of constant bits, else return `c2`.
-    fn bin_multiplex_constant_bits(
-        &mut self,
-        x: &Self::Item,
-        c1: u128,
-        c2: u128,
-        nbits: usize,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
-        let c1_bs = util::u128_to_bits(c1, nbits)
-            .into_iter()
-            .map(|x: u16| x > 0)
-            .collect_vec();
-        let c2_bs = util::u128_to_bits(c2, nbits)
-            .into_iter()
-            .map(|x: u16| x > 0)
-            .collect_vec();
-        c1_bs
-            .into_iter()
-            .zip(c2_bs)
-            .map(|(b1, b2)| self.mux_constant_bits(x, b1, b2, channel))
-            .collect::<swanky_error::Result<Vec<Self::Item>>>()
-            .map(BinaryBundle::new)
-    }
-
-    /// Multiplex gadget for binary bundles
-    fn bin_multiplex(
-        &mut self,
-        b: &Self::Item,
-        x: &BinaryBundle<Self::Item>,
-        y: &BinaryBundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
-        x.wires()
-            .iter()
-            .zip(y.wires().iter())
-            .map(|(xwire, ywire)| self.mux(b, xwire, ywire, channel))
-            .collect::<swanky_error::Result<Vec<Self::Item>>>()
-            .map(BinaryBundle::new)
-    }
-
-    /// Write the constant in binary and that gives you the shift amounts, Eg.. 7x is 4x+2x+x.
-    fn bin_cmul(
-        &mut self,
-        x: &BinaryBundle<Self::Item>,
-        c: u128,
-        nbits: usize,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
-        let zero = self.bin_constant_bundle(0, nbits, channel)?;
-        util::u128_to_bits(c, nbits)
-            .into_iter()
-            .enumerate()
-            .filter_map(|(i, b)| if b > 0 { Some(i) } else { None })
-            .try_fold(zero, |z, shift_amt| {
-                let s = self.shift(x, shift_amt, channel).map(BinaryBundle)?;
-                self.bin_addition_no_carry(&z, &s, channel)
-            })
     }
 
     /// Demux a binary bundle into a unary vector.

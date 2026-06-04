@@ -4,7 +4,7 @@
 use fancy_garbling::{
     AllWire, BinaryBundle, BinaryGadgets, Fancy,
     circuit::Circuit,
-    circuits::binary::{BinaryEquality, BinarySubtraction},
+    circuits::binary::{BinaryEquality, BinaryMultiplex, BinarySubtraction},
     util,
 };
 use swanky_twopac::semihonest::{Evaluator, Garbler};
@@ -168,8 +168,8 @@ where
         // (1) If a > b, a := a - b and b := b
         // (2) If b > a, a := a  and b := b - a
         // (3) If a == b, a := a and b := b
-        a = f.bin_multiplex(&underflow_r_1, &a, &r_1, channel)?;
-        b = f.bin_multiplex(&underflow_r_2, &b, &r_2, channel)?;
+        a = BinaryMultiplex.execute(f, &(underflow_r_1, a, r_1), channel)?;
+        b = BinaryMultiplex.execute(f, &(underflow_r_2, b, r_2), channel)?;
     }
 
     Ok(a)

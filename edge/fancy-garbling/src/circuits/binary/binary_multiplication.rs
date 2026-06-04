@@ -1,7 +1,10 @@
 use crate::{
     BinaryBundle, FancyBinary,
     circuit::{Circuit, CircuitInputMapper},
-    circuits::binary::{BinaryAddition, BinaryAdditionNoCarry, BinaryShift, BinaryShiftExtend},
+    circuits::binary::{
+        BinaryAddition, BinaryAdditionNoCarry, BinaryConstant, BinaryShift, BinaryShiftExtend,
+    },
+    util::u128_to_bits,
 };
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -90,6 +93,33 @@ impl<F: FancyBinary> Circuit<F> for BinaryMultiplicationLowerHalf {
     }
 }
 
+/// For [`BinaryBundle`] `x`, constant `c`, and bitlength `n`, output `x * c`,
+/// where the output is of bitlength `n`.
+pub struct BinaryConstantMultiplication;
+
+impl<F: FancyBinary> Circuit<F> for BinaryConstantMultiplication {
+    type Input = (BinaryBundle<F::Item>, u128, usize);
+    type Output = BinaryBundle<F::Item>;
+
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: &Self::Input,
+        channel: &mut Channel,
+    ) -> Result<Self::Output> {
+        let (x, c, nbits) = inputs;
+        let zero = BinaryConstant::new(0, *nbits).execute(backend, &(), channel)?;
+        u128_to_bits(*c, *nbits)
+            .into_iter()
+            .enumerate()
+            .filter_map(|(i, b)| if b > 0 { Some(i) } else { None })
+            .try_fold(zero, |z, shift_amt| {
+                let s = BinaryShift.execute(backend, &(x.clone(), shift_amt), channel)?;
+                BinaryAdditionNoCarry.execute(backend, &(z, s), channel)
+            })
+    }
+}
+
 /// Circuit for testing [`BinaryMultiplication`].
 pub struct TestBinaryMultiplication(pub usize);
 
@@ -128,7 +158,9 @@ impl<F: FancyBinary> CircuitInputMapper<F> for TestBinaryMultiplication {
 #[cfg(test)]
 mod test {
     use crate::{
-        circuits::binary::{BinaryMultiplication, BinaryMultiplicationLowerHalf},
+        circuits::binary::{
+            BinaryConstantMultiplication, BinaryMultiplication, BinaryMultiplicationLowerHalf,
+        },
         dummy::{Dummy, DummyVal},
     };
     use rand::{Rng, thread_rng};
@@ -162,6 +194,21 @@ mod test {
             let y_input = DummyVal::to_binary(y, nbits);
             let output = Dummy::eval(&BinaryMultiplicationLowerHalf, &(x_input, y_input)).unwrap();
             assert_eq!(DummyVal::from_binary(&output), (x * y) % q);
+        }
+    }
+
+    #[test]
+    fn binary_constant_multiplication() {
+        let mut rng = thread_rng();
+        let nbits = 64;
+        let q = 1 << nbits;
+
+        for _ in 0..16 {
+            let x = rng.r#gen::<u128>() % q;
+            let c = rng.r#gen::<u128>() % q;
+            let x_input = DummyVal::to_binary(x, nbits);
+            let output = Dummy::eval(&BinaryConstantMultiplication, &(x_input, c, nbits)).unwrap();
+            assert_eq!(DummyVal::from_binary(&output), (x * c) % q);
         }
     }
 }

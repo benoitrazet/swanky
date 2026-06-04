@@ -38,6 +38,7 @@ pub use binary_subtraction::BinarySubtraction;
 pub use binary_subtraction::test::TestBinarySubtraction;
 
 mod binary_multiplication;
+pub use binary_multiplication::BinaryConstantMultiplication;
 pub use binary_multiplication::BinaryMultiplication;
 pub use binary_multiplication::BinaryMultiplicationLowerHalf;
 pub use binary_multiplication::TestBinaryMultiplication;
@@ -65,6 +66,7 @@ pub use binary_twos_complement::test::TestBinaryTwosComplement;
 
 mod binary_multiplex;
 pub use binary_multiplex::BinaryMultiplex;
+pub use binary_multiplex::BinaryMultiplexConstantBits;
 
 mod binary_max;
 pub use binary_max::BinaryMax;
