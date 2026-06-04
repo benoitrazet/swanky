@@ -5,7 +5,10 @@ use crate::ps::{PartyEvaluator, PartyGarbler};
 use crate::{evaluator::Evaluator, preprocesser::WirePreProcessor};
 
 use fancy_garbling::circuit::Flatten;
-use fancy_garbling::circuits::binary::{TestBinaryAdditionNoCarry, TestBinaryMultiplication};
+use fancy_garbling::circuits::binary::{
+    TestBinaryAddition, TestBinaryConstant, TestBinaryMultiplication, TestBinarySubtraction,
+    TestBinaryTwosComplement,
+};
 use fancy_garbling::dummy::DummyVal;
 use fancy_garbling::{
     Fancy,
@@ -112,7 +115,7 @@ fn test_circuit<
 
 #[test]
 fn test_constant_bundle() {
-    let circuit = fancy_garbling::circuits::binary::TestBinaryConstant(1, 64);
+    let circuit = TestBinaryConstant(1, 64);
 
     test_circuit(0, 0, &circuit);
 }
@@ -181,7 +184,7 @@ fn test_xor_gate_fan_n() {
 #[test]
 fn test_binary_addition() {
     let ninputs = 400;
-    let circuit = fancy_garbling::circuits::binary::TestBinaryAddition(ninputs);
+    let circuit = TestBinaryAddition(ninputs);
 
     test_circuit(ninputs, ninputs, &circuit);
 }
@@ -195,17 +198,9 @@ fn test_binary_negate() {
 }
 
 #[test]
-fn test_bin_addition_no_carry() {
-    let ninputs = 64;
-    let circuit = TestBinaryAdditionNoCarry(ninputs);
-
-    test_circuit(ninputs, ninputs, &circuit);
-}
-
-#[test]
 fn test_bin_twos_complement() {
     let ninputs = 64;
-    let circuit = fancy_garbling::circuits::binary::TestBinaryTwosComplement(ninputs);
+    let circuit = TestBinaryTwosComplement(ninputs);
 
     test_circuit(ninputs, 0, &circuit);
 }
@@ -213,7 +208,7 @@ fn test_bin_twos_complement() {
 #[test]
 fn test_binary_subtraction() {
     let ninputs = 64;
-    let circuit = fancy_garbling::circuits::binary::TestBinarySubtraction(ninputs);
+    let circuit = TestBinarySubtraction(ninputs);
 
     test_circuit(ninputs, ninputs, &circuit);
 }

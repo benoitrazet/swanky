@@ -30,11 +30,8 @@ pub use binary_constant::test::TestBinaryConstant;
 
 mod binary_addition;
 pub use binary_addition::BinaryAddition;
+pub use binary_addition::BinaryAdditionNoCarry;
 pub use binary_addition::test::TestBinaryAddition;
-
-mod binary_addition_no_carry;
-pub use binary_addition_no_carry::BinaryAdditionNoCarry;
-pub use binary_addition_no_carry::test::TestBinaryAdditionNoCarry;
 
 mod binary_subtraction;
 pub use binary_subtraction::BinarySubtraction;
