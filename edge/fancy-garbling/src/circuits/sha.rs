@@ -120,8 +120,14 @@ impl<F: FancyBinary> CircuitInputMapper<F> for Sha256CompressionFunction {
         assert_eq!(inputs.len(), 768);
         let (block, chain) = inputs.split_at(512);
         (
-            block.to_vec().try_into().unwrap(),
-            chain.to_vec().try_into().unwrap(),
+            block
+                .to_vec()
+                .try_into()
+                .expect("Block should contain 512 elements"),
+            chain
+                .to_vec()
+                .try_into()
+                .expect("Chain should contain 256 elements"),
         )
     }
 
@@ -195,7 +201,7 @@ impl<F: FancyBinary> Circuit<F> for Sha256 {
         let mut padded = inputs.clone();
         padded.push(one.clone());
 
-        // Calculate padding: we need to reach a length ≡ 448 (mod 512)
+        // Calculate padding: we need to reach a length ≡ 448 (mod 512).
         let current_len = padded.len();
         let target_len = if current_len <= 448 {
             448
@@ -208,7 +214,7 @@ impl<F: FancyBinary> Circuit<F> for Sha256 {
         }
 
         // Append the original message length as a 64-bit big-endian integer.
-        let mut length_bundle = BinaryConstant::new_with_constants(
+        let mut length = BinaryConstant::new_with_constants(
             message_len as u128,
             64,
             Some(zero.clone()),
@@ -217,8 +223,8 @@ impl<F: FancyBinary> Circuit<F> for Sha256 {
         .execute(backend, &(), channel)?;
         // Constants are represented in little-endian, but here we need message
         // length to be in big-endian. So we reverse the bundle before using it.
-        length_bundle.reverse();
-        padded.extend_from_slice(length_bundle.wires());
+        length.reverse();
+        padded.extend_from_slice(length.wires());
 
         // Process each 512-bit block.
         for chunk in padded.chunks(512) {
