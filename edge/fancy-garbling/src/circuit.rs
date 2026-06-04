@@ -9,8 +9,7 @@ use swanky_error::Result;
 mod binary;
 pub use binary::{BinaryCircuit, BinaryGate};
 
-/// Trait for flattening the output of a [`CircuitExecutor`] into a vector of
-/// wires.
+/// Trait for flattening the output of a [`Circuit`] into a vector of wires.
 pub trait Flatten {
     /// The type of the elements in the output vector.
     type Item;
