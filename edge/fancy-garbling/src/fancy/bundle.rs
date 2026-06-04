@@ -1,7 +1,4 @@
-use crate::{
-    FancyArithmetic, FancyBinary, FancyProj,
-    fancy::{Fancy, HasModulus},
-};
+use crate::{Fancy, FancyArithmetic, FancyProj, HasModulus};
 use itertools::Itertools;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -102,7 +99,6 @@ impl<W: Clone + HasModulus> Index<usize> for Bundle<W> {
 impl<F: Fancy> BundleGadgets for F {}
 impl<F: FancyArithmetic> ArithmeticBundleGadgets for F {}
 impl<F: FancyArithmetic + FancyProj> ArithmeticProjBundleGadgets for F {}
-impl<F: FancyBinary> BinaryBundleGadgets for F {}
 
 /// Arithmetic operations on wire bundles, extending the capability of `FancyArithmetic` operating
 /// on individual wires.
@@ -364,26 +360,6 @@ pub trait ArithmeticProjBundleGadgets: FancyArithmetic + FancyProj {
         let mut tab = vec![0; b + 1];
         tab[b] = 1;
         self.proj(&z, 2, Some(tab), channel)
-    }
-}
-
-/// Binary operations on wire bundles, extending the capability of `FancyBinary` operating
-/// on individual wires.
-pub trait BinaryBundleGadgets: FancyBinary {
-    /// If b=0 then return x, else return y.
-    fn multiplex(
-        &mut self,
-        b: &Self::Item,
-        x: &Bundle<Self::Item>,
-        y: &Bundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Bundle<Self::Item>> {
-        x.wires()
-            .iter()
-            .zip(y.wires().iter())
-            .map(|(xwire, ywire)| self.mux(b, xwire, ywire, channel))
-            .collect::<swanky_error::Result<_>>()
-            .map(Bundle)
     }
 }
 

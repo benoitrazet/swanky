@@ -8,8 +8,8 @@ use aes_gcm::{
 };
 
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryBundleGadgets, BinaryGadgets, Fancy, FancyBinary,
-    circuit::Circuit, circuits::binary::BinaryEquality,
+    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyBinary, circuit::Circuit,
+    circuits::binary::BinaryEquality,
 };
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
@@ -404,7 +404,7 @@ fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
 }
 
 /// Fancy function to compute the intersection and return encoded vector of 0/1 masks.
-fn fancy_compute_intersection<F: Fancy + BinaryBundleGadgets>(
+fn fancy_compute_intersection<F: FancyBinary>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
@@ -428,7 +428,7 @@ fn fancy_compute_intersection<F: Fancy + BinaryBundleGadgets>(
 }
 
 /// Fancy function to compute the cardinality
-fn fancy_compute_cardinality<F: Fancy + BinaryBundleGadgets + FancyBinary>(
+fn fancy_compute_cardinality<F: FancyBinary>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],

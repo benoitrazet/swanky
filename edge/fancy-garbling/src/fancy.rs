@@ -12,10 +12,7 @@ mod binary;
 mod bundle;
 mod crt;
 pub use binary::{BinaryBundle, BinaryGadgets};
-pub use bundle::{
-    ArithmeticBundleGadgets, ArithmeticProjBundleGadgets, BinaryBundleGadgets, Bundle,
-    BundleGadgets,
-};
+pub use bundle::{ArithmeticBundleGadgets, ArithmeticProjBundleGadgets, Bundle, BundleGadgets};
 pub use crt::{CrtBundle, CrtGadgets, CrtProjGadgets};
 
 /// An object that has a modulus.
