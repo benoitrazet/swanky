@@ -43,14 +43,13 @@ impl<F: FancyBinary, const N: usize> Circuit<F> for LinearOram<N> {
         // based on whether the query matches the current index.
         let mut result = zero.clone();
         for (i, item) in ram.iter().enumerate() {
-            // let index = BinaryConstant::new_with_constants(
-            //     i as u128,
-            //     N,
-            //     Some(zero_bit.clone()),
-            //     Some(one_bit.clone()),
-            // )
-            // .execute(backend, &(), channel)?;
-            let index = BinaryConstant::new(i as u128, N).execute(backend, &(), channel)?;
+            let index = BinaryConstant::new_with_constants(
+                i as u128,
+                N,
+                Some(zero_bit.clone()),
+                Some(one_bit.clone()),
+            )
+            .execute(backend, &(), channel)?;
             let is_equal = BinaryEquality.execute(backend, &(query.to_owned(), index), channel)?;
             let mux = BinaryMultiplex.execute(
                 backend,
