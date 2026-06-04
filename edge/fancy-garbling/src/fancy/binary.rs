@@ -324,19 +324,6 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         self.bin_addition_no_carry(&not_xs, &one, channel)
     }
 
-    /// Subtract two binary bundles. Returns the result and whether it underflowed.
-    ///
-    /// Due to the way that `twos_complement(0) = 0`, underflow indicates `y != 0 && x >= y`.
-    fn bin_subtraction(
-        &mut self,
-        xs: &BinaryBundle<Self::Item>,
-        ys: &BinaryBundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<(BinaryBundle<Self::Item>, Self::Item)> {
-        let neg_ys = self.bin_twos_complement(ys, channel)?;
-        self.bin_addition(xs, &neg_ys, channel)
-    }
-
     /// If `x=0` return `c1` as a bundle of constant bits, else return `c2`.
     fn bin_multiplex_constant_bits(
         &mut self,
