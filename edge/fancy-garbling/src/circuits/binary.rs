@@ -42,7 +42,9 @@ pub use binary_subtraction::test::TestBinarySubtraction;
 
 mod binary_less_than;
 pub use binary_less_than::BinaryLessThan;
+pub use binary_less_than::BinaryLessThanSigned;
 pub use binary_less_than::test::TestBinaryLessThan;
+pub use binary_less_than::test::TestBinaryLessThanSigned;
 
 mod binary_greater_than_or_equal;
 pub use binary_greater_than_or_equal::BinaryGreaterThanOrEqual;
@@ -58,3 +60,6 @@ pub use binary_twos_complement::test::TestBinaryTwosComplement;
 
 mod binary_multiplex;
 pub use binary_multiplex::BinaryMultiplex;
+
+mod binary_max;
+pub use binary_max::BinaryMax;

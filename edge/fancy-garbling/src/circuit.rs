@@ -1640,39 +1640,6 @@ pub mod circuits {
             }
         }
 
-        /// Circuit for testing [`BinaryGadgets::bin_lt_signed`].
-        pub struct TestBinaryLessThanSigned(pub usize);
-        impl<F: BinaryGadgets> Circuit<F> for TestBinaryLessThanSigned {
-            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
-            type Output = F::Item;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.bin_lt_signed(&inputs.0, &inputs.1, channel)
-            }
-        }
-        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryLessThanSigned {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0 * 2);
-                let (x, y) = inputs.split_at(self.0);
-                let x = BinaryBundle::new(x.to_vec());
-                let y = BinaryBundle::new(y.to_vec());
-                (x, y)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0 * 2
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
-
         /// Circuit for testing [`BinaryGadgets::bin_rsa`].
         pub struct TestBinaryArithmeticRightShift(pub usize, pub usize);
         impl<F: BinaryGadgets> Circuit<F> for TestBinaryArithmeticRightShift {
@@ -1786,38 +1753,6 @@ pub mod circuits {
 
             fn ninputs(&self) -> usize {
                 self.0
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
-
-        /// Circuit for testing [`BinaryGadgets::bin_max`].
-        pub struct TestBinaryMax(pub usize, pub usize);
-        impl<F: BinaryGadgets> Circuit<F> for TestBinaryMax {
-            type Input = Vec<BinaryBundle<F::Item>>;
-            type Output = BinaryBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.bin_max(inputs, channel)
-            }
-        }
-        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryMax {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                inputs
-                    .chunks_exact(self.0)
-                    .map(|v| BinaryBundle::new(v.to_vec()))
-                    .collect()
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0 * self.1
             }
 
             fn modulus(&self, _: usize) -> u16 {
@@ -2463,23 +2398,6 @@ mod binary_gadgets {
     };
 
     #[test]
-    fn test_binary_lt_signed() {
-        let mut rng = thread_rng();
-        let nbits = 16;
-        let q = 1 << nbits;
-        let c = circuits::binary_gadgets::TestBinaryLessThanSigned(nbits);
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let y = rng.gen_u128() % q;
-            let x_input = DummyVal::to_binary(x, nbits);
-            let y_input = DummyVal::to_binary(y, nbits);
-            let output = Dummy::eval(&c, &(x_input, y_input)).unwrap();
-            assert_eq!(output.val() > 0, (x as i16) < (y as i16));
-        }
-    }
-
-    #[test]
     fn test_binary_multiplication_lower_half() {
         let mut rng = thread_rng();
         let nbits = 64;
@@ -2605,28 +2523,6 @@ mod binary_gadgets {
                     assert_eq!(y.val(), 0);
                 }
             }
-        }
-    }
-
-    #[test]
-    fn test_binary_max() {
-        let mut rng = thread_rng();
-        let n = 10;
-        let nbits = 16;
-        let q = 1 << nbits;
-        let c = circuits::binary_gadgets::TestBinaryMax(nbits, n);
-
-        for _ in 0..16 {
-            let inputs = (0..n).map(|_| rng.gen_u128() % q).collect::<Vec<_>>();
-            let expected = *inputs.iter().max().unwrap();
-
-            let inputs = inputs
-                .into_iter()
-                .map(|x| DummyVal::to_binary(x, nbits))
-                .collect::<Vec<_>>();
-            let z = Dummy::eval(&c, &inputs).unwrap();
-            let output = DummyVal::from_binary(&z);
-            assert_eq!(output, expected);
         }
     }
 }

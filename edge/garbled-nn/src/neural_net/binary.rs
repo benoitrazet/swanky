@@ -4,7 +4,9 @@ use crate::{
     neural_net::FancyNeuralNet,
     util::{i64_from_bits, i64_to_twos_complement},
 };
-use fancy_garbling::{BinaryBundle, BinaryGadgets, Fancy};
+use fancy_garbling::{
+    BinaryBundle, BinaryGadgets, Fancy, circuit::Circuit, circuits::binary::BinaryMax,
+};
 use ndarray::Array3;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -206,7 +208,7 @@ impl<'a, F: Fancy + BinaryGadgets> FancyNeuralNet for BinaryLayer<'a, F> {
         xs: &[BinaryBundle<F::Item>],
         channel: &mut Channel,
     ) -> Result<BinaryBundle<F::Item>> {
-        self.backend.bin_max(xs, channel)
+        BinaryMax.execute(self.backend, &xs.to_vec(), channel)
     }
 
     fn nn_activation(
