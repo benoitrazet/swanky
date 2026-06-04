@@ -77,3 +77,6 @@ pub use binary_shift::BinaryShiftExtend;
 
 mod binary_abs;
 pub use binary_abs::BinaryAbs;
+
+mod binary_to_unary;
+pub use binary_to_unary::BinaryToUnary;

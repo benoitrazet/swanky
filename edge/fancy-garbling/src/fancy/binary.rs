@@ -139,40 +139,6 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         Ok(zs.into_iter().collect())
     }
 
-    /// Demux a binary bundle into a unary vector.
-    ///
-    /// # Panics
-    /// Panics if the length of `x` is greater than eight.
-    fn bin_demux(
-        &mut self,
-        x: &BinaryBundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        let wires = x.wires();
-        let nbits = wires.len();
-        assert!(nbits <= 8, "wire bitlength is too large");
-
-        let mut outs = Vec::with_capacity(1 << nbits);
-
-        for ix in 0..1 << nbits {
-            let mut acc = wires[0].clone();
-            if (ix & 1) == 0 {
-                acc = self.negate(&acc);
-            }
-            for (i, w) in wires.iter().enumerate().skip(1) {
-                if ((ix >> i) & 1) > 0 {
-                    acc = self.and(&acc, w, channel)?;
-                } else {
-                    let not_w = self.negate(w);
-                    acc = self.and(&acc, &not_w, channel)?;
-                }
-            }
-            outs.push(acc);
-        }
-
-        Ok(outs)
-    }
-
     /// arithmetic right shift (shifts the sign of the MSB into the new spaces)
     fn bin_rsa(&mut self, x: &BinaryBundle<Self::Item>, c: usize) -> BinaryBundle<Self::Item> {
         self.bin_shr(x, c, x.wires().last().unwrap())

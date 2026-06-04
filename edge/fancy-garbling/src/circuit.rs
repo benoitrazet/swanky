@@ -1529,36 +1529,6 @@ pub mod circuits {
                 2
             }
         }
-
-        /// Circuit for testing [`BinaryGadgets::bin_demux`].
-        pub struct TestBinaryDemux(pub usize);
-        impl<F: BinaryGadgets> Circuit<F> for TestBinaryDemux {
-            type Input = BinaryBundle<F::Item>;
-            type Output = Vec<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                input: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.bin_demux(input, channel)
-            }
-        }
-        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryDemux {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0);
-                BinaryBundle::new(inputs)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
     }
 }
 
@@ -2185,27 +2155,6 @@ mod binary_gadgets {
             let c = circuits::binary_gadgets::TestBinaryLogicalRightShift(nbits, shift_size);
             let output = Dummy::eval(&c, &DummyVal::to_binary(x, nbits)).unwrap();
             assert_eq!(DummyVal::from_binary(&output), x >> shift_size);
-        }
-    }
-
-    #[test]
-    fn test_bin_demux() {
-        let mut rng = thread_rng();
-        let nbits = 8;
-        let q = 1 << nbits;
-        let c = circuits::binary_gadgets::TestBinaryDemux(nbits);
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let x_input = DummyVal::to_binary(x, nbits);
-            let output = Dummy::eval(&c, &x_input).unwrap();
-            for (i, y) in output.into_iter().enumerate() {
-                if i as u128 == x {
-                    assert_eq!(y.val(), 1);
-                } else {
-                    assert_eq!(y.val(), 0);
-                }
-            }
         }
     }
 }
