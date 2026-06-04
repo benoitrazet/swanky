@@ -6,6 +6,7 @@
 */
 use crate::parameters::FIELD_SIZE;
 use diet_mac_and_cheese::fields::SieveIrDeserialize;
+use fancy_garbling::{FancyBinary, FancyZeroKnowledge, circuit::Circuit as FancyCircuit};
 use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, RelationVisitor, Type, TypeId,
     TypedWireRange, ValueStreamKind, ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
@@ -17,7 +18,8 @@ use std::{
     io::{Cursor, Read, Seek, Write},
     path::Path,
 };
-use swanky_error::{ErrorKind, bail, swanky_error};
+use swanky_channel::Channel;
+use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::F2;
 use swanky_sieve_ir_api::{CircuitExecuter, CircuitResult, FieldBackend};
@@ -395,6 +397,80 @@ impl<'a> CircuitExecuter<F2> for CircuitInterpreter<'a> {
     }
 }
 
+impl<'a, F: FancyBinary + FancyZeroKnowledge> FancyCircuit<F> for CircuitInterpreter<'a> {
+    type Input = ();
+    type Output = Vec<F::Item>; // TODO: This should be `()`.
+
+    fn execute(
+        &self,
+        backend: &mut F,
+        _: &Self::Input,
+        channel: &mut Channel,
+    ) -> Result<Self::Output> {
+        let mut memory = CircuitMemory::<F::Item>::new(self.max_wire_id);
+        for g in self.gates.iter() {
+            match g {
+                GateM::AssertZero(ty, src) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(*ty, 0);
+
+                    let src = memory.get(src);
+                    backend.assert_zero(&src)?;
+                }
+                GateM::Add(ty, dst, left, right) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(*ty, 0);
+
+                    let left = memory.get(left);
+                    let right = memory.get(right);
+
+                    let res = backend.xor(&left, &right);
+
+                    memory.insert(*dst, res);
+                }
+                GateM::Mul(ty, dst, left, right) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(*ty, 0);
+
+                    let left = memory.get(left);
+                    let right = memory.get(right);
+
+                    let res = backend.and(&left, &right, channel)?;
+
+                    memory.insert(*dst, res);
+                }
+                GateM::AddConstant(ty, dst, left, right) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(*ty, 0);
+
+                    let left = memory.get(left);
+                    let right = F2::from_number(right)?;
+                    let right = backend.constant(right.into(), 2, channel)?;
+
+                    let res = backend.xor(&left, &right);
+
+                    memory.insert(*dst, res);
+                }
+                GateM::Witness(ty, dst) => {
+                    // Assumption: There is exactly one type ID for these circuits and it is F2.
+                    assert_eq!(*ty, 0);
+
+                    for wid in dst.start..=dst.end {
+                        let res = backend.receive(2, channel)?;
+
+                        memory.insert(wid, res);
+                    }
+                }
+                _ => bail!(
+                    ErrorKind::OtherError,
+                    "Invalid input: VOLE-in-the-head does not support gate {g:?}"
+                ),
+            }
+        }
+        Ok(vec![])
+    }
+}
+
 /// Validate that the circuit can be processed by the system, according to the header info.
 ///
 /// Note that the system can still fail to form proofs over circuits that pass this check, like
@@ -488,7 +564,7 @@ pub(crate) struct CircuitMemory<F> {
     cont: Vec<F>,
 }
 
-impl<F: Default + Clone + Copy> CircuitMemory<F> {
+impl<F: Default + Clone> CircuitMemory<F> {
     /// Create a new circuit memory.
     ///
     /// Provided the maximum wire id, it will prepare a memory ready to received contents for
@@ -515,7 +591,7 @@ impl<F: Default + Clone + Copy> CircuitMemory<F> {
     /// This function assumes that it is called on a memory associated with a well-formed circuit,
     /// more specifically that the wire id has been previously set.
     pub(crate) fn get(&self, wid: &WireId) -> F {
-        self.cont[*wid as usize]
+        self.cont[*wid as usize].clone()
     }
 }
 

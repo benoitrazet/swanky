@@ -1,4 +1,6 @@
+use fancy_garbling::{Fancy, FancyBinary, FancyZeroKnowledge, HasModulus};
 use mac_n_cheese_sieve_parser::WireId;
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
@@ -12,7 +14,7 @@ use crate::vole::RandomVoleP;
 ///
 /// The primary steps in circuit traversal include assigning VOLEs to each wire and
 /// computing the two aggregated values used in the proof.
-pub(crate) struct ProverTraverser<Vole> {
+pub struct ProverTraverser<Vole> {
     /// Current position for a fresh extended witness value.
     wire_values_pos: WireId,
 
@@ -189,6 +191,86 @@ impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
         let challenge = self.chi_challenge.next();
         self.aggregate_assert_zero += challenge * wire.1;
 
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Wire(F2, F128b);
+
+impl HasModulus for Wire {
+    fn modulus(&self) -> u16 {
+        2
+    }
+}
+
+impl<VOLE: RandomVoleP> Fancy for ProverTraverser<VOLE> {
+    type Item = Wire;
+
+    fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
+        bail!(
+            ErrorKind::OtherError,
+            "Invalid input: VOLE-in-the-head does not support encode"
+        );
+    }
+
+    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
+        let mut output = Vec::with_capacity(moduli.len());
+        for _ in 0..moduli.len() {
+            let f = self.next_witness_value()?;
+            let vole = self.next_vole()?;
+
+            // Private input gates don't define a polynomial that would contribute to the aggregated
+            // coefficients being computed
+            output.push(Wire(f, vole));
+        }
+        Ok(output)
+    }
+
+    fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
+        assert_eq!(modulus, 2);
+        Ok(Wire(F2::from(value != 0), F128b::ZERO))
+    }
+}
+
+impl<VOLE: RandomVoleP> FancyBinary for ProverTraverser<VOLE> {
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        let res = x.0 + y.0;
+
+        // Compute the correct VOLE for the output wire
+        let sum_vole = x.1 + y.1;
+
+        // Linear gates don't contribute to the aggregated values being computed
+        Wire(res, sum_vole)
+    }
+
+    fn and(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
+        let f = self.next_witness_value()?;
+
+        // Assign a fresh VOLE to the output wire and get the corresponding challenge
+        let vole = self.next_vole()?;
+        let challenge = self.chi_challenge.next();
+
+        // Compute coefficient values `A_i1` and `A_i0` (respectively). These are derived from the
+        // `c_i(X)` polynomial defined in the paper -- see Fig 7 and page 32-33 for details.
+        let degree_0_coeff = x.1 * y.1;
+        let degree_1_coeff = y.0 * x.1 + x.0 * y.1 - vole;
+
+        self.aggregate_degree_0 += challenge * degree_0_coeff;
+        self.aggregate_degree_1 += challenge * degree_1_coeff;
+
+        Ok(Wire(f, vole))
+    }
+
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
+        Wire(-x.0, -x.1)
+    }
+}
+
+impl<VOLE: RandomVoleP> FancyZeroKnowledge for ProverTraverser<VOLE> {
+    fn assert_zero(&mut self, value: &Self::Item) -> Result<()> {
+        let challenge = self.chi_challenge.next();
+        self.aggregate_assert_zero += challenge * value.1;
         Ok(())
     }
 }

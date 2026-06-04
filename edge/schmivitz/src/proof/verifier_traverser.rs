@@ -1,8 +1,14 @@
+use fancy_garbling::Fancy;
+use fancy_garbling::FancyBinary;
+use fancy_garbling::FancyZeroKnowledge;
+use fancy_garbling::HasModulus;
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_field_binary::F128b;
-use swanky_sieve_ir_api::{CircuitResult, FieldBackend};
+use swanky_sieve_ir_api::CircuitResult;
+use swanky_sieve_ir_api::FieldBackend;
 
 use crate::proof::ChiGenerator;
 
@@ -12,7 +18,7 @@ use crate::proof::ChiGenerator;
 /// The primary steps in circuit traversal are assigning masked witnesses to each
 /// wire (either using provided witnesses from the proof or evaluating expected witnesses for
 /// linear gates) and computing the aggregate value used to verify the proof.
-pub(crate) struct VerifierTraverser {
+pub struct VerifierTraverser {
     /// Fiat-Shamir challenges as powers of chi. There should be one for each polynomial (e.g. non-linear gate) and assert zero.
     chi_challenge: ChiGenerator,
 
@@ -151,6 +157,77 @@ impl FieldBackend<F2> for VerifierTraverser {
         let challenge = self.chi_challenge.next();
 
         self.aggregate_assert_zero += challenge * arg;
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Wire(F128b);
+
+impl HasModulus for Wire {
+    fn modulus(&self) -> u16 {
+        2
+    }
+}
+
+impl Fancy for VerifierTraverser {
+    type Item = Wire;
+
+    fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
+        bail!(
+            ErrorKind::OtherError,
+            "Invalid input: VOLE-in-the-head verifier does not support encode"
+        );
+    }
+
+    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
+        let mut output = Vec::with_capacity(moduli.len());
+        for _ in 0..moduli.len() {
+            // Assign a fresh masked witness to the wire
+            let res = self.next_masked_witness()?;
+
+            // Private input gates don't define a polynomial that would contribute to the aggregate
+            // being computed, so we ignore the challenge
+            output.push(Wire(res));
+        }
+        Ok(output)
+    }
+
+    fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
+        assert_eq!(modulus, 2);
+        let value = F128b::from(F2::from(value != 0));
+        Ok(Wire(value * self.verifier_key))
+    }
+}
+
+impl FancyBinary for VerifierTraverser {
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        Wire(x.0 + y.0)
+    }
+
+    fn and(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
+        // Assign the next masked witness to the destination wire
+        let res = self.next_masked_witness()?;
+        let challenge = self.chi_challenge.next();
+
+        // Compute the contibution to the aggregate: ci​(Δ) = q_left * ​q_right ​− q_dst * ​Δ
+        let eval = x.0 * y.0 - (res * self.verifier_key);
+
+        self.aggregate += challenge * eval;
+
+        Ok(Wire(res))
+    }
+
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
+        Wire(-x.0)
+    }
+}
+
+impl FancyZeroKnowledge for VerifierTraverser {
+    fn assert_zero(&mut self, value: &Self::Item) -> Result<()> {
+        let challenge = self.chi_challenge.next();
+
+        self.aggregate_assert_zero += challenge * value.0;
         Ok(())
     }
 }
