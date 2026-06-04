@@ -45,6 +45,9 @@ pub use binary_multiplication::BinaryMultiplication;
 pub use binary_multiplication::BinaryMultiplicationLowerHalf;
 pub use binary_multiplication::TestBinaryMultiplication;
 
+mod binary_division;
+pub use binary_division::BinaryDivision;
+
 mod binary_less_than;
 pub use binary_less_than::BinaryLessThan;
 pub use binary_less_than::BinaryLessThanSigned;
@@ -72,3 +75,6 @@ pub use binary_max::BinaryMax;
 mod binary_shift;
 pub use binary_shift::BinaryShift;
 pub use binary_shift::BinaryShiftExtend;
+
+mod binary_abs;
+pub use binary_abs::BinaryAbs;

@@ -150,30 +150,6 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         Ok(zs.into_iter().collect())
     }
 
-    /// Binary addition. Returns the result and the carry.
-    ///
-    /// # Panics
-    /// This panics if `xs` and `ys` do not have equal moduli.
-    fn bin_addition(
-        &mut self,
-        xs: &BinaryBundle<Self::Item>,
-        ys: &BinaryBundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<(BinaryBundle<Self::Item>, Self::Item)> {
-        assert_eq!(xs.moduli(), ys.moduli());
-        let xwires = xs.wires();
-        let ywires = ys.wires();
-        let (mut z, mut c) = self.adder(&xwires[0], &ywires[0], None, channel)?;
-        let mut bs = vec![z];
-        for i in 1..xwires.len() {
-            let res = self.adder(&xwires[i], &ywires[i], Some(&c), channel)?;
-            z = res.0;
-            c = res.1;
-            bs.push(z);
-        }
-        Ok((BinaryBundle::new(bs), c))
-    }
-
     /// Binary addition. Avoids creating extra gates for the final carry.
     ///
     /// # Panics
@@ -203,47 +179,6 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         ]);
         bs.push(z);
         Ok(BinaryBundle::new(bs))
-    }
-
-    /// Divider.
-    ///
-    /// # Panics
-    /// This panics if `xs` and `ys` do not have equal moduli.
-    fn bin_div(
-        &mut self,
-        xs: &BinaryBundle<Self::Item>,
-        ys: &BinaryBundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
-        assert_eq!(xs.moduli(), ys.moduli());
-        let ys_neg = self.bin_twos_complement(ys, channel)?;
-        let mut acc = self.bin_constant_bundle(0, xs.size(), channel)?;
-        let mut qs = BinaryBundle::new(Vec::new());
-        for x in xs.iter().rev() {
-            acc.pop();
-            acc.insert(0, x.clone());
-            let (res, cout) = self.bin_addition(&acc, &ys_neg, channel)?;
-            acc = self.bin_multiplex(&cout, &acc, &res, channel)?;
-            qs.push(cout);
-        }
-        qs.reverse(); // Switch back to little-endian
-        Ok(qs)
-    }
-
-    /// Compute the twos complement of the input bundle (which must be base 2).
-    fn bin_twos_complement(
-        &mut self,
-        xs: &BinaryBundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
-        let not_xs = BinaryBundle::new(
-            xs.wires()
-                .iter()
-                .map(|x| self.negate(x))
-                .collect::<Vec<_>>(),
-        );
-        let one = self.bin_constant_bundle(1, xs.size(), channel)?;
-        self.bin_addition_no_carry(&not_xs, &one, channel)
     }
 
     /// If `x=0` return `c1` as a bundle of constant bits, else return `c2`.
@@ -304,17 +239,6 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
                 let s = self.shift(x, shift_amt, channel).map(BinaryBundle)?;
                 self.bin_addition_no_carry(&z, &s, channel)
             })
-    }
-
-    /// Compute the absolute value of a binary bundle.
-    fn bin_abs(
-        &mut self,
-        x: &BinaryBundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
-        let sign = x.wires().last().unwrap();
-        let negated = self.bin_twos_complement(x, channel)?;
-        self.bin_multiplex(sign, x, &negated, channel)
     }
 
     /// Demux a binary bundle into a unary vector.

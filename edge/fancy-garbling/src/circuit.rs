@@ -1470,39 +1470,6 @@ pub mod circuits {
         use swanky_channel::Channel;
         use swanky_error::Result;
 
-        /// Circuit for testing [`BinaryGadgets::bin_div`].
-        pub struct TestBinaryDivision(pub usize);
-        impl<F: BinaryGadgets> Circuit<F> for TestBinaryDivision {
-            type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
-            type Output = BinaryBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.bin_div(&inputs.0, &inputs.1, channel)
-            }
-        }
-        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryDivision {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0 * 2);
-                let (x, y) = inputs.split_at(self.0);
-                let x = BinaryBundle::new(x.to_vec());
-                let y = BinaryBundle::new(y.to_vec());
-                (x, y)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0 * 2
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
-
         /// Circuit for testing [`BinaryGadgets::bin_rsa`].
         pub struct TestBinaryArithmeticRightShift(pub usize, pub usize);
         impl<F: BinaryGadgets> Circuit<F> for TestBinaryArithmeticRightShift {
@@ -1549,36 +1516,6 @@ pub mod circuits {
             }
         }
         impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryLogicalRightShift {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0);
-                BinaryBundle::new(inputs)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
-
-        /// Circuit for testing [`BinaryGadgets::bin_abs`].
-        pub struct TestBinaryAbs(pub usize);
-        impl<F: BinaryGadgets> Circuit<F> for TestBinaryAbs {
-            type Input = BinaryBundle<F::Item>;
-            type Output = BinaryBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                input: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.bin_abs(input, channel)
-            }
-        }
-        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryAbs {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
                 BinaryBundle::new(inputs)
@@ -2217,47 +2154,6 @@ mod binary_gadgets {
         dummy::{Dummy, DummyVal},
         util::RngExt,
     };
-
-    #[test]
-    fn test_binary_division() {
-        let mut rng = thread_rng();
-        let nbits = 64;
-        let q = 1 << nbits;
-        let c = circuits::binary_gadgets::TestBinaryDivision(nbits);
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let mut y = rng.gen_u128() % q;
-            while y == 0 {
-                y = rng.gen_u128() % q;
-            }
-            let x_input = DummyVal::to_binary(x, nbits);
-            let y_input = DummyVal::to_binary(y, nbits);
-            let output = Dummy::eval(&c, &(x_input, y_input)).unwrap();
-            assert_eq!(DummyVal::from_binary(&output), x / y);
-        }
-    }
-
-    #[test]
-    fn test_bin_abs() {
-        let mut rng = thread_rng();
-        let nbits = 64;
-        let q = 1 << nbits;
-        let c = circuits::binary_gadgets::TestBinaryAbs(nbits);
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let output = Dummy::eval(&c, &DummyVal::to_binary(x, nbits)).unwrap();
-            assert_eq!(
-                DummyVal::from_binary(&output),
-                if x >> (nbits - 1) > 0 {
-                    ((!x) + 1) & ((1 << nbits) - 1)
-                } else {
-                    x
-                }
-            );
-        }
-    }
 
     #[test]
     fn test_binary_rsa() {
