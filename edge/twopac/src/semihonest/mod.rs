@@ -13,9 +13,9 @@ mod tests {
         AllWire, CrtBundle, CrtGadgets, CrtProjGadgets, Fancy, FancyArithmetic, FancyBinary,
         FancyProj, WireLabel, WireMod2,
         circuit::{Circuit, CircuitInputMapper, Flatten, circuits::arithmetic::TestAddition},
+        circuit_analyzer::CircuitAnalyzer,
         circuits::{aes::AesNonExpanded, arithmetic::Multiplication},
         dummy::{Dummy, DummyVal},
-        informer::Informer,
         util::RngExt,
     };
     use itertools::Itertools;
@@ -135,14 +135,16 @@ mod tests {
     fn test_aes<C, Wire: WireLabel + Send>(circ: &C)
     where
         C: CircuitInputMapper<Dummy>
-            + CircuitInputMapper<Informer<Dummy>>
+            + CircuitInputMapper<CircuitAnalyzer>
             + CircuitInputMapper<GB<Wire>>
             + CircuitInputMapper<EV<Wire>>
             + Send
             + Sync
             + 'static,
     {
-        Informer::print_stats(circ).unwrap();
+        let mut analyzer = CircuitAnalyzer::new();
+        analyzer.eval(circ).unwrap();
+        println!("{analyzer}");
 
         let (_, out) = swanky_channel::local::local_channel_pair(
             |channel| {

@@ -10,9 +10,8 @@ use crate::{
 use fancy_garbling::{
     AllWire, BinaryBundle, BinaryGadgets, BinaryWireLabel, CrtGadgets, CrtProjGadgets, Fancy,
     FancyArithmetic, FancyBinary, HasModulus, WireMod2,
+    circuit_analyzer::CircuitAnalyzer,
     classic::{GarbledChannel, GarbledCircuit},
-    dummy::Dummy,
-    informer::Informer,
     util::output_tweak,
 };
 use ndarray::Array3;
@@ -1025,39 +1024,39 @@ impl NeuralNet {
         Ok(())
     }
 
-    /// Run [`Informer`] in binary mode.
-    pub fn informer_binary(&self, bitwidths: &[usize], secret_weights: bool) -> Result<()> {
-        let mut informer = Informer::new(Dummy::new());
+    /// Run [`CircuitAnalyzer`] in binary mode.
+    pub fn analyze_binary(&self, bitwidths: &[usize], secret_weights: bool) -> Result<()> {
+        let mut analyzer = CircuitAnalyzer::new();
 
         Channel::with(std::io::empty(), |channel| {
             let inps = (0..self.ninputs())
-                .map(|_| informer.bin_encode(0, bitwidths[0], channel))
+                .map(|_| analyzer.bin_receive(bitwidths[0], channel))
                 .collect::<Result<Vec<_>>>()?;
 
-            let mut nn = BinaryNeuralNet::new(&mut informer, bitwidths, true);
+            let mut nn = BinaryNeuralNet::new(&mut analyzer, bitwidths, true);
             nn.eval(self, &inps, secret_weights, channel)
         })?;
-        println!("{}", informer.stats());
+        println!("{analyzer}");
         Ok(())
     }
 
-    /// Run [`Informer`] in arithmetic mode.
-    pub fn informer_arith(
+    /// Run [`CircuitAnalyzer`] in arithmetic mode.
+    pub fn analyze_arith(
         &self,
         moduli: &[u128],
         secret_weights: bool,
         accuracy: &Accuracy,
     ) -> Result<()> {
-        let mut informer = Informer::new(Dummy::new());
+        let mut analyzer = CircuitAnalyzer::new();
 
         Channel::with(std::io::empty(), |channel| {
             let inps = (0..self.ninputs())
-                .map(|_| informer.crt_encode(0, moduli[0], channel))
+                .map(|_| analyzer.crt_receive(moduli[0], channel))
                 .collect::<Result<Vec<_>>>()?;
-            let mut nn = ArithmeticNeuralNet::new(&mut informer, moduli, true);
+            let mut nn = ArithmeticNeuralNet::new(&mut analyzer, moduli, true);
             nn.eval(self, &inps, secret_weights, accuracy, channel)
         })?;
-        println!("{}", informer.stats());
+        println!("{analyzer}");
         Ok(())
     }
 }

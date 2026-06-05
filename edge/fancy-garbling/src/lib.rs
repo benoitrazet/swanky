@@ -10,7 +10,6 @@ pub mod classic;
 pub mod dummy;
 mod fancy;
 mod garble;
-pub mod informer;
 mod parser;
 pub mod util;
 mod wire;

@@ -165,11 +165,11 @@ pub fn bench(
     let moduli = bitwidths_to_moduli(bitwidth);
 
     if binary {
-        nn.informer_binary(bitwidth, secret_weights).map_err(|e| {
+        nn.analyze_binary(bitwidth, secret_weights).map_err(|e| {
             swanky_error!(SwankyErrorKind::OtherError, "Binary informer failed: {e}")
         })?;
     } else {
-        nn.informer_arith(&moduli, secret_weights, accuracy)
+        nn.analyze_arith(&moduli, secret_weights, accuracy)
             .map_err(|e| {
                 swanky_error!(
                     SwankyErrorKind::OtherError,
