@@ -34,8 +34,8 @@ fn gb_set_inputs<F: BinaryGadgets>(
     input: u128,
     channel: &mut Channel,
 ) -> Result<(BinaryBundle<F::Item>, BinaryBundle<F::Item>)> {
-    let x: BinaryBundle<F::Item> = gb.bin_encode(input, NBITS, channel)?;
-    let y: BinaryBundle<F::Item> = gb.bin_receive(NBITS, channel)?;
+    let x = gb.bin_encode(input, NBITS, channel)?;
+    let y = gb.bin_receive(NBITS, channel)?;
     Ok((x, y))
 }
 
