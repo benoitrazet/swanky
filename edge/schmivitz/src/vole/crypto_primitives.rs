@@ -2,10 +2,8 @@
 use crate::parameters::SECURITY_PARAM;
 use crate::vole::commit_reconstruct::{Corrections, corrections_to_bytes};
 use rand::{RngCore, SeedableRng};
-use sha3::{
-    Shake128,
-    digest::{ExtendableOutput, Update, XofReader},
-};
+use sha3::digest::{ExtendableOutput, Update, XofReader};
+use shake::Shake128;
 use swanky_field_binary::F128b;
 use swanky_rng::SwankyRng;
 use swanky_serialization::CanonicalSerialize;

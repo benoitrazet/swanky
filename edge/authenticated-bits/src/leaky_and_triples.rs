@@ -100,9 +100,9 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
     /// Create a new [`LeakyAndTripleGenerator`].
     pub(crate) fn new<RNG: CryptoRng + Rng>(
         channel: &mut Channel,
-        mut rng: RNG,
+        rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
-        let delta = Self::generate_valid_delta(&mut rng);
+        let delta = Self::generate_valid_delta(rng);
         Self::new_with_delta(delta, channel, rng)
     }
 
@@ -115,7 +115,7 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
     pub(crate) fn new_with_delta<RNG: CryptoRng + Rng>(
         delta: U8x16,
         channel: &mut Channel,
-        rng: RNG,
+        rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(_) => {

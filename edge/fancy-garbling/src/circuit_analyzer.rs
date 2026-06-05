@@ -20,6 +20,14 @@ pub struct AnalyzerItem {
     depth: usize,
 }
 
+impl AnalyzerItem {
+    /// Create a new [`AnalyzerItem`] with the provided modulus and a depth of
+    /// zero.
+    pub fn new(modulus: u16) -> Self {
+        Self { modulus, depth: 0 }
+    }
+}
+
 impl HasModulus for AnalyzerItem {
     fn modulus(&self) -> u16 {
         self.modulus
@@ -87,6 +95,14 @@ impl CircuitAnalyzer {
     /// Return the number of input wires of the circuit
     pub fn ninputs(&self) -> usize {
         self.ninputs
+    }
+    /// Return the number of constant wires of the circuit
+    pub fn nconstants(&self) -> usize {
+        self.nconstants
+    }
+    /// Return the number of XOR gates in the circuit
+    pub fn nxors(&self) -> usize {
+        self.nxors
     }
 
     /// Evaluate `circuit` using [`CircuitAnalyzer`].
@@ -235,7 +251,7 @@ mod tests {
     #[test]
     fn single_and_gate_count_is_correct() {
         let nbits = 64;
-        let test = circuits::TestBinaryAnd(nbits);
+        let test = circuits::binary_gadgets::TestBinaryAnd(nbits);
         let mut analyzer = CircuitAnalyzer::new();
         analyzer.eval(&test).unwrap();
 
@@ -249,7 +265,7 @@ mod tests {
     #[test]
     fn binary_addition_counts_are_correct() {
         let nbits = 64;
-        let test = circuits::TestBinaryAddition(nbits);
+        let test = circuits::binary_gadgets::TestBinaryAddition(nbits);
         let mut analyzer = CircuitAnalyzer::new();
         analyzer.eval(&test).unwrap();
 
@@ -267,7 +283,7 @@ mod tests {
     #[test]
     fn binary_multiplication_counts_are_correct() {
         let nbits = 64;
-        let test = circuits::TestBinaryMultiplication(nbits);
+        let test = circuits::binary_gadgets::TestBinaryMultiplication(nbits);
         let mut analyzer = CircuitAnalyzer::new();
         analyzer.eval(&test).unwrap();
 
@@ -289,7 +305,7 @@ mod tests {
     #[test]
     fn binary_twos_complement_counts_are_correct() {
         let nbits = 64;
-        let test = circuits::TestBinaryTwosComplement(nbits);
+        let test = circuits::binary_gadgets::TestBinaryTwosComplement(nbits);
         let mut analyzer = CircuitAnalyzer::new();
         analyzer.eval(&test).unwrap();
 
