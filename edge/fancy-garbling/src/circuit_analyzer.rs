@@ -1,17 +1,14 @@
-//! Fancy object to profile a fancy circuit and compute stats such as the multiplicative depth
-//! or the number of boolean and arithmetic gates in a circuit.
+//! [`Fancy`] instantiation for computing gate counts and multiplicative depth
+//! of a [`Fancy`] circuit.
+
 use crate::{
     Fancy, FancyArithmetic, FancyBinary, FancyProj, HasModulus, circuit::CircuitInputMapper,
 };
-use std::cmp::max;
+use core::cmp::max;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
 
 /// An instantiation of [`Fancy::Item`] used by [`CircuitAnalyzer`].
-///
-/// A dummy FancyItem which is returned when profiling a [`Fancy`] circuit.
-/// The [`AnalyzerItem`] contains the wire modulus and the depth of the computation.
-/// This is because [`Fancy::Item`] needs to implement [`HasModulus`].
 #[derive(Clone, Debug)]
 pub struct AnalyzerItem {
     modulus: u16,
@@ -19,8 +16,7 @@ pub struct AnalyzerItem {
 }
 
 impl AnalyzerItem {
-    /// Create a new [`AnalyzerItem`] with the provided modulus and a depth of
-    /// zero.
+    /// Create a new [`AnalyzerItem`] with the provided modulus.
     pub fn new(modulus: u16) -> Self {
         Self { modulus, depth: 0 }
     }
@@ -32,13 +28,12 @@ impl HasModulus for AnalyzerItem {
     }
 }
 
-/// A [`Fancy`] object which counts gates in a binary circuit.
+/// A [`Fancy`] object which counts gates and depth of a
+/// [`crate::circuit::Circuit`].
 ///
-/// Specifically, [`CircuitAnalyzer`] stores the number of inputs,
-/// ands, xors, negations, constants, multiplication, addition, subtraction,
-/// constant operations and multiplication depth of the circuits. This
-/// information is especially useful for pre-processing authenticated
-/// garbling circuits.
+/// Specifically, [`CircuitAnalyzer`] stores the number of inputs, ands, xors,
+/// negations, constants, multiplications, additions, subtractions, and
+/// multiplicative depth of the computation.
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CircuitAnalyzer {
     ninputs: usize,
@@ -56,54 +51,52 @@ pub struct CircuitAnalyzer {
 impl std::fmt::Display for CircuitAnalyzer {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f, "computation info:")?;
-        writeln!(f, "   number of inputs: {:16}", self.ninputs)?;
-        writeln!(f, "   number of constants: {:16}", self.nconstants)?;
-        writeln!(f, "   number of additions: {:16}", self.nadds)?;
-        writeln!(f, "   number of subtractions: {:16}", self.nsubs)?;
-        writeln!(f, "   number of cmuls: {:16}", self.ncmuls)?;
-        writeln!(f, "   number of muls: {:16}", self.nmuls)?;
-        writeln!(f, "   number of ands: {:16}", self.nands)?;
-        writeln!(f, "   number of xors: {:16}", self.nxors)?;
-        writeln!(f, "   number of negations: {:16}", self.nnegs)?;
+        writeln!(f, "   # inputs:  {:16}", self.ninputs)?;
+        writeln!(f, "   # consts:  {:16}", self.nconstants)?;
+        writeln!(f, "   # adds:    {:16}", self.nadds)?;
+        writeln!(f, "   # subs:    {:16}", self.nsubs)?;
+        writeln!(f, "   # cmuls:   {:16}", self.ncmuls)?;
+        writeln!(f, "   # muls:    {:16}", self.nmuls)?;
+        writeln!(f, "   # ands:    {:16}", self.nands)?;
+        writeln!(f, "   # xors:    {:16}", self.nxors)?;
+        writeln!(f, "   # negates: {:16}", self.nnegs)?;
         writeln!(
             f,
-            "   total number of arithmetic gates(ADD, SUB, MUL, CMUL): {:16}",
+            "   # arithmetic gates: {}",
             self.nadds + self.nsubs + self.ncmuls + self.nmuls
         )?;
-        writeln!(
-            f,
-            "   total number of boolean gates (AND, XOR): {:16}",
-            self.nands + self.nxors
-        )?;
-        writeln!(f, "   multiplicative depth: {:16}", self.mul_depth)?;
+        writeln!(f, "   # boolean gates: {}", self.nands + self.nxors)?;
+        writeln!(f, "   mult depth: {}", self.mul_depth)?;
         Ok(())
     }
 }
 
 impl CircuitAnalyzer {
-    /// Create a new [`CircuitAnalyzer`] and sets all the gate
-    /// counts to 0.
+    /// Create a new [`CircuitAnalyzer`].
     pub fn new() -> CircuitAnalyzer {
         Default::default()
     }
-    /// Return the number of AND gates in the circuit
+    /// The number of AND gates in the circuit.
     pub fn nands(&self) -> usize {
         self.nands
     }
-    /// Return the number of input wires of the circuit
+    /// The number of input wires of the circuit.
     pub fn ninputs(&self) -> usize {
         self.ninputs
     }
-    /// Return the number of constant wires of the circuit
+    /// The number of constant wires of the circuit.
     pub fn nconstants(&self) -> usize {
         self.nconstants
     }
-    /// Return the number of XOR gates in the circuit
+    /// The number of XOR gates in the circuit.
     pub fn nxors(&self) -> usize {
         self.nxors
     }
 
-    /// Evaluate `circuit` using [`CircuitAnalyzer`].
+    /// Evaluate a circuit using [`CircuitAnalyzer`].
+    ///
+    /// The circuit needs to implement [`CircuitInputMapper`] as the circuit
+    /// analysis is input-size-dependent.
     pub fn eval<C: CircuitInputMapper<CircuitAnalyzer>>(&mut self, circuit: &C) -> Result<()> {
         Channel::with(std::io::empty(), |channel| {
             let inputs = (0..circuit.ninputs())
@@ -117,39 +110,32 @@ impl CircuitAnalyzer {
 
 impl FancyBinary for CircuitAnalyzer {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        assert_eq!(x.modulus, 2);
+        assert_eq!(y.modulus, 2);
         self.nxors += 1;
-        // Fancy's XOR gate calls the underlying arithmetic addition
-        self.nadds += 1;
         AnalyzerItem {
             modulus: x.modulus,
-            // Same depth as an ADD
             depth: max(x.depth, y.depth),
         }
     }
 
     fn and(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
+        assert_eq!(x.modulus, 2);
+        assert_eq!(y.modulus, 2);
         self.nands += 1;
-        // Fancy's AND gate calls the underlying arithmetic multiplication
-        self.nmuls += 1;
+        let depth = max(x.depth, y.depth) + 1;
+        self.mul_depth = max(self.mul_depth, depth);
         Ok(AnalyzerItem {
             modulus: x.modulus,
-            // Same depth as a MUL
-            depth: max(x.depth, y.depth) + 1,
+            depth,
         })
     }
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
+        assert_eq!(x.modulus, 2);
         self.nnegs += 1;
-
-        // Fancy implements negation with one constant gate and one XOR
-        self.nconstants += 1;
-        self.nxors += 1;
-
-        // Fancy's XOR gate calls the underlying arithmetic addition
-        self.nadds += 1;
         AnalyzerItem {
             modulus: x.modulus,
-            // Same depth as a XOR, except that negation is a unary gate
             depth: x.depth,
         }
     }
@@ -182,6 +168,8 @@ impl FancyArithmetic for CircuitAnalyzer {
 
     fn mul(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
         self.nmuls += 1;
+        let depth = max(x.depth, y.depth) + 1;
+        self.mul_depth = max(self.mul_depth, depth);
         Ok(AnalyzerItem {
             modulus: x.modulus,
             depth: max(x.depth, y.depth) + 1,
@@ -192,9 +180,9 @@ impl FancyArithmetic for CircuitAnalyzer {
 impl FancyProj for CircuitAnalyzer {
     fn proj(
         &mut self,
-        _x: &Self::Item,
-        _q: u16,
-        _tt: Option<Vec<u16>>,
+        _: &Self::Item,
+        _: u16,
+        _: Option<Vec<u16>>,
         _: &mut Channel,
     ) -> Result<Self::Item> {
         swanky_error::bail!(
@@ -209,22 +197,14 @@ impl Fancy for CircuitAnalyzer {
 
     fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
         self.ninputs += moduli.len();
-        Ok(moduli
-            .iter()
-            .map(|q| AnalyzerItem {
-                modulus: *q,
-                depth: 0,
-            })
-            .collect())
+        Ok(moduli.iter().map(|q| AnalyzerItem::new(*q)).collect())
     }
 
-    fn encode_many(
-        &mut self,
-        _values: &[u16],
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> Result<Vec<Self::Item>> {
-        self.receive_many(moduli, channel)
+    fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
+        swanky_error::bail!(
+            ErrorKind::UnsupportedError,
+            "Encoding values is unsupported"
+        )
     }
 
     fn constant(&mut self, _val: u16, q: u16, _: &mut Channel) -> Result<Self::Item> {
@@ -243,60 +223,37 @@ impl Fancy for CircuitAnalyzer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::circuits::binary::{TestBinaryMultiplication, TestBinaryTwosComplement};
+    use super::CircuitAnalyzer;
+    use crate::circuits::{aes::AesNonExpanded, sha::Sha256CompressionFunction};
 
     #[test]
-    fn binary_addition_counts_are_correct() {
-        let nbits = 64;
-        let test = crate::circuits::binary::TestBinaryAddition(nbits);
+    fn aes_128_bristol_format_is_correct() {
+        let circuit = AesNonExpanded::new();
         let mut analyzer = CircuitAnalyzer::new();
-        analyzer.eval(&test).unwrap();
+        analyzer.eval(&circuit).unwrap();
 
-        assert_eq!(analyzer.ninputs, 128);
-        assert_eq!(analyzer.nands, 64);
-        // There are (nbits -1) adders invoked with a carry
-        // and the very first one without. The adders with
-        // carry have 3 extra XORs, check fancy_garbling::adder
-        // and fancy_garbling::binary_addition for more info
-        assert_eq!(analyzer.nxors, 64 * 4 - 3);
-        assert_eq!(analyzer.nconstants, 0);
-        assert_eq!(analyzer.nnegs, 0);
+        // These counts come from
+        // <https://nigelsmart.github.io/MPC-Circuits/old-circuits.html>
+        //
+        // Note: If we change the AES circuit, these will need to change!
+        assert_eq!(analyzer.nands(), 6800);
+        assert_eq!(analyzer.nxors(), 25124);
+        assert_eq!(analyzer.nnegs, 1692);
     }
 
     #[test]
-    fn binary_multiplication_counts_are_correct() {
-        let nbits = 64;
-        let test = TestBinaryMultiplication(nbits);
+    fn sha256_compression_fn_bristol_fashion_is_correct() {
+        let circuit = Sha256CompressionFunction::new();
         let mut analyzer = CircuitAnalyzer::new();
-        analyzer.eval(&test).unwrap();
+        analyzer.eval(&circuit).unwrap();
 
-        // In binary multiplication there are :
-        // - 64 * 64 explicit ANDs, i.e. pairwise ANDS between parties input wires.
-        // - Sum(65 to 128) binary additions. Recall that in multiplication the input
-        //   size grows by 1 bit each round until each 2 times the size of the initial
-        //   input (i.e. 64 * 2)
-        assert_eq!(analyzer.ninputs, 128);
-        assert_eq!(analyzer.nands, (65..128).sum::<usize>() + 64 * 64);
-        assert_eq!(
-            analyzer.nxors,
-            (65..128).sum::<usize>() * 4 - (3 * (128 - 65))
-        );
-        assert_eq!(analyzer.nconstants, 64);
-        assert_eq!(analyzer.nnegs, 0);
-    }
-
-    #[test]
-    fn binary_twos_complement_counts_are_correct() {
-        let nbits = 64;
-        let test = TestBinaryTwosComplement(nbits);
-        let mut analyzer = CircuitAnalyzer::new();
-        analyzer.eval(&test).unwrap();
-
-        assert_eq!(analyzer.ninputs, 64);
-        assert_eq!(analyzer.nands, 63);
-        assert_eq!(analyzer.nxors, 63 * 4 - 3 + 64 + 2);
-        assert_eq!(analyzer.nconstants, 64 + 64);
-        assert_eq!(analyzer.nnegs, 64);
+        // These counts come from <https://nigelsmart.github.io/MPC-Circuits/>.
+        //
+        // Note: If we change the SHA-256 compression function circuit, these
+        // will need to change!
+        assert_eq!(analyzer.nands(), 22573);
+        assert_eq!(analyzer.nxors(), 110644);
+        assert_eq!(analyzer.nnegs, 1856);
+        assert_eq!(analyzer.mul_depth, 1607)
     }
 }
