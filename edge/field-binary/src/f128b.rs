@@ -186,7 +186,9 @@ impl<'a> SubAssign<&'a F128b> for F128b {
 //}
 
 mod multiplication {
-    use vectoreyes::{SimdBase, U64x2, SimdBase8, U8x16};
+    use vectoreyes::{SimdBase, U64x2, U8x16};
+    #[cfg(target_arch = "x86_64")]
+    use vectoreyes::SimdBase8;
 
     #[allow(dead_code)]
     mod unused {
@@ -277,39 +279,87 @@ mod multiplication {
     }
 
     macro_rules! shl {
-        ($x:expr, 64) => {
+        ($x:expr, lt64 $n:literal) => {
             {
-                let x: U64x2 = $x;  // Barf if x isn't U64x2
-                U64x2::from(U8x16::from(x).shift_bytes_left::<8>())
+                debug_assert!(0 <= $n && $n < 64);
+                let x: U64x2 = $x; // Barf if x isn't U64x2
+                #[cfg(target_arch = "x86_64")]
+                {
+                    let lo = x.shift_left::<$n>();              // Shift each lane by n
+                    let carry = x.shift_right::<{64 - $n}>();   // Bits that should cross lanes
+                    // Move carry into high lane
+                    let hi_carry = U64x2::from(U8x16::from(carry).shift_bytes_left::<8>());
+                    lo ^ hi_carry
+                }
+                #[cfg(not(target_arch = "x86_64"))]
+                bytemuck::cast::<_, U64x2>(bytemuck::cast::<_, u128>(x) << $n)
             }
         };
-        ($x:expr, $n:literal) => {
+        ($x:expr, 64) => {
             {
-                debug_assert!($n < 64 && $n >= 0);
-                let x: U64x2 = $x;                          // Barf if x isn't U64x2
-                let lo = x.shift_left::<$n>();              // Shift each lane by n
-                let carry = x.shift_right::<{64 - $n}>();   // Bits that should cross lanes
-                let carry = shl!(carry, 64);                // Move carry into high lane
-                lo ^ carry
+                let x: U64x2 = $x; // Barf if x isn't U64x2
+                #[cfg(target_arch = "x86_64")]
+                {
+                    U64x2::from(U8x16::from(x).shift_bytes_left::<8>())
+                }
+                #[cfg(not(target_arch = "x86_64"))]
+                bytemuck::cast::<_, U64x2>(bytemuck::cast::<_, u128>(x) << 64)
+            }
+        };
+        ($x:expr, gt64 $n:literal) => {
+            {
+                debug_assert!($n > 64);
+                let x: U64x2 = $x; // Barf if x isn't U64x2
+                #[cfg(target_arch = "x86_64")]
+                {
+                    // Move low bits into high lane
+                    let lo = U64x2::from(U8x16::from(x).shift_bytes_left::<8>());
+                    lo.shift_left::<{$n - 64}>() // Shift high bits the rest of the way
+                }
+                #[cfg(not(target_arch = "x86_64"))]
+                bytemuck::cast::<_, U64x2>(bytemuck::cast::<_, u128>(x) << $n)
             }
         }
     }
 
-    macro_rules! shr {
-        ($x:expr, 64) => {
+    macro_rules! srl {
+        ($x:expr, lt64 $n:literal) => {
             {
-                let x: U64x2 = $x;  // Barf if x isn't U64x2
-                U64x2::from(U8x16::from(x).shift_bytes_right::<8>())
+                let x: U64x2 = $x; // Barf if x isn't U64x2
+                #[cfg(target_arch = "x86_64")]
+                {
+                    let hi = x.shift_right::<$n>();             // Shift each lane by n
+                    let carry = x.shift_left::<{64 - $n}>();    // Bits that should cross lanes
+                    // Move carry into low lane
+                    let lo_carry = U64x2::from(U8x16::from(carry).shift_bytes_right::<8>());
+                    hi ^ lo_carry
+                }
+                #[cfg(not(target_arch = "x86_64"))]
+                bytemuck::cast::<_, U64x2>(bytemuck::cast::<_, u128>(x) >> $n)
             }
         };
-        ($x:expr, $n:literal) => {
+        ($x:expr, 64) => {
             {
-                debug_assert!($n < 64 && $n >= 0);
-                let x: U64x2 = $x;                          // Barf if x isn't U64x2
-                let hi = x.shift_right::<$n>();             // Shift each lane by n
-                let carry = x.shift_left::<{64 - $n}>();    // Bits that should cross lanes
-                let carry = shr!(carry, 64);                // Move carry into low lane
-                hi ^ carry
+                let x: U64x2 = $x; // Barf if x isn't U64x2
+                #[cfg(target_arch = "x86_64")]
+                {
+                    U64x2::from(U8x16::from(x).shift_bytes_right::<8>())
+                }
+                #[cfg(not(target_arch = "x86_64"))]
+                bytemuck::cast::<_, U64x2>(bytemuck::cast::<_, u128>(x) >> 64)
+            }
+        };
+        ($x:expr, gt64 $n:literal) => {
+            {
+                let x: U64x2 = $x; // Barf if x isn't U64x2
+                #[cfg(target_arch = "x86_64")]
+                {
+                    // Move high bits into low lane
+                    let hi = U64x2::from(U8x16::from(x).shift_bytes_right::<8>());
+                    hi.shift_right::<{$n - 64}>() // Shift low bits the rest of the way
+                }
+                #[cfg(not(target_arch = "x86_64"))]
+                bytemuck::cast::<_, U64x2>(bytemuck::cast::<_, u128>(x) >> $n)
             }
         }
     }
@@ -319,17 +369,6 @@ mod multiplication {
     // The paper describes this as, "one iteration carry-less schoolbook" multiplication.
     #[inline(always)]
     pub(crate) fn clmul(a: u128, b: u128) -> (u128, u128) {
-        //let a: U64x2 = bytemuck::cast(a);
-        //let b: U64x2 = bytemuck::cast(b);
-
-        //let c = carryless_mul_64bit::<true, true>(a, b);
-        //let d = carryless_mul_64bit::<false, false>(a, b);
-        //let e = carryless_mul_64bit::<false, false>(a ^ shr!(a, 64), b ^ shr!(b, 64));
-
-        //let c_d_e = c ^ d ^ e;
-        //let hi = c ^ shr!(c_d_e, 64);
-        //let lo = d ^ shl!(c_d_e, 64);
-        //(bytemuck::cast(hi), bytemuck::cast(lo))
         let a: U64x2 = bytemuck::cast(a);
         let b: U64x2 = bytemuck::cast(b);
 
@@ -340,10 +379,7 @@ mod multiplication {
 
         let e_f = e ^ f;
         let lo = c ^ shl!(e_f, 64);
-        let hi = d ^ shr!(e_f, 64);
-        //let c_d_e = c ^ d ^ e;
-        //let lo = d ^ shl!(c_d_e, 64);
-        //let hi = c ^ shr!(c_d_e, 64);
+        let hi = d ^ srl!(e_f, 64);
 
         (bytemuck::cast(hi), bytemuck::cast(lo))
     }
@@ -360,9 +396,9 @@ mod multiplication {
         let b: U64x2 = bytemuck::cast(b);
         let c = carryless_mul_64bit::<true, true>(a, b);
         let d = carryless_mul_64bit::<false, false>(a, b);
-        let e = carryless_mul_64bit::<false, false>(a ^ shr!(a, 64), b ^ shr!(b, 64));
+        let e = carryless_mul_64bit::<false, false>(a ^ srl!(a, 64), b ^ srl!(b, 64));
         let product_upper_half =
-            c ^ shr!(c, 64) ^ shr!(d, 64) ^ shr!(e, 64);
+            c ^ srl!(c, 64) ^ srl!(d, 64) ^ srl!(e, 64);
         let product_lower_half =
             d ^ shl!(d, 64) ^ shl!(c, 64) ^ shl!(e, 64);
         (
@@ -390,23 +426,10 @@ mod multiplication {
         let r1 = carryless_mul_64bit::<false, true>(hi, modulus);
 
         let t = r0 ^ shl!(r1, 64);
-        //let over = r1.as_array()[1]; // ≤ 7 bits
-        //let over_r = U64x2::from_array([over ^ (over << 1) ^ (over << 2) ^ (over << 7), 0]);
-        let over = shr!(r1, 64); // ≤ 7 bits
-        let over_r = over ^ shl!(over, 1) ^ shl!(over, 2) ^ shl!(over, 7);
+        let over = srl!(r1, 64); // ≤ 7 bits
+        let over_r = over ^ shl!(over, lt64 1) ^ shl!(over, lt64 2) ^ shl!(over, lt64 7);
 
         bytemuck::cast(lo ^ t ^ over_r)
-
-        //let xmm0: U64x2 = bytemuck::cast(lo);
-        //let xmm1: U64x2 = bytemuck::cast(hi);
-        //let xmm2 = xmm1;
-        //let xmm3: U64x2 = bytemuck::cast((0x87_u128 << 64) | 0x87_u128);
-
-        //let xmm1 = carryless_mul_64bit::<false, false>(xmm1, xmm3);
-        //let xmm2 = carryless_mul_64bit::<true, true>(xmm2, xmm3);
-
-        //let xmm0 = xmm0 ^ xmm1 ^ xmm2;
-        //bytemuck::cast(xmm0)
     }
 
     // Our original reduce operation, but vectorized
@@ -417,16 +440,16 @@ mod multiplication {
         let hi: U64x2 = bytemuck::cast(hi);
         let lo: U64x2 = bytemuck::cast(lo);
 
-        let x3 = shr!(hi, 64);
+        let x3 = srl!(hi, 64);
 
-        let a = shr!(x3, 63);
-        let b = shr!(x3, 62);
-        let c = shr!(x3, 57);
+        let a = srl!(x3, lt64 63);
+        let b = srl!(x3, lt64 62);
+        let c = srl!(x3, lt64 57);
 
         let x3_d = hi ^ a ^ b ^ c;
-        let e = shl!(x3_d, 1);
-        let f = shl!(x3_d, 2);
-        let g = shl!(x3_d, 7);
+        let e = shl!(x3_d, lt64 1);
+        let f = shl!(x3_d, lt64 2);
+        let g = shl!(x3_d, lt64 7);
 
         let h = x3_d ^ e ^ f ^ g;
         bytemuck::cast(lo ^ h)
@@ -542,23 +565,39 @@ mod multiplication {
             #[test]
             fn test_shl(x: u128) {
                 let x_v: U64x2 = bytemuck::cast(x);
-                let x_1: u128 = bytemuck::cast(shl!(x_v, 1));
-                let x_5: u128 = bytemuck::cast(shl!(x_v, 5));
-                let x_63: u128 = bytemuck::cast(shl!(x_v, 63));
+                let x_1: u128 = bytemuck::cast(shl!(x_v, lt64 1));
+                let x_5: u128 = bytemuck::cast(shl!(x_v, lt64 5));
+                let x_63: u128 = bytemuck::cast(shl!(x_v, lt64 63));
+                let x_64: u128 = bytemuck::cast(shl!(x_v, 64));
+                let x_65: u128 = bytemuck::cast(shl!(x_v, gt64 65));
+                let x_122: u128 = bytemuck::cast(shl!(x_v, gt64 122));
+                let x_127: u128 = bytemuck::cast(shl!(x_v, gt64 127));
                 prop_assert_eq!(x_1, x << 1);
                 prop_assert_eq!(x_5, x << 5);
                 prop_assert_eq!(x_63, x << 63);
+                prop_assert_eq!(x_64, x << 64);
+                prop_assert_eq!(x_65, x << 65);
+                prop_assert_eq!(x_122, x << 122);
+                prop_assert_eq!(x_127, x << 127);
             }
 
             #[test]
-            fn test_shr(x: u128) {
+            fn test_srl(x: u128) {
                 let x_v: U64x2 = bytemuck::cast(x);
-                let x_1: u128 = bytemuck::cast(shr!(x_v, 1));
-                let x_5: u128 = bytemuck::cast(shr!(x_v, 5));
-                let x_63: u128 = bytemuck::cast(shr!(x_v, 63));
+                let x_1: u128 = bytemuck::cast(srl!(x_v, lt64 1));
+                let x_5: u128 = bytemuck::cast(srl!(x_v, lt64 5));
+                let x_63: u128 = bytemuck::cast(srl!(x_v, lt64 63));
+                let x_64: u128 = bytemuck::cast(srl!(x_v, 64));
+                let x_65: u128 = bytemuck::cast(srl!(x_v, gt64 65));
+                let x_122: u128 = bytemuck::cast(srl!(x_v, gt64 122));
+                let x_127: u128 = bytemuck::cast(srl!(x_v, gt64 127));
                 prop_assert_eq!(x_1, x >> 1);
                 prop_assert_eq!(x_5, x >> 5);
                 prop_assert_eq!(x_63, x >> 63);
+                prop_assert_eq!(x_64, x >> 64);
+                prop_assert_eq!(x_65, x >> 65);
+                prop_assert_eq!(x_122, x >> 122);
+                prop_assert_eq!(x_127, x >> 127);
             }
         }
     }
