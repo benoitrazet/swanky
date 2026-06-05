@@ -1,26 +1,15 @@
-//! An example that computes the gcd of two secret numbers in a binary garbled circuit
-//! using fancy-garbling.
+//! An example that computes the GCD of two secret numbers in a binary circuit
+//! using `fancy-garbling`.
 
-use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryGadgets, Fancy,
-    circuit::Circuit,
-    circuits::binary::{BinaryEquality, BinaryMultiplex, BinarySubtraction, Mux},
-    util,
-};
-use swanky_twopac::semihonest::{Evaluator, Garbler};
-
+use core::cmp::{Ordering, max};
+use fancy_garbling::{AllWire, BinaryBundle, BinaryGadgets, circuit::Circuit, circuits::Gcd};
 use swanky_channel::Channel;
+use swanky_error::Result;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 use swanky_rng::SwankyRng;
+use swanky_twopac::semihonest::{Evaluator, Garbler};
 
-use std::cmp::{Ordering, max};
-
-/// A structure that contains both the garbler and the evaluators
-/// wires. This structure simplifies the API of the garbled circuit.
-struct GCDInputs<F> {
-    pub garbler_wires: BinaryBundle<F>,
-    pub evaluator_wires: BinaryBundle<F>,
-}
+const NBITS: usize = 128;
 
 /// The garbler's main method:
 /// Given an `input` and public `upper_bound` (which must be pre-shared with the evaluator)
@@ -32,38 +21,22 @@ struct GCDInputs<F> {
 /// (2) The garbler then exchanges their wires obliviously with the evaluator.
 /// (3) The garbler and the evaluator then run the garbled circuit.
 /// (4) The garbler and the evaluator open the result of the computation.
-fn gb_gcd(rng: SwankyRng, channel: &mut Channel, input: u128, upper_bound: u128) {
-    // (1)
-    let mut gb = Garbler::<SwankyRng, OtSender, AllWire>::new(channel, rng).unwrap();
-    // (2)
-    let circuit_wires = gb_set_fancy_inputs(&mut gb, input, channel);
-    // (3)
-    let gcd = fancy_gcd::<Garbler<SwankyRng, OtSender, AllWire>>(
-        &mut gb,
-        circuit_wires,
-        upper_bound,
-        channel,
-    )
-    .unwrap();
-    // (4)
-    gb.outputs(gcd.wires(), channel).unwrap();
+fn gb_gcd(input: u128, upper_bound: usize, channel: &mut Channel, rng: SwankyRng) -> Result<()> {
+    let mut gb = Garbler::<SwankyRng, OtSender, AllWire>::new(channel, rng)?;
+    let inputs = gb_set_inputs(&mut gb, input, channel)?;
+    let gcd = Gcd::new(upper_bound).execute(&mut gb, &inputs, channel)?;
+    gb.bin_output(&gcd, channel)?;
+    Ok(())
 }
-/// The garbler's wire exchange method
-fn gb_set_fancy_inputs<F>(gb: &mut F, input: u128, channel: &mut Channel) -> GCDInputs<F::Item>
-where
-    F: Fancy<Item = AllWire> + BinaryGadgets,
-{
-    // The number of bits needed to represent a single input, in this case a u128
-    let nbits = 128;
-    // The garbler encodes their input into binary wires
-    let garbler_wires: BinaryBundle<F::Item> = gb.bin_encode(input, nbits, channel).unwrap();
-    // The evaluator receives their input labels using Oblivious Transfer (OT)
-    let evaluator_wires: BinaryBundle<F::Item> = gb.bin_receive(nbits, channel).unwrap();
 
-    GCDInputs {
-        garbler_wires,
-        evaluator_wires,
-    }
+fn gb_set_inputs<F: BinaryGadgets>(
+    gb: &mut F,
+    input: u128,
+    channel: &mut Channel,
+) -> Result<(BinaryBundle<F::Item>, BinaryBundle<F::Item>)> {
+    let x: BinaryBundle<F::Item> = gb.bin_encode(input, NBITS, channel)?;
+    let y: BinaryBundle<F::Item> = gb.bin_receive(NBITS, channel)?;
+    Ok((x, y))
 }
 
 /// The evaluator's main method:
@@ -78,105 +51,24 @@ where
 /// (4) The evaluator and the garbler open the result of the computation.
 /// (5) The evaluator translates the binary output of the circuit into its decimal
 ///     representation.
-fn ev_gcd(rng: SwankyRng, channel: &mut Channel, input: u128, upper_bound: u128) -> u128 {
-    // (1)
-    let mut ev = Evaluator::<SwankyRng, OtReceiver, AllWire>::new(channel, rng).unwrap();
-    // (2)
-    let circuit_wires = ev_set_fancy_inputs(&mut ev, input, channel);
-    // (3)
-    let gcd = fancy_gcd::<Evaluator<SwankyRng, OtReceiver, AllWire>>(
-        &mut ev,
-        circuit_wires,
-        upper_bound,
-        channel,
-    )
-    .unwrap();
-    // (4)
-    let gcd_binary = ev
-        .outputs(gcd.wires(), channel)
-        .unwrap()
+fn ev_gcd(input: u128, upper_bound: usize, channel: &mut Channel, rng: SwankyRng) -> Result<u128> {
+    let mut ev = Evaluator::<SwankyRng, OtReceiver, AllWire>::new(channel, rng)?;
+    let inputs = ev_set_inputs(&mut ev, input, channel)?;
+    let gcd = Gcd::new(upper_bound).execute(&mut ev, &inputs, channel)?;
+    let output = ev
+        .bin_output(&gcd, channel)?
         .expect("evaluator should produce outputs");
-
-    // (5)
-    util::u128_from_bits(&gcd_binary)
-}
-fn ev_set_fancy_inputs<F>(ev: &mut F, input: u128, channel: &mut Channel) -> GCDInputs<F::Item>
-where
-    F: Fancy<Item = AllWire> + BinaryGadgets,
-{
-    // The number of bits needed to represent a single input, in this case a u128
-    let nbits = 128;
-    // The evaluator receives the garblers input labels.
-    let garbler_wires: BinaryBundle<F::Item> = ev.bin_receive(nbits, channel).unwrap();
-    // The evaluator receives their input labels using Oblivious Transfer (OT).
-    let evaluator_wires: BinaryBundle<F::Item> = ev.bin_encode(input, nbits, channel).unwrap();
-
-    GCDInputs {
-        garbler_wires,
-        evaluator_wires,
-    }
+    Ok(output)
 }
 
-/// The main fancy function which describes the garbled circuit for gcd.
-fn fancy_gcd<F>(
-    f: &mut F,
-    wire_inputs: GCDInputs<F::Item>,
-    upper_bound: u128,
+fn ev_set_inputs<F: BinaryGadgets>(
+    ev: &mut F,
+    input: u128,
     channel: &mut Channel,
-) -> swanky_error::Result<BinaryBundle<F::Item>>
-where
-    F: BinaryGadgets,
-{
-    let mut a: BinaryBundle<_> = wire_inputs.garbler_wires;
-    let mut b: BinaryBundle<_> = wire_inputs.evaluator_wires;
-
-    // Since the garbled circuit is oblivious, we cannot terminate the gcd algorithm by conditioning on
-    // the values of `a` or `b` as is the case in the insecure version of gcd.
-    // Instead, we rely on an upper bound on the number of iterations we know the algorithm will
-    // terminate by. The Euclidean algorithm based on subtractions will take no more than N steps where N
-    // is the larger of the two numbers we are computing the gcd for (think of GCD(X,1) for any X).
-    // This is a loose upper bound. To keep input values secret, we can choose the upper bound in the circuit
-    // to be a known maximal value that both parties know that neither of their values will exceed,
-    // for example 2^32 i.e. std::u32::MAX. This is a very loose upper bound, and is only chosen for
-    // illustrative purposes.
-    for _ in 0..upper_bound {
-        // Since the garbled circuit is non-branching, we don't know whether a > b and cannot branch computation
-        // based on that result of that conditional. Instead, we need to perform the computation that occurs
-        // for all cases of the predict "is a > b ?", i.e.:
-        // (1)  a > b, (2) b > a. We consider the case where a == b separately since that is the case where we stop
-        // updating our variables and find the result of the computation gcd(a,b).
-        //
-        // We compute a := a - b and check for an underflow that will help determine if "a > b";
-        let (r_1, mut underflow_r_1) =
-            BinarySubtraction.execute(f, &(a.to_owned(), b.to_owned()), channel)?;
-        // And compute b := b - a and check for an underflow that will help determine if "b > a";
-        let (r_2, mut underflow_r_2) =
-            BinarySubtraction.execute(f, &(b.to_owned(), a.to_owned()), channel)?;
-
-        // We compute "a == b"
-        let check_equality = BinaryEquality.execute(f, &(a.to_owned(), b.to_owned()), channel)?;
-        let zero = f.constant(0, 2, channel)?;
-
-        // The `underflow` bits act as dual purpose multiplexing bits:
-        // (1) If a > b then underflow_r_1 = 1 and underflow_r_2 = 0
-        // (2) If b > a then underflow_r_1 = 0 and underflow_r_2 = 1
-        // (3) If a == b then underflow_r_1 = underflow_r_2 = 0
-        underflow_r_1 = Mux.execute(
-            f,
-            &(check_equality.clone(), underflow_r_1, zero.clone()),
-            channel,
-        )?;
-        underflow_r_2 = Mux.execute(f, &(check_equality, underflow_r_2, zero), channel)?;
-
-        // Using the `underflow` bits we multiplex in the following way:
-        // (1) If a > b, a := a - b and b := b
-        // (2) If b > a, a := a  and b := b - a
-        // (3) If a == b, a := a and b := b
-        a = BinaryMultiplex.execute(f, &(underflow_r_1, a, r_1), channel)?;
-        b = BinaryMultiplex.execute(f, &(underflow_r_2, b, r_2), channel)?;
-    }
-
-    Ok(a)
+) -> Result<(BinaryBundle<F::Item>, BinaryBundle<F::Item>)> {
+    let x = ev.bin_receive(NBITS, channel)?;
+    let y = ev.bin_encode(input, NBITS, channel)?;
+    Ok((x, y))
 }
 
 fn gcd_in_clear(a: u128, b: u128, upper_bound: u128) -> u128 {
@@ -189,7 +81,6 @@ fn gcd_in_clear(a: u128, b: u128, upper_bound: u128) -> u128 {
             Ordering::Equal => return r_1,
         }
     }
-
     r_1
 }
 
@@ -200,11 +91,11 @@ use clap::Parser;
 /// cargo run --example gcd 2 3
 ///
 /// Computes the GCD(2,3)
-/// Where 2 is the garbler's value and 3 the evaluator's
+/// Where 2 is the garbler's value and 3 is the evaluator's.
 struct Cli {
-    /// The first integer the garbler's value
+    /// The garbler's value.
     gb_value: u128,
-    /// The second integer the evaluator's value
+    /// The evaluator's value.
     ev_value: u128,
 }
 
@@ -217,22 +108,18 @@ fn main() {
 
     let (_, result) = swanky_channel::local::local_channel_pair(
         |channel| {
-            let rng_gb = SwankyRng::new();
-            gb_gcd(rng_gb, channel, gb_value, upper_bound);
-            Ok(())
+            let rng = SwankyRng::new();
+            gb_gcd(gb_value, upper_bound as usize, channel, rng)
         },
         |channel| {
-            let rng_ev = SwankyRng::new();
-            let result = ev_gcd(rng_ev, channel, ev_value, upper_bound);
-            Ok(result)
+            let rng = SwankyRng::new();
+            ev_gcd(ev_value, upper_bound as usize, channel, rng)
         },
     )
     .unwrap();
 
-    let resut_in_clear = gcd_in_clear(gb_value, ev_value, upper_bound);
     println!("Garbled Circuit result is : GCD({gb_value}, {ev_value}) = {result}");
-    assert!(
-        result == resut_in_clear,
-        "The result is incorrect and should be {resut_in_clear} \n (Note: If this is not the value that you are expecting,\n consider changing the upper bound)"
-    );
+
+    let expected = gcd_in_clear(gb_value, ev_value, upper_bound);
+    assert_eq!(result, expected);
 }
