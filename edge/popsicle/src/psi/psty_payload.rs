@@ -32,8 +32,10 @@ use crate::{
     utils,
 };
 use fancy_garbling::{
-    AllWire, ArithmeticProjBundleGadgets, BinaryBundle, Bundle, CrtBundle, CrtGadgets,
-    CrtProjGadgets, Fancy, FancyBinary,
+    AllWire, ArithmeticProjBundleGadgets, BinaryBundle, Bundle, CrtBundle, CrtGadgets, Fancy,
+    FancyBinary,
+    circuit::Circuit,
+    circuits::arithmetic::{Addition, Division, Multiplication},
 };
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_twopac::semihonest::{Evaluator, Garbler};
@@ -141,7 +143,7 @@ impl Sender {
         self.send_data(&mut state, nbins, channel, rng)?;
 
         let (aggregate, sum_weights) = state.build_and_compute_circuit(&mut gb, channel).unwrap();
-        let weighted_mean = gb.crt_div(&aggregate, &sum_weights, channel).unwrap();
+        let weighted_mean = Division.execute(&mut gb, &(aggregate, sum_weights), channel)?;
 
         gb.outputs(weighted_mean.wires(), channel).unwrap();
 
@@ -185,7 +187,7 @@ impl Sender {
         let (aggregate, sum_weights) = self
             .compute_payload(ts_id, ts_payload, table, payload, path_deltas, channel, rng)
             .unwrap();
-        let weighted_mean = gb.crt_div(&aggregate, &sum_weights, channel).unwrap();
+        let weighted_mean = Division.execute(&mut gb, &(aggregate, sum_weights), channel)?;
         println!("Done");
         gb.outputs(weighted_mean.wires(), channel).unwrap();
         Ok(())
@@ -233,8 +235,9 @@ impl Sender {
             let (partial, partial_sum_weights) =
                 state.build_and_compute_circuit(&mut gb, channel).unwrap();
 
-            acc = gb.crt_add(&acc, &partial);
-            sum_weights = gb.crt_add(&sum_weights, &partial_sum_weights);
+            acc = Addition.execute(&mut gb, &(acc, partial), channel)?;
+            sum_weights =
+                Addition.execute(&mut gb, &(sum_weights, partial_sum_weights), channel)?;
 
             println!(
                 "Sender :: Computation time: {} ms",
@@ -265,11 +268,11 @@ impl Sender {
             let partial_aggregate = CrtBundle::new(aggregates[i].clone());
             let partial_sum_weight = CrtBundle::new(sum_of_weights[i].clone());
 
-            acc = gb.crt_add(&acc, &partial_aggregate);
-            sum_weights = gb.crt_add(&sum_weights, &partial_sum_weight);
+            acc = Addition.execute(&mut gb, &(acc, partial_aggregate), channel)?;
+            sum_weights = Addition.execute(&mut gb, &(sum_weights, partial_sum_weight), channel)?;
         }
 
-        let weighted_mean = gb.crt_div(&acc, &sum_weights, channel).unwrap();
+        let weighted_mean = Division.execute(&mut gb, &(acc, sum_weights), channel)?;
         gb.outputs(weighted_mean.wires(), channel).unwrap();
         Ok(())
     }
@@ -480,7 +483,7 @@ impl Receiver {
 
         self.receive_data(&mut state, channel, rng)?;
         let (aggregate, sum_weights) = state.build_and_compute_circuit(&mut ev, channel).unwrap();
-        let weighted_mean = ev.crt_div(&aggregate, &sum_weights, channel).unwrap();
+        let weighted_mean = Division.execute(&mut ev, &(aggregate, sum_weights), channel)?;
 
         let weighted_mean_outs = ev
             .outputs(weighted_mean.wires(), channel)
@@ -514,7 +517,7 @@ impl Receiver {
 
         let (aggregate, sum_weights) = self.compute_payload(table, payload, channel, rng).unwrap();
 
-        let weighted_mean = ev.crt_div(&aggregate, &sum_weights, channel).unwrap();
+        let weighted_mean = Division.execute(&mut ev, &(aggregate, sum_weights), channel)?;
         let weighted_mean_outs = ev
             .outputs(weighted_mean.wires(), channel)
             .unwrap()
@@ -560,8 +563,9 @@ impl Receiver {
             let (partial, partial_sum_weights) =
                 state.build_and_compute_circuit(&mut ev, channel).unwrap();
 
-            acc = ev.crt_add(&acc, &partial);
-            sum_weights = ev.crt_add(&sum_weights, &partial_sum_weights);
+            acc = Addition.execute(&mut ev, &(acc, partial), channel)?;
+            sum_weights =
+                Addition.execute(&mut ev, &(sum_weights, partial_sum_weights), channel)?;
 
             println!(
                 "Receiver :: Computation time: {} ms",
@@ -594,11 +598,12 @@ impl Receiver {
             let partial_aggregate = CrtBundle::new(aggregates[i].clone());
             let partial_sum_weights = CrtBundle::new(sum_of_weights[i].clone());
 
-            acc = ev.crt_add(&acc, &partial_aggregate);
-            sum_weights = ev.crt_add(&sum_weights, &partial_sum_weights);
+            acc = Addition.execute(&mut ev, &(acc, partial_aggregate), channel)?;
+            sum_weights =
+                Addition.execute(&mut ev, &(sum_weights, partial_sum_weights), channel)?;
         }
 
-        let weighted_mean = ev.crt_div(&acc, &sum_weights, channel).unwrap();
+        let weighted_mean = Division.execute(&mut ev, &(acc, sum_weights), channel)?;
 
         let weighted_mean_outs = ev
             .outputs(weighted_mean.wires(), channel)
@@ -894,7 +899,7 @@ fn fancy_compute_payload_aggregate<F: Fancy + ArithmeticProjBundleGadgets + Fanc
         .zip_eq(receiver_payloads.chunks(PAYLOAD_PRIME_SIZE_EXPANDED))
     {
         let (ps, pr) = it;
-        let weighted = f.crt_mul(&ps, &CrtBundle::new(pr.to_vec()), channel)?;
+        let weighted = Multiplication.execute(f, &(ps, CrtBundle::new(pr.to_vec())), channel)?;
         weighted_payloads.push(weighted);
     }
 
@@ -911,10 +916,13 @@ fn fancy_compute_payload_aggregate<F: Fancy + ArithmeticProjBundleGadgets + Fanc
             .collect::<swanky_error::Result<Vec<F::Item>>>()?;
         let b_crt = CrtBundle::new(b_ws);
 
-        let mux = f.crt_mul(&b_crt, &weighted_payloads[i], channel)?;
-        let mux_sum_weights = f.crt_mul(&b_crt, &reconstructed_payload[i], channel)?;
-        acc = f.crt_add(&acc, &mux);
-        sum_weights = f.crt_add(&sum_weights, &mux_sum_weights);
+        let mux =
+            Multiplication.execute(f, &(b_crt.clone(), weighted_payloads[i].clone()), channel)?;
+        let mux_sum_weights =
+            Multiplication.execute(f, &(b_crt, reconstructed_payload[i].clone()), channel)?;
+
+        acc = Addition.execute(f, &(acc, mux), channel)?;
+        sum_weights = Addition.execute(f, &(sum_weights, mux_sum_weights), channel)?;
     }
     Ok((acc, sum_weights))
 }

@@ -1,5 +1,6 @@
 //! Circuits for various operations.
 
+pub mod arithmetic;
 pub mod binary;
 
 mod linear_oram;

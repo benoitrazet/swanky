@@ -103,31 +103,6 @@ impl<F: FancyArithmetic + FancyProj> ArithmeticProjBundleGadgets for F {}
 /// Arithmetic operations on wire bundles, extending the capability of `FancyArithmetic` operating
 /// on individual wires.
 pub trait ArithmeticBundleGadgets: FancyArithmetic {
-    /// Add two wire bundles pairwise, zipping addition.
-    ///
-    /// In CRT this is plain addition. In binary this is xor.
-    ///
-    /// # Panics
-    /// Panics if `x` and `y` are not of the same length.
-    fn add_bundles(
-        &mut self,
-        x: &Bundle<Self::Item>,
-        y: &Bundle<Self::Item>,
-    ) -> Bundle<Self::Item> {
-        assert_eq!(
-            x.wires().len(),
-            y.wires().len(),
-            "`x` and `y` must be the same length"
-        );
-        Bundle::new(
-            x.wires()
-                .iter()
-                .zip(y.wires().iter())
-                .map(|(x, y)| self.add(x, y))
-                .collect::<Vec<Self::Item>>(),
-        )
-    }
-
     /// Subtract two wire bundles, residue by residue.
     ///
     /// In CRT this is plain subtraction. In binary this is `xor`.
@@ -151,23 +126,6 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
                 .map(|(x, y)| self.sub(x, y))
                 .collect::<Vec<Self::Item>>(),
         )
-    }
-
-    /// Multiply each wire in `x` with each wire in `y`, pairwise.
-    ///
-    /// In CRT this is plain multiplication. In binary this is `and`.
-    fn mul_bundles(
-        &mut self,
-        x: &Bundle<Self::Item>,
-        y: &Bundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Bundle<Self::Item>> {
-        x.wires()
-            .iter()
-            .zip(y.wires().iter())
-            .map(|(x, y)| self.mul(x, y, channel))
-            .collect::<swanky_error::Result<_>>()
-            .map(Bundle::new)
     }
 
     /// If b=0 then return 0, else return x.
@@ -467,25 +425,5 @@ pub trait BundleGadgets: Fancy {
             zs.push(z);
         }
         Ok(zs.into_iter().collect())
-    }
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // gadgets which are neither CRT or binary
-
-    /// Shift residues, replacing them with zeros in the modulus of the least signifigant
-    /// residue. Maintains the length of the input.
-    fn shift(
-        &mut self,
-        x: &Bundle<Self::Item>,
-        n: usize,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Bundle<Self::Item>> {
-        let mut ws = x.wires().to_vec();
-        let zero = self.constant(0, ws.last().unwrap().modulus(), channel)?;
-        for _ in 0..n {
-            ws.pop();
-            ws.insert(0, zero.clone());
-        }
-        Ok(Bundle(ws))
     }
 }

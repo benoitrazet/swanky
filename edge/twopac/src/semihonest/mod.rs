@@ -13,7 +13,7 @@ mod tests {
         AllWire, CrtBundle, CrtGadgets, CrtProjGadgets, Fancy, FancyArithmetic, FancyBinary,
         FancyProj, WireLabel, WireMod2,
         circuit::{Circuit, CircuitInputMapper, Flatten, circuits::arithmetic::TestAddition},
-        circuits::aes::AesNonExpanded,
+        circuits::{aes::AesNonExpanded, arithmetic::Multiplication},
         dummy::{Dummy, DummyVal},
         informer::Informer,
         util::RngExt,
@@ -80,7 +80,7 @@ mod tests {
         for x in xs.iter() {
             let q = x.composite_modulus();
             let c = b.crt_constant_bundle(1, q, channel).unwrap();
-            let y = b.crt_mul(x, &c, channel).unwrap();
+            let y = Multiplication.execute(b, &(x.clone(), c), channel).unwrap();
             let z = b.crt_relu(&y, "100%", None, channel).unwrap();
             outputs.push(b.crt_output(&z, channel).unwrap());
         }

@@ -161,15 +161,6 @@ pub trait CrtGadgets:
     ////////////////////////////////////////////////////////////////////////////////
     // High-level computations dealing with bundles.
 
-    /// Add two CRT bundles.
-    fn crt_add(
-        &mut self,
-        x: &CrtBundle<Self::Item>,
-        y: &CrtBundle<Self::Item>,
-    ) -> CrtBundle<Self::Item> {
-        CrtBundle(self.add_bundles(x, y))
-    }
-
     /// Subtract two CRT bundles.
     fn crt_sub(
         &mut self,
@@ -177,28 +168,6 @@ pub trait CrtGadgets:
         y: &CrtBundle<Self::Item>,
     ) -> CrtBundle<Self::Item> {
         CrtBundle(self.sub_bundles(x, y))
-    }
-
-    /// Multiplies each wire in `x` by the corresponding residue of `c`.
-    fn crt_cmul(&mut self, x: &CrtBundle<Self::Item>, c: u128) -> CrtBundle<Self::Item> {
-        let cs = util::crt(c, &x.moduli());
-        CrtBundle::new(
-            x.wires()
-                .iter()
-                .zip(cs)
-                .map(|(x, c)| self.cmul(x, c))
-                .collect::<Vec<Self::Item>>(),
-        )
-    }
-
-    /// Multiply `x` with `y`.
-    fn crt_mul(
-        &mut self,
-        x: &CrtBundle<Self::Item>,
-        y: &CrtBundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
-        self.mul_bundles(x, y, channel).map(CrtBundle)
     }
 }
 
@@ -503,62 +472,6 @@ pub trait CrtProjGadgets: ArithmeticProjBundleGadgets + CrtGadgets {
     ) -> swanky_error::Result<Self::Item> {
         let z = self.pmr_lt(x, y, channel)?;
         Ok(self.negate(&z))
-    }
-
-    /// Generic, and expensive, CRT-based addition for two ciphertexts. Uses PMR
-    /// comparison repeatedly. Requires an extra unused prime in both inputs.
-    ///
-    /// # Panics
-    /// Panics if `x` and `y` do not have equal moduli.
-    fn crt_div(
-        &mut self,
-        x: &CrtBundle<Self::Item>,
-        y: &CrtBundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
-        assert_eq!(x.moduli(), y.moduli());
-
-        let q = x.composite_modulus();
-
-        // Compute l based on the assumption that the last prime is unused.
-        let nprimes = x.moduli().len();
-        let qs_ = &x.moduli()[..nprimes - 1];
-        let q_ = util::product(qs_);
-        let l = 128 - q_.leading_zeros();
-
-        let mut quotient = self.crt_constant_bundle(0, q, channel)?;
-        let mut a = x.clone();
-
-        let one = self.crt_constant_bundle(1, q, channel)?;
-        for i in 0..l {
-            let b = 2u128.pow(l - i - 1);
-            let mut pb = q_ / b;
-            if q_.is_multiple_of(b) {
-                pb -= 1;
-            }
-
-            let tmp = self.crt_cmul(y, b);
-            let c1 = self.pmr_geq(&a, &tmp, channel)?;
-
-            let pb_crt = self.crt_constant_bundle(pb, q, channel)?;
-            let c2 = self.pmr_geq(&pb_crt, y, channel)?;
-
-            let c = self.and(&c1, &c2, channel)?;
-
-            let c_ws = one
-                .iter()
-                .map(|w| self.mul(w, &c, channel))
-                .collect::<Result<Vec<_>, _>>()?;
-            let c_crt = CrtBundle::new(c_ws);
-
-            let b_if = self.crt_cmul(&c_crt, b);
-            quotient = self.crt_add(&quotient, &b_if);
-
-            let tmp_if = self.crt_mul(&c_crt, &tmp, channel)?;
-            a = self.crt_sub(&a, &tmp_if);
-        }
-
-        Ok(quotient)
     }
 }
 

@@ -4,7 +4,12 @@ use crate::{
     neural_net::FancyNeuralNet,
     util::{from_mod_q_crt, to_mod_q, to_mod_q_crt},
 };
-use fancy_garbling::{CrtBundle, CrtProjGadgets, Fancy, HasModulus, util::factor};
+use fancy_garbling::{
+    CrtBundle, CrtProjGadgets, Fancy, HasModulus,
+    circuit::Circuit,
+    circuits::arithmetic::{Addition, ConstantMultiplication},
+    util::factor,
+};
 use ndarray::Array3;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -181,14 +186,26 @@ impl<'a, F: Fancy + CrtProjGadgets> FancyNeuralNet for ArithmeticLayer<'a, F> {
         }
     }
 
-    fn nn_add(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
-        Ok(self.backend.crt_add(x, y))
+    fn nn_add(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        channel: &mut Channel,
+    ) -> Result<Self::Item> {
+        Addition.execute(self.backend, &(x.clone(), y.clone()), channel)
     }
 
-    fn nn_cmul(&mut self, x: &Self::Item, constant: i64, _: &mut Channel) -> Result<Self::Item> {
-        Ok(self
-            .backend
-            .crt_cmul(x, to_mod_q(constant, self.input_modulus)))
+    fn nn_cmul(
+        &mut self,
+        x: &Self::Item,
+        constant: i64,
+        channel: &mut Channel,
+    ) -> Result<Self::Item> {
+        ConstantMultiplication.execute(
+            self.backend,
+            &(x.clone(), to_mod_q(constant, self.input_modulus)),
+            channel,
+        )
     }
 
     fn nn_proj(

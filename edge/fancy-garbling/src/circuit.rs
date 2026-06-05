@@ -770,158 +770,15 @@ pub mod circuits {
         }
     }
 
-    pub mod crt_gadgets {
-        //! Circuits that test [`CrtGadgets`].
-
-        use crate::{
-            CrtBundle, CrtGadgets,
-            circuit::{Circuit, CircuitInputMapper},
-        };
-        use swanky_channel::Channel;
-        use swanky_error::Result;
-
-        /// Circuit for testing [`CrtGadgets::crt_add`].
-        pub struct TestCrtAddition(pub Vec<u16>);
-        impl<F: CrtGadgets> Circuit<F> for TestCrtAddition {
-            type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
-            type Output = CrtBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: &Self::Input,
-                _: &mut Channel,
-            ) -> Result<Self::Output> {
-                Ok(backend.crt_add(&inputs.0, &inputs.1))
-            }
-        }
-        impl<F: CrtGadgets> CircuitInputMapper<F> for TestCrtAddition {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0.len() * 2);
-                let length = self.0.len();
-                let (x, y) = inputs.split_at(length);
-                let x = CrtBundle::new(x.to_vec());
-                let y = CrtBundle::new(y.to_vec());
-                (x, y)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0.len() * 2
-            }
-
-            fn modulus(&self, i: usize) -> u16 {
-                self.0[i % self.0.len()]
-            }
-        }
-
-        /// Circuit for testing [`CrtGadgets::crt_sub`].
-        pub struct TestCrtSubtraction(pub Vec<u16>);
-        impl<F: CrtGadgets> Circuit<F> for TestCrtSubtraction {
-            type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
-            type Output = CrtBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: &Self::Input,
-                _: &mut Channel,
-            ) -> Result<Self::Output> {
-                Ok(backend.crt_sub(&inputs.0, &inputs.1))
-            }
-        }
-        impl<F: CrtGadgets> CircuitInputMapper<F> for TestCrtSubtraction {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0.len() * 2);
-                let length = self.0.len();
-                let (x, y) = inputs.split_at(length);
-                let x = CrtBundle::new(x.to_vec());
-                let y = CrtBundle::new(y.to_vec());
-                (x, y)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0.len() * 2
-            }
-
-            fn modulus(&self, i: usize) -> u16 {
-                self.0[i % self.0.len()]
-            }
-        }
-
-        /// Circuit for testing [`CrtGadgets::crt_cmul`].
-        pub struct TestCrtCmul(pub Vec<u16>, pub u128);
-        impl<F: CrtGadgets> Circuit<F> for TestCrtCmul {
-            type Input = CrtBundle<F::Item>;
-            type Output = CrtBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                input: &Self::Input,
-                _: &mut Channel,
-            ) -> Result<Self::Output> {
-                Ok(backend.crt_cmul(input, self.1))
-            }
-        }
-        impl<F: CrtGadgets> CircuitInputMapper<F> for TestCrtCmul {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0.len());
-                CrtBundle::new(inputs)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0.len()
-            }
-
-            fn modulus(&self, i: usize) -> u16 {
-                self.0[i]
-            }
-        }
-    }
-
     pub mod arithmetic_bundle_gadgets {
         //! Circuits that test [`ArithmeticBundleGadgets`].
 
         use crate::{
-            ArithmeticBundleGadgets, Bundle, CrtBundle,
+            ArithmeticBundleGadgets, Bundle,
             circuit::{Circuit, CircuitInputMapper},
         };
         use swanky_channel::Channel;
         use swanky_error::Result;
-
-        /// Circuit for testing [`ArithmeticBundleGadgets::mul_bundles`].
-        pub struct TestCrtMultiplication(pub Vec<u16>);
-        impl<F: ArithmeticBundleGadgets> Circuit<F> for TestCrtMultiplication {
-            type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
-            type Output = Bundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.mul_bundles(&inputs.0, &inputs.1, channel)
-            }
-        }
-        impl<F: ArithmeticBundleGadgets> CircuitInputMapper<F> for TestCrtMultiplication {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0.len() * 2);
-                let length = self.0.len();
-                let (x, y) = inputs.split_at(length);
-                let x = CrtBundle::new(x.to_vec());
-                let y = CrtBundle::new(y.to_vec());
-                (x, y)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0.len() * 2
-            }
-
-            fn modulus(&self, i: usize) -> u16 {
-                self.0[i % self.0.len()]
-            }
-        }
 
         /// Circuit for testing [`ArithmeticBundleGadgets::mask`].
         pub struct TestMask(pub Vec<u16>);
@@ -960,6 +817,7 @@ pub mod circuits {
         use crate::{
             Bundle, CrtBundle, CrtProjGadgets,
             circuit::{Circuit, CircuitInputMapper},
+            circuits::arithmetic::Multiplication,
         };
         use swanky_channel::Channel;
         use swanky_error::Result;
@@ -991,40 +849,6 @@ pub mod circuits {
 
             fn modulus(&self, i: usize) -> u16 {
                 self.0[i]
-            }
-        }
-
-        /// Circuit for testing [`CrtProjGadgets::crt_div`].
-        pub struct TestCrtDivision(pub Vec<u16>);
-        impl<F: CrtProjGadgets> Circuit<F> for TestCrtDivision {
-            type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
-            type Output = CrtBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.crt_div(&inputs.0, &inputs.1, channel)
-            }
-        }
-        impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestCrtDivision {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0.len() * 2);
-                let length = self.0.len();
-                let (x, y) = inputs.split_at(length);
-                let x = CrtBundle::new(x.to_vec());
-                let y = CrtBundle::new(y.to_vec());
-                (x, y)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0.len() * 2
-            }
-
-            fn modulus(&self, i: usize) -> u16 {
-                self.0[i % self.0.len()]
             }
         }
 
@@ -1073,7 +897,7 @@ pub mod circuits {
                 let mut outputs = Vec::with_capacity(inputs.len());
                 for x in inputs.iter() {
                     let c = backend.crt_constant_bundle(1, x.composite_modulus(), channel)?;
-                    let y = backend.crt_mul(x, &c, channel)?;
+                    let y = Multiplication.execute(backend, &(x.clone(), c), channel)?;
                     let z = backend.crt_relu(&y, "100%", None, channel)?;
                     outputs.push(z);
                 }
@@ -1517,67 +1341,6 @@ mod fancy_proj {
 }
 
 #[cfg(test)]
-mod crt_gadgets {
-    use rand::thread_rng;
-
-    use crate::{
-        circuit::circuits,
-        dummy::{Dummy, DummyVal},
-        util::{self, RngExt, factor},
-    };
-
-    #[test]
-    fn test_crt_addition() {
-        let mut rng = thread_rng();
-        let q = rng.gen_usable_composite_modulus();
-        let c = circuits::crt_gadgets::TestCrtAddition(factor(q));
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let y = rng.gen_u128() % q;
-            let x_input = DummyVal::to_crt(x, q);
-            let y_input = DummyVal::to_crt(y, q);
-            let z = Dummy::eval(&c, &(x_input, y_input)).unwrap();
-            let output = DummyVal::from_crt(&z, q);
-            assert_eq!(output, (x + y) % q);
-        }
-    }
-
-    #[test]
-    fn test_crt_subtraction() {
-        let mut rng = thread_rng();
-        let q = rng.gen_usable_composite_modulus();
-        let c = circuits::crt_gadgets::TestCrtSubtraction(util::factor(q));
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let y = rng.gen_u128() % q;
-            let x_input = DummyVal::to_crt(x, q);
-            let y_input = DummyVal::to_crt(y, q);
-            let z = Dummy::eval(&c, &(x_input, y_input)).unwrap();
-            let output = DummyVal::from_crt(&z, q);
-            assert_eq!(output, (x + q - y) % q);
-        }
-    }
-
-    #[test]
-    fn test_cmul() {
-        let mut rng = thread_rng();
-        let q = util::modulus_with_width(16);
-        let y = rng.gen_u128() % q;
-        let c = circuits::crt_gadgets::TestCrtCmul(util::factor(q), y);
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let x_input = DummyVal::to_crt(x, q);
-            let z = Dummy::eval(&c, &x_input).unwrap();
-            let output = DummyVal::from_crt(&z, q);
-            assert_eq!(output, (x * y) % q);
-        }
-    }
-}
-
-#[cfg(test)]
 mod arithmetic_bundle_gadgets {
     use rand::thread_rng;
 
@@ -1586,23 +1349,6 @@ mod arithmetic_bundle_gadgets {
         dummy::{Dummy, DummyVal},
         util::{RngExt, factor},
     };
-
-    #[test]
-    fn test_crt_multiplication() {
-        let mut rng = thread_rng();
-        let q = rng.gen_usable_composite_modulus();
-        let c = circuits::arithmetic_bundle_gadgets::TestCrtMultiplication(factor(q));
-
-        for _ in 0..16 {
-            let x = rng.gen_u64() as u128 % q;
-            let y = rng.gen_u64() as u128 % q;
-            let x_input = DummyVal::to_crt(x, q);
-            let y_input = DummyVal::to_crt(y, q);
-            let z = Dummy::eval(&c, &(x_input, y_input)).unwrap();
-            let output = DummyVal::from_crt(&z, q);
-            assert_eq!(output, (x * y) % q);
-        }
-    }
 
     #[test]
     fn test_mask() {
@@ -1649,29 +1395,6 @@ mod crt_proj_gadgets {
             let z = Dummy::eval(&c, &x_input).unwrap();
             let output = DummyVal::from_crt(&z, q);
             assert_eq!(output, x.pow(y as u32) % q);
-        }
-    }
-
-    #[test]
-    #[ignore]
-    fn test_division() {
-        let mut rng = thread_rng();
-
-        for _ in 0..16 {
-            let qs = rng.gen_usable_factors();
-            let n = qs.len();
-            let q = crate::util::product(&qs);
-            let c = circuits::crt_proj_gadgets::TestCrtDivision(factor(q));
-
-            let q_ = crate::util::product(&qs[..n - 1]);
-            let pt_x = rng.gen_u128() % q_;
-            let pt_y = rng.gen_u128() % q_;
-
-            let pt_x_input = DummyVal::to_crt(pt_x, q_);
-            let pt_y_input = DummyVal::to_crt(pt_y, q_);
-            let z = Dummy::eval(&c, &(pt_x_input, pt_y_input)).unwrap();
-            let output = DummyVal::from_crt(&z, q);
-            assert_eq!(output, pt_x / pt_y);
         }
     }
 
