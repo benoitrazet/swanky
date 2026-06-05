@@ -1,5 +1,8 @@
 use crate::{
-    BinaryBundle, FancyBinary, circuit::Circuit, circuits::binary::Mux, util::u128_to_bits,
+    BinaryBundle, FancyBinary,
+    circuit::Circuit,
+    circuits::binary::{Mux, MuxConstants},
+    util::u128_to_bits,
 };
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -55,7 +58,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryMultiplexConstantBits {
         c1_bs
             .into_iter()
             .zip(c2_bs)
-            .map(|(b1, b2)| backend.mux_constant_bits(b, b1, b2, channel))
+            .map(|(b1, b2)| MuxConstants.execute(backend, &(b.clone(), b1, b2), channel))
             .collect::<Result<_>>()
             .map(BinaryBundle::new)
     }

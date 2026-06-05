@@ -4,7 +4,7 @@
 use fancy_garbling::{
     AllWire, BinaryBundle, BinaryGadgets, Fancy,
     circuit::Circuit,
-    circuits::binary::{BinaryEquality, BinaryMultiplex, BinarySubtraction},
+    circuits::binary::{BinaryEquality, BinaryMultiplex, BinarySubtraction, Mux},
     util,
 };
 use swanky_twopac::semihonest::{Evaluator, Garbler};
@@ -161,8 +161,12 @@ where
         // (1) If a > b then underflow_r_1 = 1 and underflow_r_2 = 0
         // (2) If b > a then underflow_r_1 = 0 and underflow_r_2 = 1
         // (3) If a == b then underflow_r_1 = underflow_r_2 = 0
-        underflow_r_1 = f.mux(&check_equality, &underflow_r_1, &zero, channel)?;
-        underflow_r_2 = f.mux(&check_equality, &underflow_r_2, &zero, channel)?;
+        underflow_r_1 = Mux.execute(
+            f,
+            &(check_equality.clone(), underflow_r_1, zero.clone()),
+            channel,
+        )?;
+        underflow_r_2 = Mux.execute(f, &(check_equality, underflow_r_2, zero), channel)?;
 
         // Using the `underflow` bits we multiplex in the following way:
         // (1) If a > b, a := a - b and b := b

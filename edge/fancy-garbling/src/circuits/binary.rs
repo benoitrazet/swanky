@@ -2,6 +2,7 @@
 
 mod mux;
 pub use mux::Mux;
+pub use mux::MuxConstants;
 
 mod pairwise_xor;
 pub use pairwise_xor::PairwiseXor;
@@ -72,8 +73,11 @@ mod binary_max;
 pub use binary_max::BinaryMax;
 
 mod binary_shift;
-pub use binary_shift::BinaryShift;
-pub use binary_shift::BinaryShiftExtend;
+pub use binary_shift::BinaryArithmeticRightShift;
+pub use binary_shift::BinaryLeftShift;
+pub use binary_shift::BinaryLeftShiftExtend;
+pub use binary_shift::BinaryLogicalRightShift;
+pub use binary_shift::BinaryRightShift;
 
 mod binary_abs;
 pub use binary_abs::BinaryAbs;

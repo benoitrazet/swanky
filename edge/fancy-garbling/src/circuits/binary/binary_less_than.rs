@@ -1,7 +1,7 @@
 use crate::{
     BinaryBundle, FancyBinary,
     circuit::Circuit,
-    circuits::binary::{BinarySubtraction, OrMany},
+    circuits::binary::{BinarySubtraction, Mux, OrMany},
 };
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -86,11 +86,11 @@ impl<F: FancyBinary> Circuit<F> for BinaryLessThanSigned {
 
         // If x is negative and y is positive, then x < y.
         let x_neg_y_pos = backend.and(x_neg, &y_pos, channel)?;
-        let r2 = backend.mux(&x_neg_y_pos, &x_lt_y_unsigned, &one, channel)?;
+        let r2 = Mux.execute(backend, &(x_neg_y_pos, x_lt_y_unsigned, one), channel)?;
 
         // If x is positive and y is negative, then !(x < y).
         let x_pos_y_neg = backend.and(&x_pos, y_neg, channel)?;
-        backend.mux(&x_pos_y_neg, &r2, &zero, channel)
+        Mux.execute(backend, &(x_pos_y_neg, r2, zero), channel)
     }
 }
 

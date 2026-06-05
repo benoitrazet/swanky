@@ -1,4 +1,4 @@
-use crate::{BinaryBundle, FancyBinary, circuit::Circuit};
+use crate::{BinaryBundle, FancyBinary, circuit::Circuit, circuits::binary::AndMany};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -30,7 +30,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryEquality {
             .collect::<Vec<_>>();
 
         // If any negated XOR is 0, then the values are not equal
-        backend.and_many(&zs, channel)
+        AndMany.execute(backend, &zs, channel)
     }
 }
 

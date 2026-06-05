@@ -250,8 +250,9 @@ pub mod circuits {
         //! Circuits that test [`FancyBinary`].
 
         use crate::{
-            BinaryBundle, FancyBinary,
+            FancyBinary,
             circuit::{Circuit, CircuitInputMapper},
+            circuits::binary::{AndMany, OrMany, XorMany},
         };
         use swanky_channel::Channel;
         use swanky_error::Result;
@@ -316,7 +317,7 @@ pub mod circuits {
             }
         }
 
-        /// Circuit for testing [`FancyBinary::and_many`].
+        /// Circuit for testing [`AndMany`].
         pub struct TestAndGateFanN(pub usize);
         impl<F: FancyBinary> Circuit<F> for TestAndGateFanN {
             type Input = Vec<F::Item>;
@@ -328,7 +329,7 @@ pub mod circuits {
                 inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                backend.and_many(inputs, channel)
+                AndMany.execute(backend, inputs, channel)
             }
         }
 
@@ -347,7 +348,7 @@ pub mod circuits {
             }
         }
 
-        /// Circuit for testing [`FancyBinary::or_many`].
+        /// Circuit for testing [`OrMany`].
         pub struct TestOrGateFanN(pub usize);
         impl<F: FancyBinary> Circuit<F> for TestOrGateFanN {
             type Input = Vec<F::Item>;
@@ -359,7 +360,7 @@ pub mod circuits {
                 inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                backend.or_many(inputs, channel)
+                OrMany.execute(backend, inputs, channel)
             }
         }
         impl<F: FancyBinary> CircuitInputMapper<F> for TestOrGateFanN {
@@ -377,7 +378,7 @@ pub mod circuits {
             }
         }
 
-        /// Circuit for testing [`FancyBinary::xor_many`].
+        /// Circuit for testing [`XorMany`].
         pub struct TestXorGateFanN(pub usize);
         impl<F: FancyBinary> Circuit<F> for TestXorGateFanN {
             type Input = Vec<F::Item>;
@@ -387,44 +388,12 @@ pub mod circuits {
                 &self,
                 backend: &mut F,
                 inputs: &Self::Input,
-                _: &mut Channel,
+                channel: &mut Channel,
             ) -> Result<Self::Output> {
-                Ok(backend.xor_many(inputs))
+                XorMany.execute(backend, inputs, channel)
             }
         }
         impl<F: FancyBinary> CircuitInputMapper<F> for TestXorGateFanN {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0);
-                inputs
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
-
-        /// Circuit for testing [`FancyBinary::negate`] over a [`BinaryBundle`].
-        pub struct TestBinaryNegate(pub usize);
-        impl<F: FancyBinary> Circuit<F> for TestBinaryNegate {
-            type Input = Vec<F::Item>;
-            type Output = BinaryBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: &Self::Input,
-                _: &mut Channel,
-            ) -> Result<Self::Output> {
-                Ok(BinaryBundle::new(
-                    inputs.iter().map(|x| backend.negate(x)).collect::<Vec<_>>(),
-                ))
-            }
-        }
-        impl<F: FancyBinary> CircuitInputMapper<F> for TestBinaryNegate {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0);
                 inputs
@@ -1459,143 +1428,6 @@ pub mod circuits {
             }
         }
     }
-
-    pub mod binary_gadgets {
-        //! Circuits that test [`BinaryGadgets`].
-
-        use crate::{
-            BinaryBundle, BinaryGadgets,
-            circuit::{Circuit, CircuitInputMapper},
-        };
-        use swanky_channel::Channel;
-        use swanky_error::Result;
-
-        /// Circuit for testing [`BinaryGadgets::bin_rsa`].
-        pub struct TestBinaryArithmeticRightShift(pub usize, pub usize);
-        impl<F: BinaryGadgets> Circuit<F> for TestBinaryArithmeticRightShift {
-            type Input = BinaryBundle<F::Item>;
-            type Output = BinaryBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                input: &Self::Input,
-                _: &mut Channel,
-            ) -> Result<Self::Output> {
-                Ok(backend.bin_rsa(input, self.1))
-            }
-        }
-        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryArithmeticRightShift {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0);
-                BinaryBundle::new(inputs)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
-
-        /// Circuit for testing [`BinaryGadgets::bin_rsl`].
-        pub struct TestBinaryLogicalRightShift(pub usize, pub usize);
-        impl<F: BinaryGadgets> Circuit<F> for TestBinaryLogicalRightShift {
-            type Input = BinaryBundle<F::Item>;
-            type Output = BinaryBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                input: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.bin_rsl(input, self.1, channel)
-            }
-        }
-        impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryLogicalRightShift {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0);
-                BinaryBundle::new(inputs)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
-    }
-}
-
-#[cfg(test)]
-mod fancy_binary {
-    use crate::{
-        circuit::circuits,
-        dummy::{Dummy, DummyVal},
-        util::RngExt,
-    };
-    use rand::thread_rng;
-
-    #[test]
-    fn binary_constant_gates() {
-        let c = circuits::fancy::TestBinaryConstant;
-        let expected_0 = DummyVal::new(0, 2);
-        let output_0 = Dummy::eval(&c, &()).unwrap()[0];
-        assert_eq!(output_0, expected_0);
-        let expected_1 = DummyVal::new(1, 2);
-        let output_1 = Dummy::eval(&c, &()).unwrap()[1];
-        assert_eq!(output_1, expected_1);
-    }
-
-    #[test]
-    fn or_gate_fan_n() {
-        let mut rng = thread_rng();
-        let n = 2 + (rng.gen_usize() % 200);
-        let c = circuits::binary::TestOrGateFanN(n);
-
-        for _ in 0..16 {
-            let inputs = (0..n)
-                .map(|_| DummyVal::rand_bool(&mut rng))
-                .collect::<Vec<_>>();
-            let expected = inputs.iter().fold(0, |acc, &x| x.val() | acc);
-            let output = Dummy::eval(&c, &inputs).unwrap();
-            assert_eq!(output.val(), expected);
-        }
-    }
-
-    #[test]
-    fn xor_gate_fan_n() {
-        let mut rng = thread_rng();
-        let n = 2 + (rng.gen_usize() % 200);
-        let c = circuits::binary::TestXorGateFanN(n);
-
-        for _ in 0..16 {
-            let inputs = (0..n)
-                .map(|_| DummyVal::rand_bool(&mut rng))
-                .collect::<Vec<_>>();
-            let expected = inputs.iter().fold(0, |acc, &x| x.val() ^ acc);
-            let output = Dummy::eval(&c, &inputs).unwrap();
-            assert_eq!(output.val(), expected);
-        }
-    }
-
-    #[test]
-    fn binary_half_gate() {
-        let mut rng = thread_rng();
-        let c = circuits::binary::TestAndGate;
-
-        for _ in 0..16 {
-            let x = DummyVal::rand_bool(&mut rng);
-            let y = DummyVal::rand_bool(&mut rng);
-            let output = Dummy::eval(&c, &(x, y)).unwrap();
-            assert_eq!(output.val(), x.val() * y.val() % 2);
-        }
-    }
 }
 
 #[cfg(test)]
@@ -2111,50 +1943,6 @@ mod arithmetic_proj_bundle_gadgets {
                 output.val(),
                 *as_mixed_radix(expected, &moduli).last().unwrap()
             );
-        }
-    }
-}
-
-#[cfg(test)]
-mod binary_gadgets {
-    use rand::thread_rng;
-
-    use crate::{
-        circuit::circuits,
-        dummy::{Dummy, DummyVal},
-        util::RngExt,
-    };
-
-    #[test]
-    fn test_binary_rsa() {
-        let mut rng = thread_rng();
-        let nbits = 64;
-        let q = 1 << nbits;
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let shift_size = rng.gen_usize() % nbits;
-            let c = circuits::binary_gadgets::TestBinaryArithmeticRightShift(nbits, shift_size);
-            let output = Dummy::eval(&c, &DummyVal::to_binary(x, nbits)).unwrap();
-            assert_eq!(
-                DummyVal::from_binary(&output) as i64,
-                (x as i64) >> shift_size
-            );
-        }
-    }
-
-    #[test]
-    fn test_binary_rsl() {
-        let mut rng = thread_rng();
-        let nbits = 64;
-        let q = 1 << nbits;
-
-        for _ in 0..16 {
-            let x = rng.gen_u128() % q;
-            let shift_size = rng.gen_usize() % nbits;
-            let c = circuits::binary_gadgets::TestBinaryLogicalRightShift(nbits, shift_size);
-            let output = Dummy::eval(&c, &DummyVal::to_binary(x, nbits)).unwrap();
-            assert_eq!(DummyVal::from_binary(&output), x >> shift_size);
         }
     }
 }

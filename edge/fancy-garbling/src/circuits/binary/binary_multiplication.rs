@@ -2,7 +2,8 @@ use crate::{
     BinaryBundle, FancyBinary,
     circuit::{Circuit, CircuitInputMapper},
     circuits::binary::{
-        BinaryAddition, BinaryAdditionNoCarry, BinaryConstant, BinaryShift, BinaryShiftExtend,
+        BinaryAddition, BinaryAdditionNoCarry, BinaryConstant, BinaryLeftShift,
+        BinaryLeftShiftExtend,
     },
     util::u128_to_bits,
 };
@@ -44,7 +45,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryMultiplication {
                 .map(|x| backend.and(x, ywire, channel))
                 .collect::<Result<_>>()
                 .map(BinaryBundle::new)?;
-            let shifted = BinaryShiftExtend.execute(backend, &(mul, i), channel)?;
+            let shifted = BinaryLeftShiftExtend.execute(backend, &(mul, i), channel)?;
             let res = BinaryAddition.execute(backend, &(sum, shifted), channel)?;
             sum = res.0;
             sum.push(res.1);
@@ -86,7 +87,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryMultiplicationLowerHalf {
                 .map(|x| backend.and(x, ywire, channel))
                 .collect::<Result<_>>()
                 .map(BinaryBundle::new)?;
-            let shifted = BinaryShift.execute(backend, &(mul, i), channel)?;
+            let shifted = BinaryLeftShift.execute(backend, &(mul, i), channel)?;
             sum = BinaryAdditionNoCarry.execute(backend, &(sum, shifted), channel)?;
         }
         Ok(sum)
@@ -114,7 +115,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryConstantMultiplication {
             .enumerate()
             .filter_map(|(i, b)| if b > 0 { Some(i) } else { None })
             .try_fold(zero, |z, shift_amt| {
-                let s = BinaryShift.execute(backend, &(x.clone(), shift_amt), channel)?;
+                let s = BinaryLeftShift.execute(backend, &(x.clone(), shift_amt), channel)?;
                 BinaryAdditionNoCarry.execute(backend, &(z, s), channel)
             })
     }

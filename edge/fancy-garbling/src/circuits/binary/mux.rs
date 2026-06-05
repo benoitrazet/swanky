@@ -23,10 +23,36 @@ impl<F: FancyBinary> Circuit<F> for Mux {
     }
 }
 
+/// For input `(b, c1, c2)`, return `c1` if `b == 0`, otherwise return `c2`.
+pub struct MuxConstants;
+
+impl<F: FancyBinary> Circuit<F> for MuxConstants {
+    type Input = (F::Item, bool, bool);
+    type Output = F::Item;
+
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: &Self::Input,
+        channel: &mut Channel,
+    ) -> Result<Self::Output> {
+        let (b, c1, c2) = inputs;
+        match (c1, c2) {
+            (false, true) => Ok(b.clone()),
+            (true, false) => Ok(backend.negate(b)),
+            (false, false) => backend.constant(0, 2, channel),
+            (true, true) => backend.constant(1, 2, channel),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::Mux;
-    use crate::dummy::{Dummy, DummyVal};
+    use crate::{
+        circuits::binary::mux::MuxConstants,
+        dummy::{Dummy, DummyVal},
+    };
 
     #[test]
     fn mux() {
@@ -42,6 +68,19 @@ mod test {
                         ),
                     )
                     .unwrap();
+                    assert_eq!(output.val(), if b == 0 { x } else { y });
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn mux_constants() {
+        for b in 0..=1 {
+            for x in 0..=1 {
+                for y in 0..=1 {
+                    let output =
+                        Dummy::eval(&MuxConstants, &(DummyVal::new(b, 2), x != 0, y != 0)).unwrap();
                     assert_eq!(output.val(), if b == 0 { x } else { y });
                 }
             }

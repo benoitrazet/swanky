@@ -190,14 +190,6 @@ fn test_binary_addition() {
 }
 
 #[test]
-fn test_binary_negate() {
-    let ninputs = 64;
-    let circuit = circuits::binary::TestBinaryNegate(ninputs);
-
-    test_circuit(ninputs / 2, ninputs / 2, &circuit);
-}
-
-#[test]
 fn test_bin_twos_complement() {
     let ninputs = 64;
     let circuit = TestBinaryTwosComplement(ninputs);
