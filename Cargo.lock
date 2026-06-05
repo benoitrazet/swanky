@@ -2313,7 +2313,6 @@ dependencies = [
 name = "schmivitz"
 version = "0.6.0"
 dependencies = [
- "aes",
  "criterion",
  "diet-mac-and-cheese",
  "env_logger 0.11.10",
@@ -2331,10 +2330,12 @@ dependencies = [
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
+ "swanky-rng",
  "swanky-serialization",
  "swanky-sieve-ir-api",
  "swanky-sieve-ir-codegen",
  "tempfile",
+ "vectoreyes",
 ]
 
 [[package]]
