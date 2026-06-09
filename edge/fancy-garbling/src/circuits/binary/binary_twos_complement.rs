@@ -1,5 +1,5 @@
 use crate::{
-    BinaryBundle, BinaryGadgets, FancyBinary,
+    BinaryBundle, FancyBinary,
     circuit::Circuit,
     circuits::binary::{BinaryAdditionNoCarry, BinaryConstant},
 };
@@ -38,7 +38,7 @@ pub mod test {
 
     /// Circuit for testing [`BinaryTwosComplement`].
     pub struct TestBinaryTwosComplement(pub usize);
-    impl<F: BinaryGadgets> Circuit<F> for TestBinaryTwosComplement {
+    impl<F: FancyBinary> Circuit<F> for TestBinaryTwosComplement {
         type Input = <BinaryTwosComplement as Circuit<F>>::Input;
         type Output = <BinaryTwosComplement as Circuit<F>>::Output;
 
@@ -52,7 +52,7 @@ pub mod test {
         }
     }
 
-    impl<F: BinaryGadgets> CircuitInputMapper<F> for TestBinaryTwosComplement {
+    impl<F: FancyBinary> CircuitInputMapper<F> for TestBinaryTwosComplement {
         fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0);
             BinaryBundle::new(inputs)

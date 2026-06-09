@@ -5,7 +5,7 @@ use crate::{
     util::{i64_from_bits, i64_to_twos_complement},
 };
 use fancy_garbling::{
-    BinaryBundle, BinaryGadgets, Fancy,
+    BinaryBundle, BinaryGadgets, Fancy, FancyBinary,
     circuit::Circuit,
     circuits::binary::{
         BinaryAdditionNoCarry, BinaryConstant, BinaryConstantMultiplication, BinaryMax,
@@ -24,7 +24,7 @@ pub(crate) struct BinaryNeuralNet<'a, F> {
     secret_weights_owned: bool,
 }
 
-impl<'a, F: BinaryGadgets> BinaryNeuralNet<'a, F> {
+impl<'a, F: FancyBinary> BinaryNeuralNet<'a, F> {
     /// Create a new `BinaryNeuralNet` for the provided backend and using the
     /// specified bitwidths for each layer of the neural net.
     ///
@@ -151,7 +151,7 @@ impl<'a, F: BinaryGadgets> BinaryLayer<'a, F> {
     }
 }
 
-impl<'a, F: Fancy + BinaryGadgets> FancyNeuralNet for BinaryLayer<'a, F> {
+impl<'a, F: Fancy + FancyBinary> FancyNeuralNet for BinaryLayer<'a, F> {
     type Item = BinaryBundle<F::Item>;
 
     fn nn_encode(&mut self, value: i64, channel: &mut Channel) -> Result<BinaryBundle<F::Item>> {

@@ -12,8 +12,8 @@ mod binary;
 mod bundle;
 mod crt;
 pub use binary::{BinaryBundle, BinaryGadgets};
-pub use bundle::{ArithmeticBundleGadgets, Bundle, BundleGadgets};
-pub use crt::{CrtBundle, CrtGadgets, CrtProjGadgets};
+pub use bundle::{Bundle, BundleGadgets};
+pub use crt::{CrtBundle, CrtGadgets};
 
 /// An object that has a modulus.
 pub trait HasModulus {

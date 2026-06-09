@@ -5,7 +5,7 @@ use crate::{
     util::{from_mod_q_crt, to_mod_q, to_mod_q_crt},
 };
 use fancy_garbling::{
-    CrtBundle, CrtProjGadgets, Fancy, HasModulus,
+    CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary, FancyProj, HasModulus,
     circuit::Circuit,
     circuits::arithmetic::{Addition, ConstantMultiplication, Max, ReLU, Sgn},
     util::factor,
@@ -22,7 +22,7 @@ pub(crate) struct ArithmeticNeuralNet<'a, F> {
     secret_weights_owned: bool,
 }
 
-impl<'a, F: CrtProjGadgets> ArithmeticNeuralNet<'a, F> {
+impl<'a, F: FancyBinary + FancyArithmetic + FancyProj> ArithmeticNeuralNet<'a, F> {
     /// Create a new `ArithmeticNeuralNet` for the provided backend and using
     /// the specified moduli for each layer of the neural net.
     ///
@@ -163,7 +163,9 @@ impl<'a, F> ArithmeticLayer<'a, F> {
     }
 }
 
-impl<'a, F: Fancy + CrtProjGadgets> FancyNeuralNet for ArithmeticLayer<'a, F> {
+impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> FancyNeuralNet
+    for ArithmeticLayer<'a, F>
+{
     type Item = CrtBundle<F::Item>;
 
     fn nn_encode(&mut self, value: i64, channel: &mut Channel) -> Result<Self::Item> {

@@ -48,7 +48,7 @@ impl<W: Clone + HasModulus> From<Bundle<W>> for BinaryBundle<W> {
 impl<F: FancyBinary> BinaryGadgets for F {}
 
 /// Extension trait for `Fancy` providing gadgets that operate over bundles of mod2 wires.
-pub trait BinaryGadgets: FancyBinary + BundleGadgets {
+pub trait BinaryGadgets: BundleGadgets {
     /// Encode a binary input bundle.
     fn bin_encode(
         &mut self,

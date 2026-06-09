@@ -1,4 +1,4 @@
-use crate::{Fancy, FancyArithmetic, HasModulus};
+use crate::{Fancy, HasModulus};
 use itertools::Itertools;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -78,25 +78,6 @@ impl<W: Clone + HasModulus> Bundle<W> {
 }
 
 impl<F: Fancy> BundleGadgets for F {}
-impl<F: FancyArithmetic> ArithmeticBundleGadgets for F {}
-
-/// Arithmetic operations on wire bundles, extending the capability of `FancyArithmetic` operating
-/// on individual wires.
-pub trait ArithmeticBundleGadgets: FancyArithmetic {
-    /// If b=0 then return 0, else return x.
-    fn mask(
-        &mut self,
-        b: &Self::Item,
-        x: &Bundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Bundle<Self::Item>> {
-        x.wires()
-            .iter()
-            .map(|xwire| self.mul(xwire, b, channel))
-            .collect::<swanky_error::Result<_>>()
-            .map(Bundle)
-    }
-}
 
 /// Extension trait for Fancy which provides Bundle constructions which are not
 /// necessarily CRT nor binary-based.

@@ -1,8 +1,8 @@
 //! Module containing `CrtGadgets`, which are the CRT-based gadgets for `Fancy`.
 
-use super::{HasModulus, bundle::ArithmeticBundleGadgets};
+use super::HasModulus;
 use crate::{
-    FancyArithmetic, FancyBinary, FancyProj,
+    FancyArithmetic, FancyBinary,
     fancy::bundle::{Bundle, BundleGadgets},
     util::{self},
 };
@@ -54,9 +54,7 @@ impl<W: Clone + HasModulus> From<Bundle<W>> for CrtBundle<W> {
 impl<F: FancyArithmetic + FancyBinary> CrtGadgets for F {}
 
 /// Extension trait for `Fancy` providing advanced CRT gadgets based on bundles of wires.
-pub trait CrtGadgets:
-    FancyArithmetic + FancyBinary + ArithmeticBundleGadgets + BundleGadgets
-{
+pub trait CrtGadgets: BundleGadgets {
     /// Encode a CRT input bundle.
     fn crt_encode(
         &mut self,
@@ -162,51 +160,5 @@ pub trait CrtGadgets:
             zs.push(z);
         }
         Ok(zs.into_iter().collect())
-    }
-}
-
-impl<F: FancyProj + CrtGadgets> CrtProjGadgets for F {}
-
-/// CRT gadgets that use projection gates.
-pub trait CrtProjGadgets: FancyProj + CrtGadgets {
-    /// Exponentiate `x` by the constant `c`.
-    fn crt_cexp(
-        &mut self,
-        x: &CrtBundle<Self::Item>,
-        c: u16,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
-        x.wires()
-            .iter()
-            .map(|x| {
-                let p = x.modulus();
-                let tab = (0..p)
-                    .map(|x| ((x as u64).pow(c as u32) % p as u64) as u16)
-                    .collect_vec();
-                self.proj(x, p, Some(tab), channel)
-            })
-            .collect::<swanky_error::Result<_>>()
-            .map(CrtBundle::new)
-    }
-
-    /// Compute the remainder with respect to modulus `p`.
-    ///
-    /// # Panics
-    /// Panics if `p` is not a modulus contained in `x`.
-    fn crt_rem(
-        &mut self,
-        x: &CrtBundle<Self::Item>,
-        p: u16,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
-        let i = x.moduli().iter().position(|&q| p == q);
-        assert!(i.is_some(), "`p` is not a modulus in the `x` bundle");
-        let i = i.unwrap();
-        let w = &x.wires()[i];
-        x.moduli()
-            .iter()
-            .map(|&q| self.mod_change(w, q, channel))
-            .collect::<swanky_error::Result<_>>()
-            .map(CrtBundle::new)
     }
 }

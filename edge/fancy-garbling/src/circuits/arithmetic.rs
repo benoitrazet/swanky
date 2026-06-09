@@ -10,8 +10,17 @@ mod multiplication;
 pub use multiplication::ConstantMultiplication;
 pub use multiplication::Multiplication;
 
+mod mask;
+pub use mask::Mask;
+
 mod division;
 pub use division::Division;
+
+mod exponentiation;
+pub use exponentiation::ConstantExponentiation;
+
+mod remainder;
+pub use remainder::Remainder;
 
 mod equality;
 pub use equality::Equality;

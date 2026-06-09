@@ -1,5 +1,5 @@
 use crate::{
-    CrtBundle, CrtProjGadgets, FancyBinary,
+    CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary, FancyProj,
     circuit::Circuit,
     circuits::arithmetic::{
         Addition, ConstantMultiplication, Multiplication, PmrGreaterThanOrEqual, Subtraction,
@@ -16,7 +16,7 @@ use swanky_error::Result;
 /// be modulo $`Q / q_n`$.
 pub struct Division;
 
-impl<F: FancyBinary + CrtProjGadgets> Circuit<F> for Division {
+impl<F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> Circuit<F> for Division {
     type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
     type Output = CrtBundle<F::Item>;
 
