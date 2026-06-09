@@ -2,7 +2,7 @@ use crate::{CrtBundle, FancyArithmetic, circuit::Circuit};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
-/// Given a wire `b` and a [`Bundle`] `x`, output `0` if `b == 0`, otherwise
+/// Given a wire `b` and a [`CrtBundle`] `x`, output `0` if `b == 0`, otherwise
 /// output `x`.
 ///
 /// This is equivalent to computing `b * x` for each wire in the bundle.
