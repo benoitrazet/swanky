@@ -145,13 +145,16 @@ mod nonstreaming {
 
 #[cfg(test)]
 mod streaming {
-    use crate::circuit::{Flatten, circuits};
+    use crate::circuit::{Circuit, Flatten, circuits};
+    use crate::circuits::arithmetic::{Multiplication, ReLU};
     use crate::{
         AllWire, Evaluator, Fancy, Garbler, WireLabel, circuit::CircuitInputMapper, dummy::Dummy,
         util::RngExt,
     };
+    use crate::{CrtBundle, CrtGadgets, FancyArithmetic, FancyProj};
     use rand::thread_rng;
     use swanky_channel::Channel;
+    use swanky_error::Result;
     use swanky_rng::SwankyRng;
 
     // Check that streaming evaluation of a circuit execution equals the dummy
@@ -259,15 +262,52 @@ mod streaming {
         }
     }
 
+    /// Circuit for testing multiple CRT operations.
+    struct TestComplexGadget(pub Vec<u16>, pub usize);
+    impl<F: FancyArithmetic + FancyProj + CrtGadgets> Circuit<F> for TestComplexGadget {
+        type Input = Vec<CrtBundle<F::Item>>;
+        type Output = Vec<CrtBundle<F::Item>>;
+
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: &Self::Input,
+            channel: &mut Channel,
+        ) -> Result<Self::Output> {
+            let mut outputs = Vec::with_capacity(inputs.len());
+            for x in inputs.iter() {
+                let c = backend.crt_constant_bundle(1, x.composite_modulus(), channel)?;
+                let y = Multiplication.execute(backend, &(x.clone(), c), channel)?;
+                let z = ReLU.execute(backend, &(y, "100%".to_string(), None), channel)?;
+                outputs.push(z);
+            }
+            Ok(outputs)
+        }
+    }
+    impl<F: FancyArithmetic + FancyProj + CrtGadgets> CircuitInputMapper<F> for TestComplexGadget {
+        fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
+            assert_eq!(inputs.len(), self.0.len() * self.1);
+            inputs
+                .chunks_exact(self.0.len())
+                .map(|x| CrtBundle::new(x.to_vec()))
+                .collect()
+        }
+
+        fn ninputs(&self) -> usize {
+            self.0.len() * self.1
+        }
+
+        fn modulus(&self, i: usize) -> u16 {
+            self.0[i % self.0.len()]
+        }
+    }
+
     #[test]
     fn complex_gadget() {
         let N = 10;
         let qs = crate::util::primes_with_width(10);
         for _ in 0..16 {
-            streaming_test_helper::<AllWire, _>(&circuits::crt_proj_gadgets::TestComplexGadget(
-                qs.clone(),
-                N,
-            ));
+            streaming_test_helper::<AllWire, _>(&TestComplexGadget(qs.clone(), N));
         }
     }
 }
