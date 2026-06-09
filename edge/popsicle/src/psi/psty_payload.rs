@@ -32,12 +32,11 @@ use crate::{
     utils,
 };
 use fancy_garbling::{
-    AllWire, ArithmeticProjBundleGadgets, BinaryBundle, Bundle, CrtBundle, CrtGadgets, Fancy,
-    FancyBinary,
+    AllWire, Bundle, CrtBundle, CrtGadgets, Fancy, FancyArithmetic, FancyProj,
     circuit::Circuit,
-    circuits::arithmetic::{Addition, Division, Multiplication},
+    circuits::arithmetic::{Addition, Division, Equality, Multiplication, Subtraction},
 };
-use swanky_error::{ErrorKind, WrapErr};
+use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 use itertools::Itertools;
@@ -854,7 +853,7 @@ fn encode_opprf_payload(opprf_ids: &[Block512]) -> Vec<u16> {
 /// Fancy function to compute a weighted average for matching ID's
 /// where one party provides the weights and the other
 //  the values
-fn fancy_compute_payload_aggregate<F: Fancy + ArithmeticProjBundleGadgets + FancyBinary>(
+fn fancy_compute_payload_aggregate<F: FancyArithmetic + FancyProj + CrtGadgets>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
@@ -874,9 +873,9 @@ fn fancy_compute_payload_aggregate<F: Fancy + ArithmeticProjBundleGadgets + Fanc
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            f.eq_bundles(
-                &BinaryBundle::new(xs.to_vec()),
-                &BinaryBundle::new(ys.to_vec()),
+            Equality.execute(
+                f,
+                &(CrtBundle::new(xs.to_vec()), CrtBundle::new(ys.to_vec())),
                 channel,
             )
         })
@@ -888,9 +887,9 @@ fn fancy_compute_payload_aggregate<F: Fancy + ArithmeticProjBundleGadgets + Fanc
         .map(|(xp, tp)| {
             let b_x = Bundle::new(xp.to_vec());
             let b_t = Bundle::new(tp.to_vec());
-            f.crt_sub(&CrtBundle::from(b_t), &CrtBundle::from(b_x))
+            Subtraction.execute(f, &(CrtBundle::from(b_t), CrtBundle::from(b_x)), channel)
         })
-        .collect::<Vec<CrtBundle<F::Item>>>();
+        .collect::<Result<Vec<_>>>()?;
 
     let mut weighted_payloads = Vec::new();
     for it in reconstructed_payload

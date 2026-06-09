@@ -1,7 +1,9 @@
 use crate::{
     CrtBundle, CrtProjGadgets, FancyBinary,
     circuit::Circuit,
-    circuits::arithmetic::{Addition, ConstantMultiplication, Multiplication, Subtraction},
+    circuits::arithmetic::{
+        Addition, ConstantMultiplication, Multiplication, PmrGreaterThanOrEqual, Subtraction,
+    },
     util::product,
 };
 use swanky_channel::Channel;
@@ -47,10 +49,10 @@ impl<F: FancyBinary + CrtProjGadgets> Circuit<F> for Division {
             }
 
             let tmp = ConstantMultiplication.execute(backend, &(y.clone(), b), channel)?;
-            let c1 = backend.pmr_geq(&a, &tmp, channel)?;
+            let c1 = PmrGreaterThanOrEqual.execute(backend, &(a.clone(), tmp.clone()), channel)?;
 
             let pb_crt = backend.crt_constant_bundle(pb, q, channel)?;
-            let c2 = backend.pmr_geq(&pb_crt, y, channel)?;
+            let c2 = PmrGreaterThanOrEqual.execute(backend, &(pb_crt, y.clone()), channel)?;
 
             let c = backend.and(&c1, &c2, channel)?;
 

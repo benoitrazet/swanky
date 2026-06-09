@@ -97,19 +97,19 @@ impl DummyVal {
 
     /// Generate a new mixed radix form [`Bundle`] for `value` using the
     /// provided `radii`.
-    pub fn to_mixed_radix(value: u128, radii: &[u16]) -> Bundle<Self> {
+    pub fn to_mixed_radix(value: u128, radii: &[u16]) -> CrtBundle<Self> {
         let mixed = as_mixed_radix(value, radii);
         let mixed = mixed
             .into_iter()
             .zip(radii)
             .map(|(x, q)| DummyVal::new(x, *q))
             .collect::<Vec<_>>();
-        Bundle::new(mixed)
+        CrtBundle::new(mixed)
     }
 
     /// Convert a [`Bundle`] representing mixed radix form into its underlying
     /// `u128`.
-    pub fn from_mixed_radix(bundle: &Bundle<Self>) -> u128 {
+    pub fn from_mixed_radix(bundle: &CrtBundle<Self>) -> u128 {
         let mut x: u128 = 0;
         for wire in bundle.wires().iter().rev() {
             let (xp, overflow) = x.overflowing_mul(wire.modulus as u128);

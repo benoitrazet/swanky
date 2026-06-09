@@ -1,4 +1,4 @@
-use crate::{Fancy, FancyArithmetic, FancyProj, HasModulus};
+use crate::{Fancy, FancyArithmetic, HasModulus};
 use itertools::Itertools;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -79,36 +79,10 @@ impl<W: Clone + HasModulus> Bundle<W> {
 
 impl<F: Fancy> BundleGadgets for F {}
 impl<F: FancyArithmetic> ArithmeticBundleGadgets for F {}
-impl<F: FancyArithmetic + FancyProj> ArithmeticProjBundleGadgets for F {}
 
 /// Arithmetic operations on wire bundles, extending the capability of `FancyArithmetic` operating
 /// on individual wires.
 pub trait ArithmeticBundleGadgets: FancyArithmetic {
-    /// Subtract two wire bundles, residue by residue.
-    ///
-    /// In CRT this is plain subtraction. In binary this is `xor`.
-    ///
-    /// # Panics
-    /// Panics if `x` and `y` are not of the same length.
-    fn sub_bundles(
-        &mut self,
-        x: &Bundle<Self::Item>,
-        y: &Bundle<Self::Item>,
-    ) -> Bundle<Self::Item> {
-        assert_eq!(
-            x.wires().len(),
-            y.wires().len(),
-            "`x` and `y` must be the same length"
-        );
-        Bundle::new(
-            x.wires()
-                .iter()
-                .zip(y.wires().iter())
-                .map(|(x, y)| self.sub(x, y))
-                .collect::<Vec<Self::Item>>(),
-        )
-    }
-
     /// If b=0 then return 0, else return x.
     fn mask(
         &mut self,
@@ -121,184 +95,6 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
             .map(|xwire| self.mul(xwire, b, channel))
             .collect::<swanky_error::Result<_>>()
             .map(Bundle)
-    }
-}
-
-/// Arithmetic operations on wire bundles that utilize projection gates.
-pub trait ArithmeticProjBundleGadgets: FancyArithmetic + FancyProj {
-    /// Mixed radix addition.
-    ///
-    /// # Panics
-    /// Panics if `xs` is empty, or the moduli in `xs` are not all equal.
-    fn mixed_radix_addition(
-        &mut self,
-        xs: &[Bundle<Self::Item>],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Bundle<Self::Item>> {
-        assert!(!xs.is_empty(), "`xs` cannot be empty");
-        assert!(xs.iter().all(|x| x.moduli() == xs[0].moduli()));
-
-        let nargs = xs.len();
-        let n = xs[0].wires().len();
-
-        let mut digit_carry = None;
-        let mut carry_carry = None;
-        let mut max_carry = 0;
-
-        let mut res = Vec::with_capacity(n);
-
-        for i in 0..n {
-            // all the ith digits, in one vec
-            let ds = xs.iter().map(|x| x.wires()[i].clone()).collect_vec();
-
-            // compute the digit -- easy
-            let digit_sum = self.add_many(&ds);
-            let digit = digit_carry.map_or(digit_sum.clone(), |d| self.add(&digit_sum, &d));
-
-            if i < n - 1 {
-                // compute the carries
-                let q = xs[0].wires()[i].modulus();
-                // max_carry currently contains the max carry from the previous iteration
-                let max_val = nargs as u16 * (q - 1) + max_carry;
-                // now it is the max carry of this iteration
-                max_carry = max_val / q;
-
-                let modded_ds = ds
-                    .iter()
-                    .map(|d| self.mod_change(d, max_val + 1, channel))
-                    .collect::<swanky_error::Result<Vec<Self::Item>>>()?;
-
-                let carry_sum = self.add_many(&modded_ds);
-                // add in the carry from the previous iteration
-                let carry = carry_carry.map_or(carry_sum.clone(), |c| self.add(&carry_sum, &c));
-
-                // carry now contains the carry information, we just have to project it to
-                // the correct moduli for the next iteration
-                let next_mod = xs[0].wires()[i + 1].modulus();
-                let tt = (0..=max_val).map(|i| (i / q) % next_mod).collect_vec();
-                digit_carry = Some(self.proj(&carry, next_mod, Some(tt), channel)?);
-
-                let next_max_val = nargs as u16 * (next_mod - 1) + max_carry;
-
-                if i < n - 2 {
-                    if max_carry < next_mod {
-                        carry_carry = Some(self.mod_change(
-                            digit_carry.as_ref().unwrap(),
-                            next_max_val + 1,
-                            channel,
-                        )?);
-                    } else {
-                        let tt = (0..=max_val).map(|i| i / q).collect_vec();
-                        carry_carry =
-                            Some(self.proj(&carry, next_max_val + 1, Some(tt), channel)?);
-                    }
-                } else {
-                    // next digit is MSB so we dont need carry_carry
-                    carry_carry = None;
-                }
-            } else {
-                digit_carry = None;
-                carry_carry = None;
-            }
-            res.push(digit);
-        }
-        Ok(Bundle(res))
-    }
-
-    /// Mixed radix addition only returning the MSB.
-    ///
-    /// # Panics
-    /// Panics if `xs` is empty, or the moduli in `xs` are not all equal.
-    fn mixed_radix_addition_msb_only(
-        &mut self,
-        xs: &[Bundle<Self::Item>],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        assert!(!xs.is_empty(), "`xs` cannot be empty");
-        assert!(xs.iter().all(|x| x.moduli() == xs[0].moduli()));
-
-        let nargs = xs.len();
-        let n = xs[0].wires().len();
-
-        let mut opt_carry = None;
-        let mut max_carry = 0;
-
-        for i in 0..n - 1 {
-            // all the ith digits, in one vec
-            let ds = xs.iter().map(|x| x.wires()[i].clone()).collect_vec();
-            // compute the carry
-            let q = xs[0].moduli()[i];
-            // max_carry currently contains the max carry from the previous iteration
-            let max_val = nargs as u16 * (q - 1) + max_carry;
-            // now it is the max carry of this iteration
-            max_carry = max_val / q;
-
-            // mod change the digits to the max sum possible plus the max carry of the
-            // previous iteration
-            let modded_ds = ds
-                .iter()
-                .map(|d| self.mod_change(d, max_val + 1, channel))
-                .collect::<swanky_error::Result<Vec<Self::Item>>>()?;
-            // add them up
-            let sum = self.add_many(&modded_ds);
-            // add in the carry
-            let sum_with_carry = opt_carry
-                .as_ref()
-                .map_or(sum.clone(), |c| self.add(&sum, c));
-
-            // carry now contains the carry information, we just have to project it to
-            // the correct moduli for the next iteration. It will either be used to
-            // compute the next carry, if i < n-2, or it will be used to compute the
-            // output MSB, in which case it should be the modulus of the SB
-            let next_mod = if i < n - 2 {
-                nargs as u16 * (xs[0].moduli()[i + 1] - 1) + max_carry + 1
-            } else {
-                xs[0].moduli()[i + 1] // we will be adding the carry to the MSB
-            };
-
-            let tt = (0..=max_val).map(|i| (i / q) % next_mod).collect_vec();
-            opt_carry = Some(self.proj(&sum_with_carry, next_mod, Some(tt), channel)?);
-        }
-
-        // compute the msb
-        let ds = xs.iter().map(|x| x.wires()[n - 1].clone()).collect_vec();
-        let digit_sum = self.add_many(&ds);
-        Ok(opt_carry
-            .as_ref()
-            .map_or(digit_sum.clone(), |d| self.add(&digit_sum, d)))
-    }
-
-    /// Compute `x == y`. Returns a wire encoding the result mod 2.
-    ///
-    /// # Panics
-    /// Panics if `x` and `y` do not have equal moduli.
-    fn eq_bundles(
-        &mut self,
-        x: &Bundle<Self::Item>,
-        y: &Bundle<Self::Item>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        assert_eq!(x.moduli(), y.moduli());
-
-        let wlen = x.wires().len() as u16;
-        let zs = x
-            .wires()
-            .iter()
-            .zip_eq(y.wires().iter())
-            .map(|(x, y)| {
-                // compute (x-y == 0) for each residue
-                let z = self.sub(x, y);
-                let mut eq_zero_tab = vec![0; x.modulus() as usize];
-                eq_zero_tab[0] = 1;
-                self.proj(&z, wlen + 1, Some(eq_zero_tab), channel)
-            })
-            .collect::<swanky_error::Result<Vec<Self::Item>>>()?;
-        // add up the results, and output whether they equal zero or not, mod 2
-        let z = self.add_many(&zs);
-        let b = zs.len();
-        let mut tab = vec![0; b + 1];
-        tab[b] = 1;
-        self.proj(&z, 2, Some(tab), channel)
     }
 }
 

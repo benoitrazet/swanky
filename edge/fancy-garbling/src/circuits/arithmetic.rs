@@ -13,6 +13,9 @@ pub use multiplication::Multiplication;
 mod division;
 pub use division::Division;
 
+mod equality;
+pub use equality::Equality;
+
 mod comparison;
 pub use comparison::GreaterThanOrEqual;
 pub use comparison::LessThan;
@@ -23,3 +26,9 @@ pub use comparison::Sign;
 
 mod mixed_radix;
 pub use mixed_radix::FractionalMixedRadix;
+pub use mixed_radix::MixedRadixAddition;
+
+mod pmr;
+pub use pmr::PmrGreaterThanOrEqual;
+pub use pmr::PmrLessThan;
+pub use pmr::ToPmr;

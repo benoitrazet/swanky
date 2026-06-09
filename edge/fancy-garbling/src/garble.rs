@@ -136,16 +136,6 @@ mod nonstreaming {
     }
 
     #[test]
-    fn mixed_radix_addition() {
-        let mut rng = thread_rng();
-        let nargs = 2 + rng.gen_usize() % 100;
-        let mods = vec![3, 7, 10, 2, 13];
-        garble_test_helper::<AllWire, _>(
-            &circuits::arithmetic_proj_bundle_gadgets::TestMixedRadixAddition(mods, nargs),
-        );
-    }
-
-    #[test]
     fn constants() {
         let q = thread_rng().gen_modulus();
         let c = thread_rng().gen_u16() % q;

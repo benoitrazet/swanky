@@ -80,6 +80,93 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for MixedRadixAdditionMSBOnly {
     }
 }
 
+/// Mixed radix addition.
+pub struct MixedRadixAddition;
+
+impl<F: FancyArithmetic + FancyProj> Circuit<F> for MixedRadixAddition {
+    type Input = Vec<CrtBundle<F::Item>>;
+    type Output = CrtBundle<F::Item>;
+
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: &Self::Input,
+        channel: &mut Channel,
+    ) -> Result<Self::Output> {
+        let xs = inputs;
+        assert!(!xs.is_empty(), "`xs` cannot be empty");
+        assert!(xs.iter().all(|x| x.moduli() == xs[0].moduli()));
+
+        let nargs = xs.len();
+        let n = xs[0].wires().len();
+
+        let mut digit_carry = None;
+        let mut carry_carry = None;
+        let mut max_carry = 0;
+
+        let mut res = Vec::with_capacity(n);
+
+        for i in 0..n {
+            // all the ith digits, in one vec
+            let ds = xs.iter().map(|x| x.wires()[i].clone()).collect::<Vec<_>>();
+
+            // compute the digit -- easy
+            let digit_sum = AddMany.execute(backend, &ds, channel)?;
+            let digit = digit_carry.map_or(digit_sum.clone(), |d| backend.add(&digit_sum, &d));
+
+            if i < n - 1 {
+                // compute the carries
+                let q = xs[0].wires()[i].modulus();
+                // max_carry currently contains the max carry from the previous iteration
+                let max_val = nargs as u16 * (q - 1) + max_carry;
+                // now it is the max carry of this iteration
+                max_carry = max_val / q;
+
+                let modded_ds = ds
+                    .iter()
+                    .map(|d| backend.mod_change(d, max_val + 1, channel))
+                    .collect::<Result<Vec<_>>>()?;
+
+                let carry_sum = AddMany.execute(backend, &modded_ds, channel)?;
+                // add in the carry from the previous iteration
+                let carry = carry_carry.map_or(carry_sum.clone(), |c| backend.add(&carry_sum, &c));
+
+                // carry now contains the carry information, we just have to project it to
+                // the correct moduli for the next iteration
+                let next_mod = xs[0].wires()[i + 1].modulus();
+                let tt = (0..=max_val)
+                    .map(|i| (i / q) % next_mod)
+                    .collect::<Vec<_>>();
+                digit_carry = Some(backend.proj(&carry, next_mod, Some(tt), channel)?);
+
+                let next_max_val = nargs as u16 * (next_mod - 1) + max_carry;
+
+                if i < n - 2 {
+                    if max_carry < next_mod {
+                        carry_carry = Some(backend.mod_change(
+                            digit_carry.as_ref().unwrap(),
+                            next_max_val + 1,
+                            channel,
+                        )?);
+                    } else {
+                        let tt = (0..=max_val).map(|i| i / q).collect::<Vec<_>>();
+                        carry_carry =
+                            Some(backend.proj(&carry, next_max_val + 1, Some(tt), channel)?);
+                    }
+                } else {
+                    // next digit is MSB so we dont need carry_carry
+                    carry_carry = None;
+                }
+            } else {
+                digit_carry = None;
+                carry_carry = None;
+            }
+            res.push(digit);
+        }
+        Ok(CrtBundle::new(res))
+    }
+}
+
 /// For input [`CrtBundle`] `x` and vector of moduli `ms`, output the MSB of the
 /// fractional part of `x / M`, where `M = product(ms)`.
 pub struct FractionalMixedRadix;
@@ -127,5 +214,83 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for FractionalMixedRadix {
         }
 
         MixedRadixAdditionMSBOnly.execute(backend, &ds, channel)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use rand::{Rng, thread_rng};
+
+    use crate::{
+        circuits::arithmetic::mixed_radix::{MixedRadixAddition, MixedRadixAdditionMSBOnly},
+        dummy::{Dummy, DummyVal},
+        util::{RngExt, as_mixed_radix, product},
+    };
+
+    #[test]
+    fn mixed_radix_addition_msb_only() {
+        let mut rng = thread_rng();
+        let nargs = 2 + rng.r#gen::<usize>() % 10;
+        let moduli = (0..7).map(|_| rng.gen_modulus()).collect::<Vec<_>>();
+        let q = product(&moduli);
+
+        // Test maximum overflow.
+        let inputs = (0..nargs)
+            .map(|_| DummyVal::to_mixed_radix(q - 1, &moduli))
+            .collect::<Vec<_>>();
+        let output = Dummy::eval(&MixedRadixAdditionMSBOnly, &inputs).unwrap();
+        assert_eq!(
+            output.val(),
+            *as_mixed_radix((q - 1) * (nargs as u128) % q, &moduli)
+                .last()
+                .unwrap()
+        );
+
+        // Test random values.
+        for _ in 0..4 {
+            let mut expected = 0;
+            let mut inputs = Vec::new();
+            for _ in 0..nargs {
+                let x = rng.gen_u128() % q;
+                expected = (expected + x) % q;
+                inputs.push(DummyVal::to_mixed_radix(x, &moduli));
+            }
+            let output = Dummy::eval(&MixedRadixAdditionMSBOnly, &inputs).unwrap();
+            assert_eq!(
+                output.val(),
+                *as_mixed_radix(expected, &moduli).last().unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn test_mixed_radix_addition() {
+        let mut rng = thread_rng();
+        let nargs = 2 + rng.gen_usize() % 100;
+        let moduli = (0..7).map(|_| rng.gen_modulus()).collect::<Vec<_>>();
+        let q: u128 = moduli.iter().map(|&q| q as u128).product();
+
+        // Test maximum overflow.
+        let inputs = (0..nargs)
+            .map(|_| DummyVal::to_mixed_radix(q - 1, &moduli))
+            .collect::<Vec<_>>();
+        let output = Dummy::eval(&MixedRadixAddition, &inputs).unwrap();
+        assert_eq!(
+            DummyVal::from_mixed_radix(&output),
+            (q - 1) * (nargs as u128) % q
+        );
+
+        // Test random values.
+        for _ in 0..4 {
+            let mut expected = 0;
+            let mut inputs = Vec::new();
+            for _ in 0..nargs {
+                let x = rng.gen_u128() % q;
+                expected = (expected + x) % q;
+                inputs.push(DummyVal::to_mixed_radix(x, &moduli));
+            }
+            let output = Dummy::eval(&MixedRadixAddition, &inputs).unwrap();
+            assert_eq!(DummyVal::from_mixed_radix(&output), expected);
+        }
     }
 }
