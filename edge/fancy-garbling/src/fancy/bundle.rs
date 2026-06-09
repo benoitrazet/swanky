@@ -2,7 +2,6 @@ use crate::{Fancy, FancyArithmetic, FancyProj, HasModulus};
 use itertools::Itertools;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::ops::Index;
 use swanky_channel::Channel;
 
 /// A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`.
@@ -17,7 +16,7 @@ impl<W: Clone + HasModulus> Bundle<W> {
     }
 
     /// Return the moduli of all the wires in the bundle.
-    pub fn moduli(&self) -> Vec<u16> {
+    pub(crate) fn moduli(&self) -> Vec<u16> {
         self.0.iter().map(HasModulus::modulus).collect()
     }
 
@@ -31,13 +30,8 @@ impl<W: Clone + HasModulus> Bundle<W> {
         self.0.len()
     }
 
-    /// Whether this bundle only contains residues in mod 2.
-    pub fn is_binary(&self) -> bool {
-        self.moduli().iter().all(|m| *m == 2)
-    }
-
     /// Returns a new bundle only containing wires with matching moduli.
-    pub fn with_moduli(&self, moduli: &[u16]) -> Bundle<W> {
+    pub(crate) fn with_moduli(&self, moduli: &[u16]) -> Bundle<W> {
         let old_ws = self.wires();
         let mut new_ws = Vec::with_capacity(moduli.len());
         for &p in moduli {
@@ -51,29 +45,24 @@ impl<W: Clone + HasModulus> Bundle<W> {
     }
 
     /// Pad the Bundle with val, n times.
-    pub fn pad(&mut self, val: &W, n: usize) {
+    pub(crate) fn pad(&mut self, val: &W, n: usize) {
         for _ in 0..n {
             self.0.push(val.clone());
         }
     }
 
-    /// Extract a wire from the Bundle, removing it and returning it.
-    pub fn extract(&mut self, wire_index: usize) -> W {
-        self.0.remove(wire_index)
-    }
-
     /// Insert a wire from the Bundle
-    pub fn insert(&mut self, wire_index: usize, val: W) {
+    pub(crate) fn insert(&mut self, wire_index: usize, val: W) {
         self.0.insert(wire_index, val)
     }
 
     /// push a wire onto the Bundle.
-    pub fn push(&mut self, val: W) {
+    pub(crate) fn push(&mut self, val: W) {
         self.0.push(val);
     }
 
     /// Pop a wire from the Bundle.
-    pub fn pop(&mut self) -> Option<W> {
+    pub(crate) fn pop(&mut self) -> Option<W> {
         self.0.pop()
     }
 
@@ -83,16 +72,8 @@ impl<W: Clone + HasModulus> Bundle<W> {
     }
 
     /// Reverse the wires
-    pub fn reverse(&mut self) {
+    pub(crate) fn reverse(&mut self) {
         self.0.reverse();
-    }
-}
-
-impl<W: Clone + HasModulus> Index<usize> for Bundle<W> {
-    type Output = W;
-
-    fn index(&self, idx: usize) -> &Self::Output {
-        self.0.index(idx)
     }
 }
 

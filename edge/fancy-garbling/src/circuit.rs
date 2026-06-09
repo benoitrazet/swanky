@@ -54,7 +54,7 @@ impl<T: Clone + HasModulus> Flatten for BinaryBundle<T> {
     type Item = T;
 
     fn flatten(self) -> Vec<T> {
-        self.extract().wires().to_vec()
+        self.wires().to_vec()
     }
 }
 
@@ -817,7 +817,7 @@ pub mod circuits {
         use crate::{
             Bundle, CrtBundle, CrtProjGadgets,
             circuit::{Circuit, CircuitInputMapper},
-            circuits::arithmetic::Multiplication,
+            circuits::arithmetic::{Multiplication, ReLU},
         };
         use swanky_channel::Channel;
         use swanky_error::Result;
@@ -898,139 +898,13 @@ pub mod circuits {
                 for x in inputs.iter() {
                     let c = backend.crt_constant_bundle(1, x.composite_modulus(), channel)?;
                     let y = Multiplication.execute(backend, &(x.clone(), c), channel)?;
-                    let z = backend.crt_relu(&y, "100%", None, channel)?;
+                    let z = ReLU.execute(backend, &(y, "100%".to_string(), None), channel)?;
                     outputs.push(z);
                 }
                 Ok(outputs)
             }
         }
         impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestComplexGadget {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0.len() * self.1);
-                inputs
-                    .chunks_exact(self.0.len())
-                    .map(|x| CrtBundle::new(x.to_vec()))
-                    .collect()
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0.len() * self.1
-            }
-
-            fn modulus(&self, i: usize) -> u16 {
-                self.0[i % self.0.len()]
-            }
-        }
-
-        /// Circuit for testing [`CrtProjGadgets::crt_relu`].
-        pub struct TestRelu(pub Vec<u16>);
-        impl<F: CrtProjGadgets> Circuit<F> for TestRelu {
-            type Input = CrtBundle<F::Item>;
-            type Output = CrtBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                input: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.crt_relu(input, "100%", None, channel)
-            }
-        }
-        impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestRelu {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0.len());
-                CrtBundle::new(inputs)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0.len()
-            }
-
-            fn modulus(&self, i: usize) -> u16 {
-                self.0[i]
-            }
-        }
-
-        /// Circuit for testing [`CrtProjGadgets::crt_sgn`].
-        pub struct TestSgn(pub Vec<u16>);
-        impl<F: CrtProjGadgets> Circuit<F> for TestSgn {
-            type Input = CrtBundle<F::Item>;
-            type Output = CrtBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                input: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.crt_sgn(input, "100%", None, channel)
-            }
-        }
-        impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestSgn {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0.len());
-                CrtBundle::new(inputs)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0.len()
-            }
-
-            fn modulus(&self, i: usize) -> u16 {
-                self.0[i]
-            }
-        }
-
-        /// Circuit for testing [`CrtProjGadgets::crt_lt`].
-        pub struct TestLeq(pub Vec<u16>);
-        impl<F: CrtProjGadgets> Circuit<F> for TestLeq {
-            type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
-            type Output = F::Item;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.crt_lt(&inputs.0, &inputs.1, "100%", channel)
-            }
-        }
-        impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestLeq {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0.len() * 2);
-                let (x, y) = inputs.split_at(self.0.len());
-                let x = CrtBundle::new(x.to_vec());
-                let y = CrtBundle::new(y.to_vec());
-                (x, y)
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0.len() * 2
-            }
-
-            fn modulus(&self, i: usize) -> u16 {
-                self.0[i % self.0.len()]
-            }
-        }
-
-        /// Circuit for testing [`CrtProjGadgets::crt_max`].
-        pub struct TestMax(pub Vec<u16>, pub usize);
-        impl<F: CrtProjGadgets> Circuit<F> for TestMax {
-            type Input = Vec<CrtBundle<F::Item>>;
-            type Output = CrtBundle<F::Item>;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: &Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                backend.crt_max(inputs, "100%", channel)
-            }
-        }
-        impl<F: CrtProjGadgets> CircuitInputMapper<F> for TestMax {
             fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
                 assert_eq!(inputs.len(), self.0.len() * self.1);
                 inputs
@@ -1412,79 +1286,6 @@ mod crt_proj_gadgets {
             let z = Dummy::eval(&c, &x_input).unwrap();
             let output = DummyVal::from_crt(&z, q);
             assert_eq!(output, x % p as u128);
-        }
-    }
-
-    #[test]
-    fn test_relu() {
-        let mut rng = thread_rng();
-        let q = modulus_with_width(10);
-        let c = circuits::crt_proj_gadgets::TestRelu(factor(q));
-
-        for _ in 0..128 {
-            let x = rng.gen_u128() % q;
-            let x_input = DummyVal::to_crt(x, q);
-            let z = Dummy::eval(&c, &x_input).unwrap();
-            let output = DummyVal::from_crt(&z, q);
-            assert_eq!(output, if x < q / 2 { x } else { 0 });
-        }
-    }
-
-    #[test]
-    fn test_sgn() {
-        let mut rng = thread_rng();
-        let q = modulus_with_width(10);
-        let c = circuits::crt_proj_gadgets::TestSgn(factor(q));
-
-        for _ in 0..128 {
-            let x = rng.gen_u128() % q;
-            let x_input = DummyVal::to_crt(x, q);
-            let z = Dummy::eval(&c, &x_input).unwrap();
-            let output = DummyVal::from_crt(&z, q);
-            assert_eq!(output, if x < q / 2 { 1 } else { q - 1 });
-        }
-    }
-
-    #[test]
-    fn test_leq() {
-        let mut rng = thread_rng();
-        let q = modulus_with_width(10);
-        let c = circuits::crt_proj_gadgets::TestLeq(factor(q));
-
-        // Let's have at least one test where they are surely equal.
-        let x = rng.gen_u128() % q / 2;
-        let x_input = DummyVal::to_crt(x, q);
-        let output = Dummy::eval(&c, &(x_input.clone(), x_input)).unwrap();
-        assert_eq!(output.val(), (x < x) as u16);
-
-        for _ in 0..64 {
-            let x = rng.gen_u128() % q / 2;
-            let y = rng.gen_u128() % q / 2;
-            let x_input = DummyVal::to_crt(x, q);
-            let y_input = DummyVal::to_crt(y, q);
-            let output = Dummy::eval(&c, &(x_input, y_input)).unwrap();
-            assert_eq!(output.val(), (x < y) as u16);
-        }
-    }
-
-    #[test]
-    fn test_max() {
-        let mut rng = thread_rng();
-        let q = modulus_with_width(10);
-        let n = 10;
-        let c = circuits::crt_proj_gadgets::TestMax(factor(q), n);
-
-        for _ in 0..16 {
-            let inputs = (0..n).map(|_| rng.gen_u128() % (q / 2)).collect::<Vec<_>>();
-            let expected = *inputs.iter().max().unwrap();
-
-            let inputs = inputs
-                .into_iter()
-                .map(|x| DummyVal::to_crt(x, q))
-                .collect::<Vec<_>>();
-            let z = Dummy::eval(&c, &inputs).unwrap();
-            let output = DummyVal::from_crt(&z, q);
-            assert_eq!(output, expected);
         }
     }
 

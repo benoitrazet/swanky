@@ -10,11 +10,14 @@ pub use garbler::Garbler;
 mod tests {
     use super::*;
     use fancy_garbling::{
-        AllWire, CrtBundle, CrtGadgets, CrtProjGadgets, Fancy, FancyArithmetic, FancyBinary,
-        FancyProj, WireLabel, WireMod2,
+        AllWire, CrtBundle, CrtGadgets, Fancy, FancyArithmetic, FancyBinary, FancyProj, WireLabel,
+        WireMod2,
         circuit::{Circuit, CircuitInputMapper, Flatten, circuits::arithmetic::TestAddition},
         circuit_analyzer::CircuitAnalyzer,
-        circuits::{aes::AesNonExpanded, arithmetic::Multiplication},
+        circuits::{
+            aes::AesNonExpanded,
+            arithmetic::{Multiplication, ReLU},
+        },
         dummy::{Dummy, DummyVal},
         util::RngExt,
     };
@@ -81,7 +84,9 @@ mod tests {
             let q = x.composite_modulus();
             let c = b.crt_constant_bundle(1, q, channel).unwrap();
             let y = Multiplication.execute(b, &(x.clone(), c), channel).unwrap();
-            let z = b.crt_relu(&y, "100%", None, channel).unwrap();
+            let z = ReLU
+                .execute(b, &(y, "100%".to_string(), None), channel)
+                .unwrap();
             outputs.push(b.crt_output(&z, channel).unwrap());
         }
         outputs.into_iter().collect()

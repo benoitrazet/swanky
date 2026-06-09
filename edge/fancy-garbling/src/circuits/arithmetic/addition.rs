@@ -27,6 +27,27 @@ impl<F: FancyArithmetic> Circuit<F> for Addition {
     }
 }
 
+pub struct AddMany;
+
+impl<F: FancyArithmetic> Circuit<F> for AddMany {
+    type Input = Vec<F::Item>;
+    type Output = F::Item;
+
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: &Self::Input,
+        _: &mut Channel,
+    ) -> Result<Self::Output> {
+        assert!(inputs.len() >= 2, "`args.len()` must be two or more");
+        let mut z = inputs[0].clone();
+        for x in inputs.iter().skip(1) {
+            z = backend.add(&z, x);
+        }
+        Ok(z)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::{

@@ -4,7 +4,7 @@ use super::{HasModulus, bundle::ArithmeticBundleGadgets};
 use crate::{
     FancyArithmetic, FancyBinary,
     fancy::bundle::{ArithmeticProjBundleGadgets, Bundle, BundleGadgets},
-    util,
+    util::{self},
 };
 use itertools::Itertools;
 use std::ops::Deref;
@@ -158,9 +158,6 @@ pub trait CrtGadgets:
         Ok(zs.into_iter().collect())
     }
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // High-level computations dealing with bundles.
-
     /// Subtract two CRT bundles.
     fn crt_sub(
         &mut self,
@@ -215,169 +212,6 @@ pub trait CrtProjGadgets: ArithmeticProjBundleGadgets + CrtGadgets {
             .collect::<swanky_error::Result<_>>()
             .map(CrtBundle::new)
     }
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // Fancy functions based on Mike's fractional mixed radix trick.
-
-    /// Helper function for advanced gadgets, returns the MSB of the fractional part of
-    /// `X/M` where `M=product(ms)`.
-    fn crt_fractional_mixed_radix(
-        &mut self,
-        bun: &CrtBundle<Self::Item>,
-        ms: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        let ndigits = ms.len();
-
-        let q = util::product(&bun.moduli());
-        let M = util::product(ms);
-
-        let mut ds = Vec::new();
-
-        for wire in bun.wires().iter() {
-            let p = wire.modulus();
-
-            let mut tabs = vec![Vec::with_capacity(p as usize); ndigits];
-
-            for x in 0..p {
-                let crt_coef = util::inv(((q / p as u128) % p as u128) as i128, p as i128);
-                let y = (M as f64 * x as f64 * crt_coef as f64 / p as f64).round() as u128 % M;
-                let digits = util::as_mixed_radix(y, ms);
-                for i in 0..ndigits {
-                    tabs[i].push(digits[i]);
-                }
-            }
-
-            let new_ds = tabs
-                .into_iter()
-                .enumerate()
-                .map(|(i, tt)| self.proj(wire, ms[i], Some(tt), channel))
-                .collect::<swanky_error::Result<Vec<Self::Item>>>()?;
-
-            ds.push(Bundle::new(new_ds));
-        }
-
-        self.mixed_radix_addition_msb_only(&ds, channel)
-    }
-
-    /// Compute `max(x,0)`.
-    ///
-    /// Optional output moduli.
-    fn crt_relu(
-        &mut self,
-        x: &CrtBundle<Self::Item>,
-        accuracy: &str,
-        output_moduli: Option<&[u16]>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
-        let factors_of_m = &get_ms(x, accuracy);
-        let res = self.crt_fractional_mixed_radix(x, factors_of_m, channel)?;
-
-        // project the MSB to 0/1, whether or not it is less than p/2
-        let p = *factors_of_m.last().unwrap();
-        let mask_tt = (0..p).map(|x| (x < p / 2) as u16).collect_vec();
-        let mask = self.proj(&res, 2, Some(mask_tt), channel)?;
-
-        // use the mask to either output x or 0
-        output_moduli
-            .map(|ps| x.with_moduli(ps))
-            .as_ref()
-            .unwrap_or(x)
-            .wires()
-            .iter()
-            .map(|x| self.mul(x, &mask, channel))
-            .collect::<swanky_error::Result<_>>()
-            .map(CrtBundle::new)
-    }
-
-    /// Return 0 if `x` is positive and 1 if `x` is negative.
-    fn crt_sign(
-        &mut self,
-        x: &CrtBundle<Self::Item>,
-        accuracy: &str,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        let factors_of_m = &get_ms(x, accuracy);
-        let res = self.crt_fractional_mixed_radix(x, factors_of_m, channel)?;
-        let p = *factors_of_m.last().unwrap();
-        let tt = (0..p).map(|x| (x >= p / 2) as u16).collect_vec();
-        self.proj(&res, 2, Some(tt), channel)
-    }
-
-    /// Return `if x >= 0 then 1 else -1`, where `-1` is interpreted as `Q-1`.
-    ///
-    /// If provided, will produce a bundle under `output_moduli` instead of `x.moduli()`
-    fn crt_sgn(
-        &mut self,
-        x: &CrtBundle<Self::Item>,
-        accuracy: &str,
-        output_moduli: Option<&[u16]>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
-        let sign = self.crt_sign(x, accuracy, channel)?;
-        output_moduli
-            .unwrap_or(&x.moduli())
-            .iter()
-            .map(|&p| {
-                let tt = vec![1, p - 1];
-                self.proj(&sign, p, Some(tt), channel)
-            })
-            .collect::<swanky_error::Result<_>>()
-            .map(CrtBundle::new)
-    }
-
-    /// Returns 1 if `x < y`.
-    fn crt_lt(
-        &mut self,
-        x: &CrtBundle<Self::Item>,
-        y: &CrtBundle<Self::Item>,
-        accuracy: &str,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        let z = self.crt_sub(x, y);
-        self.crt_sign(&z, accuracy, channel)
-    }
-
-    /// Returns 1 if `x >= y`.
-    fn crt_geq(
-        &mut self,
-        x: &CrtBundle<Self::Item>,
-        y: &CrtBundle<Self::Item>,
-        accuracy: &str,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        let z = self.crt_lt(x, y, accuracy, channel)?;
-        Ok(self.negate(&z))
-    }
-
-    /// Compute the maximum bundle in `xs`.
-    ///
-    /// # Panics
-    /// Panics if `xs` is empty.
-    fn crt_max(
-        &mut self,
-        xs: &[CrtBundle<Self::Item>],
-        accuracy: &str,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
-        assert!(!xs.is_empty(), "`xs` cannot be empty");
-        xs.iter().skip(1).try_fold(xs[0].clone(), |x, y| {
-            let pos = self.crt_lt(&x, y, accuracy, channel)?;
-            let neg = self.negate(&pos);
-            Ok(CrtBundle::new(
-                x.wires()
-                    .iter()
-                    .zip(y.wires().iter())
-                    .map(|(x, y)| {
-                        let xp = self.mul(x, &neg, channel)?;
-                        let yp = self.mul(y, &pos, channel)?;
-                        Ok(self.add(&xp, &yp))
-                    })
-                    .collect::<swanky_error::Result<Vec<Self::Item>>>()?,
-            ))
-        })
-    }
-
     /// Convert the xs bundle to PMR representation. Useful for extracting out of CRT.
     fn crt_to_pmr(
         &mut self,
@@ -472,62 +306,5 @@ pub trait CrtProjGadgets: ArithmeticProjBundleGadgets + CrtGadgets {
     ) -> swanky_error::Result<Self::Item> {
         let z = self.pmr_lt(x, y, channel)?;
         Ok(self.negate(&z))
-    }
-}
-
-/// Compute the `ms` needed for the number of CRT primes in `x`, with accuracy
-/// `accuracy`.
-///
-/// Supported accuracy: ["100%", "99.9%", "99%"]
-fn get_ms<W: Clone + HasModulus>(x: &Bundle<W>, accuracy: &str) -> Vec<u16> {
-    match accuracy {
-        "100%" => match x.moduli().len() {
-            3 => vec![2; 5],
-            4 => vec![3, 26],
-            5 => vec![3, 4, 54],
-            6 => vec![5, 5, 5, 60],
-            7 => vec![5, 6, 6, 7, 86],
-            8 => vec![5, 7, 8, 8, 9, 98],
-            9 => vec![5, 5, 7, 7, 7, 7, 7, 76],
-            10 => vec![5, 5, 6, 6, 6, 6, 11, 11, 202],
-            11 => vec![5, 5, 5, 5, 5, 6, 6, 6, 7, 7, 8, 150],
-            n => panic!("unknown exact Ms for {} primes!", n),
-        },
-        "99.999%" => match x.moduli().len() {
-            8 => vec![5, 5, 6, 7, 102],
-            9 => vec![5, 5, 6, 7, 114],
-            10 => vec![5, 6, 6, 7, 102],
-            11 => vec![5, 5, 6, 7, 130],
-            n => panic!("unknown 99.999% accurate Ms for {} primes!", n),
-        },
-        "99.99%" => match x.moduli().len() {
-            6 => vec![5, 5, 5, 42],
-            7 => vec![4, 5, 6, 88],
-            8 => vec![4, 5, 7, 78],
-            9 => vec![5, 5, 6, 84],
-            10 => vec![4, 5, 6, 112],
-            11 => vec![7, 11, 174],
-            n => panic!("unknown 99.99% accurate Ms for {} primes!", n),
-        },
-        "99.9%" => match x.moduli().len() {
-            5 => vec![3, 5, 30],
-            6 => vec![4, 5, 48],
-            7 => vec![4, 5, 60],
-            8 => vec![3, 5, 78],
-            9 => vec![9, 140],
-            10 => vec![7, 190],
-            n => panic!("unknown 99.9% accurate Ms for {} primes!", n),
-        },
-        "99%" => match x.moduli().len() {
-            4 => vec![3, 18],
-            5 => vec![3, 36],
-            6 => vec![3, 40],
-            7 => vec![3, 40],
-            8 => vec![126],
-            9 => vec![138],
-            10 => vec![140],
-            n => panic!("unknown 99% accurate Ms for {} primes!", n),
-        },
-        _ => panic!("get_ms: unsupported accuracy {}", accuracy),
     }
 }

@@ -7,7 +7,7 @@ use crate::{
 use fancy_garbling::{
     CrtBundle, CrtProjGadgets, Fancy, HasModulus,
     circuit::Circuit,
-    circuits::arithmetic::{Addition, ConstantMultiplication},
+    circuits::arithmetic::{Addition, ConstantMultiplication, Max, ReLU, Sgn},
     util::factor,
 };
 use ndarray::Array3;
@@ -243,7 +243,11 @@ impl<'a, F: Fancy + CrtProjGadgets> FancyNeuralNet for ArithmeticLayer<'a, F> {
     }
 
     fn nn_max(&mut self, xs: &[Self::Item], channel: &mut Channel) -> Result<Self::Item> {
-        self.backend.crt_max(xs, &self.accuracy.max, channel)
+        Max.execute(
+            self.backend,
+            &(xs.to_vec(), self.accuracy.max.clone()),
+            channel,
+        )
     }
 
     fn nn_activation(
@@ -254,14 +258,16 @@ impl<'a, F: Fancy + CrtProjGadgets> FancyNeuralNet for ArithmeticLayer<'a, F> {
     ) -> Result<Self::Item> {
         let ps = factor(self.output_modulus);
         match f {
-            ActivationFunction::Sign => {
-                self.backend
-                    .crt_sgn(x, &self.accuracy.sign, Some(&ps), channel)
-            }
-            ActivationFunction::Relu => {
-                self.backend
-                    .crt_relu(x, &self.accuracy.relu, Some(&ps), channel)
-            }
+            ActivationFunction::Sign => Sgn.execute(
+                self.backend,
+                &(x.clone(), self.accuracy.sign.to_string(), Some(ps)),
+                channel,
+            ),
+            ActivationFunction::Relu => ReLU.execute(
+                self.backend,
+                &(x.clone(), self.accuracy.relu.to_string(), Some(ps)),
+                channel,
+            ),
             ActivationFunction::Identity => Ok(x.clone()),
         }
     }

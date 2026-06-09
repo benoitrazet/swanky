@@ -22,11 +22,6 @@ impl<W: Clone + HasModulus> BinaryBundle<W> {
     pub fn new(ws: Vec<W>) -> BinaryBundle<W> {
         BinaryBundle(Bundle::new(ws))
     }
-
-    /// Extract the underlying bundle from this binary bundle.
-    pub fn extract(self) -> Bundle<W> {
-        self.0
-    }
 }
 
 impl<W: Clone + HasModulus> Deref for BinaryBundle<W> {
