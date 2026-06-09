@@ -328,7 +328,7 @@ mod multiplication {
     mod test {
         use super::{super::polynomial_modulus_f128b, *};
         use crate::{F2, F128b};
-        use proptest::prelude::*;
+        use proptest::{prelude::*, prop_assert_eq, test_runner::TestCaseError};
         use swanky_field::FiniteField;
         use swanky_polynomial::Polynomial;
         use vectoreyes::U8x16;
@@ -348,7 +348,7 @@ mod multiplication {
             (hi, lo)
         }
 
-        fn reduce_ref(hi: u128, lo: u128) -> Polynomial<F2> {
+        fn reduce_ref(hi: u128, lo: u128) -> Result<Polynomial<F2>, TestCaseError> {
             fn poly_from_upper_and_lower_128(upper: u128, lower: u128) -> Polynomial<F2> {
                 let mut out = Polynomial {
                     constant: F2::try_from((lower & 1) as u8).unwrap(),
@@ -369,18 +369,19 @@ mod multiplication {
                 poly: &Polynomial<F2>,
                 quotient: &Polynomial<F2>,
                 remainder: &Polynomial<F2>,
-            ) {
+            ) -> Result<(), TestCaseError> {
                 let mut tmp = quotient.clone();
                 tmp *= &polynomial_modulus_f128b();
                 tmp += remainder;
-                assert_eq!(poly, &tmp);
+                prop_assert_eq!(poly, &tmp);
+                Ok(())
             }
 
             let poly = poly_from_upper_and_lower_128(hi, lo);
             let (poly_quotient, poly_reduced) = poly.divmod(&polynomial_modulus_f128b());
-            assert_div_mod(&poly, &poly_quotient, &poly_reduced);
+            assert_div_mod(&poly, &poly_quotient, &poly_reduced)?;
 
-            poly_reduced
+            Ok(poly_reduced)
         }
 
         proptest! {
@@ -391,8 +392,8 @@ mod multiplication {
 
             #[test]
             fn test_reduce(upper in any::<u128>(), lower in any::<u128>()) {
-                let poly_reduced = reduce_ref(upper, lower);
-                assert_eq!(poly_from_128(reduce(upper, lower)), poly_reduced);
+                let poly_reduced = reduce_ref(upper, lower)?;
+                prop_assert_eq!(poly_from_128(reduce(upper, lower)), poly_reduced);
             }
         }
     }
