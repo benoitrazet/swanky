@@ -79,9 +79,6 @@ mod move_to_vectoreyes {
     /// polynomials. The result has degree 255, so it is returned in the form of 2 u128s containing
     /// the upper and lower bits, in that order: (hi, lo) = lhs * rhs
     //
-    // This function wraps either F64x2::carryless_mul function from vectoreyes or its aarch64
-    // equivalent, defined in this module. If the latter is incorporated into vectoreyes
-    //
     // This function is the equivalent of F64x2::carryless_mul instantiated for a platform with
     // aarch64 neon extentions. Moving it to Vectoreyes should be straightforward.
     #[inline(always)]
