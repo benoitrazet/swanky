@@ -17,33 +17,32 @@ edition.workspace = true
 publish.workspace = true
 version.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-aes.workspace = true
-diet-mac-and-cheese.workspace = true
 env_logger.workspace = true
 generic-array.workspace = true
 itertools.workspace = true
 log.workspace = true
-mac-n-cheese-sieve-parser.workspace = true
 merlin.workspace = true
 pretty_env_logger.workspace = true
-proptest.workspace = true
 rand.workspace = true
 rayon.workspace = true
 sha3.workspace = true
 shake.workspace = true
-swanky-sieve-ir-api.workspace = true
+tempfile.workspace = true
+
+diet-mac-and-cheese.workspace = true
+mac-n-cheese-sieve-parser.workspace = true
 swanky-error.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true
+swanky-rng.workspace = true
 swanky-serialization.workspace = true
-tempfile.workspace = true
+swanky-sieve-ir-api.workspace = true
+vectoreyes.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
-rand.workspace = true
+proptest.workspace = true
 swanky-sieve-ir-codegen.workspace = true
 
 [lints]

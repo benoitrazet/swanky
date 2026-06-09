@@ -4,7 +4,7 @@
 use rand::{CryptoRng, Error, Rng, RngCore, SeedableRng};
 use rand_core::block::{BlockRng64, BlockRngCore};
 use vectoreyes::{
-    Aes128EncryptOnly, AesBlockCipher, SimdBase, U8x16, U64x2,
+    Aes128EncryptOnly, AesBlockCipher, U8x16,
     array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
 };
 
@@ -61,6 +61,11 @@ impl SwankyRng {
         SwankyRng::from_seed(seed)
     }
 
+    /// Create a new random number generator using a given seed and IV.
+    pub fn from_seed_and_iv(seed: U8x16, iv: u128) -> Self {
+        Self(BlockRng64::new(SwankyRngCore::from_seed_and_iv(seed, iv)))
+    }
+
     /// Create a new RNG using a random seed from this one.
     #[inline]
     pub fn fork(&mut self) -> Self {
@@ -98,11 +103,16 @@ impl Default for SwankyRng {
 #[derive(Debug)]
 pub struct SwankyRngCore {
     aes: Aes128EncryptOnly,
-    // Overflowing a u64 would take well over 2^64 nanoseconds, which is over 500 years!
-    counter: u64,
+    counter: u128,
 }
 
 impl SwankyRngCore {
+    fn from_seed_and_iv(seed: U8x16, iv: u128) -> Self {
+        let mut rng = Self::from_seed(seed);
+        rng.counter = iv;
+        rng
+    }
+
     #[inline(always)]
     fn gen_rand_bits<const N: usize>(&mut self) -> [U8x16; N]
     where
@@ -111,9 +121,8 @@ impl SwankyRngCore {
         let blocks = <[U8x16; N]>::array_generate(
             #[inline(always)]
             |_| {
-                let x = self.counter;
                 self.counter += 1;
-                U8x16::from(U64x2::set_lo(x))
+                self.counter.into()
             },
         );
         self.aes.encrypt_many(blocks)
