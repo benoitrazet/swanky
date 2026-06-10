@@ -51,19 +51,12 @@ impl<F: FancyBinary, const N: usize> Circuit<F> for LinearOram<N> {
                 Some(one_bit.clone()),
             )
             .execute(backend, &(), channel)?;
-            let is_equal = BinaryEquality.execute(backend, &(query.to_owned(), index), channel)?;
-            let mux = BinaryMultiplex.execute(
-                backend,
-                &(is_equal, zero.clone(), item.clone()),
-                channel,
-            )?;
+            let is_equal = BinaryEquality::new().execute(backend, &(query, &index), channel)?;
+            let mux = BinaryMultiplex::new().execute(backend, &(is_equal, &zero, item), channel)?;
             // Every `mux` but one will be zero, so we can use `PairwiseXor`
             // instead of `BinaryAddition`.
-            let xor = PairwiseXor.execute(
-                backend,
-                &(result.wires().to_owned(), mux.wires().to_owned()),
-                channel,
-            )?;
+            let xor =
+                PairwiseXor::new().execute(backend, &(result.wires(), mux.wires()), channel)?;
             result = BinaryBundle::new(xor);
         }
         Ok(result)

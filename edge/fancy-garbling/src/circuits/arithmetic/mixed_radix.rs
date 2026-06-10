@@ -4,13 +4,25 @@ use crate::{
     circuits::arithmetic::addition::AddMany,
     util::{as_mixed_radix, inv, product},
 };
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
-struct MixedRadixAdditionMSBOnly;
+#[derive(Default)]
+struct MixedRadixAdditionMSBOnly<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyArithmetic + FancyProj> Circuit<F> for MixedRadixAdditionMSBOnly {
-    type Input = Vec<CrtBundle<F::Item>>;
+impl<'a> MixedRadixAdditionMSBOnly<'a> {
+    /// Create a new [`MixedRadixAdditionMSBOnly`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for MixedRadixAdditionMSBOnly<'a>
+where
+    F::Item: 'a,
+{
+    type Input = &'a [CrtBundle<F::Item>];
     type Output = F::Item;
 
     fn execute(
@@ -19,7 +31,7 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for MixedRadixAdditionMSBOnly {
         inputs: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let xs = inputs;
+        let xs = *inputs;
         assert!(!xs.is_empty(), "`inputs` cannot be empty");
         assert!(xs.iter().all(|x| x.moduli() == xs[0].moduli()));
 
@@ -46,7 +58,7 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for MixedRadixAdditionMSBOnly {
                 .map(|d| backend.mod_change(d, max_val + 1, channel))
                 .collect::<swanky_error::Result<Vec<_>>>()?;
             // add them up
-            let sum = AddMany.execute(backend, &modded_ds, channel)?;
+            let sum = AddMany::new().execute(backend, &modded_ds.as_slice(), channel)?;
             // add in the carry
             let sum_with_carry = opt_carry
                 .as_ref()
@@ -73,7 +85,7 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for MixedRadixAdditionMSBOnly {
             .iter()
             .map(|x| x.wires()[n - 1].clone())
             .collect::<Vec<_>>();
-        let digit_sum = AddMany.execute(backend, &ds, channel)?;
+        let digit_sum = AddMany::new().execute(backend, &ds.as_slice(), channel)?;
         Ok(opt_carry
             .as_ref()
             .map_or(digit_sum.clone(), |d| backend.add(&digit_sum, d)))
@@ -81,10 +93,21 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for MixedRadixAdditionMSBOnly {
 }
 
 /// Mixed radix addition.
-pub struct MixedRadixAddition;
+#[derive(Default)]
+pub struct MixedRadixAddition<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyArithmetic + FancyProj> Circuit<F> for MixedRadixAddition {
-    type Input = Vec<CrtBundle<F::Item>>;
+impl<'a> MixedRadixAddition<'a> {
+    /// Create a new [`MixedRadixAddition`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for MixedRadixAddition<'a>
+where
+    F::Item: 'a,
+{
+    type Input = &'a [CrtBundle<F::Item>];
     type Output = CrtBundle<F::Item>;
 
     fn execute(
@@ -93,7 +116,7 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for MixedRadixAddition {
         inputs: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let xs = inputs;
+        let xs = *inputs;
         assert!(!xs.is_empty(), "`xs` cannot be empty");
         assert!(xs.iter().all(|x| x.moduli() == xs[0].moduli()));
 
@@ -111,7 +134,7 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for MixedRadixAddition {
             let ds = xs.iter().map(|x| x.wires()[i].clone()).collect::<Vec<_>>();
 
             // compute the digit -- easy
-            let digit_sum = AddMany.execute(backend, &ds, channel)?;
+            let digit_sum = AddMany::new().execute(backend, &ds.as_slice(), channel)?;
             let digit = digit_carry.map_or(digit_sum.clone(), |d| backend.add(&digit_sum, &d));
 
             if i < n - 1 {
@@ -127,7 +150,7 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for MixedRadixAddition {
                     .map(|d| backend.mod_change(d, max_val + 1, channel))
                     .collect::<Result<Vec<_>>>()?;
 
-                let carry_sum = AddMany.execute(backend, &modded_ds, channel)?;
+                let carry_sum = AddMany::new().execute(backend, &modded_ds.as_slice(), channel)?;
                 // add in the carry from the previous iteration
                 let carry = carry_carry.map_or(carry_sum.clone(), |c| backend.add(&carry_sum, &c));
 
@@ -169,10 +192,21 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for MixedRadixAddition {
 
 /// For input [`CrtBundle`] `x` and vector of moduli `ms`, output the MSB of the
 /// fractional part of `x / M`, where `M = product(ms)`.
-pub struct FractionalMixedRadix;
+#[derive(Default)]
+pub struct FractionalMixedRadix<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyArithmetic + FancyProj> Circuit<F> for FractionalMixedRadix {
-    type Input = (CrtBundle<F::Item>, Vec<u16>);
+impl<'a> FractionalMixedRadix<'a> {
+    /// Create a new [`FractionalMixedRadix`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for FractionalMixedRadix<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a CrtBundle<F::Item>, &'a [u16]);
     type Output = F::Item;
 
     fn execute(
@@ -181,7 +215,7 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for FractionalMixedRadix {
         inputs: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let (bun, ms) = inputs;
+        let (bun, ms) = *inputs;
 
         let ndigits = ms.len();
 
@@ -213,7 +247,7 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for FractionalMixedRadix {
             ds.push(CrtBundle::new(new_ds));
         }
 
-        MixedRadixAdditionMSBOnly.execute(backend, &ds, channel)
+        MixedRadixAdditionMSBOnly::new().execute(backend, &ds.as_slice(), channel)
     }
 }
 
@@ -238,7 +272,7 @@ mod test {
         let inputs = (0..nargs)
             .map(|_| DummyVal::to_mixed_radix(q - 1, &moduli))
             .collect::<Vec<_>>();
-        let output = Dummy::eval(&MixedRadixAdditionMSBOnly, &inputs).unwrap();
+        let output = Dummy::eval(&MixedRadixAdditionMSBOnly::new(), &inputs.as_slice()).unwrap();
         assert_eq!(
             output.val(),
             *as_mixed_radix((q - 1) * (nargs as u128) % q, &moduli)
@@ -255,7 +289,8 @@ mod test {
                 expected = (expected + x) % q;
                 inputs.push(DummyVal::to_mixed_radix(x, &moduli));
             }
-            let output = Dummy::eval(&MixedRadixAdditionMSBOnly, &inputs).unwrap();
+            let output =
+                Dummy::eval(&MixedRadixAdditionMSBOnly::new(), &inputs.as_slice()).unwrap();
             assert_eq!(
                 output.val(),
                 *as_mixed_radix(expected, &moduli).last().unwrap()
@@ -274,7 +309,7 @@ mod test {
         let inputs = (0..nargs)
             .map(|_| DummyVal::to_mixed_radix(q - 1, &moduli))
             .collect::<Vec<_>>();
-        let output = Dummy::eval(&MixedRadixAddition, &inputs).unwrap();
+        let output = Dummy::eval(&MixedRadixAddition::new(), &inputs.as_slice()).unwrap();
         assert_eq!(
             DummyVal::from_mixed_radix(&output),
             (q - 1) * (nargs as u128) % q
@@ -289,7 +324,7 @@ mod test {
                 expected = (expected + x) % q;
                 inputs.push(DummyVal::to_mixed_radix(x, &moduli));
             }
-            let output = Dummy::eval(&MixedRadixAddition, &inputs).unwrap();
+            let output = Dummy::eval(&MixedRadixAddition::new(), &inputs.as_slice()).unwrap();
             assert_eq!(DummyVal::from_mixed_radix(&output), expected);
         }
     }

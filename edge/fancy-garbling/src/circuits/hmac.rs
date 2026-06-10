@@ -8,6 +8,7 @@ use crate::{
     circuit::Circuit,
     circuits::{binary::PairwiseXor, sha::Sha256},
 };
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -24,16 +25,13 @@ use swanky_error::Result;
 /// This implementation uses a 512-bit key (the SHA-256 block size) to avoid needing
 /// to hash long keys. For shorter keys, pad with zeros to 512 bits before passing
 /// to this circuit.
-pub struct HmacSha256 {
-    sha256: Sha256,
-}
+#[derive(Default)]
+pub struct HmacSha256<'a>(PhantomData<&'a ()>);
 
-impl HmacSha256 {
+impl<'a> HmacSha256<'a> {
     /// Create a new [`HmacSha256`] circuit.
     pub fn new() -> Self {
-        Self {
-            sha256: Sha256::new(),
-        }
+        Default::default()
     }
 
     /// Inner padding byte (0x36 = 00110110).
@@ -43,15 +41,12 @@ impl HmacSha256 {
     const OPAD_BYTE: &'static str = "01011100";
 }
 
-impl Default for HmacSha256 {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<F: FancyBinary> Circuit<F> for HmacSha256 {
+impl<'a, F: FancyBinary> Circuit<F> for HmacSha256<'a>
+where
+    F::Item: 'a,
+{
     /// A 512-bit key and a variable-length message.
-    type Input = ([F::Item; 512], Vec<F::Item>);
+    type Input = (&'a [F::Item; 512], &'a [F::Item]);
     /// A 256-bit HMAC tag.
     type Output = [F::Item; 256];
 
@@ -81,20 +76,21 @@ impl<F: FancyBinary> Circuit<F> for HmacSha256 {
             .collect();
 
         // Compute `key ⊕ ipad`.
-        let key_xor_ipad = PairwiseXor.execute(backend, &(key.to_vec(), ipad), channel)?;
+        let key_vec = key.to_vec();
+        let key_xor_ipad = PairwiseXor::new().execute(backend, &(&key_vec, &ipad), channel)?;
 
         // Compute `key ⊕ opad`.
-        let key_xor_opad = PairwiseXor.execute(backend, &(key.to_vec(), opad), channel)?;
+        let key_xor_opad = PairwiseXor::new().execute(backend, &(&key_vec, &opad), channel)?;
 
         // Inner hash: `H((key ⊕ ipad) || message)`.
         let mut inner_input = key_xor_ipad;
         inner_input.extend_from_slice(message);
-        let inner_hash = self.sha256.execute(backend, &inner_input, channel)?;
+        let inner_hash = Sha256::new().execute(backend, &inner_input, channel)?;
 
         // Outer hash: `H((key ⊕ opad) || inner_hash)`.
         let mut outer_input = key_xor_opad;
         outer_input.extend_from_slice(&inner_hash);
-        let hmac = self.sha256.execute(backend, &outer_input, channel)?;
+        let hmac = Sha256::new().execute(backend, &outer_input, channel)?;
 
         Ok(hmac)
     }
@@ -123,9 +119,9 @@ mod tests {
 
         let hmac = HmacSha256::new();
         let key = [DummyVal::new_bool(false); 512];
-        let message = vec![];
+        let message = [];
 
-        let output = Dummy::eval(&hmac, &(key, message)).unwrap();
+        let output = Dummy::eval(&hmac, &(&key, &message)).unwrap();
 
         // Computed using: echo -n "" | openssl dgst -sha256 -mac hmac -macopt hexkey:$(python3 -c "print('00'*64)")
         // Result: b613679a0814d9ec772f95d778c35fc5ff1697c493715653c6c712144292c5ad
@@ -154,7 +150,7 @@ mod tests {
         // 't' = 0x74 = 01110100
         let message = string_to_bool_vec("01110100011001010111001101110100");
 
-        let output = Dummy::eval(&hmac, &(key, message)).unwrap();
+        let output = Dummy::eval(&hmac, &(&key, &message[..])).unwrap();
 
         // Computed using: echo -n "test" | openssl dgst -sha256 -mac hmac -macopt hexkey:$(python3 -c "print('00'*64)")
         // Result: 43b0cef99265f9e34c10ea9d3501926d27b39f57c6d674561d8ba236e7a819fb
@@ -194,7 +190,7 @@ mod tests {
             })
             .collect();
 
-        let output = Dummy::eval(&hmac, &(key, message)).unwrap();
+        let output = Dummy::eval(&hmac, &(&key, &message[..])).unwrap();
 
         // Computed using: echo -n "The quick brown fox jumps over the lazy dog" | openssl dgst -sha256 -mac hmac -macopt key:key
         // Result: f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8

@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::{
     BinaryBundle, FancyBinary,
     circuit::Circuit,
@@ -9,10 +11,25 @@ use swanky_error::Result;
 
 /// For bit `b` and [`BinaryBundle`]s `x` and `y`, output `x` if `b == 0`, and
 /// `y` otherwise.
-pub struct BinaryMultiplex;
+#[derive(Default)]
+pub struct BinaryMultiplex<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for BinaryMultiplex {
-    type Input = (F::Item, BinaryBundle<F::Item>, BinaryBundle<F::Item>);
+impl<'a> BinaryMultiplex<'a> {
+    /// Create a new [`BinaryMultiplex`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for BinaryMultiplex<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (
+        F::Item,
+        &'a BinaryBundle<F::Item>,
+        &'a BinaryBundle<F::Item>,
+    );
     type Output = BinaryBundle<F::Item>;
 
     fn execute(
@@ -25,7 +42,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryMultiplex {
         xs.wires()
             .iter()
             .zip(ys.wires().iter())
-            .map(|(x, y)| Mux.execute(backend, &(b.clone(), x.clone(), y.clone()), channel))
+            .map(|(x, y)| Mux::new().execute(backend, &(&b.clone(), x, y), channel))
             .collect::<Result<Vec<_>>>()
             .map(BinaryBundle::new)
     }
@@ -58,7 +75,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryMultiplexConstantBits {
         c1_bs
             .into_iter()
             .zip(c2_bs)
-            .map(|(b1, b2)| MuxConstants.execute(backend, &(b.clone(), b1, b2), channel))
+            .map(|(b1, b2)| MuxConstants::new().execute(backend, &(&b.clone(), b1, b2), channel))
             .collect::<Result<_>>()
             .map(BinaryBundle::new)
     }
@@ -84,8 +101,8 @@ mod test {
 
         for b in 0..=1 {
             let output = Dummy::eval(
-                &BinaryMultiplex,
-                &(DummyVal::new(b, 2), x_inputs.clone(), y_inputs.clone()),
+                &BinaryMultiplex::new(),
+                &(DummyVal::new(b, 2), &x_inputs, &y_inputs),
             )
             .unwrap();
             assert_eq!(DummyVal::from_binary(&output), if b == 0 { x } else { y });

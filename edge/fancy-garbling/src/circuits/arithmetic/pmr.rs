@@ -2,14 +2,26 @@ use crate::{
     CrtBundle, FancyArithmetic, FancyBinary, FancyProj, HasModulus, circuit::Circuit,
     circuits::arithmetic::Subtraction, util::inv,
 };
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// Convert a [`CrtBundle`] `x` to PMR representation.
-pub struct ToPmr;
+#[derive(Default)]
+pub struct ToPmr<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyArithmetic + FancyProj> Circuit<F> for ToPmr {
-    type Input = CrtBundle<F::Item>;
+impl<'a> ToPmr<'a> {
+    /// Create a new [`ToPmr`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for ToPmr<'a>
+where
+    F::Item: 'a,
+{
+    type Input = &'a CrtBundle<F::Item>;
     type Output = CrtBundle<F::Item>;
 
     fn execute(
@@ -18,7 +30,7 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for ToPmr {
         inputs: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let xs = inputs;
+        let xs = *inputs;
         let gadget_projection_tt = |p: u16, q: u16| -> Vec<u16> {
             let pq = p as u32 + q as u32 - 1;
             let mut tab = Vec::with_capacity(pq as usize);
@@ -82,10 +94,21 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for ToPmr {
 /// necessary to represent the values. This ensures that if `x < y`, the most
 /// significant PMR digit is nonzero after subtracting them. You could add a
 /// prime to your [`CrtBundle`]s right before using this gadget.
-pub struct PmrLessThan;
+#[derive(Default)]
+pub struct PmrLessThan<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyArithmetic + FancyProj> Circuit<F> for PmrLessThan {
-    type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
+impl<'a> PmrLessThan<'a> {
+    /// Create a new [`PmrLessThan`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for PmrLessThan<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a CrtBundle<F::Item>, &'a CrtBundle<F::Item>);
     type Output = F::Item;
 
     fn execute(
@@ -94,8 +117,8 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for PmrLessThan {
         inputs: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let z = Subtraction.execute(backend, inputs, channel)?;
-        let mut pmr = ToPmr.execute(backend, &z, channel)?;
+        let z = Subtraction::new().execute(backend, inputs, channel)?;
+        let mut pmr = ToPmr::new().execute(backend, &&z, channel)?;
         let w = pmr.pop().unwrap();
         let mut tab = vec![1; w.modulus() as usize];
         tab[0] = 0;
@@ -109,10 +132,21 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for PmrLessThan {
 /// necessary to represent the values. This ensures that if `x >= y`, the most
 /// significant PMR digit is nonzero after subtracting them. You could add a
 /// prime to your [`CrtBundle`]s right before using this gadget.
-pub struct PmrGreaterThanOrEqual;
+#[derive(Default)]
+pub struct PmrGreaterThanOrEqual<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary + FancyArithmetic + FancyProj> Circuit<F> for PmrGreaterThanOrEqual {
-    type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
+impl<'a> PmrGreaterThanOrEqual<'a> {
+    /// Create a new [`PmrGreaterThanOrEqual`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary + FancyArithmetic + FancyProj> Circuit<F> for PmrGreaterThanOrEqual<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a CrtBundle<F::Item>, &'a CrtBundle<F::Item>);
     type Output = F::Item;
 
     fn execute(
@@ -121,7 +155,7 @@ impl<F: FancyBinary + FancyArithmetic + FancyProj> Circuit<F> for PmrGreaterThan
         inputs: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let z = PmrLessThan.execute(backend, inputs, channel)?;
+        let z = PmrLessThan::new().execute(backend, inputs, channel)?;
         Ok(backend.negate(&z))
     }
 }
@@ -161,7 +195,7 @@ mod test {
             let expected = to_pmr_pt(x, &ps);
 
             let x_input = DummyVal::to_crt(x, q);
-            let z = Dummy::eval(&ToPmr, &x_input).unwrap();
+            let z = Dummy::eval(&ToPmr::new(), &&x_input).unwrap();
             let output = z.wires().iter().map(|w| w.val()).collect::<Vec<_>>();
             assert_eq!(output, expected);
         }
@@ -180,7 +214,7 @@ mod test {
 
             let x_input = DummyVal::to_crt(x, q);
             let y_input = DummyVal::to_crt(y, q);
-            let output = Dummy::eval(&PmrLessThan, &(x_input, y_input)).unwrap();
+            let output = Dummy::eval(&PmrLessThan::new(), &(&x_input, &y_input)).unwrap();
             assert_eq!(output.val(), (x < y) as u16);
         }
     }
@@ -198,7 +232,7 @@ mod test {
 
             let x_input = DummyVal::to_crt(x, q);
             let y_input = DummyVal::to_crt(y, q);
-            let output = Dummy::eval(&PmrGreaterThanOrEqual, &(x_input, y_input)).unwrap();
+            let output = Dummy::eval(&PmrGreaterThanOrEqual::new(), &(&x_input, &y_input)).unwrap();
             assert_eq!(output.val(), (x >= y) as u16);
         }
     }

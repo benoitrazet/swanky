@@ -193,7 +193,7 @@ impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> FancyNeuralN
         y: &Self::Item,
         channel: &mut Channel,
     ) -> Result<Self::Item> {
-        Addition.execute(self.backend, &(x.clone(), y.clone()), channel)
+        Addition::new().execute(self.backend, &(x, y), channel)
     }
 
     fn nn_cmul(
@@ -202,9 +202,9 @@ impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> FancyNeuralN
         constant: i64,
         channel: &mut Channel,
     ) -> Result<Self::Item> {
-        ConstantMultiplication.execute(
+        ConstantMultiplication::new().execute(
             self.backend,
-            &(x.clone(), to_mod_q(constant, self.input_modulus)),
+            &(x, to_mod_q(constant, self.input_modulus)),
             channel,
         )
     }
@@ -244,11 +244,7 @@ impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> FancyNeuralN
     }
 
     fn nn_max(&mut self, xs: &[Self::Item], channel: &mut Channel) -> Result<Self::Item> {
-        Max.execute(
-            self.backend,
-            &(xs.to_vec(), self.accuracy.max.clone()),
-            channel,
-        )
+        Max::new().execute(self.backend, &(xs, &self.accuracy.max), channel)
     }
 
     fn nn_activation(
@@ -259,16 +255,12 @@ impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> FancyNeuralN
     ) -> Result<Self::Item> {
         let ps = factor(self.output_modulus);
         match f {
-            ActivationFunction::Sign => Sgn.execute(
-                self.backend,
-                &(x.clone(), self.accuracy.sign.to_string(), Some(ps)),
-                channel,
-            ),
-            ActivationFunction::Relu => ReLU.execute(
-                self.backend,
-                &(x.clone(), self.accuracy.relu.to_string(), Some(ps)),
-                channel,
-            ),
+            ActivationFunction::Sign => {
+                Sgn::new().execute(self.backend, &(x, &self.accuracy.sign, Some(&ps)), channel)
+            }
+            ActivationFunction::Relu => {
+                ReLU::new().execute(self.backend, &(x, &self.accuracy.relu, Some(&ps)), channel)
+            }
             ActivationFunction::Identity => Ok(x.clone()),
         }
     }

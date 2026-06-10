@@ -1,4 +1,5 @@
 use crate::{BinaryBundle, FancyBinary, circuit::Circuit};
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -6,10 +7,21 @@ use swanky_error::Result;
 ///
 /// # Panics
 /// Panics if the length of `x` is greater than eight.
-pub struct BinaryToUnary;
+#[derive(Default)]
+pub struct BinaryToUnary<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for BinaryToUnary {
-    type Input = BinaryBundle<F::Item>;
+impl<'a> BinaryToUnary<'a> {
+    /// Create a new [`BinaryToUnary`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for BinaryToUnary<'a>
+where
+    F::Item: 'a,
+{
+    type Input = &'a BinaryBundle<F::Item>;
     type Output = Vec<F::Item>;
 
     fn execute(
@@ -61,7 +73,7 @@ mod test {
         for _ in 0..16 {
             let x = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
-            let output = Dummy::eval(&BinaryToUnary, &x_input).unwrap();
+            let output = Dummy::eval(&BinaryToUnary::new(), &&x_input).unwrap();
             for (i, y) in output.into_iter().enumerate() {
                 if i as u128 == x {
                     assert_eq!(y.val(), 1);

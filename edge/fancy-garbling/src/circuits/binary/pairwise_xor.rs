@@ -1,12 +1,24 @@
 use crate::{FancyBinary, circuit::Circuit};
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// Pairwise XOR of two bitvectors.
-pub struct PairwiseXor;
+#[derive(Default)]
+pub struct PairwiseXor<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for PairwiseXor {
-    type Input = (Vec<F::Item>, Vec<F::Item>);
+impl<'a> PairwiseXor<'a> {
+    /// Create a new [`PairwiseXor`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for PairwiseXor<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a Vec<F::Item>, &'a Vec<F::Item>);
     type Output = Vec<F::Item>;
 
     fn execute(
@@ -15,10 +27,10 @@ impl<F: FancyBinary> Circuit<F> for PairwiseXor {
         inputs: &Self::Input,
         _: &mut Channel,
     ) -> Result<Self::Output> {
-        Ok(inputs
-            .0
+        let (x, y) = *inputs;
+        Ok(x
             .iter()
-            .zip(inputs.1.iter())
+            .zip(y.iter())
             .map(|(x, y)| backend.xor(x, y))
             .collect())
     }
@@ -47,7 +59,7 @@ pub mod test {
                 .zip(y.iter())
                 .map(|(x, y)| DummyVal::new(x.val() ^ y.val(), 2))
                 .collect::<Vec<_>>();
-            let output = Dummy::eval(&PairwiseXor, &(x, y)).unwrap();
+            let output = Dummy::eval(&PairwiseXor::new(), &(&x, &y)).unwrap();
             assert_eq!(output, expected);
         }
     }

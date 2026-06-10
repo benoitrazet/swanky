@@ -1,4 +1,5 @@
 use crate::{CrtBundle, FancyArithmetic, circuit::Circuit};
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -6,10 +7,21 @@ use swanky_error::Result;
 /// output `x`.
 ///
 /// This is equivalent to computing `b * x` for each wire in the bundle.
-pub struct Mask;
+#[derive(Default)]
+pub struct Mask<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyArithmetic> Circuit<F> for Mask {
-    type Input = (F::Item, CrtBundle<F::Item>);
+impl<'a> Mask<'a> {
+    /// Create a new [`Mask`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyArithmetic> Circuit<F> for Mask<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a F::Item, &'a CrtBundle<F::Item>);
     type Output = CrtBundle<F::Item>;
 
     fn execute(
@@ -49,7 +61,8 @@ mod test {
             let b_input = DummyVal::new(b as u16, 2);
             let x_input = DummyVal::to_crt(x, q);
 
-            let z = Dummy::eval(&Mask, &(b_input, x_input)).unwrap();
+            let circuit = Mask::new();
+            let z = Dummy::eval(&circuit, &(&b_input, &x_input)).unwrap();
             let output = DummyVal::from_crt(&z, q);
 
             assert_eq!(output, (b as u128) * x);

@@ -1,12 +1,24 @@
 use crate::{CrtBundle, FancyArithmetic, circuit::Circuit};
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// Given [`CrtBundle`]s `x` and `y`, output `x - y`.
-pub struct Subtraction;
+#[derive(Default)]
+pub struct Subtraction<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyArithmetic> Circuit<F> for Subtraction {
-    type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
+impl<'a> Subtraction<'a> {
+    /// Create a new [`Subtraction`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyArithmetic> Circuit<F> for Subtraction<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a CrtBundle<F::Item>, &'a CrtBundle<F::Item>);
     type Output = CrtBundle<F::Item>;
 
     fn execute(
@@ -46,7 +58,8 @@ mod test {
             let y = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_crt(x, q);
             let y_input = DummyVal::to_crt(y, q);
-            let z = Dummy::eval(&Subtraction, &(x_input, y_input)).unwrap();
+            let circuit = Subtraction::new();
+            let z = Dummy::eval(&circuit, &(&x_input, &y_input)).unwrap();
             let output = DummyVal::from_crt(&z, q);
             assert_eq!(output, (x + q - y) % q);
         }

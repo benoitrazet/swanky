@@ -3,14 +3,26 @@ use crate::{
     circuit::Circuit,
     circuits::binary::{BinaryAdditionNoCarry, BinaryConstant},
 };
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// Binary two's complement.
-pub struct BinaryTwosComplement;
+#[derive(Default)]
+pub struct BinaryTwosComplement<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for BinaryTwosComplement {
-    type Input = BinaryBundle<F::Item>;
+impl<'a> BinaryTwosComplement<'a> {
+    /// Create a new [`BinaryTwosComplement`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for BinaryTwosComplement<'a>
+where
+    F::Item: 'a,
+{
+    type Input = &'a BinaryBundle<F::Item>;
     type Output = BinaryBundle<F::Item>;
 
     fn execute(
@@ -19,6 +31,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryTwosComplement {
         input: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
+        let input = *input;
         let not_xs = BinaryBundle::new(
             input
                 .wires()
@@ -27,7 +40,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryTwosComplement {
                 .collect::<Vec<_>>(),
         );
         let one = BinaryConstant::new(1, input.size()).execute(backend, &(), channel)?;
-        BinaryAdditionNoCarry.execute(backend, &(not_xs, one), channel)
+        BinaryAdditionNoCarry::new().execute(backend, &(&not_xs, &one), channel)
     }
 }
 
@@ -39,8 +52,8 @@ pub mod test {
     /// Circuit for testing [`BinaryTwosComplement`].
     pub struct TestBinaryTwosComplement(pub usize);
     impl<F: FancyBinary> Circuit<F> for TestBinaryTwosComplement {
-        type Input = <BinaryTwosComplement as Circuit<F>>::Input;
-        type Output = <BinaryTwosComplement as Circuit<F>>::Output;
+        type Input = BinaryBundle<F::Item>;
+        type Output = BinaryBundle<F::Item>;
 
         fn execute(
             &self,
@@ -48,7 +61,7 @@ pub mod test {
             inputs: &Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            BinaryTwosComplement.execute(backend, inputs, channel)
+            BinaryTwosComplement::new().execute(backend, &inputs, channel)
         }
     }
 

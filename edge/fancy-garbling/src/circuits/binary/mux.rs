@@ -1,12 +1,24 @@
 use crate::{FancyBinary, circuit::Circuit};
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// For input `(b, x, y)` return `x` if `b == 0`, otherwise return `y`.
-pub struct Mux;
+#[derive(Default)]
+pub struct Mux<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for Mux {
-    type Input = (F::Item, F::Item, F::Item);
+impl<'a> Mux<'a> {
+    /// Create a new [`Mux`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for Mux<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a F::Item, &'a F::Item, &'a F::Item);
     type Output = F::Item;
 
     fn execute(
@@ -24,10 +36,21 @@ impl<F: FancyBinary> Circuit<F> for Mux {
 }
 
 /// For input `(b, c1, c2)`, return `c1` if `b == 0`, otherwise return `c2`.
-pub struct MuxConstants;
+#[derive(Default)]
+pub struct MuxConstants<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for MuxConstants {
-    type Input = (F::Item, bool, bool);
+impl<'a> MuxConstants<'a> {
+    /// Create a new [MuxConstants] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for MuxConstants<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a F::Item, bool, bool);
     type Output = F::Item;
 
     fn execute(
@@ -38,8 +61,8 @@ impl<F: FancyBinary> Circuit<F> for MuxConstants {
     ) -> Result<Self::Output> {
         let (b, c1, c2) = inputs;
         match (c1, c2) {
-            (false, true) => Ok(b.clone()),
-            (true, false) => Ok(backend.negate(b)),
+            (false, true) => Ok((*b).clone()),
+            (true, false) => Ok(backend.negate(*b)),
             (false, false) => backend.constant(0, 2, channel),
             (true, true) => backend.constant(1, 2, channel),
         }
@@ -59,15 +82,10 @@ mod test {
         for b in 0..=1 {
             for x in 0..=1 {
                 for y in 0..=1 {
-                    let output = Dummy::eval(
-                        &Mux,
-                        &(
-                            DummyVal::new(b, 2),
-                            DummyVal::new(x, 2),
-                            DummyVal::new(y, 2),
-                        ),
-                    )
-                    .unwrap();
+                    let b_val = DummyVal::new(b, 2);
+                    let x_val = DummyVal::new(x, 2);
+                    let y_val = DummyVal::new(y, 2);
+                    let output = Dummy::eval(&Mux::new(), &(&b_val, &x_val, &y_val)).unwrap();
                     assert_eq!(output.val(), if b == 0 { x } else { y });
                 }
             }
@@ -79,8 +97,9 @@ mod test {
         for b in 0..=1 {
             for x in 0..=1 {
                 for y in 0..=1 {
+                    let b_val = DummyVal::new(b, 2);
                     let output =
-                        Dummy::eval(&MuxConstants, &(DummyVal::new(b, 2), x != 0, y != 0)).unwrap();
+                        Dummy::eval(&MuxConstants::new(), &(&b_val, x != 0, y != 0)).unwrap();
                     assert_eq!(output.val(), if b == 0 { x } else { y });
                 }
             }

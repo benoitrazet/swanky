@@ -346,7 +346,7 @@ pub mod test_circuits {
                 inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                AndMany.execute(backend, inputs, channel)
+                AndMany::new().execute(backend, &inputs.as_slice(), channel)
             }
         }
 
@@ -377,7 +377,7 @@ pub mod test_circuits {
                 inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                OrMany.execute(backend, inputs, channel)
+                OrMany::new().execute(backend, &inputs.as_slice(), channel)
             }
         }
         impl<F: FancyBinary> CircuitInputMapper<F> for TestOrGateFanN {
@@ -407,7 +407,7 @@ pub mod test_circuits {
                 inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                XorMany.execute(backend, inputs, channel)
+                XorMany::new().execute(backend, &inputs.as_slice(), channel)
             }
         }
         impl<F: FancyBinary> CircuitInputMapper<F> for TestXorGateFanN {
@@ -479,7 +479,7 @@ pub mod test_circuits {
                 inputs: &Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                AddMany.execute(backend, inputs, channel)
+                AddMany::new().execute(backend, &inputs.as_slice(), channel)
             }
         }
         impl<F: FancyArithmetic> CircuitInputMapper<F> for TestAddMany {
@@ -770,7 +770,7 @@ pub mod test_circuits {
                     .iter()
                     .map(|x| backend.mod_change(x, self.0 as u16 + 1, channel))
                     .collect::<Result<Vec<_>>>()?;
-                AddMany.execute(backend, &wires, channel)
+                AddMany::new().execute(backend, &wires.as_slice(), channel)
             }
         }
         impl<F: FancyProj + FancyArithmetic> CircuitInputMapper<F> for TestAddManyModChange {
