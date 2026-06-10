@@ -1,9 +1,9 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     Evaluator, FancyArithmetic, FancyBinary, FancyProj, Garbler, WireMod2, WireModQ,
-    circuit::{Circuit, CircuitInputMapper},
     classic::GarbledCircuit,
     util::RngExt,
+    {Circuit, CircuitInputMapper},
 };
 use std::{hint::black_box, time::Duration};
 use swanky_channel::Channel;

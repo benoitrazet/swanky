@@ -2,7 +2,7 @@ use crate::preprocesser::WirePreProcessor;
 use crate::preprocesser::f_preprocessing;
 use crate::ps::PartyGarbler;
 use crate::wire::AuthenticatedWireMod2;
-use fancy_garbling::circuit::CircuitInputMapper;
+use fancy_garbling::CircuitInputMapper;
 use fancy_garbling::circuit_analyzer::CircuitAnalyzer;
 use fancy_garbling::{Fancy, FancyBinary, WireLabel, WireMod2};
 

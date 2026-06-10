@@ -1,6 +1,3 @@
-//! DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,
-//! where you create a circuit for a computation then garble it.
-
 use crate::{BinaryBundle, Bundle, CrtBundle, HasModulus, fancy::Fancy};
 use itertools::Itertools;
 use swanky_channel::Channel;

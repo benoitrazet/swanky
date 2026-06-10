@@ -4,25 +4,23 @@ use crate::garbler::Garbler;
 use crate::ps::{PartyEvaluator, PartyGarbler};
 use crate::{evaluator::Evaluator, preprocesser::WirePreProcessor};
 
-use fancy_garbling::circuit::Flatten;
+use fancy_garbling::Flatten;
 use fancy_garbling::circuits::binary::{
     TestBinaryAddition, TestBinaryConstant, TestBinaryMultiplication, TestBinarySubtraction,
     TestBinaryTwosComplement,
 };
 use fancy_garbling::dummy::DummyVal;
-use fancy_garbling::{
-    Fancy,
-    circuit::{CircuitInputMapper, circuits},
-    circuit_analyzer::CircuitAnalyzer,
-    dummy::Dummy,
+use fancy_garbling::test_circuits::binary::{
+    TestAndGate, TestAndGateFanN, TestNegateGate, TestOrGateFanN, TestXorGateFanN,
 };
+use fancy_garbling::{CircuitInputMapper, Fancy, circuit_analyzer::CircuitAnalyzer, dummy::Dummy};
 use rand::Rng;
 use swanky_rng::SwankyRng;
 
 #[test]
 fn test_party_construction_passes() {
     let input_size = 400;
-    let circuit = circuits::binary::TestAndGateFanN(input_size);
+    let circuit = TestAndGateFanN(input_size);
     swanky_channel::local::local_channel_pair(
         |c| {
             let rng = SwankyRng::new();
@@ -124,7 +122,7 @@ fn test_constant_bundle() {
 fn test_and_gate() {
     let ninputs_gb = 1;
     let ninputs_ev = 1;
-    let circuit = circuits::binary::TestAndGate;
+    let circuit = TestAndGate;
 
     test_circuit(ninputs_gb, ninputs_ev, &circuit);
 }
@@ -133,7 +131,7 @@ fn test_and_gate() {
 fn test_negate_gate_garbler() {
     let ninputs_gb = 1;
     let ninputs_ev = 0;
-    let circuit = circuits::binary::TestNegateGate;
+    let circuit = TestNegateGate;
 
     test_circuit(ninputs_gb, ninputs_ev, &circuit);
 }
@@ -142,14 +140,14 @@ fn test_negate_gate_garbler() {
 fn test_negate_gate_evaluator() {
     let ninputs_gb = 0;
     let ninputs_ev = 1;
-    let circuit = circuits::binary::TestNegateGate;
+    let circuit = TestNegateGate;
 
     test_circuit(ninputs_gb, ninputs_ev, &circuit);
 }
 
 #[test]
 fn test_constant_gates() {
-    let circuit = circuits::fancy::TestBinaryConstant;
+    let circuit = TestBinaryConstant;
 
     test_circuit(0, 0, &circuit);
 }
@@ -158,7 +156,7 @@ fn test_constant_gates() {
 fn test_and_gate_fan_n() {
     let ninputs_gb = 400;
     let ninputs_ev = 400;
-    let circuit = circuits::binary::TestAndGateFanN(ninputs_gb + ninputs_ev);
+    let circuit = TestAndGateFanN(ninputs_gb + ninputs_ev);
 
     test_circuit(ninputs_gb, ninputs_ev, &circuit);
 }
@@ -167,7 +165,7 @@ fn test_and_gate_fan_n() {
 fn test_or_gate_fan_n() {
     let ninputs_gb = 400;
     let ninputs_ev = 400;
-    let circuit = circuits::binary::TestOrGateFanN(ninputs_gb + ninputs_ev);
+    let circuit = TestOrGateFanN(ninputs_gb + ninputs_ev);
 
     test_circuit(ninputs_gb, ninputs_ev, &circuit);
 }
@@ -176,7 +174,7 @@ fn test_or_gate_fan_n() {
 fn test_xor_gate_fan_n() {
     let ninputs_gb = 400;
     let ninputs_ev = 400;
-    let circuit = circuits::binary::TestXorGateFanN(ninputs_gb + ninputs_ev);
+    let circuit = TestXorGateFanN(ninputs_gb + ninputs_ev);
 
     test_circuit(ninputs_gb, ninputs_ev, &circuit);
 }

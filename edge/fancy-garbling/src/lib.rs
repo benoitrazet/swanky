@@ -3,7 +3,9 @@
 #![deny(missing_docs)]
 // TODO: when https://git.io/JYTnW gets stabilized add the readme as module docs.
 
-pub mod circuit;
+mod circuit;
+pub use circuit::circuits as test_circuits;
+pub use circuit::{Circuit, CircuitInputMapper, Flatten};
 pub mod circuit_analyzer;
 pub mod circuits;
 pub mod classic;

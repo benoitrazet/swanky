@@ -4,8 +4,7 @@ use crate::{
     wire::AuthenticatedWireMod2,
 };
 use fancy_garbling::{
-    Fancy, FancyBinary, WireLabel, WireMod2, circuit::CircuitInputMapper,
-    circuit_analyzer::CircuitAnalyzer,
+    CircuitInputMapper, Fancy, FancyBinary, WireLabel, WireMod2, circuit_analyzer::CircuitAnalyzer,
 };
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::{
