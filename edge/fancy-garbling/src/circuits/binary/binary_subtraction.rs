@@ -3,6 +3,7 @@ use crate::{
     circuit::Circuit,
     circuits::binary::{BinaryAddition, BinaryTwosComplement},
 };
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -10,10 +11,21 @@ use swanky_error::Result;
 ///
 /// For [`BinaryBundle`]s `x` and `y`, return `(x - y, underflow)`, where
 /// `underflow` indicates `y != 0 && x >= y`.
-pub struct BinarySubtraction;
+#[derive(Default)]
+pub struct BinarySubtraction<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for BinarySubtraction {
-    type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
+impl<'a> BinarySubtraction<'a> {
+    /// Create a new [`BinarySubtraction`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for BinarySubtraction<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
     type Output = (BinaryBundle<F::Item>, F::Item);
 
     fn execute(
@@ -22,10 +34,10 @@ impl<F: FancyBinary> Circuit<F> for BinarySubtraction {
         inputs: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        assert_eq!(inputs.0.moduli(), inputs.1.moduli());
         let (x, y) = inputs;
-        let neg_y = BinaryTwosComplement.execute(backend, y, channel)?;
-        BinaryAddition.execute(backend, &(x.clone(), neg_y), channel)
+        assert_eq!(x.moduli(), y.moduli());
+        let neg_y = BinaryTwosComplement::new().execute(backend, y, channel)?;
+        BinaryAddition::new().execute(backend, &(x, &neg_y), channel)
     }
 }
 
@@ -36,8 +48,8 @@ pub mod test {
     /// Circuit for testing [`BinarySubtraction`].
     pub struct TestBinarySubtraction(pub usize);
     impl<F: FancyBinary> Circuit<F> for TestBinarySubtraction {
-        type Input = <BinarySubtraction as Circuit<F>>::Input;
-        type Output = <BinarySubtraction as Circuit<F>>::Output;
+        type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
+        type Output = (BinaryBundle<F::Item>, F::Item);
 
         fn execute(
             &self,
@@ -45,7 +57,7 @@ pub mod test {
             inputs: &Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            BinarySubtraction.execute(backend, inputs, channel)
+            BinarySubtraction::new().execute(backend, &(&inputs.0, &inputs.1), channel)
         }
     }
 

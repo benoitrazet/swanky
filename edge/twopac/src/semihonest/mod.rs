@@ -83,9 +83,9 @@ mod tests {
         for x in xs.iter() {
             let q = x.composite_modulus();
             let c = b.crt_constant_bundle(1, q, channel).unwrap();
-            let y = Multiplication.execute(b, &(x.clone(), c), channel).unwrap();
-            let z = ReLU
-                .execute(b, &(y, "100%".to_string(), None), channel)
+            let y = Multiplication::new().execute(b, &(x, &c), channel).unwrap();
+            let z = ReLU::new()
+                .execute(b, &(&y, "100%", None), channel)
                 .unwrap();
             outputs.push(b.crt_output(&z, channel).unwrap());
         }

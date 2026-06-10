@@ -1,4 +1,5 @@
 use crate::{CrtBundle, FancyProj, HasModulus, circuit::Circuit};
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -6,10 +7,21 @@ use swanky_error::Result;
 ///
 /// This uses projection gates to compute the exponentiation for each modulus in
 /// the CRT bundle.
-pub struct ConstantExponentiation;
+#[derive(Default)]
+pub struct ConstantExponentiation<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyProj> Circuit<F> for ConstantExponentiation {
-    type Input = (CrtBundle<F::Item>, u32);
+impl<'a> ConstantExponentiation<'a> {
+    /// Create a new [`ConstantExponentiation`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyProj> Circuit<F> for ConstantExponentiation<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a CrtBundle<F::Item>, u32);
     type Output = CrtBundle<F::Item>;
 
     fn execute(
@@ -18,13 +30,13 @@ impl<F: FancyProj> Circuit<F> for ConstantExponentiation {
         inputs: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let (x, c) = inputs;
+        let (x, c) = *inputs;
         x.wires()
             .iter()
             .map(|x| {
                 let p = x.modulus();
                 let tab = (0..p)
-                    .map(|x| ((x as u64).pow(*c) % p as u64) as u16)
+                    .map(|x| ((x as u64).pow(c) % p as u64) as u16)
                     .collect::<Vec<_>>();
                 backend.proj(x, p, Some(tab), channel)
             })
@@ -51,7 +63,8 @@ mod test {
             let x = rng.r#gen::<u16>() as u128 % q;
             let c = rng.gen_range(2..10);
             let x_input = DummyVal::to_crt(x, q);
-            let z = Dummy::eval(&ConstantExponentiation, &(x_input, c)).unwrap();
+            let circuit = ConstantExponentiation::new();
+            let z = Dummy::eval(&circuit, &(&x_input, c)).unwrap();
             let output = DummyVal::from_crt(&z, q);
 
             // Compute x^c mod q using modular arithmetic to avoid overflow

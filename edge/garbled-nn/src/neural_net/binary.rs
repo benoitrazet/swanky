@@ -177,7 +177,7 @@ impl<'a, F: Fancy + FancyBinary> FancyNeuralNet for BinaryLayer<'a, F> {
         y: &BinaryBundle<F::Item>,
         channel: &mut Channel,
     ) -> Result<BinaryBundle<F::Item>> {
-        BinaryAdditionNoCarry.execute(self.backend, &(x.clone(), y.clone()), channel)
+        BinaryAdditionNoCarry::new().execute(self.backend, &(x, y), channel)
     }
 
     fn nn_cmul(
@@ -186,9 +186,9 @@ impl<'a, F: Fancy + FancyBinary> FancyNeuralNet for BinaryLayer<'a, F> {
         constant: i64,
         channel: &mut Channel,
     ) -> Result<BinaryBundle<F::Item>> {
-        BinaryConstantMultiplication.execute(
+        BinaryConstantMultiplication::new().execute(
             self.backend,
-            &(x.clone(), constant as u128, self.nbits),
+            &(x, constant as u128, self.nbits),
             channel,
         )
     }
@@ -207,7 +207,7 @@ impl<'a, F: Fancy + FancyBinary> FancyNeuralNet for BinaryLayer<'a, F> {
         } else {
             self.backend.bin_receive(self.nbits, channel)?
         };
-        BinaryMultiplicationLowerHalf.execute(self.backend, &(x.clone(), w), channel)
+        BinaryMultiplicationLowerHalf::new().execute(self.backend, &(x, &w), channel)
     }
 
     fn nn_max(
@@ -215,7 +215,7 @@ impl<'a, F: Fancy + FancyBinary> FancyNeuralNet for BinaryLayer<'a, F> {
         xs: &[BinaryBundle<F::Item>],
         channel: &mut Channel,
     ) -> Result<BinaryBundle<F::Item>> {
-        BinaryMax.execute(self.backend, &xs.to_vec(), channel)
+        BinaryMax::new().execute(self.backend, &xs, channel)
     }
 
     fn nn_activation(
@@ -239,7 +239,7 @@ impl<'a, F: Fancy + FancyBinary> FancyNeuralNet for BinaryLayer<'a, F> {
                 let sign = x.wires().last().unwrap();
                 let zeros =
                     BinaryConstant::new(0, self.nbits).execute(self.backend, &(), channel)?;
-                BinaryMultiplex.execute(self.backend, &(sign.clone(), x.clone(), zeros), channel)
+                BinaryMultiplex::new().execute(self.backend, &(sign.clone(), x, &zeros), channel)
             }
             ActivationFunction::Identity => Ok(x.clone()),
         }

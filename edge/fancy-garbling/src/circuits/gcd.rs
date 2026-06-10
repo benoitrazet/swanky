@@ -3,15 +3,18 @@ use crate::{
     circuit::Circuit,
     circuits::binary::{BinaryEquality, BinaryMultiplex, BinarySubtraction, Mux},
 };
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// Given [`BinaryBundle`]s `a` and `b`, output `GCD(a, b)`.
-pub struct Gcd {
+#[derive(Default)]
+pub struct Gcd<'a> {
     upper_bound: usize,
+    _phantom: PhantomData<&'a ()>,
 }
 
-impl Gcd {
+impl<'a> Gcd<'a> {
     /// Create a new [`Gcd`] circuit using a fixed upper bound.
     ///
     /// Since the circuit needs to be oblivious, we cannot terminate the GCD
@@ -21,12 +24,18 @@ impl Gcd {
     /// Euclidean algorithm based on subtractions will take no more than `N` steps
     /// where `N` is the larger of the two numbers we are computing the GCD for.
     pub fn new(upper_bound: usize) -> Self {
-        Self { upper_bound }
+        Self {
+            upper_bound,
+            _phantom: PhantomData,
+        }
     }
 }
 
-impl<F: FancyBinary> Circuit<F> for Gcd {
-    type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
+impl<'a, F: FancyBinary> Circuit<F> for Gcd<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
     type Output = BinaryBundle<F::Item>;
 
     fn execute(
@@ -35,7 +44,9 @@ impl<F: FancyBinary> Circuit<F> for Gcd {
         inputs: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let (mut a, mut b) = inputs.clone();
+        let (a_ref, b_ref) = inputs;
+        let mut a = (*a_ref).clone();
+        let mut b = (*b_ref).clone();
         let zero = backend.constant(0, 2, channel)?;
 
         for _ in 0..self.upper_bound {
@@ -50,33 +61,33 @@ impl<F: FancyBinary> Circuit<F> for Gcd {
             // Compute `a := a - b` and check for an underflow that will help
             // determine if `a > b`.
             let (r_1, mut underflow_r_1) =
-                BinarySubtraction.execute(backend, &(a.to_owned(), b.to_owned()), channel)?;
+                BinarySubtraction::new().execute(backend, &(&a, &b), channel)?;
             // Compute `b := b - a` and check for an underflow that will help
             // determine if `b > a`.
             let (r_2, mut underflow_r_2) =
-                BinarySubtraction.execute(backend, &(b.to_owned(), a.to_owned()), channel)?;
+                BinarySubtraction::new().execute(backend, &(&b, &a), channel)?;
 
             let is_equal =
-                BinaryEquality.execute(backend, &(a.to_owned(), b.to_owned()), channel)?;
+                BinaryEquality::new().execute(backend, &(&a, &b), channel)?;
 
             // The `underflow` bits act as dual purpose multiplexing bits:
             // (1) If a > b then underflow_r_1 = 1 and underflow_r_2 = 0
             // (2) If b > a then underflow_r_1 = 0 and underflow_r_2 = 1
             // (3) If a == b then underflow_r_1 = underflow_r_2 = 0
-            underflow_r_1 = Mux.execute(
+            underflow_r_1 = Mux::new().execute(
                 backend,
-                &(is_equal.clone(), underflow_r_1, zero.clone()),
+                &(&is_equal, &underflow_r_1, &zero),
                 channel,
             )?;
             underflow_r_2 =
-                Mux.execute(backend, &(is_equal, underflow_r_2, zero.clone()), channel)?;
+                Mux::new().execute(backend, &(&is_equal, &underflow_r_2, &zero), channel)?;
 
             // Using the `underflow` bits we multiplex in the following way:
             // (1) If a > b, a := a - b and b := b
             // (2) If b > a, a := a  and b := b - a
             // (3) If a == b, a := a and b := b
-            a = BinaryMultiplex.execute(backend, &(underflow_r_1, a, r_1), channel)?;
-            b = BinaryMultiplex.execute(backend, &(underflow_r_2, b, r_2), channel)?;
+            a = BinaryMultiplex::new().execute(backend, &(underflow_r_1, &a, &r_1), channel)?;
+            b = BinaryMultiplex::new().execute(backend, &(underflow_r_2, &b, &r_2), channel)?;
         }
 
         Ok(a)

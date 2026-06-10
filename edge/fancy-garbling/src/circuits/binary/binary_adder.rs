@@ -1,4 +1,5 @@
 use crate::{FancyBinary, circuit::Circuit};
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -6,10 +7,21 @@ use swanky_error::Result;
 ///
 /// For input bits `x` and `y` and optional carry bit `c`, return `(x + y + c,
 /// c')`, where `c'` is the new carry bit.
-pub struct BinaryAdder;
+#[derive(Default)]
+pub struct BinaryAdder<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for BinaryAdder {
-    type Input = (F::Item, F::Item, Option<F::Item>);
+impl<'a> BinaryAdder<'a> {
+    /// Create a new [`BinaryAdder`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for BinaryAdder<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a F::Item, &'a F::Item, Option<&'a F::Item>);
     type Output = (F::Item, F::Item);
 
     fn execute(
@@ -18,7 +30,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryAdder {
         inputs: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let (x, y, carry_in) = inputs;
+        let (x, y, carry_in) = *inputs;
         if let Some(c) = carry_in {
             let z1 = backend.xor(x, y);
             let z2 = backend.xor(&z1, c);
@@ -42,20 +54,20 @@ pub mod test {
     fn binary_adder() {
         use crate::dummy::{Dummy, DummyVal};
 
-        let circuit = BinaryAdder;
+        let circuit = BinaryAdder::new();
         let zero = DummyVal::new(0, 2);
         let one = DummyVal::new(1, 2);
 
-        let output = Dummy::eval(&circuit, &(zero, zero, None)).unwrap();
+        let output = Dummy::eval(&circuit, &(&zero, &zero, None)).unwrap();
         assert_eq!(output.0, zero);
         assert_eq!(output.1, zero);
-        let output = Dummy::eval(&circuit, &(zero, one, None)).unwrap();
+        let output = Dummy::eval(&circuit, &(&zero, &one, None)).unwrap();
         assert_eq!(output.0, one);
         assert_eq!(output.1, zero);
-        let output = Dummy::eval(&circuit, &(one, zero, None)).unwrap();
+        let output = Dummy::eval(&circuit, &(&one, &zero, None)).unwrap();
         assert_eq!(output.0, one);
         assert_eq!(output.1, zero);
-        let output = Dummy::eval(&circuit, &(one, one, None)).unwrap();
+        let output = Dummy::eval(&circuit, &(&one, &one, None)).unwrap();
         assert_eq!(output.0, zero);
         assert_eq!(output.1, one);
     }

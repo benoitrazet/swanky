@@ -287,8 +287,10 @@ mod streaming {
             let mut outputs = Vec::with_capacity(inputs.len());
             for x in inputs.iter() {
                 let c = backend.crt_constant_bundle(1, x.composite_modulus(), channel)?;
-                let y = Multiplication.execute(backend, &(x.clone(), c), channel)?;
-                let z = ReLU.execute(backend, &(y, "100%".to_string(), None), channel)?;
+                let y = Multiplication::new().execute(backend, &(x, &c), channel)?;
+                let accuracy = "100%";
+                let none_option: Option<&[u16]> = None;
+                let z = ReLU::new().execute(backend, &(&y, accuracy, none_option), channel)?;
                 outputs.push(z);
             }
             Ok(outputs)

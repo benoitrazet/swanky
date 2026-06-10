@@ -7,14 +7,26 @@ use crate::{
     },
     util::u128_to_bits,
 };
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// For [`BinaryBundle`] inputs `x` and `y`, output `x * y`.
-pub struct BinaryMultiplication;
+#[derive(Default)]
+pub struct BinaryMultiplication<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for BinaryMultiplication {
-    type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
+impl<'a> BinaryMultiplication<'a> {
+    /// Create a new [`BinaryMultiplication`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for BinaryMultiplication<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
     type Output = BinaryBundle<F::Item>;
 
     fn execute(
@@ -46,7 +58,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryMultiplication {
                 .collect::<Result<_>>()
                 .map(BinaryBundle::new)?;
             let shifted = BinaryLeftShiftExtend.execute(backend, &(mul, i), channel)?;
-            let res = BinaryAddition.execute(backend, &(sum, shifted), channel)?;
+            let res = BinaryAddition::new().execute(backend, &(&sum, &shifted), channel)?;
             sum = res.0;
             sum.push(res.1);
         }
@@ -57,10 +69,21 @@ impl<F: FancyBinary> Circuit<F> for BinaryMultiplication {
 
 /// For [`BinaryBundle`]s `x` and `y`, return the the lower-order half of `x *
 /// y`.
-pub struct BinaryMultiplicationLowerHalf;
+#[derive(Default)]
+pub struct BinaryMultiplicationLowerHalf<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for BinaryMultiplicationLowerHalf {
-    type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
+impl<'a> BinaryMultiplicationLowerHalf<'a> {
+    /// Create a new [`BinaryMultiplicationLowerHalf`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for BinaryMultiplicationLowerHalf<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
     type Output = BinaryBundle<F::Item>;
 
     fn execute(
@@ -88,7 +111,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryMultiplicationLowerHalf {
                 .collect::<Result<_>>()
                 .map(BinaryBundle::new)?;
             let shifted = BinaryLeftShift.execute(backend, &(mul, i), channel)?;
-            sum = BinaryAdditionNoCarry.execute(backend, &(sum, shifted), channel)?;
+            sum = BinaryAdditionNoCarry::new().execute(backend, &(&sum, &shifted), channel)?;
         }
         Ok(sum)
     }
@@ -96,10 +119,21 @@ impl<F: FancyBinary> Circuit<F> for BinaryMultiplicationLowerHalf {
 
 /// For [`BinaryBundle`] `x`, constant `c`, and bitlength `n`, output `x * c`,
 /// where the output is of bitlength `n`.
-pub struct BinaryConstantMultiplication;
+#[derive(Default)]
+pub struct BinaryConstantMultiplication<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for BinaryConstantMultiplication {
-    type Input = (BinaryBundle<F::Item>, u128, usize);
+impl<'a> BinaryConstantMultiplication<'a> {
+    /// Create a new [`BinaryConstantMultiplication`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for BinaryConstantMultiplication<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a BinaryBundle<F::Item>, u128, usize);
     type Output = BinaryBundle<F::Item>;
 
     fn execute(
@@ -115,17 +149,27 @@ impl<F: FancyBinary> Circuit<F> for BinaryConstantMultiplication {
             .enumerate()
             .filter_map(|(i, b)| if b > 0 { Some(i) } else { None })
             .try_fold(zero, |z, shift_amt| {
-                let s = BinaryLeftShift.execute(backend, &(x.clone(), shift_amt), channel)?;
-                BinaryAdditionNoCarry.execute(backend, &(z, s), channel)
+                let s = BinaryLeftShift.execute(backend, &((*x).clone(), shift_amt), channel)?;
+                BinaryAdditionNoCarry::new().execute(backend, &(&z, &s), channel)
             })
     }
 }
 
 /// Circuit for testing [`BinaryMultiplication`].
-pub struct TestBinaryMultiplication(pub usize);
+pub struct TestBinaryMultiplication<'a>(pub usize, PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for TestBinaryMultiplication {
-    type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
+impl<'a> TestBinaryMultiplication<'a> {
+    /// Create a new [TestBinaryMultiplication] circuit.
+    pub fn new(nbits: usize) -> Self {
+        TestBinaryMultiplication(nbits, PhantomData)
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for TestBinaryMultiplication<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
     type Output = BinaryBundle<F::Item>;
 
     fn execute(
@@ -134,17 +178,23 @@ impl<F: FancyBinary> Circuit<F> for TestBinaryMultiplication {
         inputs: &Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        BinaryMultiplication.execute(backend, inputs, channel)
+        BinaryMultiplication::new().execute(backend, inputs, channel)
     }
 }
 
-impl<F: FancyBinary> CircuitInputMapper<F> for TestBinaryMultiplication {
+impl<'a, F: FancyBinary> CircuitInputMapper<F> for TestBinaryMultiplication<'a>
+where
+    F::Item: 'a,
+{
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), self.0 * 2);
         let (x, y) = inputs.split_at(self.0);
         let x = BinaryBundle::new(x.to_vec());
         let y = BinaryBundle::new(y.to_vec());
-        (x, y)
+        // Leak memory to create static references for the test
+        let x_ref: &'a BinaryBundle<F::Item> = Box::leak(Box::new(x));
+        let y_ref: &'a BinaryBundle<F::Item> = Box::leak(Box::new(y));
+        (x_ref, y_ref)
     }
 
     fn ninputs(&self) -> usize {
@@ -177,7 +227,7 @@ mod test {
             let y = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
             let y_input = DummyVal::to_binary(y, nbits);
-            let output = Dummy::eval(&BinaryMultiplication, &(x_input, y_input)).unwrap();
+            let output = Dummy::eval(&BinaryMultiplication::new(), &(&x_input, &y_input)).unwrap();
             assert_eq!(DummyVal::from_binary(&output), x * y);
         }
     }
@@ -193,7 +243,8 @@ mod test {
             let y = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
             let y_input = DummyVal::to_binary(y, nbits);
-            let output = Dummy::eval(&BinaryMultiplicationLowerHalf, &(x_input, y_input)).unwrap();
+            let output =
+                Dummy::eval(&BinaryMultiplicationLowerHalf::new(), &(&x_input, &y_input)).unwrap();
             assert_eq!(DummyVal::from_binary(&output), (x * y) % q);
         }
     }
@@ -208,7 +259,8 @@ mod test {
             let x = rng.r#gen::<u128>() % q;
             let c = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
-            let output = Dummy::eval(&BinaryConstantMultiplication, &(x_input, c, nbits)).unwrap();
+            let output =
+                Dummy::eval(&BinaryConstantMultiplication::new(), &(&x_input, c, nbits)).unwrap();
             assert_eq!(DummyVal::from_binary(&output), (x * c) % q);
         }
     }

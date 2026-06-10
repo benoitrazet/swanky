@@ -199,7 +199,7 @@ fn test_binary_subtraction() {
 #[test]
 fn test_binary_multiplication() {
     let ninputs = 64;
-    let circuit = TestBinaryMultiplication(ninputs);
+    let circuit = TestBinaryMultiplication::new(ninputs);
 
     test_circuit(ninputs, ninputs, &circuit);
 }
