@@ -28,8 +28,7 @@ where
         _: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
-        Ok(x
-            .iter()
+        Ok(x.iter()
             .zip(y.iter())
             .map(|(x, y)| backend.xor(x, y))
             .collect())
