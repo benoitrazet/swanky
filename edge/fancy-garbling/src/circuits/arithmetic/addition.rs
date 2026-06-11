@@ -24,10 +24,10 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         _: &mut Channel,
     ) -> Result<Self::Output> {
-        let (x, y) = *inputs;
+        let (x, y) = inputs;
         assert_eq!(x.size(), y.size(), "`x` and `y` must be the same length");
         Ok(CrtBundle::new(
             x.wires()
@@ -60,7 +60,7 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         _: &mut Channel,
     ) -> Result<Self::Output> {
         assert!(inputs.len() >= 2, "`args.len()` must be two or more");
@@ -91,7 +91,7 @@ mod test {
             let y = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_crt(x, q);
             let y_input = DummyVal::to_crt(y, q);
-            let z = Dummy::eval(&Addition::new(), &(&x_input, &y_input)).unwrap();
+            let z = Dummy::eval(&Addition::new(), (&x_input, &y_input)).unwrap();
             let output = DummyVal::from_crt(&z, q);
             assert_eq!(output, (x + y) % q);
         }

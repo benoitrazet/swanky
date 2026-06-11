@@ -24,10 +24,10 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let (x, y) = *inputs;
+        let (x, y) = inputs;
         x.iter()
             .zip(y.iter())
             .map(|(x, y)| backend.or(x, y, channel))
@@ -58,7 +58,7 @@ pub mod test {
                 .zip(y.iter())
                 .map(|(x, y)| DummyVal::new(x.val() | y.val(), 2))
                 .collect::<Vec<_>>();
-            let output = Dummy::eval(&PairwiseOr::new(), &(&x, &y)).unwrap();
+            let output = Dummy::eval(&PairwiseOr::new(), (&x, &y)).unwrap();
             assert_eq!(output, expected);
         }
     }

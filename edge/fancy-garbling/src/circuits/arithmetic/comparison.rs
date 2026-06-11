@@ -29,12 +29,12 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, accuracy) = inputs;
         let factors_of_m = get_ms(x, accuracy);
-        let res = FractionalMixedRadix::new().execute(backend, &(x, &factors_of_m), channel)?;
+        let res = FractionalMixedRadix::new().execute(backend, (x, &factors_of_m), channel)?;
         let p = factors_of_m.last().unwrap();
         let tt = (0..*p).map(|x| (x >= p / 2) as u16).collect::<Vec<_>>();
         backend.proj(&res, 2, Some(tt), channel)
@@ -62,12 +62,12 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y, accuracy) = inputs;
-        let z = Subtraction::new().execute(backend, &(x, y), channel)?;
-        Sign::new().execute(backend, &(&z, accuracy), channel)
+        let z = Subtraction::new().execute(backend, (x, y), channel)?;
+        Sign::new().execute(backend, (&z, accuracy), channel)
     }
 }
 
@@ -92,7 +92,7 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let z = LessThan::new().execute(backend, inputs, channel)?;
@@ -121,14 +121,14 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (xs, accuracy) = inputs;
         assert!(!xs.is_empty(), "`xs` cannot be empty");
 
         xs.iter().skip(1).try_fold(xs[0].clone(), |x, y| {
-            let pos = LessThan::new().execute(backend, &(&x, y, accuracy), channel)?;
+            let pos = LessThan::new().execute(backend, (&x, y, accuracy), channel)?;
             let neg = backend.negate(&pos);
             Ok(CrtBundle::new(
                 x.wires()
@@ -169,11 +169,11 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, accuracy, output_moduli) = inputs;
-        let sign = Sign::new().execute(backend, &(x, accuracy), channel)?;
+        let sign = Sign::new().execute(backend, (x, accuracy), channel)?;
         output_moduli
             .map(|m| m.to_vec())
             .unwrap_or_else(|| x.moduli())
@@ -208,12 +208,12 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, accuracy, output_moduli) = inputs;
         let factors_of_m = get_ms(x, accuracy);
-        let res = FractionalMixedRadix::new().execute(backend, &(x, &factors_of_m), channel)?;
+        let res = FractionalMixedRadix::new().execute(backend, (x, &factors_of_m), channel)?;
 
         // project the MSB to 0/1, whether or not it is less than p/2
         let p = *factors_of_m.last().unwrap();
@@ -257,13 +257,13 @@ mod test {
         // Check that `Sign(0) == 0`.
         let x = 0;
         let x_input = DummyVal::to_crt(x, q);
-        let output = Dummy::eval(&Sign::new(), &(&x_input, accuracy)).unwrap();
+        let output = Dummy::eval(&Sign::new(), (&x_input, accuracy)).unwrap();
         assert_eq!(output.val(), if x < q / 2 { 0 } else { 1 });
 
         for _ in 0..64 {
             let x = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_crt(x, q);
-            let output = Dummy::eval(&Sign::new(), &(&x_input, accuracy)).unwrap();
+            let output = Dummy::eval(&Sign::new(), (&x_input, accuracy)).unwrap();
             assert_eq!(output.val(), if x < q / 2 { 0 } else { 1 });
         }
     }
@@ -277,7 +277,7 @@ mod test {
         // Check that `x < x` works.
         let x = rng.r#gen::<u128>() % q / 2;
         let x_input = DummyVal::to_crt(x, q);
-        let output = Dummy::eval(&LessThan::new(), &(&x_input, &x_input, accuracy)).unwrap();
+        let output = Dummy::eval(&LessThan::new(), (&x_input, &x_input, accuracy)).unwrap();
         assert_eq!(output.val(), (x < x) as u16);
 
         for _ in 0..64 {
@@ -285,7 +285,7 @@ mod test {
             let y = rng.r#gen::<u128>() % q / 2;
             let x_input = DummyVal::to_crt(x, q);
             let y_input = DummyVal::to_crt(y, q);
-            let output = Dummy::eval(&LessThan::new(), &(&x_input, &y_input, accuracy)).unwrap();
+            let output = Dummy::eval(&LessThan::new(), (&x_input, &y_input, accuracy)).unwrap();
             assert_eq!(output.val(), (x < y) as u16);
         }
     }
@@ -300,7 +300,7 @@ mod test {
         let x = rng.r#gen::<u128>() % q / 2;
         let x_input = DummyVal::to_crt(x, q);
         let output =
-            Dummy::eval(&GreaterThanOrEqual::new(), &(&x_input, &x_input, accuracy)).unwrap();
+            Dummy::eval(&GreaterThanOrEqual::new(), (&x_input, &x_input, accuracy)).unwrap();
         assert_eq!(output.val(), (x >= x) as u16);
 
         for _ in 0..64 {
@@ -309,7 +309,7 @@ mod test {
             let x_input = DummyVal::to_crt(x, q);
             let y_input = DummyVal::to_crt(y, q);
             let output =
-                Dummy::eval(&GreaterThanOrEqual::new(), &(&x_input, &y_input, accuracy)).unwrap();
+                Dummy::eval(&GreaterThanOrEqual::new(), (&x_input, &y_input, accuracy)).unwrap();
             assert_eq!(output.val(), (x >= y) as u16);
         }
     }
@@ -330,7 +330,7 @@ mod test {
                 .into_iter()
                 .map(|x| DummyVal::to_crt(x, q))
                 .collect::<Vec<_>>();
-            let z = Dummy::eval(&Max::new(), &(&inputs[..], accuracy)).unwrap();
+            let z = Dummy::eval(&Max::new(), (&inputs[..], accuracy)).unwrap();
             let output = DummyVal::from_crt(&z, q);
             assert_eq!(output, expected);
         }
@@ -345,14 +345,14 @@ mod test {
         // Check that `Sign(0) == 1`.
         let x = 0;
         let x_input = DummyVal::to_crt(x, q);
-        let z = Dummy::eval(&Sgn::new(), &(&x_input, accuracy, None)).unwrap();
+        let z = Dummy::eval(&Sgn::new(), (&x_input, accuracy, None)).unwrap();
         let output = DummyVal::from_crt(&z, q);
         assert_eq!(output, if x < q / 2 { 1 } else { q - 1 });
 
         for _ in 0..64 {
             let x = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_crt(x, q);
-            let z = Dummy::eval(&Sgn::new(), &(&x_input, accuracy, None)).unwrap();
+            let z = Dummy::eval(&Sgn::new(), (&x_input, accuracy, None)).unwrap();
             let output = DummyVal::from_crt(&z, q);
             assert_eq!(output, if x < q / 2 { 1 } else { q - 1 });
         }
@@ -367,14 +367,14 @@ mod test {
         // Check that `Sign(0) == 1`.
         let x = 0;
         let x_input = DummyVal::to_crt(x, q);
-        let z = Dummy::eval(&ReLU::new(), &(&x_input, accuracy, None)).unwrap();
+        let z = Dummy::eval(&ReLU::new(), (&x_input, accuracy, None)).unwrap();
         let output = DummyVal::from_crt(&z, q);
         assert_eq!(output, if x < q / 2 { x } else { 0 });
 
         for _ in 0..64 {
             let x = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_crt(x, q);
-            let z = Dummy::eval(&ReLU::new(), &(&x_input, accuracy, None)).unwrap();
+            let z = Dummy::eval(&ReLU::new(), (&x_input, accuracy, None)).unwrap();
             let output = DummyVal::from_crt(&z, q);
             assert_eq!(output, if x < q / 2 { x } else { 0 });
         }

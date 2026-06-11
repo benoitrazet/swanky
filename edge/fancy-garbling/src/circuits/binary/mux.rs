@@ -24,7 +24,7 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         // The mux can be computed as `b (x ^ y) ^ x`.
@@ -56,13 +56,13 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (b, c1, c2) = inputs;
         match (c1, c2) {
-            (false, true) => Ok((*b).clone()),
-            (true, false) => Ok(backend.negate(*b)),
+            (false, true) => Ok(b.clone()),
+            (true, false) => Ok(backend.negate(b)),
             (false, false) => backend.constant(0, 2, channel),
             (true, true) => backend.constant(1, 2, channel),
         }
@@ -85,7 +85,7 @@ mod test {
                     let b_val = DummyVal::new(b, 2);
                     let x_val = DummyVal::new(x, 2);
                     let y_val = DummyVal::new(y, 2);
-                    let output = Dummy::eval(&Mux::new(), &(&b_val, &x_val, &y_val)).unwrap();
+                    let output = Dummy::eval(&Mux::new(), (&b_val, &x_val, &y_val)).unwrap();
                     assert_eq!(output.val(), if b == 0 { x } else { y });
                 }
             }
@@ -99,7 +99,7 @@ mod test {
                 for y in 0..=1 {
                     let b_val = DummyVal::new(b, 2);
                     let output =
-                        Dummy::eval(&MuxConstants::new(), &(&b_val, x != 0, y != 0)).unwrap();
+                        Dummy::eval(&MuxConstants::new(), (&b_val, x != 0, y != 0)).unwrap();
                     assert_eq!(output.val(), if b == 0 { x } else { y });
                 }
             }

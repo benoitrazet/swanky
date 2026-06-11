@@ -27,10 +27,10 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let (x, y, carry_in) = *inputs;
+        let (x, y, carry_in) = inputs;
         if let Some(c) = carry_in {
             let z1 = backend.xor(x, y);
             let z2 = backend.xor(&z1, c);
@@ -58,16 +58,16 @@ pub mod test {
         let zero = DummyVal::new(0, 2);
         let one = DummyVal::new(1, 2);
 
-        let output = Dummy::eval(&circuit, &(&zero, &zero, None)).unwrap();
+        let output = Dummy::eval(&circuit, (&zero, &zero, None)).unwrap();
         assert_eq!(output.0, zero);
         assert_eq!(output.1, zero);
-        let output = Dummy::eval(&circuit, &(&zero, &one, None)).unwrap();
+        let output = Dummy::eval(&circuit, (&zero, &one, None)).unwrap();
         assert_eq!(output.0, one);
         assert_eq!(output.1, zero);
-        let output = Dummy::eval(&circuit, &(&one, &zero, None)).unwrap();
+        let output = Dummy::eval(&circuit, (&one, &zero, None)).unwrap();
         assert_eq!(output.0, one);
         assert_eq!(output.1, zero);
-        let output = Dummy::eval(&circuit, &(&one, &one, None)).unwrap();
+        let output = Dummy::eval(&circuit, (&one, &one, None)).unwrap();
         assert_eq!(output.0, zero);
         assert_eq!(output.1, one);
     }

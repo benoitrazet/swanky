@@ -27,10 +27,9 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let inputs = *inputs;
         assert!(!inputs.is_empty(), "`args` cannot be empty");
         inputs
             .iter()
@@ -56,7 +55,7 @@ pub mod test {
                 .collect::<Vec<_>>();
             let expected = inputs.iter().fold(0, |acc, &x| x.val() | acc);
             let circuit = OrMany::new();
-            let output = Dummy::eval(&circuit, &inputs.as_slice()).unwrap();
+            let output = Dummy::eval(&circuit, inputs.as_slice()).unwrap();
             assert_eq!(output.val(), expected);
         }
     }

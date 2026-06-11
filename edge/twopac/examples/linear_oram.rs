@@ -56,7 +56,7 @@ fn gb_linear_oram<RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>>(
     let circuit = LinearOram::<NBITS>::new(inputs.len());
 
     let inputs = gb_set_inputs(&mut gb, inputs, channel)?;
-    let query = circuit.execute(&mut gb, &inputs, channel)?;
+    let query = circuit.execute(&mut gb, inputs, channel)?;
     gb.outputs(query.wires(), channel)?;
     Ok(())
 }
@@ -74,7 +74,7 @@ fn ev_linear_oram<RNG: CryptoRng + RngCore>(
     let circuit = LinearOram::<NBITS>::new(size);
 
     let inputs = ev_set_inputs(&mut ev, input, size, channel)?;
-    let output = circuit.execute(&mut ev, &inputs, channel)?;
+    let output = circuit.execute(&mut ev, inputs, channel)?;
     let result = ev
         .bin_output(&output, channel)?
         .expect("evaluator should produce outputs");

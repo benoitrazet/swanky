@@ -26,7 +26,7 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         assert_eq!(inputs.0.moduli(), inputs.1.moduli());
@@ -42,7 +42,7 @@ where
             .collect::<Vec<_>>();
 
         // If any negated XOR is 0, then the values are not equal
-        AndMany::new().execute(backend, &zs.as_slice(), channel)
+        AndMany::new().execute(backend, zs.as_slice(), channel)
     }
 }
 
@@ -59,10 +59,10 @@ pub mod test {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &Self::Input,
+            inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            BinaryEquality::new().execute(backend, &(&inputs.0, &inputs.1), channel)
+            BinaryEquality::new().execute(backend, (&inputs.0, &inputs.1), channel)
         }
     }
 
@@ -97,7 +97,7 @@ pub mod test {
             let y = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
             let y_input = DummyVal::to_binary(y, nbits);
-            let output = Dummy::eval(&c, &(x_input, y_input)).unwrap();
+            let output = Dummy::eval(&c, (x_input, y_input)).unwrap();
             assert_eq!(output.val() > 0, x == y);
         }
 
@@ -105,7 +105,7 @@ pub mod test {
         for _ in 0..8 {
             let x = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
-            let output = Dummy::eval(&c, &(x_input.clone(), x_input)).unwrap();
+            let output = Dummy::eval(&c, (x_input.clone(), x_input)).unwrap();
             assert_eq!(output.val(), 1);
         }
     }

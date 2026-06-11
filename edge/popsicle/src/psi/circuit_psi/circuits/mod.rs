@@ -35,7 +35,7 @@ where
         .map(|(xs, ys)| {
             BinaryEquality::new().execute(
                 f,
-                &(
+                (
                     &BinaryBundle::new(xs.to_vec()),
                     &BinaryBundle::new(ys.to_vec()),
                 ),
@@ -70,7 +70,7 @@ where
 
     for i in 0..elements.len() {
         let xor =
-            PairwiseXor::new().execute(f, &(elements[i].wires(), masks[i].wires()), channel)?;
+            PairwiseXor::new().execute(f, (elements[i].wires(), masks[i].wires()), channel)?;
         res.push(BinaryBundle::new(xor));
     }
     Ok(res)
@@ -85,12 +85,12 @@ pub fn fancy_cardinality<F>(
 where
     F: FancyBinary + Fancy<Item = WireMod2>,
 {
-    let zero = BinaryConstant::new(0, PRIMARY_KEY_SIZE * 8).execute(f, &(), channel)?;
-    let one = BinaryConstant::new(1, PRIMARY_KEY_SIZE * 8).execute(f, &(), channel)?;
+    let zero = BinaryConstant::new(0, PRIMARY_KEY_SIZE * 8).execute(f, (), channel)?;
+    let one = BinaryConstant::new(1, PRIMARY_KEY_SIZE * 8).execute(f, (), channel)?;
     let mut acc = zero.clone();
     for bit in intersect_bitvec {
-        let mux = BinaryMultiplex::new().execute(f, &(*bit, &zero, &one), channel)?;
-        acc = BinaryAdditionNoCarry::new().execute(f, &(&acc, &mux), channel)?;
+        let mux = BinaryMultiplex::new().execute(f, (*bit, &zero, &one), channel)?;
+        acc = BinaryAdditionNoCarry::new().execute(f, (&acc, &mux), channel)?;
     }
     Ok(acc)
 }
@@ -108,15 +108,15 @@ pub fn fancy_payload_sum<F>(
 where
     F: FancyBinary + Fancy<Item = WireMod2>,
 {
-    let zero = BinaryConstant::new(0, PRIMARY_KEY_SIZE * 8).execute(f, &(), channel)?;
+    let zero = BinaryConstant::new(0, PRIMARY_KEY_SIZE * 8).execute(f, (), channel)?;
     let mut acc = zero.clone();
     let multiplex = BinaryMultiplex::new();
 
     for (i, bit) in intersect_bitvec.iter().enumerate() {
-        let mux_a = multiplex.execute(f, &(*bit, &zero, &payload_a[i]), channel)?;
-        let mux_b = multiplex.execute(f, &(*bit, &zero, &payload_b[i]), channel)?;
-        let mul = BinaryAdditionNoCarry::new().execute(f, &(&mux_a, &mux_b), channel)?;
-        acc = BinaryAdditionNoCarry::new().execute(f, &(&acc, &mul), channel)?;
+        let mux_a = multiplex.execute(f, (*bit, &zero, &payload_a[i]), channel)?;
+        let mux_b = multiplex.execute(f, (*bit, &zero, &payload_b[i]), channel)?;
+        let mul = BinaryAdditionNoCarry::new().execute(f, (&mux_a, &mux_b), channel)?;
+        acc = BinaryAdditionNoCarry::new().execute(f, (&acc, &mul), channel)?;
     }
     Ok(acc)
 }

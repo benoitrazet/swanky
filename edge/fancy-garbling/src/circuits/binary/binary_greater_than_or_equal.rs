@@ -26,13 +26,10 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let (x, y) = *inputs;
-        assert_eq!(x.moduli(), y.moduli());
-
-        let z = BinaryLessThan::new().execute(backend, &(x, y), channel)?;
+        let z = BinaryLessThan::new().execute(backend, inputs, channel)?;
         Ok(backend.negate(&z))
     }
 }
@@ -50,10 +47,10 @@ pub mod test {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &Self::Input,
+            inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            BinaryGreaterThanOrEqual::new().execute(backend, &(&inputs.0, &inputs.1), channel)
+            BinaryGreaterThanOrEqual::new().execute(backend, (&inputs.0, &inputs.1), channel)
         }
     }
 
@@ -88,7 +85,7 @@ pub mod test {
             let y = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
             let y_input = DummyVal::to_binary(y, nbits);
-            let output = Dummy::eval(&c, &(x_input, y_input)).unwrap();
+            let output = Dummy::eval(&c, (x_input, y_input)).unwrap();
             assert_eq!(output.val() > 0, x >= y);
         }
     }

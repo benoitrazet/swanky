@@ -13,14 +13,14 @@ impl<F: FancyBinary> Circuit<F> for BinaryLeftShift {
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (bundle, n) = inputs;
         let zero = backend.constant(0, 2, channel)?;
 
         let mut wires = bundle.wires().to_vec();
-        for _ in 0..*n {
+        for _ in 0..n {
             wires.pop();
             wires.insert(0, zero.clone());
         }
@@ -41,13 +41,13 @@ impl<F: FancyBinary> Circuit<F> for BinaryLeftShiftExtend {
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (bundle, n) = inputs;
         let mut wires = bundle.wires().to_vec();
         let zero = backend.constant(0, 2, channel)?;
-        for _ in 0..*n {
+        for _ in 0..n {
             wires.insert(0, zero.clone());
         }
         Ok(BinaryBundle::new(wires))
@@ -62,7 +62,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryRightShift {
     type Input = (BinaryBundle<F::Item>, usize, F::Item);
     type Output = BinaryBundle<F::Item>;
 
-    fn execute(&self, _: &mut F, inputs: &Self::Input, _: &mut Channel) -> Result<Self::Output> {
+    fn execute(&self, _: &mut F, inputs: Self::Input, _: &mut Channel) -> Result<Self::Output> {
         let (x, n, pad) = inputs;
         let mut wires: Vec<_> = Vec::with_capacity(x.wires().len());
 
@@ -88,12 +88,12 @@ impl<F: FancyBinary> Circuit<F> for BinaryLogicalRightShift {
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, n) = inputs;
         let zero = backend.constant(0, 2, channel)?;
-        BinaryRightShift.execute(backend, &(x.clone(), *n, zero), channel)
+        BinaryRightShift.execute(backend, (x.clone(), n, zero), channel)
     }
 }
 
@@ -107,12 +107,12 @@ impl<F: FancyBinary> Circuit<F> for BinaryArithmeticRightShift {
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, n) = inputs;
         let pad = x.wires().last().unwrap();
-        BinaryRightShift.execute(backend, &(x.clone(), *n, pad.clone()), channel)
+        BinaryRightShift.execute(backend, (x.clone(), n, pad.clone()), channel)
     }
 }
 
@@ -136,7 +136,7 @@ mod test {
             let shift_size = rng.r#gen::<usize>() % N;
             let x = rng.r#gen::<u64>();
             let input = DummyVal::to_binary(x as u128, N);
-            let output = Dummy::eval(&BinaryLeftShift, &(input, shift_size as usize)).unwrap();
+            let output = Dummy::eval(&BinaryLeftShift, (input, shift_size as usize)).unwrap();
             assert_eq!(
                 DummyVal::from_binary(&output) as u64,
                 x.wrapping_shl(shift_size as u32)
@@ -154,7 +154,7 @@ mod test {
             let shift_size = rng.r#gen::<usize>() % nbits;
             let x = rng.r#gen::<u128>() % q;
             let input = DummyVal::to_binary(x, nbits);
-            let output = Dummy::eval(&BinaryLeftShiftExtend, &(input, shift_size)).unwrap();
+            let output = Dummy::eval(&BinaryLeftShiftExtend, (input, shift_size)).unwrap();
             assert_eq!(DummyVal::from_binary(&output), x << shift_size);
         }
     }
@@ -169,7 +169,7 @@ mod test {
             let x = rng.r#gen::<u64>();
             let input = DummyVal::to_binary(x as u128, N);
             let output =
-                Dummy::eval(&BinaryLogicalRightShift, &(input, shift_size as usize)).unwrap();
+                Dummy::eval(&BinaryLogicalRightShift, (input, shift_size as usize)).unwrap();
             assert_eq!(DummyVal::from_binary(&output) as u64, x >> shift_size);
         }
     }
@@ -184,7 +184,7 @@ mod test {
             let x = rng.r#gen::<u128>() % Q;
             let shift_size = rng.r#gen::<usize>() % N;
             let x_input = DummyVal::to_binary(x, N);
-            let output = Dummy::eval(&BinaryArithmeticRightShift, &(x_input, shift_size)).unwrap();
+            let output = Dummy::eval(&BinaryArithmeticRightShift, (x_input, shift_size)).unwrap();
             assert_eq!(
                 DummyVal::from_binary(&output) as i64,
                 (x as i64) >> shift_size

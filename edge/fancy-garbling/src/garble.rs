@@ -56,7 +56,7 @@ mod nonstreaming {
                 let wirelabels = ev
                     .eval_to_wirelabels(
                         circuit,
-                        &<Ex as CircuitInputMapper<Evaluator<W>>>::map(circuit, xs),
+                        <Ex as CircuitInputMapper<Evaluator<W>>>::map(circuit, xs),
                     )
                     .unwrap();
                 let decoded = output_mapping.to_outputs(&wirelabels.flatten()).unwrap();
@@ -64,7 +64,7 @@ mod nonstreaming {
                 // Run the dummy evaluator.
                 let expected = Dummy::eval(
                     circuit,
-                    &<Ex as CircuitInputMapper<Dummy>>::map(circuit, inputs),
+                    <Ex as CircuitInputMapper<Dummy>>::map(circuit, inputs),
                 )
                 .unwrap();
                 let expected = expected
@@ -191,7 +191,7 @@ mod streaming {
             let inputs = dummy.encode_many(&inputs, &moduli, channel)?;
             let outputs = circuit.execute(
                 &mut dummy,
-                &<Ex as CircuitInputMapper<Dummy>>::map(circuit, inputs),
+                <Ex as CircuitInputMapper<Dummy>>::map(circuit, inputs),
                 channel,
             )?;
             Ok(dummy.outputs(&outputs.flatten(), channel)?.unwrap())
@@ -204,7 +204,7 @@ mod streaming {
                 let zeros = gb.encode_many(&inputs, &moduli, channel)?;
                 let outputs = circuit.execute(
                     &mut gb,
-                    &<Ex as CircuitInputMapper<Garbler<_, _>>>::map(circuit, zeros),
+                    <Ex as CircuitInputMapper<Garbler<_, _>>>::map(circuit, zeros),
                     channel,
                 )?;
                 gb.outputs(&outputs.flatten(), channel)?;
@@ -215,7 +215,7 @@ mod streaming {
                 let wires = ev.receive_many(&moduli, channel)?;
                 let outputs = circuit.execute(
                     &mut ev,
-                    &<Ex as CircuitInputMapper<Evaluator<_>>>::map(circuit, wires),
+                    <Ex as CircuitInputMapper<Evaluator<_>>>::map(circuit, wires),
                     channel,
                 )?;
                 Ok(ev.outputs(&outputs.flatten(), channel)?.unwrap())
@@ -281,16 +281,16 @@ mod streaming {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &Self::Input,
+            inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
             let mut outputs = Vec::with_capacity(inputs.len());
             for x in inputs.iter() {
                 let c = backend.crt_constant_bundle(1, x.composite_modulus(), channel)?;
-                let y = Multiplication::new().execute(backend, &(x, &c), channel)?;
+                let y = Multiplication::new().execute(backend, (x, &c), channel)?;
                 let accuracy = "100%";
                 let none_option: Option<&[u16]> = None;
-                let z = ReLU::new().execute(backend, &(&y, accuracy, none_option), channel)?;
+                let z = ReLU::new().execute(backend, (&y, accuracy, none_option), channel)?;
                 outputs.push(z);
             }
             Ok(outputs)

@@ -27,10 +27,10 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let (x, c) = *inputs;
+        let (x, c) = inputs;
         x.wires()
             .iter()
             .map(|x| {
@@ -64,7 +64,7 @@ mod test {
             let c = rng.gen_range(2..10);
             let x_input = DummyVal::to_crt(x, q);
             let circuit = ConstantExponentiation::new();
-            let z = Dummy::eval(&circuit, &(&x_input, c)).unwrap();
+            let z = Dummy::eval(&circuit, (&x_input, c)).unwrap();
             let output = DummyVal::from_crt(&z, q);
 
             // Compute x^c mod q using modular arithmetic to avoid overflow

@@ -56,7 +56,7 @@ fn bench_eval_binary_ex<
             let ys = gc
                 .eval_to_wirelabels(
                     &ex,
-                    &<Ex as CircuitInputMapper<Evaluator<_>>>::map(&ex, xs.clone()),
+                    <Ex as CircuitInputMapper<Evaluator<_>>>::map(&ex, xs.clone()),
                 )
                 .unwrap();
             black_box(ys);
@@ -84,7 +84,7 @@ fn bench_eval_arith_ex<
             let ys = gc
                 .eval_to_wirelabels(
                     &ex,
-                    &<Ex as CircuitInputMapper<Evaluator<_>>>::map(&ex, xs.clone()),
+                    <Ex as CircuitInputMapper<Evaluator<_>>>::map(&ex, xs.clone()),
                 )
                 .unwrap();
             black_box(ys);
@@ -102,7 +102,7 @@ impl<F: FancyBinary> Circuit<F> for MixedOp {
     fn execute(
         &self,
         backend: &mut F,
-        input: &Self::Input,
+        input: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let mut x = input.clone();
@@ -140,7 +140,7 @@ impl<F: FancyArithmetic> Circuit<F> for MixedOpArith {
     fn execute(
         &self,
         backend: &mut F,
-        input: &Self::Input,
+        input: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let mut x = input.clone();
@@ -178,11 +178,11 @@ impl<F: FancyProj> Circuit<F> for Proj {
     fn execute(
         &self,
         backend: &mut F,
-        input: &Self::Input,
+        input: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         for _ in 0..1000 {
-            let _ = backend.proj(input, self.0, Some(self.1.clone()), channel)?;
+            let _ = backend.proj(&input, self.0, Some(self.1.clone()), channel)?;
         }
         Ok(vec![])
     }
@@ -211,11 +211,11 @@ impl<F: FancyArithmetic> Circuit<F> for Mul {
     fn execute(
         &self,
         backend: &mut F,
-        input: &Self::Input,
+        input: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         for _ in 0..1000 {
-            let _ = backend.mul(input, input, channel)?;
+            let _ = backend.mul(&input, &input, channel)?;
         }
         Ok(vec![])
     }

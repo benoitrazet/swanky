@@ -27,10 +27,10 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let (x, y) = *inputs;
+        let (x, y) = inputs;
         assert_eq!(x.moduli(), y.moduli());
 
         let wlen = x.wires().len() as u16;
@@ -47,7 +47,7 @@ where
             })
             .collect::<Result<Vec<_>>>()?;
         // add up the results, and output whether they equal zero or not, mod 2
-        let z = AddMany::new().execute(backend, &zs.as_slice(), channel)?;
+        let z = AddMany::new().execute(backend, zs.as_slice(), channel)?;
         let b = zs.len();
         let mut tab = vec![0; b + 1];
         tab[b] = 1;
@@ -72,7 +72,7 @@ mod test {
         // Check that `x == x`.
         let x = rng.r#gen::<u128>() % q;
         let x_input = DummyVal::to_crt(x, q);
-        let output = Dummy::eval(&Equality::new(), &(&x_input, &x_input)).unwrap();
+        let output = Dummy::eval(&Equality::new(), (&x_input, &x_input)).unwrap();
         assert_eq!(output.val(), (x == x) as u16);
 
         for _ in 0..64 {
@@ -80,7 +80,7 @@ mod test {
             let y = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_crt(x, q);
             let y_input = DummyVal::to_crt(y, q);
-            let output = Dummy::eval(&Equality::new(), &(&x_input, &y_input)).unwrap();
+            let output = Dummy::eval(&Equality::new(), (&x_input, &y_input)).unwrap();
             assert_eq!(output.val(), (x == y) as u16);
         }
     }

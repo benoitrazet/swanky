@@ -28,21 +28,21 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (xs, ys) = inputs;
         assert_eq!(xs.moduli(), ys.moduli());
 
         let ys_neg = BinaryTwosComplement::new().execute(backend, ys, channel)?;
-        let mut acc = BinaryConstant::new(0, xs.size()).execute(backend, &(), channel)?;
+        let mut acc = BinaryConstant::new(0, xs.size()).execute(backend, (), channel)?;
         let mut qs = BinaryBundle::new(Vec::new());
         for x in xs.iter().rev() {
             acc.pop();
             acc.insert(0, x.clone());
             let (res, cout) =
-                BinaryAddition::default().execute(backend, &(&acc, &ys_neg), channel)?;
-            acc = BinaryMultiplex::new().execute(backend, &(cout.clone(), &acc, &res), channel)?;
+                BinaryAddition::default().execute(backend, (&acc, &ys_neg), channel)?;
+            acc = BinaryMultiplex::new().execute(backend, (cout.clone(), &acc, &res), channel)?;
             qs.push(cout);
         }
         qs.reverse(); // Switch back to little-endian
@@ -73,7 +73,7 @@ mod test {
             }
             let x_input = DummyVal::to_binary(x, nbits);
             let y_input = DummyVal::to_binary(y, nbits);
-            let output = Dummy::eval(&BinaryDivision::new(), &(&x_input, &y_input)).unwrap();
+            let output = Dummy::eval(&BinaryDivision::new(), (&x_input, &y_input)).unwrap();
             assert_eq!(DummyVal::from_binary(&output), x / y);
         }
     }

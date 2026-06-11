@@ -23,7 +23,7 @@ fn bench_eval_aes_binary(c: &mut Criterion) {
     let key = inputs[..128].try_into().unwrap();
     let block = inputs[128..].try_into().unwrap();
     c.bench_function("eval::aes-binary", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&aes, &(key, block)))
+        bench.iter(|| gc.eval_to_wirelabels(&aes, (key, block)))
     });
 }
 
@@ -40,7 +40,7 @@ fn bench_eval_sha_256_binary(c: &mut Criterion) {
     let inputs = en.encode_inputs(&vec![0; 512]);
     let block = inputs.try_into().unwrap();
     c.bench_function("eval::sha-256-binary", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&sha256, &block))
+        bench.iter(|| gc.eval_to_wirelabels(&sha256, block))
     });
 }
 
@@ -59,7 +59,7 @@ fn bench_eval_aes_arithmetic(c: &mut Criterion) {
     let block: [_; 128] = inputs[128..].to_vec().try_into().unwrap();
 
     c.bench_function("eval::aes-arithmetic", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&aes, &(key.clone(), block.clone())))
+        bench.iter(|| gc.eval_to_wirelabels(&aes, (key.clone(), block.clone())))
     });
 }
 
@@ -77,7 +77,7 @@ fn bench_eval_sha_256_arithmetic(c: &mut Criterion) {
     let block: [_; 512] = inputs.try_into().unwrap();
 
     c.bench_function("eval::sha-256-arithmetic", move |bench| {
-        bench.iter(|| gc.eval_to_wirelabels(&sha256, &block.clone()))
+        bench.iter(|| gc.eval_to_wirelabels(&sha256, block.clone()))
     });
 }
 

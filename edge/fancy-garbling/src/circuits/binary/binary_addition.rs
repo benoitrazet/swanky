@@ -31,22 +31,19 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let (x, y) = *inputs;
+        let (x, y) = inputs;
         assert_eq!(x.moduli(), y.moduli());
         let xwires = x.wires();
         let ywires = y.wires();
         let (mut z, mut c) =
-            BinaryAdder::new().execute(backend, &(&xwires[0], &ywires[0], None), channel)?;
+            BinaryAdder::new().execute(backend, (&xwires[0], &ywires[0], None), channel)?;
         let mut bs = vec![z];
         for i in 1..xwires.len() {
-            let res = BinaryAdder::new().execute(
-                backend,
-                &(&xwires[i], &ywires[i], Some(&c)),
-                channel,
-            )?;
+            let res =
+                BinaryAdder::new().execute(backend, (&xwires[i], &ywires[i], Some(&c)), channel)?;
             z = res.0;
             c = res.1;
             bs.push(z);
@@ -78,22 +75,19 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let (x, y) = *inputs;
+        let (x, y) = inputs;
         assert_eq!(x.moduli(), y.moduli());
         let xwires = x.wires();
         let ywires = y.wires();
         let (mut z, mut c) =
-            BinaryAdder::new().execute(backend, &(&xwires[0], &ywires[0], None), channel)?;
+            BinaryAdder::new().execute(backend, (&xwires[0], &ywires[0], None), channel)?;
         let mut bs = vec![z];
         for i in 1..xwires.len() - 1 {
-            let res = BinaryAdder::new().execute(
-                backend,
-                &(&xwires[i], &ywires[i], Some(&c)),
-                channel,
-            )?;
+            let res =
+                BinaryAdder::new().execute(backend, (&xwires[i], &ywires[i], Some(&c)), channel)?;
             z = res.0;
             c = res.1;
             bs.push(z);
@@ -104,7 +98,7 @@ where
             ywires.last().unwrap().clone(),
             c,
         ];
-        z = XorMany::new().execute(backend, &&xor_inputs[..], channel)?;
+        z = XorMany::new().execute(backend, &xor_inputs[..], channel)?;
         bs.push(z);
         Ok(BinaryBundle::new(bs))
     }
@@ -124,10 +118,10 @@ pub mod test {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &Self::Input,
+            inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            BinaryAddition::new().execute(backend, &(&inputs.0, &inputs.1), channel)
+            BinaryAddition::new().execute(backend, (&inputs.0, &inputs.1), channel)
         }
     }
 
@@ -162,7 +156,7 @@ pub mod test {
             let y = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
             let y_input = DummyVal::to_binary(y, nbits);
-            let outputs = Dummy::eval(&circuit, &(&x_input, &y_input)).unwrap();
+            let outputs = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
             assert_eq!(DummyVal::from_binary(&outputs.0), (x + y) % q);
             assert_eq!(outputs.1.val(), (x + y >= q) as u16);
         }
@@ -182,7 +176,7 @@ pub mod test {
             let y = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
             let y_input = DummyVal::to_binary(y, nbits);
-            let output = Dummy::eval(&BinaryAdditionNoCarry::new(), &(&x_input, &y_input)).unwrap();
+            let output = Dummy::eval(&BinaryAdditionNoCarry::new(), (&x_input, &y_input)).unwrap();
             assert_eq!(DummyVal::from_binary(&output), (x + y) % q);
         }
     }

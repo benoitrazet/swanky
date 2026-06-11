@@ -27,7 +27,7 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let wires = inputs.wires();
@@ -73,7 +73,7 @@ mod test {
         for _ in 0..16 {
             let x = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
-            let output = Dummy::eval(&BinaryToUnary::new(), &&x_input).unwrap();
+            let output = Dummy::eval(&BinaryToUnary::new(), &x_input).unwrap();
             for (i, y) in output.into_iter().enumerate() {
                 if i as u128 == x {
                     assert_eq!(y.val(), 1);

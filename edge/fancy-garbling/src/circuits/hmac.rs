@@ -53,7 +53,7 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (key, message) = inputs;
@@ -77,20 +77,20 @@ where
 
         // Compute `key ⊕ ipad`.
         let key_vec = key.to_vec();
-        let key_xor_ipad = PairwiseXor::new().execute(backend, &(&key_vec, &ipad), channel)?;
+        let key_xor_ipad = PairwiseXor::new().execute(backend, (&key_vec, &ipad), channel)?;
 
         // Compute `key ⊕ opad`.
-        let key_xor_opad = PairwiseXor::new().execute(backend, &(&key_vec, &opad), channel)?;
+        let key_xor_opad = PairwiseXor::new().execute(backend, (&key_vec, &opad), channel)?;
 
         // Inner hash: `H((key ⊕ ipad) || message)`.
         let mut inner_input = key_xor_ipad;
         inner_input.extend_from_slice(message);
-        let inner_hash = Sha256::new().execute(backend, &inner_input, channel)?;
+        let inner_hash = Sha256::new().execute(backend, inner_input, channel)?;
 
         // Outer hash: `H((key ⊕ opad) || inner_hash)`.
         let mut outer_input = key_xor_opad;
         outer_input.extend_from_slice(&inner_hash);
-        let hmac = Sha256::new().execute(backend, &outer_input, channel)?;
+        let hmac = Sha256::new().execute(backend, outer_input, channel)?;
 
         Ok(hmac)
     }
@@ -121,7 +121,7 @@ mod tests {
         let key = [DummyVal::new_bool(false); 512];
         let message = [];
 
-        let output = Dummy::eval(&hmac, &(&key, &message)).unwrap();
+        let output = Dummy::eval(&hmac, (&key, &message)).unwrap();
 
         // Computed using: echo -n "" | openssl dgst -sha256 -mac hmac -macopt hexkey:$(python3 -c "print('00'*64)")
         // Result: b613679a0814d9ec772f95d778c35fc5ff1697c493715653c6c712144292c5ad
@@ -150,7 +150,7 @@ mod tests {
         // 't' = 0x74 = 01110100
         let message = string_to_bool_vec("01110100011001010111001101110100");
 
-        let output = Dummy::eval(&hmac, &(&key, &message[..])).unwrap();
+        let output = Dummy::eval(&hmac, (&key, &message[..])).unwrap();
 
         // Computed using: echo -n "test" | openssl dgst -sha256 -mac hmac -macopt hexkey:$(python3 -c "print('00'*64)")
         // Result: 43b0cef99265f9e34c10ea9d3501926d27b39f57c6d674561d8ba236e7a819fb
@@ -190,7 +190,7 @@ mod tests {
             })
             .collect();
 
-        let output = Dummy::eval(&hmac, &(&key, &message[..])).unwrap();
+        let output = Dummy::eval(&hmac, (&key, &message[..])).unwrap();
 
         // Computed using: echo -n "The quick brown fox jumps over the lazy dog" | openssl dgst -sha256 -mac hmac -macopt key:key
         // Result: f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8

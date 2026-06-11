@@ -68,7 +68,7 @@ fn test_circuit<
     let dummy_inputs = [dummy_inputs_gb, dummy_inputs_ev].concat();
     let expected = Dummy::eval(
         circuit,
-        &<C as CircuitInputMapper<Dummy>>::map(circuit, dummy_inputs),
+        <C as CircuitInputMapper<Dummy>>::map(circuit, dummy_inputs),
     )
     .unwrap();
     let expected = expected
@@ -86,7 +86,7 @@ fn test_circuit<
             inputs.extend(theirs);
             let outputs = circuit.execute(
                 &mut gb,
-                &<C as CircuitInputMapper<Garbler<_>>>::map(circuit, inputs),
+                <C as CircuitInputMapper<Garbler<_>>>::map(circuit, inputs),
                 c,
             )?;
             gb.outputs(&outputs.flatten(), c)
@@ -99,7 +99,7 @@ fn test_circuit<
             inputs.extend(mine);
             let outputs = circuit.execute(
                 &mut ev,
-                &<C as CircuitInputMapper<Evaluator>>::map(circuit, inputs),
+                <C as CircuitInputMapper<Evaluator>>::map(circuit, inputs),
                 c,
             )?;
             ev.outputs(&outputs.flatten(), c)
