@@ -2745,6 +2745,7 @@ name = "swanky-field-binary"
 version = "0.6.0"
 dependencies = [
  "bytemuck",
+ "criterion",
  "crypto-bigint",
  "generic-array 1.4.1",
  "proptest",

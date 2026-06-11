@@ -24,3 +24,8 @@ crypto-bigint.workspace = true
 swanky-field-test.workspace = true
 swanky-polynomial.workspace = true
 proptest.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "f128b"
+harness = false
