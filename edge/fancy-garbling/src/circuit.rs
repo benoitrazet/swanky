@@ -467,7 +467,7 @@ pub mod test_circuits {
             }
         }
 
-        /// Circuit for testing [`FancyArithmetic::add_many`].
+        /// Circuit for testing [`AddMany`].
         pub struct TestAddMany(pub u16, pub usize);
         impl<F: FancyArithmetic> Circuit<F> for TestAddMany {
             type Input = Vec<F::Item>;
@@ -754,7 +754,7 @@ pub mod test_circuits {
         }
 
         /// Circuit for testing [`FancyProj::mod_change`] followed by
-        /// [`FancyArithmetic::add_many`].
+        /// [`AddMany`].
         pub struct TestAddManyModChange(pub usize);
         impl<F: FancyProj + FancyArithmetic> Circuit<F> for TestAddManyModChange {
             type Input = Vec<F::Item>;
