@@ -12,9 +12,17 @@ pub use binary_and::BinaryWireLabel;
 mod nonstreaming {
     use crate::{
         AllWire, Evaluator, Garbler, WireLabel, WireMod2,
-        circuit::{CircuitInputMapper, Flatten, circuits},
+        circuit::{CircuitInputMapper, Flatten},
         classic::GarbledCircuit,
         dummy::{Dummy, DummyVal},
+        test_circuits::{
+            arithmetic::{
+                TestAddMany, TestAddition, TestCmul, TestConstants, TestMulGate,
+                TestMulGateUnequalMods, TestSubtraction,
+            },
+            binary::TestOrGateFanN,
+            proj::{TestModChange, TestProj, TestProjRand},
+        },
         util::RngExt,
     };
     use rand::thread_rng;
@@ -72,37 +80,37 @@ mod nonstreaming {
     #[test]
     fn add() {
         let q = thread_rng().gen_prime();
-        garble_test_helper::<AllWire, _>(&circuits::arithmetic::TestAddition(q));
+        garble_test_helper::<AllWire, _>(&TestAddition(q));
     }
 
     #[test]
     fn add_many() {
         let q = thread_rng().gen_prime();
-        garble_test_helper::<AllWire, _>(&circuits::arithmetic::TestAddMany(q, 16));
+        garble_test_helper::<AllWire, _>(&TestAddMany(q, 16));
     }
 
     #[test]
     fn or_many() {
-        garble_test_helper::<WireMod2, _>(&circuits::binary::TestOrGateFanN(16));
+        garble_test_helper::<WireMod2, _>(&TestOrGateFanN(16));
     }
 
     #[test]
     fn sub() {
         let q = thread_rng().gen_prime();
-        garble_test_helper::<AllWire, _>(&circuits::arithmetic::TestSubtraction(q));
+        garble_test_helper::<AllWire, _>(&TestSubtraction(q));
     }
 
     #[test]
     fn cmul() {
         let q = thread_rng().gen_prime();
         let c = thread_rng().gen_u16() % q;
-        garble_test_helper::<AllWire, _>(&circuits::arithmetic::TestCmul(q, c));
+        garble_test_helper::<AllWire, _>(&TestCmul(q, c));
     }
 
     #[test]
     fn proj() {
         let q = thread_rng().gen_prime();
-        garble_test_helper::<AllWire, _>(&circuits::proj::TestProj(q));
+        garble_test_helper::<AllWire, _>(&TestProj(q));
     }
 
     #[test]
@@ -112,19 +120,19 @@ mod nonstreaming {
             .map(|_| thread_rng().gen_u16() % q)
             .collect::<Vec<_>>();
 
-        garble_test_helper::<AllWire, _>(&circuits::proj::TestProjRand(q, tab));
+        garble_test_helper::<AllWire, _>(&TestProjRand(q, tab));
     }
 
     #[test]
     fn mod_change() {
         let q = thread_rng().gen_prime();
-        garble_test_helper::<AllWire, _>(&circuits::proj::TestModChange(q, q * 2));
+        garble_test_helper::<AllWire, _>(&TestModChange(q, q * 2));
     }
 
     #[test]
     fn arithmetic_half_gate() {
         let q = thread_rng().gen_prime();
-        garble_test_helper::<AllWire, _>(&circuits::arithmetic::TestMulGate(q));
+        garble_test_helper::<AllWire, _>(&TestMulGate(q));
     }
 
     #[test]
@@ -132,21 +140,23 @@ mod nonstreaming {
         let q = thread_rng().gen_prime();
         // Lower modulus is capped at 8.
         let p = 2 + thread_rng().gen_prime() % 6;
-        garble_test_helper::<AllWire, _>(&circuits::arithmetic::TestMulGateUnequalMods([q, p]));
+        garble_test_helper::<AllWire, _>(&TestMulGateUnequalMods([q, p]));
     }
 
     #[test]
     fn constants() {
         let q = thread_rng().gen_modulus();
         let c = thread_rng().gen_u16() % q;
-        garble_test_helper::<AllWire, _>(&circuits::arithmetic::TestConstants(q, c));
+        garble_test_helper::<AllWire, _>(&TestConstants(q, c));
     }
 }
 
 #[cfg(test)]
 mod streaming {
-    use crate::circuit::{Circuit, Flatten, circuits};
+    use crate::circuit::{Circuit, Flatten};
     use crate::circuits::arithmetic::{Multiplication, ReLU};
+    use crate::test_circuits::arithmetic::{TestAddition, TestCmul, TestMulGate, TestSubtraction};
+    use crate::test_circuits::proj::TestProj;
     use crate::{
         AllWire, Evaluator, Fancy, Garbler, WireLabel, circuit::CircuitInputMapper, dummy::Dummy,
         util::RngExt,
@@ -221,7 +231,7 @@ mod streaming {
         let mut rng = thread_rng();
         for _ in 0..16 {
             let q = rng.gen_modulus();
-            streaming_test_helper::<AllWire, _>(&circuits::arithmetic::TestAddition(q));
+            streaming_test_helper::<AllWire, _>(&TestAddition(q));
         }
     }
 
@@ -230,7 +240,7 @@ mod streaming {
         let mut rng = thread_rng();
         for _ in 0..16 {
             let q = rng.gen_modulus();
-            streaming_test_helper::<AllWire, _>(&circuits::arithmetic::TestSubtraction(q));
+            streaming_test_helper::<AllWire, _>(&TestSubtraction(q));
         }
     }
 
@@ -239,7 +249,7 @@ mod streaming {
         let mut rng = thread_rng();
         for _ in 0..16 {
             let q = rng.gen_modulus();
-            streaming_test_helper::<AllWire, _>(&circuits::arithmetic::TestMulGate(q));
+            streaming_test_helper::<AllWire, _>(&TestMulGate(q));
         }
     }
 
@@ -249,7 +259,7 @@ mod streaming {
         for _ in 0..16 {
             let q = rng.gen_modulus();
             let c = rng.gen_u16() % q;
-            streaming_test_helper::<AllWire, _>(&circuits::arithmetic::TestCmul(q, c));
+            streaming_test_helper::<AllWire, _>(&TestCmul(q, c));
         }
     }
 
@@ -258,7 +268,7 @@ mod streaming {
         let mut rng = thread_rng();
         for _ in 0..16 {
             let q = rng.gen_modulus();
-            streaming_test_helper::<AllWire, _>(&circuits::proj::TestProj(q));
+            streaming_test_helper::<AllWire, _>(&TestProj(q));
         }
     }
 

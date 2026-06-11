@@ -95,20 +95,25 @@ impl<T: Clone + HasModulus, const N: usize> Flatten for [T; N] {
     }
 }
 
-/// Trait for defining input-size-dependent [`Circuit`]s.
+/// Trait for defining computations over [`Fancy`] objects.
 ///
-/// A `CircuitInputMapper` can map vectors of inputs to the appropriate input
-/// type as required to run [`Circuit::execute`].
+/// A `Circuit` computation is defined by a [`Circuit::Input`] associated type,
+/// a [`Circuit::Output`] associated type, and a [`Circuit::execute`] method
+/// that maps [`Circuit::Input`] to [`Circuit::Output`]. The body of
+/// [`Circuit::execute`] may use other `Circuit`s internally.
+///
+/// For mapping arbitrary inputs into the correct `Circuit` input
+/// representation, use the [`CircuitInputMapper`] trait.
 ///
 /// # Example
-/// Below extends the `AddCircuit` example from the [`Circuit`] documentation to
-/// support mapping a vector of inputs into the appropriate input type for the
-/// given circuit.
+/// Below is a simple circuit computing an add gate. The computation is defined
+/// in `execute` by directly calling operations on the underlying [`Fancy`]
+/// backend ([`crate::FancyArithmetic`] in this example).
 /// ```
-/// # use fancy_garbling::{FancyArithmetic, circuit::{Circuit, CircuitInputMapper}};
+/// # use fancy_garbling::{FancyArithmetic, circuit::Circuit};
 /// # use swanky_channel::Channel;
 /// # use swanky_error::Result;
-/// struct AddCircuit(u16);
+/// struct AddCircuit;
 /// impl<F: FancyArithmetic> Circuit<F> for AddCircuit {
 ///     type Input = (F::Item, F::Item);
 ///     type Output = F::Item;
@@ -122,6 +127,67 @@ impl<T: Clone + HasModulus, const N: usize> Flatten for [T; N] {
 ///         Ok(backend.add(&inputs.0, &inputs.1))
 ///     }
 /// }
+/// ```
+/// Given `AddCircuit`, any object instantiating the required [`Fancy`] traits
+/// can evaluate the circuit by calling `AddMany.execute(...)`.
+pub trait Circuit<F: Fancy> {
+    /// The input type of the circuit.
+    type Input;
+    /// The output type of the circuit.
+    ///
+    /// The [`Flatten`] trait allows the output type to be converted into a
+    /// `Vec<F::Item>`, which is useful when calling [`Fancy::outputs`].
+    type Output: Flatten<Item = F::Item>;
+
+    /// Execute a circuit on a given [`Fancy`] backend using the provided inputs.
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: &Self::Input,
+        channel: &mut Channel,
+    ) -> Result<Self::Output>;
+}
+
+/// Trait for defining input-size-dependent [`Circuit`]s.
+///
+/// The [`Circuit`] trait allows one to write circuits for arbitrary-length
+/// inputs, which becomes a problem when needing to be used in, for example, a
+/// garbled circuit protocol, where the input length needs to be know during the
+/// Oblivious Transfer phase of the protocol. This is where `CircuitInputMapper`
+/// comes in: it provides a [`CircuitInputMapper::map`] method for mapping
+/// vectors of inputs to the appropriate input type as required to run
+/// [`Circuit::execute`], alongside [`CircuitInputMapper::ninputs`] for
+/// determining the number of inputs for the circuit. Finally,
+/// [`CircuitInputMapper::modulus`] outputs the particular modulus required for
+/// the `i`th input wire.
+///
+/// While certain [`Fancy`] instantiations can evaluate [`Circuit`]s directly,
+/// several, including garbled circuits and zero knowledge protocols, operate
+/// over `CircuitInputMapper`s instead, and any [`Circuit`] to be run under
+/// these protocols needs to implement `CircuitInputMapper` as well.
+///
+/// # Example
+/// The below code extends the `AddCircuit` example from the [`Circuit`]
+/// documentation to support mapping a vector of inputs into the appropriate
+/// input type for the given circuit.
+/// ```
+/// # use fancy_garbling::{FancyArithmetic, circuit::{Circuit, CircuitInputMapper}};
+/// # use swanky_channel::Channel;
+/// # use swanky_error::Result;
+/// # struct AddCircuit;
+/// # impl<F: FancyArithmetic> Circuit<F> for AddCircuit {
+/// #     type Input = (F::Item, F::Item);
+/// #     type Output = F::Item;
+/// #
+/// #     fn execute(
+/// #         &self,
+/// #         backend: &mut F,
+/// #         inputs: &Self::Input,
+/// #         channel: &mut Channel,
+/// #     ) -> Result<Self::Output> {
+/// #         Ok(backend.add(&inputs.0, &inputs.1))
+/// #     }
+/// # }
 /// impl<F: FancyArithmetic> CircuitInputMapper<F> for AddCircuit {
 ///     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
 ///         assert_eq!(inputs.len(), 2);
@@ -141,62 +207,16 @@ pub trait CircuitInputMapper<F: Fancy>: Circuit<F> {
     /// Map a vector of inputs to [`Circuit::Input`].
     ///
     /// # Panics
-    /// This panics of the number of inputs does not match the expected input size.
+    /// This panics if the number of inputs does not match the expected input
+    /// size.
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input;
-    /// The number of inputs to provide to [`Circuit::execute`].
+    /// The number of inputs to provide to [`CircuitInputMapper::map`].
     fn ninputs(&self) -> usize;
-    /// The modulus for input `i`.
+    /// The modulus of the `i`th input.
     fn modulus(&self, i: usize) -> u16;
 }
 
-/// Trait for defining computations over [`Fancy`] objects.
-///
-/// A `Circuit` computation is defined by an [`Circuit::Input`] associated type,
-/// a [`Circuit::Output`] associated type, and a [`Circuit::execute`] method
-/// that maps a [`Circuit::Input`] to a [`Circuit::Output`].
-///
-/// For mapping arbitrary inputs into the correct `Circuit` input
-/// representation, use the [`CircuitInputMapper`] trait.
-///
-/// # Example
-/// Below is a simple example of computing an add gate over an arbitrary
-/// modulus. The computation is defined in `execute` by directly calling
-/// operations on the underlying [`Fancy`] backend.
-/// ```
-/// # use fancy_garbling::{FancyArithmetic, circuit::Circuit};
-/// # use swanky_channel::Channel;
-/// # use swanky_error::Result;
-/// struct AddCircuit(u16);
-/// impl<F: FancyArithmetic> Circuit<F> for AddCircuit {
-///     type Input = (F::Item, F::Item);
-///     type Output = F::Item;
-///
-///     fn execute(
-///         &self,
-///         backend: &mut F,
-///         inputs: &Self::Input,
-///         channel: &mut Channel,
-///     ) -> Result<Self::Output> {
-///         Ok(backend.add(&inputs.0, &inputs.1))
-///     }
-/// }
-/// ```
-pub trait Circuit<F: Fancy> {
-    /// The input type of the circuit.
-    type Input;
-    /// The output type of the circuit.
-    type Output: Flatten<Item = F::Item>;
-
-    /// Execute a circuit on a given [`Fancy`] backend using the provided inputs.
-    fn execute(
-        &self,
-        backend: &mut F,
-        inputs: &Self::Input,
-        channel: &mut Channel,
-    ) -> Result<Self::Output>;
-}
-
-pub mod circuits {
+pub mod test_circuits {
     //! A collection of test circuits.
 
     pub mod fancy {
@@ -771,8 +791,8 @@ pub mod circuits {
 #[cfg(test)]
 mod fancy_arithmetic {
     use crate::{
-        circuit::circuits,
         dummy::{Dummy, DummyVal},
+        test_circuits::arithmetic::{TestConstants, TestMulGate},
         util::RngExt,
     };
     use rand::thread_rng;
@@ -782,7 +802,7 @@ mod fancy_arithmetic {
         let mut rng = thread_rng();
         let q = rng.gen_modulus();
         let c = rng.gen_u16() % q;
-        let circ = circuits::arithmetic::TestConstants(q, c);
+        let circ = TestConstants(q, c);
 
         for _ in 0..64 {
             let x = DummyVal::rand(q, &mut rng);
@@ -795,7 +815,7 @@ mod fancy_arithmetic {
     fn arithmetic_half_gate() {
         let mut rng = thread_rng();
         let q = rng.gen_prime();
-        let c = circuits::arithmetic::TestMulGate(q);
+        let c = TestMulGate(q);
 
         for _ in 0..16 {
             let x = DummyVal::rand(q, &mut rng);
@@ -809,8 +829,9 @@ mod fancy_arithmetic {
 #[cfg(test)]
 mod fancy_proj {
     use crate::{
-        circuit::{CircuitInputMapper, circuits},
+        circuit::CircuitInputMapper,
         dummy::{Dummy, DummyVal},
+        test_circuits::proj::{TestAddManyModChange, TestModChange},
         util::RngExt,
     };
     use rand::thread_rng;
@@ -820,7 +841,7 @@ mod fancy_proj {
         let mut rng = thread_rng();
         let p = rng.gen_prime();
         let q = rng.gen_prime();
-        let c = circuits::proj::TestModChange(p, q);
+        let c = TestModChange(p, q);
 
         for _ in 0..16 {
             let x = DummyVal::rand(p, &mut rng);
@@ -833,16 +854,13 @@ mod fancy_proj {
     fn add_many_mod_change() {
         let mut rng = thread_rng();
         let n = 113;
-        let c = circuits::proj::TestAddManyModChange(n);
+        let c = TestAddManyModChange(n);
 
         for _ in 0..64 {
-            let inputs = (0
-                ..<circuits::proj::TestAddManyModChange as CircuitInputMapper<Dummy>>::ninputs(&c))
+            let inputs = (0..<TestAddManyModChange as CircuitInputMapper<Dummy>>::ninputs(&c))
                 .map(|i| {
                     DummyVal::rand(
-                        <circuits::proj::TestAddManyModChange as CircuitInputMapper<Dummy>>::modulus(
-                            &c, i,
-                        ),
+                        <TestAddManyModChange as CircuitInputMapper<Dummy>>::modulus(&c, i),
                         &mut rng,
                     )
                 })
