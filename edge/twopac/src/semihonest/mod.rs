@@ -41,7 +41,7 @@ mod tests {
                         let y = gb.receive(modulus, channel)?;
                         let outputs = circuit.execute(
                             &mut gb,
-                            &<TestAddition as CircuitInputMapper<
+                            <TestAddition as CircuitInputMapper<
                                 Garbler<SwankyRng, ChouOrlandiSender, _>,
                             >>::map(&circuit, [x, y].to_vec()),
                             channel,
@@ -59,7 +59,7 @@ mod tests {
                         let y = ev.encode(b, modulus, channel)?;
                         let output = circuit.execute(
                             &mut ev,
-                            &<TestAddition as CircuitInputMapper<
+                            <TestAddition as CircuitInputMapper<
                                 Evaluator<SwankyRng, ChouOrlandiReceiver, _>,
                             >>::map(&circuit, [x, y].to_vec()),
                             channel,
@@ -83,10 +83,8 @@ mod tests {
         for x in xs.iter() {
             let q = x.composite_modulus();
             let c = b.crt_constant_bundle(1, q, channel).unwrap();
-            let y = Multiplication::new().execute(b, &(x, &c), channel).unwrap();
-            let z = ReLU::new()
-                .execute(b, &(&y, "100%", None), channel)
-                .unwrap();
+            let y = Multiplication::new().execute(b, (x, &c), channel).unwrap();
+            let z = ReLU::new().execute(b, (&y, "100%", None), channel).unwrap();
             outputs.push(b.crt_output(&z, channel).unwrap());
         }
         outputs.into_iter().collect()
@@ -160,7 +158,7 @@ mod tests {
                 xs.extend(ys);
                 let outputs = circ.execute(
                     &mut gb,
-                    &<C as CircuitInputMapper<GB<_>>>::map(circ, xs),
+                    <C as CircuitInputMapper<GB<_>>>::map(circ, xs),
                     channel,
                 )?;
                 gb.outputs(&outputs.flatten(), channel)?;
@@ -174,7 +172,7 @@ mod tests {
                 xs.extend(ys);
                 let wirelabels = circ.execute(
                     &mut ev,
-                    &<C as CircuitInputMapper<EV<_>>>::map(circ, xs),
+                    <C as CircuitInputMapper<EV<_>>>::map(circ, xs),
                     channel,
                 )?;
                 let out = ev.outputs(&wirelabels.flatten(), channel)?;
@@ -185,7 +183,7 @@ mod tests {
 
         let target = Dummy::eval(
             circ,
-            &<C as CircuitInputMapper<Dummy>>::map(circ, vec![DummyVal::new(0, 2); 256]),
+            <C as CircuitInputMapper<Dummy>>::map(circ, vec![DummyVal::new(0, 2); 256]),
         )
         .unwrap();
         let target = target

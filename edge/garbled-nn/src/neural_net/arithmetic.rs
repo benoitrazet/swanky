@@ -193,7 +193,7 @@ impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> FancyNeuralN
         y: &Self::Item,
         channel: &mut Channel,
     ) -> Result<Self::Item> {
-        Addition::new().execute(self.backend, &(x, y), channel)
+        Addition::new().execute(self.backend, (x, y), channel)
     }
 
     fn nn_cmul(
@@ -204,7 +204,7 @@ impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> FancyNeuralN
     ) -> Result<Self::Item> {
         ConstantMultiplication::new().execute(
             self.backend,
-            &(x, to_mod_q(constant, self.input_modulus)),
+            (x, to_mod_q(constant, self.input_modulus)),
             channel,
         )
     }
@@ -244,7 +244,7 @@ impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> FancyNeuralN
     }
 
     fn nn_max(&mut self, xs: &[Self::Item], channel: &mut Channel) -> Result<Self::Item> {
-        Max::new().execute(self.backend, &(xs, &self.accuracy.max), channel)
+        Max::new().execute(self.backend, (xs, &self.accuracy.max), channel)
     }
 
     fn nn_activation(
@@ -256,10 +256,10 @@ impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> FancyNeuralN
         let ps = factor(self.output_modulus);
         match f {
             ActivationFunction::Sign => {
-                Sgn::new().execute(self.backend, &(x, &self.accuracy.sign, Some(&ps)), channel)
+                Sgn::new().execute(self.backend, (x, &self.accuracy.sign, Some(&ps)), channel)
             }
             ActivationFunction::Relu => {
-                ReLU::new().execute(self.backend, &(x, &self.accuracy.relu, Some(&ps)), channel)
+                ReLU::new().execute(self.backend, (x, &self.accuracy.relu, Some(&ps)), channel)
             }
             ActivationFunction::Identity => Ok(x.clone()),
         }

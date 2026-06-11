@@ -32,7 +32,7 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (xs, ys) = inputs;
@@ -57,8 +57,8 @@ where
                 .map(|x| backend.and(x, ywire, channel))
                 .collect::<Result<_>>()
                 .map(BinaryBundle::new)?;
-            let shifted = BinaryLeftShiftExtend.execute(backend, &(mul, i), channel)?;
-            let res = BinaryAddition::new().execute(backend, &(&sum, &shifted), channel)?;
+            let shifted = BinaryLeftShiftExtend.execute(backend, (mul, i), channel)?;
+            let res = BinaryAddition::new().execute(backend, (&sum, &shifted), channel)?;
             sum = res.0;
             sum.push(res.1);
         }
@@ -89,7 +89,7 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (xs, ys) = inputs;
@@ -110,8 +110,8 @@ where
                 .map(|x| backend.and(x, ywire, channel))
                 .collect::<Result<_>>()
                 .map(BinaryBundle::new)?;
-            let shifted = BinaryLeftShift.execute(backend, &(mul, i), channel)?;
-            sum = BinaryAdditionNoCarry::new().execute(backend, &(&sum, &shifted), channel)?;
+            let shifted = BinaryLeftShift.execute(backend, (mul, i), channel)?;
+            sum = BinaryAdditionNoCarry::new().execute(backend, (&sum, &shifted), channel)?;
         }
         Ok(sum)
     }
@@ -139,18 +139,18 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, c, nbits) = inputs;
-        let zero = BinaryConstant::new(0, *nbits).execute(backend, &(), channel)?;
-        u128_to_bits(*c, *nbits)
+        let zero = BinaryConstant::new(0, nbits).execute(backend, (), channel)?;
+        u128_to_bits(c, nbits)
             .into_iter()
             .enumerate()
             .filter_map(|(i, b)| if b > 0 { Some(i) } else { None })
             .try_fold(zero, |z, shift_amt| {
-                let s = BinaryLeftShift.execute(backend, &((*x).clone(), shift_amt), channel)?;
-                BinaryAdditionNoCarry::new().execute(backend, &(&z, &s), channel)
+                let s = BinaryLeftShift.execute(backend, ((*x).clone(), shift_amt), channel)?;
+                BinaryAdditionNoCarry::new().execute(backend, (&z, &s), channel)
             })
     }
 }
@@ -175,7 +175,7 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         BinaryMultiplication::new().execute(backend, inputs, channel)
@@ -227,7 +227,7 @@ mod test {
             let y = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
             let y_input = DummyVal::to_binary(y, nbits);
-            let output = Dummy::eval(&BinaryMultiplication::new(), &(&x_input, &y_input)).unwrap();
+            let output = Dummy::eval(&BinaryMultiplication::new(), (&x_input, &y_input)).unwrap();
             assert_eq!(DummyVal::from_binary(&output), x * y);
         }
     }
@@ -244,7 +244,7 @@ mod test {
             let x_input = DummyVal::to_binary(x, nbits);
             let y_input = DummyVal::to_binary(y, nbits);
             let output =
-                Dummy::eval(&BinaryMultiplicationLowerHalf::new(), &(&x_input, &y_input)).unwrap();
+                Dummy::eval(&BinaryMultiplicationLowerHalf::new(), (&x_input, &y_input)).unwrap();
             assert_eq!(DummyVal::from_binary(&output), (x * y) % q);
         }
     }
@@ -260,7 +260,7 @@ mod test {
             let c = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
             let output =
-                Dummy::eval(&BinaryConstantMultiplication::new(), &(&x_input, c, nbits)).unwrap();
+                Dummy::eval(&BinaryConstantMultiplication::new(), (&x_input, c, nbits)).unwrap();
             assert_eq!(DummyVal::from_binary(&output), (x * c) % q);
         }
     }

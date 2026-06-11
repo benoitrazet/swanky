@@ -29,14 +29,14 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let xs = *inputs;
+        let xs = inputs;
         assert!(!xs.is_empty(), "`xs` cannot be empty");
         xs.iter().skip(1).try_fold(xs[0].clone(), |x, y| {
             // Compute `x < y`.
-            let pos = BinaryLessThan::new().execute(backend, &(&x, y), channel)?;
+            let pos = BinaryLessThan::new().execute(backend, (&x, y), channel)?;
             // Compute `!(x < y)`.
             let neg = backend.negate(&pos);
             // Compute `x * (x >= y) ^ y * (x < y)`.
@@ -77,7 +77,7 @@ mod test {
             let max = *xs.iter().max().unwrap();
             let xs_input: Vec<BinaryBundle<DummyVal>> =
                 xs.iter().map(|x| DummyVal::to_binary(*x, nbits)).collect();
-            let output = Dummy::eval(&BinaryMax::new(), &xs_input.as_slice()).unwrap();
+            let output = Dummy::eval(&BinaryMax::new(), xs_input.as_slice()).unwrap();
             let output_val = DummyVal::from_binary(&output);
             assert_eq!(output_val, max);
         }

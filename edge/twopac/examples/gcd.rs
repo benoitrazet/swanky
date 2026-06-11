@@ -24,7 +24,7 @@ const NBITS: usize = 128;
 fn gb_gcd(input: u128, upper_bound: usize, channel: &mut Channel, rng: SwankyRng) -> Result<()> {
     let mut gb = Garbler::<SwankyRng, OtSender, AllWire>::new(channel, rng)?;
     let inputs = gb_set_inputs(&mut gb, input, channel)?;
-    let gcd = Gcd::new(upper_bound).execute(&mut gb, &(&inputs.0, &inputs.1), channel)?;
+    let gcd = Gcd::new(upper_bound).execute(&mut gb, (&inputs.0, &inputs.1), channel)?;
     gb.bin_output(&gcd, channel)?;
     Ok(())
 }
@@ -54,7 +54,7 @@ fn gb_set_inputs<F: BinaryGadgets>(
 fn ev_gcd(input: u128, upper_bound: usize, channel: &mut Channel, rng: SwankyRng) -> Result<u128> {
     let mut ev = Evaluator::<SwankyRng, OtReceiver, AllWire>::new(channel, rng)?;
     let inputs = ev_set_inputs(&mut ev, input, channel)?;
-    let gcd = Gcd::new(upper_bound).execute(&mut ev, &(&inputs.0, &inputs.1), channel)?;
+    let gcd = Gcd::new(upper_bound).execute(&mut ev, (&inputs.0, &inputs.1), channel)?;
     let output = ev
         .bin_output(&gcd, channel)?
         .expect("evaluator should produce outputs");

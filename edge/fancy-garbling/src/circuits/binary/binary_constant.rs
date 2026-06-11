@@ -42,7 +42,7 @@ impl<F: Fancy> Circuit<F> for BinaryConstant<F> {
     fn execute(
         &self,
         backend: &mut F,
-        _: &Self::Input,
+        _: Self::Input,
         channel: &mut swanky_channel::Channel,
     ) -> Result<Self::Output> {
         let xs = u128_to_bits(self.value, self.nbits);
@@ -81,7 +81,7 @@ pub mod test {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &Self::Input,
+            inputs: Self::Input,
             channel: &mut swanky_channel::Channel,
         ) -> Result<Self::Output> {
             BinaryConstant::new(self.0, self.1).execute(backend, inputs, channel)
@@ -112,7 +112,7 @@ pub mod test {
             let nbits = 1 + rng.r#gen::<usize>() % 127;
             let value = rng.r#gen::<u128>() % (nbits as u128);
             let c = TestBinaryConstant(value, nbits);
-            let output = Dummy::eval(&c, &()).unwrap();
+            let output = Dummy::eval(&c, ()).unwrap();
             assert_eq!(DummyVal::from_binary(&output), value);
         }
     }

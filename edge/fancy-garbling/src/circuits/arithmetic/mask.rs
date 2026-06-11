@@ -27,7 +27,7 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (b, x) = inputs;
@@ -62,7 +62,7 @@ mod test {
             let x_input = DummyVal::to_crt(x, q);
 
             let circuit = Mask::new();
-            let z = Dummy::eval(&circuit, &(&b_input, &x_input)).unwrap();
+            let z = Dummy::eval(&circuit, (&b_input, &x_input)).unwrap();
             let output = DummyVal::from_crt(&z, q);
 
             assert_eq!(output, (b as u128) * x);

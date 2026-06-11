@@ -27,10 +27,10 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let xs = *inputs;
+        let xs = inputs;
         let gadget_projection_tt = |p: u16, q: u16| -> Vec<u16> {
             let pq = p as u32 + q as u32 - 1;
             let mut tab = Vec::with_capacity(pq as usize);
@@ -114,11 +114,11 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let z = Subtraction::new().execute(backend, inputs, channel)?;
-        let mut pmr = ToPmr::new().execute(backend, &&z, channel)?;
+        let mut pmr = ToPmr::new().execute(backend, &z, channel)?;
         let w = pmr.pop().unwrap();
         let mut tab = vec![1; w.modulus() as usize];
         tab[0] = 0;
@@ -152,7 +152,7 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let z = PmrLessThan::new().execute(backend, inputs, channel)?;
@@ -195,7 +195,7 @@ mod test {
             let expected = to_pmr_pt(x, &ps);
 
             let x_input = DummyVal::to_crt(x, q);
-            let z = Dummy::eval(&ToPmr::new(), &&x_input).unwrap();
+            let z = Dummy::eval(&ToPmr::new(), &x_input).unwrap();
             let output = z.wires().iter().map(|w| w.val()).collect::<Vec<_>>();
             assert_eq!(output, expected);
         }
@@ -214,7 +214,7 @@ mod test {
 
             let x_input = DummyVal::to_crt(x, q);
             let y_input = DummyVal::to_crt(y, q);
-            let output = Dummy::eval(&PmrLessThan::new(), &(&x_input, &y_input)).unwrap();
+            let output = Dummy::eval(&PmrLessThan::new(), (&x_input, &y_input)).unwrap();
             assert_eq!(output.val(), (x < y) as u16);
         }
     }
@@ -232,7 +232,7 @@ mod test {
 
             let x_input = DummyVal::to_crt(x, q);
             let y_input = DummyVal::to_crt(y, q);
-            let output = Dummy::eval(&PmrGreaterThanOrEqual::new(), &(&x_input, &y_input)).unwrap();
+            let output = Dummy::eval(&PmrGreaterThanOrEqual::new(), (&x_input, &y_input)).unwrap();
             assert_eq!(output.val(), (x >= y) as u16);
         }
     }

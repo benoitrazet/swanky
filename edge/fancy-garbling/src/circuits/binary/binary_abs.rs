@@ -28,14 +28,14 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let x = *inputs;
+        let x = inputs;
 
         let sign = x.wires().last().unwrap();
-        let negated = BinaryTwosComplement::new().execute(backend, &x, channel)?;
-        BinaryMultiplex::new().execute(backend, &(sign.clone(), x, &negated), channel)
+        let negated = BinaryTwosComplement::new().execute(backend, x, channel)?;
+        BinaryMultiplex::new().execute(backend, (sign.clone(), x, &negated), channel)
     }
 }
 
@@ -57,7 +57,7 @@ mod test {
             let x = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
             let circuit = BinaryAbs::new();
-            let output = Dummy::eval(&circuit, &&x_input).unwrap();
+            let output = Dummy::eval(&circuit, &x_input).unwrap();
             assert_eq!(
                 DummyVal::from_binary(&output),
                 if x >> (nbits - 1) > 0 {

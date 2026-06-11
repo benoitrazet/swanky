@@ -23,10 +23,10 @@ impl<F: FancyBinary> Circuit<F> for BinaryCircuit {
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        self.eval_to_wirelabels(backend, inputs, channel)
+        self.eval_to_wirelabels(backend, &inputs, channel)
     }
 }
 

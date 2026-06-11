@@ -28,10 +28,9 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        input: &Self::Input,
+        input: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let input = *input;
         let not_xs = BinaryBundle::new(
             input
                 .wires()
@@ -39,8 +38,8 @@ where
                 .map(|x| backend.negate(x))
                 .collect::<Vec<_>>(),
         );
-        let one = BinaryConstant::new(1, input.size()).execute(backend, &(), channel)?;
-        BinaryAdditionNoCarry::new().execute(backend, &(&not_xs, &one), channel)
+        let one = BinaryConstant::new(1, input.size()).execute(backend, (), channel)?;
+        BinaryAdditionNoCarry::new().execute(backend, (&not_xs, &one), channel)
     }
 }
 
@@ -58,7 +57,7 @@ pub mod test {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &Self::Input,
+            inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
             BinaryTwosComplement::new().execute(backend, &inputs, channel)
@@ -93,7 +92,7 @@ pub mod test {
         for _ in 0..16 {
             let x = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
-            let output = Dummy::eval(&c, &x_input).unwrap();
+            let output = Dummy::eval(&c, x_input).unwrap();
             assert_eq!(DummyVal::from_binary(&output), (((!x) % q) + 1) % q);
         }
     }

@@ -64,7 +64,7 @@ impl GarbledCircuit {
 
             // First, garble the circuit, outputting the zero wirelabels
             // associated with the output.
-            let zeros = circuit.execute(&mut garbler, &circuit.map(inputs.clone()), channel)?;
+            let zeros = circuit.execute(&mut garbler, circuit.map(inputs.clone()), channel)?;
             let zeros = zeros.flatten();
             // Next, map the zero output wirelabels to the set of valid outputs.
             // This is needed for evaluators that don't use the output
@@ -87,7 +87,7 @@ impl GarbledCircuit {
     pub fn eval<Wire: WireLabel, C: Circuit<Evaluator<Wire>>>(
         &self,
         circuit: &C,
-        inputs: &C::Input,
+        inputs: C::Input,
         output_mapping: &OutputMapping,
     ) -> swanky_error::Result<Vec<u16>> {
         let wirelabels = self.eval_to_wirelabels(circuit, inputs)?;
@@ -99,7 +99,7 @@ impl GarbledCircuit {
     pub fn eval_to_wirelabels<Wire: WireLabel, C: Circuit<Evaluator<Wire>>>(
         &self,
         circuit: &C,
-        inputs: &C::Input,
+        inputs: C::Input,
     ) -> swanky_error::Result<C::Output> {
         Channel::with(GarbledChannel::from(self), |channel| {
             let mut evaluator = Evaluator::new(channel)?;

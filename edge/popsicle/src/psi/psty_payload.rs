@@ -142,7 +142,7 @@ impl Sender {
 
         let (aggregate, sum_weights) = state.build_and_compute_circuit(&mut gb, channel).unwrap();
         let weighted_mean =
-            Division::new().execute(&mut gb, &(&aggregate, &sum_weights), channel)?;
+            Division::new().execute(&mut gb, (&aggregate, &sum_weights), channel)?;
 
         gb.outputs(weighted_mean.wires(), channel).unwrap();
 
@@ -187,7 +187,7 @@ impl Sender {
             .compute_payload(ts_id, ts_payload, table, payload, path_deltas, channel, rng)
             .unwrap();
         let weighted_mean =
-            Division::new().execute(&mut gb, &(&aggregate, &sum_weights), channel)?;
+            Division::new().execute(&mut gb, (&aggregate, &sum_weights), channel)?;
         println!("Done");
         gb.outputs(weighted_mean.wires(), channel).unwrap();
         Ok(())
@@ -235,9 +235,9 @@ impl Sender {
             let (partial, partial_sum_weights) =
                 state.build_and_compute_circuit(&mut gb, channel).unwrap();
 
-            acc = Addition::new().execute(&mut gb, &(&acc, &partial), channel)?;
+            acc = Addition::new().execute(&mut gb, (&acc, &partial), channel)?;
             sum_weights =
-                Addition::new().execute(&mut gb, &(&sum_weights, &partial_sum_weights), channel)?;
+                Addition::new().execute(&mut gb, (&sum_weights, &partial_sum_weights), channel)?;
 
             println!(
                 "Sender :: Computation time: {} ms",
@@ -268,12 +268,12 @@ impl Sender {
             let partial_aggregate = CrtBundle::new(aggregates[i].clone());
             let partial_sum_weight = CrtBundle::new(sum_of_weights[i].clone());
 
-            acc = Addition::new().execute(&mut gb, &(&acc, &partial_aggregate), channel)?;
+            acc = Addition::new().execute(&mut gb, (&acc, &partial_aggregate), channel)?;
             sum_weights =
-                Addition::new().execute(&mut gb, &(&sum_weights, &partial_sum_weight), channel)?;
+                Addition::new().execute(&mut gb, (&sum_weights, &partial_sum_weight), channel)?;
         }
 
-        let weighted_mean = Division::new().execute(&mut gb, &(&acc, &sum_weights), channel)?;
+        let weighted_mean = Division::new().execute(&mut gb, (&acc, &sum_weights), channel)?;
         gb.outputs(weighted_mean.wires(), channel).unwrap();
         Ok(())
     }
@@ -485,7 +485,7 @@ impl Receiver {
         self.receive_data(&mut state, channel, rng)?;
         let (aggregate, sum_weights) = state.build_and_compute_circuit(&mut ev, channel).unwrap();
         let weighted_mean =
-            Division::new().execute(&mut ev, &(&aggregate, &sum_weights), channel)?;
+            Division::new().execute(&mut ev, (&aggregate, &sum_weights), channel)?;
 
         let weighted_mean_outs = ev
             .outputs(weighted_mean.wires(), channel)
@@ -520,7 +520,7 @@ impl Receiver {
         let (aggregate, sum_weights) = self.compute_payload(table, payload, channel, rng).unwrap();
 
         let weighted_mean =
-            Division::new().execute(&mut ev, &(&aggregate, &sum_weights), channel)?;
+            Division::new().execute(&mut ev, (&aggregate, &sum_weights), channel)?;
         let weighted_mean_outs = ev
             .outputs(weighted_mean.wires(), channel)
             .unwrap()
@@ -566,9 +566,9 @@ impl Receiver {
             let (partial, partial_sum_weights) =
                 state.build_and_compute_circuit(&mut ev, channel).unwrap();
 
-            acc = Addition::new().execute(&mut ev, &(&acc, &partial), channel)?;
+            acc = Addition::new().execute(&mut ev, (&acc, &partial), channel)?;
             sum_weights =
-                Addition::new().execute(&mut ev, &(&sum_weights, &partial_sum_weights), channel)?;
+                Addition::new().execute(&mut ev, (&sum_weights, &partial_sum_weights), channel)?;
 
             println!(
                 "Receiver :: Computation time: {} ms",
@@ -601,12 +601,12 @@ impl Receiver {
             let partial_aggregate = CrtBundle::new(aggregates[i].clone());
             let partial_sum_weights = CrtBundle::new(sum_of_weights[i].clone());
 
-            acc = Addition::new().execute(&mut ev, &(&acc, &partial_aggregate), channel)?;
+            acc = Addition::new().execute(&mut ev, (&acc, &partial_aggregate), channel)?;
             sum_weights =
-                Addition::new().execute(&mut ev, &(&sum_weights, &partial_sum_weights), channel)?;
+                Addition::new().execute(&mut ev, (&sum_weights, &partial_sum_weights), channel)?;
         }
 
-        let weighted_mean = Division::new().execute(&mut ev, &(&acc, &sum_weights), channel)?;
+        let weighted_mean = Division::new().execute(&mut ev, (&acc, &sum_weights), channel)?;
 
         let weighted_mean_outs = ev
             .outputs(weighted_mean.wires(), channel)
@@ -879,7 +879,7 @@ fn fancy_compute_payload_aggregate<F: FancyArithmetic + FancyProj + CrtGadgets>(
         .map(|(xs, ys)| {
             Equality::new().execute(
                 f,
-                &(&CrtBundle::new(xs.to_vec()), &CrtBundle::new(ys.to_vec())),
+                (&CrtBundle::new(xs.to_vec()), &CrtBundle::new(ys.to_vec())),
                 channel,
             )
         })
@@ -891,7 +891,7 @@ fn fancy_compute_payload_aggregate<F: FancyArithmetic + FancyProj + CrtGadgets>(
         .map(|(xp, tp)| {
             let b_x = Bundle::new(xp.to_vec());
             let b_t = Bundle::new(tp.to_vec());
-            Subtraction::new().execute(f, &(&CrtBundle::from(b_t), &CrtBundle::from(b_x)), channel)
+            Subtraction::new().execute(f, (&CrtBundle::from(b_t), &CrtBundle::from(b_x)), channel)
         })
         .collect::<Result<Vec<_>>>()?;
 
@@ -903,7 +903,7 @@ fn fancy_compute_payload_aggregate<F: FancyArithmetic + FancyProj + CrtGadgets>(
     {
         let (ps, pr) = it;
         let weighted =
-            Multiplication::new().execute(f, &(&ps, &CrtBundle::new(pr.to_vec())), channel)?;
+            Multiplication::new().execute(f, (&ps, &CrtBundle::new(pr.to_vec())), channel)?;
         weighted_payloads.push(weighted);
     }
 
@@ -920,12 +920,12 @@ fn fancy_compute_payload_aggregate<F: FancyArithmetic + FancyProj + CrtGadgets>(
             .collect::<swanky_error::Result<Vec<F::Item>>>()?;
         let b_crt = CrtBundle::new(b_ws);
 
-        let mux = Multiplication::new().execute(f, &(&b_crt, &weighted_payloads[i]), channel)?;
+        let mux = Multiplication::new().execute(f, (&b_crt, &weighted_payloads[i]), channel)?;
         let mux_sum_weights =
-            Multiplication::new().execute(f, &(&b_crt, &reconstructed_payload[i]), channel)?;
+            Multiplication::new().execute(f, (&b_crt, &reconstructed_payload[i]), channel)?;
 
-        acc = Addition::new().execute(f, &(&acc, &mux), channel)?;
-        sum_weights = Addition::new().execute(f, &(&sum_weights, &mux_sum_weights), channel)?;
+        acc = Addition::new().execute(f, (&acc, &mux), channel)?;
+        sum_weights = Addition::new().execute(f, (&sum_weights, &mux_sum_weights), channel)?;
     }
     Ok((acc, sum_weights))
 }

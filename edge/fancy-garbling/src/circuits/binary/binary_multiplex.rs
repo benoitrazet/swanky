@@ -35,14 +35,14 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (b, xs, ys) = inputs;
         xs.wires()
             .iter()
             .zip(ys.wires().iter())
-            .map(|(x, y)| Mux::new().execute(backend, &(&b.clone(), x, y), channel))
+            .map(|(x, y)| Mux::new().execute(backend, (&b.clone(), x, y), channel))
             .collect::<Result<Vec<_>>>()
             .map(BinaryBundle::new)
     }
@@ -59,23 +59,23 @@ impl<F: FancyBinary> Circuit<F> for BinaryMultiplexConstantBits {
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (b, c1, c2, nbits) = inputs;
 
-        let c1_bs = u128_to_bits(*c1, *nbits)
+        let c1_bs = u128_to_bits(c1, nbits)
             .into_iter()
             .map(|x: u16| x > 0)
             .collect::<Vec<_>>();
-        let c2_bs = u128_to_bits(*c2, *nbits)
+        let c2_bs = u128_to_bits(c2, nbits)
             .into_iter()
             .map(|x: u16| x > 0)
             .collect::<Vec<_>>();
         c1_bs
             .into_iter()
             .zip(c2_bs)
-            .map(|(b1, b2)| MuxConstants::new().execute(backend, &(&b.clone(), b1, b2), channel))
+            .map(|(b1, b2)| MuxConstants::new().execute(backend, (&b.clone(), b1, b2), channel))
             .collect::<Result<_>>()
             .map(BinaryBundle::new)
     }
@@ -102,7 +102,7 @@ mod test {
         for b in 0..=1 {
             let output = Dummy::eval(
                 &BinaryMultiplex::new(),
-                &(DummyVal::new(b, 2), &x_inputs, &y_inputs),
+                (DummyVal::new(b, 2), &x_inputs, &y_inputs),
             )
             .unwrap();
             assert_eq!(DummyVal::from_binary(&output), if b == 0 { x } else { y });
@@ -119,7 +119,7 @@ mod test {
         for b in 0..=1 {
             let output = Dummy::eval(
                 &BinaryMultiplexConstantBits,
-                &(DummyVal::new(b, 2), x, y, nbits),
+                (DummyVal::new(b, 2), x, y, nbits),
             )
             .unwrap();
             assert_eq!(DummyVal::from_binary(&output), if b == 0 { x } else { y });

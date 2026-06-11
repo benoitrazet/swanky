@@ -28,10 +28,10 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let xs = *inputs;
+        let xs = inputs;
         assert!(!xs.is_empty(), "`inputs` cannot be empty");
         assert!(xs.iter().all(|x| x.moduli() == xs[0].moduli()));
 
@@ -58,7 +58,7 @@ where
                 .map(|d| backend.mod_change(d, max_val + 1, channel))
                 .collect::<swanky_error::Result<Vec<_>>>()?;
             // add them up
-            let sum = AddMany::new().execute(backend, &modded_ds.as_slice(), channel)?;
+            let sum = AddMany::new().execute(backend, modded_ds.as_slice(), channel)?;
             // add in the carry
             let sum_with_carry = opt_carry
                 .as_ref()
@@ -85,7 +85,7 @@ where
             .iter()
             .map(|x| x.wires()[n - 1].clone())
             .collect::<Vec<_>>();
-        let digit_sum = AddMany::new().execute(backend, &ds.as_slice(), channel)?;
+        let digit_sum = AddMany::new().execute(backend, ds.as_slice(), channel)?;
         Ok(opt_carry
             .as_ref()
             .map_or(digit_sum.clone(), |d| backend.add(&digit_sum, d)))
@@ -113,10 +113,10 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let xs = *inputs;
+        let xs = inputs;
         assert!(!xs.is_empty(), "`xs` cannot be empty");
         assert!(xs.iter().all(|x| x.moduli() == xs[0].moduli()));
 
@@ -134,7 +134,7 @@ where
             let ds = xs.iter().map(|x| x.wires()[i].clone()).collect::<Vec<_>>();
 
             // compute the digit -- easy
-            let digit_sum = AddMany::new().execute(backend, &ds.as_slice(), channel)?;
+            let digit_sum = AddMany::new().execute(backend, ds.as_slice(), channel)?;
             let digit = digit_carry.map_or(digit_sum.clone(), |d| backend.add(&digit_sum, &d));
 
             if i < n - 1 {
@@ -150,7 +150,7 @@ where
                     .map(|d| backend.mod_change(d, max_val + 1, channel))
                     .collect::<Result<Vec<_>>>()?;
 
-                let carry_sum = AddMany::new().execute(backend, &modded_ds.as_slice(), channel)?;
+                let carry_sum = AddMany::new().execute(backend, modded_ds.as_slice(), channel)?;
                 // add in the carry from the previous iteration
                 let carry = carry_carry.map_or(carry_sum.clone(), |c| backend.add(&carry_sum, &c));
 
@@ -212,10 +212,10 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let (bun, ms) = *inputs;
+        let (bun, ms) = inputs;
 
         let ndigits = ms.len();
 
@@ -247,7 +247,7 @@ where
             ds.push(CrtBundle::new(new_ds));
         }
 
-        MixedRadixAdditionMSBOnly::new().execute(backend, &ds.as_slice(), channel)
+        MixedRadixAdditionMSBOnly::new().execute(backend, ds.as_slice(), channel)
     }
 }
 
@@ -272,7 +272,7 @@ mod test {
         let inputs = (0..nargs)
             .map(|_| DummyVal::to_mixed_radix(q - 1, &moduli))
             .collect::<Vec<_>>();
-        let output = Dummy::eval(&MixedRadixAdditionMSBOnly::new(), &inputs.as_slice()).unwrap();
+        let output = Dummy::eval(&MixedRadixAdditionMSBOnly::new(), inputs.as_slice()).unwrap();
         assert_eq!(
             output.val(),
             *as_mixed_radix((q - 1) * (nargs as u128) % q, &moduli)
@@ -289,8 +289,7 @@ mod test {
                 expected = (expected + x) % q;
                 inputs.push(DummyVal::to_mixed_radix(x, &moduli));
             }
-            let output =
-                Dummy::eval(&MixedRadixAdditionMSBOnly::new(), &inputs.as_slice()).unwrap();
+            let output = Dummy::eval(&MixedRadixAdditionMSBOnly::new(), inputs.as_slice()).unwrap();
             assert_eq!(
                 output.val(),
                 *as_mixed_radix(expected, &moduli).last().unwrap()
@@ -309,7 +308,7 @@ mod test {
         let inputs = (0..nargs)
             .map(|_| DummyVal::to_mixed_radix(q - 1, &moduli))
             .collect::<Vec<_>>();
-        let output = Dummy::eval(&MixedRadixAddition::new(), &inputs.as_slice()).unwrap();
+        let output = Dummy::eval(&MixedRadixAddition::new(), inputs.as_slice()).unwrap();
         assert_eq!(
             DummyVal::from_mixed_radix(&output),
             (q - 1) * (nargs as u128) % q
@@ -324,7 +323,7 @@ mod test {
                 expected = (expected + x) % q;
                 inputs.push(DummyVal::to_mixed_radix(x, &moduli));
             }
-            let output = Dummy::eval(&MixedRadixAddition::new(), &inputs.as_slice()).unwrap();
+            let output = Dummy::eval(&MixedRadixAddition::new(), inputs.as_slice()).unwrap();
             assert_eq!(DummyVal::from_mixed_radix(&output), expected);
         }
     }

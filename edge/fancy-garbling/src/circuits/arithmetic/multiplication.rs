@@ -24,7 +24,7 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
@@ -60,11 +60,11 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         _: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, c) = inputs;
-        let cs = crt(*c, &x.moduli());
+        let cs = crt(c, &x.moduli());
         Ok(CrtBundle::new(
             x.wires()
                 .iter()
@@ -95,7 +95,7 @@ mod test {
             let x_input = DummyVal::to_crt(x, q);
             let y_input = DummyVal::to_crt(y, q);
             let circuit = Multiplication::new();
-            let z = Dummy::eval(&circuit, &(&x_input, &y_input)).unwrap();
+            let z = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
             let output = DummyVal::from_crt(&z, q);
             assert_eq!(output, (x * y) % q);
         }
@@ -111,7 +111,7 @@ mod test {
             let c = rng.r#gen::<u64>() as u128 % q;
             let x_input = DummyVal::to_crt(x, q);
             let circuit = ConstantMultiplication::new();
-            let z = Dummy::eval(&circuit, &(&x_input, c)).unwrap();
+            let z = Dummy::eval(&circuit, (&x_input, c)).unwrap();
             let output = DummyVal::from_crt(&z, q);
             assert_eq!(output, (x * c) % q);
         }

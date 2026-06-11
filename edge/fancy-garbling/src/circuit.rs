@@ -121,7 +121,7 @@ impl<T: Clone + HasModulus, const N: usize> Flatten for [T; N] {
 ///     fn execute(
 ///         &self,
 ///         backend: &mut F,
-///         inputs: &Self::Input,
+///         inputs: Self::Input,
 ///         channel: &mut Channel,
 ///     ) -> Result<Self::Output> {
 ///         Ok(backend.add(&inputs.0, &inputs.1))
@@ -143,7 +143,7 @@ pub trait Circuit<F: Fancy> {
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output>;
 }
@@ -182,7 +182,7 @@ pub trait Circuit<F: Fancy> {
 /// #     fn execute(
 /// #         &self,
 /// #         backend: &mut F,
-/// #         inputs: &Self::Input,
+/// #         inputs: Self::Input,
 /// #         channel: &mut Channel,
 /// #     ) -> Result<Self::Output> {
 /// #         Ok(backend.add(&inputs.0, &inputs.1))
@@ -238,7 +238,7 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                _: &Self::Input,
+                _: Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
                 let outputs = vec![
@@ -283,10 +283,10 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                input: &Self::Input,
+                input: Self::Input,
                 _: &mut Channel,
             ) -> Result<Self::Output> {
-                Ok(backend.negate(input))
+                Ok(backend.negate(&input))
             }
         }
         impl<F: FancyBinary> CircuitInputMapper<F> for TestNegateGate {
@@ -313,7 +313,7 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &Self::Input,
+                inputs: Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
                 backend.and(&inputs.0, &inputs.1, channel)
@@ -343,10 +343,10 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &Self::Input,
+                inputs: Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                AndMany::new().execute(backend, &inputs.as_slice(), channel)
+                AndMany::new().execute(backend, inputs.as_slice(), channel)
             }
         }
 
@@ -374,10 +374,10 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &Self::Input,
+                inputs: Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                OrMany::new().execute(backend, &inputs.as_slice(), channel)
+                OrMany::new().execute(backend, inputs.as_slice(), channel)
             }
         }
         impl<F: FancyBinary> CircuitInputMapper<F> for TestOrGateFanN {
@@ -404,10 +404,10 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &Self::Input,
+                inputs: Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                XorMany::new().execute(backend, &inputs.as_slice(), channel)
+                XorMany::new().execute(backend, inputs.as_slice(), channel)
             }
         }
         impl<F: FancyBinary> CircuitInputMapper<F> for TestXorGateFanN {
@@ -446,7 +446,7 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &Self::Input,
+                inputs: Self::Input,
                 _: &mut Channel,
             ) -> Result<Self::Output> {
                 Ok(backend.add(&inputs.0, &inputs.1))
@@ -476,10 +476,10 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &Self::Input,
+                inputs: Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                AddMany::new().execute(backend, &inputs.as_slice(), channel)
+                AddMany::new().execute(backend, inputs.as_slice(), channel)
             }
         }
         impl<F: FancyArithmetic> CircuitInputMapper<F> for TestAddMany {
@@ -506,7 +506,7 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &Self::Input,
+                inputs: Self::Input,
                 _: &mut Channel,
             ) -> Result<Self::Output> {
                 Ok(backend.sub(&inputs.0, &inputs.1))
@@ -536,7 +536,7 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &Self::Input,
+                inputs: Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
                 backend.mul(&inputs.0, &inputs.1, channel)
@@ -567,7 +567,7 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &Self::Input,
+                inputs: Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
                 backend.mul(&inputs.0, &inputs.1, channel)
@@ -597,10 +597,10 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                input: &Self::Input,
+                input: Self::Input,
                 _: &mut Channel,
             ) -> Result<Self::Output> {
-                Ok(backend.cmul(input, self.1))
+                Ok(backend.cmul(&input, self.1))
             }
         }
         impl<F: FancyArithmetic> CircuitInputMapper<F> for TestCmul {
@@ -627,11 +627,11 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                input: &Self::Input,
+                input: Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
                 let constant = backend.constant(self.1, self.0, channel)?;
-                Ok(backend.add(input, &constant))
+                Ok(backend.add(&input, &constant))
             }
         }
         impl<F: FancyArithmetic> CircuitInputMapper<F> for TestConstants {
@@ -670,11 +670,11 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                input: &Self::Input,
+                input: Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
                 let tab = (0..self.0).map(|i| (i + 1) % self.0).collect();
-                backend.proj(input, self.0, Some(tab), channel)
+                backend.proj(&input, self.0, Some(tab), channel)
             }
         }
         impl<F: FancyProj> CircuitInputMapper<F> for TestProj {
@@ -701,10 +701,10 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                input: &Self::Input,
+                input: Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                backend.proj(input, self.0, Some(self.1.clone()), channel)
+                backend.proj(&input, self.0, Some(self.1.clone()), channel)
             }
         }
         impl<F: FancyProj> CircuitInputMapper<F> for TestProjRand {
@@ -731,10 +731,10 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                input: &Self::Input,
+                input: Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let y = backend.mod_change(input, self.1, channel)?;
+                let y = backend.mod_change(&input, self.1, channel)?;
                 backend.mod_change(&y, self.0, channel)
             }
         }
@@ -763,14 +763,14 @@ pub mod test_circuits {
             fn execute(
                 &self,
                 backend: &mut F,
-                inputs: &Self::Input,
+                inputs: Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
                 let wires = inputs
                     .iter()
                     .map(|x| backend.mod_change(x, self.0 as u16 + 1, channel))
                     .collect::<Result<Vec<_>>>()?;
-                AddMany::new().execute(backend, &wires.as_slice(), channel)
+                AddMany::new().execute(backend, wires.as_slice(), channel)
             }
         }
         impl<F: FancyProj + FancyArithmetic> CircuitInputMapper<F> for TestAddManyModChange {
@@ -808,7 +808,7 @@ mod fancy_arithmetic {
 
         for _ in 0..64 {
             let x = DummyVal::rand(q, &mut rng);
-            let output = Dummy::eval(&circ, &x).unwrap();
+            let output = Dummy::eval(&circ, x).unwrap();
             assert_eq!(output.val(), (x.val() + c) % q);
         }
     }
@@ -822,7 +822,7 @@ mod fancy_arithmetic {
         for _ in 0..16 {
             let x = DummyVal::rand(q, &mut rng);
             let y = DummyVal::rand(q, &mut rng);
-            let output = Dummy::eval(&c, &(x, y)).unwrap();
+            let output = Dummy::eval(&c, (x, y)).unwrap();
             assert_eq!(output.val(), (x.val() * y.val()) % q);
         }
     }
@@ -847,7 +847,7 @@ mod fancy_proj {
 
         for _ in 0..16 {
             let x = DummyVal::rand(p, &mut rng);
-            let output = Dummy::eval(&c, &x).unwrap();
+            let output = Dummy::eval(&c, x).unwrap();
             assert_eq!(output.val(), x.val() % q);
         }
     }
@@ -868,7 +868,7 @@ mod fancy_proj {
                 })
                 .collect::<Vec<_>>();
             let expected: u16 = inputs.iter().map(|x| x.val()).sum();
-            let output = Dummy::eval(&c, &inputs).unwrap();
+            let output = Dummy::eval(&c, inputs).unwrap();
             assert_eq!(output.val(), expected);
         }
     }

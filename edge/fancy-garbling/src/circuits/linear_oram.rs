@@ -29,7 +29,7 @@ impl<F: FancyBinary, const N: usize> Circuit<F> for LinearOram<N> {
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (ram, query) = inputs;
@@ -38,7 +38,7 @@ impl<F: FancyBinary, const N: usize> Circuit<F> for LinearOram<N> {
 
         let zero =
             BinaryConstant::new_with_constants(0, N, Some(zero_bit.clone()), Some(one_bit.clone()))
-                .execute(backend, &(), channel)?;
+                .execute(backend, (), channel)?;
 
         // Traverse the RAM one element at a time, and multiplex the result
         // based on whether the query matches the current index.
@@ -50,13 +50,13 @@ impl<F: FancyBinary, const N: usize> Circuit<F> for LinearOram<N> {
                 Some(zero_bit.clone()),
                 Some(one_bit.clone()),
             )
-            .execute(backend, &(), channel)?;
-            let is_equal = BinaryEquality::new().execute(backend, &(query, &index), channel)?;
-            let mux = BinaryMultiplex::new().execute(backend, &(is_equal, &zero, item), channel)?;
+            .execute(backend, (), channel)?;
+            let is_equal = BinaryEquality::new().execute(backend, (&query, &index), channel)?;
+            let mux = BinaryMultiplex::new().execute(backend, (is_equal, &zero, item), channel)?;
             // Every `mux` but one will be zero, so we can use `PairwiseXor`
             // instead of `BinaryAddition`.
             let xor =
-                PairwiseXor::new().execute(backend, &(result.wires(), mux.wires()), channel)?;
+                PairwiseXor::new().execute(backend, (result.wires(), mux.wires()), channel)?;
             result = BinaryBundle::new(xor);
         }
         Ok(result)
@@ -107,7 +107,7 @@ pub mod test {
             let ram_input: Vec<BinaryBundle<DummyVal>> =
                 ram.iter().map(|&val| DummyVal::to_binary(val, N)).collect();
             let query_input = DummyVal::to_binary(index as u128, N);
-            let output = Dummy::eval(&c, &(ram_input, query_input)).unwrap();
+            let output = Dummy::eval(&c, (ram_input, query_input)).unwrap();
             let result = DummyVal::from_binary(&output);
             assert_eq!(result, ram[index]);
         }

@@ -24,7 +24,7 @@ where
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         _: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
@@ -59,7 +59,7 @@ mod test {
             let x_input = DummyVal::to_crt(x, q);
             let y_input = DummyVal::to_crt(y, q);
             let circuit = Subtraction::new();
-            let z = Dummy::eval(&circuit, &(&x_input, &y_input)).unwrap();
+            let z = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
             let output = DummyVal::from_crt(&z, q);
             assert_eq!(output, (x + q - y) % q);
         }
