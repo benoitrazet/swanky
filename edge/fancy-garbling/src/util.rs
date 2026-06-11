@@ -2,25 +2,25 @@
 //!
 //! Note: all number representations in this library are little-endian.
 
-use crate::WireLabel;
-use itertools::Itertools;
-use std::collections::HashMap;
 use vectoreyes::U8x16;
+
+use crate::{Bundle, HasModulus};
 
 ////////////////////////////////////////////////////////////////////////////////
 // tweak functions for garbling
 
 /// Tweak function for a single item.
-pub fn tweak(i: usize) -> u128 {
+pub(crate) fn tweak(i: usize) -> u128 {
     i as u128
 }
 
 /// Tweak function for two items.
-pub fn tweak2(i: u64, j: u64) -> u128 {
+pub(crate) fn tweak2(i: u64, j: u64) -> u128 {
     (j as u128) << 64 | (i as u128)
 }
 
-/// Compute the output tweak for a garbled gate where i is the gate id and k is the value.
+/// Compute the output tweak for a garbled gate where `i`` is the gate ID and
+/// `k` is the value.
 pub fn output_tweak(i: usize, k: u16) -> u128 {
     let (left, _) = (i as u128).overflowing_shl(64);
     left + k as u128
@@ -29,51 +29,16 @@ pub fn output_tweak(i: usize, k: u16) -> u128 {
 ////////////////////////////////////////////////////////////////////////////////
 // mixed radix stuff
 
-/// Add a base `q` slice `ys` into `xs`.
-pub fn base_q_add_eq(xs: &mut [u16], ys: &[u16], q: u16) {
-    debug_assert!(
-        xs.len() >= ys.len(),
-        "q={} xs.len()={} ys.len()={} xs={:?} ys={:?}",
-        q,
-        xs.len(),
-        ys.len(),
-        xs,
-        ys
-    );
-
-    let mut c = 0;
-    let mut i = 0;
-
-    while i < ys.len() {
-        xs[i] += ys[i] + c;
-        c = (xs[i] >= q) as u16;
-        xs[i] -= c * q;
-        i += 1;
-    }
-
-    // continue the carrying if possible
-    while i < xs.len() {
-        xs[i] += c;
-        if xs[i] >= q {
-            xs[i] -= q;
-        // c = 1
-        } else {
-            // c = 0
-            break;
-        }
-        i += 1;
-    }
-}
-
 /// Convert `x` into base `q`, building a vector of length `n`.
+#[cfg(test)]
 fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
-    let ms = std::iter::repeat_n(q, n).collect_vec();
+    let ms = std::iter::repeat_n(q, n).collect::<Vec<_>>();
     as_mixed_radix(x, &ms)
 }
 
 /// Determine how many `mod q` digits fit into a `u128` (includes the color
 /// digit).
-pub fn digits_per_u128(modulus: u16) -> usize {
+pub(crate) fn digits_per_u128(modulus: u16) -> usize {
     debug_assert_ne!(modulus, 0);
     debug_assert_ne!(modulus, 1);
     if modulus == 2 {
@@ -100,12 +65,13 @@ pub fn digits_per_u128(modulus: u16) -> usize {
 }
 
 /// Convert `x` into base `q`.
-pub fn as_base_q_u128(x: u128, q: u16) -> Vec<u16> {
+#[cfg(test)]
+pub(crate) fn as_base_q_u128(x: u128, q: u16) -> Vec<u16> {
     as_base_q(x, q, digits_per_u128(q))
 }
 
 /// Convert `x` into mixed radix form using the provided `radii`.
-pub fn as_mixed_radix(x: u128, radii: &[u16]) -> Vec<u16> {
+pub(crate) fn as_mixed_radix(x: u128, radii: &[u16]) -> Vec<u16> {
     let mut x = x;
     radii
         .iter()
@@ -124,21 +90,10 @@ pub fn as_mixed_radix(x: u128, radii: &[u16]) -> Vec<u16> {
 }
 
 /// Convert little-endian base `q` digits into `u128`.
-pub fn from_base_q(ds: &[u16], q: u16) -> u128 {
+pub(crate) fn from_base_q(ds: &[u16], q: u16) -> u128 {
     let mut x = 0u128;
     for &d in ds.iter().rev() {
         let (xp, overflow) = x.overflowing_mul(q.into());
-        debug_assert!(!overflow, "overflow!!!! x={}", x);
-        x = xp + d as u128;
-    }
-    x
-}
-
-/// Convert little-endian mixed radix digits into u128.
-pub fn from_mixed_radix(digits: &[u16], radii: &[u16]) -> u128 {
-    let mut x: u128 = 0;
-    for (&d, &q) in digits.iter().zip(radii.iter()).rev() {
-        let (xp, overflow) = x.overflowing_mul(q as u128);
         debug_assert!(!overflow, "overflow!!!! x={}", x);
         x = xp + d as u128;
     }
@@ -150,7 +105,7 @@ pub fn from_mixed_radix(digits: &[u16], radii: &[u16]) -> u128 {
 
 /// Get the bits of a u128 encoded in 128 u16s, which is convenient for the rest of
 /// the library, which uses u16 as the base digit type in Wire.
-pub fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
+pub(crate) fn u128_to_bits(x: u128, n: usize) -> Vec<u16> {
     let mut bits = Vec::with_capacity(n);
     let mut y = x;
     for _ in 0..n {
@@ -227,7 +182,7 @@ pub fn crt_inv_factor(xs: &[u16], q: u128) -> u128 {
 }
 
 /// Invert inp_a mod inp_b.
-pub fn inv(inp_a: i128, inp_b: i128) -> i128 {
+pub(crate) fn inv(inp_a: i128, inp_b: i128) -> i128 {
     let mut a = inp_a;
     let mut b = inp_b;
     let mut q;
@@ -259,22 +214,15 @@ pub fn inv(inp_a: i128, inp_b: i128) -> i128 {
     x1
 }
 
-/// Number of primes supported by our library.
-pub const NPRIMES: usize = 29;
+const NPRIMES: usize = 29;
 
-/// Primes used in fancy garbling.
-pub const PRIMES: [u16; 29] = [
+/// Primes used in `fancy-garbling`.
+pub const PRIMES: [u16; NPRIMES] = [
     2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97,
     101, 103, 107, 109,
 ];
 
-// /// Primes skipping the modulus 2, which allows certain gadgets.
-// pub const PRIMES_SKIP_2: [u16; 29] = [
-//     3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97,
-//     101, 103, 107, 109, 113,
-// ];
-
-/// Generate a CRT modulus with n primes.
+/// Generate a CRT modulus using the `n` smallest primes in [`PRIMES`].
 pub fn modulus_with_nprimes(n: usize) -> u128 {
     product(&PRIMES[0..n])
 }
@@ -282,22 +230,18 @@ pub fn modulus_with_nprimes(n: usize) -> u128 {
 /// Generate a CRT modulus that support at least n-bit integers, using the built-in
 /// PRIMES.
 pub fn modulus_with_width(n: u32) -> u128 {
-    base_modulus_with_width(n, &PRIMES)
+    product(&base_primes_with_width(n, &PRIMES))
 }
 
 /// Generate the factors of a CRT modulus that support at least n-bit integers, using the
-/// built-in PRIMES.
+/// built-in [`PRIMES`].
 pub fn primes_with_width(n: u32) -> Vec<u16> {
     base_primes_with_width(n, &PRIMES)
 }
 
-/// Generate a CRT modulus that support at least n-bit integers, using provided primes.
-pub fn base_modulus_with_width(nbits: u32, primes: &[u16]) -> u128 {
-    product(&base_primes_with_width(nbits, primes))
-}
-
-/// Generate the factors of a CRT modulus that support at least n-bit integers, using provided primes.
-pub fn base_primes_with_width(nbits: u32, primes: &[u16]) -> Vec<u16> {
+/// Generate the factors of a CRT modulus that support at least n-bit integers,
+/// using provided primes.
+fn base_primes_with_width(nbits: u32, primes: &[u16]) -> Vec<u16> {
     let mut res = 1;
     let mut ps = Vec::new();
     for &p in primes.iter() {
@@ -311,47 +255,66 @@ pub fn base_primes_with_width(nbits: u32, primes: &[u16]) -> Vec<u16> {
     ps
 }
 
-// /// Generate a CRT modulus that support at least n-bit integers, using the built-in
-// /// PRIMES_SKIP_2 (does not include 2 as a factor).
-// pub fn modulus_with_width_skip2(nbits: u32) -> u128 {
-//     base_modulus_with_width(nbits, &PRIMES_SKIP_2)
-// }
-
-/// Compute the product of some u16s as a u128.
+/// Compute the product of some `u16`s as a `u128`.
 pub fn product(xs: &[u16]) -> u128 {
     xs.iter().fold(1, |acc, &x| acc * x as u128)
 }
 
-// /// Raise a u16 to a power mod some value.
-// pub fn powm(inp: u16, pow: u16, modulus: u16) -> u16 {
-//     let mut x = inp as u16;
-//     let mut z = 1;
-//     let mut n = pow;
-//     while n > 0 {
-//         if n % 2 == 0 {
-//             x = x.pow(2) % modulus as u16;
-//             n /= 2;
-//         } else {
-//             z = x * z % modulus as u16;
-//             n -= 1;
-//         }
-//     }
-//     z as u16
-// }
-
-/// Returns `true` if `x` is a power of 2.
-pub fn is_power_of_2(x: u16) -> bool {
-    (x & (x - 1)) == 0
-}
-
-/// Generate deltas ahead of time for the Garbler.
-pub fn generate_deltas<Wire: WireLabel>(primes: &[u16]) -> HashMap<u16, Wire> {
-    let mut deltas = HashMap::new();
-    let mut rng = rand::thread_rng();
-    for q in primes {
-        deltas.insert(*q, Wire::rand_delta(&mut rng, *q));
+/// Compute the `ms` needed for the number of CRT primes in `x`, with accuracy
+/// `accuracy`.
+///
+/// Supported accuracy: ["100%", "99.9%", "99%"]
+pub(crate) fn get_ms<W: Clone + HasModulus>(x: &Bundle<W>, accuracy: &str) -> Vec<u16> {
+    match accuracy {
+        "100%" => match x.moduli().len() {
+            3 => vec![2; 5],
+            4 => vec![3, 26],
+            5 => vec![3, 4, 54],
+            6 => vec![5, 5, 5, 60],
+            7 => vec![5, 6, 6, 7, 86],
+            8 => vec![5, 7, 8, 8, 9, 98],
+            9 => vec![5, 5, 7, 7, 7, 7, 7, 76],
+            10 => vec![5, 5, 6, 6, 6, 6, 11, 11, 202],
+            11 => vec![5, 5, 5, 5, 5, 6, 6, 6, 7, 7, 8, 150],
+            n => panic!("unknown exact Ms for {} primes!", n),
+        },
+        "99.999%" => match x.moduli().len() {
+            8 => vec![5, 5, 6, 7, 102],
+            9 => vec![5, 5, 6, 7, 114],
+            10 => vec![5, 6, 6, 7, 102],
+            11 => vec![5, 5, 6, 7, 130],
+            n => panic!("unknown 99.999% accurate Ms for {} primes!", n),
+        },
+        "99.99%" => match x.moduli().len() {
+            6 => vec![5, 5, 5, 42],
+            7 => vec![4, 5, 6, 88],
+            8 => vec![4, 5, 7, 78],
+            9 => vec![5, 5, 6, 84],
+            10 => vec![4, 5, 6, 112],
+            11 => vec![7, 11, 174],
+            n => panic!("unknown 99.99% accurate Ms for {} primes!", n),
+        },
+        "99.9%" => match x.moduli().len() {
+            5 => vec![3, 5, 30],
+            6 => vec![4, 5, 48],
+            7 => vec![4, 5, 60],
+            8 => vec![3, 5, 78],
+            9 => vec![9, 140],
+            10 => vec![7, 190],
+            n => panic!("unknown 99.9% accurate Ms for {} primes!", n),
+        },
+        "99%" => match x.moduli().len() {
+            4 => vec![3, 18],
+            5 => vec![3, 36],
+            6 => vec![3, 40],
+            7 => vec![3, 40],
+            8 => vec![126],
+            9 => vec![138],
+            10 => vec![140],
+            n => panic!("unknown 99% accurate Ms for {} primes!", n),
+        },
+        _ => panic!("get_ms: unsupported accuracy {}", accuracy),
     }
-    deltas
 }
 
 /// Extra Rng functionality, useful for `fancy-garbling`.
@@ -362,10 +325,6 @@ pub trait RngExt: rand::Rng + Sized {
     }
     /// Randomly generate a `u16`.
     fn gen_u16(&mut self) -> u16 {
-        self.r#gen()
-    }
-    /// Randomly generate a `u32`.
-    fn gen_u32(&mut self) -> u32 {
         self.r#gen()
     }
     /// Randomly generate a `u64`.
@@ -380,13 +339,9 @@ pub trait RngExt: rand::Rng + Sized {
     fn gen_u128(&mut self) -> u128 {
         self.r#gen()
     }
-    /// Randomly generate a `Block`.
-    fn gen_block(&mut self) -> U8x16 {
-        self.r#gen()
-    }
     /// Randomly generate a valid `Block`.
     fn gen_usable_block(&mut self, modulus: u16) -> U8x16 {
-        if is_power_of_2(modulus) {
+        if modulus.is_power_of_two() {
             let nbits = (modulus - 1).count_ones();
             if 128 % nbits == 0 {
                 return U8x16::from(self.gen_u128());

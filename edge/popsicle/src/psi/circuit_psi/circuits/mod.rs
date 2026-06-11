@@ -1,6 +1,11 @@
 //! Various fancy circuits
 use crate::circuit_psi::*;
-use fancy_garbling::{BinaryBundle, BinaryGadgets, Fancy, FancyBinary};
+use fancy_garbling::{
+    BinaryBundle, Circuit, Fancy, FancyBinary,
+    circuits::binary::{
+        BinaryAdditionNoCarry, BinaryConstant, BinaryEquality, BinaryMultiplex, PairwiseXor,
+    },
+};
 use itertools::Itertools;
 use swanky_channel::Channel;
 
@@ -28,9 +33,12 @@ where
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            f.bin_eq_bundles(
-                &BinaryBundle::new(xs.to_vec()),
-                &BinaryBundle::new(ys.to_vec()),
+            BinaryEquality.execute(
+                f,
+                &(
+                    BinaryBundle::new(xs.to_vec()),
+                    BinaryBundle::new(ys.to_vec()),
+                ),
                 channel,
             )
         })
@@ -53,6 +61,7 @@ pub fn fancy_unmask<F>(
     f: &mut F,
     elements: &[BinaryBundle<F::Item>],
     masks: &[BinaryBundle<F::Item>],
+    channel: &mut Channel,
 ) -> swanky_error::Result<Vec<BinaryBundle<F::Item>>>
 where
     F: Fancy + FancyBinary,
@@ -60,7 +69,12 @@ where
     let mut res = Vec::new();
 
     for i in 0..elements.len() {
-        res.push(f.bin_xor(&elements[i], &masks[i]));
+        let xor = PairwiseXor.execute(
+            f,
+            &(elements[i].wires().to_owned(), masks[i].wires().to_owned()),
+            channel,
+        )?;
+        res.push(BinaryBundle::new(xor));
     }
     Ok(res)
 }
@@ -74,12 +88,12 @@ pub fn fancy_cardinality<F>(
 where
     F: FancyBinary + Fancy<Item = WireMod2>,
 {
-    let mut acc = f.bin_constant_bundle(0, PRIMARY_KEY_SIZE * 8, channel)?;
-    let one = f.bin_constant_bundle(1, PRIMARY_KEY_SIZE * 8, channel)?;
-    let zero = f.bin_constant_bundle(0, PRIMARY_KEY_SIZE * 8, channel)?;
+    let zero = BinaryConstant::new(0, PRIMARY_KEY_SIZE * 8).execute(f, &(), channel)?;
+    let one = BinaryConstant::new(1, PRIMARY_KEY_SIZE * 8).execute(f, &(), channel)?;
+    let mut acc = zero.clone();
     for bit in intersect_bitvec {
-        let mux = f.bin_multiplex(bit, &zero, &one, channel)?;
-        acc = f.bin_addition_no_carry(&acc, &mux, channel)?;
+        let mux = BinaryMultiplex.execute(f, &(*bit, zero.clone(), one.clone()), channel)?;
+        acc = BinaryAdditionNoCarry.execute(f, &(acc, mux), channel)?;
     }
     Ok(acc)
 }
@@ -97,14 +111,16 @@ pub fn fancy_payload_sum<F>(
 where
     F: FancyBinary + Fancy<Item = WireMod2>,
 {
-    let mut acc = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8, channel)?; // multiplication extends the representation of the number
-    let zero = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8, channel)?;
+    let zero = BinaryConstant::new(0, PRIMARY_KEY_SIZE * 8).execute(f, &(), channel)?;
+    let mut acc = zero.clone();
 
     for (i, bit) in intersect_bitvec.iter().enumerate() {
-        let mux_a = f.bin_multiplex(bit, &zero, &payload_a[i], channel)?;
-        let mux_b = f.bin_multiplex(bit, &zero, &payload_b[i], channel)?;
-        let mul = f.bin_addition_no_carry(&mux_a, &mux_b, channel)?;
-        acc = f.bin_addition_no_carry(&acc, &mul, channel)?;
+        let mux_a =
+            BinaryMultiplex.execute(f, &(*bit, zero.clone(), payload_a[i].clone()), channel)?;
+        let mux_b =
+            BinaryMultiplex.execute(f, &(*bit, zero.clone(), payload_b[i].clone()), channel)?;
+        let mul = BinaryAdditionNoCarry.execute(f, &(mux_a, mux_b), channel)?;
+        acc = BinaryAdditionNoCarry.execute(f, &(acc, mul), channel)?;
     }
     Ok(acc)
 }

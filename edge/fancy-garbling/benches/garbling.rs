@@ -1,14 +1,16 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     Evaluator, FancyArithmetic, FancyBinary, FancyProj, Garbler, WireMod2, WireModQ,
-    circuit::CircuitExecutor, classic::GarbledCircuit, util::RngExt,
+    classic::GarbledCircuit,
+    util::RngExt,
+    {Circuit, CircuitInputMapper},
 };
 use std::{hint::black_box, time::Duration};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_rng::SwankyRng;
 
-fn bench_garble_binary_ex<Ex: CircuitExecutor<Garbler<SwankyRng, WireMod2>>>(
+fn bench_garble_binary_ex<Ex: CircuitInputMapper<Garbler<SwankyRng, WireMod2>>>(
     c: &mut Criterion,
     name: &str,
     ex: Ex,
@@ -21,7 +23,7 @@ fn bench_garble_binary_ex<Ex: CircuitExecutor<Garbler<SwankyRng, WireMod2>>>(
     });
 }
 
-fn bench_garble_arith_ex<Ex: CircuitExecutor<Garbler<SwankyRng, WireModQ>>>(
+fn bench_garble_arith_ex<Ex: CircuitInputMapper<Garbler<SwankyRng, WireModQ>>>(
     c: &mut Criterion,
     name: &str,
     ex: Ex,
@@ -36,7 +38,7 @@ fn bench_garble_arith_ex<Ex: CircuitExecutor<Garbler<SwankyRng, WireModQ>>>(
 }
 
 fn bench_eval_binary_ex<
-    Ex: CircuitExecutor<Garbler<SwankyRng, WireMod2>> + CircuitExecutor<Evaluator<WireMod2>>,
+    Ex: CircuitInputMapper<Garbler<SwankyRng, WireMod2>> + CircuitInputMapper<Evaluator<WireMod2>>,
 >(
     c: &mut Criterion,
     name: &str,
@@ -46,19 +48,24 @@ fn bench_eval_binary_ex<
         let mut rng = rand::thread_rng();
         let (encoder, gc, _) =
             GarbledCircuit::garble::<WireMod2, _, _>(&ex, SwankyRng::new()).unwrap();
-        let inputs = (0..<Ex as CircuitExecutor<Garbler<_, _>>>::ninputs(&ex))
-            .map(|i| rng.gen_u16() % <Ex as CircuitExecutor<Garbler<_, _>>>::modulus(&ex, i))
+        let inputs = (0..<Ex as CircuitInputMapper<Garbler<_, _>>>::ninputs(&ex))
+            .map(|i| rng.gen_u16() % <Ex as CircuitInputMapper<Garbler<_, _>>>::modulus(&ex, i))
             .collect::<Vec<u16>>();
         let xs = encoder.encode_inputs(&inputs);
         bench.iter(|| {
-            let ys = gc.eval_to_wirelabels(&ex, &xs).unwrap();
+            let ys = gc
+                .eval_to_wirelabels(
+                    &ex,
+                    &<Ex as CircuitInputMapper<Evaluator<_>>>::map(&ex, xs.clone()),
+                )
+                .unwrap();
             black_box(ys);
         })
     });
 }
 
 fn bench_eval_arith_ex<
-    Ex: CircuitExecutor<Garbler<SwankyRng, WireModQ>> + CircuitExecutor<Evaluator<WireModQ>>,
+    Ex: CircuitInputMapper<Garbler<SwankyRng, WireModQ>> + CircuitInputMapper<Evaluator<WireModQ>>,
 >(
     c: &mut Criterion,
     name: &str,
@@ -69,12 +76,17 @@ fn bench_eval_arith_ex<
         let mut rng = rand::thread_rng();
         let (encoder, gc, _) =
             GarbledCircuit::garble::<WireModQ, _, _>(&ex, SwankyRng::new()).unwrap();
-        let inputs = (0..<Ex as CircuitExecutor<Garbler<_, _>>>::ninputs(&ex))
-            .map(|i| rng.gen_u16() % <Ex as CircuitExecutor<Garbler<_, _>>>::modulus(&ex, i))
+        let inputs = (0..<Ex as CircuitInputMapper<Garbler<_, _>>>::ninputs(&ex))
+            .map(|i| rng.gen_u16() % <Ex as CircuitInputMapper<Garbler<_, _>>>::modulus(&ex, i))
             .collect::<Vec<u16>>();
         let xs = encoder.encode_inputs(&inputs);
         bench.iter(|| {
-            let ys = gc.eval_to_wirelabels(&ex, &xs).unwrap();
+            let ys = gc
+                .eval_to_wirelabels(
+                    &ex,
+                    &<Ex as CircuitInputMapper<Evaluator<_>>>::map(&ex, xs.clone()),
+                )
+                .unwrap();
             black_box(ys);
         })
     });
@@ -83,14 +95,17 @@ fn bench_eval_arith_ex<
 const MIXED_OP_NUM_OPS: usize = 100_000;
 
 struct MixedOp;
-impl<F: FancyBinary> CircuitExecutor<F> for MixedOp {
+impl<F: FancyBinary> Circuit<F> for MixedOp {
+    type Input = F::Item;
+    type Output = F::Item;
+
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &[F::Item],
+        input: &Self::Input,
         channel: &mut Channel,
-    ) -> Result<Vec<F::Item>> {
-        let mut x = inputs[0].clone();
+    ) -> Result<Self::Output> {
+        let mut x = input.clone();
         for step in 0..MIXED_OP_NUM_OPS {
             if step % 2 == 1 {
                 x = backend.and(&x, &x, channel)?;
@@ -98,7 +113,14 @@ impl<F: FancyBinary> CircuitExecutor<F> for MixedOp {
                 x = backend.xor(&x, &x);
             }
         }
-        Ok(vec![x])
+        Ok(x)
+    }
+}
+
+impl<F: FancyBinary> CircuitInputMapper<F> for MixedOp {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
+        assert_eq!(inputs.len(), 1);
+        inputs[0].clone()
     }
 
     fn ninputs(&self) -> usize {
@@ -111,14 +133,17 @@ impl<F: FancyBinary> CircuitExecutor<F> for MixedOp {
 }
 
 struct MixedOpArith(u16);
-impl<F: FancyArithmetic> CircuitExecutor<F> for MixedOpArith {
+impl<F: FancyArithmetic> Circuit<F> for MixedOpArith {
+    type Input = F::Item;
+    type Output = F::Item;
+
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &[F::Item],
+        input: &Self::Input,
         channel: &mut Channel,
-    ) -> Result<Vec<F::Item>> {
-        let mut x = inputs[0].clone();
+    ) -> Result<Self::Output> {
+        let mut x = input.clone();
         for step in 0..MIXED_OP_NUM_OPS {
             if step % 2 == 1 {
                 x = backend.mul(&x, &x, channel)?;
@@ -126,7 +151,14 @@ impl<F: FancyArithmetic> CircuitExecutor<F> for MixedOpArith {
                 x = backend.add(&x, &x);
             }
         }
-        Ok(vec![x])
+        Ok(x)
+    }
+}
+
+impl<F: FancyArithmetic> CircuitInputMapper<F> for MixedOpArith {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
+        assert_eq!(inputs.len(), 1);
+        inputs[0].clone()
     }
 
     fn ninputs(&self) -> usize {
@@ -139,17 +171,27 @@ impl<F: FancyArithmetic> CircuitExecutor<F> for MixedOpArith {
 }
 
 struct Proj(u16, Vec<u16>);
-impl<F: FancyProj> CircuitExecutor<F> for Proj {
+impl<F: FancyProj> Circuit<F> for Proj {
+    type Input = F::Item;
+    type Output = Vec<F::Item>;
+
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &[<F as fancy_garbling::Fancy>::Item],
+        input: &Self::Input,
         channel: &mut Channel,
-    ) -> Result<Vec<<F as fancy_garbling::Fancy>::Item>> {
+    ) -> Result<Self::Output> {
         for _ in 0..1000 {
-            let _ = backend.proj(&inputs[0], self.0, Some(self.1.clone()), channel)?;
+            let _ = backend.proj(input, self.0, Some(self.1.clone()), channel)?;
         }
         Ok(vec![])
+    }
+}
+
+impl<F: FancyProj> CircuitInputMapper<F> for Proj {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
+        assert_eq!(inputs.len(), 1);
+        inputs[0].clone()
     }
 
     fn ninputs(&self) -> usize {
@@ -162,17 +204,27 @@ impl<F: FancyProj> CircuitExecutor<F> for Proj {
 }
 
 struct Mul(u16);
-impl<F: FancyArithmetic> CircuitExecutor<F> for Mul {
+impl<F: FancyArithmetic> Circuit<F> for Mul {
+    type Input = F::Item;
+    type Output = Vec<F::Item>;
+
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &[<F as fancy_garbling::Fancy>::Item],
+        input: &Self::Input,
         channel: &mut Channel,
-    ) -> Result<Vec<<F as fancy_garbling::Fancy>::Item>> {
+    ) -> Result<Self::Output> {
         for _ in 0..1000 {
-            let _ = backend.mul(&inputs[0], &inputs[0], channel)?;
+            let _ = backend.mul(input, input, channel)?;
         }
         Ok(vec![])
+    }
+}
+
+impl<F: FancyArithmetic> CircuitInputMapper<F> for Mul {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
+        assert_eq!(inputs.len(), 1);
+        inputs[0].clone()
     }
 
     fn ninputs(&self) -> usize {

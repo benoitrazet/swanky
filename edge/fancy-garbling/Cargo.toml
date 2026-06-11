@@ -52,7 +52,3 @@ harness = false
 [[bench]]
 name = "circuits"
 harness = false
-
-[[bench]]
-name = "util"
-harness = false

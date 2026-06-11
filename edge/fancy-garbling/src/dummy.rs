@@ -3,20 +3,23 @@
 //! Useful for evaluating the circuits produced by `Fancy` without actually
 //! creating any circuits.
 
+use rand::{CryptoRng, Rng, RngCore};
 use swanky_channel::Channel;
-use swanky_error::ErrorKind;
+use swanky_error::{ErrorKind, Result};
 
 use crate::{
-    FancyArithmetic, FancyBinary, FancyProj, check_binary,
-    circuit::CircuitExecutor,
+    BinaryBundle, BinaryGadgets, Bundle, CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary,
+    FancyProj, check_binary,
+    circuit::Circuit,
     fancy::{Fancy, HasModulus},
+    util::{as_mixed_radix, crt_inv_factor, u128_from_bits},
 };
 
 /// Simple struct that performs the fancy computation over `u16`.
 pub struct Dummy;
 
 /// Wrapper around `u16`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DummyVal {
     val: u16,
     modulus: u16,
@@ -29,14 +32,91 @@ impl HasModulus for DummyVal {
 }
 
 impl DummyVal {
-    /// Create a new DummyVal.
+    /// Create a new [`DummyVal`].
     pub fn new(val: u16, modulus: u16) -> Self {
-        Self { val, modulus }
+        Self {
+            val: val % modulus,
+            modulus,
+        }
+    }
+
+    /// Create a new boolean [`DummyVal`].
+    pub fn new_bool(val: bool) -> Self {
+        Self {
+            val: val as u16,
+            modulus: 2,
+        }
     }
 
     /// Extract the value.
     pub fn val(&self) -> u16 {
         self.val
+    }
+
+    /// Generate a random boolean [`DummyVal`].
+    pub fn rand_bool<RNG: CryptoRng + RngCore>(rng: &mut RNG) -> Self {
+        Self::rand(2, rng)
+    }
+
+    /// Generate a random [`DummyVal`].
+    pub fn rand<RNG: CryptoRng + RngCore>(modulus: u16, rng: &mut RNG) -> Self {
+        Self::new(rng.r#gen::<u16>(), modulus)
+    }
+
+    /// Generate a new [`CrtBundle`] of `value % modulus`.
+    pub fn to_crt(value: u128, modulus: u128) -> CrtBundle<Self> {
+        let mut dummy = Dummy::new();
+        Channel::with(std::io::empty(), |channel| {
+            dummy.crt_encode(value, modulus, channel)
+        })
+        .unwrap()
+    }
+
+    /// Convert a [`Bundle`] representing a CRT value into its underlying
+    /// `u128`.
+    pub fn from_crt(crt: &Bundle<Self>, modulus: u128) -> u128 {
+        let crt = crt.wires().iter().map(|w| w.val()).collect::<Vec<_>>();
+        crt_inv_factor(&crt, modulus)
+    }
+
+    /// Generate a new [`BinaryBundle`] of `value`.
+    pub fn to_binary(value: u128, nbits: usize) -> BinaryBundle<Self> {
+        let mut dummy = Dummy::new();
+        Channel::with(std::io::empty(), |channel| {
+            dummy.bin_encode(value, nbits, channel)
+        })
+        .unwrap()
+    }
+
+    /// Convert a [`Bundle`] representing a binary value into its underlying
+    /// `u128`.
+    pub fn from_binary(bin: &Bundle<Self>) -> u128 {
+        let bin = bin.wires().iter().map(|w| w.val()).collect::<Vec<_>>();
+        u128_from_bits(&bin)
+    }
+
+    /// Generate a new mixed radix form [`Bundle`] for `value` using the
+    /// provided `radii`.
+    pub fn to_mixed_radix(value: u128, radii: &[u16]) -> CrtBundle<Self> {
+        let mixed = as_mixed_radix(value, radii);
+        let mixed = mixed
+            .into_iter()
+            .zip(radii)
+            .map(|(x, q)| DummyVal::new(x, *q))
+            .collect::<Vec<_>>();
+        CrtBundle::new(mixed)
+    }
+
+    /// Convert a [`Bundle`] representing mixed radix form into its underlying
+    /// `u128`.
+    pub fn from_mixed_radix(bundle: &CrtBundle<Self>) -> u128 {
+        let mut x: u128 = 0;
+        for wire in bundle.wires().iter().rev() {
+            let (xp, overflow) = x.overflowing_mul(wire.modulus as u128);
+            assert!(!overflow);
+            x = xp + wire.val as u128;
+        }
+        x
     }
 }
 
@@ -47,29 +127,9 @@ impl Dummy {
     }
 
     /// Evaluate `circuit` in plaintext.
-    ///
-    /// # Panics
-    /// Panics if `inputs.len()` does not equal the circuit's expected number of
-    /// inputs.
-    pub fn eval<C: CircuitExecutor<Dummy>>(
-        circuit: &C,
-        inputs: &[u16],
-    ) -> swanky_error::Result<Vec<u16>> {
-        assert_eq!(inputs.len(), circuit.ninputs());
-
-        let mut dummy = crate::dummy::Dummy::new();
-
-        // encode inputs as DummyVals
-        let inputs = inputs
-            .iter()
-            .enumerate()
-            .map(|(i, x)| DummyVal::new(*x, circuit.modulus(i)))
-            .collect::<Vec<_>>();
-
-        let outputs = Channel::with(std::io::empty(), |c| {
-            circuit.execute(&mut dummy, &inputs, c)
-        })?;
-        Ok(outputs.iter().map(|x| x.val()).collect())
+    pub fn eval<C: Circuit<Dummy>>(circuit: &C, inputs: &C::Input) -> Result<C::Output> {
+        let mut dummy = Dummy::new();
+        Channel::with(std::io::empty(), |c| circuit.execute(&mut dummy, inputs, c))
     }
 }
 
@@ -172,7 +232,6 @@ impl FancyProj for Dummy {
 impl Fancy for Dummy {
     type Item = DummyVal;
 
-    /// Encode a single dummy value.
     fn encode(
         &mut self,
         value: u16,
@@ -182,7 +241,6 @@ impl Fancy for Dummy {
         Ok(DummyVal::new(value, modulus))
     }
 
-    /// Encode a slice of inputs and a slice of moduli as DummyVals.
     fn encode_many(
         &mut self,
         xs: &[u16],

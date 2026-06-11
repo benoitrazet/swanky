@@ -3,7 +3,7 @@
 
 use crate::{
     Fancy, WireLabel,
-    circuit::CircuitExecutor,
+    circuit::{Circuit, CircuitInputMapper, Flatten},
     garble::{Evaluator, Garbler},
     util::output_tweak,
 };
@@ -44,73 +44,69 @@ impl GarbledCircuit {
     ///    associated underlying values.
     pub fn garble<
         Wire: WireLabel,
-        Ex: CircuitExecutor<Garbler<RNG, Wire>>,
+        C: CircuitInputMapper<Garbler<RNG, Wire>>,
         RNG: CryptoRng + RngCore,
     >(
-        c: &Ex,
+        circuit: &C,
         rng: RNG,
     ) -> swanky_error::Result<(Encoder<Wire>, Self, OutputMapping)> {
         let mut channel = GarbledChannel::new_writer(None);
-        let mut garbler = Channel::with(&mut channel, |channel| Garbler::new(rng, channel))?;
+        let (en, output_mapping) = Channel::with(&mut channel, |channel| {
+            let mut garbler = Garbler::new(rng, channel)?;
 
-        // Produce zero wirelabels for the inputs.
-        let inputs = (0..c.ninputs())
-            .map(|i| {
-                let q = c.modulus(i);
-                garbler.encode_zero(q)
-            })
-            .collect::<Vec<_>>();
+            // Produce zero wirelabels for the inputs.
+            let inputs = (0..circuit.ninputs())
+                .map(|i| {
+                    let q = circuit.modulus(i);
+                    garbler.encode_zero(q)
+                })
+                .collect::<Vec<_>>();
 
-        let zeros = Channel::with(&mut channel, |channel| {
             // First, garble the circuit, outputting the zero wirelabels
             // associated with the output.
-            let zeros = c.execute(&mut garbler, &inputs, channel)?;
+            let zeros = circuit.execute(&mut garbler, &circuit.map(inputs.clone()), channel)?;
+            let zeros = zeros.flatten();
             // Next, map the zero output wirelabels to the set of valid outputs.
             // This is needed for evaluators that don't use the output
             // mapping provided as output; in that case, we need the channel to
             // contain that mapping, which is what the below does.
             garbler.outputs(&zeros, channel)?;
-            Ok(zeros)
+
+            let deltas = garbler.get_deltas();
+            let en = Encoder::new(inputs, deltas.clone());
+            let output_mapping = OutputMapping::new(&zeros, &deltas);
+
+            Ok((en, output_mapping))
         })?;
-
-        let deltas = garbler.get_deltas();
-        let en = Encoder::new(inputs, deltas.clone());
         let gc = GarbledCircuit::new(channel.finish_writing());
-        let output_mapping = OutputMapping::new(&zeros, &deltas);
-
         Ok((en, gc, output_mapping))
     }
 
     /// Evaluate the garbled circuit on the provided inputs, mapping the output
     /// wirelabels to their associated values.
-    pub fn eval<Wire: WireLabel, Ex: CircuitExecutor<Evaluator<Wire>>>(
+    pub fn eval<Wire: WireLabel, C: Circuit<Evaluator<Wire>>>(
         &self,
-        c: &Ex,
-        inputs: &[Wire],
+        circuit: &C,
+        inputs: &C::Input,
         output_mapping: &OutputMapping,
     ) -> swanky_error::Result<Vec<u16>> {
-        let wirelabels = self.eval_to_wirelabels(c, inputs)?;
-        output_mapping.to_outputs(&wirelabels)
+        let wirelabels = self.eval_to_wirelabels(circuit, inputs)?;
+        output_mapping.to_outputs(&wirelabels.flatten())
     }
 
     /// Evaluate the garbled circuit on the provided inputs, returning the
     /// output wirelabels.
-    pub fn eval_to_wirelabels<Wire: WireLabel, Ex: CircuitExecutor<Evaluator<Wire>>>(
+    pub fn eval_to_wirelabels<Wire: WireLabel, C: Circuit<Evaluator<Wire>>>(
         &self,
-        c: &Ex,
-        inputs: &[Wire],
-    ) -> swanky_error::Result<Vec<Wire>> {
-        let wirelabels = Channel::with(GarbledChannel::from(self), |channel| {
+        circuit: &C,
+        inputs: &C::Input,
+    ) -> swanky_error::Result<C::Output> {
+        Channel::with(GarbledChannel::from(self), |channel| {
             let mut evaluator = Evaluator::new(channel)?;
-            let wirelabels = c.execute(&mut evaluator, inputs, channel)?;
-            Ok(wirelabels)
-        })?;
-        Ok(wirelabels)
+            circuit.execute(&mut evaluator, inputs, channel)
+        })
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// Encoder
 
 /// Encoder for input wirelabels.
 #[derive(Debug)]

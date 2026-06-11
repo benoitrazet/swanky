@@ -4,7 +4,11 @@ use crate::{
     neural_net::FancyNeuralNet,
     util::{from_mod_q_crt, to_mod_q, to_mod_q_crt},
 };
-use fancy_garbling::{CrtBundle, CrtProjGadgets, Fancy, HasModulus, util::factor};
+use fancy_garbling::{
+    Circuit, CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary, FancyProj, HasModulus,
+    circuits::arithmetic::{Addition, ConstantMultiplication, Max, ReLU, Sgn},
+    util::factor,
+};
 use ndarray::Array3;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -17,7 +21,7 @@ pub(crate) struct ArithmeticNeuralNet<'a, F> {
     secret_weights_owned: bool,
 }
 
-impl<'a, F: CrtProjGadgets> ArithmeticNeuralNet<'a, F> {
+impl<'a, F: FancyBinary + FancyArithmetic + FancyProj> ArithmeticNeuralNet<'a, F> {
     /// Create a new `ArithmeticNeuralNet` for the provided backend and using
     /// the specified moduli for each layer of the neural net.
     ///
@@ -158,7 +162,9 @@ impl<'a, F> ArithmeticLayer<'a, F> {
     }
 }
 
-impl<'a, F: Fancy + CrtProjGadgets> FancyNeuralNet for ArithmeticLayer<'a, F> {
+impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> FancyNeuralNet
+    for ArithmeticLayer<'a, F>
+{
     type Item = CrtBundle<F::Item>;
 
     fn nn_encode(&mut self, value: i64, channel: &mut Channel) -> Result<Self::Item> {
@@ -181,14 +187,26 @@ impl<'a, F: Fancy + CrtProjGadgets> FancyNeuralNet for ArithmeticLayer<'a, F> {
         }
     }
 
-    fn nn_add(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
-        Ok(self.backend.crt_add(x, y))
+    fn nn_add(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        channel: &mut Channel,
+    ) -> Result<Self::Item> {
+        Addition.execute(self.backend, &(x.clone(), y.clone()), channel)
     }
 
-    fn nn_cmul(&mut self, x: &Self::Item, constant: i64, _: &mut Channel) -> Result<Self::Item> {
-        Ok(self
-            .backend
-            .crt_cmul(x, to_mod_q(constant, self.input_modulus)))
+    fn nn_cmul(
+        &mut self,
+        x: &Self::Item,
+        constant: i64,
+        channel: &mut Channel,
+    ) -> Result<Self::Item> {
+        ConstantMultiplication.execute(
+            self.backend,
+            &(x.clone(), to_mod_q(constant, self.input_modulus)),
+            channel,
+        )
     }
 
     fn nn_proj(
@@ -226,7 +244,11 @@ impl<'a, F: Fancy + CrtProjGadgets> FancyNeuralNet for ArithmeticLayer<'a, F> {
     }
 
     fn nn_max(&mut self, xs: &[Self::Item], channel: &mut Channel) -> Result<Self::Item> {
-        self.backend.crt_max(xs, &self.accuracy.max, channel)
+        Max.execute(
+            self.backend,
+            &(xs.to_vec(), self.accuracy.max.clone()),
+            channel,
+        )
     }
 
     fn nn_activation(
@@ -237,14 +259,16 @@ impl<'a, F: Fancy + CrtProjGadgets> FancyNeuralNet for ArithmeticLayer<'a, F> {
     ) -> Result<Self::Item> {
         let ps = factor(self.output_modulus);
         match f {
-            ActivationFunction::Sign => {
-                self.backend
-                    .crt_sgn(x, &self.accuracy.sign, Some(&ps), channel)
-            }
-            ActivationFunction::Relu => {
-                self.backend
-                    .crt_relu(x, &self.accuracy.relu, Some(&ps), channel)
-            }
+            ActivationFunction::Sign => Sgn.execute(
+                self.backend,
+                &(x.clone(), self.accuracy.sign.to_string(), Some(ps)),
+                channel,
+            ),
+            ActivationFunction::Relu => ReLU.execute(
+                self.backend,
+                &(x.clone(), self.accuracy.relu.to_string(), Some(ps)),
+                channel,
+            ),
             ActivationFunction::Identity => Ok(x.clone()),
         }
     }

@@ -1,5 +1,8 @@
 use fancy_garbling::{
-    Fancy, circuit::CircuitExecutor, circuit_analyzer::CircuitAnalyzer, dummy::Dummy,
+    Fancy,
+    circuit_analyzer::CircuitAnalyzer,
+    dummy::Dummy,
+    {CircuitInputMapper, Flatten},
 };
 use swanky_authenticated_garbling::{
     Evaluator, Garbler, WirePreProcessor,
@@ -9,12 +12,12 @@ use swanky_rng::SwankyRng;
 
 /// Circuit Runner
 pub fn test_circuit<
-    C: CircuitExecutor<CircuitAnalyzer>
-        + CircuitExecutor<WirePreProcessor<PartyGarbler>>
-        + CircuitExecutor<WirePreProcessor<PartyEvaluator>>
-        + CircuitExecutor<Garbler<SwankyRng>>
-        + CircuitExecutor<Evaluator>
-        + CircuitExecutor<Dummy>
+    C: CircuitInputMapper<CircuitAnalyzer>
+        + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
+        + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
+        + CircuitInputMapper<Garbler<SwankyRng>>
+        + CircuitInputMapper<Evaluator>
+        + CircuitInputMapper<Dummy>
         + Sync,
 >(
     inputs_gb: &[u16],
@@ -29,16 +32,24 @@ pub fn test_circuit<
             let mut inputs = gb.encode_many(inputs_gb, &vec![2; inputs_gb.len()], c)?;
             let theirs = gb.receive_many(&vec![2; inputs_ev.len()], c)?;
             inputs.extend(theirs);
-            let outputs = circuit.execute(&mut gb, &inputs, c)?;
-            gb.outputs(&outputs, c)
+            let outputs = circuit.execute(
+                &mut gb,
+                &<C as CircuitInputMapper<Garbler<_>>>::map(circuit, inputs),
+                c,
+            )?;
+            gb.outputs(&outputs.flatten(), c)
         },
         |c| {
             let mut ev = Evaluator::new(circuit, c, rng_ev)?;
             let mut inputs = ev.receive_many(&vec![2; inputs_gb.len()], c)?;
             let mine = ev.encode_many(inputs_ev, &vec![2; inputs_ev.len()], c)?;
             inputs.extend(mine);
-            let outputs = circuit.execute(&mut ev, &inputs, c)?;
-            ev.outputs(&outputs, c)
+            let outputs = circuit.execute(
+                &mut ev,
+                &<C as CircuitInputMapper<Evaluator>>::map(circuit, inputs),
+                c,
+            )?;
+            ev.outputs(&outputs.flatten(), c)
         },
     )
     .unwrap();

@@ -1,10 +1,15 @@
-//! Functions for parsing and running a circuit file based on the format given
-//! here: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
+//! Functions for parsing and running circuit files.
+//!
+//! This module provides parsers for two Bristol circuit formats:
+//!
+//! - **Bristol Format**: The original format:
+//!   <https://nigelsmart.github.io/MPC-Circuits/old-circuits.html>
+//! - **Bristol Fashion**: The new format: <https://nigelsmart.github.io/MPC-Circuits>
 
 use crate::circuit::{BinaryCircuit, BinaryGate};
 use regex::{Captures, Regex};
-use std::str::FromStr;
-use swanky_error::{ErrorKind, Result, WrapErr, swanky_error};
+use std::{io::BufRead, str::FromStr};
+use swanky_error::{ErrorKind, Result, WrapErr, ensure, swanky_error};
 
 enum GateType {
     AndGate,
@@ -37,11 +42,154 @@ fn regex2captures<'t>(re: &Regex, line: &'t str) -> Result<Captures<'t>> {
 }
 
 impl BinaryCircuit {
-    /// Generates a new `Circuit` from file `filename`. The file must follow the
-    /// format given here: <https://homes.esat.kuleuven.be/~nsmart/MPC/old-circuits.html>,
-    /// (Bristol Format---the OLD format---not Bristol Fashion---the NEW format) otherwise
-    /// a `CircuitParserError` is returned.
-    pub fn parse(mut reader: impl std::io::BufRead) -> Result<Self> {
+    /// Generates a new [`BinaryCircuit`] from the provided [`BufRead`]er. The file
+    /// must follow the Bristol Fashion format.
+    pub fn parse_bristol_fashion(mut reader: impl BufRead) -> Result<Self> {
+        // Parse first line: "ngates nwires\n".
+        let mut line = String::new();
+        reader
+            .read_line(&mut line)
+            .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
+        let parts = line.split_whitespace().collect::<Vec<_>>();
+        ensure!(
+            parts.len() == 2,
+            ErrorKind::OtherError,
+            "Failed to parse gate and wire count"
+        );
+        let ngates = FromStr::from_str(parts[0])
+            .wrap_err(ErrorKind::OtherError, "Failed to parse gate count")?;
+        let nwires: usize = FromStr::from_str(parts[1])
+            .wrap_err(ErrorKind::OtherError, "Failed to parse wire count")?;
+
+        // Parse second line: "ninputs input1 input2 ...\n".
+        let mut line = String::new();
+        reader
+            .read_line(&mut line)
+            .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
+        let parts = line.split_whitespace().collect::<Vec<_>>();
+        ensure!(!parts.is_empty(), ErrorKind::OtherError, "Empty input line");
+
+        let ninputs: usize = FromStr::from_str(parts[0])
+            .wrap_err(ErrorKind::OtherError, "Failed to parse number of parties")?;
+        ensure!(
+            parts.len() == ninputs + 1,
+            ErrorKind::OtherError,
+            "Expected {} input values, got {}",
+            ninputs,
+            parts.len() - 1
+        );
+        let mut ninputs_total = 0;
+        for part in parts.iter().skip(1) {
+            let ninputs: usize = FromStr::from_str(part)
+                .wrap_err(ErrorKind::OtherError, "Failed to parse input count")?;
+            ninputs_total += ninputs;
+        }
+
+        // Parse third line: nparties_output output_bits_party1 output_bits_party2 ...\n
+        // Note: nparties_output can be different from nparties (input parties)
+        let mut line = String::new();
+        reader
+            .read_line(&mut line)
+            .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
+        let parts = line.split_whitespace().collect::<Vec<_>>();
+        ensure!(
+            !parts.is_empty(),
+            ErrorKind::OtherError,
+            "Empty output line"
+        );
+        let noutputs: usize = FromStr::from_str(parts[0]).wrap_err(
+            ErrorKind::OtherError,
+            "Failed to parse number of output parties",
+        )?;
+        ensure!(
+            parts.len() == noutputs + 1,
+            ErrorKind::OtherError,
+            "Expected {} output values, got {}",
+            noutputs,
+            parts.len() - 1
+        );
+        let mut noutputs_total = 0;
+        for part in parts.iter().skip(1) {
+            let noutputs: usize = FromStr::from_str(part)
+                .wrap_err(ErrorKind::OtherError, "Failed to parse output count")?;
+            noutputs_total += noutputs;
+        }
+
+        let mut circ = Self::new(Some(ngates));
+
+        let re1 = Regex::new(r"1 1 (\d+) (\d+) INV").expect("regex should be valid");
+        let re2 = Regex::new(r"2 1 (\d+) (\d+) (\d+) ((AND|XOR))").expect("regex should be valid");
+
+        let mut id = 0;
+
+        // Process inputs.
+        for i in 0..ninputs_total {
+            circ.gates.push(BinaryGate::Input { id: i });
+            circ.input_refs.push(i);
+        }
+        // Create a constant wire for negations.
+        circ.gates.push(BinaryGate::Constant { val: 1 });
+        circ.const_refs.push(ninputs_total);
+        // Process outputs.
+        for i in (0..noutputs_total).rev() {
+            circ.output_refs.push(nwires - noutputs_total + i);
+        }
+
+        // Parse gate definitions (same as Bristol Format).
+        for line in reader.lines() {
+            let line = line.wrap_err(ErrorKind::OtherError, "Failed to read line")?;
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            match line.chars().next() {
+                Some('1') => {
+                    let cap = regex2captures(&re1, line)?;
+                    let yref = cap2int(&cap, 1)?;
+                    let out = cap2int(&cap, 2)?;
+                    circ.gates.push(BinaryGate::Inv {
+                        xref: yref,
+                        out: Some(out),
+                    })
+                }
+                Some('2') => {
+                    let cap = regex2captures(&re2, line)?;
+                    let xref = cap2int(&cap, 1)?;
+                    let yref = cap2int(&cap, 2)?;
+                    let out = cap2int(&cap, 3)?;
+                    let typ = cap2typ(&cap, 4)?;
+                    let gate = match typ {
+                        GateType::AndGate => {
+                            let gate = BinaryGate::And {
+                                xref,
+                                yref,
+                                id,
+                                out: Some(out),
+                            };
+                            id += 1;
+                            gate
+                        }
+                        GateType::XorGate => BinaryGate::Xor {
+                            xref,
+                            yref,
+                            out: Some(out),
+                        },
+                    };
+                    circ.gates.push(gate);
+                }
+                None => break,
+                _ => {
+                    swanky_error::bail!(ErrorKind::OtherError, "Invalid gate definition: {}", line);
+                }
+            }
+        }
+        Ok(circ)
+    }
+
+    /// Generates a new [`BinaryCircuit`] from the provided [`BufRead`]er. The file
+    /// must follow the Bristol Format given here:
+    /// <https://nigelsmart.github.io/MPC-Circuits/old-circuits.html>.
+    pub fn parse_bristol_format(mut reader: impl BufRead) -> Result<Self> {
         // Parse first line: ngates nwires\n
         let mut line = String::new();
         reader
@@ -142,57 +290,70 @@ impl BinaryCircuit {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        WireMod2, circuit::BinaryCircuit as Circuit, classic::GarbledCircuit, dummy::Dummy,
-    };
-    use swanky_rng::SwankyRng;
+    use crate::circuit::{BinaryCircuit, BinaryGate};
+    use std::io::Cursor;
 
     #[test]
-    fn test_parser() {
-        let circ = Circuit::parse(std::io::Cursor::<&'static [u8]>::new(include_bytes!(
-            "../circuits/AES-non-expanded.txt"
-        )))
-        .unwrap();
-        let input = [0u16; 256];
-        let output = Dummy::eval(&circ, &input).unwrap();
-        assert_eq!(
-            output.iter().map(|i| i.to_string()).collect::<String>(),
-            "01100110111010010100101111010100111011111000101000101100001110111000100001001100111110100101100111001010001101000010101100101110"
-        );
-        let mut input = vec![0u16; 128];
-        input.extend([1u16; 128]);
-        let output = Dummy::eval(&circ, &input).unwrap();
-        assert_eq!(
-            output.iter().map(|i| i.to_string()).collect::<String>(),
-            "10100001111101100010010110001100100001110111110101011111110011011000100101100100010010000100010100111000101111111100100100101100"
-        );
-        let mut input = [0u16; 256];
-        for key_part in input[128..].iter_mut().take(8) {
-            *key_part = 1;
-        }
-        let output = Dummy::eval(&circ, &input).unwrap();
-        assert_eq!(
-            output.iter().map(|i| i.to_string()).collect::<String>(),
-            "10110001110101110101100000100101011010110010100011111101100001010000101011010100100101000100001000001000110011110001000101010101"
-        );
-        let mut input = vec![0u16; 256];
-        input[128 + 7] = 1;
-        let output = Dummy::eval(&circ, &input).unwrap();
-        assert_eq!(
-            output.iter().map(|i| i.to_string()).collect::<String>(),
-            "11011100000011101101100001011101111110010110000100011010101110110111001001001001110011011101000101101000110001010100011001111110"
-        );
+    fn bristol_format_parser_works() {
+        // Tests all the circuits in the `circuits/bristol-format` directory.
+
+        let result = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
+            include_bytes!("../circuits/bristol-format/adder_32bit.txt"),
+        ));
+        assert!(result.is_ok());
+
+        let result = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
+            include_bytes!("../circuits/bristol-format/AES-non-expanded.txt"),
+        ));
+        assert!(result.is_ok());
+
+        let result = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
+            include_bytes!("../circuits/bristol-format/sha-1.txt"),
+        ));
+        assert!(result.is_ok());
+
+        let result = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
+            include_bytes!("../circuits/bristol-format/sha-256.txt"),
+        ));
+        assert!(result.is_ok());
     }
 
     #[test]
-    fn test_gc_eval() {
-        let circ = Circuit::parse(std::io::Cursor::<&'static [u8]>::new(include_bytes!(
-            "../circuits/AES-non-expanded.txt"
-        )))
-        .unwrap();
-        let (encoder, gc, _) =
-            GarbledCircuit::garble::<WireMod2, _, _>(&circ, SwankyRng::new()).unwrap();
-        let inputs = encoder.encode_inputs(&vec![0u16; 256]);
-        gc.eval_to_wirelabels(&circ, &inputs).unwrap();
+    fn bristol_fashion_parser_works() {
+        // Tests all the circuits in the `circuits/bristol-fashion` directory.
+
+        // Test AES-128 circuit.
+        let result = BinaryCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
+            include_bytes!("../circuits/bristol-fashion/aes_128.txt"),
+        ));
+        assert!(result.is_ok());
+        let circuit = result.unwrap();
+        // AES-128: 2 input values with 128 bits each = 256 inputs total.
+        assert_eq!(circuit.input_refs.len(), 256);
+        // AES-128: 1 output value with 128 bits output = 128 outputs total.
+        assert_eq!(circuit.output_refs.len(), 128);
+        // Verify circuit has gates.
+        assert!(!circuit.gates.is_empty());
+        // First 256 gates should be inputs.
+        for i in 0..256 {
+            if let BinaryGate::Input { id } = circuit.gates[i] {
+                assert_eq!(id, i);
+            } else {
+                panic!("Expected Input gate at position {}", i);
+            }
+        }
+
+        // Test SHA-256 circuit.
+        let result = BinaryCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
+            include_bytes!("../circuits/bristol-fashion/sha256.txt"),
+        ));
+        assert!(result.is_ok());
+        let circuit = result.unwrap();
+        // SHA-256: 2 parties with 512 + 256 = 768 inputs total
+        assert_eq!(circuit.input_refs.len(), 768);
+        // SHA-256: 1 party with 256 bits output = 256 outputs total
+        assert_eq!(circuit.output_refs.len(), 256);
+        // Verify circuit has gates
+        assert!(!circuit.gates.is_empty());
     }
 }

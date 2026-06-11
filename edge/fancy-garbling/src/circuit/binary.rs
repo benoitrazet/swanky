@@ -1,5 +1,9 @@
-use crate::{FancyBinary, circuit::CircuitExecutor};
+use crate::{
+    FancyBinary,
+    circuit::{Circuit, CircuitInputMapper},
+};
 use swanky_channel::Channel;
+use swanky_error::Result;
 
 /// Static representation of binary computation supported by fancy garbling.
 #[derive(Clone, Debug, PartialEq)]
@@ -12,18 +16,24 @@ pub struct BinaryCircuit {
     pub(crate) num_nonfree_gates: usize,
 }
 
-impl<F: FancyBinary> CircuitExecutor<F> for BinaryCircuit {
+impl<F: FancyBinary> Circuit<F> for BinaryCircuit {
+    type Input = Vec<F::Item>;
+    type Output = Vec<F::Item>;
+
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &[<F as crate::Fancy>::Item],
+        inputs: &Self::Input,
         channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<<F as crate::Fancy>::Item>> {
-        assert_eq!(
-            inputs.len(),
-            <BinaryCircuit as CircuitExecutor<F>>::ninputs(self)
-        );
+    ) -> Result<Self::Output> {
         self.eval_to_wirelabels(backend, inputs, channel)
+    }
+}
+
+impl<F: FancyBinary> CircuitInputMapper<F> for BinaryCircuit {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
+        assert_eq!(inputs.len(), self.input_refs.len());
+        inputs
     }
 
     fn ninputs(&self) -> usize {

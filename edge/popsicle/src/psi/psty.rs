@@ -8,7 +8,8 @@ use aes_gcm::{
 };
 
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryBundleGadgets, BinaryGadgets, Fancy, FancyBinary,
+    AllWire, BinaryBundle, Circuit, Fancy, FancyBinary,
+    circuits::binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality},
 };
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
@@ -403,7 +404,7 @@ fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
 }
 
 /// Fancy function to compute the intersection and return encoded vector of 0/1 masks.
-fn fancy_compute_intersection<F: Fancy + BinaryBundleGadgets>(
+fn fancy_compute_intersection<F: FancyBinary>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
@@ -414,9 +415,12 @@ fn fancy_compute_intersection<F: Fancy + BinaryBundleGadgets>(
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            f.bin_eq_bundles(
-                &BinaryBundle::new(xs.to_vec()),
-                &BinaryBundle::new(ys.to_vec()),
+            BinaryEquality.execute(
+                f,
+                &(
+                    BinaryBundle::new(xs.to_vec()),
+                    BinaryBundle::new(ys.to_vec()),
+                ),
                 channel,
             )
         })
@@ -424,7 +428,7 @@ fn fancy_compute_intersection<F: Fancy + BinaryBundleGadgets>(
 }
 
 /// Fancy function to compute the cardinality
-fn fancy_compute_cardinality<F: Fancy + BinaryBundleGadgets + FancyBinary>(
+fn fancy_compute_cardinality<F: FancyBinary>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
@@ -436,25 +440,27 @@ fn fancy_compute_cardinality<F: Fancy + BinaryBundleGadgets + FancyBinary>(
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            f.bin_eq_bundles(
-                &BinaryBundle::new(xs.to_vec()),
-                &BinaryBundle::new(ys.to_vec()),
+            BinaryEquality.execute(
+                f,
+                &(
+                    BinaryBundle::new(xs.to_vec()),
+                    BinaryBundle::new(ys.to_vec()),
+                ),
                 channel,
             )
         })
         .collect::<swanky_error::Result<Vec<F::Item>>>()?;
 
-    let mut acc = f.bin_constant_bundle(0, HASH_SIZE * 8, channel)?;
+    let mut acc = BinaryConstant::new(0, HASH_SIZE * 8).execute(f, &(), channel)?;
+    let one = BinaryConstant::new(1, HASH_SIZE * 8).execute(f, &(), channel)?;
 
     for b in eqs.into_iter() {
-        let one = f.bin_constant_bundle(1, HASH_SIZE * 8, channel)?;
         let b_ws = one
             .iter()
             .map(|w| f.and(w, &b, channel))
             .collect::<Result<Vec<_>, _>>()?;
         let b_binary = BinaryBundle::new(b_ws);
-
-        acc = f.bin_addition_no_carry(&acc, &b_binary, channel)?;
+        acc = BinaryAdditionNoCarry.execute(f, &(acc, b_binary), channel)?;
     }
 
     Ok(acc)

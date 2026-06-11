@@ -84,7 +84,8 @@ where
         // (2)
         let primary_keys =
             bundle_primary_keys::<Garbler<RNG, OtSender, WireMod2>>(&circuit_inputs)?;
-        let (sender_payloads, receiver_payloads) = bundle_payloads(&mut self.gb, &circuit_inputs)?;
+        let (sender_payloads, receiver_payloads) =
+            bundle_payloads(&mut self.gb, &circuit_inputs, channel)?;
 
         // (3)
         let existence_bit_vector = fancy_intersection_bit_vector(

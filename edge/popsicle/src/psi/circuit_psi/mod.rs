@@ -94,6 +94,7 @@ pub struct Intersection {
 fn bundle_payloads<F>(
     f: &mut F,
     circuit_inputs: &CircuitInputs<F::Item>,
+    channel: &mut Channel,
 ) -> swanky_error::Result<(
     Vec<BinaryBundle<<F as Fancy>::Item>>,
     Vec<BinaryBundle<<F as Fancy>::Item>>,
@@ -105,6 +106,7 @@ where
         f,
         &wires_to_bundle::<F>(&circuit_inputs.sender_payloads_masked, PAYLOAD_SIZE * 8),
         &wires_to_bundle::<F>(&circuit_inputs.masks, PAYLOAD_SIZE * 8),
+        channel,
     )?;
     let receiver_payloads =
         wires_to_bundle::<F>(&circuit_inputs.receiver_payloads, PAYLOAD_SIZE * 8);

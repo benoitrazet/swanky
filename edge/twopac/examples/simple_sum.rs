@@ -1,123 +1,54 @@
 //! An example that adds two secret numbers in a binary garbled circuit
 //! using fancy-garbling.
-use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, util,
-};
-use swanky_twopac::semihonest::{Evaluator, Garbler};
 
+use fancy_garbling::{
+    AllWire, BinaryBundle, BinaryGadgets, Circuit, circuits::binary::BinaryAdditionNoCarry,
+};
 use swanky_channel::Channel;
+use swanky_error::Result;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 use swanky_rng::SwankyRng;
+use swanky_twopac::semihonest::{Evaluator, Garbler};
 
-/// A structure that contains both the garbler and the evaluators
-/// wires. This structure simplifies the API of the garbled circuit.
-struct SUMInputs<F> {
-    pub garbler_wires: BinaryBundle<F>,
-    pub evaluator_wires: BinaryBundle<F>,
+const NBITS: usize = 128;
+
+fn gb_sum(input: u128, channel: &mut Channel, rng: SwankyRng) -> Result<()> {
+    let mut gb = Garbler::<SwankyRng, OtSender, AllWire>::new(channel, rng)?;
+    let inputs = gb_set_inputs(&mut gb, input, channel)?;
+    let sum = BinaryAdditionNoCarry.execute(&mut gb, &inputs, channel)?;
+    gb.bin_output(&sum, channel)?;
+    Ok(())
 }
 
-/// The garbler's main method:
-/// (1) The garbler is first created using the passed rng and value.
-/// (2) The garbler then exchanges their wires obliviously with the evaluator.
-/// (3) The garbler and the evaluator then run the garbled circuit.
-/// (4) The garbler and the evaluator open the result of the computation.
-fn gb_sum(rng: SwankyRng, channel: &mut Channel, input: u128) {
-    // (1)
-    let mut gb = Garbler::<SwankyRng, OtSender, AllWire>::new(channel, rng).unwrap();
-    // (2)
-    let circuit_wires = gb_set_fancy_inputs(&mut gb, input, channel);
-    // (3)
-    let sum = fancy_sum::<Garbler<SwankyRng, OtSender, AllWire>>(&mut gb, circuit_wires, channel)
-        .unwrap();
-    // (4)
-    gb.outputs(sum.wires(), channel).unwrap();
+fn gb_set_inputs<F: BinaryGadgets>(
+    gb: &mut F,
+    input: u128,
+    channel: &mut Channel,
+) -> Result<(BinaryBundle<F::Item>, BinaryBundle<F::Item>)> {
+    let x = gb.bin_encode(input, NBITS, channel)?;
+    let y = gb.bin_receive(NBITS, channel)?;
+    Ok((x, y))
 }
 
-/// The garbler's wire exchange method
-fn gb_set_fancy_inputs<F>(gb: &mut F, input: u128, channel: &mut Channel) -> SUMInputs<F::Item>
-where
-    F: Fancy<Item = AllWire> + BinaryGadgets,
-{
-    // The number of bits needed to represent a single input, in this case a u128
-    let nbits = 128;
-    // The garbler encodes their input into binary wires
-    let garbler_wires: BinaryBundle<F::Item> = gb.bin_encode(input, nbits, channel).unwrap();
-    // The evaluator receives their input labels using Oblivious Transfer (OT)
-    let evaluator_wires: BinaryBundle<F::Item> = gb.bin_receive(nbits, channel).unwrap();
-
-    SUMInputs {
-        garbler_wires,
-        evaluator_wires,
-    }
-}
-
-/// The evaluator's main method:
-/// (1) The evaluator is first created using the passed rng and value.
-/// (2) The evaluator then exchanges their wires obliviously with the garbler.
-/// (3) The evaluator and the garbler then run the garbled circuit.
-/// (4) The evaluator and the garbler open the result of the computation.
-/// (5) The evaluator translates the binary output of the circuit into its decimal
-///     representation.
-fn ev_sum(rng: SwankyRng, channel: &mut Channel, input: u128) -> u128 {
-    // (1)
-    let mut ev = Evaluator::<SwankyRng, OtReceiver, AllWire>::new(channel, rng).unwrap();
-    // (2)
-    let circuit_wires = ev_set_fancy_inputs(&mut ev, input, channel);
-    // (3)
-    let sum =
-        fancy_sum::<Evaluator<SwankyRng, OtReceiver, AllWire>>(&mut ev, circuit_wires, channel)
-            .unwrap();
-
-    // (4)
-    let sum_binary = ev
-        .outputs(sum.wires(), channel)
+fn ev_sum(input: u128, channel: &mut Channel, rng: SwankyRng) -> Result<u128> {
+    let mut ev = Evaluator::<SwankyRng, OtReceiver, AllWire>::new(channel, rng)?;
+    let inputs = ev_set_inputs(&mut ev, input, channel)?;
+    let sum = BinaryAdditionNoCarry.execute(&mut ev, &inputs, channel)?;
+    let output = ev
+        .bin_output(&sum, channel)
         .unwrap()
         .expect("evaluator should produce outputs");
-    // (5)
-    util::u128_from_bits(&sum_binary)
+    Ok(output)
 }
 
-/// The evaluator's wire exchange method
-fn ev_set_fancy_inputs<F>(ev: &mut F, input: u128, channel: &mut Channel) -> SUMInputs<F::Item>
-where
-    F: Fancy<Item = AllWire> + BinaryGadgets,
-{
-    // The number of bits needed to represent a single input, in this case a u128
-    let nbits = 128;
-    // The evaluator receives the garblers input labels.
-    let garbler_wires: BinaryBundle<F::Item> = ev.bin_receive(nbits, channel).unwrap();
-    // The evaluator receives their input labels using Oblivious Transfer (OT).
-    let evaluator_wires: BinaryBundle<F::Item> = ev.bin_encode(input, nbits, channel).unwrap();
-
-    SUMInputs {
-        garbler_wires,
-        evaluator_wires,
-    }
-}
-
-/// The main fancy function which describes the garbled circuit for summation.
-fn fancy_sum<F>(
-    f: &mut F,
-    wire_inputs: SUMInputs<F::Item>,
+fn ev_set_inputs<F: BinaryGadgets>(
+    ev: &mut F,
+    input: u128,
     channel: &mut Channel,
-) -> swanky_error::Result<BinaryBundle<F::Item>>
-where
-    F: Fancy + BinaryGadgets + FancyBinary + FancyArithmetic,
-{
-    // The garbler and the evaluator's values are added together.
-    // For simplicity we assume that the addition will not result
-    // in a carry.
-    let sum = f.bin_addition_no_carry(
-        &wire_inputs.garbler_wires,
-        &wire_inputs.evaluator_wires,
-        channel,
-    )?;
-
-    Ok(sum)
-}
-
-fn sum_in_clear(gb_value: u128, ev_value: u128) -> u128 {
-    gb_value + ev_value
+) -> Result<(BinaryBundle<F::Item>, BinaryBundle<F::Item>)> {
+    let x = ev.bin_receive(NBITS, channel)?;
+    let y = ev.bin_encode(input, NBITS, channel)?;
+    Ok((x, y))
 }
 
 use clap::Parser;
@@ -127,38 +58,32 @@ use clap::Parser;
 /// cargo run --example simple_sum 2 3
 ///
 /// Computes the SUM(2,3)
-/// Where 2 is the garbler's value and 3 the evaluator's
+/// Where 2 is the garbler's value and 3 is the evaluator's.
 struct Cli {
-    /// The first integer the garbler's value
+    /// The garbler's value.
     gb_value: u128,
-    /// The second integer the evaluator's value
+    /// The evaluator's value.
     ev_value: u128,
 }
 
 fn main() {
     let cli = Cli::parse();
-    let gb_value: u128 = cli.gb_value;
-    let ev_value: u128 = cli.ev_value;
+    let x: u128 = cli.gb_value;
+    let y: u128 = cli.ev_value;
 
     let (_, result) = swanky_channel::local::local_channel_pair(
         |channel| {
-            let rng_gb = SwankyRng::new();
-            gb_sum(rng_gb, channel, gb_value);
-            Ok(())
+            let rng = SwankyRng::new();
+            gb_sum(x, channel, rng)
         },
         |channel| {
-            let rng_ev = SwankyRng::new();
-            let result = ev_sum(rng_ev, channel, ev_value);
-            Ok(result)
+            let rng = SwankyRng::new();
+            ev_sum(y, channel, rng)
         },
     )
     .unwrap();
 
-    let sum = sum_in_clear(gb_value, ev_value);
+    println!("SUM({x}, {y}) = {result}");
 
-    println!("Garbled Circuit result is : SUM({gb_value}, {ev_value}) = {result}");
-    assert!(
-        result == sum,
-        "The garbled circuit result is incorrect and sould be {sum}"
-    );
+    assert_eq!(result, x + y);
 }

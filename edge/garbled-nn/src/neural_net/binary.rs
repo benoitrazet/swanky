@@ -4,7 +4,13 @@ use crate::{
     neural_net::FancyNeuralNet,
     util::{i64_from_bits, i64_to_twos_complement},
 };
-use fancy_garbling::{BinaryBundle, BinaryGadgets, Fancy};
+use fancy_garbling::{
+    BinaryBundle, BinaryGadgets, Circuit, Fancy, FancyBinary,
+    circuits::binary::{
+        BinaryAdditionNoCarry, BinaryConstant, BinaryConstantMultiplication, BinaryMax,
+        BinaryMultiplex, BinaryMultiplexConstantBits, BinaryMultiplicationLowerHalf,
+    },
+};
 use ndarray::Array3;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -17,7 +23,7 @@ pub(crate) struct BinaryNeuralNet<'a, F> {
     secret_weights_owned: bool,
 }
 
-impl<'a, F: BinaryGadgets> BinaryNeuralNet<'a, F> {
+impl<'a, F: FancyBinary> BinaryNeuralNet<'a, F> {
     /// Create a new `BinaryNeuralNet` for the provided backend and using the
     /// specified bitwidths for each layer of the neural net.
     ///
@@ -144,12 +150,12 @@ impl<'a, F: BinaryGadgets> BinaryLayer<'a, F> {
     }
 }
 
-impl<'a, F: Fancy + BinaryGadgets> FancyNeuralNet for BinaryLayer<'a, F> {
+impl<'a, F: Fancy + FancyBinary> FancyNeuralNet for BinaryLayer<'a, F> {
     type Item = BinaryBundle<F::Item>;
 
     fn nn_encode(&mut self, value: i64, channel: &mut Channel) -> Result<BinaryBundle<F::Item>> {
         let twos = i64_to_twos_complement(value, self.nbits);
-        self.backend.bin_constant_bundle(twos, self.nbits, channel)
+        BinaryConstant::new(twos, self.nbits).execute(self.backend, &(), channel)
     }
 
     fn nn_secret(
@@ -171,7 +177,7 @@ impl<'a, F: Fancy + BinaryGadgets> FancyNeuralNet for BinaryLayer<'a, F> {
         y: &BinaryBundle<F::Item>,
         channel: &mut Channel,
     ) -> Result<BinaryBundle<F::Item>> {
-        self.backend.bin_addition_no_carry(x, y, channel)
+        BinaryAdditionNoCarry.execute(self.backend, &(x.clone(), y.clone()), channel)
     }
 
     fn nn_cmul(
@@ -180,8 +186,11 @@ impl<'a, F: Fancy + BinaryGadgets> FancyNeuralNet for BinaryLayer<'a, F> {
         constant: i64,
         channel: &mut Channel,
     ) -> Result<BinaryBundle<F::Item>> {
-        self.backend
-            .bin_cmul(x, constant as u128, self.nbits, channel)
+        BinaryConstantMultiplication.execute(
+            self.backend,
+            &(x.clone(), constant as u128, self.nbits),
+            channel,
+        )
     }
 
     fn nn_proj(
@@ -198,7 +207,7 @@ impl<'a, F: Fancy + BinaryGadgets> FancyNeuralNet for BinaryLayer<'a, F> {
         } else {
             self.backend.bin_receive(self.nbits, channel)?
         };
-        self.backend.bin_multiplication_lower_half(x, &w, channel)
+        BinaryMultiplicationLowerHalf.execute(self.backend, &(x.clone(), w), channel)
     }
 
     fn nn_max(
@@ -206,7 +215,7 @@ impl<'a, F: Fancy + BinaryGadgets> FancyNeuralNet for BinaryLayer<'a, F> {
         xs: &[BinaryBundle<F::Item>],
         channel: &mut Channel,
     ) -> Result<BinaryBundle<F::Item>> {
-        self.backend.bin_max(xs, channel)
+        BinaryMax.execute(self.backend, &xs.to_vec(), channel)
     }
 
     fn nn_activation(
@@ -219,21 +228,24 @@ impl<'a, F: Fancy + BinaryGadgets> FancyNeuralNet for BinaryLayer<'a, F> {
             ActivationFunction::Sign => {
                 let sign = x.wires().last().unwrap();
                 let neg1 = (1 << self.nbits) - 1;
-                self.backend
-                    .bin_multiplex_constant_bits(sign, 1, neg1, self.nbits, channel)
+
+                BinaryMultiplexConstantBits.execute(
+                    self.backend,
+                    &(sign.clone(), 1, neg1, self.nbits),
+                    channel,
+                )
             }
             ActivationFunction::Relu => {
                 let sign = x.wires().last().unwrap();
-                let zeros = self
-                    .backend
-                    .bin_constant_bundle(0u128, self.nbits, channel)?;
-                self.backend.bin_multiplex(sign, x, &zeros, channel)
+                let zeros =
+                    BinaryConstant::new(0, self.nbits).execute(self.backend, &(), channel)?;
+                BinaryMultiplex.execute(self.backend, &(sign.clone(), x.clone(), zeros), channel)
             }
             ActivationFunction::Identity => Ok(x.clone()),
         }
     }
 
     fn nn_zero(&mut self, channel: &mut Channel) -> Result<BinaryBundle<F::Item>> {
-        self.backend.bin_constant_bundle(0u128, self.nbits, channel)
+        BinaryConstant::new(0, self.nbits).execute(self.backend, &(), channel)
     }
 }

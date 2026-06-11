@@ -188,7 +188,7 @@ impl WireLabel for WireModQ {
         // This function converts a Block into its WireLabel representation
         // by splitting the Block into several digits mod q that can each fit
         // into 128b.
-        let ds = if util::is_power_of_2(q) {
+        let ds = if q.is_power_of_two() {
             // It's a power of 2, just split the digits.
             let ndigits = util::digits_per_u128(q);
             let width = 128 / ndigits;
