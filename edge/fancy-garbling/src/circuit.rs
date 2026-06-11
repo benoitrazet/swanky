@@ -110,7 +110,7 @@ impl<T: Clone + HasModulus, const N: usize> Flatten for [T; N] {
 /// in `execute` by directly calling operations on the underlying [`Fancy`]
 /// backend ([`crate::FancyArithmetic`] in this example).
 /// ```
-/// # use fancy_garbling::{FancyArithmetic, circuit::Circuit};
+/// # use fancy_garbling::{FancyArithmetic, Circuit};
 /// # use swanky_channel::Channel;
 /// # use swanky_error::Result;
 /// struct AddCircuit;
@@ -171,7 +171,7 @@ pub trait Circuit<F: Fancy> {
 /// documentation to support mapping a vector of inputs into the appropriate
 /// input type for the given circuit.
 /// ```
-/// # use fancy_garbling::{FancyArithmetic, circuit::{Circuit, CircuitInputMapper}};
+/// # use fancy_garbling::{FancyArithmetic, Circuit, CircuitInputMapper};
 /// # use swanky_channel::Channel;
 /// # use swanky_error::Result;
 /// # struct AddCircuit;
