@@ -57,7 +57,7 @@ where
                 .map(|x| backend.and(x, ywire, channel))
                 .collect::<Result<_>>()
                 .map(BinaryBundle::new)?;
-            let shifted = BinaryLeftShiftExtend.execute(backend, (mul, i), channel)?;
+            let shifted = BinaryLeftShiftExtend::new().execute(backend, (&mul, i), channel)?;
             let res = BinaryAddition::new().execute(backend, (&sum, &shifted), channel)?;
             sum = res.0;
             sum.push(res.1);
@@ -110,7 +110,7 @@ where
                 .map(|x| backend.and(x, ywire, channel))
                 .collect::<Result<_>>()
                 .map(BinaryBundle::new)?;
-            let shifted = BinaryLeftShift.execute(backend, (mul, i), channel)?;
+            let shifted = BinaryLeftShift::new().execute(backend, (&mul, i), channel)?;
             sum = BinaryAdditionNoCarry::new().execute(backend, (&sum, &shifted), channel)?;
         }
         Ok(sum)
@@ -149,7 +149,7 @@ where
             .enumerate()
             .filter_map(|(i, b)| if b > 0 { Some(i) } else { None })
             .try_fold(zero, |z, shift_amt| {
-                let s = BinaryLeftShift.execute(backend, ((*x).clone(), shift_amt), channel)?;
+                let s = BinaryLeftShift::new().execute(backend, (x, shift_amt), channel)?;
                 BinaryAdditionNoCarry::new().execute(backend, (&z, &s), channel)
             })
     }
