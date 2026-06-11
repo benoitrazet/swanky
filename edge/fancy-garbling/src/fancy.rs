@@ -168,19 +168,6 @@ pub trait FancyArithmetic: Fancy {
         y: &Self::Item,
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item>;
-
-    /// Sum up a slice of wires.
-    ///
-    /// # Panics
-    /// Panics if `args.len() < 2`.
-    fn add_many(&mut self, args: &[Self::Item]) -> Self::Item {
-        assert!(args.len() >= 2, "`args.len()` must be two or more");
-        let mut z = args[0].clone();
-        for x in args.iter().skip(1) {
-            z = self.add(&z, x);
-        }
-        z
-    }
 }
 
 /// Extension trait for [`Fancy`] that provides a projection gate, alongside

@@ -27,6 +27,7 @@ impl<F: FancyArithmetic> Circuit<F> for Addition {
     }
 }
 
+/// Given a vector `xs` of values, output `sum(xs)`.
 pub struct AddMany;
 
 impl<F: FancyArithmetic> Circuit<F> for AddMany {

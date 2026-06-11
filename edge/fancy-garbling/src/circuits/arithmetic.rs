@@ -1,6 +1,7 @@
 //! Circuits for operating over arithmetic values.
 
 mod addition;
+pub use addition::AddMany;
 pub use addition::Addition;
 
 mod subtraction;
