@@ -1,8 +1,8 @@
 use fancy_garbling::{
     Fancy,
-    circuit::{CircuitInputMapper, Flatten},
     circuit_analyzer::CircuitAnalyzer,
     dummy::Dummy,
+    {CircuitInputMapper, Flatten},
 };
 use swanky_authenticated_garbling::{
     Evaluator, Garbler, WirePreProcessor,

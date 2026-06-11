@@ -3,10 +3,13 @@ use std::time::Duration;
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
     Fancy,
-    circuit::circuits,
     circuits::{
         aes::AesNonExpanded,
         binary::{TestBinaryAddition, TestBinarySubtraction},
+    },
+    test_circuits::{
+        binary::{TestAndGateFanN, TestOrGateFanN, TestXorGateFanN},
+        fancy::TestBinaryConstant,
     },
 };
 use rand::Rng;
@@ -21,7 +24,7 @@ fn bench_party_construction(c: &mut Criterion) {
     let input_size: usize = 1000;
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
-    let circuit = circuits::binary::TestAndGateFanN(input_size);
+    let circuit = TestAndGateFanN(input_size);
     c.bench_function("party-construction", move |b| {
         b.iter(|| {
             swanky_channel::local::local_channel_pair(
@@ -37,7 +40,7 @@ fn bench_party_encoding_receiving(c: &mut Criterion) {
     let input_size: usize = 400;
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
-    let circuit = circuits::binary::TestAndGateFanN(2 * input_size);
+    let circuit = TestAndGateFanN(2 * input_size);
 
     c.bench_function("party-encoding-receiving", move |b| {
         b.iter(|| {
@@ -63,7 +66,7 @@ fn bench_party_encoding_receiving(c: &mut Criterion) {
 fn bench_single_and_gate(c: &mut Criterion) {
     let ninputs_gb = 1;
     let ninputs_ev = 1;
-    let circuit = circuits::binary::TestAndGateFanN(ninputs_gb + ninputs_ev);
+    let circuit = TestAndGateFanN(ninputs_gb + ninputs_ev);
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
     let inputs_gb: Vec<u16> = (0..ninputs_gb).map(|_| rng_gb.r#gen::<u16>() % 2).collect();
@@ -79,7 +82,7 @@ fn bench_single_and_gate(c: &mut Criterion) {
 }
 
 fn bench_constant_gates(c: &mut Criterion) {
-    let circuit = circuits::fancy::TestBinaryConstant;
+    let circuit = TestBinaryConstant;
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
     let inputs_gb: Vec<u16> = (0..0).map(|_| rng_gb.r#gen::<u16>() % 2).collect();
@@ -97,7 +100,7 @@ fn bench_constant_gates(c: &mut Criterion) {
 fn bench_and_gate_fan_n(c: &mut Criterion) {
     let ninputs_gb = 400;
     let ninputs_ev = 400;
-    let circuit = circuits::binary::TestAndGateFanN(ninputs_gb + ninputs_ev);
+    let circuit = TestAndGateFanN(ninputs_gb + ninputs_ev);
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
     let inputs_gb: Vec<u16> = (0..ninputs_gb).map(|_| rng_gb.r#gen::<u16>() % 2).collect();
@@ -115,7 +118,7 @@ fn bench_and_gate_fan_n(c: &mut Criterion) {
 fn bench_or_gate_fan_n(c: &mut Criterion) {
     let ninputs_gb = 400;
     let ninputs_ev = 400;
-    let circuit = circuits::binary::TestOrGateFanN(ninputs_gb + ninputs_ev);
+    let circuit = TestOrGateFanN(ninputs_gb + ninputs_ev);
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
     let inputs_gb: Vec<u16> = (0..ninputs_gb).map(|_| rng_gb.r#gen::<u16>() % 2).collect();
@@ -133,7 +136,7 @@ fn bench_or_gate_fan_n(c: &mut Criterion) {
 fn bench_xor_gate_fan_n(c: &mut Criterion) {
     let ninputs_gb = 400;
     let ninputs_ev = 400;
-    let circuit = circuits::binary::TestXorGateFanN(ninputs_gb + ninputs_ev);
+    let circuit = TestXorGateFanN(ninputs_gb + ninputs_ev);
 
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();

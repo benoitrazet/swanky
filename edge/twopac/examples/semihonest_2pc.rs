@@ -1,6 +1,5 @@
 use fancy_garbling::{
-    Fancy, WireMod2,
-    circuit::CircuitInputMapper,
+    CircuitInputMapper, Fancy, WireMod2,
     circuits::{aes::AesNonExpanded, sha::Sha256CompressionFunctionFixedIV},
 };
 use std::time::SystemTime;

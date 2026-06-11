@@ -5,8 +5,7 @@ use crate::{
     util::{from_mod_q_crt, to_mod_q, to_mod_q_crt},
 };
 use fancy_garbling::{
-    CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary, FancyProj, HasModulus,
-    circuit::Circuit,
+    Circuit, CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary, FancyProj, HasModulus,
     circuits::arithmetic::{Addition, ConstantMultiplication, Max, ReLU, Sgn},
     util::factor,
 };

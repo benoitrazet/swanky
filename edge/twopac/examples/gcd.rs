@@ -2,7 +2,7 @@
 //! using `fancy-garbling`.
 
 use core::cmp::{Ordering, max};
-use fancy_garbling::{AllWire, BinaryBundle, BinaryGadgets, circuit::Circuit, circuits::Gcd};
+use fancy_garbling::{AllWire, BinaryBundle, BinaryGadgets, Circuit, circuits::Gcd};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};

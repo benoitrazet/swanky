@@ -2,7 +2,7 @@
 //! using fancy-garbling.
 
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryGadgets, circuit::Circuit, circuits::binary::BinaryAdditionNoCarry,
+    AllWire, BinaryBundle, BinaryGadgets, Circuit, circuits::binary::BinaryAdditionNoCarry,
 };
 use swanky_channel::Channel;
 use swanky_error::Result;

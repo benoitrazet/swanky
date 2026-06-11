@@ -12,7 +12,6 @@ mod tests {
     use fancy_garbling::{
         AllWire, CrtBundle, CrtGadgets, Fancy, FancyArithmetic, FancyBinary, FancyProj, WireLabel,
         WireMod2,
-        circuit::{Circuit, CircuitInputMapper, Flatten, circuits::arithmetic::TestAddition},
         circuit_analyzer::CircuitAnalyzer,
         circuits::{
             aes::AesNonExpanded,
@@ -20,6 +19,7 @@ mod tests {
         },
         dummy::{Dummy, DummyVal},
         util::RngExt,
+        {Circuit, CircuitInputMapper, Flatten, test_circuits::arithmetic::TestAddition},
     };
     use itertools::Itertools;
     use swanky_channel::Channel;

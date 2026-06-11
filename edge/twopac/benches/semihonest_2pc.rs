@@ -3,8 +3,7 @@
 use core::time::Duration;
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
-    Fancy, WireMod2,
-    circuit::CircuitInputMapper,
+    CircuitInputMapper, Fancy, WireMod2,
     circuits::{aes::AesNonExpanded, sha::Sha256CompressionFunctionFixedIV},
 };
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};

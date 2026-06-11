@@ -5,8 +5,7 @@ use crate::{
     util::{i64_from_bits, i64_to_twos_complement},
 };
 use fancy_garbling::{
-    BinaryBundle, BinaryGadgets, Fancy, FancyBinary,
-    circuit::Circuit,
+    BinaryBundle, BinaryGadgets, Circuit, Fancy, FancyBinary,
     circuits::binary::{
         BinaryAdditionNoCarry, BinaryConstant, BinaryConstantMultiplication, BinaryMax,
         BinaryMultiplex, BinaryMultiplexConstantBits, BinaryMultiplicationLowerHalf,

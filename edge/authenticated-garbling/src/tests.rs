@@ -6,13 +6,13 @@ use crate::{evaluator::Evaluator, preprocesser::WirePreProcessor};
 
 use fancy_garbling::Flatten;
 use fancy_garbling::circuits::binary::{
-    TestBinaryAddition, TestBinaryConstant, TestBinaryMultiplication, TestBinarySubtraction,
-    TestBinaryTwosComplement,
+    TestBinaryAddition, TestBinaryMultiplication, TestBinarySubtraction, TestBinaryTwosComplement,
 };
 use fancy_garbling::dummy::DummyVal;
 use fancy_garbling::test_circuits::binary::{
     TestAndGate, TestAndGateFanN, TestNegateGate, TestOrGateFanN, TestXorGateFanN,
 };
+use fancy_garbling::test_circuits::fancy::TestBinaryConstant;
 use fancy_garbling::{CircuitInputMapper, Fancy, circuit_analyzer::CircuitAnalyzer, dummy::Dummy};
 use rand::Rng;
 use swanky_rng::SwankyRng;
@@ -109,13 +109,6 @@ fn test_circuit<
     assert!(outputs_gb.is_none());
     let outputs = outputs_ev.unwrap();
     assert_eq!(outputs, expected)
-}
-
-#[test]
-fn test_constant_bundle() {
-    let circuit = TestBinaryConstant(1, 64);
-
-    test_circuit(0, 0, &circuit);
 }
 
 #[test]
