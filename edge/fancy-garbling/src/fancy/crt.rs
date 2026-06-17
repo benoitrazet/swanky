@@ -123,19 +123,6 @@ pub trait CrtGadgets: BundleGadgets {
         Ok(buns)
     }
 
-    /// Creates a bundle of constant wires for the CRT representation of `x` under
-    /// composite modulus `q`.
-    fn crt_constant_bundle(
-        &mut self,
-        x: u128,
-        q: u128,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
-        let ps = util::factor(q);
-        let xs = ps.iter().map(|&p| (x % p as u128) as u16).collect_vec();
-        self.constant_bundle(&xs, &ps, channel).map(CrtBundle)
-    }
-
     /// Output a CRT bundle and interpret it mod Q.
     fn crt_output(
         &mut self,

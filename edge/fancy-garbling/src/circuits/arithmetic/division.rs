@@ -2,7 +2,8 @@ use crate::{
     CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary, FancyProj,
     circuit::Circuit,
     circuits::arithmetic::{
-        Addition, ConstantMultiplication, Multiplication, PmrGreaterThanOrEqual, Subtraction,
+        Addition, Constant, ConstantMultiplication, Multiplication, PmrGreaterThanOrEqual,
+        Subtraction,
     },
     util::product,
 };
@@ -49,10 +50,10 @@ where
         let q_ = product(qs_);
         let l = 128 - q_.leading_zeros();
 
-        let mut quotient = backend.crt_constant_bundle(0, q, channel)?;
+        let mut quotient = Constant::new(0, q).execute(backend, (), channel)?;
         let mut a = (*x).clone();
 
-        let one = backend.crt_constant_bundle(1, q, channel)?;
+        let one = Constant::new(1, q).execute(backend, (), channel)?;
         for i in 0..l {
             let b = 2u128.pow(l - i - 1);
             let mut pb = q_ / b;
@@ -63,7 +64,7 @@ where
             let tmp = ConstantMultiplication::new().execute(backend, (y, b), channel)?;
             let c1 = PmrGreaterThanOrEqual::new().execute(backend, (&a, &tmp), channel)?;
 
-            let pb_crt = backend.crt_constant_bundle(pb, q, channel)?;
+            let pb_crt = Constant::new(pb, q).execute(backend, (), channel)?;
             let c2 = PmrGreaterThanOrEqual::new().execute(backend, (&pb_crt, y), channel)?;
 
             let c = backend.and(&c1, &c2, channel)?;

@@ -1,4 +1,5 @@
 use crate::{BinaryBundle, Fancy, circuit::Circuit, util::u128_to_bits};
+use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// Binary constant.
@@ -43,7 +44,7 @@ impl<F: Fancy> Circuit<F> for BinaryConstant<F> {
         &self,
         backend: &mut F,
         _: Self::Input,
-        channel: &mut swanky_channel::Channel,
+        channel: &mut Channel,
     ) -> Result<Self::Output> {
         let xs = u128_to_bits(self.value, self.nbits);
         xs.into_iter()
