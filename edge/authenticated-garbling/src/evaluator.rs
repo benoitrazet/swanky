@@ -13,9 +13,10 @@ use swanky_authenticated_bits::{
     authshares::{AuthShare, AuthShareGenerator},
 };
 use swanky_channel::Channel;
-use swanky_error::{ErrorKind, ensure};
+use swanky_error::{ErrorKind, WrapErr, ensure};
 use swanky_field::FiniteRing;
-use swanky_field_binary::{F2, F128b};
+use swanky_field_binary::{F2, F2BitSerializer, F128b};
+use swanky_serialization::SequenceSerializer;
 use vectoreyes::U8x16;
 
 type AuthenticatedWire = AuthenticatedWireMod2<PartyEvaluator>;
@@ -41,6 +42,12 @@ pub struct Evaluator {
     and_auth_shares: Vec<AuthShare<PartyEvaluator>>,
     // The index of the current AND authenticated share we're using.
     and_auth_shares_index: usize,
+    // A vector that stores the masked wire values. This is used during the
+    // finalization/validation stage.
+    lc_values: Vec<F2>,
+    // A vector that stores the Evaluator's validation shares. Contrary to the
+    // Garbler, the Evalutor can compute these shares during evaluation.
+    validation_shares: Vec<AuthShare<PartyEvaluator>>,
 }
 
 impl Evaluator {
@@ -58,7 +65,7 @@ impl Evaluator {
         let mut and_generator = AndTripleGenerator::new_with_delta(delta, channel, rng)?;
         let (auth_shares, and_auth_shares) =
             f_preprocessing(circuit, &mut and_generator, channel, rng)?;
-
+        let num_and_gates = and_auth_shares.len();
         let one = channel.read::<U8x16>()?;
         Ok(Evaluator {
             delta,
@@ -68,6 +75,8 @@ impl Evaluator {
             auth_shares_index: 0,
             and_auth_shares,
             and_auth_shares_index: 0,
+            lc_values: Vec::with_capacity(num_and_gates),
+            validation_shares: Vec::with_capacity(num_and_gates),
         })
     }
 
@@ -77,13 +86,13 @@ impl Evaluator {
         self.and_wire_index += 1;
         current
     }
-
+    /// The authenticated share associated with the current gate of the garbling computation.
     fn next_auth_share(&mut self) -> AuthShare<PartyEvaluator> {
         let share = self.auth_shares[self.auth_shares_index];
         self.auth_shares_index += 1;
         share
     }
-
+    /// The AND authenticated share associated with the current gate of the garbling computation.
     fn next_and_auth_share(&mut self) -> AuthShare<PartyEvaluator> {
         let share = self.and_auth_shares[self.and_auth_shares_index];
         self.and_auth_shares_index += 1;
@@ -108,6 +117,39 @@ impl Evaluator {
             wires.push(AuthenticatedWire::new(masked_value, wire_label, auth_share));
         }
         Ok(wires)
+    }
+    /// A function that finalizes the authenticated garbling computation before
+    /// opening the output share.
+    ///
+    /// Prior to revealing the result of the computation, the garbler and evaluator
+    /// need to validate the authenticated AND gates. In the case of the evaluator,
+    /// the evaluator sends out the masked wire values to the garbler, then can immediately
+    /// open the validation bits since they already compute their share of those bits
+    /// a-priori.
+    pub fn finalize(&mut self, channel: &mut Channel) -> swanky_error::Result<()> {
+        channel.write(&self.lc_values.len())?;
+        let bit_ser: F2BitSerializer = SequenceSerializer::new(&mut channel.as_std_io()).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize sequence serializer.",
+        )?;
+        bit_ser.write_vector(channel.as_std_io(), &self.lc_values)?;
+
+        let mut validation_bits = Vec::with_capacity(self.validation_shares.len());
+        // The parties then open the share c_γ
+        AuthShareGenerator::open_with_delta(
+            &self.validation_shares,
+            self.delta,
+            &mut validation_bits,
+            channel,
+        )?;
+        println!("ev validation bits {:?}", validation_bits);
+        let validation_bit = validation_bits.iter().fold(F2::ZERO, |acc, &x| acc + x);
+        ensure!(
+            validation_bit == F2::ZERO,
+            ErrorKind::OtherError,
+            "Evaluator's authentication validation check failed"
+        );
+        Ok(())
     }
 }
 
@@ -188,10 +230,10 @@ impl FancyBinary for Evaluator {
         // z'γ := z_γ + λ_γ := b_γ + lsb(L_{γ, z_γ + λ_γ})
         let lc_value = F128b::from(lc_label).lsb() + bit_c;
 
-        // The Evaluator sends out the masked bit z'γ so that the Garbler
-        // can locally compute their share of c_γ
-        channel.write(&lc_value)?;
-
+        // // The Evaluator sends out the masked bit z'γ so that the Garbler
+        // // can locally compute their share of c_γ
+        // channel.write(&lc_value)?;
+        self.lc_values.push(lc_value);
         // The Evaluator computes its share of the validation bit
         // c_γ :=  (z'α ⊕ λ_α) ∧ (z'β ⊕ λ_β ) ⊕ (z'γ ⊕ λ_γ )
         //     := (z'α z'β ⊕ z'β λ_α ⊕ z'α λ_β ⊕ λ_α λ_β) ⊕ (z'γ ⊕ λ_γ )
@@ -207,21 +249,7 @@ impl FancyBinary for Evaluator {
             ^ lb_lambda.mul_with_const(la_value)
             ^ lc_triple
             ^ lc_share;
-
-        let mut validation_bit = Vec::with_capacity(1);
-        // The parties then open the share c_γ
-        AuthShareGenerator::open_with_delta(
-            &[validation_share],
-            self.delta,
-            &mut validation_bit,
-            channel,
-        )?;
-
-        ensure!(
-            validation_bit[0] == F2::ZERO,
-            ErrorKind::OtherError,
-            "Evaluator's authentication validation check failed at index {index}"
-        );
+        self.validation_shares.push(validation_share);
 
         Ok(AuthenticatedWire::new(
             lc_value,
