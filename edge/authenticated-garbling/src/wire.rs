@@ -13,8 +13,8 @@ use swanky_party::GenericParty;
 /// actual bit represented by the wirelabel.
 #[derive(Clone)]
 pub struct AuthenticatedWireMod2<P: GenericParty> {
-    /// Masked value $`w \oplus \lambda`$.
-    masked_value: F2,
+    /// An optional masked value $`w \oplus \lambda`$.
+    masked_value: Option<F2>,
     /// The wirelabel $`L`$.
     wire_label: WireMod2,
     /// Sharing of the color bit $`\lambda`$.
@@ -26,15 +26,24 @@ impl<P: GenericParty> AuthenticatedWireMod2<P> {
     /// $`L`$, and its associated color bit share $`\langle \lambda \rangle`$.
     pub(crate) fn new(masked_value: F2, wire_label: WireMod2, auth_share: AuthShare<P>) -> Self {
         AuthenticatedWireMod2 {
-            masked_value,
+            masked_value: Some(masked_value),
             wire_label,
             auth_share,
         }
     }
 
+    /// Create a new `AuthenticatedWireMod2` given the underlying wirelabel
+    /// $`L`$, and its associated color bit share $`\langle \lambda \rangle`$.
+    pub(crate) fn new_without_mask(wire_label: WireMod2, auth_share: AuthShare<P>) -> Self {
+        AuthenticatedWireMod2 {
+            masked_value: None,
+            wire_label,
+            auth_share,
+        }
+    }
     /// The masked value associated with this wire.
     pub(crate) fn masked_value(&self) -> F2 {
-        self.masked_value
+        self.masked_value.unwrap()
     }
 
     /// The wirelabel $`L`$ associated with this wire.

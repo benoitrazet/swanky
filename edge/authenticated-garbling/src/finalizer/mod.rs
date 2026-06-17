@@ -1,4 +1,4 @@
-use fancy_garbling::{Fancy, FancyBinary, HasModulus};
+use fancy_garbling::{Fancy, FancyBinary, FancyEncode, FancyOutput, HasModulus};
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
@@ -15,6 +15,14 @@ pub struct FinalizedWire<P: GenericParty> {
     masked_value: F2,
     /// Sharing of the color bit $`\lambda`$.
     auth_share: AuthShare<P>,
+}
+
+impl<P: GenericParty> core::fmt::Debug for FinalizedWire<P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FinalizedWire")
+            .field("auth_share", &())
+            .finish()
+    }
 }
 
 impl<P: GenericParty> FinalizedWire<P> {
@@ -100,6 +108,23 @@ impl<'a, RNG: CryptoRng + RngCore> GarblerFinalizer<'a, RNG> {
         self.gb.delta()
     }
 }
+impl<'a, RNG> Fancy for GarblerFinalizer<'a, RNG>
+where
+    RNG: RngCore + CryptoRng,
+{
+    type Item = FinalizedWire<PartyGarbler>;
+    fn constant(
+        &mut self,
+        value: u16,
+        _q: u16,
+        _channel: &mut Channel,
+    ) -> swanky_error::Result<FinalizedWire<PartyGarbler>> {
+        let constant = F2::try_from(value).expect("constant must be boolean");
+        let auth_share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta());
+
+        Ok(FinalizedWire::new(constant, auth_share))
+    }
+}
 
 impl<'a, RNG> FancyBinary for GarblerFinalizer<'a, RNG>
 where
@@ -155,12 +180,10 @@ where
     }
 }
 
-impl<'a, RNG> Fancy for GarblerFinalizer<'a, RNG>
+impl<'a, RNG> FancyEncode for GarblerFinalizer<'a, RNG>
 where
     RNG: RngCore + CryptoRng,
 {
-    type Item = FinalizedWire<PartyGarbler>;
-
     fn receive_many(
         &mut self,
         moduli: &[u16],
@@ -184,19 +207,12 @@ where
     ) -> swanky_error::Result<Vec<Self::Item>> {
         unimplemented!("Preprocessor cannot encode values");
     }
+}
 
-    fn constant(
-        &mut self,
-        value: u16,
-        _q: u16,
-        _channel: &mut Channel,
-    ) -> swanky_error::Result<FinalizedWire<PartyGarbler>> {
-        let constant = F2::try_from(value).expect("constant must be boolean");
-        let auth_share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta());
-
-        Ok(FinalizedWire::new(constant, auth_share))
-    }
-
+impl<'a, RNG> FancyOutput for GarblerFinalizer<'a, RNG>
+where
+    RNG: RngCore + CryptoRng,
+{
     fn output(&mut self, _: &Self::Item, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
         Ok(None)
     }

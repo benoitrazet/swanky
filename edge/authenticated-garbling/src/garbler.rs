@@ -1,3 +1,4 @@
+use crate::GarblerFinalizer;
 use crate::preprocesser::WirePreProcessor;
 use crate::preprocesser::f_preprocessing;
 use crate::ps::PartyGarbler;
@@ -14,7 +15,9 @@ use swanky_channel::Channel;
 use swanky_error::WrapErr;
 use swanky_error::{ErrorKind, Result, ensure};
 use swanky_field::FiniteRing;
+use swanky_field_binary::F2BitDeserializer;
 use swanky_field_binary::{F2, F128b};
+use swanky_serialization::SequenceDeserializer;
 use vectoreyes::U8x16;
 
 type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
@@ -47,12 +50,18 @@ pub struct Garbler<RNG> {
 impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// Create a new garbler for a given circuit.
     pub fn new<
-        C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyGarbler>>,
+        'a,
+        C: CircuitInputMapper<CircuitAnalyzer>
+            + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
+            + CircuitInputMapper<GarblerFinalizer<'a, RNG>>,
     >(
         circuit: &C,
         channel: &mut Channel,
         mut rng: RNG,
-    ) -> swanky_error::Result<Self> {
+    ) -> swanky_error::Result<Self>
+    where
+        RNG: 'a,
+    {
         let delta = AndTripleGenerator::<PartyGarbler>::generate_valid_delta(&mut rng);
         let zero = WireMod2::rand(&mut rng, 2);
         let one = WireMod2::from_repr(zero.to_repr() ^ delta, 2);
@@ -66,9 +75,9 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             delta: WireMod2::from_repr(delta, 2),
             zero,
             and_gate_index: 0,
-            auth_shares,
+            auth_shares: auth_shares.clone(),
             auth_shares_index: 0,
-            and_auth_shares: known_triples,
+            and_auth_shares: known_triples.clone(),
             and_auth_shares_index: 0,
             masked_values: Vec::new(),
             rng,
@@ -86,13 +95,11 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         self.auth_shares_index += 1;
         share
     }
-
     fn next_and_auth_share(&mut self) -> AuthShare<PartyGarbler> {
         let share = self.and_auth_shares[self.and_auth_shares_index];
         self.and_auth_shares_index += 1;
         share
     }
-
     pub(crate) fn auth_share_at_index(&self, index: usize) -> AuthShare<PartyGarbler> {
         self.auth_shares[index]
     }
@@ -142,6 +149,66 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
                 AuthenticatedWire::new(masked_value, zero, auth_share)
             })
             .collect())
+    }
+    /// A function that finalizes the authenticated garbling computation before
+    /// opening the output share.
+    ///
+    /// Prior to revealing the result of the computation, the garbler and evaluator
+    /// need to validate the authenticated AND gates. In the case of the garbler, this
+    /// involved locally traversing the circuit in order to compute those validation bits
+    /// from the wire masked values that the evaluator sends.
+    pub fn finalize<
+        'a,
+        'b: 'a,
+        C: CircuitInputMapper<CircuitAnalyzer>
+            + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
+            + CircuitInputMapper<GarblerFinalizer<'a, RNG>>,
+    >(
+        &'b self,
+        circuit: &C,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<()>
+    where
+        RNG: 'a,
+    {
+        let nands = channel.read()?;
+        // Receive the masked values from the evaluator
+        let mut bit_ser: F2BitDeserializer = SequenceDeserializer::new(channel.as_std_io())
+            .wrap_err(
+                ErrorKind::InitializationError,
+                "Failed to create sequence deserializer.",
+            )?;
+
+        let lc_values = bit_ser.read_vector(channel.as_std_io(), nands)?;
+
+        // Locally run the circuit to correctly construct the validation shares
+        let mut finalizer = GarblerFinalizer::new(self, lc_values);
+        let inputs = finalizer.receive_many(
+            &vec![2; <C as CircuitInputMapper<GarblerFinalizer<RNG>>>::ninputs(circuit)],
+            channel,
+        )?;
+        circuit.execute(
+            &mut finalizer,
+            <C as CircuitInputMapper<GarblerFinalizer<'a, RNG>>>::map(circuit, inputs),
+            channel,
+        )?;
+
+        let mut validation_bits = Vec::with_capacity(nands);
+        // The parties then open the share c_γ
+        AuthShareGenerator::open_with_delta(
+            finalizer.validation_shares(),
+            self.delta(),
+            &mut validation_bits,
+            channel,
+        )?;
+        println!("gb validation bits {:?}", validation_bits);
+        let validation_bit = validation_bits.iter().fold(F2::ZERO, |acc, &x| acc + x);
+        ensure!(
+            validation_bit == F2::ZERO,
+            ErrorKind::OtherError,
+            "Garbler's authentication validation check failed !"
+        );
+        Ok(())
     }
 }
 
@@ -212,72 +279,21 @@ where
         channel.write(&gate1)?;
         channel.write(&bit_c)?;
 
-        // z'α := z_α + λ_α, where z_α is the actual wire value of the input
-        // wire with label L_α and λ_α is the mask of that value
-        let la_value = la0.masked_value();
-        // The Garbler's authenticated share of λ_α
-        let la_lambda = la0.auth_share();
-        // z'β := z_β + λ_β, where z_β is the actual wire value of the input
-        // wire with label L_β and λ_β is the mask of that value
-        let lb_value = lb0.masked_value();
-        // The Garbler's authenticated share of λ_β
-        let lb_lambda = lb0.auth_share();
-
-        // The Garbler receives the value z'γ from the Evaluator so that
-        // they can locally compute their share of c_γ
-        let lc_value: F2 = channel.read()?;
-
-        // The Garbler computes its share of the validation bit
-        // c_γ :=  (z'α ⊕ λ_α) ∧ (z'β ⊕ λ_β ) ⊕ (z'γ ⊕ λ_γ )
-        //     := (z'α z'β ⊕ z'β λ_α ⊕ z'α λ_β ⊕ λ_α λ_β) ⊕ (z'γ ⊕ λ_γ )
-        //     := (z'α z'β ⊕ z'γ ) ⊕ (z'β λ_α ⊕ z'α λ_β ⊕ λ*_γ ⊕ λ_γ)
-
-        // The Garbler first creates the constant share of (z'α z'β ⊕ z'γ )
-        let share_masks = AuthShareGenerator::constant_with_delta(
-            la_value * lb_value + lc_value,
-            self.delta.to_repr(),
-        );
-        // Then they create their share of the validation bit
-        // c_γ := (z'α z'β ⊕ z'γ ) ⊕ (z'β λ_α ⊕ z'α λ_β ⊕ λ*_γ ⊕ λ_γ)
-        let validation_share = share_masks
-            ^ la_lambda.mul_with_const(lb_value)
-            ^ lb_lambda.mul_with_const(la_value)
-            ^ lc_triple
-            ^ lc_share;
-
-        let mut validation_bit = Vec::with_capacity(1);
-        // The parties then open the share c_γ
-        AuthShareGenerator::open_with_delta(
-            &[validation_share],
-            self.delta.to_repr(),
-            &mut validation_bit,
-            channel,
-        )?;
-
-        ensure!(
-            validation_bit[0] == F2::ZERO,
-            ErrorKind::OtherError,
-            "Garbler's authentication validation check failed at index {index}"
-        );
-
-        Ok(AuthenticatedWire::new(
-            lc_value,
+        Ok(AuthenticatedWire::new_without_mask(
             WireMod2::from_repr(lc0, 2),
             lc_share,
         ))
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        AuthenticatedWire::new(
-            x.masked_value() + y.masked_value(),
+        AuthenticatedWire::new_without_mask(
             x.wire_label() + y.wire_label(),
             x.auth_share() ^ y.auth_share(),
         )
     }
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        AuthenticatedWire::new(
-            x.masked_value() + F2::ONE,
+        AuthenticatedWire::new_without_mask(
             WireMod2::from_repr(x.wire_label().to_repr() ^ self.zero.to_repr(), 2),
             x.auth_share(),
         )
@@ -341,6 +357,7 @@ impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
         // Send `x_w ⊕ λ_w` to the evaluator.
         for masked_value in my_masked_values.iter() {
             channel.write(masked_value)?;
+            self.masked_values.push(*masked_value);
         }
 
         self.encode_wirelabels(my_masked_values, my_auth_shares, channel)
@@ -361,7 +378,11 @@ impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
 
         // Receive `y_w ⊕ λ_w := y_w ⊕ (s_w ⊕ r_w)` from the evaluator.
         let their_masked_values = (0..moduli.len())
-            .map(|_| channel.read())
+            .map(|_| {
+                let masked_value: F2 = channel.read()?;
+                self.masked_values.push(masked_value);
+                Ok(masked_value)
+            })
             .collect::<Result<Vec<_>>>()?;
 
         self.encode_wirelabels(their_masked_values, my_auth_shares, channel)

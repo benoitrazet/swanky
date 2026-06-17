@@ -3,19 +3,21 @@ use fancy_garbling::{
     dummy::Dummy,
 };
 use swanky_authenticated_garbling::{
-    Evaluator, Garbler, WirePreProcessor,
+    Evaluator, Garbler, GarblerFinalizer, WirePreProcessor,
     ps::{PartyEvaluator, PartyGarbler},
 };
 use swanky_rng::SwankyRng;
 
 /// Circuit Runner
 pub fn test_circuit<
+    'a,
     C: CircuitInputMapper<CircuitAnalyzer>
         + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
         + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
         + CircuitInputMapper<Garbler<SwankyRng>>
         + CircuitInputMapper<Evaluator>
         + CircuitInputMapper<Dummy>
+        + CircuitInputMapper<GarblerFinalizer<'a, SwankyRng>>
         + Sync,
 >(
     inputs_gb: &[u16],
