@@ -7,6 +7,7 @@
 //! respectively.
 
 use swanky_channel::Channel;
+use swanky_error::Result;
 
 mod binary;
 mod bundle;
@@ -50,42 +51,25 @@ pub trait Fancy {
         values: &[u16],
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>>;
+    ) -> Result<Vec<Self::Item>>;
 
     /// Receive many wirelabels for unknown values.
-    fn receive_many(
-        &mut self,
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>>;
+    fn receive_many(&mut self, moduli: &[u16], channel: &mut Channel) -> Result<Vec<Self::Item>>;
 
     /// Encode a constant `x` with modulus `q`.
-    fn constant(
-        &mut self,
-        x: u16,
-        q: u16,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item>;
+    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> Result<Self::Item>;
 
     /// Output the value associated with wirelabel `x`.
     ///
     /// Some [`Fancy`] implementers don't actually *return* output, but they
     /// need to be involved in the process, so they can return `None`.
-    fn output(
-        &mut self,
-        x: &Self::Item,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Option<u16>>;
+    fn output(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Option<u16>>;
 
     /// Output the values associated with a slice of wirelabels.
     ///
     /// Some [`Fancy`] implementers don't actually *return* output, but they
     /// need to be involved in the process, so they can return `None`.
-    fn outputs(
-        &mut self,
-        xs: &[Self::Item],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Option<Vec<u16>>> {
+    fn outputs(&mut self, xs: &[Self::Item], channel: &mut Channel) -> Result<Option<Vec<u16>>> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             zs.push(self.output(x, channel)?);
@@ -97,18 +81,13 @@ pub trait Fancy {
     ///
     /// When writing a garbler, the return value must correspond to the zero
     /// wire label.
-    fn encode(
-        &mut self,
-        value: u16,
-        modulus: u16,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
+    fn encode(&mut self, value: u16, modulus: u16, channel: &mut Channel) -> Result<Self::Item> {
         let mut xs = self.encode_many(&[value], &[modulus], channel)?;
         Ok(xs.remove(0))
     }
 
     /// Receive a wirelabel for an unknown value.
-    fn receive(&mut self, modulus: u16, channel: &mut Channel) -> swanky_error::Result<Self::Item> {
+    fn receive(&mut self, modulus: u16, channel: &mut Channel) -> Result<Self::Item> {
         let mut xs = self.receive_many(&[modulus], channel)?;
         Ok(xs.remove(0))
     }
@@ -120,23 +99,13 @@ pub trait FancyBinary: Fancy {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
 
     /// Binary AND.
-    fn and(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item>;
+    fn and(&mut self, x: &Self::Item, y: &Self::Item, channel: &mut Channel) -> Result<Self::Item>;
 
     /// Binary negation.
     fn negate(&mut self, x: &Self::Item) -> Self::Item;
 
     /// Binary OR.
-    fn or(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
+    fn or(&mut self, x: &Self::Item, y: &Self::Item, channel: &mut Channel) -> Result<Self::Item> {
         let notx = self.negate(x);
         let noty = self.negate(y);
         let z = self.and(&notx, &noty, channel)?;
@@ -162,12 +131,7 @@ pub trait FancyArithmetic: Fancy {
     fn cmul(&mut self, x: &Self::Item, c: u16) -> Self::Item;
 
     /// Multiply `x` and `y`.
-    fn mul(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item>;
+    fn mul(&mut self, x: &Self::Item, y: &Self::Item, channel: &mut Channel) -> Result<Self::Item>;
 }
 
 /// Extension trait for [`Fancy`] that provides a projection gate, alongside
@@ -192,7 +156,7 @@ pub trait FancyProj: Fancy {
         q: u16,
         tt: Option<Vec<u16>>,
         channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item>;
+    ) -> Result<Self::Item>;
 
     /// Change the modulus of `x` to `to_modulus` using a projection gate.
     fn mod_change(
@@ -200,7 +164,7 @@ pub trait FancyProj: Fancy {
         x: &Self::Item,
         to_modulus: u16,
         channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
+    ) -> Result<Self::Item> {
         let from_modulus = x.modulus();
         if from_modulus == to_modulus {
             return Ok(x.clone());
