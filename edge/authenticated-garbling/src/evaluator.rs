@@ -230,9 +230,8 @@ impl FancyBinary for Evaluator {
         // z'γ := z_γ + λ_γ := b_γ + lsb(L_{γ, z_γ + λ_γ})
         let lc_value = F128b::from(lc_label).lsb() + bit_c;
 
-        // // The Evaluator sends out the masked bit z'γ so that the Garbler
-        // // can locally compute their share of c_γ
-        // channel.write(&lc_value)?;
+        // The Evaluator sends out the masked bit z'γ so that the Garbler
+        // can locally compute their share of c_γ
         self.lc_values.push(lc_value);
         // The Evaluator computes its share of the validation bit
         // c_γ :=  (z'α ⊕ λ_α) ∧ (z'β ⊕ λ_β ) ⊕ (z'γ ⊕ λ_γ )
