@@ -39,6 +39,8 @@ pub struct Garbler<RNG> {
     and_auth_shares: Vec<AuthShare<PartyGarbler>>,
     // The index of the current AND authenticated share we're using.
     and_auth_shares_index: usize,
+    // A vector which stores the masked wire values received from the evaluator.
+    masked_values: Vec<F2>,
     rng: RNG,
 }
 
@@ -68,6 +70,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             auth_shares_index: 0,
             and_auth_shares: known_triples,
             and_auth_shares_index: 0,
+            masked_values: Vec::new(),
             rng,
         })
     }
@@ -88,6 +91,21 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         let share = self.and_auth_shares[self.and_auth_shares_index];
         self.and_auth_shares_index += 1;
         share
+    }
+
+    pub(crate) fn auth_share_at_index(&self, index: usize) -> AuthShare<PartyGarbler> {
+        self.auth_shares[index]
+    }
+
+    pub(crate) fn and_auth_share_at_index(&self, index: usize) -> AuthShare<PartyGarbler> {
+        self.and_auth_shares[index]
+    }
+
+    pub(crate) fn masked_value_at_index(&self, index: usize) -> F2 {
+        self.masked_values[index]
+    }
+    pub(crate) fn delta(&self) -> U8x16 {
+        self.delta.to_repr()
     }
 
     // Create wirelabels `L_0` and `L_1`, sending the wirelabel `L_b` associated
