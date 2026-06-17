@@ -1,7 +1,7 @@
 use crate::{
     CrtBundle, FancyArithmetic, FancyProj, HasModulus,
     circuit::Circuit,
-    circuits::arithmetic::addition::AddMany,
+    circuits::arithmetic::{ModChange, addition::AddMany},
     util::{as_mixed_radix, inv, product},
 };
 use core::marker::PhantomData;
@@ -54,8 +54,8 @@ where
             // mod change the digits to the max sum possible plus the max carry of the
             // previous iteration
             let modded_ds = ds
-                .iter()
-                .map(|d| backend.mod_change(d, max_val + 1, channel))
+                .into_iter()
+                .map(|d| ModChange.execute(backend, (d, max_val + 1), channel))
                 .collect::<swanky_error::Result<Vec<_>>>()?;
             // add them up
             let sum = AddMany::new().execute(backend, modded_ds.as_slice(), channel)?;
@@ -146,8 +146,8 @@ where
                 max_carry = max_val / q;
 
                 let modded_ds = ds
-                    .iter()
-                    .map(|d| backend.mod_change(d, max_val + 1, channel))
+                    .into_iter()
+                    .map(|d| ModChange.execute(backend, (d, max_val + 1), channel))
                     .collect::<Result<Vec<_>>>()?;
 
                 let carry_sum = AddMany::new().execute(backend, modded_ds.as_slice(), channel)?;
@@ -166,9 +166,9 @@ where
 
                 if i < n - 2 {
                     if max_carry < next_mod {
-                        carry_carry = Some(backend.mod_change(
-                            digit_carry.as_ref().unwrap(),
-                            next_max_val + 1,
+                        carry_carry = Some(ModChange.execute(
+                            backend,
+                            (digit_carry.as_ref().unwrap().clone(), next_max_val + 1),
                             channel,
                         )?);
                     } else {
