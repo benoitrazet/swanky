@@ -31,3 +31,6 @@ proptest.workspace = true
 [[bench]]
 name = "main"
 harness = false
+
+[[example]]
+name = "gates_per_sec"
