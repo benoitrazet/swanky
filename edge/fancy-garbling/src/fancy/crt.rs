@@ -64,7 +64,7 @@ pub trait CrtGadgets: BundleGadgets {
     ) -> swanky_error::Result<CrtBundle<Self::Item>> {
         let qs = util::factor(modulus);
         let xs = util::crt(value, &qs);
-        self.encode_bundle(&xs, &qs, channel).map(CrtBundle::from)
+        self.encode_many(&xs, &qs, channel).map(CrtBundle::new)
     }
 
     /// Receive an CRT input bundle.
@@ -74,7 +74,7 @@ pub trait CrtGadgets: BundleGadgets {
         channel: &mut Channel,
     ) -> swanky_error::Result<CrtBundle<Self::Item>> {
         let qs = util::factor(modulus);
-        self.receive_bundle(&qs, channel).map(CrtBundle::from)
+        self.receive_many(&qs, channel).map(CrtBundle::new)
     }
 
     /// Encode many CRT input bundles.
