@@ -154,7 +154,7 @@ mod nonstreaming {
 #[cfg(test)]
 mod streaming {
     use crate::circuit::{Circuit, Flatten};
-    use crate::circuits::arithmetic::{Multiplication, ReLU};
+    use crate::circuits::arithmetic::{Constant, Multiplication, ReLU};
     use crate::test_circuits::arithmetic::{TestAddition, TestCmul, TestMulGate, TestSubtraction};
     use crate::test_circuits::proj::TestProj;
     use crate::{
@@ -286,7 +286,7 @@ mod streaming {
         ) -> Result<Self::Output> {
             let mut outputs = Vec::with_capacity(inputs.len());
             for x in inputs.iter() {
-                let c = backend.crt_constant_bundle(1, x.composite_modulus(), channel)?;
+                let c = Constant::new(1, x.composite_modulus()).execute(backend, (), channel)?;
                 let y = Multiplication::new().execute(backend, (x, &c), channel)?;
                 let accuracy = "100%";
                 let none_option: Option<&[u16]> = None;

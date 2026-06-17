@@ -6,7 +6,7 @@ use crate::{
 };
 use fancy_garbling::{
     Circuit, CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary, FancyProj, HasModulus,
-    circuits::arithmetic::{Addition, ConstantMultiplication, Max, ReLU, Sgn},
+    circuits::arithmetic::{Addition, Constant, ConstantMultiplication, Max, ReLU, Sgn},
     util::factor,
 };
 use ndarray::Array3;
@@ -168,9 +168,9 @@ impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> FancyNeuralN
     type Item = CrtBundle<F::Item>;
 
     fn nn_encode(&mut self, value: i64, channel: &mut Channel) -> Result<Self::Item> {
-        self.backend.crt_constant_bundle(
-            to_mod_q(value, self.input_modulus),
-            self.input_modulus,
+        Constant::new(to_mod_q(value, self.input_modulus), self.input_modulus).execute(
+            self.backend,
+            (),
             channel,
         )
     }
@@ -266,7 +266,6 @@ impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> FancyNeuralN
     }
 
     fn nn_zero(&mut self, channel: &mut Channel) -> Result<Self::Item> {
-        self.backend
-            .crt_constant_bundle(0, self.input_modulus, channel)
+        Constant::new(0, self.input_modulus).execute(self.backend, (), channel)
     }
 }

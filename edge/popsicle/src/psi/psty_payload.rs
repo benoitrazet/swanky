@@ -33,7 +33,7 @@ use crate::{
 };
 use fancy_garbling::{
     AllWire, Bundle, Circuit, CrtBundle, CrtGadgets, Fancy, FancyArithmetic, FancyProj,
-    circuits::arithmetic::{Addition, Division, Equality, Multiplication, Subtraction},
+    circuits::arithmetic::{Addition, Constant, Division, Equality, Multiplication, Subtraction},
 };
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_twopac::semihonest::{Evaluator, Garbler};
@@ -209,15 +209,16 @@ impl Sender {
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<(CrtBundle<AllWire>, CrtBundle<AllWire>)> {
-        let mut gb =
-            Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen())).unwrap();
+        let mut gb = Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))?;
         let _ = gb.load_deltas(path_deltas);
 
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
         let q = fancy_garbling::util::product(qs);
 
-        let mut acc = gb.crt_constant_bundle(0, q, channel).unwrap();
-        let mut sum_weights = gb.crt_constant_bundle(0, q, channel).unwrap();
+        let zero = Constant::new(0, q).execute(&mut gb, (), channel)?;
+
+        let mut acc = zero.clone();
+        let mut sum_weights = zero;
 
         let nmegabins = ts_id.len();
         for i in 0..nmegabins {
@@ -233,7 +234,7 @@ impl Sender {
 
             self.send_data(&mut state, nbins, channel, rng)?;
             let (partial, partial_sum_weights) =
-                state.build_and_compute_circuit(&mut gb, channel).unwrap();
+                state.build_and_compute_circuit(&mut gb, channel)?;
 
             acc = Addition::new().execute(&mut gb, (&acc, &partial), channel)?;
             sum_weights =
@@ -548,8 +549,10 @@ impl Receiver {
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
         let q = fancy_garbling::util::product(qs);
 
-        let mut acc = ev.crt_constant_bundle(0, q, channel).unwrap();
-        let mut sum_weights = ev.crt_constant_bundle(0, q, channel).unwrap();
+        let zero = Constant::new(0, q).execute(&mut ev, (), channel)?;
+
+        let mut acc = zero.clone();
+        let mut sum_weights = zero;
 
         let nmegabins = table.len();
         println!("nmegabins: {:?}", nmegabins);
@@ -909,9 +912,11 @@ fn fancy_compute_payload_aggregate<F: FancyArithmetic + FancyProj + CrtGadgets>(
 
     assert_eq!(eqs.len(), weighted_payloads.len());
 
-    let mut acc = f.crt_constant_bundle(0, q, channel)?;
-    let mut sum_weights = f.crt_constant_bundle(0, q, channel)?;
-    let one = f.crt_constant_bundle(1, q, channel)?;
+    let zero = Constant::new(0, q).execute(f, (), channel)?;
+    let one = Constant::new(1, q).execute(f, (), channel)?;
+
+    let mut acc = zero.clone();
+    let mut sum_weights = zero;
 
     for (i, b) in eqs.iter().enumerate() {
         let b_ws = one
