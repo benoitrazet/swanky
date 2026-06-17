@@ -656,7 +656,7 @@ pub mod test_circuits {
         use crate::{
             FancyArithmetic, FancyProj,
             circuit::{Circuit, CircuitInputMapper},
-            circuits::arithmetic::AddMany,
+            circuits::arithmetic::{AddMany, ModChange},
         };
         use swanky_channel::Channel;
         use swanky_error::Result;
@@ -734,8 +734,8 @@ pub mod test_circuits {
                 input: Self::Input,
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
-                let y = backend.mod_change(&input, self.1, channel)?;
-                backend.mod_change(&y, self.0, channel)
+                let y = ModChange.execute(backend, (input, self.1), channel)?;
+                ModChange.execute(backend, (y, self.0), channel)
             }
         }
         impl<F: FancyProj> CircuitInputMapper<F> for TestModChange {
@@ -767,8 +767,8 @@ pub mod test_circuits {
                 channel: &mut Channel,
             ) -> Result<Self::Output> {
                 let wires = inputs
-                    .iter()
-                    .map(|x| backend.mod_change(x, self.0 as u16 + 1, channel))
+                    .into_iter()
+                    .map(|x| ModChange.execute(backend, (x, self.0 as u16 + 1), channel))
                     .collect::<Result<Vec<_>>>()?;
                 AddMany::new().execute(backend, wires.as_slice(), channel)
             }

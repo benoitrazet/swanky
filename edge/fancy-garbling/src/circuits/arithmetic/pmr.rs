@@ -1,6 +1,8 @@
 use crate::{
-    CrtBundle, FancyArithmetic, FancyBinary, FancyProj, HasModulus, circuit::Circuit,
-    circuits::arithmetic::Subtraction, util::inv,
+    CrtBundle, FancyArithmetic, FancyBinary, FancyProj, HasModulus,
+    circuit::Circuit,
+    circuits::arithmetic::{ModChange, Subtraction},
+    util::inv,
 };
 use core::marker::PhantomData;
 use swanky_channel::Channel;
@@ -57,11 +59,11 @@ where
             tab
         };
 
-        let mut gadget = |x: &F::Item, y: &F::Item| -> Result<F::Item> {
+        let mut gadget = |x: F::Item, y: F::Item| -> Result<F::Item> {
             let p = x.modulus();
             let q = y.modulus();
-            let x_ = backend.mod_change(x, p + q - 1, channel)?;
-            let y_ = backend.mod_change(y, p + q - 1, channel)?;
+            let x_ = ModChange.execute(backend, (x, p + q - 1), channel)?;
+            let y_ = ModChange.execute(backend, (y, p + q - 1), channel)?;
             let z = backend.sub(&x_, &y_);
             backend.proj(&z, q, Some(gadget_projection_tt(p, q)), channel)
         };
@@ -75,7 +77,7 @@ where
 
         for i in 1..=n {
             for j in i + 1..=n {
-                let z = gadget(x[i - 1][i].as_ref().unwrap(), x[i - 1][j].as_ref().unwrap())?;
+                let z = gadget(x[i - 1][i].clone().unwrap(), x[i - 1][j].clone().unwrap())?;
                 x[i][j] = Some(z);
             }
         }

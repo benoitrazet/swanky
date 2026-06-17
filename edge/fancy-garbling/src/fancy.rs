@@ -157,23 +157,6 @@ pub trait FancyProj: Fancy {
         tt: Option<Vec<u16>>,
         channel: &mut Channel,
     ) -> Result<Self::Item>;
-
-    /// Change the modulus of `x` to `to_modulus` using a projection gate.
-    fn mod_change(
-        &mut self,
-        x: &Self::Item,
-        to_modulus: u16,
-        channel: &mut Channel,
-    ) -> Result<Self::Item> {
-        let from_modulus = x.modulus();
-        if from_modulus == to_modulus {
-            return Ok(x.clone());
-        }
-        let tab = (0..from_modulus)
-            .map(|x| x % to_modulus)
-            .collect::<Vec<_>>();
-        self.proj(x, to_modulus, Some(tab), channel)
-    }
 }
 
 macro_rules! check_binary {

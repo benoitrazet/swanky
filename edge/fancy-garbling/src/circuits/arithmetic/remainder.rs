@@ -1,4 +1,4 @@
-use crate::{CrtBundle, FancyProj, circuit::Circuit};
+use crate::{CrtBundle, FancyProj, circuit::Circuit, circuits::arithmetic::ModChange};
 use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -42,7 +42,7 @@ where
         // Convert the wire modulo `modulus` to all the other moduli in the bundle.
         x.moduli()
             .iter()
-            .map(|&q| backend.mod_change(w, q, channel))
+            .map(|&q| ModChange.execute(backend, (w.clone(), q), channel))
             .collect::<Result<_>>()
             .map(CrtBundle::new)
     }
