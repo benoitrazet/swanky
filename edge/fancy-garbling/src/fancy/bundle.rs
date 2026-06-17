@@ -143,20 +143,6 @@ pub trait BundleGadgets: Fancy {
         Ok(buns)
     }
 
-    /// Creates a bundle of constant wires using moduli `ps`.
-    fn constant_bundle(
-        &mut self,
-        xs: &[u16],
-        ps: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Bundle<Self::Item>> {
-        xs.iter()
-            .zip(ps.iter())
-            .map(|(&x, &p)| self.constant(x, p, channel))
-            .collect::<swanky_error::Result<_>>()
-            .map(Bundle)
-    }
-
     /// Output the wires that make up a bundle.
     fn output_bundle(
         &mut self,
