@@ -11,6 +11,7 @@ use std::{
     ops::{AddAssign, MulAssign, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
+use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::{BiggerThanModulus, FiniteField, FiniteRing, PrimeFiniteField};
 use swanky_serialization::CanonicalSerialize;
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
@@ -213,6 +214,27 @@ pub struct F2BitSerializer {
     current_word: u64,
     num_bits: usize,
 }
+
+impl F2BitSerializer {
+    /// A wraper around write and finalize which writes a vector of
+    /// bits into the channel and finishes afterwards.
+    pub fn write_vector<W: std::io::Write>(
+        mut self,
+        dst: &mut W,
+        bits: &[F2],
+    ) -> swanky_error::Result<()> {
+        for b in bits.iter() {
+            self.write(dst, *b).wrap_err(
+                ErrorKind::SerializationError,
+                "Failed to write serialized bits.",
+            )?;
+        }
+        self.finish(dst).wrap_err(
+            ErrorKind::SerializationError,
+            "Failed to finish bit serialization.",
+        )
+    }
+}
 impl SequenceSerializer<F2> for F2BitSerializer {
     fn serialized_size(n: usize) -> usize {
         (n / 64 + (if n.is_multiple_of(64) { 0 } else { 1 })) * 8
@@ -256,6 +278,25 @@ impl std::ops::Drop for F2BitSerializer {
 pub struct F2BitDeserializer {
     current_word: u64,
     num_bits: usize,
+}
+
+impl F2BitDeserializer {
+    /// A wraper around read which reads a specific number of
+    /// bits defined by len and returns those bits
+    pub fn read_vector<R: std::io::Read>(
+        &mut self,
+        src: &mut R,
+        len: usize,
+    ) -> swanky_error::Result<Vec<F2>> {
+        let mut res = Vec::new();
+        for _ in 0..len {
+            res.push(self.read(src).wrap_err(
+                ErrorKind::SerializationError,
+                "Failed to read serialized bits.",
+            )?);
+        }
+        Ok(res)
+    }
 }
 impl SequenceDeserializer<F2> for F2BitDeserializer {
     fn new<R: std::io::Read>(_dst: &mut R) -> std::io::Result<Self> {
