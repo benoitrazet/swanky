@@ -1,6 +1,6 @@
 use fancy_garbling::{
-    AllWire, ArithmeticWire, Evaluator as Ev, Fancy, FancyArithmetic, FancyBinary, FancyProj,
-    WireLabel, WireMod2,
+    AllWire, ArithmeticWire, Evaluator as Ev, Fancy, FancyArithmetic, FancyBinary, FancyEncode,
+    FancyProj, WireLabel, WireMod2,
 };
 use rand::{CryptoRng, Rng};
 use swanky_adversary::SemiHonest;
@@ -141,11 +141,23 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
 {
     type Item = Wire;
 
-    /// Receive a garbler input wire.
-    fn receive(&mut self, modulus: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
-        self.evaluator.receive(modulus, channel)
+    fn constant(
+        &mut self,
+        x: u16,
+        q: u16,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Self::Item> {
+        self.evaluator.constant(x, q, channel)
     }
 
+    fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
+        self.evaluator.output(x, channel)
+    }
+}
+
+impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyEncode
+    for Evaluator<RNG, OT, Wire>
+{
     /// Receive garbler input wires.
     fn receive_many(
         &mut self,
@@ -185,19 +197,6 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
                 combine(chunk, *q)
             })
             .collect::<Vec<Wire>>())
-    }
-
-    fn constant(
-        &mut self,
-        x: u16,
-        q: u16,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        self.evaluator.constant(x, q, channel)
-    }
-
-    fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
-        self.evaluator.output(x, channel)
     }
 }
 

@@ -1,7 +1,7 @@
 use super::security_warning::warn_proj;
 use crate::{
-    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyProj, HasModulus, WireMod2,
-    check_binary,
+    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyEncode, FancyProj, HasModulus,
+    WireMod2, check_binary,
     fancy::Fancy,
     garble::binary_and::BinaryWireLabel,
     hash_wires,
@@ -207,29 +207,6 @@ impl<Wire: WireLabel + ArithmeticWire> FancyProj for Evaluator<Wire> {
 impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
     type Item = Wire;
 
-    fn encode_many(
-        &mut self,
-        _values: &[u16],
-        _moduli: &[u16],
-        _: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        unimplemented!("Evaluator cannot encode values")
-    }
-
-    fn receive_many(
-        &mut self,
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        moduli
-            .iter()
-            .map(|q| {
-                let block = channel.read()?;
-                Ok(Wire::from_repr(block, *q))
-            })
-            .collect()
-    }
-
     fn constant(&mut self, _: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
         Ok(Wire::from_repr(channel.read()?, q))
     }
@@ -260,5 +237,30 @@ impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
         } else {
             swanky_error::bail!(ErrorKind::OtherError, "Decoding failed");
         }
+    }
+}
+
+impl<Wire: WireLabel> FancyEncode for Evaluator<Wire> {
+    fn encode_many(
+        &mut self,
+        _values: &[u16],
+        _moduli: &[u16],
+        _: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        unimplemented!("Evaluator cannot encode values")
+    }
+
+    fn receive_many(
+        &mut self,
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Vec<Self::Item>> {
+        moduli
+            .iter()
+            .map(|q| {
+                let block = channel.read()?;
+                Ok(Wire::from_repr(block, *q))
+            })
+            .collect()
     }
 }

@@ -172,8 +172,8 @@ mod streaming {
     use crate::test_circuits::arithmetic::{TestAddition, TestCmul, TestMulGate, TestSubtraction};
     use crate::test_circuits::proj::TestProj;
     use crate::{
-        AllWire, Evaluator, Fancy, Garbler, WireLabel, circuit::CircuitInputMapper, dummy::Dummy,
-        util::RngExt,
+        AllWire, Evaluator, Fancy, FancyEncode, Garbler, WireLabel, circuit::CircuitInputMapper,
+        dummy::Dummy, util::RngExt,
     };
     use crate::{CrtBundle, CrtGadgets, FancyArithmetic, FancyProj};
     use rand::thread_rng;

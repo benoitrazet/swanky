@@ -8,7 +8,7 @@ use aes_gcm::{
 };
 
 use fancy_garbling::{
-    AllWire, BinaryBundle, Circuit, Fancy, FancyBinary,
+    AllWire, BinaryBundle, Circuit, Fancy, FancyBinary, FancyEncode,
     circuits::binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality},
 };
 use itertools::Itertools;

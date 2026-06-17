@@ -11,7 +11,7 @@ mod tests {
     use super::*;
     use fancy_garbling::{
         AllWire, Circuit, CircuitInputMapper, CrtBundle, CrtGadgets, Fancy, FancyArithmetic,
-        FancyBinary, FancyProj, Flatten, WireLabel, WireMod2,
+        FancyBinary, FancyEncode, FancyProj, Flatten, WireLabel, WireMod2,
         circuit_analyzer::CircuitAnalyzer,
         circuits::{
             aes::AesNonExpanded,
@@ -74,7 +74,7 @@ mod tests {
         }
     }
 
-    fn relu<F: FancyArithmetic + FancyBinary + FancyProj>(
+    fn relu<F: FancyArithmetic + FancyBinary + FancyProj + FancyEncode>(
         b: &mut F,
         xs: &[CrtBundle<F::Item>],
         channel: &mut Channel,

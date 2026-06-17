@@ -4,6 +4,7 @@ use crate::{
     utils,
 };
 
+use fancy_garbling::FancyEncode;
 use swanky_block::{Block, Block512};
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_oprf_kmprt::Sender as KmprtSender;
@@ -197,7 +198,7 @@ impl BasePsi for OpprfSender {
         channel: &mut Channel,
     ) -> swanky_error::Result<CircuitInputs<F::Item>>
     where
-        F: Fancy<Item = WireMod2>,
+        F: FancyEncode,
     {
         let sender_primary_keys = bin_encode_many_block512(
             gc_party,

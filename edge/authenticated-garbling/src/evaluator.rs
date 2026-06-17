@@ -4,7 +4,8 @@ use crate::{
     wire::AuthenticatedWireMod2,
 };
 use fancy_garbling::{
-    CircuitInputMapper, Fancy, FancyBinary, WireLabel, WireMod2, circuit_analyzer::CircuitAnalyzer,
+    CircuitInputMapper, Fancy, FancyBinary, FancyEncode, WireLabel, WireMod2,
+    circuit_analyzer::CircuitAnalyzer,
 };
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::{
@@ -233,6 +234,53 @@ impl FancyBinary for Evaluator {
 impl Fancy for Evaluator {
     type Item = AuthenticatedWire;
 
+    fn constant(
+        &mut self,
+        value: u16,
+        _q: u16,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<AuthenticatedWire> {
+        let constant = F2::try_from(value).expect("constant must be boolean");
+        let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
+
+        let wirelabel = WireMod2::from_repr(channel.read()?, 2);
+
+        Ok(AuthenticatedWire::new(constant, wirelabel, share))
+    }
+
+    fn output(
+        &mut self,
+        x: &AuthenticatedWire,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Option<u16>> {
+        Ok(self
+            .outputs(core::slice::from_ref(x), channel)?
+            .map(|xs| xs[0]))
+    }
+
+    fn outputs(
+        &mut self,
+        x: &[AuthenticatedWire],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Option<Vec<u16>>> {
+        let auth_shares = x.iter().map(|wire| wire.auth_share()).collect::<Vec<_>>();
+        let mut masks = Vec::with_capacity(x.len());
+        AuthShareGenerator::open_their_shares_with_delta(
+            &auth_shares,
+            self.delta,
+            &mut masks,
+            channel,
+        )?;
+        let outputs = masks
+            .into_iter()
+            .zip(x)
+            .map(|(mask, out)| (mask + out.masked_value() + out.auth_share().bit()).into())
+            .collect::<Vec<_>>();
+        Ok(Some(outputs))
+    }
+}
+
+impl FancyEncode for Evaluator {
     fn encode_many(
         &mut self,
         values: &[u16],
@@ -289,50 +337,5 @@ impl Fancy for Evaluator {
             .collect::<swanky_error::Result<Vec<_>>>()?;
 
         self.receive_wirelabels(masked_values, my_auth_shares, channel)
-    }
-
-    fn constant(
-        &mut self,
-        value: u16,
-        _q: u16,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<AuthenticatedWire> {
-        let constant = F2::try_from(value).expect("constant must be boolean");
-        let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
-
-        let wirelabel = WireMod2::from_repr(channel.read()?, 2);
-
-        Ok(AuthenticatedWire::new(constant, wirelabel, share))
-    }
-
-    fn output(
-        &mut self,
-        x: &AuthenticatedWire,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Option<u16>> {
-        Ok(self
-            .outputs(core::slice::from_ref(x), channel)?
-            .map(|xs| xs[0]))
-    }
-
-    fn outputs(
-        &mut self,
-        x: &[AuthenticatedWire],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Option<Vec<u16>>> {
-        let auth_shares = x.iter().map(|wire| wire.auth_share()).collect::<Vec<_>>();
-        let mut masks = Vec::with_capacity(x.len());
-        AuthShareGenerator::open_their_shares_with_delta(
-            &auth_shares,
-            self.delta,
-            &mut masks,
-            channel,
-        )?;
-        let outputs = masks
-            .into_iter()
-            .zip(x)
-            .map(|(mask, out)| (mask + out.masked_value() + out.auth_share().bit()).into())
-            .collect::<Vec<_>>();
-        Ok(Some(outputs))
     }
 }

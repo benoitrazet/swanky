@@ -1,6 +1,6 @@
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Error, Parser, Subcommand};
-use fancy_garbling::dummy::Dummy;
+use fancy_garbling::dummy::{Dummy, DummyVal};
 use ndarray::Array3;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -124,11 +124,11 @@ pub fn main() -> swanky_error::Result<()> {
             Channel::with(std::io::empty(), |channel| {
                 let mut dummy = Dummy::new();
                 if cli.boolean {
-                    nn.boolean_accuracy_test::<_, Dummy>(
+                    nn.boolean_accuracy_test::<DummyVal, Dummy>(
                         &mut dummy, &tests, &labels, &bitwidth, cli.secret, channel,
                     )?;
                 } else {
-                    nn.arith_accuracy_test(
+                    nn.arith_accuracy_test::<DummyVal, Dummy>(
                         &mut dummy, &tests, &labels, &bitwidth, cli.secret, accuracy, channel,
                     )?;
                 }

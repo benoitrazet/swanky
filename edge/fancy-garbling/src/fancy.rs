@@ -42,20 +42,6 @@ pub trait Fancy {
     /// The underlying wirelabel representation of this [`Fancy`] object.
     type Item: Clone + core::fmt::Debug + HasModulus;
 
-    /// Encode many wirelabels for known values.
-    ///
-    /// When writing a garbler, the return value must correspond to the zero
-    /// wire label.
-    fn encode_many(
-        &mut self,
-        values: &[u16],
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> Result<Vec<Self::Item>>;
-
-    /// Receive many wirelabels for unknown values.
-    fn receive_many(&mut self, moduli: &[u16], channel: &mut Channel) -> Result<Vec<Self::Item>>;
-
     /// Encode a constant `x` with modulus `q`.
     fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> Result<Self::Item>;
 
@@ -76,20 +62,31 @@ pub trait Fancy {
         }
         Ok(zs.into_iter().collect())
     }
+}
 
-    /// Encode a wirelabel for a known value.
-    ///
-    /// When writing a garbler, the return value must correspond to the zero
-    /// wire label.
+/// Extension trait for [`Fancy`] that provides encoding and receiving operations.
+pub trait FancyEncode: Fancy {
+    /// Encode many wires for known values.
+    fn encode_many(
+        &mut self,
+        values: &[u16],
+        moduli: &[u16],
+        channel: &mut Channel,
+    ) -> Result<Vec<Self::Item>>;
+
+    /// Receive many wires for unknown values.
+    fn receive_many(&mut self, moduli: &[u16], channel: &mut Channel) -> Result<Vec<Self::Item>>;
+
+    /// Encode a wire for a known value.
     fn encode(&mut self, value: u16, modulus: u16, channel: &mut Channel) -> Result<Self::Item> {
-        let mut xs = self.encode_many(&[value], &[modulus], channel)?;
-        Ok(xs.remove(0))
+        let xs = self.encode_many(&[value], &[modulus], channel)?;
+        Ok(xs[0].clone())
     }
 
-    /// Receive a wirelabel for an unknown value.
+    /// Receive a wire for an unknown value.
     fn receive(&mut self, modulus: u16, channel: &mut Channel) -> Result<Self::Item> {
-        let mut xs = self.receive_many(&[modulus], channel)?;
-        Ok(xs.remove(0))
+        let xs = self.receive_many(&[modulus], channel)?;
+        Ok(xs[0].clone())
     }
 }
 

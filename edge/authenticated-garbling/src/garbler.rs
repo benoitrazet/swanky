@@ -4,7 +4,7 @@ use crate::ps::PartyGarbler;
 use crate::wire::AuthenticatedWireMod2;
 use fancy_garbling::CircuitInputMapper;
 use fancy_garbling::circuit_analyzer::CircuitAnalyzer;
-use fancy_garbling::{Fancy, FancyBinary, WireLabel, WireMod2};
+use fancy_garbling::{Fancy, FancyBinary, FancyEncode, WireLabel, WireMod2};
 
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
@@ -268,6 +268,44 @@ where
 impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
     type Item = AuthenticatedWire;
 
+    fn constant(
+        &mut self,
+        value: u16,
+        _q: u16,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<AuthenticatedWire> {
+        let constant = F2::try_from(value).expect("constant must be boolean");
+        let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());
+
+        let zero = WireMod2::rand(&mut self.rng, 2);
+        let wirelabel = zero + self.delta * value;
+        channel.write(&wirelabel.to_repr())?;
+
+        Ok(AuthenticatedWire::new(constant, zero, share))
+    }
+
+    fn output(
+        &mut self,
+        x: &AuthenticatedWire,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Option<u16>> {
+        Ok(self
+            .outputs(core::slice::from_ref(x), channel)?
+            .map(|xs| xs[0]))
+    }
+
+    fn outputs(
+        &mut self,
+        x: &[AuthenticatedWire],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Option<Vec<u16>>> {
+        let auth_shares = x.iter().map(|wire| wire.auth_share()).collect::<Vec<_>>();
+        AuthShareGenerator::open_my_shares(&auth_shares, channel)?;
+        Ok(None)
+    }
+}
+
+impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
     fn encode_many(
         &mut self,
         values: &[u16],
@@ -328,41 +366,5 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
             .collect::<Result<Vec<_>>>()?;
 
         self.encode_wirelabels(their_masked_values, my_auth_shares, channel)
-    }
-
-    fn constant(
-        &mut self,
-        value: u16,
-        _q: u16,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<AuthenticatedWire> {
-        let constant = F2::try_from(value).expect("constant must be boolean");
-        let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());
-
-        let zero = WireMod2::rand(&mut self.rng, 2);
-        let wirelabel = zero + self.delta * value;
-        channel.write(&wirelabel.to_repr())?;
-
-        Ok(AuthenticatedWire::new(constant, zero, share))
-    }
-
-    fn output(
-        &mut self,
-        x: &AuthenticatedWire,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Option<u16>> {
-        Ok(self
-            .outputs(core::slice::from_ref(x), channel)?
-            .map(|xs| xs[0]))
-    }
-
-    fn outputs(
-        &mut self,
-        x: &[AuthenticatedWire],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Option<Vec<u16>>> {
-        let auth_shares = x.iter().map(|wire| wire.auth_share()).collect::<Vec<_>>();
-        AuthShareGenerator::open_my_shares(&auth_shares, channel)?;
-        Ok(None)
     }
 }

@@ -2,7 +2,8 @@
 //! of a [`Fancy`] circuit.
 
 use crate::{
-    Fancy, FancyArithmetic, FancyBinary, FancyProj, HasModulus, circuit::CircuitInputMapper,
+    Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyProj, HasModulus,
+    circuit::CircuitInputMapper,
 };
 use core::cmp::max;
 use swanky_channel::Channel;
@@ -195,18 +196,6 @@ impl FancyProj for CircuitAnalyzer {
 impl Fancy for CircuitAnalyzer {
     type Item = AnalyzerItem;
 
-    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        self.ninputs += moduli.len();
-        Ok(moduli.iter().map(|q| AnalyzerItem::new(*q)).collect())
-    }
-
-    fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        swanky_error::bail!(
-            ErrorKind::UnsupportedError,
-            "Encoding values is unsupported"
-        )
-    }
-
     fn constant(&mut self, _val: u16, q: u16, _: &mut Channel) -> Result<Self::Item> {
         self.nconstants += 1;
         Ok(AnalyzerItem {
@@ -218,6 +207,20 @@ impl Fancy for CircuitAnalyzer {
     fn output(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Option<u16>> {
         self.mul_depth = max(self.mul_depth, x.depth);
         Ok(None)
+    }
+}
+
+impl FancyEncode for CircuitAnalyzer {
+    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
+        self.ninputs += moduli.len();
+        Ok(moduli.iter().map(|q| AnalyzerItem::new(*q)).collect())
+    }
+
+    fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
+        swanky_error::bail!(
+            ErrorKind::UnsupportedError,
+            "Encoding values is unsupported"
+        )
     }
 }
 

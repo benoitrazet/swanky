@@ -1,4 +1,4 @@
-use crate::{Fancy, HasModulus};
+use crate::{FancyEncode, HasModulus};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use swanky_channel::Channel;
@@ -76,11 +76,11 @@ impl<W: Clone + HasModulus> Bundle<W> {
     }
 }
 
-impl<F: Fancy> BundleGadgets for F {}
+impl<F: FancyEncode> BundleGadgets for F {}
 
 /// Extension trait for Fancy which provides Bundle constructions which are not
 /// necessarily CRT nor binary-based.
-pub trait BundleGadgets: Fancy {
+pub trait BundleGadgets: FancyEncode {
     /// Output the wires that make up a bundle.
     fn output_bundle(
         &mut self,

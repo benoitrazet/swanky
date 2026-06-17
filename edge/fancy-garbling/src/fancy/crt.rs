@@ -2,7 +2,7 @@
 
 use super::HasModulus;
 use crate::{
-    FancyArithmetic, FancyBinary,
+    FancyArithmetic, FancyBinary, FancyEncode,
     fancy::bundle::{Bundle, BundleGadgets},
     util::{self},
 };
@@ -51,7 +51,7 @@ impl<W: Clone + HasModulus> From<Bundle<W>> for CrtBundle<W> {
     }
 }
 
-impl<F: FancyArithmetic + FancyBinary> CrtGadgets for F {}
+impl<F: FancyArithmetic + FancyBinary + FancyEncode> CrtGadgets for F {}
 
 /// Extension trait for `Fancy` providing advanced CRT gadgets based on bundles of wires.
 pub trait CrtGadgets: BundleGadgets {

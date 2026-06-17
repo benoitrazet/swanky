@@ -1,5 +1,5 @@
 use fancy_garbling::{
-    Fancy,
+    Fancy, FancyEncode,
     circuit_analyzer::CircuitAnalyzer,
     dummy::Dummy,
     {CircuitInputMapper, Flatten},

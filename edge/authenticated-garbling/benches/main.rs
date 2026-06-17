@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{
-    Fancy,
+    FancyEncode,
     circuits::{
         aes::AesNonExpanded,
         binary::{TestBinaryAddition, TestBinarySubtraction},

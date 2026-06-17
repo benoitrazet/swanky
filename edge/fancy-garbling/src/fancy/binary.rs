@@ -1,5 +1,5 @@
 use crate::{
-    FancyBinary,
+    FancyBinary, FancyEncode,
     fancy::{
         HasModulus,
         bundle::{Bundle, BundleGadgets},
@@ -45,7 +45,7 @@ impl<W: Clone + HasModulus> From<Bundle<W>> for BinaryBundle<W> {
     }
 }
 
-impl<F: FancyBinary> BinaryGadgets for F {}
+impl<F: FancyBinary + FancyEncode> BinaryGadgets for F {}
 
 /// Extension trait for `Fancy` providing gadgets that operate over bundles of mod2 wires.
 pub trait BinaryGadgets: BundleGadgets {
