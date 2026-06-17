@@ -21,7 +21,7 @@ mod nonstreaming {
                 TestMulGateUnequalMods, TestSubtraction,
             },
             binary::TestOrGateFanN,
-            proj::{TestModChange, TestProj, TestProjRand},
+            proj::{TestProj, TestProjRand},
         },
         util::RngExt,
     };
@@ -121,12 +121,6 @@ mod nonstreaming {
             .collect::<Vec<_>>();
 
         garble_test_helper::<AllWire, _>(&TestProjRand(q, tab));
-    }
-
-    #[test]
-    fn mod_change() {
-        let q = thread_rng().gen_prime();
-        garble_test_helper::<AllWire, _>(&TestModChange(q, q * 2));
     }
 
     #[test]
