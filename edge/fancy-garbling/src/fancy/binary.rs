@@ -57,8 +57,8 @@ pub trait BinaryGadgets: BundleGadgets {
         channel: &mut Channel,
     ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
         let xs = util::u128_to_bits(value, nbits);
-        self.encode_bundle(&xs, &vec![2; nbits], channel)
-            .map(BinaryBundle::from)
+        self.encode_many(&xs, &vec![2; nbits], channel)
+            .map(BinaryBundle::new)
     }
 
     /// Receive an binary input bundle.
@@ -67,8 +67,8 @@ pub trait BinaryGadgets: BundleGadgets {
         nbits: usize,
         channel: &mut Channel,
     ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
-        self.receive_bundle(&vec![2; nbits], channel)
-            .map(BinaryBundle::from)
+        self.receive_many(&vec![2; nbits], channel)
+            .map(BinaryBundle::new)
     }
 
     /// Encode many binary input bundles.
