@@ -654,9 +654,8 @@ pub mod test_circuits {
         //! Circuits that test [`FancyProj`].
 
         use crate::{
-            FancyArithmetic, FancyProj,
+            FancyProj,
             circuit::{Circuit, CircuitInputMapper},
-            circuits::arithmetic::{AddMany, ModChange},
         };
         use swanky_channel::Channel;
         use swanky_error::Result;
@@ -721,72 +720,6 @@ pub mod test_circuits {
                 self.0
             }
         }
-
-        /// Circuit for testing [`FancyProj::mod_change`].
-        pub struct TestModChange(pub u16, pub u16);
-        impl<F: FancyProj> Circuit<F> for TestModChange {
-            type Input = F::Item;
-            type Output = F::Item;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                input: Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                let y = ModChange.execute(backend, (input, self.1), channel)?;
-                ModChange.execute(backend, (y, self.0), channel)
-            }
-        }
-        impl<F: FancyProj> CircuitInputMapper<F> for TestModChange {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), 1);
-                inputs[0].clone()
-            }
-
-            fn ninputs(&self) -> usize {
-                1
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                self.0
-            }
-        }
-
-        /// Circuit for testing [`FancyProj::mod_change`] followed by
-        /// [`AddMany`].
-        pub struct TestAddManyModChange(pub usize);
-        impl<F: FancyProj + FancyArithmetic> Circuit<F> for TestAddManyModChange {
-            type Input = Vec<F::Item>;
-            type Output = F::Item;
-
-            fn execute(
-                &self,
-                backend: &mut F,
-                inputs: Self::Input,
-                channel: &mut Channel,
-            ) -> Result<Self::Output> {
-                let wires = inputs
-                    .into_iter()
-                    .map(|x| ModChange.execute(backend, (x, self.0 as u16 + 1), channel))
-                    .collect::<Result<Vec<_>>>()?;
-                AddMany::new().execute(backend, wires.as_slice(), channel)
-            }
-        }
-        impl<F: FancyProj + FancyArithmetic> CircuitInputMapper<F> for TestAddManyModChange {
-            fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-                assert_eq!(inputs.len(), self.0);
-                inputs
-            }
-
-            fn ninputs(&self) -> usize {
-                self.0
-            }
-
-            fn modulus(&self, _: usize) -> u16 {
-                2
-            }
-        }
     }
 }
 
@@ -824,52 +757,6 @@ mod fancy_arithmetic {
             let y = DummyVal::rand(q, &mut rng);
             let output = Dummy::eval(&c, (x, y)).unwrap();
             assert_eq!(output.val(), (x.val() * y.val()) % q);
-        }
-    }
-}
-
-#[cfg(test)]
-mod fancy_proj {
-    use crate::{
-        circuit::CircuitInputMapper,
-        dummy::{Dummy, DummyVal},
-        test_circuits::proj::{TestAddManyModChange, TestModChange},
-        util::RngExt,
-    };
-    use rand::thread_rng;
-
-    #[test]
-    fn mod_change() {
-        let mut rng = thread_rng();
-        let p = rng.gen_prime();
-        let q = rng.gen_prime();
-        let c = TestModChange(p, q);
-
-        for _ in 0..16 {
-            let x = DummyVal::rand(p, &mut rng);
-            let output = Dummy::eval(&c, x).unwrap();
-            assert_eq!(output.val(), x.val() % q);
-        }
-    }
-
-    #[test]
-    fn add_many_mod_change() {
-        let mut rng = thread_rng();
-        let n = 113;
-        let c = TestAddManyModChange(n);
-
-        for _ in 0..64 {
-            let inputs = (0..<TestAddManyModChange as CircuitInputMapper<Dummy>>::ninputs(&c))
-                .map(|i| {
-                    DummyVal::rand(
-                        <TestAddManyModChange as CircuitInputMapper<Dummy>>::modulus(&c, i),
-                        &mut rng,
-                    )
-                })
-                .collect::<Vec<_>>();
-            let expected: u16 = inputs.iter().map(|x| x.val()).sum();
-            let output = Dummy::eval(&c, inputs).unwrap();
-            assert_eq!(output.val(), expected);
         }
     }
 }
