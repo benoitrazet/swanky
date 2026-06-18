@@ -19,7 +19,7 @@ use crate::{
 pub struct Dummy;
 
 /// Wrapper around `u16`.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct DummyVal {
     val: u16,
     modulus: u16,

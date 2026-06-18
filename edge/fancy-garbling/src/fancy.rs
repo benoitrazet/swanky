@@ -35,7 +35,7 @@ pub trait HasModulus {
 /// for converting wires into their underlying plaintext representation.
 pub trait Fancy {
     /// The underlying wire representation of this [`Fancy`] object.
-    type Item: Clone + core::fmt::Debug + HasModulus;
+    type Item: Clone + HasModulus + core::fmt::Debug + core::default::Default;
 
     /// Encode a constant `x` with modulus `q`.
     fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> Result<Self::Item>;

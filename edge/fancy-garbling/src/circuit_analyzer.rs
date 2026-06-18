@@ -10,7 +10,7 @@ use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
 
 /// An instantiation of [`Fancy::Item`] used by [`CircuitAnalyzer`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct AnalyzerItem {
     modulus: u16,
     depth: usize,

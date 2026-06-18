@@ -14,7 +14,7 @@ use vectoreyes::U8x16;
 /// pre-processing, the garbler has to construct the authenticated share of XOR
 /// and Negation gates during pre-processing in order to correctly produce known
 /// AND gates.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct PreProcessedWire<P: GenericParty> {
     auth_share: AuthShare<P>,
 }

@@ -75,7 +75,7 @@ use vectoreyes::U8x16;
 ///
 /// See [`crate::authshares`] for details. [`AuthShare`]s can be generated using
 /// [`AuthShareGenerator`].
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct AuthShare<P: GenericParty> {
     /// Party A's side of the authenticated share.
     party_a: PartyEitherCopy<P, AuthBit<Party0<P>>, AuthBit<Party1<P>>>,
