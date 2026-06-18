@@ -1,6 +1,7 @@
 mod test {
     use fancy_garbling::{
-        FancyBinary, FancyZeroKnowledge, circuits::sha::Sha256CompressionFunction,
+        Circuit as FancyCircuit, FancyBinary, FancyZeroKnowledge,
+        circuits::{hmac::HmacSha256, sha::Sha256CompressionFunction},
     };
     use merlin::Transcript;
     use rand::thread_rng;
@@ -10,7 +11,8 @@ mod test {
         circuit::load_circuit_from_strings_prover,
         vole::functionality::{VoleProver, VoleVerifier},
     };
-    use std::sync::Once;
+    use std::{sync::Once, time::Instant};
+    use swanky_channel::Channel;
     use swanky_error::Result;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
@@ -381,9 +383,7 @@ mod test {
 
     struct TestSha256CompressionFunction(Sha256CompressionFunction);
 
-    impl<F: FancyBinary + FancyZeroKnowledge> fancy_garbling::Circuit<F>
-        for TestSha256CompressionFunction
-    {
+    impl<F: FancyBinary + FancyZeroKnowledge> FancyCircuit<F> for TestSha256CompressionFunction {
         type Input = ();
         type Output = Vec<F::Item>; // TODO: should be `()`
 
@@ -391,7 +391,7 @@ mod test {
             &self,
             backend: &mut F,
             _: Self::Input,
-            channel: &mut swanky_channel::Channel,
+            channel: &mut Channel,
         ) -> Result<Self::Output> {
             let block = (0..512)
                 .map(|_| backend.receive(2, channel))
@@ -415,13 +415,13 @@ mod test {
             init_logger();
         }
 
-        let t = std::time::Instant::now();
+        let t = Instant::now();
         let circuit = TestSha256CompressionFunction(Sha256CompressionFunction::new());
         log::info!("parsing: {:?}", t.elapsed());
 
         let private_input = (0..768).map(|_| F2::ZERO).collect::<Vec<_>>();
 
-        let t = std::time::Instant::now();
+        let t = Instant::now();
         let rng = &mut thread_rng();
         let proof = Proof::<VoleProver, VoleVerifier>::prove(
             &circuit,
@@ -434,7 +434,65 @@ mod test {
 
         log::info!("proof size estimate: {:?}", proof.proof_size_estimate());
 
-        let t = std::time::Instant::now();
+        let t = Instant::now();
+        proof.verify(&circuit, &mut transcript())?;
+        log::info!("Elapsed verifier sha256: {:?}", t.elapsed());
+
+        Ok(())
+    }
+
+    struct TestHmac<'a>(HmacSha256<'a>);
+
+    impl<'a, F: FancyBinary + FancyZeroKnowledge> FancyCircuit<F> for TestHmac<'a> {
+        type Input = ();
+        type Output = Vec<F::Item>; // TODO: should be `()`
+
+        fn execute(
+            &self,
+            backend: &mut F,
+            _: Self::Input,
+            channel: &mut Channel,
+        ) -> Result<Self::Output> {
+            let key = (0..512)
+                .map(|_| backend.receive(2, channel))
+                .collect::<Result<Vec<_>>>()?
+                .try_into()
+                .unwrap();
+            let input = (0..512)
+                .map(|_| backend.receive(2, channel))
+                .collect::<Result<Vec<_>>>()?;
+            let _output = self.0.execute(backend, (&key, &input), channel)?;
+            Ok(vec![])
+        }
+    }
+
+    #[test]
+    fn prove_hmac_circuit() -> Result<()> {
+        // if log-level `RUST_LOG` not already set, then set to info
+        if DO_LOGGING {
+            init_logger();
+        }
+
+        let t = Instant::now();
+        let circuit = TestHmac(HmacSha256::new());
+        log::info!("parsing: {:?}", t.elapsed());
+
+        let private_input = (0..1024).map(|_| F2::ZERO).collect::<Vec<_>>();
+
+        let t = Instant::now();
+        let rng = &mut thread_rng();
+        let proof = Proof::<VoleProver, VoleVerifier>::prove(
+            &circuit,
+            &private_input,
+            None,
+            &mut transcript(),
+            rng,
+        )?;
+        log::info!("Elapsed prover   sha256: {:?}", t.elapsed());
+
+        log::info!("proof size estimate: {:?}", proof.proof_size_estimate());
+
+        let t = Instant::now();
         proof.verify(&circuit, &mut transcript())?;
         log::info!("Elapsed verifier sha256: {:?}", t.elapsed());
 
