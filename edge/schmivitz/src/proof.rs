@@ -8,7 +8,6 @@
 //! Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
 //!
 use fancy_garbling::Circuit as FancyCircuit;
-use mac_n_cheese_sieve_parser::WireId;
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
 use rayon::iter::*;
@@ -84,14 +83,20 @@ where
         RNG: CryptoRng + RngCore,
     {
         let (gates, private_input, max_wire_id) = circuit.to_interpreter();
-        Self::prove(&gates, private_input, max_wire_id, transcript, rng)
+        Self::prove(
+            &gates,
+            private_input,
+            Some(max_wire_id as usize),
+            transcript,
+            rng,
+        )
     }
 
     /// Create a proof of knowledge of a witness that satisfies the given circuit.
     pub fn prove<'a, C, RNG>(
         circuit: &C,
         private_input: &'a [F2],
-        max_wire_id: WireId,
+        witness_size: Option<usize>,
         transcript: &mut Transcript,
         rng: &mut RNG,
     ) -> Result<Self>
@@ -107,7 +112,7 @@ where
 
         // Evaluate the circuit in the clear to get the full witness and all wire values
         let t = std::time::Instant::now();
-        let mut circuit_preparer = ProverPreparer::new(private_input, max_wire_id)?;
+        let mut circuit_preparer = ProverPreparer::new(private_input, witness_size)?;
         Channel::with(std::io::empty(), |channel| {
             circuit.execute(&mut circuit_preparer, (), channel)?;
             Ok(())

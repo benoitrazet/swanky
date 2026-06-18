@@ -138,7 +138,7 @@ fn benchmark_example_10000(c: &mut Criterion) {
             let proof = Proof::<VoleProver, VoleVerifier>::prove(
                 &ExampleCircuit::<10000>,
                 &circuit.private_inputs,
-                circuit.max_wire_id,
+                Some(circuit.max_wire_id as usize),
                 &mut transcript(),
                 rng,
             )
@@ -205,7 +205,7 @@ fn benchmark_example_100000(c: &mut Criterion) {
             let proof = Proof::<VoleProver, VoleVerifier>::prove(
                 &ExampleCircuit::<100000>,
                 &circuit.private_inputs,
-                circuit.max_wire_id,
+                Some(circuit.max_wire_id as usize),
                 &mut transcript(),
                 rng,
             )
@@ -217,7 +217,7 @@ fn benchmark_example_100000(c: &mut Criterion) {
     let proof = Proof::<VoleProver, VoleVerifier>::prove(
         &ExampleCircuit::<100000>,
         &circuit.private_inputs,
-        circuit.max_wire_id,
+        Some(circuit.max_wire_id as usize),
         &mut transcript(),
         rng,
     )

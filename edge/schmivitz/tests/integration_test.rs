@@ -112,11 +112,10 @@ mod test {
 
         // Verify the compiled circuit with the dynamic circuit.
         let rng = &mut thread_rng();
-        let max_wire_id = 2;
         let proof = Proof::<VoleProver, VoleVerifier>::prove(
             &DoesntExplode,
             &mini_circuit.private_inputs,
-            max_wire_id,
+            None,
             &mut transcript(),
             rng,
         )
@@ -169,11 +168,10 @@ mod test {
         assert!(verif.is_ok());
 
         let rng = &mut thread_rng();
-        let max_wire_id = 2;
         let proof = Proof::<VoleProver, VoleVerifier>::prove(
             &AssertZero,
             &mini_circuit.private_inputs,
-            max_wire_id,
+            None,
             &mut transcript(),
             rng,
         )
@@ -422,14 +420,13 @@ mod test {
         log::info!("parsing: {:?}", t.elapsed());
 
         let private_input = (0..768).map(|_| F2::ZERO).collect::<Vec<_>>();
-        let max_wire_id = 768;
 
         let t = std::time::Instant::now();
         let rng = &mut thread_rng();
         let proof = Proof::<VoleProver, VoleVerifier>::prove(
             &circuit,
             &private_input,
-            max_wire_id,
+            None,
             &mut transcript(),
             rng,
         )?;

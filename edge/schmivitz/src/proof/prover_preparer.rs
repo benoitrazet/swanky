@@ -1,5 +1,4 @@
 use fancy_garbling::{Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
-use mac_n_cheese_sieve_parser::WireId;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field_binary::F2;
@@ -33,11 +32,16 @@ pub struct ProverPreparer<'a> {
 }
 
 impl<'a> ProverPreparer<'a> {
-    pub(crate) fn new(private_input: &'a [F2], max_wire_id: WireId) -> swanky_error::Result<Self> {
+    /// Create a new [`ProverPreparer`] using the provided private input and an
+    /// optional witness size.
+    pub(crate) fn new(
+        private_input: &'a [F2],
+        witness_size: Option<usize>,
+    ) -> swanky_error::Result<Self> {
         Ok(Self {
             private_input,
             priv_input_pos: 0,
-            witness: Vec::with_capacity(max_wire_id as usize),
+            witness: Vec::with_capacity(witness_size.unwrap_or(0)),
             challenge_count: 0,
         })
     }
@@ -156,7 +160,8 @@ mod tests {
     ) -> swanky_error::Result<ProverPreparer<'a>> {
         let (circuit, private_input, max_wire_id) = circuit_loaded.to_interpreter();
 
-        let mut counter: ProverPreparer = ProverPreparer::new(private_input, max_wire_id)?;
+        let mut counter: ProverPreparer =
+            ProverPreparer::new(private_input, Some(max_wire_id as usize))?;
         Channel::with(std::io::empty(), |channel| {
             circuit.execute(&mut counter, (), channel)?;
             Ok(())
