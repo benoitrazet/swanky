@@ -9,19 +9,60 @@ pub use crate::garble::{evaluator::Evaluator, garbler::Garbler};
 pub use binary_and::BinaryWireLabel;
 
 #[cfg(test)]
+mod helpers {
+    use rand::{Rng, thread_rng};
+
+    use crate::{
+        CircuitInputMapper, Flatten,
+        dummy::{Dummy, DummyVal},
+    };
+
+    pub(crate) fn plaintext<C: CircuitInputMapper<Dummy>>(
+        circuit: &C,
+    ) -> (Vec<u16>, Vec<u16>, Vec<u16>) {
+        let mut rng = thread_rng();
+
+        let moduli = (0..<C as CircuitInputMapper<Dummy>>::ninputs(circuit))
+            .map(|i| <C as CircuitInputMapper<Dummy>>::modulus(circuit, i))
+            .collect::<Vec<_>>();
+        let inputs = moduli
+            .iter()
+            .map(|q| {
+                let x = rng.r#gen::<u16>() % q;
+                DummyVal::new(x, *q)
+            })
+            .collect::<Vec<_>>();
+        let plaintext = inputs.iter().map(|x| x.val()).collect::<Vec<_>>();
+
+        let expected = Dummy::eval(
+            circuit,
+            <C as CircuitInputMapper<Dummy>>::map(circuit, inputs),
+        )
+        .unwrap();
+        let expected = expected
+            .flatten()
+            .iter()
+            .map(|x| x.val())
+            .collect::<Vec<_>>();
+
+        (plaintext, moduli, expected)
+    }
+}
+
+#[cfg(test)]
 mod nonstreaming {
     use crate::{
         AllWire, Evaluator, Garbler, WireLabel, WireMod2,
         circuit::{CircuitInputMapper, Flatten},
         classic::GarbledCircuit,
-        dummy::{Dummy, DummyVal},
+        dummy::Dummy,
         test_circuits::{
             arithmetic::{
                 TestAddMany, TestAddition, TestCmul, TestConstants, TestMulGate,
                 TestMulGateUnequalMods, TestSubtraction,
             },
             binary::TestOrGateFanN,
-            proj::{TestModChange, TestProj, TestProjRand},
+            proj::{TestProj, TestProjRand},
         },
         util::RngExt,
     };
@@ -38,42 +79,21 @@ mod nonstreaming {
     >(
         circuit: &Ex,
     ) {
-        let mut rng = thread_rng();
         for _ in 0..16 {
+            let (inputs, _, expected) = super::helpers::plaintext(circuit);
+
             let (en, ev, output_mapping) =
                 GarbledCircuit::garble::<W, _, _>(circuit, SwankyRng::new()).unwrap();
-            for _ in 0..16 {
-                let inputs = (0..<Ex as CircuitInputMapper<Dummy>>::ninputs(circuit))
-                    .map(|i| {
-                        let q = <Ex as CircuitInputMapper<Dummy>>::modulus(circuit, i);
-                        let x = rng.gen_u16() % q;
-                        DummyVal::new(x, q)
-                    })
-                    .collect::<Vec<_>>();
-                let plaintext = inputs.iter().map(|x| x.val()).collect::<Vec<_>>();
-                // Run the garbled circuit evaluator.
-                let xs = en.encode_inputs(&plaintext);
-                let wirelabels = ev
-                    .eval_to_wirelabels(
-                        circuit,
-                        &<Ex as CircuitInputMapper<Evaluator<W>>>::map(circuit, xs),
-                    )
-                    .unwrap();
-                let decoded = output_mapping.to_outputs(&wirelabels.flatten()).unwrap();
 
-                // Run the dummy evaluator.
-                let expected = Dummy::eval(
+            let xs = en.encode_inputs(&inputs);
+            let wirelabels = ev
+                .eval_to_wirelabels(
                     circuit,
-                    &<Ex as CircuitInputMapper<Dummy>>::map(circuit, inputs),
+                    <Ex as CircuitInputMapper<Evaluator<W>>>::map(circuit, xs),
                 )
                 .unwrap();
-                let expected = expected
-                    .flatten()
-                    .iter()
-                    .map(|x| x.val())
-                    .collect::<Vec<_>>();
-                assert_eq!(decoded, expected);
-            }
+            let decoded = output_mapping.to_outputs(&wirelabels.flatten()).unwrap();
+            assert_eq!(decoded, expected);
         }
     }
 
@@ -124,12 +144,6 @@ mod nonstreaming {
     }
 
     #[test]
-    fn mod_change() {
-        let q = thread_rng().gen_prime();
-        garble_test_helper::<AllWire, _>(&TestModChange(q, q * 2));
-    }
-
-    #[test]
     fn arithmetic_half_gate() {
         let q = thread_rng().gen_prime();
         garble_test_helper::<AllWire, _>(&TestMulGate(q));
@@ -154,7 +168,7 @@ mod nonstreaming {
 #[cfg(test)]
 mod streaming {
     use crate::circuit::{Circuit, Flatten};
-    use crate::circuits::arithmetic::{Multiplication, ReLU};
+    use crate::circuits::arithmetic::{Constant, Multiplication, ReLU};
     use crate::test_circuits::arithmetic::{TestAddition, TestCmul, TestMulGate, TestSubtraction};
     use crate::test_circuits::proj::TestProj;
     use crate::{
@@ -179,24 +193,9 @@ mod streaming {
     >(
         circuit: &Ex,
     ) {
-        let mut rng = SwankyRng::new();
-        let moduli = (0..<Ex as CircuitInputMapper<Dummy>>::ninputs(circuit))
-            .map(|i| <Ex as CircuitInputMapper<Dummy>>::modulus(circuit, i))
-            .collect::<Vec<_>>();
-        let inputs = moduli.iter().map(|q| rng.gen_u16() % q).collect::<Vec<_>>();
+        let rng = SwankyRng::new();
 
-        // evaluate f_gb as a dummy
-        let should_be = Channel::with(std::io::empty(), |channel| {
-            let mut dummy = Dummy::new();
-            let inputs = dummy.encode_many(&inputs, &moduli, channel)?;
-            let outputs = circuit.execute(
-                &mut dummy,
-                &<Ex as CircuitInputMapper<Dummy>>::map(circuit, inputs),
-                channel,
-            )?;
-            Ok(dummy.outputs(&outputs.flatten(), channel)?.unwrap())
-        })
-        .unwrap();
+        let (inputs, moduli, expected) = super::helpers::plaintext(circuit);
 
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
@@ -204,7 +203,7 @@ mod streaming {
                 let zeros = gb.encode_many(&inputs, &moduli, channel)?;
                 let outputs = circuit.execute(
                     &mut gb,
-                    &<Ex as CircuitInputMapper<Garbler<_, _>>>::map(circuit, zeros),
+                    <Ex as CircuitInputMapper<Garbler<_, _>>>::map(circuit, zeros),
                     channel,
                 )?;
                 gb.outputs(&outputs.flatten(), channel)?;
@@ -215,7 +214,7 @@ mod streaming {
                 let wires = ev.receive_many(&moduli, channel)?;
                 let outputs = circuit.execute(
                     &mut ev,
-                    &<Ex as CircuitInputMapper<Evaluator<_>>>::map(circuit, wires),
+                    <Ex as CircuitInputMapper<Evaluator<_>>>::map(circuit, wires),
                     channel,
                 )?;
                 Ok(ev.outputs(&outputs.flatten(), channel)?.unwrap())
@@ -223,7 +222,7 @@ mod streaming {
         )
         .unwrap();
 
-        assert_eq!(result, should_be);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -281,14 +280,16 @@ mod streaming {
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &Self::Input,
+            inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
             let mut outputs = Vec::with_capacity(inputs.len());
             for x in inputs.iter() {
-                let c = backend.crt_constant_bundle(1, x.composite_modulus(), channel)?;
-                let y = Multiplication.execute(backend, &(x.clone(), c), channel)?;
-                let z = ReLU.execute(backend, &(y, "100%".to_string(), None), channel)?;
+                let c = Constant::new(1, x.composite_modulus()).execute(backend, (), channel)?;
+                let y = Multiplication::new().execute(backend, (x, &c), channel)?;
+                let accuracy = "100%";
+                let none_option: Option<&[u16]> = None;
+                let z = ReLU::new().execute(backend, (&y, accuracy, none_option), channel)?;
                 outputs.push(z);
             }
             Ok(outputs)

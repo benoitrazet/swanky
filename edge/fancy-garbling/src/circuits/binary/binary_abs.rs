@@ -3,27 +3,39 @@ use crate::{
     circuit::Circuit,
     circuits::binary::{BinaryMultiplex, BinaryTwosComplement},
 };
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// For [`BinaryBundle`] `x`, output the absolute value of `x`.
-pub struct BinaryAbs;
+#[derive(Default)]
+pub struct BinaryAbs<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for BinaryAbs {
-    type Input = BinaryBundle<F::Item>;
+impl<'a> BinaryAbs<'a> {
+    /// Create a new [`BinaryAbs`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for BinaryAbs<'a>
+where
+    F::Item: 'a,
+{
+    type Input = &'a BinaryBundle<F::Item>;
     type Output = BinaryBundle<F::Item>;
 
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let x = inputs;
 
         let sign = x.wires().last().unwrap();
-        let negated = BinaryTwosComplement.execute(backend, x, channel)?;
-        BinaryMultiplex.execute(backend, &(sign.clone(), x.clone(), negated), channel)
+        let negated = BinaryTwosComplement::new().execute(backend, x, channel)?;
+        BinaryMultiplex::new().execute(backend, (sign.clone(), x, &negated), channel)
     }
 }
 
@@ -44,7 +56,8 @@ mod test {
         for _ in 0..16 {
             let x = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
-            let output = Dummy::eval(&BinaryAbs, &x_input).unwrap();
+            let circuit = BinaryAbs::new();
+            let output = Dummy::eval(&circuit, &x_input).unwrap();
             assert_eq!(
                 DummyVal::from_binary(&output),
                 if x >> (nbits - 1) > 0 {

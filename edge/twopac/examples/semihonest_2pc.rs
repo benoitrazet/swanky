@@ -43,7 +43,7 @@ fn run_circuit<
             let start = SystemTime::now();
             circ.execute(
                 &mut gb,
-                &<C as CircuitInputMapper<Garbler<SwankyRng, OtSender, WireMod2>>>::map(circ, xs),
+                <C as CircuitInputMapper<Garbler<SwankyRng, OtSender, WireMod2>>>::map(circ, xs),
                 channel,
             )
             .unwrap();
@@ -74,7 +74,7 @@ fn run_circuit<
             let start = SystemTime::now();
             circ.execute(
                 &mut ev,
-                &<C as CircuitInputMapper<Evaluator<SwankyRng, OtReceiver, WireMod2>>>::map(
+                <C as CircuitInputMapper<Evaluator<SwankyRng, OtReceiver, WireMod2>>>::map(
                     circ, xs,
                 ),
                 channel,

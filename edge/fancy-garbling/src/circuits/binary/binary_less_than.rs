@@ -3,22 +3,34 @@ use crate::{
     circuit::Circuit,
     circuits::binary::{BinarySubtraction, Mux, OrMany},
 };
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// Binary less than.
 ///
 /// For [`BinaryBundle`]s `x` and `y`, return `x < y`.
-pub struct BinaryLessThan;
+#[derive(Default)]
+pub struct BinaryLessThan<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for BinaryLessThan {
-    type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
+impl<'a> BinaryLessThan<'a> {
+    /// Create a new [`BinaryLessThan`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for BinaryLessThan<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
     type Output = F::Item;
 
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         assert_eq!(inputs.0.moduli(), inputs.1.moduli());
@@ -26,17 +38,16 @@ impl<F: FancyBinary> Circuit<F> for BinaryLessThan {
 
         // underflow indicates y != 0 && x >= y
         // requiring special care to remove the y != 0, which is what follows.
-        let (_, lhs) =
-            BinarySubtraction.execute(backend, &(x.to_owned(), y.to_owned()), channel)?;
+        let (_, lhs) = BinarySubtraction::new().execute(backend, (x, y), channel)?;
 
         // Now we build a clause equal to (y == 0 || x >= y), which we can OR with
         // lhs to remove the y==0 aspect.
         // check if y==0
-        let y_contains_1 = OrMany.execute(backend, y.wires(), channel)?;
+        let y_contains_1 = OrMany::new().execute(backend, y.wires().as_slice(), channel)?;
         let y_eq_0 = backend.negate(&y_contains_1);
 
         // if x != 0, then x >= y, ... assuming x is not negative
-        let x_contains_1 = OrMany.execute(backend, x.wires(), channel)?;
+        let x_contains_1 = OrMany::new().execute(backend, x.wires().as_slice(), channel)?;
 
         // y == 0 && x >= y
         let rhs = backend.and(&y_eq_0, &x_contains_1, channel)?;
@@ -57,16 +68,27 @@ impl<F: FancyBinary> Circuit<F> for BinaryLessThan {
 ///
 /// For [`BinaryBundle`]s `x` and `y` representing signed integers in two's complement,
 /// return `x < y`.
-pub struct BinaryLessThanSigned;
+#[derive(Default)]
+pub struct BinaryLessThanSigned<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for BinaryLessThanSigned {
-    type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
+impl<'a> BinaryLessThanSigned<'a> {
+    /// Create a new [`BinaryLessThanSigned`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for BinaryLessThanSigned<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
     type Output = F::Item;
 
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         assert_eq!(inputs.0.moduli(), inputs.1.moduli());
@@ -82,15 +104,15 @@ impl<F: FancyBinary> Circuit<F> for BinaryLessThanSigned {
         let y_pos = backend.negate(y_neg);
 
         // Base case: if x and y have the same sign, use unsigned less than.
-        let x_lt_y_unsigned = BinaryLessThan.execute(backend, &(x.clone(), y.clone()), channel)?;
+        let x_lt_y_unsigned = BinaryLessThan::new().execute(backend, (x, y), channel)?;
 
         // If x is negative and y is positive, then x < y.
         let x_neg_y_pos = backend.and(x_neg, &y_pos, channel)?;
-        let r2 = Mux.execute(backend, &(x_neg_y_pos, x_lt_y_unsigned, one), channel)?;
+        let r2 = Mux::new().execute(backend, (&x_neg_y_pos, &x_lt_y_unsigned, &one), channel)?;
 
         // If x is positive and y is negative, then !(x < y).
         let x_pos_y_neg = backend.and(&x_pos, y_neg, channel)?;
-        Mux.execute(backend, &(x_pos_y_neg, r2, zero), channel)
+        Mux::new().execute(backend, (&x_pos_y_neg, &r2, &zero), channel)
     }
 }
 
@@ -101,16 +123,16 @@ pub mod test {
     /// Circuit for testing [`BinaryLessThan`].
     pub struct TestBinaryLessThan(pub usize);
     impl<F: FancyBinary> Circuit<F> for TestBinaryLessThan {
-        type Input = <BinaryLessThan as Circuit<F>>::Input;
-        type Output = <BinaryLessThan as Circuit<F>>::Output;
+        type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
+        type Output = F::Item;
 
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &Self::Input,
+            inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            BinaryLessThan.execute(backend, inputs, channel)
+            BinaryLessThan::new().execute(backend, (&inputs.0, &inputs.1), channel)
         }
     }
 
@@ -133,16 +155,16 @@ pub mod test {
     /// Circuit for testing [`BinaryLessThanSigned`].
     pub struct TestBinaryLessThanSigned(pub usize);
     impl<F: FancyBinary> Circuit<F> for TestBinaryLessThanSigned {
-        type Input = <BinaryLessThanSigned as Circuit<F>>::Input;
-        type Output = <BinaryLessThanSigned as Circuit<F>>::Output;
+        type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
+        type Output = F::Item;
 
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &Self::Input,
+            inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            BinaryLessThanSigned.execute(backend, inputs, channel)
+            BinaryLessThanSigned::new().execute(backend, (&inputs.0, &inputs.1), channel)
         }
     }
 
@@ -177,7 +199,7 @@ pub mod test {
             let y = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
             let y_input = DummyVal::to_binary(y, nbits);
-            let output = Dummy::eval(&c, &(x_input, y_input)).unwrap();
+            let output = Dummy::eval(&c, (x_input, y_input)).unwrap();
             assert_eq!(output.val() > 0, x < y);
         }
     }
@@ -197,7 +219,7 @@ pub mod test {
             let y = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
             let y_input = DummyVal::to_binary(y, nbits);
-            let output = Dummy::eval(&c, &(x_input, y_input)).unwrap();
+            let output = Dummy::eval(&c, (x_input, y_input)).unwrap();
             assert_eq!(output.val() > 0, (x as i64) < (y as i64));
         }
     }

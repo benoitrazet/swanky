@@ -127,7 +127,7 @@ impl Dummy {
     }
 
     /// Evaluate `circuit` in plaintext.
-    pub fn eval<C: Circuit<Dummy>>(circuit: &C, inputs: &C::Input) -> Result<C::Output> {
+    pub fn eval<C: Circuit<Dummy>>(circuit: &C, inputs: C::Input) -> Result<C::Output> {
         let mut dummy = Dummy::new();
         Channel::with(std::io::empty(), |c| circuit.execute(&mut dummy, inputs, c))
     }

@@ -1,5 +1,8 @@
 //! Circuits for operating over arithmetic values.
 
+mod constant;
+pub use constant::Constant;
+
 mod addition;
 pub use addition::AddMany;
 pub use addition::Addition;
@@ -33,6 +36,9 @@ pub use comparison::Max;
 pub use comparison::ReLU;
 pub use comparison::Sgn;
 pub use comparison::Sign;
+
+mod mod_change;
+pub use mod_change::ModChange;
 
 mod mixed_radix;
 pub use mixed_radix::FractionalMixedRadix;

@@ -43,10 +43,10 @@ impl<F: FancyBinary> Circuit<F> for Sha256CompressionFunctionFixedIV {
     fn execute(
         &self,
         backend: &mut F,
-        input: &Self::Input,
+        input: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let output = self.0.execute(backend, &input.to_vec(), channel)?;
+        let output = self.0.execute(backend, input.to_vec(), channel)?;
         Ok(output
             .try_into()
             .expect("SHA-256 compression function output should always be 256 elements"))
@@ -100,7 +100,7 @@ impl<F: FancyBinary> Circuit<F> for Sha256CompressionFunction {
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         // Bristol Fashion expects its input in the _reverse_ order of what
@@ -108,7 +108,7 @@ impl<F: FancyBinary> Circuit<F> for Sha256CompressionFunction {
         // the vector to pass to [`BinaryCircuit`].
         let mut combined = inputs.0.iter().rev().cloned().collect::<Vec<_>>();
         combined.extend(inputs.1.iter().rev().cloned());
-        let output = self.0.execute(backend, &combined, channel)?;
+        let output = self.0.execute(backend, combined, channel)?;
         Ok(output
             .try_into()
             .expect("SHA-256 compression function output should always be 256 elements"))
@@ -181,7 +181,7 @@ impl<F: FancyBinary> Circuit<F> for Sha256 {
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let message_len = inputs.len();
@@ -220,7 +220,7 @@ impl<F: FancyBinary> Circuit<F> for Sha256 {
             Some(zero.clone()),
             Some(one.clone()),
         )
-        .execute(backend, &(), channel)?;
+        .execute(backend, (), channel)?;
         // Constants are represented in little-endian, but here we need message
         // length to be in big-endian. So we reverse the bundle before using it.
         length.reverse();
@@ -231,9 +231,7 @@ impl<F: FancyBinary> Circuit<F> for Sha256 {
             let block: [F::Item; 512] =
                 chunk.to_vec().try_into().expect("Chunk should be 512 bits");
 
-            chain = self
-                .compression
-                .execute(backend, &(block, chain), channel)?;
+            chain = self.compression.execute(backend, (block, chain), channel)?;
         }
 
         Ok(chain)
@@ -271,7 +269,7 @@ mod test {
         ).try_into().unwrap();
 
         let block = [DummyVal::new_bool(false); 512];
-        let output = Dummy::eval(&sha256_fixed_iv, &block).unwrap();
+        let output = Dummy::eval(&sha256_fixed_iv, block).unwrap();
         assert_eq!(
             output
                 .iter()
@@ -279,13 +277,13 @@ mod test {
                 .collect::<String>(),
             "1101101001010110100110001011111000010111101110011011010001101001011000100011001101010111100110010111011110011111101111101100101010001100111001011101010010010001110000001101001001100010010000111011101011111110111110011110101000011000001101111010100111011000"
         );
-        let output_with_iv = Dummy::eval(&sha256, &(block, iv)).unwrap();
+        let output_with_iv = Dummy::eval(&sha256, (block, iv)).unwrap();
         assert_eq!(output, output_with_iv);
 
         let block = string_to_bool_vec(
             "00000000000000010000001000000011000001000000010100000110000001110000100000001001000010100000101100001100000011010000111000001111000100000001000100010010000100110001010000010101000101100001011100011000000110010001101000011011000111000001110100011110000111110010000000100001001000100010001100100100001001010010011000100111001010000010100100101010001010110010110000101101001011100010111100110000001100010011001000110011001101000011010100110110001101110011100000111001001110100011101100111100001111010011111000111111",
         ).try_into().unwrap();
-        let output = Dummy::eval(&sha256_fixed_iv, &block).unwrap();
+        let output = Dummy::eval(&sha256_fixed_iv, block).unwrap();
         assert_eq!(
             output
                 .iter()
@@ -293,11 +291,11 @@ mod test {
                 .collect::<String>(),
             "1111110010011001101000101101111110001000111101000010101001111010011110111011100111010001100000000011001111001101110001101010001000000010010101100111010101011111100111010101101110011010010100000100010010101001110011000011000101011010101111101000010010100111"
         );
-        let output_with_iv = Dummy::eval(&sha256, &(block, iv)).unwrap();
+        let output_with_iv = Dummy::eval(&sha256, (block, iv)).unwrap();
         assert_eq!(output, output_with_iv);
 
         let block = [DummyVal::new_bool(true); 512];
-        let output = Dummy::eval(&sha256_fixed_iv, &block).unwrap();
+        let output = Dummy::eval(&sha256_fixed_iv, block).unwrap();
         assert_eq!(
             output
                 .iter()
@@ -305,13 +303,13 @@ mod test {
                 .collect::<String>(),
             "1110111100001100011101001000110111110100110110100101000010101000110101101100010000111100000000010011111011011100001111001110011101101100100111011001111110101001101000010100010110001010110111100101011011101011100001101100000010100110010001001001001011010010"
         );
-        let output_with_iv = Dummy::eval(&sha256, &(block, iv)).unwrap();
+        let output_with_iv = Dummy::eval(&sha256, (block, iv)).unwrap();
         assert_eq!(output, output_with_iv);
 
         let block = string_to_bool_vec(
             "00100100001111110110101010001000100001011010001100001000110100110001001100011001100010100010111000000011011100000111001101000100101001000000100100111000001000100010100110011111001100011101000000001000001011101111101010011000111011000100111001101100100010010100010100101000001000011110011000111000110100000001001101110111101111100101010001100110110011110011010011101001000011000110110011000000101011000010100110110111110010010111110001010000110111010011111110000100110101011011010110110101010001110000100100010111",
         ).try_into().unwrap();
-        let output = Dummy::eval(&sha256_fixed_iv, &block).unwrap();
+        let output = Dummy::eval(&sha256_fixed_iv, block).unwrap();
         assert_eq!(
             output
                 .iter()
@@ -319,7 +317,7 @@ mod test {
                 .collect::<String>(),
             "1100111100001010111001001110101101100111110100111000111111111110101110010100000001101000100110000100101100100010101010111101111001001110100100101011110001010100100011010001010001011000010111100100100011011100101010001000100000101101011110110000100111001110"
         );
-        let output_with_iv = Dummy::eval(&sha256, &(block, iv)).unwrap();
+        let output_with_iv = Dummy::eval(&sha256, (block, iv)).unwrap();
         assert_eq!(output, output_with_iv);
     }
 
@@ -330,7 +328,7 @@ mod test {
 
         let sha256 = Sha256::new();
         let input = vec![];
-        let output = Dummy::eval(&sha256, &input).unwrap();
+        let output = Dummy::eval(&sha256, input).unwrap();
         assert_eq!(
             output
                 .iter()
@@ -352,7 +350,7 @@ mod test {
         // 'b' = 0x62 = 01100010
         // 'c' = 0x63 = 01100011
         let input = string_to_bool_vec("011000010110001001100011");
-        let output = Dummy::eval(&sha256, &input).unwrap();
+        let output = Dummy::eval(&sha256, input).unwrap();
         assert_eq!(
             output
                 .iter()
@@ -369,7 +367,7 @@ mod test {
 
         let sha256 = Sha256::new();
         let input = vec![DummyVal::new_bool(false); 448];
-        let output = Dummy::eval(&sha256, &input).unwrap();
+        let output = Dummy::eval(&sha256, input).unwrap();
         assert_eq!(
             output
                 .iter()
@@ -391,7 +389,7 @@ mod test {
         for _ in 0..32 {
             input.extend_from_slice(&abcd);
         }
-        let output = Dummy::eval(&sha256, &input).unwrap();
+        let output = Dummy::eval(&sha256, input).unwrap();
         assert_eq!(
             output
                 .iter()
@@ -415,7 +413,7 @@ mod test {
             })
             .collect();
 
-        let output = Dummy::eval(&sha256, &input).unwrap();
+        let output = Dummy::eval(&sha256, input).unwrap();
         assert_eq!(
             output
                 .iter()

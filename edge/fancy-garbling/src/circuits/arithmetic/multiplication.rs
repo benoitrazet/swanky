@@ -1,18 +1,30 @@
 use crate::{CrtBundle, FancyArithmetic, circuit::Circuit, util::crt};
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// Given [`CrtBundle`]s `x` and `y`, output `x * y`.
-pub struct Multiplication;
+#[derive(Default)]
+pub struct Multiplication<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyArithmetic> Circuit<F> for Multiplication {
-    type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
+impl<'a> Multiplication<'a> {
+    /// Create a new [`Multiplication`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyArithmetic> Circuit<F> for Multiplication<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a CrtBundle<F::Item>, &'a CrtBundle<F::Item>);
     type Output = CrtBundle<F::Item>;
 
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
@@ -28,20 +40,31 @@ impl<F: FancyArithmetic> Circuit<F> for Multiplication {
 }
 
 /// Given [`CrtBundle`] `x` and constant `c`, output `x * c`.
-pub struct ConstantMultiplication;
+#[derive(Default)]
+pub struct ConstantMultiplication<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyArithmetic> Circuit<F> for ConstantMultiplication {
-    type Input = (CrtBundle<F::Item>, u128);
+impl<'a> ConstantMultiplication<'a> {
+    /// Create a new [`ConstantMultiplication`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyArithmetic> Circuit<F> for ConstantMultiplication<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a CrtBundle<F::Item>, u128);
     type Output = CrtBundle<F::Item>;
 
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         _: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, c) = inputs;
-        let cs = crt(*c, &x.moduli());
+        let cs = crt(c, &x.moduli());
         Ok(CrtBundle::new(
             x.wires()
                 .iter()
@@ -71,7 +94,8 @@ mod test {
             let y = rng.r#gen::<u64>() as u128 % q;
             let x_input = DummyVal::to_crt(x, q);
             let y_input = DummyVal::to_crt(y, q);
-            let z = Dummy::eval(&Multiplication, &(x_input, y_input)).unwrap();
+            let circuit = Multiplication::new();
+            let z = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
             let output = DummyVal::from_crt(&z, q);
             assert_eq!(output, (x * y) % q);
         }
@@ -86,7 +110,8 @@ mod test {
             let x = rng.r#gen::<u64>() as u128 % q;
             let c = rng.r#gen::<u64>() as u128 % q;
             let x_input = DummyVal::to_crt(x, q);
-            let z = Dummy::eval(&ConstantMultiplication, &(x_input, c)).unwrap();
+            let circuit = ConstantMultiplication::new();
+            let z = Dummy::eval(&circuit, (&x_input, c)).unwrap();
             let output = DummyVal::from_crt(&z, q);
             assert_eq!(output, (x * c) % q);
         }

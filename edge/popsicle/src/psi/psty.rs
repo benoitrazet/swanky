@@ -415,11 +415,11 @@ fn fancy_compute_intersection<F: FancyBinary>(
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            BinaryEquality.execute(
+            BinaryEquality::new().execute(
                 f,
-                &(
-                    BinaryBundle::new(xs.to_vec()),
-                    BinaryBundle::new(ys.to_vec()),
+                (
+                    &BinaryBundle::new(xs.to_vec()),
+                    &BinaryBundle::new(ys.to_vec()),
                 ),
                 channel,
             )
@@ -440,19 +440,19 @@ fn fancy_compute_cardinality<F: FancyBinary>(
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            BinaryEquality.execute(
+            BinaryEquality::new().execute(
                 f,
-                &(
-                    BinaryBundle::new(xs.to_vec()),
-                    BinaryBundle::new(ys.to_vec()),
+                (
+                    &BinaryBundle::new(xs.to_vec()),
+                    &BinaryBundle::new(ys.to_vec()),
                 ),
                 channel,
             )
         })
         .collect::<swanky_error::Result<Vec<F::Item>>>()?;
 
-    let mut acc = BinaryConstant::new(0, HASH_SIZE * 8).execute(f, &(), channel)?;
-    let one = BinaryConstant::new(1, HASH_SIZE * 8).execute(f, &(), channel)?;
+    let mut acc = BinaryConstant::new(0, HASH_SIZE * 8).execute(f, (), channel)?;
+    let one = BinaryConstant::new(1, HASH_SIZE * 8).execute(f, (), channel)?;
 
     for b in eqs.into_iter() {
         let b_ws = one
@@ -460,7 +460,7 @@ fn fancy_compute_cardinality<F: FancyBinary>(
             .map(|w| f.and(w, &b, channel))
             .collect::<Result<Vec<_>, _>>()?;
         let b_binary = BinaryBundle::new(b_ws);
-        acc = BinaryAdditionNoCarry.execute(f, &(acc, b_binary), channel)?;
+        acc = BinaryAdditionNoCarry::new().execute(f, (&acc, &b_binary), channel)?;
     }
 
     Ok(acc)

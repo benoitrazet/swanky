@@ -1,4 +1,5 @@
 use crate::{BinaryBundle, FancyBinary, circuit::Circuit, circuits::binary::BinaryLessThan};
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -8,22 +9,34 @@ use swanky_error::Result;
 ///
 /// # Panics
 /// This panics if the input vector is empty.
-pub struct BinaryMax;
+#[derive(Default)]
+pub struct BinaryMax<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for BinaryMax {
-    type Input = Vec<BinaryBundle<F::Item>>;
+impl<'a> BinaryMax<'a> {
+    /// Create a new [`BinaryMax`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for BinaryMax<'a>
+where
+    F::Item: 'a,
+{
+    type Input = &'a [BinaryBundle<F::Item>];
     type Output = BinaryBundle<F::Item>;
 
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        assert!(!inputs.is_empty(), "`xs` cannot be empty");
-        inputs.iter().skip(1).try_fold(inputs[0].clone(), |x, y| {
+        let xs = inputs;
+        assert!(!xs.is_empty(), "`xs` cannot be empty");
+        xs.iter().skip(1).try_fold(xs[0].clone(), |x, y| {
             // Compute `x < y`.
-            let pos = BinaryLessThan.execute(backend, &(x.clone(), y.clone()), channel)?;
+            let pos = BinaryLessThan::new().execute(backend, (&x, y), channel)?;
             // Compute `!(x < y)`.
             let neg = backend.negate(&pos);
             // Compute `x * (x >= y) ^ y * (x < y)`.
@@ -64,7 +77,7 @@ mod test {
             let max = *xs.iter().max().unwrap();
             let xs_input: Vec<BinaryBundle<DummyVal>> =
                 xs.iter().map(|x| DummyVal::to_binary(*x, nbits)).collect();
-            let output = Dummy::eval(&BinaryMax, &xs_input).unwrap();
+            let output = Dummy::eval(&BinaryMax::new(), xs_input.as_slice()).unwrap();
             let output_val = DummyVal::from_binary(&output);
             assert_eq!(output_val, max);
         }

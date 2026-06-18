@@ -33,7 +33,7 @@ fn bench_circuit<
             xs.extend(ys);
             circ.execute(
                 &mut gb,
-                &<C as CircuitInputMapper<Garbler<SwankyRng, OtSender, WireMod2>>>::map(circ, xs),
+                <C as CircuitInputMapper<Garbler<SwankyRng, OtSender, WireMod2>>>::map(circ, xs),
                 channel,
             )
             .unwrap();
@@ -49,7 +49,7 @@ fn bench_circuit<
             xs.extend(ys);
             circ.execute(
                 &mut ev,
-                &<C as CircuitInputMapper<Evaluator<SwankyRng, OtReceiver, WireMod2>>>::map(
+                <C as CircuitInputMapper<Evaluator<SwankyRng, OtReceiver, WireMod2>>>::map(
                     circ, xs,
                 ),
                 channel,

@@ -64,7 +64,7 @@ pub trait CrtGadgets: BundleGadgets {
     ) -> swanky_error::Result<CrtBundle<Self::Item>> {
         let qs = util::factor(modulus);
         let xs = util::crt(value, &qs);
-        self.encode_bundle(&xs, &qs, channel).map(CrtBundle::from)
+        self.encode_many(&xs, &qs, channel).map(CrtBundle::new)
     }
 
     /// Receive an CRT input bundle.
@@ -74,7 +74,7 @@ pub trait CrtGadgets: BundleGadgets {
         channel: &mut Channel,
     ) -> swanky_error::Result<CrtBundle<Self::Item>> {
         let qs = util::factor(modulus);
-        self.receive_bundle(&qs, channel).map(CrtBundle::from)
+        self.receive_many(&qs, channel).map(CrtBundle::new)
     }
 
     /// Encode many CRT input bundles.
@@ -121,19 +121,6 @@ pub trait CrtGadgets: BundleGadgets {
             })
             .collect_vec();
         Ok(buns)
-    }
-
-    /// Creates a bundle of constant wires for the CRT representation of `x` under
-    /// composite modulus `q`.
-    fn crt_constant_bundle(
-        &mut self,
-        x: u128,
-        q: u128,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<CrtBundle<Self::Item>> {
-        let ps = util::factor(q);
-        let xs = ps.iter().map(|&p| (x % p as u128) as u16).collect_vec();
-        self.constant_bundle(&xs, &ps, channel).map(CrtBundle)
     }
 
     /// Output a CRT bundle and interpret it mod Q.

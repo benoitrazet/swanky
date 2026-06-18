@@ -21,7 +21,7 @@ impl<F: FancyBinary> Circuit<F> for And {
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let mut z = backend.and(&inputs.0, &inputs.1, channel)?;
@@ -87,7 +87,7 @@ where
     let t = Instant::now();
     let ys = gc.eval_to_wirelabels(
         circuit,
-        &<C as CircuitInputMapper<SemiHonestEvaluator<_>>>::map(circuit, xs.clone()),
+        <C as CircuitInputMapper<SemiHonestEvaluator<_>>>::map(circuit, xs.clone()),
     )?;
     black_box(ys);
     let time = t.elapsed();
@@ -117,7 +117,7 @@ where
         |channel| {
             let outputs = circuit.execute(
                 &mut gb,
-                &<C as CircuitInputMapper<SemiHonestGarbler<_, _>>>::map(circuit, zeros),
+                <C as CircuitInputMapper<SemiHonestGarbler<_, _>>>::map(circuit, zeros),
                 channel,
             )?;
             gb.outputs(&outputs.flatten(), channel)?;
@@ -126,7 +126,7 @@ where
         |channel| {
             let outputs = circuit.execute(
                 &mut ev,
-                &<C as CircuitInputMapper<SemiHonestEvaluator<_>>>::map(circuit, wires),
+                <C as CircuitInputMapper<SemiHonestEvaluator<_>>>::map(circuit, wires),
                 channel,
             )?;
             Ok(ev.outputs(&outputs.flatten(), channel)?.unwrap())
@@ -159,7 +159,7 @@ where
         |channel| {
             let outputs = circuit.execute(
                 &mut gb,
-                &<C as CircuitInputMapper<Garbler<_>>>::map(circuit, inputs_gb),
+                <C as CircuitInputMapper<Garbler<_>>>::map(circuit, inputs_gb),
                 channel,
             )?;
             gb.outputs(&outputs.flatten(), channel)
@@ -167,7 +167,7 @@ where
         |channel| {
             let outputs = circuit.execute(
                 &mut ev,
-                &<C as CircuitInputMapper<Evaluator>>::map(circuit, inputs_ev),
+                <C as CircuitInputMapper<Evaluator>>::map(circuit, inputs_ev),
                 channel,
             )?;
             ev.outputs(&outputs.flatten(), channel)

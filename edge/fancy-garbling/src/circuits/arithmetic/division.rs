@@ -2,10 +2,12 @@ use crate::{
     CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary, FancyProj,
     circuit::Circuit,
     circuits::arithmetic::{
-        Addition, ConstantMultiplication, Multiplication, PmrGreaterThanOrEqual, Subtraction,
+        Addition, Constant, ConstantMultiplication, Multiplication, PmrGreaterThanOrEqual,
+        Subtraction,
     },
     util::product,
 };
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -14,16 +16,27 @@ use swanky_error::Result;
 /// The inputs are required to have an extra (unused) prime. That is, for
 /// modulus $`Q = \prod_{i = 1,...,n} q_i`$, plaintext inputs `x` and `y` must
 /// be modulo $`Q / q_n`$.
-pub struct Division;
+#[derive(Default)]
+pub struct Division<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> Circuit<F> for Division {
-    type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
+impl<'a> Division<'a> {
+    /// Create a new [`Division`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> Circuit<F> for Division<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a CrtBundle<F::Item>, &'a CrtBundle<F::Item>);
     type Output = CrtBundle<F::Item>;
 
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
@@ -37,10 +50,10 @@ impl<F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> Circuit<F> for D
         let q_ = product(qs_);
         let l = 128 - q_.leading_zeros();
 
-        let mut quotient = backend.crt_constant_bundle(0, q, channel)?;
-        let mut a = x.clone();
+        let mut quotient = Constant::new(0, q).execute(backend, (), channel)?;
+        let mut a = (*x).clone();
 
-        let one = backend.crt_constant_bundle(1, q, channel)?;
+        let one = Constant::new(1, q).execute(backend, (), channel)?;
         for i in 0..l {
             let b = 2u128.pow(l - i - 1);
             let mut pb = q_ / b;
@@ -48,11 +61,11 @@ impl<F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> Circuit<F> for D
                 pb -= 1;
             }
 
-            let tmp = ConstantMultiplication.execute(backend, &(y.clone(), b), channel)?;
-            let c1 = PmrGreaterThanOrEqual.execute(backend, &(a.clone(), tmp.clone()), channel)?;
+            let tmp = ConstantMultiplication::new().execute(backend, (y, b), channel)?;
+            let c1 = PmrGreaterThanOrEqual::new().execute(backend, (&a, &tmp), channel)?;
 
-            let pb_crt = backend.crt_constant_bundle(pb, q, channel)?;
-            let c2 = PmrGreaterThanOrEqual.execute(backend, &(pb_crt, y.clone()), channel)?;
+            let pb_crt = Constant::new(pb, q).execute(backend, (), channel)?;
+            let c2 = PmrGreaterThanOrEqual::new().execute(backend, (&pb_crt, y), channel)?;
 
             let c = backend.and(&c1, &c2, channel)?;
 
@@ -62,11 +75,11 @@ impl<F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> Circuit<F> for D
                 .collect::<Result<Vec<_>>>()?;
             let c_crt = CrtBundle::new(c_ws);
 
-            let b_if = ConstantMultiplication.execute(backend, &(c_crt.clone(), b), channel)?;
-            quotient = Addition.execute(backend, &(quotient, b_if), channel)?;
+            let b_if = ConstantMultiplication::new().execute(backend, (&c_crt, b), channel)?;
+            quotient = Addition::new().execute(backend, (&quotient, &b_if), channel)?;
 
-            let tmp_if = Multiplication.execute(backend, &(c_crt, tmp), channel)?;
-            a = Subtraction.execute(backend, &(a, tmp_if), channel)?;
+            let tmp_if = Multiplication::new().execute(backend, (&c_crt, &tmp), channel)?;
+            a = Subtraction::new().execute(backend, (&a, &tmp_if), channel)?;
         }
 
         Ok(quotient)
@@ -94,7 +107,7 @@ mod test {
             let y = rng.r#gen::<u128>() % q_;
             let x_input = DummyVal::to_crt(x, q);
             let y_input = DummyVal::to_crt(y, q);
-            let z = Dummy::eval(&Division, &(x_input, y_input)).unwrap();
+            let z = Dummy::eval(&Division::new(), (&x_input, &y_input)).unwrap();
             let output = DummyVal::from_crt(&z, q);
             assert_eq!(output, x / y);
         }

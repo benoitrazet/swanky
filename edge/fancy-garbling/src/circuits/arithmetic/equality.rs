@@ -2,20 +2,32 @@ use crate::{
     CrtBundle, FancyArithmetic, FancyProj, HasModulus, circuit::Circuit,
     circuits::arithmetic::addition::AddMany,
 };
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// For [`CrtBundle`]s `x` and `y`, output `x == y`.
-pub struct Equality;
+#[derive(Default)]
+pub struct Equality<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyArithmetic + FancyProj> Circuit<F> for Equality {
-    type Input = (CrtBundle<F::Item>, CrtBundle<F::Item>);
+impl<'a> Equality<'a> {
+    /// Create a new [`Equality`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for Equality<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a CrtBundle<F::Item>, &'a CrtBundle<F::Item>);
     type Output = F::Item;
 
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
@@ -35,7 +47,7 @@ impl<F: FancyArithmetic + FancyProj> Circuit<F> for Equality {
             })
             .collect::<Result<Vec<_>>>()?;
         // add up the results, and output whether they equal zero or not, mod 2
-        let z = AddMany.execute(backend, &zs, channel)?;
+        let z = AddMany::new().execute(backend, zs.as_slice(), channel)?;
         let b = zs.len();
         let mut tab = vec![0; b + 1];
         tab[b] = 1;
@@ -60,7 +72,7 @@ mod test {
         // Check that `x == x`.
         let x = rng.r#gen::<u128>() % q;
         let x_input = DummyVal::to_crt(x, q);
-        let output = Dummy::eval(&Equality, &(x_input.clone(), x_input)).unwrap();
+        let output = Dummy::eval(&Equality::new(), (&x_input, &x_input)).unwrap();
         assert_eq!(output.val(), (x == x) as u16);
 
         for _ in 0..64 {
@@ -68,7 +80,7 @@ mod test {
             let y = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_crt(x, q);
             let y_input = DummyVal::to_crt(y, q);
-            let output = Dummy::eval(&Equality, &(x_input, y_input)).unwrap();
+            let output = Dummy::eval(&Equality::new(), (&x_input, &y_input)).unwrap();
             assert_eq!(output.val(), (x == y) as u16);
         }
     }

@@ -1,26 +1,35 @@
 use crate::{BinaryBundle, FancyBinary, circuit::Circuit, circuits::binary::BinaryLessThan};
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// Binary greater than or equal.
 ///
 /// For [`BinaryBundle`]s `x` and `y`, return `x >= y`.
-pub struct BinaryGreaterThanOrEqual;
+#[derive(Default)]
+pub struct BinaryGreaterThanOrEqual<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for BinaryGreaterThanOrEqual {
-    type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
+impl<'a> BinaryGreaterThanOrEqual<'a> {
+    /// Create a new [`BinaryGreaterThanOrEqual`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for BinaryGreaterThanOrEqual<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
     type Output = F::Item;
 
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        assert_eq!(inputs.0.moduli(), inputs.1.moduli());
-        let (x, y) = inputs;
-
-        let z = BinaryLessThan.execute(backend, &(x.to_owned(), y.to_owned()), channel)?;
+        let z = BinaryLessThan::new().execute(backend, inputs, channel)?;
         Ok(backend.negate(&z))
     }
 }
@@ -32,16 +41,16 @@ pub mod test {
     /// Circuit for testing [`BinaryGreaterThanOrEqual`].
     pub struct TestBinaryGreaterThanOrEqual(pub usize);
     impl<F: FancyBinary> Circuit<F> for TestBinaryGreaterThanOrEqual {
-        type Input = <BinaryGreaterThanOrEqual as Circuit<F>>::Input;
-        type Output = <BinaryGreaterThanOrEqual as Circuit<F>>::Output;
+        type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
+        type Output = F::Item;
 
         fn execute(
             &self,
             backend: &mut F,
-            inputs: &Self::Input,
+            inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            BinaryGreaterThanOrEqual.execute(backend, inputs, channel)
+            BinaryGreaterThanOrEqual::new().execute(backend, (&inputs.0, &inputs.1), channel)
         }
     }
 
@@ -76,7 +85,7 @@ pub mod test {
             let y = rng.r#gen::<u128>() % q;
             let x_input = DummyVal::to_binary(x, nbits);
             let y_input = DummyVal::to_binary(y, nbits);
-            let output = Dummy::eval(&c, &(x_input, y_input)).unwrap();
+            let output = Dummy::eval(&c, (x_input, y_input)).unwrap();
             assert_eq!(output.val() > 0, x >= y);
         }
     }

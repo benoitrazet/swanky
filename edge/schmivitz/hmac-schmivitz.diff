@@ -1,0 +1,86 @@
+diff --git a/edge/schmivitz/tests/integration_test.rs b/edge/schmivitz/tests/integration_test.rs
+index 318f9de0..7056fa9b 100644
+--- a/edge/schmivitz/tests/integration_test.rs
++++ b/edge/schmivitz/tests/integration_test.rs
+@@ -1,6 +1,7 @@
+ mod test {
+     use fancy_garbling::{
+-        FancyBinary, FancyZeroKnowledge, circuits::sha::Sha256CompressionFunction,
++        FancyBinary, FancyZeroKnowledge,
++        circuits::{hmac::HmacSha256, sha::Sha256CompressionFunction},
+     };
+     use merlin::Transcript;
+     use rand::thread_rng;
+@@ -16,7 +17,7 @@ mod test {
+     use swanky_field_binary::F2;
+     use swanky_sieve_ir_codegen::compile_sieve_ir_str;
+ 
+-    static DO_LOGGING: bool = false;
++    static DO_LOGGING: bool = true;
+     static INIT: Once = Once::new();
+ 
+     fn init_logger() {
+@@ -443,4 +444,63 @@ mod test {
+ 
+         Ok(())
+     }
++
++    struct TestHmacSha256(HmacSha256);
++
++    impl<F: FancyBinary + FancyZeroKnowledge> fancy_garbling::circuit::Circuit<F> for TestHmacSha256 {
++        type Input = ();
++        type Output = Vec<F::Item>; // TODO: should be `()`
++
++        fn execute(
++            &self,
++            backend: &mut F,
++            _: &Self::Input,
++            channel: &mut swanky_channel::Channel,
++        ) -> Result<Self::Output> {
++            let key = (0..512)
++                .map(|_| backend.receive(2, channel))
++                .collect::<Result<Vec<_>>>()?
++                .try_into()
++                .unwrap();
++            let message = (0..512)
++                .map(|_| backend.receive(2, channel))
++                .collect::<Result<Vec<_>>>()?;
++            let _ = self.0.execute(backend, &(key, message), channel)?;
++            Ok(vec![])
++        }
++    }
++
++    #[test]
++    fn prove_hmac_circuit() -> Result<()> {
++        // if log-level `RUST_LOG` not already set, then set to info
++        if DO_LOGGING {
++            init_logger();
++        }
++
++        let t = std::time::Instant::now();
++        let circuit = TestHmacSha256(HmacSha256::new());
++        log::info!("parsing: {:?}", t.elapsed());
++
++        let private_input = (0..1024).map(|_| F2::ZERO).collect::<Vec<_>>();
++        let max_wire_id = 1024;
++
++        let t = std::time::Instant::now();
++        let rng = &mut thread_rng();
++        let proof = Proof::<VoleProver, VoleVerifier>::prove(
++            &circuit,
++            &private_input,
++            max_wire_id,
++            &mut transcript(),
++            rng,
++        )?;
++        log::info!("Elapsed prover   hmac-sha256: {:?}", t.elapsed());
++
++        log::info!("proof size estimate: {:?}", proof.proof_size_estimate());
++
++        let t = std::time::Instant::now();
++        proof.verify(&circuit, &mut transcript())?;
++        log::info!("Elapsed verifier hmac-sha256: {:?}", t.elapsed());
++
++        Ok(())
++    }
+ }

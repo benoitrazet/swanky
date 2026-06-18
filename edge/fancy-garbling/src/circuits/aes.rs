@@ -42,7 +42,7 @@ impl<F: FancyBinary> Circuit<F> for AesNonExpanded {
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         // Confusingly, the AES Bristol Format file takes the block _first_, and
@@ -52,7 +52,7 @@ impl<F: FancyBinary> Circuit<F> for AesNonExpanded {
         // conventional approach.
         let mut combined = inputs.1.to_vec();
         combined.extend_from_slice(&inputs.0);
-        let output = self.0.execute(backend, &combined, channel)?;
+        let output = self.0.execute(backend, combined, channel)?;
         Ok(output
             .try_into()
             .expect("AES output should always be 128 elements"))
@@ -90,7 +90,7 @@ mod test {
 
         let key = [DummyVal::new(0, 2); 128];
         let block = [DummyVal::new(0, 2); 128];
-        let output = Dummy::eval(&aes, &(key, block)).unwrap();
+        let output = Dummy::eval(&aes, (key, block)).unwrap();
         assert_eq!(
             output
                 .iter()
@@ -101,7 +101,7 @@ mod test {
 
         let key = [DummyVal::new(1, 2); 128];
         let block = [DummyVal::new(0, 2); 128];
-        let output = Dummy::eval(&aes, &(key, block)).unwrap();
+        let output = Dummy::eval(&aes, (key, block)).unwrap();
         assert_eq!(
             output
                 .iter()
@@ -115,7 +115,7 @@ mod test {
             *key_part = DummyVal::new(1, 2);
         }
         let block = [DummyVal::new(0, 2); 128];
-        let output = Dummy::eval(&aes, &(key, block)).unwrap();
+        let output = Dummy::eval(&aes, (key, block)).unwrap();
         assert_eq!(
             output
                 .iter()
@@ -127,7 +127,7 @@ mod test {
         let mut key = [DummyVal::new(0, 2); 128];
         key[7] = DummyVal::new(1, 2);
         let block = [DummyVal::new(0, 2); 128];
-        let output = Dummy::eval(&aes, &(key, block)).unwrap();
+        let output = Dummy::eval(&aes, (key, block)).unwrap();
         assert_eq!(
             output
                 .iter()
@@ -149,6 +149,6 @@ mod test {
         let inputs = encoder.encode_inputs(&vec![0u16; 256]);
         let key = inputs[..128].try_into().unwrap();
         let block = inputs[128..].try_into().unwrap();
-        gc.eval_to_wirelabels(&aes, &(key, block)).unwrap();
+        gc.eval_to_wirelabels(&aes, (key, block)).unwrap();
     }
 }

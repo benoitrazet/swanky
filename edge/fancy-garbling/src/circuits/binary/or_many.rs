@@ -1,4 +1,5 @@
 use crate::{FancyBinary, circuit::Circuit};
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -6,16 +7,27 @@ use swanky_error::Result;
 ///
 /// # Panics
 /// Panics if no inputs are provided.
-pub struct OrMany;
+#[derive(Default)]
+pub struct OrMany<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyBinary> Circuit<F> for OrMany {
-    type Input = Vec<F::Item>;
+impl<'a> OrMany<'a> {
+    /// Create a new [`OrMany`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for OrMany<'a>
+where
+    F::Item: 'a,
+{
+    type Input = &'a [F::Item];
     type Output = F::Item;
 
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         assert!(!inputs.is_empty(), "`args` cannot be empty");
@@ -42,7 +54,8 @@ pub mod test {
                 .map(|_| DummyVal::rand_bool(&mut rng))
                 .collect::<Vec<_>>();
             let expected = inputs.iter().fold(0, |acc, &x| x.val() | acc);
-            let output = Dummy::eval(&OrMany, &inputs).unwrap();
+            let circuit = OrMany::new();
+            let output = Dummy::eval(&circuit, inputs.as_slice()).unwrap();
             assert_eq!(output.val(), expected);
         }
     }

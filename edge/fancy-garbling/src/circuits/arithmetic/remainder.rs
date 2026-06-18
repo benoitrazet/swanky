@@ -1,4 +1,5 @@
-use crate::{CrtBundle, FancyProj, circuit::Circuit};
+use crate::{CrtBundle, FancyProj, circuit::Circuit, circuits::arithmetic::ModChange};
+use core::marker::PhantomData;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -6,20 +7,31 @@ use swanky_error::Result;
 ///
 /// # Panics
 /// Panics if `p` is not a modulus contained in `x`.
-pub struct Remainder;
+#[derive(Default)]
+pub struct Remainder<'a>(PhantomData<&'a ()>);
 
-impl<F: FancyProj> Circuit<F> for Remainder {
-    type Input = (CrtBundle<F::Item>, u16);
+impl<'a> Remainder<'a> {
+    /// Create a new [`Remainder`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: FancyProj> Circuit<F> for Remainder<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a CrtBundle<F::Item>, u16);
     type Output = CrtBundle<F::Item>;
 
     fn execute(
         &self,
         backend: &mut F,
-        inputs: &Self::Input,
+        inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, modulus) = inputs;
-        let i = x.moduli().iter().position(|&q| *modulus == q);
+        let i = x.moduli().iter().position(|&q| modulus == q);
         assert!(
             i.is_some(),
             "`modulus` {modulus} is not in the input bundle",
@@ -30,7 +42,7 @@ impl<F: FancyProj> Circuit<F> for Remainder {
         // Convert the wire modulo `modulus` to all the other moduli in the bundle.
         x.moduli()
             .iter()
-            .map(|&q| backend.mod_change(w, q, channel))
+            .map(|&q| ModChange.execute(backend, (w.clone(), q), channel))
             .collect::<Result<_>>()
             .map(CrtBundle::new)
     }
@@ -56,7 +68,8 @@ mod test {
             let p = factors[rng.gen_range(0..factors.len())];
 
             let x_input = DummyVal::to_crt(x, q);
-            let z = Dummy::eval(&Remainder, &(x_input, p)).unwrap();
+            let circuit = Remainder::new();
+            let z = Dummy::eval(&circuit, (&x_input, p)).unwrap();
             let output = DummyVal::from_crt(&z, q);
 
             assert_eq!(output, x % (p as u128));
