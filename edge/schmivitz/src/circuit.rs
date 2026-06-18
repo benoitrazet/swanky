@@ -6,7 +6,7 @@
 */
 use crate::parameters::FIELD_SIZE;
 use diet_mac_and_cheese::fields::SieveIrDeserialize;
-use fancy_garbling::{FancyBinary, FancyZeroKnowledge, circuit::Circuit as FancyCircuit};
+use fancy_garbling::{Circuit as FancyCircuit, FancyBinary, FancyZeroKnowledge};
 use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, RelationVisitor, Type, TypeId,
     TypedWireRange, ValueStreamKind, ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
@@ -404,7 +404,7 @@ impl<'a, F: FancyBinary + FancyZeroKnowledge> FancyCircuit<F> for CircuitInterpr
     fn execute(
         &self,
         backend: &mut F,
-        _: &Self::Input,
+        _: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let mut memory = CircuitMemory::<F::Item>::new(self.max_wire_id);
@@ -415,7 +415,7 @@ impl<'a, F: FancyBinary + FancyZeroKnowledge> FancyCircuit<F> for CircuitInterpr
                     assert_eq!(*ty, 0);
 
                     let src = memory.get(src);
-                    backend.assert_zero(&src)?;
+                    backend.assert_zero(&src, channel)?;
                 }
                 GateM::Add(ty, dst, left, right) => {
                     // Assumption: There is exactly one type ID for these circuits and it is F2.

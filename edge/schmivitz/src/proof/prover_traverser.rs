@@ -1,4 +1,4 @@
-use fancy_garbling::{Fancy, FancyBinary, FancyZeroKnowledge, HasModulus};
+use fancy_garbling::{Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
 use mac_n_cheese_sieve_parser::WireId;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
@@ -207,6 +207,13 @@ impl HasModulus for Wire {
 impl<VOLE: RandomVoleP> Fancy for ProverTraverser<VOLE> {
     type Item = Wire;
 
+    fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
+        assert_eq!(modulus, 2);
+        Ok(Wire(F2::from(value != 0), F128b::ZERO))
+    }
+}
+
+impl<VOLE: RandomVoleP> FancyEncode for ProverTraverser<VOLE> {
     fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
         bail!(
             ErrorKind::OtherError,
@@ -225,11 +232,6 @@ impl<VOLE: RandomVoleP> Fancy for ProverTraverser<VOLE> {
             output.push(Wire(f, vole));
         }
         Ok(output)
-    }
-
-    fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
-        assert_eq!(modulus, 2);
-        Ok(Wire(F2::from(value != 0), F128b::ZERO))
     }
 }
 
@@ -268,7 +270,7 @@ impl<VOLE: RandomVoleP> FancyBinary for ProverTraverser<VOLE> {
 }
 
 impl<VOLE: RandomVoleP> FancyZeroKnowledge for ProverTraverser<VOLE> {
-    fn assert_zero(&mut self, value: &Self::Item) -> Result<()> {
+    fn assert_zero(&mut self, value: &Self::Item, _: &mut Channel) -> Result<()> {
         let challenge = self.chi_challenge.next();
         self.aggregate_assert_zero += challenge * value.1;
         Ok(())

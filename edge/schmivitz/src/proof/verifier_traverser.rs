@@ -1,5 +1,6 @@
 use fancy_garbling::Fancy;
 use fancy_garbling::FancyBinary;
+use fancy_garbling::FancyEncode;
 use fancy_garbling::FancyZeroKnowledge;
 use fancy_garbling::HasModulus;
 use swanky_channel::Channel;
@@ -173,6 +174,14 @@ impl HasModulus for Wire {
 impl Fancy for VerifierTraverser {
     type Item = Wire;
 
+    fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
+        assert_eq!(modulus, 2);
+        let value = F128b::from(F2::from(value != 0));
+        Ok(Wire(value * self.verifier_key))
+    }
+}
+
+impl FancyEncode for VerifierTraverser {
     fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
         bail!(
             ErrorKind::OtherError,
@@ -191,12 +200,6 @@ impl Fancy for VerifierTraverser {
             output.push(Wire(res));
         }
         Ok(output)
-    }
-
-    fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
-        assert_eq!(modulus, 2);
-        let value = F128b::from(F2::from(value != 0));
-        Ok(Wire(value * self.verifier_key))
     }
 }
 
@@ -224,7 +227,7 @@ impl FancyBinary for VerifierTraverser {
 }
 
 impl FancyZeroKnowledge for VerifierTraverser {
-    fn assert_zero(&mut self, value: &Self::Item) -> Result<()> {
+    fn assert_zero(&mut self, value: &Self::Item, _: &mut Channel) -> Result<()> {
         let challenge = self.chi_challenge.next();
 
         self.aggregate_assert_zero += challenge * value.0;

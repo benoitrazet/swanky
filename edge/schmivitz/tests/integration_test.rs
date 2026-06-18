@@ -383,7 +383,7 @@ mod test {
 
     struct TestSha256CompressionFunction(Sha256CompressionFunction);
 
-    impl<F: FancyBinary + FancyZeroKnowledge> fancy_garbling::circuit::Circuit<F>
+    impl<F: FancyBinary + FancyZeroKnowledge> fancy_garbling::Circuit<F>
         for TestSha256CompressionFunction
     {
         type Input = ();
@@ -392,7 +392,7 @@ mod test {
         fn execute(
             &self,
             backend: &mut F,
-            _: &Self::Input,
+            _: Self::Input,
             channel: &mut swanky_channel::Channel,
         ) -> Result<Self::Output> {
             let block = (0..512)
@@ -405,7 +405,7 @@ mod test {
                 .collect::<Result<Vec<_>>>()?
                 .try_into()
                 .unwrap();
-            let _ = self.0.execute(backend, &(block, chain), channel)?;
+            let _ = self.0.execute(backend, (block, chain), channel)?;
             Ok(vec![])
         }
     }

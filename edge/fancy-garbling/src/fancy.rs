@@ -15,6 +15,8 @@ mod crt;
 pub use binary::{BinaryBundle, BinaryGadgets};
 pub use bundle::Bundle;
 pub use crt::{CrtBundle, CrtGadgets};
+mod zk;
+pub use zk::FancyZeroKnowledge;
 
 /// An object that has a modulus.
 pub trait HasModulus {

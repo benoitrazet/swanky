@@ -1,4 +1,4 @@
-use fancy_garbling::{FancyBinary, FancyZeroKnowledge, circuit::Circuit};
+use fancy_garbling::{Circuit, FancyBinary, FancyZeroKnowledge};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -11,7 +11,7 @@ impl<F: FancyBinary + FancyZeroKnowledge, const N: usize> Circuit<F> for Example
     fn execute(
         &self,
         backend: &mut F,
-        _: &Self::Input,
+        _: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let mut v = backend.receive(2, channel)?;

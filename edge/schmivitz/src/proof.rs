@@ -7,7 +7,7 @@
 //! Emmanuela Orsini, Lawrence Roy, and Peter Scholl. [Publicly Verifiable Zero-Knowledge and
 //! Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
 //!
-use fancy_garbling::circuit::Circuit as FancyCircuit;
+use fancy_garbling::Circuit as FancyCircuit;
 use mac_n_cheese_sieve_parser::WireId;
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
@@ -109,7 +109,7 @@ where
         let t = std::time::Instant::now();
         let mut circuit_preparer = ProverPreparer::new(private_input, max_wire_id)?;
         Channel::with(std::io::empty(), |channel| {
-            circuit.execute(&mut circuit_preparer, &(), channel)?;
+            circuit.execute(&mut circuit_preparer, (), channel)?;
             Ok(())
         })?;
 
@@ -150,7 +150,7 @@ where
         // the challenges.
         let mut circuit_traverser = ProverTraverser::new(witness, chi_challenge, voles)?;
         Channel::with(std::io::empty(), |channel| {
-            circuit.execute(&mut circuit_traverser, &(), channel)?;
+            circuit.execute(&mut circuit_traverser, (), channel)?;
             Ok(())
         })?;
 
@@ -290,7 +290,7 @@ where
             masked_witnesses,
         )?;
         Channel::with(std::io::empty(), |channel| {
-            circuit.execute(&mut verifier_traverser, &(), channel)?;
+            circuit.execute(&mut verifier_traverser, (), channel)?;
             Ok(())
         })?;
 

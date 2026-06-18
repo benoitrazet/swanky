@@ -1,4 +1,4 @@
-use fancy_garbling::{Fancy, FancyBinary, FancyZeroKnowledge, HasModulus};
+use fancy_garbling::{Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
 use mac_n_cheese_sieve_parser::WireId;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
@@ -118,6 +118,13 @@ impl HasModulus for Wire {
 impl<'a> Fancy for ProverPreparer<'a> {
     type Item = Wire;
 
+    fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
+        assert_eq!(modulus, 2);
+        Ok(Wire(F2::from(value != 0)))
+    }
+}
+
+impl<'a> FancyEncode for ProverPreparer<'a> {
     fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
         bail!(
             ErrorKind::OtherError,
@@ -136,11 +143,6 @@ impl<'a> Fancy for ProverPreparer<'a> {
             output.push(Wire(f2));
         }
         Ok(output)
-    }
-
-    fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
-        assert_eq!(modulus, 2);
-        Ok(Wire(F2::from(value != 0)))
     }
 }
 
@@ -166,7 +168,7 @@ impl<'a> FancyBinary for ProverPreparer<'a> {
 }
 
 impl<'a> FancyZeroKnowledge for ProverPreparer<'a> {
-    fn assert_zero(&mut self, _: &Self::Item) -> Result<()> {
+    fn assert_zero(&mut self, _: &Self::Item, _: &mut Channel) -> Result<()> {
         self.challenge_count += 1;
         Ok(())
     }
@@ -178,7 +180,7 @@ mod tests {
     use std::io::Cursor;
     use swanky_channel::Channel;
 
-    use fancy_garbling::circuit::Circuit as _;
+    use fancy_garbling::Circuit as _;
     use mac_n_cheese_sieve_parser::text_parser::RelationReader;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
@@ -208,7 +210,7 @@ mod tests {
 
         let mut counter: ProverPreparer = ProverPreparer::new(private_input, max_wire_id)?;
         Channel::with(std::io::empty(), |channel| {
-            circuit.execute(&mut counter, &(), channel)?;
+            circuit.execute(&mut counter, (), channel)?;
             Ok(())
         })?;
 
