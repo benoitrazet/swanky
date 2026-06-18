@@ -1,7 +1,7 @@
 use super::security_warning::warn_proj;
 use crate::{
-    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyProj, HasModulus, WireMod2,
-    check_binary,
+    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj,
+    HasModulus, WireMod2, check_binary,
     fancy::Fancy,
     garble::binary_and::BinaryWireLabel,
     hash_wires,
@@ -207,6 +207,12 @@ impl<Wire: WireLabel + ArithmeticWire> FancyProj for Evaluator<Wire> {
 impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
     type Item = Wire;
 
+    fn constant(&mut self, _: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
+        Ok(Wire::from_repr(channel.read()?, q))
+    }
+}
+
+impl<Wire: WireLabel> FancyEncode for Evaluator<Wire> {
     fn encode_many(
         &mut self,
         _values: &[u16],
@@ -229,11 +235,9 @@ impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
             })
             .collect()
     }
+}
 
-    fn constant(&mut self, _: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
-        Ok(Wire::from_repr(channel.read()?, q))
-    }
-
+impl<Wire: WireLabel> FancyOutput for Evaluator<Wire> {
     fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
         let q = x.modulus();
         let i = self.current_output();

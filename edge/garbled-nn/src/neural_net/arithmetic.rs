@@ -21,7 +21,7 @@ pub(crate) struct ArithmeticNeuralNet<'a, F> {
     secret_weights_owned: bool,
 }
 
-impl<'a, F: FancyBinary + FancyArithmetic + FancyProj> ArithmeticNeuralNet<'a, F> {
+impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> ArithmeticNeuralNet<'a, F> {
     /// Create a new `ArithmeticNeuralNet` for the provided backend and using
     /// the specified moduli for each layer of the neural net.
     ///

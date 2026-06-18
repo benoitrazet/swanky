@@ -2,7 +2,8 @@
 //! of a [`Fancy`] circuit.
 
 use crate::{
-    Fancy, FancyArithmetic, FancyBinary, FancyProj, HasModulus, circuit::CircuitInputMapper,
+    Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj, HasModulus,
+    circuit::CircuitInputMapper,
 };
 use core::cmp::max;
 use swanky_channel::Channel;
@@ -195,6 +196,16 @@ impl FancyProj for CircuitAnalyzer {
 impl Fancy for CircuitAnalyzer {
     type Item = AnalyzerItem;
 
+    fn constant(&mut self, _val: u16, q: u16, _: &mut Channel) -> Result<Self::Item> {
+        self.nconstants += 1;
+        Ok(AnalyzerItem {
+            modulus: q,
+            depth: 0,
+        })
+    }
+}
+
+impl FancyEncode for CircuitAnalyzer {
     fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
         self.ninputs += moduli.len();
         Ok(moduli.iter().map(|q| AnalyzerItem::new(*q)).collect())
@@ -206,15 +217,9 @@ impl Fancy for CircuitAnalyzer {
             "Encoding values is unsupported"
         )
     }
+}
 
-    fn constant(&mut self, _val: u16, q: u16, _: &mut Channel) -> Result<Self::Item> {
-        self.nconstants += 1;
-        Ok(AnalyzerItem {
-            modulus: q,
-            depth: 0,
-        })
-    }
-
+impl FancyOutput for CircuitAnalyzer {
     fn output(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Option<u16>> {
         self.mul_depth = max(self.mul_depth, x.depth);
         Ok(None)

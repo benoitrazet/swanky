@@ -4,7 +4,6 @@ use crate::garbler::Garbler;
 use crate::ps::{PartyEvaluator, PartyGarbler};
 use crate::{evaluator::Evaluator, preprocesser::WirePreProcessor};
 
-use fancy_garbling::Flatten;
 use fancy_garbling::circuits::binary::{
     TestBinaryAddition, TestBinaryMultiplication, TestBinarySubtraction, TestBinaryTwosComplement,
 };
@@ -13,7 +12,10 @@ use fancy_garbling::test_circuits::binary::{
     TestAndGate, TestAndGateFanN, TestNegateGate, TestOrGateFanN, TestXorGateFanN,
 };
 use fancy_garbling::test_circuits::fancy::TestBinaryConstant;
-use fancy_garbling::{CircuitInputMapper, Fancy, circuit_analyzer::CircuitAnalyzer, dummy::Dummy};
+use fancy_garbling::{
+    CircuitInputMapper, FancyEncode, circuit_analyzer::CircuitAnalyzer, dummy::Dummy,
+};
+use fancy_garbling::{FancyOutput, Flatten};
 use rand::Rng;
 use swanky_rng::SwankyRng;
 

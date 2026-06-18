@@ -51,6 +51,8 @@ mod tests {
     ) -> swanky_error::Result<u128> {
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
+                use fancy_garbling::FancyOutput;
+
                 let mut gb_psi =
                     OpprfPsiGarbler::<SwankyRng>::new(channel, Block::from(seed_sx)).unwrap();
 
@@ -65,6 +67,8 @@ mod tests {
                 Ok(())
             },
             |channel| {
+                use fancy_garbling::FancyOutput;
+
                 let mut ev_psi =
                     OpprfPsiEvaluator::<SwankyRng>::new(channel, Block::from(seed_rx)).unwrap();
                 let intersection_results = ev_psi.intersect(set_b, channel).unwrap();
@@ -96,6 +100,8 @@ mod tests {
     ) -> swanky_error::Result<u128> {
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
+                use fancy_garbling::FancyOutput;
+
                 let mut gb_psi =
                     OpprfPsiGarbler::<SwankyRng>::new(channel, Block::from(seed_sx)).unwrap();
 
@@ -114,6 +120,8 @@ mod tests {
                 Ok(())
             },
             |channel| {
+                use fancy_garbling::FancyOutput;
+
                 let mut ev_psi =
                     OpprfPsiEvaluator::<SwankyRng>::new(channel, Block::from(seed_rx)).unwrap();
                 let intersection_results = ev_psi

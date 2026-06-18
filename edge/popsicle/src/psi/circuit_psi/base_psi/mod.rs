@@ -1,7 +1,7 @@
 //! The base psi computation that pre-processes the party's
 //! inputs prior to calling the circuit in the circuit psi
 use crate::circuit_psi::*;
-use fancy_garbling::WireMod2;
+use fancy_garbling::FancyEncode;
 use rand::{CryptoRng, RngCore, SeedableRng};
 use swanky_channel::Channel;
 
@@ -69,7 +69,7 @@ pub trait BasePsi {
         channel: &mut Channel,
     ) -> swanky_error::Result<CircuitInputs<F::Item>>
     where
-        F: Fancy<Item = WireMod2>;
+        F: FancyEncode;
     /// A wrapper that calls the different pieces of the BasePsi in order
     /// to the necessary hidden inputs that the CircuitPsi can operate on.
     fn base_psi<F, RNG>(
@@ -81,7 +81,7 @@ pub trait BasePsi {
     ) -> swanky_error::Result<CircuitInputs<F::Item>>
     where
         Self: Sized,
-        F: Fancy<Item = WireMod2>,
+        F: FancyEncode,
         RNG: RngCore + CryptoRng + SeedableRng,
     {
         let has_payloads = payloads.is_some();

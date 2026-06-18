@@ -165,7 +165,7 @@ impl BasePsi for OpprfReceiver {
         channel: &mut Channel,
     ) -> swanky_error::Result<CircuitInputs<F::Item>>
     where
-        F: Fancy<Item = WireMod2>,
+        F: FancyEncode,
     {
         // We compute the number of wires that the receivers should
         // expect from the sender by taking the size of an element in

@@ -22,30 +22,28 @@ pub trait HasModulus {
     fn modulus(&self) -> u16;
 }
 
-/// The `Fancy` trait provides the basic set of operations possible in a garbled
-/// circuit.
+/// The `Fancy` trait is the core trait for writing circuits.
 ///
 /// The trait contains an associated type, [`Fancy::Item`], which defines the
-/// underlying wirelabel representation. The trait then defines several methods
-/// for:
-/// 1. Encoding a value into a wirelabel ([`Fancy::encode`] and
-///    [`Fancy::encode_many`]).
-/// 2. Receiving a wirelabel for an unknown value ([`Fancy::receive`] and
-///    [`Fancy::receive_many`]).
-/// 3. Creating a wirelabel for a fixed (public) constant value
-///    ([`Fancy::constant`]).
+/// underlying wire representation, alongside a [`Fancy::constant`] method for
+/// creating constant (public) wires.
 ///
 /// This trait can be further extended to support binary, arithmetic, and/or
 /// projections by using the [`FancyBinary`], [`FancyArithmetic`], or
-/// [`FancyProj`] extension traits, respectively.
+/// [`FancyProj`] extension traits, respectively. The [`FancyEncode`] trait
+/// allows for encoding values into wires, and the [`FancyOutput`] trait allows
+/// for converting wires into their underlying plaintext representation.
 pub trait Fancy {
-    /// The underlying wirelabel representation of this [`Fancy`] object.
+    /// The underlying wire representation of this [`Fancy`] object.
     type Item: Clone + core::fmt::Debug + HasModulus;
 
-    /// Encode many wirelabels for known values.
-    ///
-    /// When writing a garbler, the return value must correspond to the zero
-    /// wire label.
+    /// Encode a constant `x` with modulus `q`.
+    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> Result<Self::Item>;
+}
+
+/// Extension trait for [`Fancy`] that provides encoding and receiving operations.
+pub trait FancyEncode: Fancy {
+    /// Encode many wires for known values.
     fn encode_many(
         &mut self,
         values: &[u16],
@@ -53,19 +51,31 @@ pub trait Fancy {
         channel: &mut Channel,
     ) -> Result<Vec<Self::Item>>;
 
-    /// Receive many wirelabels for unknown values.
+    /// Receive many wires for unknown values.
     fn receive_many(&mut self, moduli: &[u16], channel: &mut Channel) -> Result<Vec<Self::Item>>;
 
-    /// Encode a constant `x` with modulus `q`.
-    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> Result<Self::Item>;
+    /// Encode a wire for a known value.
+    fn encode(&mut self, value: u16, modulus: u16, channel: &mut Channel) -> Result<Self::Item> {
+        let xs = self.encode_many(&[value], &[modulus], channel)?;
+        Ok(xs[0].clone())
+    }
 
-    /// Output the value associated with wirelabel `x`.
+    /// Receive a wire for an unknown value.
+    fn receive(&mut self, modulus: u16, channel: &mut Channel) -> Result<Self::Item> {
+        let xs = self.receive_many(&[modulus], channel)?;
+        Ok(xs[0].clone())
+    }
+}
+
+/// Extension trait for [`Fancy`] that provides output operations.
+pub trait FancyOutput: Fancy {
+    /// Output the value associated with wire `x`.
     ///
     /// Some [`Fancy`] implementers don't actually *return* output, but they
     /// need to be involved in the process, so they can return `None`.
     fn output(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Option<u16>>;
 
-    /// Output the values associated with a slice of wirelabels.
+    /// Output the values associated with a slice of wires.
     ///
     /// Some [`Fancy`] implementers don't actually *return* output, but they
     /// need to be involved in the process, so they can return `None`.
@@ -75,21 +85,6 @@ pub trait Fancy {
             zs.push(self.output(x, channel)?);
         }
         Ok(zs.into_iter().collect())
-    }
-
-    /// Encode a wirelabel for a known value.
-    ///
-    /// When writing a garbler, the return value must correspond to the zero
-    /// wire label.
-    fn encode(&mut self, value: u16, modulus: u16, channel: &mut Channel) -> Result<Self::Item> {
-        let mut xs = self.encode_many(&[value], &[modulus], channel)?;
-        Ok(xs.remove(0))
-    }
-
-    /// Receive a wirelabel for an unknown value.
-    fn receive(&mut self, modulus: u16, channel: &mut Channel) -> Result<Self::Item> {
-        let mut xs = self.receive_many(&[modulus], channel)?;
-        Ok(xs.remove(0))
     }
 }
 
@@ -141,7 +136,8 @@ pub trait FancyArithmetic: Fancy {
 /// In its current form, using projection gates in arithmetic garbling is
 /// **insecure**.
 pub trait FancyProj: Fancy {
-    /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
+    /// Project `x` according to the truth table `tt`. Resulting wire has
+    /// modulus `q`.
     ///
     /// Optional `tt` is useful for hiding the gate from the evaluator.
     ///

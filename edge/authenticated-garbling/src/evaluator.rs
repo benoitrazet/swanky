@@ -4,7 +4,8 @@ use crate::{
     wire::AuthenticatedWireMod2,
 };
 use fancy_garbling::{
-    CircuitInputMapper, Fancy, FancyBinary, WireLabel, WireMod2, circuit_analyzer::CircuitAnalyzer,
+    CircuitInputMapper, Fancy, FancyBinary, FancyEncode, FancyOutput, WireLabel, WireMod2,
+    circuit_analyzer::CircuitAnalyzer,
 };
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::{
@@ -233,6 +234,22 @@ impl FancyBinary for Evaluator {
 impl Fancy for Evaluator {
     type Item = AuthenticatedWire;
 
+    fn constant(
+        &mut self,
+        value: u16,
+        _q: u16,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<AuthenticatedWire> {
+        let constant = F2::try_from(value).expect("constant must be boolean");
+        let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
+
+        let wirelabel = WireMod2::from_repr(channel.read()?, 2);
+
+        Ok(AuthenticatedWire::new(constant, wirelabel, share))
+    }
+}
+
+impl FancyEncode for Evaluator {
     fn encode_many(
         &mut self,
         values: &[u16],
@@ -290,21 +307,9 @@ impl Fancy for Evaluator {
 
         self.receive_wirelabels(masked_values, my_auth_shares, channel)
     }
+}
 
-    fn constant(
-        &mut self,
-        value: u16,
-        _q: u16,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<AuthenticatedWire> {
-        let constant = F2::try_from(value).expect("constant must be boolean");
-        let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
-
-        let wirelabel = WireMod2::from_repr(channel.read()?, 2);
-
-        Ok(AuthenticatedWire::new(constant, wirelabel, share))
-    }
-
+impl FancyOutput for Evaluator {
     fn output(
         &mut self,
         x: &AuthenticatedWire,

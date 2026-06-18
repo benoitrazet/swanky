@@ -1,9 +1,9 @@
 use std::{hint::black_box, time::Instant};
 
 use fancy_garbling::{
-    Circuit, CircuitInputMapper, Evaluator as SemiHonestEvaluator, Fancy, FancyBinary, Flatten,
-    Garbler as SemiHonestGarbler, WireMod2, circuit_analyzer::CircuitAnalyzer,
-    circuits::LinearOram, classic::GarbledCircuit,
+    Circuit, CircuitInputMapper, Evaluator as SemiHonestEvaluator, FancyBinary, FancyEncode,
+    FancyOutput, Flatten, Garbler as SemiHonestGarbler, WireMod2,
+    circuit_analyzer::CircuitAnalyzer, circuits::LinearOram, classic::GarbledCircuit,
 };
 use swanky_authenticated_garbling::{
     Evaluator, Garbler, WirePreProcessor,

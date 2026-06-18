@@ -25,7 +25,7 @@
 //! Garbling for Faster Secure Two-Party Computation".
 //! <https://eprint.iacr.org/2018/578.pdf>
 
-use fancy_garbling::{CircuitInputMapper, Fancy, circuit_analyzer::CircuitAnalyzer};
+use fancy_garbling::{CircuitInputMapper, FancyEncode, circuit_analyzer::CircuitAnalyzer};
 use rand::{CryptoRng, Rng};
 use swanky_authenticated_bits::{and_triples::AndTripleGenerator, authshares::AuthShare};
 use swanky_channel::Channel;

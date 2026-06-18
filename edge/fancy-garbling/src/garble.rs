@@ -172,10 +172,10 @@ mod streaming {
     use crate::test_circuits::arithmetic::{TestAddition, TestCmul, TestMulGate, TestSubtraction};
     use crate::test_circuits::proj::TestProj;
     use crate::{
-        AllWire, Evaluator, Fancy, Garbler, WireLabel, circuit::CircuitInputMapper, dummy::Dummy,
-        util::RngExt,
+        AllWire, Evaluator, FancyEncode, Garbler, WireLabel, circuit::CircuitInputMapper,
+        dummy::Dummy, util::RngExt,
     };
-    use crate::{CrtBundle, CrtGadgets, FancyArithmetic, FancyProj};
+    use crate::{CrtBundle, CrtGadgets, FancyArithmetic, FancyOutput, FancyProj};
     use rand::thread_rng;
     use swanky_channel::Channel;
     use swanky_error::Result;

@@ -1,6 +1,6 @@
 use fancy_garbling::{
-    AllWire, ArithmeticWire, Fancy, FancyArithmetic, FancyBinary, FancyProj, Garbler as Gb,
-    WireLabel, WireMod2,
+    AllWire, ArithmeticWire, Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput,
+    FancyProj, Garbler as Gb, WireLabel, WireMod2,
 };
 use rand::{CryptoRng, Rng, SeedableRng};
 use swanky_adversary::SemiHonest;
@@ -154,15 +154,22 @@ impl<
 {
     type Item = Wire;
 
-    fn encode(
+    fn constant(
         &mut self,
-        val: u16,
-        modulus: u16,
+        x: u16,
+        q: u16,
         channel: &mut Channel,
-    ) -> swanky_error::Result<Wire> {
-        self.garbler.encode(val, modulus, channel)
+    ) -> swanky_error::Result<Self::Item> {
+        self.garbler.constant(x, q, channel)
     }
+}
 
+impl<
+    RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+    OT: OtSender<Msg = Block> + SemiHonest,
+    Wire: WireLabel,
+> FancyEncode for Garbler<RNG, OT, Wire>
+{
     fn encode_many(
         &mut self,
         vals: &[u16],
@@ -195,16 +202,14 @@ impl<
             .wrap_err(ErrorKind::OtherError, "Failed to send obliviously.")?;
         Ok(wires)
     }
+}
 
-    fn constant(
-        &mut self,
-        x: u16,
-        q: u16,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        self.garbler.constant(x, q, channel)
-    }
-
+impl<
+    RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+    OT: OtSender<Msg = Block> + SemiHonest,
+    Wire: WireLabel,
+> FancyOutput for Garbler<RNG, OT, Wire>
+{
     fn output(
         &mut self,
         x: &Self::Item,

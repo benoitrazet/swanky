@@ -9,9 +9,10 @@ pub use garbler::Garbler;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core::marker::PhantomData;
     use fancy_garbling::{
-        AllWire, Circuit, CircuitInputMapper, CrtBundle, CrtGadgets, Fancy, FancyArithmetic,
-        FancyBinary, FancyProj, Flatten, WireLabel, WireMod2,
+        AllWire, Circuit, CircuitInputMapper, CrtBundle, CrtGadgets, FancyArithmetic, FancyEncode,
+        FancyOutput, FancyProj, Flatten, WireLabel, WireMod2,
         circuit_analyzer::CircuitAnalyzer,
         circuits::{
             aes::AesNonExpanded,
@@ -19,10 +20,10 @@ mod tests {
         },
         dummy::{Dummy, DummyVal},
         test_circuits::arithmetic::TestAddition,
-        util::RngExt,
     };
-    use itertools::Itertools;
+    use rand::Rng;
     use swanky_channel::Channel;
+    use swanky_error::Result;
     use swanky_ot_chou_orlandi::{Receiver as ChouOrlandiReceiver, Sender as ChouOrlandiSender};
     use swanky_rng::SwankyRng;
 
@@ -39,13 +40,7 @@ mod tests {
                             Garbler::<SwankyRng, ChouOrlandiSender, AllWire>::new(channel, rng)?;
                         let x = gb.encode(a, modulus, channel)?;
                         let y = gb.receive(modulus, channel)?;
-                        let outputs = circuit.execute(
-                            &mut gb,
-                            <TestAddition as CircuitInputMapper<
-                                Garbler<SwankyRng, ChouOrlandiSender, _>,
-                            >>::map(&circuit, [x, y].to_vec()),
-                            channel,
-                        )?;
+                        let outputs = circuit.execute(&mut gb, (x, y), channel)?;
                         let result = gb.output(&outputs, channel)?;
                         assert!(result.is_none());
                         Ok(())
@@ -57,13 +52,7 @@ mod tests {
                         )?;
                         let x = ev.receive(modulus, channel)?;
                         let y = ev.encode(b, modulus, channel)?;
-                        let output = circuit.execute(
-                            &mut ev,
-                            <TestAddition as CircuitInputMapper<
-                                Evaluator<SwankyRng, ChouOrlandiReceiver, _>,
-                            >>::map(&circuit, [x, y].to_vec()),
-                            channel,
-                        )?;
+                        let output = circuit.execute(&mut ev, (x, y), channel)?;
                         let result = ev.output(&output, channel)?;
                         Ok(result.unwrap())
                     },
@@ -74,20 +63,35 @@ mod tests {
         }
     }
 
-    fn relu<F: FancyArithmetic + FancyBinary + FancyProj>(
-        b: &mut F,
-        xs: &[CrtBundle<F::Item>],
-        channel: &mut Channel,
-    ) -> Option<Vec<u128>> {
-        let mut outputs = Vec::new();
-        for x in xs.iter() {
-            let q = x.composite_modulus();
-            let c = Constant::new(1, q).execute(b, (), channel).unwrap();
-            let y = Multiplication::new().execute(b, (x, &c), channel).unwrap();
-            let z = ReLU::new().execute(b, (&y, "100%", None), channel).unwrap();
-            outputs.push(b.crt_output(&z, channel).unwrap());
+    struct TestCircuit<'a>(PhantomData<&'a ()>);
+    impl<'a> TestCircuit<'a> {
+        fn new() -> Self {
+            TestCircuit(PhantomData)
         }
-        outputs.into_iter().collect()
+    }
+    impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for TestCircuit<'a>
+    where
+        F::Item: 'a,
+    {
+        type Input = &'a [CrtBundle<F::Item>];
+        type Output = Vec<CrtBundle<F::Item>>;
+
+        fn execute(
+            &self,
+            backend: &mut F,
+            inputs: Self::Input,
+            channel: &mut Channel,
+        ) -> Result<Self::Output> {
+            let mut outputs = Vec::with_capacity(inputs.len());
+            for x in inputs.iter() {
+                let q = x.composite_modulus();
+                let c = Constant::new(1, q).execute(backend, (), channel)?;
+                let y = Multiplication::new().execute(backend, (x, &c), channel)?;
+                let z = ReLU::new().execute(backend, (&y, "100%", None), channel)?;
+                outputs.push(z);
+            }
+            Ok(outputs)
+        }
     }
 
     #[test]
@@ -96,40 +100,41 @@ mod tests {
         let n = 10;
         let ps = fancy_garbling::util::primes_with_width(10);
         let q = fancy_garbling::util::product(&ps);
-        let input = (0..n).map(|_| rng.gen_u128() % q).collect::<Vec<u128>>();
+
+        let plaintext = (0..n).map(|_| rng.r#gen::<u128>() % q).collect::<Vec<_>>();
 
         // Run dummy version.
-        let target = Channel::with(std::io::empty(), |channel| {
-            let mut dummy = Dummy::new();
-            let dummy_input = input
-                .iter()
-                .map(|x| dummy.crt_encode(*x, q, channel).unwrap())
-                .collect_vec();
-            Ok(relu(&mut dummy, &dummy_input, channel).unwrap())
-        })
-        .unwrap();
+        let inputs = plaintext
+            .iter()
+            .map(|x| DummyVal::to_crt(*x, q))
+            .collect::<Vec<_>>();
+        let output = Dummy::eval(&TestCircuit::new(), &inputs).unwrap();
+        let expected = output
+            .iter()
+            .map(|x| DummyVal::from_crt(x, q))
+            .collect::<Vec<_>>();
 
         // Run 2PC version.
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
                 let rng = SwankyRng::new();
-                let mut gb =
-                    Garbler::<SwankyRng, ChouOrlandiSender, AllWire>::new(channel, rng).unwrap();
-                let xs = gb.crt_encode_many(&input, q, channel).unwrap();
-                relu(&mut gb, &xs, channel);
+                let mut gb = Garbler::<SwankyRng, ChouOrlandiSender, AllWire>::new(channel, rng)?;
+                let xs = gb.crt_encode_many(&plaintext, q, channel)?;
+                let result = TestCircuit::new().execute(&mut gb, &xs, channel)?;
+                gb.crt_outputs(&result, channel)?;
                 Ok(())
             },
             |channel| {
                 let rng = SwankyRng::new();
                 let mut ev =
-                    Evaluator::<SwankyRng, ChouOrlandiReceiver, AllWire>::new(channel, rng)
-                        .unwrap();
-                let xs = ev.crt_receive_many(n, q, channel).unwrap();
-                Ok(relu(&mut ev, &xs, channel).unwrap())
+                    Evaluator::<SwankyRng, ChouOrlandiReceiver, AllWire>::new(channel, rng)?;
+                let xs = ev.crt_receive_many(n, q, channel)?;
+                let result = TestCircuit::new().execute(&mut ev, &xs, channel)?;
+                Ok(ev.crt_outputs(&result, channel)?.unwrap())
             },
         )
         .unwrap();
-        assert_eq!(target, result);
+        assert_eq!(result, expected);
     }
 
     type GB<Wire> = Garbler<SwankyRng, ChouOrlandiSender, Wire>;

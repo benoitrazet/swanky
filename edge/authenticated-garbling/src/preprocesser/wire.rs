@@ -1,4 +1,4 @@
-use fancy_garbling::{Fancy, FancyBinary, HasModulus};
+use fancy_garbling::{Fancy, FancyBinary, FancyEncode, HasModulus};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_field::FiniteRing;
@@ -108,6 +108,21 @@ impl<P: GenericParty> FancyBinary for WirePreProcessor<P> {
 impl<P: GenericParty> Fancy for WirePreProcessor<P> {
     type Item = PreProcessedWire<P>;
 
+    fn constant(
+        &mut self,
+        value: u16,
+        modulus: u16,
+        _: &mut Channel,
+    ) -> swanky_error::Result<Self::Item> {
+        assert!(value == 0 || value == 1);
+        assert_eq!(modulus, 2);
+
+        let authshare = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
+        Ok(PreProcessedWire::new(authshare))
+    }
+}
+
+impl<P: GenericParty> FancyEncode for WirePreProcessor<P> {
     fn receive_many(
         &mut self,
         moduli: &[u16],
@@ -128,22 +143,5 @@ impl<P: GenericParty> Fancy for WirePreProcessor<P> {
         _: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
         unimplemented!("Preprocessor cannot encode values");
-    }
-
-    fn constant(
-        &mut self,
-        value: u16,
-        modulus: u16,
-        _: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        assert!(value == 0 || value == 1);
-        assert_eq!(modulus, 2);
-
-        let authshare = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
-        Ok(PreProcessedWire::new(authshare))
-    }
-
-    fn output(&mut self, _: &Self::Item, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
-        Ok(None)
     }
 }

@@ -9,7 +9,7 @@ use swanky_error::{ErrorKind, Result};
 
 use crate::{
     BinaryBundle, BinaryGadgets, Bundle, CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary,
-    FancyProj, check_binary,
+    FancyEncode, FancyOutput, FancyProj, check_binary,
     circuit::Circuit,
     fancy::{Fancy, HasModulus},
     util::{as_mixed_radix, crt_inv_factor, u128_from_bits},
@@ -232,15 +232,17 @@ impl FancyProj for Dummy {
 impl Fancy for Dummy {
     type Item = DummyVal;
 
-    fn encode(
+    fn constant(
         &mut self,
-        value: u16,
+        val: u16,
         modulus: u16,
         _: &mut Channel,
     ) -> swanky_error::Result<DummyVal> {
-        Ok(DummyVal::new(value, modulus))
+        Ok(DummyVal { val, modulus })
     }
+}
 
+impl FancyEncode for Dummy {
     fn encode_many(
         &mut self,
         xs: &[u16],
@@ -266,16 +268,9 @@ impl Fancy for Dummy {
             "`receive_many` is undefined for `Dummy`"
         );
     }
+}
 
-    fn constant(
-        &mut self,
-        val: u16,
-        modulus: u16,
-        _: &mut Channel,
-    ) -> swanky_error::Result<DummyVal> {
-        Ok(DummyVal { val, modulus })
-    }
-
+impl FancyOutput for Dummy {
     fn output(&mut self, x: &DummyVal, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
         Ok(Some(x.val))
     }

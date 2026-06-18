@@ -1,11 +1,11 @@
+use fancy_garbling::FancyOutput;
 use popsicle::circuit_psi::{
     CircuitPsi, circuits::*, evaluator::OpprfPsiEvaluator, garbler::OpprfPsiGarbler, utils::*,
 };
-
-use fancy_garbling::Fancy;
 use rand::Rng;
 use swanky_block::Block;
 use swanky_rng::SwankyRng;
+
 const SET_SIZE: usize = 1 << 8;
 
 pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {

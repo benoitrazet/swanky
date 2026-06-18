@@ -136,7 +136,7 @@ pub trait Circuit<F: Fancy> {
     /// The output type of the circuit.
     ///
     /// The [`Flatten`] trait allows the output type to be converted into a
-    /// `Vec<F::Item>`, which is useful when calling [`Fancy::outputs`].
+    /// `Vec<F::Item>`.
     type Output: Flatten<Item = F::Item>;
 
     /// Execute a circuit on a given [`Fancy`] backend using the provided inputs.

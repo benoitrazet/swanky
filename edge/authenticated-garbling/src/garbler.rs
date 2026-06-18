@@ -3,8 +3,9 @@ use crate::preprocesser::f_preprocessing;
 use crate::ps::PartyGarbler;
 use crate::wire::AuthenticatedWireMod2;
 use fancy_garbling::CircuitInputMapper;
+use fancy_garbling::FancyOutput;
 use fancy_garbling::circuit_analyzer::CircuitAnalyzer;
-use fancy_garbling::{Fancy, FancyBinary, WireLabel, WireMod2};
+use fancy_garbling::{Fancy, FancyBinary, FancyEncode, WireLabel, WireMod2};
 
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
@@ -268,6 +269,24 @@ where
 impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
     type Item = AuthenticatedWire;
 
+    fn constant(
+        &mut self,
+        value: u16,
+        _q: u16,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<AuthenticatedWire> {
+        let constant = F2::try_from(value).expect("constant must be boolean");
+        let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());
+
+        let zero = WireMod2::rand(&mut self.rng, 2);
+        let wirelabel = zero + self.delta * value;
+        channel.write(&wirelabel.to_repr())?;
+
+        Ok(AuthenticatedWire::new(constant, zero, share))
+    }
+}
+
+impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
     fn encode_many(
         &mut self,
         values: &[u16],
@@ -329,23 +348,9 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
 
         self.encode_wirelabels(their_masked_values, my_auth_shares, channel)
     }
+}
 
-    fn constant(
-        &mut self,
-        value: u16,
-        _q: u16,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<AuthenticatedWire> {
-        let constant = F2::try_from(value).expect("constant must be boolean");
-        let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());
-
-        let zero = WireMod2::rand(&mut self.rng, 2);
-        let wirelabel = zero + self.delta * value;
-        channel.write(&wirelabel.to_repr())?;
-
-        Ok(AuthenticatedWire::new(constant, zero, share))
-    }
-
+impl<RNG: RngCore + CryptoRng> FancyOutput for Garbler<RNG> {
     fn output(
         &mut self,
         x: &AuthenticatedWire,

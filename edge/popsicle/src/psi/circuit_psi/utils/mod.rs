@@ -1,6 +1,6 @@
 //! Various utils for PSTY
 use crate::cuckoo::CuckooItem;
-use fancy_garbling::{Fancy, WireMod2, util};
+use fancy_garbling::{FancyEncode, util};
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use swanky_block::{Block, Block512};
@@ -166,7 +166,7 @@ pub fn bin_encode_many_block512<F>(
     channel: &mut Channel,
 ) -> swanky_error::Result<Vec<F::Item>>
 where
-    F: Fancy<Item = WireMod2>,
+    F: FancyEncode,
 {
     let bits = encode_binary(values, size);
     // Then specify the moduli of the wires
@@ -182,7 +182,7 @@ pub fn bin_receive_many_block512<F>(
     channel: &mut Channel,
 ) -> swanky_error::Result<Vec<F::Item>>
 where
-    F: Fancy<Item = WireMod2>,
+    F: FancyEncode,
 {
     // Specify the moduli of the wires
     let moduli = vec![2; size];
