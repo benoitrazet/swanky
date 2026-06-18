@@ -27,7 +27,6 @@ swanky-field.workspace = true
 swanky-field-binary.workspace = true
 swanky-rng.workspace = true
 swanky-serialization.workspace = true
-swanky-sieve-ir-api.workspace = true
 
 aes.workspace = true
 env_logger.workspace = true

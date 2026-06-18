@@ -4,7 +4,6 @@ use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
-use swanky_sieve_ir_api::FieldBackend;
 
 use crate::proof::ChiGenerator;
 use crate::vole::RandomVoleP;
@@ -132,66 +131,6 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
                 )
             })
             .copied()
-    }
-}
-
-// TODO: Generalize this for large primes.
-impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
-    type Wire = (F2, F128b);
-    fn input_public(&mut self) -> Result<Self::Wire> {
-        todo!()
-    }
-    fn input_private(&mut self) -> Result<Self::Wire> {
-        let f = self.next_witness_value()?;
-        let vole = self.next_vole()?;
-
-        // Private input gates don't define a polynomial that would contribute to the aggregated
-        // coefficients being computed
-        Ok((f, vole))
-    }
-    fn add(&mut self, left: &Self::Wire, right: &Self::Wire) -> Result<Self::Wire> {
-        let res = left.0 + right.0;
-
-        // Compute the correct VOLE for the output wire
-        let sum_vole = left.1 + right.1;
-
-        // Linear gates don't contribute to the aggregated values being computed
-        Ok((res, sum_vole))
-    }
-    fn addc(&mut self, left: &Self::Wire, right: F2) -> Result<Self::Wire> {
-        let res = left.0 + right;
-
-        // Compute the correct VOLE for the output wire
-        let sum_vole = left.1;
-
-        // Linear gates don't contribute to the aggregated values being computed
-        Ok((res, sum_vole))
-    }
-    fn mul(&mut self, left: &Self::Wire, right: &Self::Wire) -> Result<Self::Wire> {
-        let f = self.next_witness_value()?;
-
-        // Assign a fresh VOLE to the output wire and get the corresponding challenge
-        let vole = self.next_vole()?;
-        let challenge = self.chi_challenge.next();
-
-        // Compute coefficient values `A_i1` and `A_i0` (respectively). These are derived from the
-        // `c_i(X)` polynomial defined in the paper -- see Fig 7 and page 32-33 for details.
-        let degree_0_coeff = left.1 * right.1;
-        let degree_1_coeff = right.0 * left.1 + left.0 * right.1 - vole;
-
-        self.aggregate_degree_0 += challenge * degree_0_coeff;
-        self.aggregate_degree_1 += challenge * degree_1_coeff;
-
-        Ok((f, vole))
-    }
-    fn mulc(&mut self, _: &Self::Wire, _: F2) -> Result<Self::Wire> {
-        todo!()
-    }
-    fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()> {
-        let challenge = self.chi_challenge.next();
-        self.aggregate_assert_zero += challenge * wire.1;
-
-        Ok(())
     }
 }
 

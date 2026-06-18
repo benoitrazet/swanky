@@ -3,7 +3,6 @@ use mac_n_cheese_sieve_parser::WireId;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field_binary::F2;
-use swanky_sieve_ir_api::FieldBackend;
 
 /// A [`ProverPreparer`] allows the prover to prepare for VOLE-in-the-head by evaluating the
 /// circuit in the clear and determining the full extended witness.
@@ -17,7 +16,7 @@ use swanky_sieve_ir_api::FieldBackend;
 /// if it visits a circuit where:
 /// - there are gates other than `private-input`, `add`, `addc`, or `mul`
 /// - there is more than one type ID used for any gate
-/// - any private input to the circuit is not in $`F2`$
+/// - any private input to the circuit is not in [`F2`]
 #[derive(Debug)]
 pub struct ProverPreparer<'a> {
     /// Private circuit inputs.
@@ -53,56 +52,6 @@ impl<'a> ProverPreparer<'a> {
     /// These values will be empty if the circuit has not yet been traversed.
     pub(crate) fn into_parts(self) -> (Vec<F2>, usize) {
         (self.witness, self.challenge_count)
-    }
-}
-
-// TODO: Generalize this for large primes.
-impl<'a> FieldBackend<F2> for ProverPreparer<'a> {
-    type Wire = F2;
-
-    fn input_public(&mut self) -> Result<Self::Wire> {
-        bail!(
-            ErrorKind::OtherError,
-            "Invalid input: VOLE-in-the-head does not support gate public inputs"
-        );
-    }
-    fn input_private(&mut self) -> Result<Self::Wire> {
-        let f2 = self.private_input[self.priv_input_pos as usize];
-        self.priv_input_pos += 1;
-
-        // TODO: Can we push all of the input witnesses up front?
-        self.witness.push(f2);
-
-        Ok(f2)
-    }
-    fn add(&mut self, left: &Self::Wire, right: &Self::Wire) -> Result<Self::Wire> {
-        let sum = left + right;
-
-        Ok(sum)
-    }
-    fn addc(&mut self, left: &Self::Wire, right: F2) -> Result<Self::Wire> {
-        let sum = left + right;
-
-        Ok(sum)
-    }
-    fn mul(&mut self, left: &Self::Wire, right: &Self::Wire) -> Result<Self::Wire> {
-        self.challenge_count += 1;
-
-        let product = left * right;
-
-        // Save product to the witness.
-        self.witness.push(product);
-        Ok(product)
-    }
-    fn mulc(&mut self, _: &Self::Wire, _: F2) -> Result<Self::Wire> {
-        bail!(
-            ErrorKind::OtherError,
-            "Invalid input: VOLE-in-the-head does not support gate mulc"
-        );
-    }
-    fn assert_zero(&mut self, _: &Self::Wire) -> Result<()> {
-        self.challenge_count += 1;
-        Ok(())
     }
 }
 

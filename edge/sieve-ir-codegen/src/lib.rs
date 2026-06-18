@@ -145,18 +145,6 @@ fn codegen_impls<T: Read + Seek>(
     // JP: Hard coding F2 for now.
     let main = codegen.main;
     quote! {
-        impl #struct_name {
-            pub fn main<B: #ty_constraints>(&self, backend: &mut B) -> swanky_sieve_ir_api::CircuitResult<()> {
-                use swanky_serialization::CanonicalSerialize;
-                #main
-                Ok(())
-            }
-        }
-        impl swanky_sieve_ir_api::CircuitExecuter<swanky_field_binary::F2> for #struct_name {
-            fn execute<B: #ty_constraints>(&self, backend: &mut B) -> swanky_sieve_ir_api::CircuitResult<()> {
-                self.main(backend)
-            }
-        }
         impl<F: fancy_garbling::FancyBinary + fancy_garbling::FancyZeroKnowledge + #ty_constraints> fancy_garbling::Circuit<F> for #struct_name {
             type Input = ();
             type Output = Vec<F::Item>; // TODO: should be `()`.
@@ -167,7 +155,8 @@ fn codegen_impls<T: Read + Seek>(
                 _: Self::Input,
                 channel: &mut swanky_channel::Channel,
             ) -> swanky_error::Result<Self::Output> {
-                self.main(backend)?;
+                use swanky_serialization::CanonicalSerialize;
+                #main
                 Ok(vec![])
             }
 
@@ -205,11 +194,12 @@ fn type_constraints<T: Read + Seek>(circuit_parser: &RelationReader<T>) -> Token
         .iter()
         .map(|ty| match ty {
             SIEVEType::Field { modulus } => {
-                let ty_var = modulus_to_type_var(modulus);
+                let _ty_var = modulus_to_type_var(modulus);
 
-                quote! {
-                    swanky_sieve_ir_api::FieldBackend<#ty_var>,
-                }
+                // quote! {
+                //     swanky_sieve_ir_api::FieldBackend<#ty_var>,
+                // }
+                quote! {}
             }
             _ => {
                 panic!("SEIVE IR codegen does not currently support type: {ty:?}");
@@ -286,12 +276,12 @@ impl FunctionBodyVisitor for Codegen {
         left: WireId,
         right: WireId,
     ) -> swanky_error::Result<()> {
-        let ty = self.to_type_var(ty);
+        let _ty = self.to_type_var(ty);
         let dst = self.to_wire_ident(dst);
         let left = self.to_wire_ident(left);
         let right = self.to_wire_ident(right);
         self.main.extend(quote! {
-            let #dst = <B as swanky_sieve_ir_api::FieldBackend<#ty>>::add(backend, &#left, &#right)?;
+            let #dst = backend.xor(&#left, &#right);
         });
         Ok(())
     }
@@ -302,12 +292,12 @@ impl FunctionBodyVisitor for Codegen {
         left: WireId,
         right: WireId,
     ) -> swanky_error::Result<()> {
-        let ty = self.to_type_var(ty);
+        let _ty = self.to_type_var(ty);
         let dst = self.to_wire_ident(dst);
         let left = self.to_wire_ident(left);
         let right = self.to_wire_ident(right);
         self.main.extend(quote! {
-            let #dst = <B as swanky_sieve_ir_api::FieldBackend<#ty>>::mul(backend, &#left, &#right)?;
+            let #dst = backend.and(&#left, &#right, channel)?;
         });
         Ok(())
     }
@@ -318,12 +308,12 @@ impl FunctionBodyVisitor for Codegen {
         left: WireId,
         right: &Number,
     ) -> swanky_error::Result<()> {
-        let fty = self.to_type_var(ty);
+        let _fty = self.to_type_var(ty);
         let dst = self.to_wire_ident(dst);
         let left = self.to_wire_ident(left);
         let right = self.reify_constant(ty, *right);
         self.main.extend(quote! {
-            let #dst = <B as swanky_sieve_ir_api::FieldBackend<#fty>>::addc(backend, &#left, #right)?;
+            let #dst = backend.xor(&#left, #right);
         });
         Ok(())
     }
@@ -351,13 +341,13 @@ impl FunctionBodyVisitor for Codegen {
         panic!("public_input is not supported yet");
     }
     fn private_input(&mut self, ty: TypeId, dst: WireRange) -> swanky_error::Result<()> {
-        let ty = self.to_type_var(ty);
+        let _ty = self.to_type_var(ty);
         let statements = dst
             .range()
             .map(|wid| {
                 let var = self.to_wire_ident(wid);
                 quote! {
-                    let #var = <B as swanky_sieve_ir_api::FieldBackend<#ty>>::input_private(backend)?;
+                    let #var = backend.receive(2, channel)?;
                 }
             })
             .collect::<Vec<_>>();
@@ -365,11 +355,11 @@ impl FunctionBodyVisitor for Codegen {
         Ok(())
     }
     fn assert_zero(&mut self, ty: TypeId, src: WireId) -> swanky_error::Result<()> {
-        let fty = self.to_type_var(ty);
+        let _fty = self.to_type_var(ty);
         let src = self.to_wire_ident(src);
 
         self.main.extend(quote! {
-            <B as swanky_sieve_ir_api::FieldBackend<#fty>>::assert_zero(backend, &#src)?;
+            backend.assert_zero(&#src, channel)?;
         });
         Ok(())
     }

@@ -2335,7 +2335,6 @@ dependencies = [
  "swanky-field-binary",
  "swanky-rng",
  "swanky-serialization",
- "swanky-sieve-ir-api",
  "swanky-sieve-ir-codegen",
  "tempfile",
 ]
