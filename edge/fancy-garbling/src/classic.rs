@@ -2,7 +2,7 @@
 //! circuit without streaming.
 
 use crate::{
-    Fancy, WireLabel,
+    FancyOutput, WireLabel,
     circuit::{Circuit, CircuitInputMapper, Flatten},
     garble::{Evaluator, Garbler},
     util::output_tweak,

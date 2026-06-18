@@ -2,7 +2,7 @@
 //! of a [`Fancy`] circuit.
 
 use crate::{
-    Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyProj, HasModulus,
+    Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj, HasModulus,
     circuit::CircuitInputMapper,
 };
 use core::cmp::max;
@@ -203,11 +203,6 @@ impl Fancy for CircuitAnalyzer {
             depth: 0,
         })
     }
-
-    fn output(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Option<u16>> {
-        self.mul_depth = max(self.mul_depth, x.depth);
-        Ok(None)
-    }
 }
 
 impl FancyEncode for CircuitAnalyzer {
@@ -221,6 +216,13 @@ impl FancyEncode for CircuitAnalyzer {
             ErrorKind::UnsupportedError,
             "Encoding values is unsupported"
         )
+    }
+}
+
+impl FancyOutput for CircuitAnalyzer {
+    fn output(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Option<u16>> {
+        self.mul_depth = max(self.mul_depth, x.depth);
+        Ok(None)
     }
 }
 

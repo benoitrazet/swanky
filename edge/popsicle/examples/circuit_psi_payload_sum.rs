@@ -1,12 +1,12 @@
+use fancy_garbling::FancyOutput;
 use popsicle::circuit_psi::{
     CircuitPsi, PAYLOAD_SIZE, circuits::*, evaluator::OpprfPsiEvaluator, garbler::OpprfPsiGarbler,
     utils::*,
 };
-
-use fancy_garbling::Fancy;
 use rand::Rng;
 use swanky_block::{Block, Block512};
 use swanky_rng::SwankyRng;
+
 const SET_SIZE: usize = 1 << 8;
 
 pub fn psty_payload_sum(

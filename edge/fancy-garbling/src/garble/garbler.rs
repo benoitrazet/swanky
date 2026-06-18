@@ -1,6 +1,6 @@
 use crate::{
-    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyEncode, FancyProj, HasModulus,
-    WireLabel, WireMod2, check_binary,
+    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj,
+    HasModulus, WireLabel, WireMod2, check_binary,
     fancy::{BinaryBundle, Fancy},
     garble::binary_and::BinaryWireLabel,
     hash_wires,
@@ -379,17 +379,6 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
         channel.write(&wire.to_repr())?;
         Ok(zero)
     }
-
-    fn output(&mut self, X: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
-        let q = X.modulus();
-        let i = self.current_output();
-        let D = self.delta(q);
-        for k in 0..q {
-            let block = (X.clone() + D.clone() * k).hash(output_tweak(i, k));
-            channel.write(&block)?;
-        }
-        Ok(None)
-    }
 }
 
 impl<RNG: RngCore + CryptoRng, Wire: WireLabel> FancyEncode for Garbler<RNG, Wire> {
@@ -418,5 +407,18 @@ impl<RNG: RngCore + CryptoRng, Wire: WireLabel> FancyEncode for Garbler<RNG, Wir
         _: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
         unimplemented!("Garbler cannot receive values")
+    }
+}
+
+impl<RNG: RngCore + CryptoRng, Wire: WireLabel> FancyOutput for Garbler<RNG, Wire> {
+    fn output(&mut self, X: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
+        let q = X.modulus();
+        let i = self.current_output();
+        let D = self.delta(q);
+        for k in 0..q {
+            let block = (X.clone() + D.clone() * k).hash(output_tweak(i, k));
+            channel.write(&block)?;
+        }
+        Ok(None)
     }
 }

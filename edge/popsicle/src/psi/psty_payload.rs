@@ -32,8 +32,9 @@ use crate::{
     utils,
 };
 use fancy_garbling::{
-    AllWire, Bundle, Circuit, CrtBundle, CrtGadgets, Fancy, FancyArithmetic, FancyEncode,
-    FancyProj, circuits::arithmetic::{Addition, Constant, Division, Equality, Multiplication, Subtraction},
+    AllWire, Bundle, Circuit, CrtBundle, CrtGadgets, FancyArithmetic, FancyEncode, FancyOutput,
+    FancyProj,
+    circuits::arithmetic::{Addition, Constant, Division, Equality, Multiplication, Subtraction},
 };
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_twopac::semihonest::{Evaluator, Garbler};

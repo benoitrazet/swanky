@@ -1,6 +1,6 @@
 use fancy_garbling::{
     AllWire, ArithmeticWire, Evaluator as Ev, Fancy, FancyArithmetic, FancyBinary, FancyEncode,
-    FancyProj, WireLabel, WireMod2,
+    FancyOutput, FancyProj, WireLabel, WireMod2,
 };
 use rand::{CryptoRng, Rng};
 use swanky_adversary::SemiHonest;
@@ -149,10 +149,6 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
     ) -> swanky_error::Result<Self::Item> {
         self.evaluator.constant(x, q, channel)
     }
-
-    fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
-        self.evaluator.output(x, channel)
-    }
 }
 
 impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyEncode
@@ -197,6 +193,14 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
                 combine(chunk, *q)
             })
             .collect::<Vec<Wire>>())
+    }
+}
+
+impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyOutput
+    for Evaluator<RNG, OT, Wire>
+{
+    fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
+        self.evaluator.output(x, channel)
     }
 }
 

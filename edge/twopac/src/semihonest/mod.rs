@@ -10,8 +10,8 @@ pub use garbler::Garbler;
 mod tests {
     use super::*;
     use fancy_garbling::{
-        AllWire, Circuit, CircuitInputMapper, CrtBundle, CrtGadgets, Fancy, FancyArithmetic,
-        FancyBinary, FancyEncode, FancyProj, Flatten, WireLabel, WireMod2,
+        AllWire, Circuit, CircuitInputMapper, CrtBundle, CrtGadgets, FancyArithmetic, FancyEncode,
+        FancyOutput, FancyProj, Flatten, WireLabel, WireMod2,
         circuit_analyzer::CircuitAnalyzer,
         circuits::{
             aes::AesNonExpanded,
@@ -74,7 +74,7 @@ mod tests {
         }
     }
 
-    fn relu<F: FancyArithmetic + FancyBinary + FancyProj + FancyEncode>(
+    fn relu<F: FancyArithmetic + FancyProj + CrtGadgets>(
         b: &mut F,
         xs: &[CrtBundle<F::Item>],
         channel: &mut Channel,

@@ -120,10 +120,6 @@ impl<P: GenericParty> Fancy for WirePreProcessor<P> {
         let authshare = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
         Ok(PreProcessedWire::new(authshare))
     }
-
-    fn output(&mut self, _: &Self::Item, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
-        Ok(None)
-    }
 }
 
 impl<P: GenericParty> FancyEncode for WirePreProcessor<P> {

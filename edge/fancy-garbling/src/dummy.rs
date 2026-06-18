@@ -9,7 +9,7 @@ use swanky_error::{ErrorKind, Result};
 
 use crate::{
     BinaryBundle, BinaryGadgets, Bundle, CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary,
-    FancyEncode, FancyProj, check_binary,
+    FancyEncode, FancyOutput, FancyProj, check_binary,
     circuit::Circuit,
     fancy::{Fancy, HasModulus},
     util::{as_mixed_radix, crt_inv_factor, u128_from_bits},
@@ -240,10 +240,6 @@ impl Fancy for Dummy {
     ) -> swanky_error::Result<DummyVal> {
         Ok(DummyVal { val, modulus })
     }
-
-    fn output(&mut self, x: &DummyVal, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
-        Ok(Some(x.val))
-    }
 }
 
 impl FancyEncode for Dummy {
@@ -271,5 +267,11 @@ impl FancyEncode for Dummy {
             ErrorKind::UnsupportedError,
             "`receive_many` is undefined for `Dummy`"
         );
+    }
+}
+
+impl FancyOutput for Dummy {
+    fn output(&mut self, x: &DummyVal, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
+        Ok(Some(x.val))
     }
 }

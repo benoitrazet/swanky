@@ -3,6 +3,7 @@ use crate::preprocesser::f_preprocessing;
 use crate::ps::PartyGarbler;
 use crate::wire::AuthenticatedWireMod2;
 use fancy_garbling::CircuitInputMapper;
+use fancy_garbling::FancyOutput;
 use fancy_garbling::circuit_analyzer::CircuitAnalyzer;
 use fancy_garbling::{Fancy, FancyBinary, FancyEncode, WireLabel, WireMod2};
 
@@ -283,26 +284,6 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
 
         Ok(AuthenticatedWire::new(constant, zero, share))
     }
-
-    fn output(
-        &mut self,
-        x: &AuthenticatedWire,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Option<u16>> {
-        Ok(self
-            .outputs(core::slice::from_ref(x), channel)?
-            .map(|xs| xs[0]))
-    }
-
-    fn outputs(
-        &mut self,
-        x: &[AuthenticatedWire],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Option<Vec<u16>>> {
-        let auth_shares = x.iter().map(|wire| wire.auth_share()).collect::<Vec<_>>();
-        AuthShareGenerator::open_my_shares(&auth_shares, channel)?;
-        Ok(None)
-    }
 }
 
 impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
@@ -366,5 +347,27 @@ impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
             .collect::<Result<Vec<_>>>()?;
 
         self.encode_wirelabels(their_masked_values, my_auth_shares, channel)
+    }
+}
+
+impl<RNG: RngCore + CryptoRng> FancyOutput for Garbler<RNG> {
+    fn output(
+        &mut self,
+        x: &AuthenticatedWire,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Option<u16>> {
+        Ok(self
+            .outputs(core::slice::from_ref(x), channel)?
+            .map(|xs| xs[0]))
+    }
+
+    fn outputs(
+        &mut self,
+        x: &[AuthenticatedWire],
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Option<Vec<u16>>> {
+        let auth_shares = x.iter().map(|wire| wire.auth_share()).collect::<Vec<_>>();
+        AuthShareGenerator::open_my_shares(&auth_shares, channel)?;
+        Ok(None)
     }
 }

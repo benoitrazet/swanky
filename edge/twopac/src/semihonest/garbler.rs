@@ -1,6 +1,6 @@
 use fancy_garbling::{
-    AllWire, ArithmeticWire, Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyProj,
-    Garbler as Gb, WireLabel, WireMod2,
+    AllWire, ArithmeticWire, Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput,
+    FancyProj, Garbler as Gb, WireLabel, WireMod2,
 };
 use rand::{CryptoRng, Rng, SeedableRng};
 use swanky_adversary::SemiHonest;
@@ -162,14 +162,6 @@ impl<
     ) -> swanky_error::Result<Self::Item> {
         self.garbler.constant(x, q, channel)
     }
-
-    fn output(
-        &mut self,
-        x: &Self::Item,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Option<u16>> {
-        self.garbler.output(x, channel)
-    }
 }
 
 impl<
@@ -209,6 +201,21 @@ impl<
             .send(channel, &inputs, &mut self.rng)
             .wrap_err(ErrorKind::OtherError, "Failed to send obliviously.")?;
         Ok(wires)
+    }
+}
+
+impl<
+    RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+    OT: OtSender<Msg = Block> + SemiHonest,
+    Wire: WireLabel,
+> FancyOutput for Garbler<RNG, OT, Wire>
+{
+    fn output(
+        &mut self,
+        x: &Self::Item,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Option<u16>> {
+        self.garbler.output(x, channel)
     }
 }
 
