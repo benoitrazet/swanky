@@ -22,7 +22,6 @@ use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::F2;
-use swanky_sieve_ir_api::{CircuitExecuter, FieldBackend};
 use tempfile::tempdir;
 
 /// Gates
@@ -327,74 +326,6 @@ impl Circuit {
 pub struct CircuitInterpreter<'a> {
     gates: &'a [GateM],
     max_wire_id: u64,
-}
-
-// TODO: Generalize field.
-impl<'a> CircuitExecuter<F2> for CircuitInterpreter<'a> {
-    fn execute<B: FieldBackend<F2>>(&self, backend: &mut B) -> Result<()> {
-        let mut memory = CircuitMemory::<B::Wire>::new(self.max_wire_id);
-        for g in self.gates.iter() {
-            match g {
-                GateM::Add(ty, dst, left, right) => {
-                    // Assumption: There is exactly one type ID for these circuits and it is F2.
-                    assert_eq!(*ty, 0);
-
-                    let left = memory.get(left);
-                    let right = memory.get(right);
-
-                    let res = backend.add(&left, &right)?;
-
-                    memory.insert(*dst, res);
-                }
-                GateM::Mul(ty, dst, left, right) => {
-                    // Assumption: There is exactly one type ID for these circuits and it is F2.
-                    assert_eq!(*ty, 0);
-
-                    let left = memory.get(left);
-                    let right = memory.get(right);
-
-                    let res = backend.mul(&left, &right)?;
-
-                    memory.insert(*dst, res);
-                }
-                GateM::AddConstant(ty, dst, left, right) => {
-                    // Assumption: There is exactly one type ID for these circuits and it is F2.
-                    assert_eq!(*ty, 0);
-
-                    let left = memory.get(left);
-                    let right = F2::from_number(right)?;
-
-                    let res = backend.addc(&left, right)?;
-
-                    memory.insert(*dst, res);
-                }
-                GateM::Witness(ty, dst) => {
-                    // Assumption: There is exactly one type ID for these circuits and it is F2.
-                    assert_eq!(*ty, 0);
-
-                    for wid in dst.start..=dst.end {
-                        let res = backend.input_private()?;
-
-                        memory.insert(wid, res);
-                    }
-                }
-                GateM::AssertZero(ty, src) => {
-                    // Assumption: There is exactly one type ID for these circuits and it is F2.
-                    assert_eq!(*ty, 0);
-
-                    let src = memory.get(src);
-                    backend.assert_zero(&src)?;
-                }
-                _ => bail!(
-                    ErrorKind::OtherError,
-                    "Invalid input: VOLE-in-the-head does not support gate {:?}",
-                    g
-                ),
-            }
-        }
-
-        Ok(())
-    }
 }
 
 impl<'a, F: FancyBinary + FancyZeroKnowledge> FancyCircuit<F> for CircuitInterpreter<'a> {
