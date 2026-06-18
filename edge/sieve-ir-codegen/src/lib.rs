@@ -1,8 +1,6 @@
-//! This crate statically parses a SIEVE IR circuit at compile time and produces a circuit using
-//! `sieve-ir-api`, thereby eliminating the runtime overhead of dynamically parsing and interpretting
-//! the circuit.
-//!
-
+//! This crate statically parses a SIEVE IR circuit at compile time and produces
+//! a circuit using `fancy-garbling`s `Circuit` API, thereby eliminating the
+//! runtime overhead of dynamically parsing and interpretting the circuit.
 #![deny(missing_docs)]
 
 extern crate proc_macro;

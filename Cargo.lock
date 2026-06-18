@@ -3037,15 +3037,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-sieve-ir-api"
-version = "0.6.0"
-dependencies = [
- "swanky-error",
- "swanky-field-binary",
- "swanky-field-ff-primes",
-]
-
-[[package]]
 name = "swanky-sieve-ir-codegen"
 version = "0.6.0"
 dependencies = [

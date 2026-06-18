@@ -71,7 +71,6 @@ have a lesser stability guarantee.
 - **`swanky-ot-traits`**: Base traits for Obliivious Transfer protocols
 - **`swanky-polynomial`**: Support for various representations of polynomials over finite fields
 - **`swanky-rng`**: A fast random number generator based on AES-CTR.
-- **`swanky-sieve-ir-api`**: A library providing a Rust API for defining zero-knowledge circuits.
 - **`swanky-sieve-ir-codegen`**: A library providing macros to statically parse SIEVE IR zero-knowledge circuits.
 - **`swanky-svole-wykw`**: An implementation of the WYKW svole protocol
 - **`swanky-twopac`**: Two-party secure computation using garbled circuits.
