@@ -157,6 +157,21 @@ fn codegen_impls<T: Read + Seek>(
                 self.main(backend)
             }
         }
+        impl<F: fancy_garbling::FancyBinary + fancy_garbling::FancyZeroKnowledge + #ty_constraints> fancy_garbling::Circuit<F> for #struct_name {
+            type Input = ();
+            type Output = Vec<F::Item>; // TODO: should be `()`.
+
+            fn execute(
+                &self,
+                backend: &mut F,
+                _: Self::Input,
+                channel: &mut swanky_channel::Channel,
+            ) -> swanky_error::Result<Self::Output> {
+                self.main(backend)?;
+                Ok(vec![])
+            }
+
+        }
     }
 }
 
