@@ -8,7 +8,6 @@ use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_field_binary::F128b;
-use swanky_sieve_ir_api::CircuitResult;
 use swanky_sieve_ir_api::FieldBackend;
 
 use crate::proof::ChiGenerator;
@@ -110,10 +109,10 @@ impl VerifierTraverser {
 impl FieldBackend<F2> for VerifierTraverser {
     type Wire = F128b;
 
-    fn input_public(&mut self) -> CircuitResult<Self::Wire> {
+    fn input_public(&mut self) -> Result<Self::Wire> {
         todo!();
     }
-    fn input_private(&mut self) -> CircuitResult<Self::Wire> {
+    fn input_private(&mut self) -> Result<Self::Wire> {
         // Assign a fresh masked witness to the wire
         let res = self.next_masked_witness()?;
 
@@ -122,13 +121,13 @@ impl FieldBackend<F2> for VerifierTraverser {
         Ok(res)
     }
 
-    fn add(&mut self, left: &Self::Wire, right: &Self::Wire) -> CircuitResult<Self::Wire> {
+    fn add(&mut self, left: &Self::Wire, right: &Self::Wire) -> Result<Self::Wire> {
         // Compute the correct masked witness for the output wire
         Ok(left + right)
 
         // Linear gates don't contribute to the aggregate being computed
     }
-    fn addc(&mut self, left: &Self::Wire, right: F2) -> CircuitResult<Self::Wire> {
+    fn addc(&mut self, left: &Self::Wire, right: F2) -> Result<Self::Wire> {
         // Compute the correct masked witness for the output wire
         let t = if right == F2::ZERO {
             F128b::ZERO
@@ -139,7 +138,7 @@ impl FieldBackend<F2> for VerifierTraverser {
 
         // Linear gates don't contribute to the aggregate being computed
     }
-    fn mul(&mut self, left: &Self::Wire, right: &Self::Wire) -> CircuitResult<Self::Wire> {
+    fn mul(&mut self, left: &Self::Wire, right: &Self::Wire) -> Result<Self::Wire> {
         // Assign the next masked witness to the destination wire
         let res = self.next_masked_witness()?;
         let challenge = self.chi_challenge.next();
@@ -151,10 +150,10 @@ impl FieldBackend<F2> for VerifierTraverser {
 
         Ok(res)
     }
-    fn mulc(&mut self, _lhs: &Self::Wire, _rhs: F2) -> CircuitResult<Self::Wire> {
+    fn mulc(&mut self, _lhs: &Self::Wire, _rhs: F2) -> Result<Self::Wire> {
         todo!();
     }
-    fn assert_zero(&mut self, arg: &Self::Wire) -> CircuitResult<()> {
+    fn assert_zero(&mut self, arg: &Self::Wire) -> Result<()> {
         let challenge = self.chi_challenge.next();
 
         self.aggregate_assert_zero += challenge * arg;

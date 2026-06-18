@@ -22,7 +22,7 @@ use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::F2;
-use swanky_sieve_ir_api::{CircuitExecuter, CircuitResult, FieldBackend};
+use swanky_sieve_ir_api::{CircuitExecuter, FieldBackend};
 use tempfile::tempdir;
 
 /// Gates
@@ -331,7 +331,7 @@ pub struct CircuitInterpreter<'a> {
 
 // TODO: Generalize field.
 impl<'a> CircuitExecuter<F2> for CircuitInterpreter<'a> {
-    fn execute<B: FieldBackend<F2>>(&self, backend: &mut B) -> CircuitResult<()> {
+    fn execute<B: FieldBackend<F2>>(&self, backend: &mut B) -> Result<()> {
         let mut memory = CircuitMemory::<B::Wire>::new(self.max_wire_id);
         for g in self.gates.iter() {
             match g {
