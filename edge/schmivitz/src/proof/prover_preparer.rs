@@ -106,6 +106,7 @@ impl<'a> FieldBackend<F2> for ProverPreparer<'a> {
     }
 }
 
+/// Wrapper around the [`F2`] type to make it compatible with [`Fancy::Item`].
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Wire(F2);
 
@@ -128,7 +129,7 @@ impl<'a> FancyEncode for ProverPreparer<'a> {
     fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
         bail!(
             ErrorKind::OtherError,
-            "Invalid input: VOLE-in-the-head prover does not support receive"
+            "Invalid input: VOLE-in-the-head prover does not support encode"
         );
     }
 
@@ -176,17 +177,15 @@ impl<'a> FancyZeroKnowledge for ProverPreparer<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::circuit::CircuitIngestor;
+    use crate::proof::{Circuit, prover_preparer::ProverPreparer};
+    use fancy_garbling::Circuit as _;
+    use mac_n_cheese_sieve_parser::text_parser::RelationReader;
     use rand::thread_rng;
     use std::io::Cursor;
     use swanky_channel::Channel;
-
-    use fancy_garbling::Circuit as _;
-    use mac_n_cheese_sieve_parser::text_parser::RelationReader;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
-
-    use crate::circuit::CircuitIngestor;
-    use crate::proof::{Circuit, prover_preparer::ProverPreparer};
 
     /// Take a string description of a circuit and parse it.
     fn load_circuit(circuit: &str) -> swanky_error::Result<Circuit> {

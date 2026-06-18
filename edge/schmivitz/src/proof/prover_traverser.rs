@@ -195,6 +195,7 @@ impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
     }
 }
 
+/// An [`F2`] element alongside its associated VOLE tag.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Wire(F2, F128b);
 
@@ -208,6 +209,7 @@ impl<VOLE: RandomVoleP> Fancy for ProverTraverser<VOLE> {
     type Item = Wire;
 
     fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
+        assert!(value == 0 || value == 1);
         assert_eq!(modulus, 2);
         Ok(Wire(F2::from(value != 0), F128b::ZERO))
     }

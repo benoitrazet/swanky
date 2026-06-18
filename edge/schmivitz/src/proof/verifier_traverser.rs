@@ -162,6 +162,7 @@ impl FieldBackend<F2> for VerifierTraverser {
     }
 }
 
+/// An [`F128b`] element representing a VOLE tag.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Wire(F128b);
 
