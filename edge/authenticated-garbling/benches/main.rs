@@ -36,37 +36,37 @@ fn bench_party_construction(c: &mut Criterion) {
     });
 }
 
-fn bench_party_encoding_receiving(c: &mut Criterion) {
-    let input_size: usize = 400;
-    let mut rng_gb = SwankyRng::new();
-    let mut rng_ev = SwankyRng::new();
-    let circuit = TestAndGateFanN(2 * input_size);
-    let offline_wires = gb.encode_offline(ninputs_gb + ninputs_ev)?;
-    c.bench_function("party-encoding-receiving", move |b| {
-        b.iter(|| {
-            swanky_channel::local::local_channel_pair(
-                |c| {
-                    let mut gb = Garbler::new(&circuit, c, &mut rng_gb)?;
-                    gb.encode_many(
-                        &offline_wires[..ninputs_gb],
-                        &vec![0; input_size],
-                        &vec![2; input_size],
-                        c,
-                    )?;
-                    gb.receive_many(&vec![2; input_size], c)?;
-                    Ok(())
-                },
-                |c| {
-                    let mut ev = Evaluator::new(&circuit, c, &mut rng_ev)?;
-                    ev.receive_many(&vec![2; input_size], c)?;
-                    ev.encode_many(&vec![0; input_size], &vec![2; input_size], c)?;
-                    Ok(())
-                },
-            )
-            .unwrap();
-        });
-    });
-}
+// fn bench_party_encoding_receiving(c: &mut Criterion) {
+//     let input_size: usize = 400;
+//     let mut rng_gb = SwankyRng::new();
+//     let mut rng_ev = SwankyRng::new();
+//     let circuit = TestAndGateFanN(2 * input_size);
+//     let offline_wires = gb.encode_offline(ninputs_gb + ninputs_ev)?;
+//     c.bench_function("party-encoding-receiving", move |b| {
+//         b.iter(|| {
+//             swanky_channel::local::local_channel_pair(
+//                 |c| {
+//                     let mut gb = Garbler::new(&circuit, c, &mut rng_gb)?;
+//                     gb.encode_many(
+//                         &offline_wires[..ninputs_gb],
+//                         &vec![0; input_size],
+//                         &vec![2; input_size],
+//                         c,
+//                     )?;
+//                     gb.receive_many(&vec![2; input_size], c)?;
+//                     Ok(())
+//                 },
+//                 |c| {
+//                     let mut ev = Evaluator::new(&circuit, c, &mut rng_ev)?;
+//                     ev.receive_many(&vec![2; input_size], c)?;
+//                     ev.encode_many(&vec![0; input_size], &vec![2; input_size], c)?;
+//                     Ok(())
+//                 },
+//             )
+//             .unwrap();
+//         });
+//     });
+// }
 
 fn bench_single_and_gate(c: &mut Criterion) {
     let ninputs_gb = 1;
