@@ -13,10 +13,10 @@ use swanky_authenticated_bits::{
     authshares::{AuthShare, AuthShareGenerator},
 };
 use swanky_channel::Channel;
-use swanky_error::{ErrorKind, WrapErr, ensure};
+use swanky_error::{ErrorKind, Result, WrapErr, ensure};
 use swanky_field::FiniteRing;
-use swanky_field_binary::{F2, F2BitSerializer, F128b};
-use swanky_serialization::SequenceSerializer;
+use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
+use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 use vectoreyes::U8x16;
 
 type AuthenticatedWire = AuthenticatedWireMod2<PartyEvaluator>;
@@ -48,6 +48,14 @@ pub struct Evaluator {
     // A vector that stores the Evaluator's validation shares. Contrary to the
     // Garbler, the Evalutor can compute these shares during evaluation.
     validation_shares: Vec<AuthShare<PartyEvaluator>>,
+    // A vector that stores the garbling gates.
+    gates: Vec<(U8x16, U8x16)>,
+    // The index of the current AND agate.
+    gate_index: usize,
+    // A vector that stores the garbling gate bits.
+    gate_bits: Vec<F2>,
+    // The index of the garbling gate bit associated with the current AND agate.
+    gate_bits_index: usize,
 }
 
 impl Evaluator {
@@ -77,6 +85,10 @@ impl Evaluator {
             and_auth_shares_index: 0,
             lc_values: Vec::with_capacity(num_and_gates),
             validation_shares: Vec::with_capacity(num_and_gates),
+            gates: Vec::with_capacity(num_and_gates),
+            gate_bits: Vec::with_capacity(num_and_gates),
+            gate_index: 0,
+            gate_bits_index: 0,
         })
     }
 
@@ -98,7 +110,37 @@ impl Evaluator {
         self.and_auth_shares_index += 1;
         share
     }
+    /// The gate garbling material associated with the current AND gate
+    fn next_and_gate(&mut self) -> (U8x16, U8x16) {
+        let gate = self.gates[self.gate_index];
+        self.gate_index += 1;
+        gate
+    }
+    /// The gate garbling  material associated with the current AND gate
+    fn next_and_gate_bit(&mut self) -> F2 {
+        let bit = self.gate_bits[self.gate_bits_index];
+        self.gate_bits_index += 1;
+        bit
+    }
+    fn receive_garbling_material(&mut self, channel: &mut Channel) -> Result<()> {
+        let nands = self.and_auth_shares.len();
+        // Receive the garbled gates first
+        let mut bit_ser: F2BitDeserializer = SequenceDeserializer::new(channel.as_std_io())
+            .wrap_err(
+                ErrorKind::InitializationError,
+                "Failed to create sequence deserializer.",
+            )?;
 
+        self.gate_bits
+            .extend(bit_ser.read_vector(channel.as_std_io(), nands)?);
+
+        for _ in 0..nands {
+            let g0: U8x16 = channel.read()?;
+            let g1: U8x16 = channel.read()?;
+            self.gates.push((g0, g1));
+        }
+        Ok(())
+    }
     /// Receive wirelabel `L_w` from the garbler, where `w` represents the
     /// masked value of the wire.
     ///
@@ -174,7 +216,7 @@ impl FancyBinary for Evaluator {
         &mut self,
         la: &Self::Item,
         lb: &Self::Item,
-        channel: &mut Channel,
+        _channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item> {
         // This index is called γ in the paper
         let index = self.next_and_wire_index();
@@ -188,12 +230,8 @@ impl FancyBinary for Evaluator {
         // This is the MAC associated with the current wire's authenticated triple: M[s*_γ]
         let mac_triple = lc_triple.mac();
 
-        // This is the value: Gate_{γ,0}
-        let gate_c0: U8x16 = channel.read()?;
-        // This is the value: Gate_{γ,1}
-        let gate_c1: U8x16 = channel.read()?;
-        // This is the value: b_γ
-        let bit_c: F2 = channel.read()?;
+        let (gate_c0, gate_c1) = self.next_and_gate();
+        let bit_c = self.next_and_gate_bit();
 
         // This is the value: Gate_0 = Gate_{γ,0} + M[s_β]
         let gate0 = gate_c0 ^ lb.auth_share().mac();
@@ -323,6 +361,8 @@ impl FancyEncode for Evaluator {
         moduli: &[u16],
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
+        // Receive the gate garbling material
+        self.receive_garbling_material(channel)?;
         // Grab authenticated shares for each of the inputs.
         let my_auth_shares = (0..moduli.len())
             .map(|_i| self.next_auth_share())

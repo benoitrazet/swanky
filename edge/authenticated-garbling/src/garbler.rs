@@ -16,8 +16,10 @@ use swanky_error::WrapErr;
 use swanky_error::{ErrorKind, Result, ensure};
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2BitDeserializer;
+use swanky_field_binary::F2BitSerializer;
 use swanky_field_binary::{F2, F128b};
 use swanky_serialization::SequenceDeserializer;
+use swanky_serialization::SequenceSerializer;
 use vectoreyes::U8x16;
 
 type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
@@ -44,6 +46,10 @@ pub struct Garbler<RNG> {
     and_auth_shares_index: usize,
     // A vector which stores the masked wire values received from the evaluator.
     masked_values: Vec<F2>,
+    // A vector that stores the garbling gates.
+    gates: Vec<(U8x16, U8x16)>,
+    // A vector that stores the garbling gate bits.
+    gate_bits: Vec<F2>,
     rng: RNG,
 }
 
@@ -80,6 +86,8 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             and_auth_shares: known_triples.clone(),
             and_auth_shares_index: 0,
             masked_values: Vec::new(),
+            gates: Vec::with_capacity(known_triples.len()),
+            gate_bits: Vec::with_capacity(known_triples.len()),
             rng,
         })
     }
@@ -114,7 +122,21 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     pub(crate) fn delta(&self) -> U8x16 {
         self.delta.to_repr()
     }
+    pub(crate) fn send_garbling_material(&self, channel: &mut Channel) -> Result<()> {
+        // The garbler sends out all the gate material that they computed offline
+        let bit_ser: F2BitSerializer = SequenceSerializer::new(&mut channel.as_std_io()).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize sequence serializer.",
+        )?;
 
+        bit_ser.write_vector(channel.as_std_io(), &self.gate_bits)?;
+
+        for (g0, g1) in self.gates.iter() {
+            channel.write(g0)?;
+            channel.write(g1)?;
+        }
+        Ok(())
+    }
     // Create wirelabels `L_0` and `L_1`, sending the wirelabel `L_b` associated
     // with the masked value `b` to the evaluator, and returning a vector of the
     // corresponding `AuthenticatedWireMod2` values.
@@ -220,7 +242,7 @@ where
         &mut self,
         la0: &Self::Item,
         lb0: &Self::Item,
-        channel: &mut Channel,
+        _channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item> {
         // This index is called γ in the paper
         let index = self.next_and_gate_index();
@@ -275,9 +297,8 @@ where
         // b_γ = lsb(L_{γ,0})
         let bit_c = F128b::from(lc0).lsb();
 
-        channel.write(&gate0)?;
-        channel.write(&gate1)?;
-        channel.write(&bit_c)?;
+        self.gates.push((gate0, gate1));
+        self.gate_bits.push(bit_c);
 
         Ok(AuthenticatedWire::new_without_mask(
             WireMod2::from_repr(lc0, 2),
@@ -324,7 +345,8 @@ impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<<Self as Fancy>::Item>> {
         assert_eq!(values.len(), moduli.len());
-
+        // Send the gate garbling material
+        self.send_garbling_material(channel)?;
         // Grab authenticated shares for each of the inputs.
         let my_auth_shares = (0..values.len())
             .map(|_| self.next_auth_share())
