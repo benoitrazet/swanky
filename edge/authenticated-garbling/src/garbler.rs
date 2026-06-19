@@ -64,7 +64,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         circuit: &C,
         channel: &mut Channel,
         mut rng: RNG,
-    ) -> swanky_error::Result<Self>
+    ) -> Result<Self>
     where
         RNG: 'a,
     {
@@ -147,7 +147,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         masked_values: Vec<F2>,
         auth_shares: Vec<AuthShare<PartyGarbler>>,
         channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<AuthenticatedWire>> {
+    ) -> Result<Vec<AuthenticatedWire>> {
         // Compute zero wirelabels `L_{w,0}`.
         let zeros = (0..masked_values.len())
             .map(|_| WireMod2::rand(&mut self.rng, 2))
@@ -189,7 +189,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         &'b self,
         circuit: &C,
         channel: &mut Channel,
-    ) -> swanky_error::Result<()>
+    ) -> Result<()>
     where
         RNG: 'a,
     {
@@ -243,7 +243,7 @@ where
         la0: &Self::Item,
         lb0: &Self::Item,
         _channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
+    ) -> Result<Self::Item> {
         // This index is called γ in the paper
         let index = self.next_and_gate_index();
         // This is the share for wire label L_{γ,0}
@@ -329,7 +329,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         value: u16,
         _q: u16,
         _channel: &mut Channel,
-    ) -> swanky_error::Result<AuthenticatedWire> {
+    ) -> Result<AuthenticatedWire> {
         let constant = F2::try_from(value).expect("constant must be boolean");
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());
 
@@ -343,7 +343,7 @@ impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
         values: &[u16],
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<<Self as Fancy>::Item>> {
+    ) -> Result<Vec<<Self as Fancy>::Item>> {
         assert_eq!(values.len(), moduli.len());
         // Send the gate garbling material
         self.send_garbling_material(channel)?;
@@ -381,11 +381,7 @@ impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
         self.encode_wirelabels(my_masked_values, my_auth_shares, channel)
     }
 
-    fn receive_many(
-        &mut self,
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
+    fn receive_many(&mut self, moduli: &[u16], channel: &mut Channel) -> Result<Vec<Self::Item>> {
         // Grab authenticated shares for each of the inputs.
         let my_auth_shares = (0..moduli.len())
             .map(|_| self.next_auth_share())
@@ -408,11 +404,7 @@ impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
 }
 
 impl<RNG: RngCore + CryptoRng> FancyOutput for Garbler<RNG> {
-    fn output(
-        &mut self,
-        x: &AuthenticatedWire,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Option<u16>> {
+    fn output(&mut self, x: &AuthenticatedWire, channel: &mut Channel) -> Result<Option<u16>> {
         Ok(self
             .outputs(core::slice::from_ref(x), channel)?
             .map(|xs| xs[0]))
@@ -422,7 +414,7 @@ impl<RNG: RngCore + CryptoRng> FancyOutput for Garbler<RNG> {
         &mut self,
         x: &[AuthenticatedWire],
         channel: &mut Channel,
-    ) -> swanky_error::Result<Option<Vec<u16>>> {
+    ) -> Result<Option<Vec<u16>>> {
         let auth_shares = x.iter().map(|wire| wire.auth_share()).collect::<Vec<_>>();
         AuthShareGenerator::open_my_shares(&auth_shares, channel)?;
         Ok(None)
