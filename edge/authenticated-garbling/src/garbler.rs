@@ -258,9 +258,6 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     where
         RNG: 'a,
     {
-        // Create a finalizer using the pre-computed wires
-        let mut finalizer = GarblerFinalizer::new(self, input_wires.clone());
-
         let nands = channel.read()?;
         // Receive the masked values from the Evaluator
         let mut bit_deser: F2BitDeserializer = SequenceDeserializer::new(channel.as_std_io())
@@ -268,7 +265,9 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
                 ErrorKind::InitializationError,
                 "Failed to create sequence deserializer.",
             )?;
-        finalizer.set_lc_values(bit_deser.read_vector(channel.as_std_io(), nands)?)?;
+        let lc_values = bit_deser.read_vector(channel.as_std_io(), nands)?;
+        // Create a finalizer using the pre-computed wires
+        let mut finalizer = GarblerFinalizer::new(self, input_wires.clone(), lc_values);
 
         // Locally run the circuit to correctly construct the validation shares
         circuit.execute(

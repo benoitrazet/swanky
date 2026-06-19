@@ -184,8 +184,8 @@
 //     Ok(())
 // }
 
-// fn main() -> Result<()> {
-//     stats("AND", &And(1_000_000))?;
-//     stats("Linear ORAM", &LinearOram::<1024>::new(1024))?;
-//     Ok(())
-// }
+fn main() -> swanky_error::Result<()> {
+    // stats("AND", &And(1_000_000))?;
+    // stats("Linear ORAM", &LinearOram::<1024>::new(1024))?;
+    Ok(())
+}

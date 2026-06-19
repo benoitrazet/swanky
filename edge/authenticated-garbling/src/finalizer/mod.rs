@@ -4,18 +4,13 @@ use fancy_garbling::{
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
-use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field::FiniteRing;
-use swanky_field_binary::{F2, F128b};
-use swanky_party::GenericParty;
+use swanky_field_binary::F2;
+
 use vectoreyes::U8x16;
 
-use crate::{
-    AuthenticatedWireMod2, Garbler,
-    ps::{Party, PartyGarbler},
-};
+use crate::{Garbler, ps::PartyGarbler};
 
-type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 #[derive(Clone, Copy)]
 pub struct FinalizedWire {
     /// Masked value $`w \oplus \lambda`$.
@@ -80,11 +75,12 @@ impl<'a, RNG: CryptoRng + RngCore> GarblerFinalizer<'a, RNG> {
     pub fn new<'b>(
         gb: &'b Garbler<RNG>,
         input_wires: Vec<FinalizedWire>,
+        lc_values: Vec<F2>,
     ) -> GarblerFinalizer<'b, RNG> {
         GarblerFinalizer {
             gb,
             validation_shares: Vec::new(),
-            lc_values: Vec::new(),
+            lc_values,
             lc_values_index: 0,
             auth_shares_index: input_wires.len(),
             and_auth_shares_index: 0,
@@ -92,11 +88,7 @@ impl<'a, RNG: CryptoRng + RngCore> GarblerFinalizer<'a, RNG> {
             input_wires_index: 0,
         }
     }
-    /// Set the lc values once they are received.
-    pub fn set_lc_values(&mut self, lc_values: Vec<F2>) -> Result<()> {
-        self.lc_values.extend(lc_values);
-        Ok(())
-    }
+
     /// Return the computed validation shares that be opened and authenticated
     pub fn validation_shares(&self) -> &[AuthShare<PartyGarbler>] {
         &self.validation_shares
