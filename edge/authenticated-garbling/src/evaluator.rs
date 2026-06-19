@@ -265,12 +265,16 @@ impl Fancy for Evaluator {
         &mut self,
         value: u16,
         _q: u16,
-        channel: &mut Channel,
+        _channel: &mut Channel,
     ) -> swanky_error::Result<AuthenticatedWire> {
         let constant = F2::try_from(value).expect("constant must be boolean");
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
 
-        let wirelabel = WireMod2::from_repr(channel.read()?, 2);
+        let wirelabel = if value == 1 {
+            self.one
+        } else {
+            WireMod2::from_repr(self.one.to_repr() ^ self.delta, 2)
+        };
 
         Ok(AuthenticatedWire::new(constant, wirelabel, share))
     }

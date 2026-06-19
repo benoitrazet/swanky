@@ -307,16 +307,12 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
         &mut self,
         value: u16,
         _q: u16,
-        channel: &mut Channel,
+        _channel: &mut Channel,
     ) -> swanky_error::Result<AuthenticatedWire> {
         let constant = F2::try_from(value).expect("constant must be boolean");
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());
 
-        let zero = WireMod2::rand(&mut self.rng, 2);
-        let wirelabel = zero + self.delta * value;
-        channel.write(&wirelabel.to_repr())?;
-
-        Ok(AuthenticatedWire::new(constant, zero, share))
+        Ok(AuthenticatedWire::new(constant, self.zero, share))
     }
 }
 
