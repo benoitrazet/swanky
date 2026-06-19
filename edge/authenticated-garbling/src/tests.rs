@@ -85,28 +85,43 @@ fn test_circuit<
         |c| {
             let rng = SwankyRng::new();
             let mut gb = Garbler::new(circuit, c, rng)?;
-            let mut inputs = gb.encode_many(&inputs_gb, &vec![2; ninputs_gb], c)?;
-            let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
-            inputs.extend(theirs);
+
+            let offline_wires = gb.encode_offline(ninputs_gb + ninputs_ev)?;
+
             let outputs = circuit.execute(
                 &mut gb,
-                <C as CircuitInputMapper<Garbler<_>>>::map(circuit, inputs),
+                <C as CircuitInputMapper<Garbler<_>>>::map(circuit, offline_wires.clone()),
                 c,
             )?;
-            gb.finalize(circuit, c).unwrap();
+            let mut inputs = gb
+                .encode_many(
+                    &offline_wires[..ninputs_gb],
+                    &inputs_gb,
+                    &vec![2; ninputs_gb],
+                    c,
+                )
+                .unwrap();
+            let their = gb
+                .receive_many(&offline_wires[ninputs_gb..], &vec![2; ninputs_gb], c)
+                .unwrap();
+            inputs.extend(their);
+            gb.finalize(circuit, inputs, c).unwrap();
             gb.outputs(&outputs.flatten(), c)
         },
         |c| {
             let mut rng = SwankyRng::new();
             let mut ev = Evaluator::new(circuit, c, &mut rng)?;
+
             let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
             let mine = ev.encode_many(&inputs_ev, &vec![2; ninputs_ev], c)?;
             inputs.extend(mine);
+
             let outputs = circuit.execute(
                 &mut ev,
                 <C as CircuitInputMapper<Evaluator>>::map(circuit, inputs),
                 c,
             )?;
+
             ev.finalize(c).unwrap();
             ev.outputs(&outputs.flatten(), c)
         },

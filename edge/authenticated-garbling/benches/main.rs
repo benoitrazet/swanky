@@ -41,13 +41,18 @@ fn bench_party_encoding_receiving(c: &mut Criterion) {
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
     let circuit = TestAndGateFanN(2 * input_size);
-
+    let offline_wires = gb.encode_offline(ninputs_gb + ninputs_ev)?;
     c.bench_function("party-encoding-receiving", move |b| {
         b.iter(|| {
             swanky_channel::local::local_channel_pair(
                 |c| {
                     let mut gb = Garbler::new(&circuit, c, &mut rng_gb)?;
-                    gb.encode_many(&vec![0; input_size], &vec![2; input_size], c)?;
+                    gb.encode_many(
+                        &offline_wires[..ninputs_gb],
+                        &vec![0; input_size],
+                        &vec![2; input_size],
+                        c,
+                    )?;
                     gb.receive_many(&vec![2; input_size], c)?;
                     Ok(())
                 },
@@ -209,7 +214,7 @@ fn bench_aes(c: &mut Criterion) {
 criterion_group! {
     name = authenticated_garbling;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = bench_party_construction, bench_party_encoding_receiving,
+    targets = bench_party_construction,
     bench_and_gate_fan_n, bench_binary_addition,bench_binary_subtraction,
     bench_constant_gates,bench_or_gate_fan_n,bench_single_and_gate,bench_xor_gate_fan_n,
     bench_aes

@@ -1,23 +1,30 @@
-use fancy_garbling::{Fancy, FancyBinary, FancyEncode, FancyOutput, HasModulus};
+use fancy_garbling::{
+    Fancy, FancyBinary, FancyEncode, FancyOutput, HasModulus, WireLabel, WireMod2,
+};
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
+use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field::FiniteRing;
-use swanky_field_binary::F2;
+use swanky_field_binary::{F2, F128b};
 use swanky_party::GenericParty;
 use vectoreyes::U8x16;
 
-use crate::{Garbler, ps::PartyGarbler};
+use crate::{
+    AuthenticatedWireMod2, Garbler,
+    ps::{Party, PartyGarbler},
+};
 
+type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 #[derive(Clone, Copy)]
-pub struct FinalizedWire<P: GenericParty> {
+pub struct FinalizedWire {
     /// Masked value $`w \oplus \lambda`$.
     masked_value: F2,
     /// Sharing of the color bit $`\lambda`$.
-    auth_share: AuthShare<P>,
+    auth_share: AuthShare<PartyGarbler>,
 }
 
-impl<P: GenericParty> core::fmt::Debug for FinalizedWire<P> {
+impl core::fmt::Debug for FinalizedWire {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("FinalizedWire")
             .field("auth_share", &())
@@ -25,9 +32,9 @@ impl<P: GenericParty> core::fmt::Debug for FinalizedWire<P> {
     }
 }
 
-impl<P: GenericParty> FinalizedWire<P> {
+impl FinalizedWire {
     /// Construct a new [`FinalizedWire`] from an authenticated share.
-    pub(crate) fn new(masked_value: F2, auth_share: AuthShare<P>) -> Self {
+    pub(crate) fn new(masked_value: F2, auth_share: AuthShare<PartyGarbler>) -> Self {
         FinalizedWire {
             masked_value,
             auth_share,
@@ -39,12 +46,12 @@ impl<P: GenericParty> FinalizedWire<P> {
     }
     /// The authenticated share $`\langle \lambda \rangle`$ associated with this
     /// wire.
-    pub(crate) fn auth_share(&self) -> AuthShare<P> {
+    pub(crate) fn auth_share(&self) -> AuthShare<PartyGarbler> {
         self.auth_share
     }
 }
 
-impl<P: GenericParty> HasModulus for FinalizedWire<P> {
+impl HasModulus for FinalizedWire {
     fn modulus(&self) -> u16 {
         2
     }
@@ -61,50 +68,57 @@ pub struct GarblerFinalizer<'a, RNG> {
     auth_shares_index: usize,
     // The index of the current AND authenticated share we're using.
     and_auth_shares_index: usize,
-    // The index of the current input masked value we're using.
-    masked_values_index: usize,
+    // The input wires computed by the garbler in the offline phase
+    input_wires: Vec<FinalizedWire>,
+    // The index of the current input wire
+    input_wires_index: usize,
 }
 
 impl<'a, RNG: CryptoRng + RngCore> GarblerFinalizer<'a, RNG> {
     /// Create a new [`GarblerFinalizer`] from a reference to the [`Garbler`]
     /// and from the masked wire values received from the evaluator
-    pub fn new<'b>(gb: &'b Garbler<RNG>, lc_values: Vec<F2>) -> GarblerFinalizer<'b, RNG> {
+    pub fn new<'b>(
+        gb: &'b Garbler<RNG>,
+        input_wires: Vec<FinalizedWire>,
+    ) -> GarblerFinalizer<'b, RNG> {
         GarblerFinalizer {
             gb,
             validation_shares: Vec::new(),
-            lc_values,
+            lc_values: Vec::new(),
             lc_values_index: 0,
-            auth_shares_index: 0,
+            auth_shares_index: input_wires.len(),
             and_auth_shares_index: 0,
-            masked_values_index: 0,
+            input_wires,
+            input_wires_index: 0,
         }
+    }
+    /// Set the lc values once they are received.
+    pub fn set_lc_values(&mut self, lc_values: Vec<F2>) -> Result<()> {
+        self.lc_values.extend(lc_values);
+        Ok(())
     }
     /// Return the computed validation shares that be opened and authenticated
     pub fn validation_shares(&self) -> &[AuthShare<PartyGarbler>] {
         &self.validation_shares
     }
-    pub(crate) fn next_auth_share(&mut self) -> AuthShare<PartyGarbler> {
+    fn next_auth_share(&mut self) -> AuthShare<PartyGarbler> {
         let share = self.gb.auth_share_at_index(self.auth_shares_index);
         self.auth_shares_index += 1;
         share
     }
 
-    pub(crate) fn next_and_auth_share(&mut self) -> AuthShare<PartyGarbler> {
+    fn next_and_auth_share(&mut self) -> AuthShare<PartyGarbler> {
         let share = self.gb.and_auth_share_at_index(self.and_auth_shares_index);
         self.and_auth_shares_index += 1;
         share
     }
-    pub(crate) fn next_masked_value(&mut self) -> F2 {
-        let masked_value = self.gb.masked_value_at_index(self.masked_values_index);
-        self.masked_values_index += 1;
-        masked_value
-    }
-    pub(crate) fn next_lc_value(&mut self) -> F2 {
+
+    fn next_lc_value(&mut self) -> F2 {
         let lc_value = self.lc_values[self.lc_values_index];
         self.lc_values_index += 1;
         lc_value
     }
-    pub(crate) fn delta(&self) -> U8x16 {
+    fn delta(&self) -> U8x16 {
         self.gb.delta()
     }
 }
@@ -112,13 +126,13 @@ impl<'a, RNG> Fancy for GarblerFinalizer<'a, RNG>
 where
     RNG: RngCore + CryptoRng,
 {
-    type Item = FinalizedWire<PartyGarbler>;
+    type Item = FinalizedWire;
     fn constant(
         &mut self,
         value: u16,
         _q: u16,
         _channel: &mut Channel,
-    ) -> swanky_error::Result<FinalizedWire<PartyGarbler>> {
+    ) -> swanky_error::Result<FinalizedWire> {
         let constant = F2::try_from(value).expect("constant must be boolean");
         let auth_share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta());
 
@@ -187,25 +201,22 @@ where
     fn receive_many(
         &mut self,
         moduli: &[u16],
-        _: &mut Channel,
+        channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        let mut input_wires = Vec::with_capacity(moduli.len());
-        for _i in 0..moduli.len() {
-            input_wires.push(FinalizedWire::new(
-                self.next_masked_value(),
-                self.next_auth_share(),
-            ));
-        }
-        Ok(input_wires)
+        let start = self.input_wires_index;
+        self.input_wires_index += moduli.len();
+        Ok(self.input_wires[start..moduli.len()].to_vec())
     }
 
     fn encode_many(
         &mut self,
-        _: &[u16],
-        _: &[u16],
-        _: &mut Channel,
+        _values: &[u16],
+        moduli: &[u16],
+        _channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        unimplemented!("Preprocessor cannot encode values");
+        let start = self.input_wires_index;
+        self.input_wires_index += moduli.len();
+        Ok(self.input_wires[start..moduli.len()].to_vec())
     }
 }
 
