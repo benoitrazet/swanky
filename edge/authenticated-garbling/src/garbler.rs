@@ -279,10 +279,10 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             channel,
         )?;
 
-        let validation_bits: Vec<&F2> =
-            validation_bits.iter().filter(|&&x| x == F2::ZERO).collect();
+        let validation_failures: Vec<&F2> =
+            validation_bits.iter().filter(|&&x| x == F2::ONE).collect();
         ensure!(
-            validation_bits.len() != 0,
+            validation_failures.len() == 0,
             ErrorKind::OtherError,
             "Evaluator's authentication validation check failed"
         );
