@@ -45,8 +45,6 @@ pub struct Garbler<RNG> {
     and_auth_shares: Vec<AuthShare<PartyGarbler>>,
     // The index of the current AND authenticated share we're using.
     and_auth_shares_index: usize,
-    // A vector which stores the masked wire values received from the evaluator.
-    masked_values: Vec<F2>,
     // A vector that stores the garbling gates.
     gates: Vec<(U8x16, U8x16)>,
     // A vector that stores the garbling gate bits.
@@ -76,19 +74,18 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         let mut and_generator = AndTripleGenerator::new_with_delta(delta, channel, &mut rng)?;
         let (auth_shares, known_triples) =
             f_preprocessing(circuit, &mut and_generator, channel, &mut rng)?;
-
+        let nands = known_triples.len();
         channel.write(&one.to_repr())?;
         Ok(Garbler {
             delta: WireMod2::from_repr(delta, 2),
             zero,
             and_gate_index: 0,
-            auth_shares: auth_shares.clone(),
+            auth_shares,
             auth_shares_index: 0,
-            and_auth_shares: known_triples.clone(),
+            and_auth_shares: known_triples,
             and_auth_shares_index: 0,
-            masked_values: Vec::new(),
-            gates: Vec::with_capacity(known_triples.len()),
-            gate_bits: Vec::with_capacity(known_triples.len()),
+            gates: Vec::with_capacity(nands),
+            gate_bits: Vec::with_capacity(nands),
             rng,
         })
     }
@@ -117,9 +114,6 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         self.and_auth_shares[index]
     }
 
-    pub(crate) fn masked_value_at_index(&self, index: usize) -> F2 {
-        self.masked_values[index]
-    }
     pub(crate) fn delta(&self) -> U8x16 {
         self.delta.to_repr()
     }
@@ -258,7 +252,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     where
         RNG: 'a,
     {
-        let nands = channel.read()?;
+        let nands = self.and_auth_shares.len();
         // Receive the masked values from the Evaluator
         let mut bit_deser: F2BitDeserializer = SequenceDeserializer::new(channel.as_std_io())
             .wrap_err(
@@ -285,11 +279,12 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             channel,
         )?;
 
-        let validation_bit = validation_bits.iter().fold(F2::ZERO, |acc, &x| acc + x);
+        let validation_bits: Vec<&F2> =
+            validation_bits.iter().filter(|&&x| x == F2::ZERO).collect();
         ensure!(
-            validation_bit == F2::ZERO,
+            validation_bits.len() != 0,
             ErrorKind::OtherError,
-            "Garbler's authentication validation check failed !"
+            "Evaluator's authentication validation check failed"
         );
         Ok(())
     }
@@ -405,11 +400,15 @@ impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
         _moduli: &[u16],
         _channel: &mut Channel,
     ) -> Result<Vec<<Self as Fancy>::Item>> {
-        unimplemented!("The garbler encodes their value online via the finalizer !");
+        unimplemented!(
+            "The garbler needs to be calling its own special encoding function to use its offline generated material!"
+        );
     }
 
-    fn receive_many(&mut self, moduli: &[u16], channel: &mut Channel) -> Result<Vec<Self::Item>> {
-        unimplemented!("The garbler receives the evaluator's value online via the finalizer !");
+    fn receive_many(&mut self, _moduli: &[u16], _channel: &mut Channel) -> Result<Vec<Self::Item>> {
+        unimplemented!(
+            "The garbler needs to be calling its own special receive function to use its offline generated material!"
+        );
     }
 }
 

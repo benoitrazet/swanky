@@ -169,7 +169,6 @@ impl Evaluator {
     /// open the validation bits since they already compute their share of those bits
     /// a-priori.
     pub fn finalize(&mut self, channel: &mut Channel) -> Result<()> {
-        channel.write(&self.lc_values.len())?;
         let bit_ser: F2BitSerializer = SequenceSerializer::new(&mut channel.as_std_io()).wrap_err(
             ErrorKind::InitializationError,
             "Failed to initialize sequence serializer.",
@@ -184,10 +183,11 @@ impl Evaluator {
             &mut validation_bits,
             channel,
         )?;
-        println!("ev validation bits {:?}", validation_bits);
-        let validation_bit = validation_bits.iter().fold(F2::ZERO, |acc, &x| acc + x);
+
+        let validation_bits: Vec<&F2> =
+            validation_bits.iter().filter(|&&x| x == F2::ZERO).collect();
         ensure!(
-            validation_bit == F2::ZERO,
+            validation_bits.len() != 0,
             ErrorKind::OtherError,
             "Evaluator's authentication validation check failed"
         );

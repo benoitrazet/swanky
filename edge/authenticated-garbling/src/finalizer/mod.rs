@@ -1,6 +1,4 @@
-use fancy_garbling::{
-    Fancy, FancyBinary, FancyEncode, FancyOutput, HasModulus, WireLabel, WireMod2,
-};
+use fancy_garbling::{Fancy, FancyBinary, FancyEncode, FancyOutput, HasModulus};
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
@@ -193,7 +191,7 @@ where
     fn receive_many(
         &mut self,
         moduli: &[u16],
-        channel: &mut Channel,
+        _channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
         let start = self.input_wires_index;
         self.input_wires_index += moduli.len();
