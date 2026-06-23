@@ -1,6 +1,7 @@
+use fancy_analyzer::CircuitAnalyzer;
 use fancy_garbling::{
-    Evaluator as SemiHonestEvaluator, Garbler as SemiHonestGarbler, WireMod2,
-    circuit_analyzer::CircuitAnalyzer, circuits::LinearOram, classic::GarbledCircuit,
+    Evaluator as SemiHonestEvaluator, Garbler as SemiHonestGarbler, WireMod2, circuits::LinearOram,
+    classic::GarbledCircuit,
 };
 use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary, FancyEncode, FancyOutput, Flatten};
 use std::{hint::black_box, time::Instant};

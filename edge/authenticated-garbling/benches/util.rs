@@ -1,4 +1,4 @@
-use fancy_garbling::circuit_analyzer::CircuitAnalyzer;
+use fancy_analyzer::CircuitAnalyzer;
 use fancy_plaintext::Dummy;
 use fancy_traits::{CircuitInputMapper, FancyEncode, FancyOutput, Flatten};
 use swanky_authenticated_garbling::{

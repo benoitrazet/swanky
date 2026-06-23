@@ -6,7 +6,6 @@
 mod circuit;
 pub use circuit::test_circuits;
 mod binary;
-pub mod circuit_analyzer;
 pub mod circuits;
 pub mod classic;
 mod fancy;

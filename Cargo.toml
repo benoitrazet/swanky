@@ -21,6 +21,7 @@ members = [
   "edge/diet-mac-and-cheese/web-mac-and-cheese/websocket",
   "edge/f-eq",
   "edge/f-rand",
+  "edge/fancy-analyzer",
   "edge/fancy-garbling",
   "edge/fancy-plaintext",
   "edge/fancy-traits",
@@ -82,6 +83,7 @@ type_complexity = "allow"
 # Don't remove, or modify, the below "# BEGIN OUR CRATES" line. It's used by ./swanky new-crate
 # BEGIN OUR CRATES
 diet-mac-and-cheese = { path = "edge/diet-mac-and-cheese" }
+fancy-analyzer = { path = "edge/fancy-analyzer" }
 fancy-garbling = { path = "edge/fancy-garbling" }
 fancy-plaintext = { path = "edge/fancy-plaintext" }
 fancy-traits = { path = "edge/fancy-traits" }

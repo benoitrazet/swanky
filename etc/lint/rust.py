@@ -162,6 +162,7 @@ MISNAMED_CRATES = {
     "humidor",
     "inferno",
     "keyed_arena",
+    "fancy-analyzer",
     "fancy-garbling",
     "fancy-plaintext",
     "fancy-traits",

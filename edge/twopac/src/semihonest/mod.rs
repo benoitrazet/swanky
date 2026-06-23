@@ -10,9 +10,9 @@ pub use garbler::Garbler;
 mod tests {
     use super::*;
     use core::marker::PhantomData;
+    use fancy_analyzer::CircuitAnalyzer;
     use fancy_garbling::{
         AllWire, CrtBundle, CrtGadgets, VecCrtBundle, WireLabel, WireMod2,
-        circuit_analyzer::CircuitAnalyzer,
         circuits::{
             aes::AesNonExpanded,
             arithmetic::{Constant, Multiplication, ReLU},

@@ -1,5 +1,6 @@
 //! [`Fancy`] instantiation for computing gate counts and multiplicative depth
 //! of a [`Fancy`] circuit.
+#![deny(missing_docs)]
 
 use core::cmp::max;
 use fancy_traits::{
@@ -229,7 +230,7 @@ impl FancyOutput for CircuitAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::CircuitAnalyzer;
-    use crate::circuits::{aes::AesNonExpanded, sha::Sha256CompressionFunction};
+    use fancy_garbling::circuits::{aes::AesNonExpanded, sha::Sha256CompressionFunction};
 
     #[test]
     fn aes_128_bristol_format_is_correct() {
