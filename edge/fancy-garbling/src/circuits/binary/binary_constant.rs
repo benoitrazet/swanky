@@ -1,4 +1,5 @@
-use crate::{BinaryBundle, Fancy, circuit::Circuit, util::u128_to_bits};
+use crate::{BinaryBundle, util::u128_to_bits};
+use fancy_traits::{Circuit, Fancy};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -71,7 +72,7 @@ impl<F: Fancy> Circuit<F> for BinaryConstant<F> {
 
 pub mod test {
     use super::*;
-    use crate::circuit::CircuitInputMapper;
+    use fancy_traits::CircuitInputMapper;
 
     /// Circuit for testing [`BinaryConstant`].
     pub struct TestBinaryConstant(pub u128, pub usize);

@@ -1,9 +1,7 @@
 //! AES circuits.
 
-use crate::{
-    FancyBinary,
-    circuit::{BinaryCircuit, Circuit, CircuitInputMapper},
-};
+use crate::binary::BinaryCircuit;
+use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary};
 use std::io::Cursor;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -60,7 +58,7 @@ impl<F: FancyBinary> Circuit<F> for AesNonExpanded {
 }
 
 impl<F: FancyBinary> CircuitInputMapper<F> for AesNonExpanded {
-    fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 256);
         let (key, block) = inputs.split_at(128);
         (

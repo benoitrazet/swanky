@@ -1,11 +1,10 @@
 //! Module containing `CrtGadgets`, which are the CRT-based gadgets for `Fancy`.
 
-use super::HasModulus;
 use crate::{
-    FancyArithmetic, FancyBinary, FancyEncode, FancyOutput,
     fancy::bundle::{Bundle, BundleGadgets},
-    util::{self},
+    util,
 };
+use fancy_traits::{FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, Flatten, HasModulus};
 use itertools::Itertools;
 use std::ops::{Deref, DerefMut};
 use swanky_channel::Channel;
@@ -48,6 +47,25 @@ impl<W: Clone + HasModulus> DerefMut for CrtBundle<W> {
 impl<W: Clone + HasModulus> From<Bundle<W>> for CrtBundle<W> {
     fn from(b: Bundle<W>) -> CrtBundle<W> {
         CrtBundle(b)
+    }
+}
+
+impl<T: Clone + HasModulus> Flatten for CrtBundle<T> {
+    type Item = T;
+
+    fn flatten(self) -> Vec<T> {
+        self.extract().wires().to_vec()
+    }
+}
+
+/// Wrapper type for `Vec<CrtBundle<T>>`.
+pub struct VecCrtBundle<T>(pub Vec<CrtBundle<T>>);
+
+impl<T: Clone + HasModulus> Flatten for VecCrtBundle<T> {
+    type Item = T;
+
+    fn flatten(self) -> Vec<Self::Item> {
+        self.0.into_iter().map(|bundle| bundle.flatten()).concat()
     }
 }
 

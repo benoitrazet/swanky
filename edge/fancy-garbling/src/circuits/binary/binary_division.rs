@@ -1,9 +1,9 @@
 use crate::{
-    BinaryBundle, FancyBinary,
-    circuit::Circuit,
+    BinaryBundle, BinaryBundleAndItem,
     circuits::binary::{BinaryAddition, BinaryConstant, BinaryMultiplex, BinaryTwosComplement},
 };
 use core::marker::PhantomData;
+use fancy_traits::{Circuit, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -40,7 +40,7 @@ where
         for x in xs.iter().rev() {
             acc.pop();
             acc.insert(0, x.clone());
-            let (res, cout) =
+            let BinaryBundleAndItem(res, cout) =
                 BinaryAddition::default().execute(backend, (&acc, &ys_neg), channel)?;
             acc = BinaryMultiplex::new().execute(backend, (cout.clone(), &acc, &res), channel)?;
             qs.push(cout);

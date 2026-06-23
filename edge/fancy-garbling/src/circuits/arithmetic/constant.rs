@@ -1,4 +1,5 @@
-use crate::{Circuit, CrtBundle, Fancy, util::factor};
+use crate::{CrtBundle, util::factor};
+use fancy_traits::{Circuit, Fancy};
 use swanky_channel::Channel;
 use swanky_error::Result;
 

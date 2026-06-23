@@ -826,6 +826,7 @@ name = "fancy-garbling"
 version = "0.6.0"
 dependencies = [
  "criterion",
+ "fancy-traits",
  "itertools 0.14.0",
  "rand 0.8.5",
  "regex",
@@ -838,6 +839,15 @@ dependencies = [
  "swanky-error",
  "swanky-rng",
  "vectoreyes",
+]
+
+[[package]]
+name = "fancy-traits"
+version = "0.6.0"
+dependencies = [
+ "swanky-channel",
+ "swanky-error",
+ "swanky-rng",
 ]
 
 [[package]]
@@ -1888,6 +1898,7 @@ dependencies = [
  "aes-gcm",
  "criterion",
  "fancy-garbling",
+ "fancy-traits",
  "itertools 0.14.0",
  "proptest",
  "rand 0.8.5",
@@ -2602,6 +2613,7 @@ version = "0.6.0"
 dependencies = [
  "criterion",
  "fancy-garbling",
+ "fancy-traits",
  "proptest",
  "rand 0.8.5",
  "swanky-authenticated-bits",
@@ -2834,6 +2846,7 @@ dependencies = [
  "clap",
  "criterion",
  "fancy-garbling",
+ "fancy-traits",
  "itertools 0.14.0",
  "ndarray",
  "rand 0.8.5",
@@ -3092,6 +3105,7 @@ dependencies = [
  "clap",
  "criterion",
  "fancy-garbling",
+ "fancy-traits",
  "itertools 0.14.0",
  "rand 0.8.5",
  "swanky-adversary",

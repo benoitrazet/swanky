@@ -8,12 +8,12 @@ use crate::{
     util,
 };
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryGadgets, BinaryWireLabel, CrtGadgets, FancyArithmetic,
-    FancyBinary, FancyProj, HasModulus, WireMod2,
+    AllWire, BinaryBundle, BinaryGadgets, BinaryWireLabel, CrtGadgets, WireMod2,
     circuit_analyzer::CircuitAnalyzer,
     classic::{GarbledChannel, GarbledCircuit},
     util::output_tweak,
 };
+use fancy_traits::{FancyArithmetic, FancyBinary, FancyProj, HasModulus};
 use ndarray::Array3;
 use rand::{CryptoRng, RngCore};
 #[cfg(feature = "serde")]

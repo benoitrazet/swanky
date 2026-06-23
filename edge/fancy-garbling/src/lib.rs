@@ -5,7 +5,7 @@
 
 mod circuit;
 pub use circuit::test_circuits;
-pub use circuit::{Circuit, CircuitInputMapper, Flatten};
+mod binary;
 pub mod circuit_analyzer;
 pub mod circuits;
 pub mod classic;

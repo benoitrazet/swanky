@@ -12,10 +12,8 @@ pub use binary_and::BinaryWireLabel;
 mod helpers {
     use rand::{Rng, thread_rng};
 
-    use crate::{
-        CircuitInputMapper, Flatten,
-        dummy::{Dummy, DummyVal},
-    };
+    use crate::dummy::{Dummy, DummyVal};
+    use fancy_traits::{CircuitInputMapper, Flatten};
 
     pub(crate) fn plaintext<C: CircuitInputMapper<Dummy>>(
         circuit: &C,
@@ -53,7 +51,6 @@ mod helpers {
 mod nonstreaming {
     use crate::{
         AllWire, Evaluator, Garbler, WireLabel, WireMod2,
-        circuit::{CircuitInputMapper, Flatten},
         classic::GarbledCircuit,
         dummy::Dummy,
         test_circuits::{
@@ -66,6 +63,7 @@ mod nonstreaming {
         },
         util::RngExt,
     };
+    use fancy_traits::{CircuitInputMapper, Flatten};
     use rand::thread_rng;
     use swanky_rng::SwankyRng;
 
@@ -167,15 +165,13 @@ mod nonstreaming {
 
 #[cfg(test)]
 mod streaming {
-    use crate::circuit::{Circuit, Flatten};
     use crate::circuits::arithmetic::{Constant, Multiplication, ReLU};
     use crate::test_circuits::arithmetic::{TestAddition, TestCmul, TestMulGate, TestSubtraction};
     use crate::test_circuits::proj::TestProj;
-    use crate::{
-        AllWire, Evaluator, FancyEncode, Garbler, WireLabel, circuit::CircuitInputMapper,
-        dummy::Dummy, util::RngExt,
-    };
-    use crate::{CrtBundle, CrtGadgets, FancyArithmetic, FancyOutput, FancyProj};
+    use crate::{AllWire, Evaluator, Garbler, WireLabel, dummy::Dummy, util::RngExt};
+    use crate::{CrtBundle, CrtGadgets, VecCrtBundle};
+    use fancy_traits::{Circuit, CircuitInputMapper, Flatten};
+    use fancy_traits::{FancyArithmetic, FancyEncode, FancyOutput, FancyProj};
     use rand::thread_rng;
     use swanky_channel::Channel;
     use swanky_error::Result;
@@ -275,7 +271,7 @@ mod streaming {
     struct TestComplexGadget(pub Vec<u16>, pub usize);
     impl<F: FancyArithmetic + FancyProj + CrtGadgets> Circuit<F> for TestComplexGadget {
         type Input = Vec<CrtBundle<F::Item>>;
-        type Output = Vec<CrtBundle<F::Item>>;
+        type Output = VecCrtBundle<F::Item>;
 
         fn execute(
             &self,
@@ -292,7 +288,7 @@ mod streaming {
                 let z = ReLU::new().execute(backend, (&y, accuracy, none_option), channel)?;
                 outputs.push(z);
             }
-            Ok(outputs)
+            Ok(VecCrtBundle(outputs))
         }
     }
     impl<F: FancyArithmetic + FancyProj + CrtGadgets> CircuitInputMapper<F> for TestComplexGadget {

@@ -1,9 +1,9 @@
 use crate::{
-    BinaryBundle, FancyBinary,
-    circuit::Circuit,
+    BinaryBundle,
     circuits::binary::{BinaryAdditionNoCarry, BinaryConstant},
 };
 use core::marker::PhantomData;
+use fancy_traits::{Circuit, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -44,7 +44,7 @@ where
 }
 
 pub mod test {
-    use crate::circuit::CircuitInputMapper;
+    use fancy_traits::CircuitInputMapper;
 
     use super::*;
 
@@ -65,7 +65,7 @@ pub mod test {
     }
 
     impl<F: FancyBinary> CircuitInputMapper<F> for TestBinaryTwosComplement {
-        fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
+        fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0);
             BinaryBundle::new(inputs)
         }

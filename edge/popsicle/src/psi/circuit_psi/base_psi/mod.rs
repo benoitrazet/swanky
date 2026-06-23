@@ -1,7 +1,7 @@
 //! The base psi computation that pre-processes the party's
 //! inputs prior to calling the circuit in the circuit psi
 use crate::circuit_psi::*;
-use fancy_garbling::FancyEncode;
+use fancy_traits::FancyEncode;
 use rand::{CryptoRng, RngCore, SeedableRng};
 use swanky_channel::Channel;
 

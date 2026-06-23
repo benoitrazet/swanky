@@ -1,4 +1,4 @@
-use crate::{Circuit, FancyProj, HasModulus};
+use fancy_traits::{Circuit, FancyProj, HasModulus};
 use swanky_channel::Channel;
 use swanky_error::Result;
 

@@ -1,4 +1,5 @@
-use crate::{HasModulus, WireLabel, WireMod2, hash_wires, util::tweak2};
+use crate::{WireLabel, WireMod2, hash_wires, util::tweak2};
+use fancy_traits::HasModulus;
 use subtle::ConditionallySelectable;
 use vectoreyes::U8x16;
 

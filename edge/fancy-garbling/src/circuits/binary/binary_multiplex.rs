@@ -1,11 +1,10 @@
-use std::marker::PhantomData;
-
 use crate::{
-    BinaryBundle, FancyBinary,
-    circuit::Circuit,
+    BinaryBundle,
     circuits::binary::{Mux, MuxConstants},
     util::u128_to_bits,
 };
+use core::marker::PhantomData;
+use fancy_traits::{Circuit, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 

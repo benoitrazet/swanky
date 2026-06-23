@@ -1,6 +1,5 @@
 use crate::{
-    CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary, FancyProj,
-    circuit::Circuit,
+    CrtBundle, CrtGadgets,
     circuits::arithmetic::{
         Addition, Constant, ConstantMultiplication, Multiplication, PmrGreaterThanOrEqual,
         Subtraction,
@@ -8,6 +7,7 @@ use crate::{
     util::product,
 };
 use core::marker::PhantomData;
+use fancy_traits::{Circuit, FancyArithmetic, FancyBinary, FancyProj};
 use swanky_channel::Channel;
 use swanky_error::Result;
 

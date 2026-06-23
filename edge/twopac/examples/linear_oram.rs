@@ -1,9 +1,10 @@
 //! An example that secretly retrieves an element from an ORAM in a binary garbled circuit
 //! using fancy-garbling.
+
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryGadgets, Circuit, FancyOutput, circuit_analyzer::CircuitAnalyzer,
-    circuits::LinearOram,
+    AllWire, BinaryBundle, BinaryGadgets, circuit_analyzer::CircuitAnalyzer, circuits::LinearOram,
 };
+use fancy_traits::{Circuit, FancyOutput};
 use rand::{CryptoRng, RngCore, SeedableRng};
 use swanky_block::Block;
 use swanky_channel::Channel;

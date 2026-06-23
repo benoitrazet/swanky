@@ -1,7 +1,8 @@
 use fancy_garbling::{
-    CircuitInputMapper, FancyEncode, WireMod2,
+    WireMod2,
     circuits::{aes::AesNonExpanded, sha::Sha256CompressionFunctionFixedIV},
 };
+use fancy_traits::{CircuitInputMapper, FancyEncode};
 use std::time::SystemTime;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 use swanky_rng::SwankyRng;

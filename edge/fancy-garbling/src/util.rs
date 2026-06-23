@@ -2,9 +2,10 @@
 //!
 //! Note: all number representations in this library are little-endian.
 
+use fancy_traits::HasModulus;
 use vectoreyes::U8x16;
 
-use crate::{Bundle, HasModulus};
+use crate::Bundle;
 
 ////////////////////////////////////////////////////////////////////////////////
 // tweak functions for garbling

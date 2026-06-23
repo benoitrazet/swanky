@@ -12,10 +12,8 @@ use fancy_garbling::test_circuits::binary::{
     TestAndGate, TestAndGateFanN, TestNegateGate, TestOrGateFanN, TestXorGateFanN,
 };
 use fancy_garbling::test_circuits::fancy::TestBinaryConstant;
-use fancy_garbling::{
-    CircuitInputMapper, FancyEncode, circuit_analyzer::CircuitAnalyzer, dummy::Dummy,
-};
-use fancy_garbling::{FancyOutput, Flatten};
+use fancy_garbling::{circuit_analyzer::CircuitAnalyzer, dummy::Dummy};
+use fancy_traits::{CircuitInputMapper, FancyEncode, FancyOutput, Flatten};
 use rand::Rng;
 use swanky_rng::SwankyRng;
 

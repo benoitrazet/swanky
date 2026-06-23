@@ -1,12 +1,13 @@
 use super::security_warning::warn_proj;
 use crate::{
-    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj,
-    HasModulus, WireMod2, check_binary,
-    fancy::Fancy,
+    AllWire, ArithmeticWire, WireMod2,
     garble::binary_and::BinaryWireLabel,
     hash_wires,
     util::{output_tweak, tweak, tweak2},
     wire::WireLabel,
+};
+use fancy_traits::{
+    Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj, HasModulus, is_binary,
 };
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
@@ -76,14 +77,14 @@ impl<W: BinaryWireLabel> FancyBinary for Evaluator<W> {
 impl FancyBinary for Evaluator<AllWire> {
     /// Overriding `negate` to be a noop: entirely handled on garbler's end
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        check_binary!(x);
+        is_binary!(x);
 
         x.clone() + self.one.clone()
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        check_binary!(x);
-        check_binary!(y);
+        is_binary!(x);
+        is_binary!(y);
 
         self.add(x, y)
     }
@@ -104,8 +105,8 @@ impl FancyBinary for Evaluator<AllWire> {
         }
 
         // If we got here, one of the wires isn't binary
-        check_binary!(x);
-        check_binary!(y);
+        is_binary!(x);
+        is_binary!(y);
 
         // Shouldn't be reachable, unless the wire has modulus 2 but is not AllWire::Mod2()
         unreachable!()

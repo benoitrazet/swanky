@@ -1,8 +1,8 @@
 use crate::{
-    BinaryBundle, FancyBinary,
-    circuit::{Circuit, CircuitInputMapper},
+    BinaryBundle,
     circuits::binary::{BinaryConstant, BinaryEquality, BinaryMultiplex, PairwiseXor},
 };
+use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -64,7 +64,7 @@ impl<F: FancyBinary, const N: usize> Circuit<F> for LinearOram<N> {
 }
 
 impl<F: FancyBinary, const N: usize> CircuitInputMapper<F> for LinearOram<N> {
-    fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), (self.size + 1) * N);
         let (ram_bits, query_bits) = inputs.split_at(self.size * N);
 

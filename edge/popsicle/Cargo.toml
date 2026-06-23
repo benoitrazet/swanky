@@ -27,6 +27,7 @@ itertools.workspace = true
 rand.workspace = true
 sha2.workspace = true
 aes-gcm.workspace = true
+fancy-traits.workspace = true
 fancy-garbling = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -39,12 +40,13 @@ swanky-channel.workspace = true
 swanky-channel-legacy.workspace = true
 swanky-cointoss.workspace = true
 swanky-error.workspace = true
-proptest = { workspace = true }
 vectoreyes.workspace = true
+
 [dev-dependencies]
 swanky-ot-alsz-kos.workspace = true
 swanky-ocelot-error.workspace = true
 criterion.workspace = true
+proptest.workspace = true
 
 [[bench]]
 name = "psz"

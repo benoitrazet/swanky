@@ -1,4 +1,5 @@
-use crate::{ArithmeticWire, HasModulus, WireLabel, util, wire::_unrank};
+use crate::{ArithmeticWire, WireLabel, util, wire::_unrank};
+use fancy_traits::HasModulus;
 use rand::{CryptoRng, Rng, RngCore};
 use vectoreyes::U8x16;
 

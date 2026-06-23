@@ -1,11 +1,11 @@
 //! [`Fancy`] instantiation for computing gate counts and multiplicative depth
 //! of a [`Fancy`] circuit.
 
-use crate::{
-    Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj, HasModulus,
-    circuit::CircuitInputMapper,
-};
 use core::cmp::max;
+use fancy_traits::{
+    CircuitInputMapper, Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj,
+    HasModulus,
+};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
 

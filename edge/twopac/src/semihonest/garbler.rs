@@ -1,7 +1,5 @@
-use fancy_garbling::{
-    AllWire, ArithmeticWire, Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput,
-    FancyProj, Garbler as Gb, WireLabel, WireMod2,
-};
+use fancy_garbling::{AllWire, ArithmeticWire, Garbler as Gb, WireLabel, WireMod2};
+use fancy_traits::{Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj};
 use rand::{CryptoRng, Rng, SeedableRng};
 use swanky_adversary::SemiHonest;
 use swanky_block::Block;

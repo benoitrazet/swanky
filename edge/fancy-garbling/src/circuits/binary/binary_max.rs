@@ -1,5 +1,6 @@
-use crate::{BinaryBundle, FancyBinary, circuit::Circuit, circuits::binary::BinaryLessThan};
+use crate::{BinaryBundle, circuits::binary::BinaryLessThan};
 use core::marker::PhantomData;
+use fancy_traits::{Circuit, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 

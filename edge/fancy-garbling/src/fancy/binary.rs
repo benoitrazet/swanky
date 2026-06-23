@@ -1,20 +1,15 @@
 use crate::{
-    FancyBinary, FancyEncode, FancyOutput,
-    fancy::{
-        HasModulus,
-        bundle::{Bundle, BundleGadgets},
-    },
+    fancy::bundle::{Bundle, BundleGadgets},
     util,
 };
+use fancy_traits::{FancyBinary, FancyEncode, FancyOutput, Flatten, HasModulus};
 use itertools::Itertools;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 use swanky_channel::Channel;
 
 /// Bundle which is explicitly binary representation.
 #[derive(Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BinaryBundle<W>(Bundle<W>);
 
 impl<W: Clone + HasModulus> BinaryBundle<W> {
@@ -42,6 +37,26 @@ impl<W: Clone + HasModulus> From<Bundle<W>> for BinaryBundle<W> {
     fn from(b: Bundle<W>) -> BinaryBundle<W> {
         debug_assert!(b.moduli().iter().all(|&p| p == 2));
         BinaryBundle(b)
+    }
+}
+
+impl<T: Clone + HasModulus> Flatten for BinaryBundle<T> {
+    type Item = T;
+
+    fn flatten(self) -> Vec<T> {
+        self.wires().to_vec()
+    }
+}
+
+/// Wrapper type for `(BinaryBundle<T>, T)`.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct BinaryBundleAndItem<T>(pub BinaryBundle<T>, pub T);
+
+impl<T: Clone + HasModulus> Flatten for BinaryBundleAndItem<T> {
+    type Item = T;
+
+    fn flatten(self) -> Vec<Self::Item> {
+        [self.0.flatten(), vec![self.1]].concat()
     }
 }
 

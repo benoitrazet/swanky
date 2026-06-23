@@ -1,9 +1,9 @@
 use crate::{
-    BinaryBundle, FancyBinary,
-    circuit::Circuit,
+    BinaryBundle, BinaryBundleAndItem,
     circuits::binary::{BinaryEquality, BinaryMultiplex, BinarySubtraction, Mux},
 };
 use core::marker::PhantomData;
+use fancy_traits::{Circuit, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -60,11 +60,11 @@ where
 
             // Compute `a := a - b` and check for an underflow that will help
             // determine if `a > b`.
-            let (r_1, mut underflow_r_1) =
+            let BinaryBundleAndItem(r_1, mut underflow_r_1) =
                 BinarySubtraction::new().execute(backend, (&a, &b), channel)?;
             // Compute `b := b - a` and check for an underflow that will help
             // determine if `b > a`.
-            let (r_2, mut underflow_r_2) =
+            let BinaryBundleAndItem(r_2, mut underflow_r_2) =
                 BinarySubtraction::new().execute(backend, (&b, &a), channel)?;
 
             let is_equal = BinaryEquality::new().execute(backend, (&a, &b), channel)?;
