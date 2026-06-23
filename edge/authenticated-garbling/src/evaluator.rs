@@ -26,8 +26,10 @@ pub struct Evaluator {
     // The evaluator's Δ, used to validate the authenticated shares and AND
     // triples.
     delta: U8x16,
-    /// A wirelabel denoting one. Used to make negations free.
+    /// A wirelabel denoting one. Used to make negations and constant 1 gates free.
     one: WireMod2,
+    /// A wirelabel denoting zero. Used to make constant 0 gates free.
+    zero: WireMod2,
     // The index of the current AND gate. Used as the tweak when hashing
     // wirelabels in the AND gate garbling.
     and_wire_index: usize,
@@ -75,9 +77,11 @@ impl Evaluator {
             f_preprocessing(circuit, &mut and_generator, channel, rng)?;
         let num_and_gates = and_auth_shares.len();
         let one = channel.read::<U8x16>()?;
+        let zero = channel.read::<U8x16>()?;
         Ok(Evaluator {
             delta,
             one: WireMod2::from_repr(one, 2),
+            zero: WireMod2::from_repr(zero, 2),
             and_wire_index: 0,
             auth_shares,
             auth_shares_index: 0,
@@ -308,7 +312,7 @@ impl Fancy for Evaluator {
         let wirelabel = if constant == F2::ONE {
             self.one
         } else {
-            WireMod2::from_repr(self.one.to_repr() ^ self.delta, 2)
+            self.zero
         };
 
         Ok(AuthenticatedWire::new(constant, wirelabel, share))

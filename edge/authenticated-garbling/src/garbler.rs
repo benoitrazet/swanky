@@ -29,7 +29,11 @@ pub struct Garbler<RNG> {
     // The garbler's Δ.
     delta: WireMod2,
     // A random wirelabel denoting zero. Used to make negations free.
+    // The one label that can be derived out of this label is also used for
+    // constant 1 gates.
     zero: WireMod2,
+    // A random wirelabel denoting zero. Used to make constants free.
+    zero_constant: WireMod2,
     // The index of the current AND gate. Used as the tweak when hashing
     // wirelabels in the AND gate garbling.
     and_gate_index: usize,
@@ -71,7 +75,14 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         RNG: 'a,
     {
         let delta = AndTripleGenerator::<PartyGarbler>::generate_valid_delta(&mut rng);
+        // The garbler pre-generates two constant wire-labels
+        // - The one wire label that is used for negation and garbling constant 1 gates.
+        // - The zero wire label used for garbling constant 0 gates.
+        // These wire labels are used to make negation and constant gates free.
+        // Because they are uncorrelated, the evaluator learns nothing about the garbler's
+        // private delta value.
         let zero = WireMod2::rand(&mut rng, 2);
+        let zero_constant = WireMod2::rand(&mut rng, 2);
         let one = WireMod2::from_repr(zero.to_repr() ^ delta, 2);
 
         let mut and_generator = AndTripleGenerator::new_with_delta(delta, channel, &mut rng)?;
@@ -79,9 +90,11 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             f_preprocessing(circuit, &mut and_generator, channel, &mut rng)?;
         let nands = known_triples.len();
         channel.write(&one.to_repr())?;
+        channel.write(&zero_constant.to_repr())?;
         Ok(Garbler {
             delta: WireMod2::from_repr(delta, 2),
             zero,
+            zero_constant,
             and_gate_index: 0,
             auth_shares,
             auth_shares_index: 0,
@@ -341,8 +354,20 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
     ) -> Result<AuthenticatedWire> {
         let constant = F2::try_from(value).expect("constant must be boolean");
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());
-
-        Ok(AuthenticatedWire::new(constant, self.zero, share))
+        // Because the garbler is sending uncorrelated zero and one wire labels to the evaluator for constant gates and free negation,
+        // they have to be careful which zero wire label to use for each constant gate so that it correlates
+        // with the one that the evaluator is using.
+        let wire_label = if constant == F2::ONE {
+            // If the value of the gate is 1, then the garbler needs to user the wire label
+            // associated with the constant 1 wire label that they sent out to the evaluator,
+            // i.e. the zero value that they generated for that wire and free negations.
+            self.zero
+        } else {
+            // Otherwise, the garbler needs to use the same zero wire label as the one they sent
+            // to the evaluator, i.e. the wire label specifically generated for zero constant gates.
+            self.zero_constant
+        };
+        Ok(AuthenticatedWire::new(constant, wire_label, share))
     }
 }
 
