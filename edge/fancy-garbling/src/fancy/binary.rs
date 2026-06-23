@@ -1,7 +1,8 @@
 use crate::{
     fancy::bundle::{Bundle, BundleGadgets},
-    util,
+    util::{self, u128_from_bits},
 };
+use fancy_plaintext::{Dummy, DummyVal};
 use fancy_traits::{FancyBinary, FancyEncode, FancyOutput, Flatten, HasModulus};
 use itertools::Itertools;
 use std::ops::{Deref, DerefMut};
@@ -16,6 +17,24 @@ impl<W: Clone + HasModulus> BinaryBundle<W> {
     /// Create a new binary bundle from a vector of wires.
     pub fn new(ws: Vec<W>) -> BinaryBundle<W> {
         BinaryBundle(Bundle::new(ws))
+    }
+}
+
+impl From<(u128, usize)> for BinaryBundle<DummyVal> {
+    /// Generate a new [`BinaryBundle`] of `value.0` containing `value.1` bits.
+    fn from(value: (u128, usize)) -> Self {
+        let mut dummy = Dummy::new();
+        Channel::with(std::io::empty(), |channel| {
+            dummy.bin_encode(value.0, value.1, channel)
+        })
+        .unwrap()
+    }
+}
+
+impl From<BinaryBundle<DummyVal>> for u128 {
+    fn from(value: BinaryBundle<DummyVal>) -> Self {
+        let bin = value.wires().iter().map(|w| w.val()).collect::<Vec<_>>();
+        u128_from_bits(&bin)
     }
 }
 

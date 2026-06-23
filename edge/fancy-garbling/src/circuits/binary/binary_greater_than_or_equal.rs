@@ -73,7 +73,7 @@ pub mod test {
 
     #[test]
     fn binary_greater_than_or_equal() {
-        use crate::dummy::{Dummy, DummyVal};
+        use fancy_plaintext::Dummy;
         use rand::Rng;
 
         let mut rng = rand::thread_rng();
@@ -84,8 +84,8 @@ pub mod test {
         for _ in 0..16 {
             let x = rng.r#gen::<u128>() % q;
             let y = rng.r#gen::<u128>() % q;
-            let x_input = DummyVal::to_binary(x, nbits);
-            let y_input = DummyVal::to_binary(y, nbits);
+            let x_input = BinaryBundle::from((x, nbits));
+            let y_input = BinaryBundle::from((y, nbits));
             let output = Dummy::eval(&c, (x_input, y_input)).unwrap();
             assert_eq!(output.val() > 0, x >= y);
         }

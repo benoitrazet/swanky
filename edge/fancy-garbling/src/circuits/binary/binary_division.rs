@@ -52,12 +52,9 @@ where
 
 #[cfg(test)]
 mod test {
+    use crate::{BinaryBundle, circuits::binary::BinaryDivision};
+    use fancy_plaintext::Dummy;
     use rand::{Rng, thread_rng};
-
-    use crate::{
-        circuits::binary::BinaryDivision,
-        dummy::{Dummy, DummyVal},
-    };
 
     #[test]
     fn test_binary_division() {
@@ -71,10 +68,10 @@ mod test {
             while y == 0 {
                 y = rng.r#gen::<u128>() % q;
             }
-            let x_input = DummyVal::to_binary(x, nbits);
-            let y_input = DummyVal::to_binary(y, nbits);
+            let x_input = BinaryBundle::from((x, nbits));
+            let y_input = BinaryBundle::from((y, nbits));
             let output = Dummy::eval(&BinaryDivision::new(), (&x_input, &y_input)).unwrap();
-            assert_eq!(DummyVal::from_binary(&output), x / y);
+            assert_eq!(Into::<u128>::into(output), x / y);
         }
     }
 }

@@ -209,11 +209,12 @@ where
 #[cfg(test)]
 mod test {
     use crate::{
+        BinaryBundle,
         circuits::binary::{
             BinaryConstantMultiplication, BinaryMultiplication, BinaryMultiplicationLowerHalf,
         },
-        dummy::{Dummy, DummyVal},
     };
+    use fancy_plaintext::Dummy;
     use rand::{Rng, thread_rng};
 
     #[test]
@@ -225,10 +226,10 @@ mod test {
         for _ in 0..16 {
             let x = rng.r#gen::<u128>() % q;
             let y = rng.r#gen::<u128>() % q;
-            let x_input = DummyVal::to_binary(x, nbits);
-            let y_input = DummyVal::to_binary(y, nbits);
+            let x_input = BinaryBundle::from((x, nbits));
+            let y_input = BinaryBundle::from((y, nbits));
             let output = Dummy::eval(&BinaryMultiplication::new(), (&x_input, &y_input)).unwrap();
-            assert_eq!(DummyVal::from_binary(&output), x * y);
+            assert_eq!(Into::<u128>::into(output), x * y);
         }
     }
 
@@ -241,11 +242,11 @@ mod test {
         for _ in 0..16 {
             let x = rng.r#gen::<u128>() % q;
             let y = rng.r#gen::<u128>() % q;
-            let x_input = DummyVal::to_binary(x, nbits);
-            let y_input = DummyVal::to_binary(y, nbits);
+            let x_input = BinaryBundle::from((x, nbits));
+            let y_input = BinaryBundle::from((y, nbits));
             let output =
                 Dummy::eval(&BinaryMultiplicationLowerHalf::new(), (&x_input, &y_input)).unwrap();
-            assert_eq!(DummyVal::from_binary(&output), (x * y) % q);
+            assert_eq!(Into::<u128>::into(output), (x * y) % q);
         }
     }
 
@@ -258,10 +259,10 @@ mod test {
         for _ in 0..16 {
             let x = rng.r#gen::<u128>() % q;
             let c = rng.r#gen::<u128>() % q;
-            let x_input = DummyVal::to_binary(x, nbits);
+            let x_input = BinaryBundle::from((x, nbits));
             let output =
                 Dummy::eval(&BinaryConstantMultiplication::new(), (&x_input, c, nbits)).unwrap();
-            assert_eq!(DummyVal::from_binary(&output), (x * c) % q);
+            assert_eq!(Into::<u128>::into(output), (x * c) % q);
         }
     }
 }

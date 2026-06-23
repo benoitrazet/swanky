@@ -96,7 +96,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dummy::{Dummy, DummyVal};
+    use fancy_plaintext::{Dummy, DummyVal};
 
     fn string_to_bool_vec(str: &str) -> Vec<DummyVal> {
         str.chars()

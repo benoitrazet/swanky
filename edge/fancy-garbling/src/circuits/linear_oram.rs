@@ -89,12 +89,11 @@ impl<F: FancyBinary, const N: usize> CircuitInputMapper<F> for LinearOram<N> {
 #[cfg(test)]
 pub mod test {
     use crate::{BinaryBundle, circuits::LinearOram};
+    use fancy_plaintext::{Dummy, DummyVal};
+    use rand::Rng;
 
     #[test]
     fn linear_oram() {
-        use crate::dummy::{Dummy, DummyVal};
-        use rand::Rng;
-
         const N: usize = 128;
         let mut rng = rand::thread_rng();
         let ram_size = 10;
@@ -104,11 +103,13 @@ pub mod test {
             let ram: Vec<u128> = (0..ram_size).map(|_| rng.r#gen::<u128>()).collect();
             let index = rng.r#gen::<usize>() % ram_size;
 
-            let ram_input: Vec<BinaryBundle<DummyVal>> =
-                ram.iter().map(|&val| DummyVal::to_binary(val, N)).collect();
-            let query_input = DummyVal::to_binary(index as u128, N);
+            let ram_input: Vec<BinaryBundle<DummyVal>> = ram
+                .iter()
+                .map(|&val| BinaryBundle::from((val, N)))
+                .collect();
+            let query_input = BinaryBundle::from((index as u128, N));
             let output = Dummy::eval(&c, (ram_input, query_input)).unwrap();
-            let result = DummyVal::from_binary(&output);
+            let result: u128 = output.into();
             assert_eq!(result, ram[index]);
         }
     }

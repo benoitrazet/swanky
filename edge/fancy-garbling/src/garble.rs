@@ -12,7 +12,7 @@ pub use binary_and::BinaryWireLabel;
 mod helpers {
     use rand::{Rng, thread_rng};
 
-    use crate::dummy::{Dummy, DummyVal};
+    use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::{CircuitInputMapper, Flatten};
 
     pub(crate) fn plaintext<C: CircuitInputMapper<Dummy>>(
@@ -52,7 +52,6 @@ mod nonstreaming {
     use crate::{
         AllWire, Evaluator, Garbler, WireLabel, WireMod2,
         classic::GarbledCircuit,
-        dummy::Dummy,
         test_circuits::{
             arithmetic::{
                 TestAddMany, TestAddition, TestCmul, TestConstants, TestMulGate,
@@ -63,6 +62,7 @@ mod nonstreaming {
         },
         util::RngExt,
     };
+    use fancy_plaintext::Dummy;
     use fancy_traits::{CircuitInputMapper, Flatten};
     use rand::thread_rng;
     use swanky_rng::SwankyRng;
@@ -168,8 +168,9 @@ mod streaming {
     use crate::circuits::arithmetic::{Constant, Multiplication, ReLU};
     use crate::test_circuits::arithmetic::{TestAddition, TestCmul, TestMulGate, TestSubtraction};
     use crate::test_circuits::proj::TestProj;
-    use crate::{AllWire, Evaluator, Garbler, WireLabel, dummy::Dummy, util::RngExt};
+    use crate::{AllWire, Evaluator, Garbler, WireLabel, util::RngExt};
     use crate::{CrtBundle, CrtGadgets, VecCrtBundle};
+    use fancy_plaintext::Dummy;
     use fancy_traits::{Circuit, CircuitInputMapper, Flatten};
     use fancy_traits::{FancyArithmetic, FancyEncode, FancyOutput, FancyProj};
     use rand::thread_rng;

@@ -25,6 +25,8 @@ vectoreyes.workspace = true
 rand.workspace = true
 
 [dev-dependencies]
+fancy-plaintext.workspace = true
+
 criterion.workspace = true
 proptest.workspace = true
 

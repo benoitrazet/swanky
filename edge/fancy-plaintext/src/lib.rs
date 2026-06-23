@@ -1,25 +1,18 @@
-//! Dummy implementation of `Fancy`.
-//!
-//! Useful for evaluating the circuits produced by `Fancy` without actually
-//! creating any circuits.
+//! Plaintext implementation of [`Fancy`].
+#![deny(missing_docs)]
 
-use rand::{CryptoRng, Rng, RngCore};
-use swanky_channel::Channel;
-use swanky_error::{ErrorKind, Result};
-
-use crate::{
-    BinaryBundle, BinaryGadgets, Bundle, CrtBundle, CrtGadgets,
-    util::{as_mixed_radix, crt_inv_factor, u128_from_bits},
-};
 use fancy_traits::{
     Circuit, Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj, HasModulus,
     is_binary,
 };
+use rand::{CryptoRng, Rng, RngCore};
+use swanky_channel::Channel;
+use swanky_error::{ErrorKind, Result};
 
-/// Simple struct that performs the fancy computation over `u16`.
+/// Plaintext implementation of [`Fancy`].
 pub struct Dummy;
 
-/// Wrapper around `u16`.
+/// Plaintext wire value.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DummyVal {
     val: u16,
@@ -63,71 +56,15 @@ impl DummyVal {
     pub fn rand<RNG: CryptoRng + RngCore>(modulus: u16, rng: &mut RNG) -> Self {
         Self::new(rng.r#gen::<u16>(), modulus)
     }
-
-    /// Generate a new [`CrtBundle`] of `value % modulus`.
-    pub fn to_crt(value: u128, modulus: u128) -> CrtBundle<Self> {
-        let mut dummy = Dummy::new();
-        Channel::with(std::io::empty(), |channel| {
-            dummy.crt_encode(value, modulus, channel)
-        })
-        .unwrap()
-    }
-
-    /// Convert a [`Bundle`] representing a CRT value into its underlying
-    /// `u128`.
-    pub fn from_crt(crt: &Bundle<Self>, modulus: u128) -> u128 {
-        let crt = crt.wires().iter().map(|w| w.val()).collect::<Vec<_>>();
-        crt_inv_factor(&crt, modulus)
-    }
-
-    /// Generate a new [`BinaryBundle`] of `value`.
-    pub fn to_binary(value: u128, nbits: usize) -> BinaryBundle<Self> {
-        let mut dummy = Dummy::new();
-        Channel::with(std::io::empty(), |channel| {
-            dummy.bin_encode(value, nbits, channel)
-        })
-        .unwrap()
-    }
-
-    /// Convert a [`Bundle`] representing a binary value into its underlying
-    /// `u128`.
-    pub fn from_binary(bin: &Bundle<Self>) -> u128 {
-        let bin = bin.wires().iter().map(|w| w.val()).collect::<Vec<_>>();
-        u128_from_bits(&bin)
-    }
-
-    /// Generate a new mixed radix form [`Bundle`] for `value` using the
-    /// provided `radii`.
-    pub fn to_mixed_radix(value: u128, radii: &[u16]) -> CrtBundle<Self> {
-        let mixed = as_mixed_radix(value, radii);
-        let mixed = mixed
-            .into_iter()
-            .zip(radii)
-            .map(|(x, q)| DummyVal::new(x, *q))
-            .collect::<Vec<_>>();
-        CrtBundle::new(mixed)
-    }
-
-    /// Convert a [`Bundle`] representing mixed radix form into its underlying
-    /// `u128`.
-    pub fn from_mixed_radix(bundle: &CrtBundle<Self>) -> u128 {
-        let mut x: u128 = 0;
-        for wire in bundle.wires().iter().rev() {
-            let (xp, overflow) = x.overflowing_mul(wire.modulus as u128);
-            assert!(!overflow);
-            x = xp + wire.val as u128;
-        }
-        x
-    }
 }
 
 impl Dummy {
-    /// Create a new Dummy.
-    pub fn new() -> Dummy {
-        Dummy {}
+    /// Create a new [`Dummy`] instance.
+    pub fn new() -> Self {
+        Self
     }
 
-    /// Evaluate `circuit` in plaintext.
+    /// Evaluate a circuit on the provided inputs in plaintext.
     pub fn eval<C: Circuit<Dummy>>(circuit: &C, inputs: C::Input) -> Result<C::Output> {
         let mut dummy = Dummy::new();
         Channel::with(std::io::empty(), |c| circuit.execute(&mut dummy, inputs, c))
@@ -148,12 +85,7 @@ impl FancyBinary for Dummy {
         self.add(x, y)
     }
 
-    fn and(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
+    fn and(&mut self, x: &Self::Item, y: &Self::Item, channel: &mut Channel) -> Result<Self::Item> {
         is_binary!(x);
         is_binary!(y);
 
@@ -233,12 +165,7 @@ impl FancyProj for Dummy {
 impl Fancy for Dummy {
     type Item = DummyVal;
 
-    fn constant(
-        &mut self,
-        val: u16,
-        modulus: u16,
-        _: &mut Channel,
-    ) -> swanky_error::Result<DummyVal> {
+    fn constant(&mut self, val: u16, modulus: u16, _: &mut Channel) -> Result<DummyVal> {
         Ok(DummyVal { val, modulus })
     }
 }
@@ -249,7 +176,7 @@ impl FancyEncode for Dummy {
         xs: &[u16],
         moduli: &[u16],
         _: &mut Channel,
-    ) -> swanky_error::Result<Vec<DummyVal>> {
+    ) -> Result<Vec<DummyVal>> {
         assert_eq!(xs.len(), moduli.len());
         Ok(xs
             .iter()
@@ -258,11 +185,7 @@ impl FancyEncode for Dummy {
             .collect())
     }
 
-    fn receive_many(
-        &mut self,
-        _moduli: &[u16],
-        _: &mut Channel,
-    ) -> swanky_error::Result<Vec<DummyVal>> {
+    fn receive_many(&mut self, _moduli: &[u16], _: &mut Channel) -> Result<Vec<DummyVal>> {
         // Receive is undefined for Dummy which is a single party "protocol"
         swanky_error::bail!(
             ErrorKind::UnsupportedError,
@@ -272,7 +195,7 @@ impl FancyEncode for Dummy {
 }
 
 impl FancyOutput for Dummy {
-    fn output(&mut self, x: &DummyVal, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
+    fn output(&mut self, x: &DummyVal, _: &mut Channel) -> Result<Option<u16>> {
         Ok(Some(x.val))
     }
 }

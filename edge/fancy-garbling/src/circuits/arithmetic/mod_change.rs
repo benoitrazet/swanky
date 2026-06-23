@@ -30,11 +30,8 @@ impl<F: FancyProj> Circuit<F> for ModChange {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        circuits::arithmetic::ModChange,
-        dummy::{Dummy, DummyVal},
-        util::RngExt,
-    };
+    use crate::{circuits::arithmetic::ModChange, util::RngExt};
+    use fancy_plaintext::{Dummy, DummyVal};
     use rand::{Rng, thread_rng};
 
     #[test]

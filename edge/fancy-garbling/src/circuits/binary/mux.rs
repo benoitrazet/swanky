@@ -72,10 +72,8 @@ where
 #[cfg(test)]
 mod test {
     use super::Mux;
-    use crate::{
-        circuits::binary::mux::MuxConstants,
-        dummy::{Dummy, DummyVal},
-    };
+    use crate::circuits::binary::mux::MuxConstants;
+    use fancy_plaintext::{Dummy, DummyVal};
 
     #[test]
     fn mux() {

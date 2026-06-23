@@ -52,7 +52,7 @@ pub mod test {
 
     #[test]
     fn binary_adder() {
-        use crate::dummy::{Dummy, DummyVal};
+        use fancy_plaintext::{Dummy, DummyVal};
 
         let circuit = BinaryAdder::new();
         let zero = DummyVal::new(0, 2);

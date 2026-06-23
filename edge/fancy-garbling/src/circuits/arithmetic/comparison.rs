@@ -237,16 +237,16 @@ where
 
 #[cfg(test)]
 mod test {
-    use rand::{Rng, thread_rng};
-
     use crate::{
+        CrtBundle,
         circuits::arithmetic::{
             ReLU, Sgn,
             comparison::{GreaterThanOrEqual, LessThan, Max, Sign},
         },
-        dummy::{Dummy, DummyVal},
         util::modulus_with_width,
     };
+    use fancy_plaintext::Dummy;
+    use rand::{Rng, thread_rng};
 
     #[test]
     fn sign() {
@@ -256,13 +256,13 @@ mod test {
 
         // Check that `Sign(0) == 0`.
         let x = 0;
-        let x_input = DummyVal::to_crt(x, q);
+        let x_input = CrtBundle::from((x, q));
         let output = Dummy::eval(&Sign::new(), (&x_input, accuracy)).unwrap();
         assert_eq!(output.val(), if x < q / 2 { 0 } else { 1 });
 
         for _ in 0..64 {
             let x = rng.r#gen::<u128>() % q;
-            let x_input = DummyVal::to_crt(x, q);
+            let x_input = CrtBundle::from((x, q));
             let output = Dummy::eval(&Sign::new(), (&x_input, accuracy)).unwrap();
             assert_eq!(output.val(), if x < q / 2 { 0 } else { 1 });
         }
@@ -276,15 +276,15 @@ mod test {
 
         // Check that `x < x` works.
         let x = rng.r#gen::<u128>() % q / 2;
-        let x_input = DummyVal::to_crt(x, q);
+        let x_input = CrtBundle::from((x, q));
         let output = Dummy::eval(&LessThan::new(), (&x_input, &x_input, accuracy)).unwrap();
         assert_eq!(output.val(), (x < x) as u16);
 
         for _ in 0..64 {
             let x = rng.r#gen::<u128>() % q / 2;
             let y = rng.r#gen::<u128>() % q / 2;
-            let x_input = DummyVal::to_crt(x, q);
-            let y_input = DummyVal::to_crt(y, q);
+            let x_input = CrtBundle::from((x, q));
+            let y_input = CrtBundle::from((y, q));
             let output = Dummy::eval(&LessThan::new(), (&x_input, &y_input, accuracy)).unwrap();
             assert_eq!(output.val(), (x < y) as u16);
         }
@@ -298,7 +298,7 @@ mod test {
 
         // Check that `x >= x` works.
         let x = rng.r#gen::<u128>() % q / 2;
-        let x_input = DummyVal::to_crt(x, q);
+        let x_input = CrtBundle::from((x, q));
         let output =
             Dummy::eval(&GreaterThanOrEqual::new(), (&x_input, &x_input, accuracy)).unwrap();
         assert_eq!(output.val(), (x >= x) as u16);
@@ -306,8 +306,8 @@ mod test {
         for _ in 0..64 {
             let x = rng.r#gen::<u128>() % q / 2;
             let y = rng.r#gen::<u128>() % q / 2;
-            let x_input = DummyVal::to_crt(x, q);
-            let y_input = DummyVal::to_crt(y, q);
+            let x_input = CrtBundle::from((x, q));
+            let y_input = CrtBundle::from((y, q));
             let output =
                 Dummy::eval(&GreaterThanOrEqual::new(), (&x_input, &y_input, accuracy)).unwrap();
             assert_eq!(output.val(), (x >= y) as u16);
@@ -328,10 +328,10 @@ mod test {
 
             let inputs = inputs
                 .into_iter()
-                .map(|x| DummyVal::to_crt(x, q))
+                .map(|x| CrtBundle::from((x, q)))
                 .collect::<Vec<_>>();
             let z = Dummy::eval(&Max::new(), (&inputs[..], accuracy)).unwrap();
-            let output = DummyVal::from_crt(&z, q);
+            let output = CrtBundle::from_crt(&z, q);
             assert_eq!(output, expected);
         }
     }
@@ -344,16 +344,16 @@ mod test {
 
         // Check that `Sign(0) == 1`.
         let x = 0;
-        let x_input = DummyVal::to_crt(x, q);
+        let x_input = CrtBundle::from((x, q));
         let z = Dummy::eval(&Sgn::new(), (&x_input, accuracy, None)).unwrap();
-        let output = DummyVal::from_crt(&z, q);
+        let output = CrtBundle::from_crt(&z, q);
         assert_eq!(output, if x < q / 2 { 1 } else { q - 1 });
 
         for _ in 0..64 {
             let x = rng.r#gen::<u128>() % q;
-            let x_input = DummyVal::to_crt(x, q);
+            let x_input = CrtBundle::from((x, q));
             let z = Dummy::eval(&Sgn::new(), (&x_input, accuracy, None)).unwrap();
-            let output = DummyVal::from_crt(&z, q);
+            let output = CrtBundle::from_crt(&z, q);
             assert_eq!(output, if x < q / 2 { 1 } else { q - 1 });
         }
     }
@@ -366,16 +366,16 @@ mod test {
 
         // Check that `Sign(0) == 1`.
         let x = 0;
-        let x_input = DummyVal::to_crt(x, q);
+        let x_input = CrtBundle::from((x, q));
         let z = Dummy::eval(&ReLU::new(), (&x_input, accuracy, None)).unwrap();
-        let output = DummyVal::from_crt(&z, q);
+        let output = CrtBundle::from_crt(&z, q);
         assert_eq!(output, if x < q / 2 { x } else { 0 });
 
         for _ in 0..64 {
             let x = rng.r#gen::<u128>() % q;
-            let x_input = DummyVal::to_crt(x, q);
+            let x_input = CrtBundle::from((x, q));
             let z = Dummy::eval(&ReLU::new(), (&x_input, accuracy, None)).unwrap();
-            let output = DummyVal::from_crt(&z, q);
+            let output = CrtBundle::from_crt(&z, q);
             assert_eq!(output, if x < q / 2 { x } else { 0 });
         }
     }

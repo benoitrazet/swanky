@@ -44,7 +44,7 @@ pub mod test {
 
     #[test]
     fn or_many() {
-        use crate::dummy::{Dummy, DummyVal};
+        use fancy_plaintext::{Dummy, DummyVal};
         use rand::Rng;
 
         let mut rng = rand::thread_rng();

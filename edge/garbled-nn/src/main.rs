@@ -1,6 +1,6 @@
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Error, Parser, Subcommand};
-use fancy_garbling::dummy::{Dummy, DummyVal};
+use fancy_plaintext::{Dummy, DummyVal};
 use ndarray::Array3;
 use std::path::PathBuf;
 use std::time::Instant;

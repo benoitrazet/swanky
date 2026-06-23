@@ -256,10 +256,11 @@ mod test {
     use rand::{Rng, thread_rng};
 
     use crate::{
+        CrtBundle,
         circuits::arithmetic::mixed_radix::{MixedRadixAddition, MixedRadixAdditionMSBOnly},
-        dummy::{Dummy, DummyVal},
         util::{RngExt, as_mixed_radix, product},
     };
+    use fancy_plaintext::Dummy;
 
     #[test]
     fn mixed_radix_addition_msb_only() {
@@ -270,7 +271,7 @@ mod test {
 
         // Test maximum overflow.
         let inputs = (0..nargs)
-            .map(|_| DummyVal::to_mixed_radix(q - 1, &moduli))
+            .map(|_| CrtBundle::to_mixed_radix(q - 1, &moduli))
             .collect::<Vec<_>>();
         let output = Dummy::eval(&MixedRadixAdditionMSBOnly::new(), inputs.as_slice()).unwrap();
         assert_eq!(
@@ -287,7 +288,7 @@ mod test {
             for _ in 0..nargs {
                 let x = rng.gen_u128() % q;
                 expected = (expected + x) % q;
-                inputs.push(DummyVal::to_mixed_radix(x, &moduli));
+                inputs.push(CrtBundle::to_mixed_radix(x, &moduli));
             }
             let output = Dummy::eval(&MixedRadixAdditionMSBOnly::new(), inputs.as_slice()).unwrap();
             assert_eq!(
@@ -306,11 +307,11 @@ mod test {
 
         // Test maximum overflow.
         let inputs = (0..nargs)
-            .map(|_| DummyVal::to_mixed_radix(q - 1, &moduli))
+            .map(|_| CrtBundle::to_mixed_radix(q - 1, &moduli))
             .collect::<Vec<_>>();
         let output = Dummy::eval(&MixedRadixAddition::new(), inputs.as_slice()).unwrap();
         assert_eq!(
-            DummyVal::from_mixed_radix(&output),
+            CrtBundle::from_mixed_radix(&output),
             (q - 1) * (nargs as u128) % q
         );
 
@@ -321,10 +322,10 @@ mod test {
             for _ in 0..nargs {
                 let x = rng.gen_u128() % q;
                 expected = (expected + x) % q;
-                inputs.push(DummyVal::to_mixed_radix(x, &moduli));
+                inputs.push(CrtBundle::to_mixed_radix(x, &moduli));
             }
             let output = Dummy::eval(&MixedRadixAddition::new(), inputs.as_slice()).unwrap();
-            assert_eq!(DummyVal::from_mixed_radix(&output), expected);
+            assert_eq!(CrtBundle::from_mixed_radix(&output), expected);
         }
     }
 }

@@ -59,10 +59,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        circuits::binary::BinaryToUnary,
-        dummy::{Dummy, DummyVal},
-    };
+    use crate::{BinaryBundle, circuits::binary::BinaryToUnary};
+    use fancy_plaintext::Dummy;
     use rand::{Rng, thread_rng};
 
     #[test]
@@ -73,7 +71,7 @@ mod test {
 
         for _ in 0..16 {
             let x = rng.r#gen::<u128>() % q;
-            let x_input = DummyVal::to_binary(x, nbits);
+            let x_input = BinaryBundle::from((x, nbits));
             let output = Dummy::eval(&BinaryToUnary::new(), &x_input).unwrap();
             for (i, y) in output.into_iter().enumerate() {
                 if i as u128 == x {

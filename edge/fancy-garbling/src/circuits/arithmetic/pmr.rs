@@ -167,13 +167,14 @@ mod test {
     use rand::Rng;
 
     use crate::{
+        CrtBundle,
         circuits::arithmetic::{
             ToPmr,
             pmr::{PmrGreaterThanOrEqual, PmrLessThan},
         },
-        dummy::{Dummy, DummyVal},
         util::{RngExt, product},
     };
+    use fancy_plaintext::Dummy;
 
     #[test]
     fn to_pmr() {
@@ -196,7 +197,7 @@ mod test {
             let x = rng.r#gen::<u128>() % q;
             let expected = to_pmr_pt(x, &ps);
 
-            let x_input = DummyVal::to_crt(x, q);
+            let x_input = CrtBundle::from((x, q));
             let z = Dummy::eval(&ToPmr::new(), &x_input).unwrap();
             let output = z.wires().iter().map(|w| w.val()).collect::<Vec<_>>();
             assert_eq!(output, expected);
@@ -214,8 +215,8 @@ mod test {
             let x = rng.r#gen::<u128>() % q_;
             let y = rng.r#gen::<u128>() % q_;
 
-            let x_input = DummyVal::to_crt(x, q);
-            let y_input = DummyVal::to_crt(y, q);
+            let x_input = CrtBundle::from((x, q));
+            let y_input = CrtBundle::from((y, q));
             let output = Dummy::eval(&PmrLessThan::new(), (&x_input, &y_input)).unwrap();
             assert_eq!(output.val(), (x < y) as u16);
         }
@@ -232,8 +233,8 @@ mod test {
             let x = rng.gen_u128() % q_;
             let y = rng.gen_u128() % q_;
 
-            let x_input = DummyVal::to_crt(x, q);
-            let y_input = DummyVal::to_crt(y, q);
+            let x_input = CrtBundle::from((x, q));
+            let y_input = CrtBundle::from((y, q));
             let output = Dummy::eval(&PmrGreaterThanOrEqual::new(), (&x_input, &y_input)).unwrap();
             assert_eq!(output.val(), (x >= y) as u16);
         }

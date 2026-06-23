@@ -9,7 +9,6 @@ mod binary;
 pub mod circuit_analyzer;
 pub mod circuits;
 pub mod classic;
-pub mod dummy;
 mod fancy;
 mod garble;
 mod parser;

@@ -17,9 +17,9 @@ mod tests {
             aes::AesNonExpanded,
             arithmetic::{Constant, Multiplication, ReLU},
         },
-        dummy::{Dummy, DummyVal},
         test_circuits::arithmetic::TestAddition,
     };
+    use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::{
         Circuit, CircuitInputMapper, FancyArithmetic, FancyEncode, FancyOutput, FancyProj, Flatten,
     };
@@ -108,12 +108,12 @@ mod tests {
         // Run dummy version.
         let inputs = plaintext
             .iter()
-            .map(|x| DummyVal::to_crt(*x, q))
+            .map(|x| CrtBundle::from((*x, q)))
             .collect::<Vec<_>>();
         let VecCrtBundle(output) = Dummy::eval(&TestCircuit::new(), &inputs).unwrap();
         let expected = output
             .iter()
-            .map(|x| DummyVal::from_crt(x, q))
+            .map(|x| CrtBundle::from_crt(x, q))
             .collect::<Vec<_>>();
 
         // Run 2PC version.

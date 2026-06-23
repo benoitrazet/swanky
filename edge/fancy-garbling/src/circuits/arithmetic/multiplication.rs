@@ -79,10 +79,11 @@ where
 #[cfg(test)]
 mod test {
     use crate::{
+        CrtBundle,
         circuits::arithmetic::{ConstantMultiplication, Multiplication},
-        dummy::{Dummy, DummyVal},
         util::RngExt,
     };
+    use fancy_plaintext::Dummy;
     use rand::{Rng, thread_rng};
 
     #[test]
@@ -93,11 +94,11 @@ mod test {
         for _ in 0..16 {
             let x = rng.r#gen::<u64>() as u128 % q;
             let y = rng.r#gen::<u64>() as u128 % q;
-            let x_input = DummyVal::to_crt(x, q);
-            let y_input = DummyVal::to_crt(y, q);
+            let x_input = CrtBundle::from((x, q));
+            let y_input = CrtBundle::from((y, q));
             let circuit = Multiplication::new();
             let z = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
-            let output = DummyVal::from_crt(&z, q);
+            let output = CrtBundle::from_crt(&z, q);
             assert_eq!(output, (x * y) % q);
         }
     }
@@ -110,10 +111,10 @@ mod test {
         for _ in 0..16 {
             let x = rng.r#gen::<u64>() as u128 % q;
             let c = rng.r#gen::<u64>() as u128 % q;
-            let x_input = DummyVal::to_crt(x, q);
+            let x_input = CrtBundle::from((x, q));
             let circuit = ConstantMultiplication::new();
             let z = Dummy::eval(&circuit, (&x_input, c)).unwrap();
-            let output = DummyVal::from_crt(&z, q);
+            let output = CrtBundle::from_crt(&z, q);
             assert_eq!(output, (x * c) % q);
         }
     }
