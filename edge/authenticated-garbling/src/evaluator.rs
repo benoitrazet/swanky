@@ -42,7 +42,7 @@ pub struct Evaluator {
     and_auth_shares: Vec<AuthShare<PartyEvaluator>>,
     // The index of the current AND authenticated share we're using.
     and_auth_shares_index: usize,
-    // A vector that stores the masked wire values. This is used during the
+    // The masked wire values are used during the
     // finalization/validation stage.
     lc_values: Vec<F2>,
     // A vector that stores the Evaluator's validation shares. Contrary to the
@@ -110,30 +110,29 @@ impl Evaluator {
         self.and_auth_shares_index += 1;
         share
     }
-    /// The gate garbling material associated with the current AND gate
+    /// The gate specific garbling material associated with the current AND gate
     fn next_and_gate(&mut self) -> (U8x16, U8x16) {
         let gate = self.gates[self.gate_index];
         self.gate_index += 1;
         gate
     }
-    /// The gate garbling  material associated with the current AND gate
+    /// The least significant bit of the 0 wire label of the current AND gate
     fn next_and_gate_bit(&mut self) -> F2 {
         let bit = self.gate_bits[self.gate_bits_index];
         self.gate_bits_index += 1;
         bit
     }
     fn receive_garbling_material(&mut self, channel: &mut Channel) -> Result<()> {
-        let nands = self.and_auth_shares.len();
-        // Receive the garbled gates first
         let mut bit_ser: F2BitDeserializer = SequenceDeserializer::new(channel.as_std_io())
             .wrap_err(
                 ErrorKind::InitializationError,
                 "Failed to create sequence deserializer.",
             )?;
-
+        let nands = self.and_auth_shares.len();
+        // Receive the lsb of 0 wire label
         self.gate_bits
             .extend(bit_ser.read_vector(channel.as_std_io(), nands)?);
-
+        // Receive the garbled gates
         for _ in 0..nands {
             let g0: U8x16 = channel.read()?;
             let g1: U8x16 = channel.read()?;
@@ -160,8 +159,7 @@ impl Evaluator {
         }
         Ok(wires)
     }
-    /// A function that finalizes the authenticated garbling computation before
-    /// opening the output share.
+    /// Finalizes the authenticated garbling computation before opening the output share.
     ///
     /// Prior to revealing the result of the computation, the garbler and evaluator
     /// need to validate the authenticated AND gates. In the case of the evaluator,
@@ -307,7 +305,7 @@ impl Fancy for Evaluator {
         let constant = F2::try_from(value).expect("constant must be boolean");
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
 
-        let wirelabel = if value == 1 {
+        let wirelabel = if constant == F2::ONE {
             self.one
         } else {
             WireMod2::from_repr(self.one.to_repr() ^ self.delta, 2)

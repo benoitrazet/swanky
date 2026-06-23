@@ -87,23 +87,13 @@ fn test_circuit<
             let mut gb = Garbler::new(circuit, c, rng)?;
 
             let offline_wires = gb.encode_offline(ninputs_gb + ninputs_ev)?;
-            println!("offline_wires {:?}", offline_wires.len());
             let outputs = circuit.execute(
                 &mut gb,
-                <C as CircuitInputMapper<Garbler<_>>>::map(circuit, offline_wires.clone()),
+                <C as CircuitInputMapper<Garbler<_>>>::map(circuit, offline_wires),
                 c,
             )?;
-            let mut inputs = gb
-                .encode_many(
-                    &offline_wires[..ninputs_gb],
-                    &inputs_gb,
-                    &vec![2; ninputs_gb],
-                    c,
-                )
-                .unwrap();
-            let their = gb
-                .receive_many(&offline_wires[ninputs_gb..], &vec![2; ninputs_ev], c)
-                .unwrap();
+            let mut inputs = gb.encode_many(&inputs_gb, &vec![2; ninputs_gb], c).unwrap();
+            let their = gb.receive_many(&vec![2; ninputs_ev], c).unwrap();
             inputs.extend(their);
             gb.finalize(circuit, inputs, c).unwrap();
             gb.outputs(&outputs.flatten(), c)

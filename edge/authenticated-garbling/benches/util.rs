@@ -36,13 +36,8 @@ pub fn test_circuit<
                 <C as CircuitInputMapper<Garbler<_>>>::map(circuit, offline_wires.clone()),
                 c,
             )?;
-            let mut inputs = gb.encode_many(
-                &offline_wires[..ninputs_gb],
-                &inputs_gb,
-                &vec![2; ninputs_gb],
-                c,
-            )?;
-            let theirs = gb.receive_many(&offline_wires[ninputs_gb..], &vec![2; ninputs_gb], c)?;
+            let mut inputs = gb.encode_many(&inputs_gb, &vec![2; ninputs_gb], c)?;
+            let theirs = gb.receive_many(&vec![2; ninputs_gb], c)?;
             inputs.extend(theirs);
             gb.finalize(circuit, inputs, c).unwrap();
             gb.outputs(&outputs.flatten(), c)

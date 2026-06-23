@@ -1,5 +1,4 @@
 use crate::GarblerFinalizer;
-use crate::finalizer::FinalizedWire;
 use crate::preprocesser::WirePreProcessor;
 use crate::preprocesser::f_preprocessing;
 use crate::ps::PartyGarbler;
@@ -49,6 +48,10 @@ pub struct Garbler<RNG> {
     gates: Vec<(U8x16, U8x16)>,
     // A vector that stores the garbling gate bits.
     gate_bits: Vec<F2>,
+    // The wire material that the garbler computes offline
+    offline_wires: Vec<AuthenticatedWire>,
+    // The index of the current offline wire
+    wires_offline_index: usize,
     rng: RNG,
 }
 
@@ -86,6 +89,8 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             and_auth_shares_index: 0,
             gates: Vec::with_capacity(nands),
             gate_bits: Vec::with_capacity(nands),
+            offline_wires: Vec::new(),
+            wires_offline_index: 0,
             rng,
         })
     }
@@ -106,6 +111,11 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         self.and_auth_shares_index += 1;
         share
     }
+    fn next_offline_wire(&mut self) -> AuthenticatedWire {
+        let wire = self.offline_wires[self.wires_offline_index];
+        self.wires_offline_index += 1;
+        wire
+    }
     pub(crate) fn auth_share_at_index(&self, index: usize) -> AuthShare<PartyGarbler> {
         self.auth_shares[index]
     }
@@ -123,9 +133,9 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             ErrorKind::InitializationError,
             "Failed to initialize sequence serializer.",
         )?;
-
+        // Send the lsb of 0 wire label
         bit_ser.write_vector(channel.as_std_io(), &self.gate_bits)?;
-
+        // Send the garbled gates
         for (g0, g1) in self.gates.iter() {
             channel.write(g0)?;
             channel.write(g1)?;
@@ -144,6 +154,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
                 )
             })
             .collect();
+        self.offline_wires = input_wires.clone();
         Ok(input_wires)
     }
     // Send the wirelabel `L_b` associated with the masked value `b` to the evaluator returning a vector of the
@@ -155,7 +166,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         wires: &[AuthenticatedWire],
         masked_values: Vec<F2>,
         channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<FinalizedWire>> {
+    ) -> Result<Vec<AuthenticatedWire>> {
         let mut result = Vec::new();
         for (masked_value, wire) in masked_values.iter().zip(wires.iter()) {
             // Use masked values `x_w + λ_w` and zero wirelabels `L_0` to create
@@ -163,71 +174,13 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             let wirelabel = wire.wire_label()
                 + WireMod2::from_repr(U8x16::from(*masked_value * F128b::from(self.delta())), 2);
             channel.write(&wirelabel.to_repr())?;
-            result.push(FinalizedWire::new(*masked_value, wire.auth_share()));
+            result.push(AuthenticatedWire::new(
+                *masked_value,
+                wirelabel,
+                wire.auth_share(),
+            ));
         }
         Ok(result)
-    }
-    /// Receive the evaluators wire labels online
-    pub fn receive_many(
-        &mut self,
-        wires_offline: &[AuthenticatedWire],
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<FinalizedWire>> {
-        let my_auth_shares: Vec<AuthShare<PartyGarbler>> =
-            wires_offline.iter().map(|w| w.auth_share()).collect();
-
-        // Open the garbler's shares `[r_w]` using these shares.
-        AuthShareGenerator::open_my_shares(&my_auth_shares, channel)?;
-
-        // Receive `y_w ⊕ λ_w := y_w ⊕ (s_w ⊕ r_w)` from the evaluator.
-        let their_masked_values = (0..moduli.len())
-            .map(|_| channel.read::<F2>())
-            .collect::<Result<Vec<_>>>()?;
-
-        self.encode_wirelabels(wires_offline, their_masked_values, channel)
-    }
-    /// Encode and send the garblers wire labels online
-    pub fn encode_many(
-        &mut self,
-        wires_offline: &[AuthenticatedWire],
-        values: &[u16],
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<FinalizedWire>> {
-        assert_eq!(values.len(), moduli.len());
-
-        self.send_garbling_material(channel)?;
-
-        let my_auth_shares: Vec<AuthShare<PartyGarbler>> =
-            wires_offline.iter().map(|w| w.auth_share()).collect();
-
-        // Open the evaluator's shares `[s_w]` using these shares.
-        let mut their_bits = Vec::with_capacity(values.len());
-        AuthShareGenerator::open_their_shares_with_delta(
-            &my_auth_shares,
-            self.delta(),
-            &mut their_bits,
-            channel,
-        )?;
-
-        // Compute masked values `x_w ⊕ λ_w := x_w ⊕ (s_w ⊕ r_w)`.
-        let my_masked_values = their_bits
-            .into_iter()
-            .zip(my_auth_shares.iter().zip(values.iter()))
-            .map(|(theirs, (mine, value))| {
-                F2::try_from(*value)
-                    .wrap_err(ErrorKind::OtherError, "Invalid value, must be boolean")
-                    .map(|value| theirs + mine.bit() + value)
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        // Send `x_w ⊕ λ_w` to the evaluator.
-        for masked_value in my_masked_values.iter() {
-            channel.write(masked_value)?;
-        }
-
-        self.encode_wirelabels(&wires_offline, my_masked_values, channel)
     }
 
     /// A function that finalizes the authenticated garbling computation before
@@ -246,7 +199,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     >(
         &'b self,
         circuit: &C,
-        input_wires: Vec<FinalizedWire>,
+        input_wires: Vec<AuthenticatedWire>,
         channel: &mut Channel,
     ) -> Result<()>
     where
@@ -396,19 +349,64 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
 impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
     fn encode_many(
         &mut self,
-        _values: &[u16],
-        _moduli: &[u16],
-        _channel: &mut Channel,
+        values: &[u16],
+        moduli: &[u16],
+        channel: &mut Channel,
     ) -> Result<Vec<<Self as Fancy>::Item>> {
-        unimplemented!(
-            "The garbler needs to be calling its own special encoding function to use its offline generated material!"
-        );
+        assert_eq!(values.len(), moduli.len());
+
+        self.send_garbling_material(channel)?;
+
+        let offline_wires: Vec<AuthenticatedWire> = (0..moduli.len())
+            .map(|_| self.next_offline_wire())
+            .collect();
+        let my_auth_shares: Vec<AuthShare<PartyGarbler>> =
+            offline_wires.iter().map(|w| w.auth_share()).collect();
+
+        // Open the evaluator's shares `[s_w]` using these shares.
+        let mut their_bits = Vec::with_capacity(values.len());
+        AuthShareGenerator::open_their_shares_with_delta(
+            &my_auth_shares,
+            self.delta(),
+            &mut their_bits,
+            channel,
+        )?;
+
+        // Compute masked values `x_w ⊕ λ_w := x_w ⊕ (s_w ⊕ r_w)`.
+        let my_masked_values = their_bits
+            .into_iter()
+            .zip(my_auth_shares.iter().zip(values.iter()))
+            .map(|(theirs, (mine, value))| {
+                F2::try_from(*value)
+                    .wrap_err(ErrorKind::OtherError, "Invalid value, must be boolean")
+                    .map(|value| theirs + mine.bit() + value)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        // Send `x_w ⊕ λ_w` to the evaluator.
+        for masked_value in my_masked_values.iter() {
+            channel.write(masked_value)?;
+        }
+
+        self.encode_wirelabels(&offline_wires, my_masked_values, channel)
     }
 
-    fn receive_many(&mut self, _moduli: &[u16], _channel: &mut Channel) -> Result<Vec<Self::Item>> {
-        unimplemented!(
-            "The garbler needs to be calling its own special receive function to use its offline generated material!"
-        );
+    fn receive_many(&mut self, moduli: &[u16], channel: &mut Channel) -> Result<Vec<Self::Item>> {
+        let offline_wires: Vec<AuthenticatedWire> = (0..moduli.len())
+            .map(|_| self.next_offline_wire())
+            .collect();
+        let my_auth_shares: Vec<AuthShare<PartyGarbler>> =
+            offline_wires.iter().map(|w| w.auth_share()).collect();
+
+        // Open the garbler's shares `[r_w]` using these shares.
+        AuthShareGenerator::open_my_shares(&my_auth_shares, channel)?;
+
+        // Receive `y_w ⊕ λ_w := y_w ⊕ (s_w ⊕ r_w)` from the evaluator.
+        let their_masked_values = (0..moduli.len())
+            .map(|_| channel.read::<F2>())
+            .collect::<Result<Vec<_>>>()?;
+
+        self.encode_wirelabels(&offline_wires, their_masked_values, channel)
     }
 }
 

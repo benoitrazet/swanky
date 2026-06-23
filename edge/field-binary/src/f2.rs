@@ -216,7 +216,7 @@ pub struct F2BitSerializer {
 }
 
 impl F2BitSerializer {
-    /// A wraper around write and finalize which writes a vector of
+    /// A wrapper around [`F2BitSerializer::write`] and [`F2BitSerializer::finish`] which writes a vector of
     /// bits into the channel and finishes afterwards.
     pub fn write_vector<W: std::io::Write>(
         mut self,
@@ -281,7 +281,7 @@ pub struct F2BitDeserializer {
 }
 
 impl F2BitDeserializer {
-    /// A wraper around read which reads a specific number of
+    /// A wrapper around [`F2BitDeserializer::read`] which reads a specific number of
     /// bits defined by len and returns those bits
     pub fn read_vector<R: std::io::Read>(
         &mut self,

@@ -16,7 +16,7 @@ pub struct AuthenticatedWireMod2<P: GenericParty> {
     /// An optional masked value $`w \oplus \lambda`$.
     masked_value: Option<F2>,
     /// The wirelabel $`L`$.
-    wire_label: WireMod2,
+    wire_label: Option<WireMod2>,
     /// Sharing of the color bit $`\lambda`$.
     auth_share: AuthShare<P>,
 }
@@ -27,7 +27,7 @@ impl<P: GenericParty> AuthenticatedWireMod2<P> {
     pub(crate) fn new(masked_value: F2, wire_label: WireMod2, auth_share: AuthShare<P>) -> Self {
         AuthenticatedWireMod2 {
             masked_value: Some(masked_value),
-            wire_label,
+            wire_label: Some(wire_label),
             auth_share,
         }
     }
@@ -37,7 +37,16 @@ impl<P: GenericParty> AuthenticatedWireMod2<P> {
     pub(crate) fn new_without_mask(wire_label: WireMod2, auth_share: AuthShare<P>) -> Self {
         AuthenticatedWireMod2 {
             masked_value: None,
-            wire_label,
+            wire_label: Some(wire_label),
+            auth_share,
+        }
+    }
+    /// Create a new `AuthenticatedWireMod2` given the underlying wirelabel
+    /// $`L`$, and its associated color bit share $`\langle \lambda \rangle`$.
+    pub(crate) fn new_without_label(masked_value: F2, auth_share: AuthShare<P>) -> Self {
+        AuthenticatedWireMod2 {
+            masked_value: Some(masked_value),
+            wire_label: None,
             auth_share,
         }
     }
@@ -48,7 +57,7 @@ impl<P: GenericParty> AuthenticatedWireMod2<P> {
 
     /// The wirelabel $`L`$ associated with this wire.
     pub(crate) fn wire_label(&self) -> WireMod2 {
-        self.wire_label
+        self.wire_label.unwrap()
     }
 
     /// The authenticated share $`\langle \lambda \rangle`$ associated with this

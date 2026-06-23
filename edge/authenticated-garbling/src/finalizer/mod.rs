@@ -1,54 +1,14 @@
-use fancy_garbling::{Fancy, FancyBinary, FancyEncode, FancyOutput, HasModulus};
+use fancy_garbling::{Fancy, FancyBinary, FancyEncode, FancyOutput};
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
-
 use vectoreyes::U8x16;
 
-use crate::{Garbler, ps::PartyGarbler};
+use crate::{AuthenticatedWireMod2, Garbler, ps::PartyGarbler};
 
-#[derive(Clone, Copy)]
-pub struct FinalizedWire {
-    /// Masked value $`w \oplus \lambda`$.
-    masked_value: F2,
-    /// Sharing of the color bit $`\lambda`$.
-    auth_share: AuthShare<PartyGarbler>,
-}
-
-impl core::fmt::Debug for FinalizedWire {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FinalizedWire")
-            .field("auth_share", &())
-            .finish()
-    }
-}
-
-impl FinalizedWire {
-    /// Construct a new [`FinalizedWire`] from an authenticated share.
-    pub(crate) fn new(masked_value: F2, auth_share: AuthShare<PartyGarbler>) -> Self {
-        FinalizedWire {
-            masked_value,
-            auth_share,
-        }
-    }
-    /// The masked value associated with this wire.
-    pub(crate) fn masked_value(&self) -> F2 {
-        self.masked_value
-    }
-    /// The authenticated share $`\langle \lambda \rangle`$ associated with this
-    /// wire.
-    pub(crate) fn auth_share(&self) -> AuthShare<PartyGarbler> {
-        self.auth_share
-    }
-}
-
-impl HasModulus for FinalizedWire {
-    fn modulus(&self) -> u16 {
-        2
-    }
-}
+type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 /// A struct which allows the garbler to compute the validation shares before opening them
 pub struct GarblerFinalizer<'a, RNG> {
     gb: &'a Garbler<RNG>,
@@ -62,7 +22,7 @@ pub struct GarblerFinalizer<'a, RNG> {
     // The index of the current AND authenticated share we're using.
     and_auth_shares_index: usize,
     // The input wires computed by the garbler in the offline phase
-    input_wires: Vec<FinalizedWire>,
+    input_wires: Vec<AuthenticatedWire>,
     // The index of the current input wire
     input_wires_index: usize,
 }
@@ -72,7 +32,7 @@ impl<'a, RNG: CryptoRng + RngCore> GarblerFinalizer<'a, RNG> {
     /// and from the masked wire values received from the evaluator
     pub fn new<'b>(
         gb: &'b Garbler<RNG>,
-        input_wires: Vec<FinalizedWire>,
+        input_wires: Vec<AuthenticatedWire>,
         lc_values: Vec<F2>,
     ) -> GarblerFinalizer<'b, RNG> {
         GarblerFinalizer {
@@ -116,17 +76,17 @@ impl<'a, RNG> Fancy for GarblerFinalizer<'a, RNG>
 where
     RNG: RngCore + CryptoRng,
 {
-    type Item = FinalizedWire;
+    type Item = AuthenticatedWire;
     fn constant(
         &mut self,
         value: u16,
         _q: u16,
         _channel: &mut Channel,
-    ) -> swanky_error::Result<FinalizedWire> {
+    ) -> swanky_error::Result<AuthenticatedWire> {
         let constant = F2::try_from(value).expect("constant must be boolean");
         let auth_share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta());
 
-        Ok(FinalizedWire::new(constant, auth_share))
+        Ok(AuthenticatedWire::new_without_label(constant, auth_share))
     }
 }
 
@@ -169,18 +129,18 @@ where
                 ^ lc_triple
                 ^ lc_share,
         );
-        Ok(FinalizedWire::new(lc_value, lc_share))
+        Ok(AuthenticatedWire::new_without_label(lc_value, lc_share))
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        FinalizedWire::new(
+        AuthenticatedWire::new_without_label(
             x.masked_value() + y.masked_value(),
             x.auth_share() ^ y.auth_share(),
         )
     }
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        FinalizedWire::new(x.masked_value() + F2::ONE, x.auth_share())
+        AuthenticatedWire::new_without_label(x.masked_value() + F2::ONE, x.auth_share())
     }
 }
 
