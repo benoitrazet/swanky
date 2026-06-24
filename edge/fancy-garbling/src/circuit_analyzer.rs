@@ -30,7 +30,7 @@ impl HasModulus for AnalyzerItem {
 }
 
 /// A [`Fancy`] object which counts gates and depth of a
-/// [`crate::circuit::Circuit`].
+/// [`fancy_traits::Circuit`].
 ///
 /// Specifically, [`CircuitAnalyzer`] stores the number of inputs, ands, xors,
 /// negations, constants, multiplications, additions, subtractions, and
