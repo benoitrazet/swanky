@@ -1,0 +1,28 @@
+[package]
+name = "fancy-circuits"
+readme = "README.md"
+description = "Circuits implementing the `Fancy` API"
+categories = ["cryptography"]
+keywords = ["cryptography", "secure computation"]
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+fancy-plaintext.workspace = true
+fancy-traits.workspace = true
+swanky-channel.workspace = true
+swanky-error.workspace = true
+
+rand.workspace = true
+regex.workspace = true
+
+[dev-dependencies]
+fancy-plaintext.workspace = true
+fancy-garbling.workspace = true
+swanky-rng.workspace = true

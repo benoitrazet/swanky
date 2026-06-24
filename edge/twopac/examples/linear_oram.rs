@@ -2,7 +2,8 @@
 //! using fancy-garbling.
 
 use fancy_analyzer::CircuitAnalyzer;
-use fancy_garbling::{AllWire, BinaryBundle, BinaryGadgets, circuits::LinearOram};
+use fancy_circuits::{BinaryBundle, BinaryGadgets, LinearOram};
+use fancy_garbling::AllWire;
 use fancy_traits::{Circuit, FancyOutput};
 use rand::{CryptoRng, RngCore, SeedableRng};
 use swanky_block::Block;

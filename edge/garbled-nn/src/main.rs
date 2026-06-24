@@ -106,7 +106,7 @@ pub fn main() -> swanky_error::Result<()> {
         "# Primes: {:?}",
         bitwidth
             .iter()
-            .map(|&w| fancy_garbling::util::primes_with_width(w as u32).len())
+            .map(|&w| fancy_circuits::util::primes_with_width(w).len())
             .collect::<Vec<_>>()
     );
 

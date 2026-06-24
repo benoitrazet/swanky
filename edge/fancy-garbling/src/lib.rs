@@ -3,15 +3,9 @@
 #![deny(missing_docs)]
 // TODO: when https://git.io/JYTnW gets stabilized add the readme as module docs.
 
-mod circuit;
-pub use circuit::test_circuits;
-mod binary;
-pub mod circuits;
 pub mod classic;
-mod fancy;
 mod garble;
-mod parser;
 pub mod util;
 mod wire;
 
-pub use crate::{fancy::*, garble::*, wire::*};
+pub use crate::{garble::*, wire::*};

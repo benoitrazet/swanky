@@ -112,7 +112,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fancy_garbling::circuits::binary::TestBinaryAddition;
+    use fancy_circuits::binary::TestBinaryAddition;
     use swanky_party::party_system;
     use swanky_rng::SwankyRng;
 

@@ -163,6 +163,7 @@ MISNAMED_CRATES = {
     "inferno",
     "keyed_arena",
     "fancy-analyzer",
+    "fancy-circuits",
     "fancy-garbling",
     "fancy-plaintext",
     "fancy-traits",

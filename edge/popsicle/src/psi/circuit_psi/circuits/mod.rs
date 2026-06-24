@@ -1,10 +1,8 @@
 //! Various fancy circuits
 use crate::circuit_psi::*;
-use fancy_garbling::{
+use fancy_circuits::{
     BinaryBundle,
-    circuits::binary::{
-        BinaryAdditionNoCarry, BinaryConstant, BinaryEquality, BinaryMultiplex, PairwiseXor,
-    },
+    binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality, BinaryMultiplex, PairwiseXor},
 };
 use fancy_traits::{Circuit, Fancy, FancyBinary};
 use itertools::Itertools;

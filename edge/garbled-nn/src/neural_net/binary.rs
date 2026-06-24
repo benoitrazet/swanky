@@ -4,9 +4,9 @@ use crate::{
     neural_net::FancyNeuralNet,
     util::{i64_from_bits, i64_to_twos_complement},
 };
-use fancy_garbling::{
+use fancy_circuits::{
     BinaryBundle, BinaryGadgets,
-    circuits::binary::{
+    binary::{
         BinaryAdditionNoCarry, BinaryConstant, BinaryConstantMultiplication, BinaryMax,
         BinaryMultiplex, BinaryMultiplexConstantBits, BinaryMultiplicationLowerHalf,
     },
