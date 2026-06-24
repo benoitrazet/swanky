@@ -188,7 +188,7 @@ impl Evaluator {
         let validation_failures: Vec<&F2> =
             validation_bits.iter().filter(|&&x| x == F2::ONE).collect();
         ensure!(
-            validation_failures.len() == 0,
+            validation_failures.is_empty(),
             ErrorKind::OtherError,
             "Evaluator's authentication validation check failed"
         );

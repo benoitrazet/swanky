@@ -50,7 +50,7 @@ pub struct Garbler<RNG> {
     and_auth_shares_index: usize,
     // A vector that stores the garbling gates.
     gates: Vec<(U8x16, U8x16)>,
-    // A vector that stores the garbling gate bits.
+    // A vector that stores the lsb of the 0 wire label associated with AND gates.
     gate_bits: Vec<F2>,
     // The wire material that the garbler computes offline
     offline_wires: Vec<AuthenticatedWire>,
@@ -248,7 +248,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         let validation_failures: Vec<&F2> =
             validation_bits.iter().filter(|&&x| x == F2::ONE).collect();
         ensure!(
-            validation_failures.len() == 0,
+            validation_failures.is_empty(),
             ErrorKind::OtherError,
             "Evaluator's authentication validation check failed"
         );
