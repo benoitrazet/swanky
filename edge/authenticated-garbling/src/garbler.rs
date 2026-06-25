@@ -213,13 +213,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// need to validate the authenticated AND gates. In the case of the garbler, this
     /// involved locally traversing the circuit in order to compute those validation bits
     /// from the wire masked values that the evaluator sends.
-    pub fn finalize<
-        'a,
-        'b: 'a,
-        C: CircuitInputMapper<CircuitAnalyzer>
-            + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
-            + CircuitInputMapper<GarblerFinalizer<'a, RNG>>,
-    >(
+    pub fn finalize<'a, 'b: 'a, C: CircuitInputMapper<GarblerFinalizer<'a, RNG>>>(
         &'b self,
         circuit: &C,
         input_wires: Vec<AuthenticatedWire>,
@@ -237,14 +231,10 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             )?;
         let lc_values = bit_deser.read_vector(channel.as_std_io(), nands)?;
         // Create a finalizer using the pre-computed wires
-        let mut finalizer = GarblerFinalizer::new(self, input_wires.clone(), lc_values);
+        let finalizer = GarblerFinalizer::new(self, input_wires.clone(), lc_values);
 
         // Locally run the circuit to correctly construct the validation shares
-        circuit.execute(
-            &mut finalizer,
-            <C as CircuitInputMapper<GarblerFinalizer<'a, RNG>>>::map(circuit, input_wires),
-            channel,
-        )?;
+        circuit.map(input_wires);
 
         let mut validation_bits = Vec::with_capacity(nands);
         // The parties then open the share c_γ

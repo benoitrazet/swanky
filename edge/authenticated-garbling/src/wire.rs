@@ -15,7 +15,7 @@ use swanky_party::GenericParty;
 pub struct AuthenticatedWireMod2<P: GenericParty> {
     /// An optional masked value $`w \oplus \lambda`$.
     masked_value: Option<F2>,
-    /// The wirelabel $`L`$.
+    /// An optional  wirelabel $`L`$.
     wire_label: Option<WireMod2>,
     /// Sharing of the color bit $`\lambda`$.
     auth_share: AuthShare<P>,
