@@ -1,8 +1,8 @@
 #![cfg(test)]
 
-use crate::finalizer::GarblerValidator;
 use crate::garbler::Garbler;
 use crate::ps::{PartyEvaluator, PartyGarbler};
+use crate::validator::GarblerValidator;
 use crate::{evaluator::Evaluator, preprocesser::WirePreProcessor};
 
 use fancy_garbling::Flatten;

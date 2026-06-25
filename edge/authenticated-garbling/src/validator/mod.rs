@@ -28,7 +28,7 @@ pub struct GarblerValidator<RNG> {
 }
 
 impl<RNG: CryptoRng + RngCore> GarblerValidator<RNG> {
-    /// Create a new [`GarblerFinalizer`] from a reference to the [`Garbler`]
+    /// Create a new [`GarblerValidator`] from a reference to the [`Garbler`]
     /// and from the masked wire values received from the evaluator
     pub fn new(
         gb: Garbler<RNG>,
