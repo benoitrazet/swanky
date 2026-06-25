@@ -146,7 +146,7 @@ where
         swanky_channel::local::local_channel_pair(
             |channel: &mut Channel<'_>| {
                 let mut gb = Garbler::new(circuit, channel, SwankyRng::new())?;
-                let offline_wires = gb.encode_offline(inputs.len())?;
+                let offline_wires = gb.offline_wires();
                 let outputs = circuit.execute(
                     &mut gb,
                     <C as CircuitInputMapper<Garbler<_>>>::map(circuit, offline_wires),

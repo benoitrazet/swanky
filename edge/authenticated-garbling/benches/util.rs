@@ -30,10 +30,10 @@ pub fn test_circuit<
     swanky_channel::local::local_channel_pair(
         |c| {
             let mut gb = Garbler::new(circuit, c, rng_gb)?;
-            let offline_wires = gb.encode_offline(ninputs_gb + ninputs_ev)?;
+            let offline_wires = gb.offline_wires();
             let outputs = circuit.execute(
                 &mut gb,
-                <C as CircuitInputMapper<Garbler<_>>>::map(circuit, offline_wires.clone()),
+                <C as CircuitInputMapper<Garbler<_>>>::map(circuit, offline_wires),
                 c,
             )?;
             let mut inputs = gb.encode_many(inputs_gb, &vec![2; ninputs_gb], c)?;

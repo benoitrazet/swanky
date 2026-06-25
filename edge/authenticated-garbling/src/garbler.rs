@@ -26,6 +26,8 @@ type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 
 /// The authenticated garbler.
 pub struct Garbler<RNG> {
+    // The number of input wires to the circuit
+    ninputs: usize,
     // The garbler's Δ.
     delta: WireMod2,
     // A random wirelabel denoting zero. Used to make negations free.
@@ -89,9 +91,11 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         let (auth_shares, known_triples) =
             f_preprocessing(circuit, &mut and_generator, channel, &mut rng)?;
         let nands = known_triples.len();
+        let ninputs: usize = <C as CircuitInputMapper<CircuitAnalyzer>>::ninputs(circuit);
         channel.write(&one.to_repr())?;
         channel.write(&zero_constant.to_repr())?;
-        Ok(Garbler {
+        let mut garbler = Garbler {
+            ninputs,
             delta: WireMod2::from_repr(delta, 2),
             zero,
             zero_constant,
@@ -105,7 +109,9 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             offline_wires: Vec::new(),
             wires_offline_index: 0,
             rng,
-        })
+        };
+        garbler.offline()?;
+        Ok(garbler)
     }
 
     fn next_and_gate_index(&mut self) -> usize {
@@ -158,8 +164,8 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// This function allows the garbler to encode wire labels offline prior
     /// to receiving the evaluator's values. By doing this we greatly improve
     /// the performance of the protocol.
-    pub fn encode_offline(&mut self, ninputs: usize) -> Result<Vec<AuthenticatedWire>> {
-        let input_wires: Vec<AuthenticatedWire> = (0..ninputs)
+    fn offline(&mut self) -> Result<()> {
+        let input_wires: Vec<AuthenticatedWire> = (0..self.ninputs)
             .map(|_| {
                 AuthenticatedWire::new_without_mask(
                     WireMod2::rand(&mut self.rng, 2),
@@ -167,8 +173,12 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
                 )
             })
             .collect();
-        self.offline_wires = input_wires.clone();
-        Ok(input_wires)
+        self.offline_wires = input_wires;
+        Ok(())
+    }
+    /// Returns the offline wires for the purpose for circuit execution
+    pub fn offline_wires(&self) -> Vec<AuthenticatedWire> {
+        self.offline_wires.clone()
     }
     // Send the wirelabel `L_b` associated with the masked value `b` to the evaluator returning a vector of the
     // corresponding `FinalizedWire` values.

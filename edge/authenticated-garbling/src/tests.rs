@@ -85,8 +85,7 @@ fn test_circuit<
         |c| {
             let rng = SwankyRng::new();
             let mut gb = Garbler::new(circuit, c, rng)?;
-
-            let offline_wires = gb.encode_offline(ninputs_gb + ninputs_ev)?;
+            let offline_wires = gb.offline_wires();
             let outputs = circuit.execute(
                 &mut gb,
                 <C as CircuitInputMapper<Garbler<_>>>::map(circuit, offline_wires),
