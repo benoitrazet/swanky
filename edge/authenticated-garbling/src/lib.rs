@@ -10,7 +10,7 @@ pub use garbler::Garbler;
 mod preprocesser;
 pub use preprocesser::WirePreProcessor;
 mod finalizer;
-pub use finalizer::GarblerFinalizer;
+pub use finalizer::GarblerValidator;
 mod tests;
 mod wire;
 pub use wire::AuthenticatedWireMod2;

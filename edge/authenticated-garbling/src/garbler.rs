@@ -1,4 +1,4 @@
-use crate::GarblerFinalizer;
+use crate::GarblerValidator;
 use crate::preprocesser::WirePreProcessor;
 use crate::preprocesser::f_preprocessing;
 use crate::ps::PartyGarbler;
@@ -67,7 +67,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         'a,
         C: CircuitInputMapper<CircuitAnalyzer>
             + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
-            + CircuitInputMapper<GarblerFinalizer<'a, RNG>>,
+            + CircuitInputMapper<GarblerValidator<'a, RNG>>,
     >(
         circuit: &C,
         channel: &mut Channel,
@@ -206,14 +206,14 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         Ok(result)
     }
 
-    /// A function that finalizes the authenticated garbling computation before
+    /// A function that validates the authenticated garbling computation before
     /// opening the output share.
     ///
     /// Prior to revealing the result of the computation, the garbler and evaluator
     /// need to validate the authenticated AND gates. In the case of the garbler, this
     /// involved locally traversing the circuit in order to compute those validation bits
     /// from the wire masked values that the evaluator sends.
-    pub fn finalize<'a, 'b: 'a, C: CircuitInputMapper<GarblerFinalizer<'a, RNG>>>(
+    pub fn validate<'a, 'b: 'a, C: CircuitInputMapper<GarblerValidator<'a, RNG>>>(
         &'b self,
         circuit: &C,
         input_wires: Vec<AuthenticatedWire>,
@@ -231,7 +231,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             )?;
         let lc_values = bit_deser.read_vector(channel.as_std_io(), nands)?;
         // Create a finalizer using the pre-computed wires
-        let finalizer = GarblerFinalizer::new(self, input_wires.clone(), lc_values);
+        let validator = GarblerValidator::new(self, input_wires.clone(), lc_values);
 
         // Locally run the circuit to correctly construct the validation shares
         circuit.map(input_wires);
@@ -239,7 +239,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         let mut validation_bits = Vec::with_capacity(nands);
         // The parties then open the share c_γ
         AuthShareGenerator::open_with_delta(
-            finalizer.validation_shares(),
+            validator.validation_shares(),
             self.delta(),
             &mut validation_bits,
             channel,

@@ -3,7 +3,7 @@ use fancy_garbling::{
     dummy::Dummy,
 };
 use swanky_authenticated_garbling::{
-    Evaluator, Garbler, GarblerFinalizer, WirePreProcessor,
+    Evaluator, Garbler, GarblerValidator, WirePreProcessor,
     ps::{PartyEvaluator, PartyGarbler},
 };
 use swanky_rng::SwankyRng;
@@ -16,7 +16,7 @@ pub fn test_circuit<
         + CircuitInputMapper<Garbler<SwankyRng>>
         + CircuitInputMapper<Evaluator>
         + CircuitInputMapper<Dummy>
-        + for<'c> CircuitInputMapper<GarblerFinalizer<'c, SwankyRng>>
+        + for<'c> CircuitInputMapper<GarblerValidator<'c, SwankyRng>>
         + Sync,
 >(
     inputs_gb: &[u16],
@@ -39,7 +39,7 @@ pub fn test_circuit<
             let mut inputs = gb.encode_many(inputs_gb, &vec![2; ninputs_gb], c)?;
             let theirs = gb.receive_many(&vec![2; ninputs_gb], c)?;
             inputs.extend(theirs);
-            gb.finalize(circuit, inputs, c).unwrap();
+            gb.validate(circuit, inputs, c).unwrap();
             gb.outputs(&outputs.flatten(), c)
         },
         |c| {

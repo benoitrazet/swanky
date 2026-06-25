@@ -6,7 +6,7 @@ use fancy_garbling::{
     circuit_analyzer::CircuitAnalyzer, circuits::LinearOram, classic::GarbledCircuit,
 };
 use swanky_authenticated_garbling::{
-    Evaluator, Garbler, GarblerFinalizer, WirePreProcessor,
+    Evaluator, Garbler, GarblerValidator, WirePreProcessor,
     ps::{PartyEvaluator, PartyGarbler},
 };
 use swanky_channel::Channel;
@@ -54,7 +54,7 @@ where
         + CircuitInputMapper<SemiHonestEvaluator<WireMod2>>
         + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
         + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
-        + for<'c> CircuitInputMapper<GarblerFinalizer<'c, SwankyRng>>
+        + for<'c> CircuitInputMapper<GarblerValidator<'c, SwankyRng>>
         + CircuitInputMapper<Garbler<SwankyRng>>
         + CircuitInputMapper<Evaluator>
         + Sync,
@@ -165,7 +165,7 @@ where
     let t = Instant::now();
     let (_, result) = swanky_channel::local::local_channel_pair(
         |channel| {
-            gb.finalize(circuit, inputs_gb, channel).unwrap();
+            gb.validate(circuit, inputs_gb, channel).unwrap();
             gb.outputs(&outputs.flatten(), channel)
         },
         |channel| {
@@ -174,7 +174,7 @@ where
                 <C as CircuitInputMapper<Evaluator>>::map(circuit, inputs_ev),
                 channel,
             )?;
-            ev.finalize(channel).unwrap();
+            ev.validate(channel).unwrap();
             ev.outputs(&outputs.flatten(), channel)
         },
     )?;

@@ -10,7 +10,7 @@ use crate::{AuthenticatedWireMod2, Garbler, ps::PartyGarbler};
 
 type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 /// A struct which allows the garbler to compute the validation shares before opening them
-pub struct GarblerFinalizer<'a, RNG> {
+pub struct GarblerValidator<'a, RNG> {
     gb: &'a Garbler<RNG>,
     validation_shares: Vec<AuthShare<PartyGarbler>>,
     // A vector that stores the masked wire values received from the evaluator.
@@ -27,15 +27,15 @@ pub struct GarblerFinalizer<'a, RNG> {
     input_wires_index: usize,
 }
 
-impl<'a, RNG: CryptoRng + RngCore> GarblerFinalizer<'a, RNG> {
+impl<'a, RNG: CryptoRng + RngCore> GarblerValidator<'a, RNG> {
     /// Create a new [`GarblerFinalizer`] from a reference to the [`Garbler`]
     /// and from the masked wire values received from the evaluator
     pub fn new<'b>(
         gb: &'b Garbler<RNG>,
         input_wires: Vec<AuthenticatedWire>,
         lc_values: Vec<F2>,
-    ) -> GarblerFinalizer<'b, RNG> {
-        GarblerFinalizer {
+    ) -> GarblerValidator<'b, RNG> {
+        GarblerValidator {
             gb,
             validation_shares: Vec::new(),
             lc_values,
@@ -72,7 +72,7 @@ impl<'a, RNG: CryptoRng + RngCore> GarblerFinalizer<'a, RNG> {
         self.gb.delta()
     }
 }
-impl<'a, RNG> Fancy for GarblerFinalizer<'a, RNG>
+impl<'a, RNG> Fancy for GarblerValidator<'a, RNG>
 where
     RNG: RngCore + CryptoRng,
 {
@@ -90,7 +90,7 @@ where
     }
 }
 
-impl<'a, RNG> FancyBinary for GarblerFinalizer<'a, RNG>
+impl<'a, RNG> FancyBinary for GarblerValidator<'a, RNG>
 where
     RNG: RngCore + CryptoRng,
 {
@@ -144,7 +144,7 @@ where
     }
 }
 
-impl<'a, RNG> FancyEncode for GarblerFinalizer<'a, RNG>
+impl<'a, RNG> FancyEncode for GarblerValidator<'a, RNG>
 where
     RNG: RngCore + CryptoRng,
 {
@@ -170,7 +170,7 @@ where
     }
 }
 
-impl<'a, RNG> FancyOutput for GarblerFinalizer<'a, RNG>
+impl<'a, RNG> FancyOutput for GarblerValidator<'a, RNG>
 where
     RNG: RngCore + CryptoRng,
 {

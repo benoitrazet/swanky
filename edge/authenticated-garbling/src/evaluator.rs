@@ -163,14 +163,14 @@ impl Evaluator {
         }
         Ok(wires)
     }
-    /// Finalizes the authenticated garbling computation before opening the output share.
+    /// Validate the authenticated garbling computation before opening the output share.
     ///
     /// Prior to revealing the result of the computation, the garbler and evaluator
     /// need to validate the authenticated AND gates. In the case of the evaluator,
     /// the evaluator sends out the masked wire values to the garbler, then can immediately
     /// open the validation bits since they already compute their share of those bits
     /// a-priori.
-    pub fn finalize(&mut self, channel: &mut Channel) -> Result<()> {
+    pub fn validate(&mut self, channel: &mut Channel) -> Result<()> {
         let bit_ser: F2BitSerializer = SequenceSerializer::new(&mut channel.as_std_io()).wrap_err(
             ErrorKind::InitializationError,
             "Failed to initialize sequence serializer.",

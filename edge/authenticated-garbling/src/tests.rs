@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::finalizer::GarblerFinalizer;
+use crate::finalizer::GarblerValidator;
 use crate::garbler::Garbler;
 use crate::ps::{PartyEvaluator, PartyGarbler};
 use crate::{evaluator::Evaluator, preprocesser::WirePreProcessor};
@@ -44,7 +44,7 @@ fn test_circuit<
         + CircuitInputMapper<Garbler<SwankyRng>>
         + CircuitInputMapper<Evaluator>
         + CircuitInputMapper<Dummy>
-        + for<'c> CircuitInputMapper<GarblerFinalizer<'c, SwankyRng>>
+        + for<'c> CircuitInputMapper<GarblerValidator<'c, SwankyRng>>
         + Sync,
 >(
     ninputs_gb: usize,
@@ -94,7 +94,7 @@ fn test_circuit<
             let mut inputs = gb.encode_many(&inputs_gb, &vec![2; ninputs_gb], c).unwrap();
             let their = gb.receive_many(&vec![2; ninputs_ev], c).unwrap();
             inputs.extend(their);
-            gb.finalize(circuit, inputs, c).unwrap();
+            gb.validate(circuit, inputs, c).unwrap();
             gb.outputs(&outputs.flatten(), c)
         },
         |c| {
@@ -111,7 +111,7 @@ fn test_circuit<
                 c,
             )?;
 
-            ev.finalize(c).unwrap();
+            ev.validate(c).unwrap();
             ev.outputs(&outputs.flatten(), c)
         },
     )
