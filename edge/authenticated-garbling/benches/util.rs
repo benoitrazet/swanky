@@ -29,17 +29,12 @@ pub fn test_circuit<
     let ninputs_ev = inputs_ev.len();
     swanky_channel::local::local_channel_pair(
         |c| {
-            let mut gb = Garbler::new(circuit, c, rng_gb)?;
-            let offline_wires = gb.offline_wires();
-            let outputs = circuit.execute(
-                &mut gb,
-                <C as CircuitInputMapper<Garbler<_>>>::map(circuit, offline_wires),
-                c,
-            )?;
+            let (mut gb, preprocessed_outputs) = Garbler::new(circuit, c, rng_gb)?;
+
             let mut inputs = gb.encode_many(inputs_gb, &vec![2; ninputs_gb], c)?;
             let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
             inputs.extend(theirs);
-            gb.finalize(circuit, inputs, &outputs.flatten(), c)
+            gb.finalize(circuit, inputs, &preprocessed_outputs.flatten(), c)
         },
         |c| {
             let mut ev = Evaluator::new(circuit, c, rng_ev)?;

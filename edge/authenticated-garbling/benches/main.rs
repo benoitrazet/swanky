@@ -41,12 +41,12 @@ fn bench_party_encoding_receiving(c: &mut Criterion) {
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
     let circuit = TestAndGateFanN(2 * input_size);
-    let (mut gb, mut ev) = swanky_channel::local::local_channel_pair(
+    let ((mut gb, _preprocessed_outputs), mut ev) = swanky_channel::local::local_channel_pair(
         |c| Garbler::new(&circuit, c, &mut rng_gb),
         |c| Evaluator::new(&circuit, c, &mut rng_ev),
     )
     .unwrap();
-    let offline_wires = gb.offline_wires();
+
     c.bench_function("party-encoding-receiving-no-setup", move |b| {
         b.iter(|| {
             swanky_channel::local::local_channel_pair(

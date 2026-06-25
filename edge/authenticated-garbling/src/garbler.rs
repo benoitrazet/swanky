@@ -3,6 +3,7 @@ use crate::preprocesser::WirePreProcessor;
 use crate::preprocesser::f_preprocessing;
 use crate::ps::PartyGarbler;
 use crate::wire::AuthenticatedWireMod2;
+use fancy_garbling::Circuit;
 use fancy_garbling::CircuitInputMapper;
 use fancy_garbling::FancyOutput;
 use fancy_garbling::circuit_analyzer::CircuitAnalyzer;
@@ -66,12 +67,13 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     pub fn new<
         C: CircuitInputMapper<CircuitAnalyzer>
             + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
-            + CircuitInputMapper<GarblerValidator<RNG>>,
+            + CircuitInputMapper<GarblerValidator<RNG>>
+            + CircuitInputMapper<Self>,
     >(
         circuit: &C,
         channel: &mut Channel,
         mut rng: RNG,
-    ) -> Result<Self> {
+    ) -> Result<(Self, <C as Circuit<Garbler<RNG>>>::Output)> {
         let delta = AndTripleGenerator::<PartyGarbler>::generate_valid_delta(&mut rng);
         // The garbler pre-generates two constant wire-labels
         // - The one wire label that is used for negation and garbling constant 1 gates.
@@ -106,8 +108,14 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             wires_offline_index: 0,
             rng,
         };
-        garbler.offline()?;
-        Ok(garbler)
+        let offline_wires = garbler.offline()?;
+
+        let outputs = circuit.execute(
+            &mut garbler,
+            CircuitInputMapper::<Self>::map(circuit, offline_wires),
+            channel,
+        )?;
+        Ok((garbler, outputs))
     }
 
     fn next_and_gate_index(&mut self) -> usize {
@@ -160,7 +168,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// This function allows the garbler to encode wire labels offline prior
     /// to receiving the evaluator's values. By doing this we greatly improve
     /// the performance of the protocol.
-    fn offline(&mut self) -> Result<()> {
+    fn offline(&mut self) -> Result<Vec<AuthenticatedWire>> {
         let input_wires: Vec<AuthenticatedWire> = (0..self.ninputs)
             .map(|_| {
                 AuthenticatedWire::new_without_mask(
@@ -169,8 +177,8 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
                 )
             })
             .collect();
-        self.offline_wires = input_wires;
-        Ok(())
+        self.offline_wires = input_wires.clone();
+        Ok(input_wires)
     }
     /// Returns the offline wires for the purpose for circuit execution
     pub fn offline_wires(&self) -> Vec<AuthenticatedWire> {

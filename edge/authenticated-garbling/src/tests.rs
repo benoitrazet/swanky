@@ -84,17 +84,12 @@ fn test_circuit<
     let (outputs_gb, outputs_ev) = swanky_channel::local::local_channel_pair(
         |c| {
             let rng = SwankyRng::new();
-            let mut gb = Garbler::new(circuit, c, rng)?;
-            let offline_wires = gb.offline_wires();
-            let outputs = circuit.execute(
-                &mut gb,
-                <C as CircuitInputMapper<Garbler<_>>>::map(circuit, offline_wires),
-                c,
-            )?;
+            let (mut gb, preprocessed_outputs) = Garbler::new(circuit, c, rng)?;
+
             let mut inputs = gb.encode_many(&inputs_gb, &vec![2; ninputs_gb], c).unwrap();
             let their = gb.receive_many(&vec![2; ninputs_ev], c).unwrap();
             inputs.extend(their);
-            gb.finalize(circuit, inputs, &outputs.flatten(), c)
+            gb.finalize(circuit, inputs, &preprocessed_outputs.flatten(), c)
         },
         |c| {
             let mut rng = SwankyRng::new();
