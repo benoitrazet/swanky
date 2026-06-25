@@ -64,18 +64,14 @@ pub struct Garbler<RNG> {
 impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// Create a new garbler for a given circuit.
     pub fn new<
-        'a,
         C: CircuitInputMapper<CircuitAnalyzer>
             + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
-            + CircuitInputMapper<GarblerValidator<'a, RNG>>,
+            + CircuitInputMapper<GarblerValidator<RNG>>,
     >(
         circuit: &C,
         channel: &mut Channel,
         mut rng: RNG,
-    ) -> Result<Self>
-    where
-        RNG: 'a,
-    {
+    ) -> Result<Self> {
         let delta = AndTripleGenerator::<PartyGarbler>::generate_valid_delta(&mut rng);
         // The garbler pre-generates two constant wire-labels
         // - The one wire label that is used for negation and garbling constant 1 gates.
@@ -213,15 +209,12 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// need to validate the authenticated AND gates. In the case of the garbler, this
     /// involved locally traversing the circuit in order to compute those validation bits
     /// from the wire masked values that the evaluator sends.
-    pub fn validate<'a, 'b: 'a, C: CircuitInputMapper<GarblerValidator<'a, RNG>>>(
-        &'b self,
+    pub fn validate<C: CircuitInputMapper<GarblerValidator<RNG>>>(
+        self,
         circuit: &C,
         input_wires: Vec<AuthenticatedWire>,
         channel: &mut Channel,
-    ) -> Result<()>
-    where
-        RNG: 'a,
-    {
+    ) -> Result<Garbler<RNG>> {
         let nands = self.and_auth_shares.len();
         // Receive the masked values from the Evaluator
         let mut bit_deser: F2BitDeserializer = SequenceDeserializer::new(channel.as_std_io())
@@ -230,6 +223,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
                 "Failed to create sequence deserializer.",
             )?;
         let lc_values = bit_deser.read_vector(channel.as_std_io(), nands)?;
+        let delta = self.delta();
         // Create a finalizer using the pre-computed wires
         let validator = GarblerValidator::new(self, input_wires.clone(), lc_values);
 
@@ -240,7 +234,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         // The parties then open the share c_γ
         AuthShareGenerator::open_with_delta(
             validator.validation_shares(),
-            self.delta(),
+            delta,
             &mut validation_bits,
             channel,
         )?;
@@ -252,7 +246,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             ErrorKind::OtherError,
             "Evaluator's authentication validation check failed"
         );
-        Ok(())
+        Ok(validator.garbler())
     }
 }
 

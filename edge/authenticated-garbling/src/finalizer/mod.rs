@@ -10,8 +10,8 @@ use crate::{AuthenticatedWireMod2, Garbler, ps::PartyGarbler};
 
 type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 /// A struct which allows the garbler to compute the validation shares before opening them
-pub struct GarblerValidator<'a, RNG> {
-    gb: &'a Garbler<RNG>,
+pub struct GarblerValidator<RNG> {
+    gb: Garbler<RNG>,
     validation_shares: Vec<AuthShare<PartyGarbler>>,
     // A vector that stores the masked wire values received from the evaluator.
     lc_values: Vec<F2>,
@@ -27,14 +27,14 @@ pub struct GarblerValidator<'a, RNG> {
     input_wires_index: usize,
 }
 
-impl<'a, RNG: CryptoRng + RngCore> GarblerValidator<'a, RNG> {
+impl<RNG: CryptoRng + RngCore> GarblerValidator<RNG> {
     /// Create a new [`GarblerFinalizer`] from a reference to the [`Garbler`]
     /// and from the masked wire values received from the evaluator
-    pub fn new<'b>(
-        gb: &'b Garbler<RNG>,
+    pub fn new(
+        gb: Garbler<RNG>,
         input_wires: Vec<AuthenticatedWire>,
         lc_values: Vec<F2>,
-    ) -> GarblerValidator<'b, RNG> {
+    ) -> GarblerValidator<RNG> {
         GarblerValidator {
             gb,
             validation_shares: Vec::new(),
@@ -71,8 +71,12 @@ impl<'a, RNG: CryptoRng + RngCore> GarblerValidator<'a, RNG> {
     fn delta(&self) -> U8x16 {
         self.gb.delta()
     }
+    /// Return the garbler's state
+    pub fn garbler(self) -> Garbler<RNG> {
+        self.gb
+    }
 }
-impl<'a, RNG> Fancy for GarblerValidator<'a, RNG>
+impl<RNG> Fancy for GarblerValidator<RNG>
 where
     RNG: RngCore + CryptoRng,
 {
@@ -90,7 +94,7 @@ where
     }
 }
 
-impl<'a, RNG> FancyBinary for GarblerValidator<'a, RNG>
+impl<RNG> FancyBinary for GarblerValidator<RNG>
 where
     RNG: RngCore + CryptoRng,
 {
@@ -144,7 +148,7 @@ where
     }
 }
 
-impl<'a, RNG> FancyEncode for GarblerValidator<'a, RNG>
+impl<RNG> FancyEncode for GarblerValidator<RNG>
 where
     RNG: RngCore + CryptoRng,
 {
@@ -170,7 +174,7 @@ where
     }
 }
 
-impl<'a, RNG> FancyOutput for GarblerValidator<'a, RNG>
+impl<RNG> FancyOutput for GarblerValidator<RNG>
 where
     RNG: RngCore + CryptoRng,
 {

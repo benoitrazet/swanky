@@ -54,7 +54,7 @@ where
         + CircuitInputMapper<SemiHonestEvaluator<WireMod2>>
         + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
         + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
-        + for<'c> CircuitInputMapper<GarblerValidator<'c, SwankyRng>>
+        + CircuitInputMapper<GarblerValidator<SwankyRng>>
         + CircuitInputMapper<Garbler<SwankyRng>>
         + CircuitInputMapper<Evaluator>
         + Sync,
@@ -165,7 +165,7 @@ where
     let t = Instant::now();
     let (_, result) = swanky_channel::local::local_channel_pair(
         |channel| {
-            gb.validate(circuit, inputs_gb, channel).unwrap();
+            let mut gb = gb.validate(circuit, inputs_gb, channel).unwrap();
             gb.outputs(&outputs.flatten(), channel)
         },
         |channel| {

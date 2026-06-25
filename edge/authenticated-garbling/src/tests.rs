@@ -44,7 +44,7 @@ fn test_circuit<
         + CircuitInputMapper<Garbler<SwankyRng>>
         + CircuitInputMapper<Evaluator>
         + CircuitInputMapper<Dummy>
-        + for<'c> CircuitInputMapper<GarblerValidator<'c, SwankyRng>>
+        + CircuitInputMapper<GarblerValidator<SwankyRng>>
         + Sync,
 >(
     ninputs_gb: usize,
@@ -94,7 +94,7 @@ fn test_circuit<
             let mut inputs = gb.encode_many(&inputs_gb, &vec![2; ninputs_gb], c).unwrap();
             let their = gb.receive_many(&vec![2; ninputs_ev], c).unwrap();
             inputs.extend(their);
-            gb.validate(circuit, inputs, c).unwrap();
+            let mut gb = gb.validate(circuit, inputs, c).unwrap();
             gb.outputs(&outputs.flatten(), c)
         },
         |c| {
