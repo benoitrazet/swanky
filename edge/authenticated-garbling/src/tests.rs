@@ -94,8 +94,7 @@ fn test_circuit<
             let mut inputs = gb.encode_many(&inputs_gb, &vec![2; ninputs_gb], c).unwrap();
             let their = gb.receive_many(&vec![2; ninputs_ev], c).unwrap();
             inputs.extend(their);
-            let mut gb = gb.validate(circuit, inputs, c).unwrap();
-            gb.outputs(&outputs.flatten(), c)
+            gb.finalize(circuit, inputs, &outputs.flatten(), c)
         },
         |c| {
             let mut rng = SwankyRng::new();
@@ -111,8 +110,7 @@ fn test_circuit<
                 c,
             )?;
 
-            ev.validate(c).unwrap();
-            ev.outputs(&outputs.flatten(), c)
+            ev.finalize(&outputs.flatten(), c)
         },
     )
     .unwrap();

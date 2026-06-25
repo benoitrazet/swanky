@@ -164,18 +164,15 @@ where
 
     let t = Instant::now();
     let (_, result) = swanky_channel::local::local_channel_pair(
-        |channel| {
-            let mut gb = gb.validate(circuit, inputs_gb, channel).unwrap();
-            gb.outputs(&outputs.flatten(), channel)
-        },
+        |channel| gb.finalize(circuit, inputs_gb, &outputs.flatten(), channel),
         |channel| {
             let outputs = circuit.execute(
                 &mut ev,
                 <C as CircuitInputMapper<Evaluator>>::map(circuit, inputs_ev),
                 channel,
             )?;
-            ev.validate(channel).unwrap();
-            ev.outputs(&outputs.flatten(), channel)
+
+            ev.finalize(&outputs.flatten(), channel)
         },
     )?;
     black_box(result);

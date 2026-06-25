@@ -194,6 +194,15 @@ impl Evaluator {
         );
         Ok(())
     }
+    /// Validate the computation and reveal the outputs
+    pub fn finalize(
+        &mut self,
+        output_wires: &[AuthenticatedWire],
+        channel: &mut Channel,
+    ) -> Result<Option<Vec<u16>>> {
+        self.validate(channel)?;
+        self.outputs(output_wires, channel)
+    }
 }
 
 impl FancyBinary for Evaluator {

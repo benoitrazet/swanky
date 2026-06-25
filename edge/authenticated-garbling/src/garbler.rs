@@ -248,6 +248,17 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         );
         Ok(validator.garbler())
     }
+    /// Validate the computation and reveal the outputs
+    pub fn finalize<C: CircuitInputMapper<GarblerValidator<RNG>>>(
+        self,
+        circuit: &C,
+        input_wires: Vec<AuthenticatedWire>,
+        output_wires: &[AuthenticatedWire],
+        channel: &mut Channel,
+    ) -> Result<Option<Vec<u16>>> {
+        let mut gb = self.validate(circuit, input_wires, channel)?;
+        gb.outputs(output_wires, channel)
+    }
 }
 
 impl<RNG> FancyBinary for Garbler<RNG>
