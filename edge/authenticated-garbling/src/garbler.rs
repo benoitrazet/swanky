@@ -233,10 +233,12 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         let lc_values = bit_deser.read_vector(channel.as_std_io(), nands)?;
         let delta = self.delta();
         // Create a finalizer using the pre-computed wires
-        let validator = GarblerValidator::new(self, input_wires.clone(), lc_values);
+        let mut validator = GarblerValidator::new(self, input_wires.clone(), lc_values);
 
         // Locally run the circuit to correctly construct the validation shares
-        circuit.map(input_wires);
+        Channel::with(std::io::empty(), {
+            |c| circuit.execute(&mut validator, circuit.map(input_wires), c)
+        })?;
 
         let mut validation_bits = Vec::with_capacity(nands);
         // The parties then open the share c_γ

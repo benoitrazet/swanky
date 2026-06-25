@@ -142,7 +142,7 @@ where
     );
 
     println!("=== Authenticated Garbling ===");
-    let ((mut gb, inputs_gb, outputs), (mut ev, inputs_ev)) =
+    let ((gb, inputs_gb, outputs), (mut ev, inputs_ev)) =
         swanky_channel::local::local_channel_pair(
             |channel: &mut Channel<'_>| {
                 let (mut gb, preprocessed_outputs) =
