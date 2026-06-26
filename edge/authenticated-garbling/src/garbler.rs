@@ -92,7 +92,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         let ninputs: usize = <C as CircuitInputMapper<CircuitAnalyzer>>::ninputs(circuit);
         channel.write(&one.to_repr())?;
         channel.write(&zero_constant.to_repr())?;
-        let mut garbler = Garbler {
+        let garbler = Garbler {
             ninputs,
             delta: WireMod2::from_repr(delta, 2),
             zero,
@@ -108,8 +108,8 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             wires_offline_index: 0,
             rng,
         };
-        let offline_wires = garbler.offline()?;
-
+        let mut garbler = garbler.offline()?;
+        let offline_wires = garbler.offline_wires();
         let outputs = circuit.execute(
             &mut garbler,
             CircuitInputMapper::<Self>::map(circuit, offline_wires),
@@ -168,17 +168,18 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// This function allows the garbler to encode wire labels offline prior
     /// to receiving the evaluator's values. By doing this we greatly improve
     /// the performance of the protocol.
-    fn offline(&mut self) -> Result<Vec<AuthenticatedWire>> {
-        let input_wires: Vec<AuthenticatedWire> = (0..self.ninputs)
+    fn offline(self) -> Result<Self> {
+        let mut gb: Garbler<RNG> = self;
+        let input_wires: Vec<AuthenticatedWire> = (0..gb.ninputs)
             .map(|_| {
                 AuthenticatedWire::new_without_mask(
-                    WireMod2::rand(&mut self.rng, 2),
-                    self.next_auth_share(),
+                    WireMod2::rand(&mut gb.rng, 2),
+                    gb.next_auth_share(),
                 )
             })
             .collect();
-        self.offline_wires = input_wires.clone();
-        Ok(input_wires)
+        gb.offline_wires = input_wires;
+        Ok(gb)
     }
     /// Returns the offline wires for the purpose for circuit execution
     pub fn offline_wires(&self) -> Vec<AuthenticatedWire> {
