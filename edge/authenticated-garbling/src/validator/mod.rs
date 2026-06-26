@@ -1,54 +1,82 @@
-use fancy_garbling::{Fancy, FancyBinary, FancyEncode};
+use crate::{AuthenticatedWireMod2, ps::PartyGarbler, vec_wrapper::VecWrapper};
+use fancy_garbling::{CircuitInputMapper, Fancy, FancyBinary, FancyOutput, WireLabel, WireMod2};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
+use swanky_error::{ErrorKind, Result};
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use vectoreyes::U8x16;
 
-use crate::{
-    AuthenticatedWireMod2, garbler::GarblerOnline, ps::PartyGarbler, vec_wrapper::VecWrapper,
-};
-
 type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 /// A struct which allows the garbler to compute the validation shares before opening them
 pub struct GarblerValidator {
-    gb: GarblerOnline,
+    // The garbler's Δ.
+    delta: WireMod2,
+    // A vector of authenticated shares, one per input wire and AND gate output.
+    // Corresponds to〈r_w, s_w〉from the paper.
+    auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
+    // A vector of fixed authenticated shares for AND gate wires. Each share is
+    // set such that it is equal to the AND of the incoming wire shares.
+    // Corresponds to〈r_w^*, s_w^*〉from the paper.
+    and_auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
     validation_shares: Vec<AuthShare<PartyGarbler>>,
     // A vector that stores the masked wire values received from the evaluator.
     lc_values: VecWrapper<F2>,
-    // The input wires computed by the garbler in the offline phase
-    input_wires: VecWrapper<AuthenticatedWire>,
 }
 
 impl GarblerValidator {
     /// Create a new [`GarblerValidator`] from a reference to the [`Garbler`]
     /// and from the masked wire values received from the evaluator
-    pub fn new(
-        mut gb: GarblerOnline,
-        input_wires: Vec<AuthenticatedWire>,
+    pub(crate) fn new(
+        delta: WireMod2,
+        mut auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
+        mut and_auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
+        ninputs: usize,
         lc_values: Vec<F2>,
     ) -> GarblerValidator {
-        gb.auth_shares.set_index(input_wires.len());
-        gb.and_auth_shares.reset();
+        auth_shares.set_index(ninputs);
+        and_auth_shares.reset();
         GarblerValidator {
-            gb,
+            delta,
+            auth_shares,
+            and_auth_shares,
             validation_shares: Vec::new(),
             lc_values: VecWrapper::new(lc_values),
-            input_wires: VecWrapper::new(input_wires),
         }
     }
 
-    /// Return the computed validation shares that be opened and authenticated
-    pub fn validation_shares(&self) -> &[AuthShare<PartyGarbler>] {
-        &self.validation_shares
+    pub(crate) fn validate<C: CircuitInputMapper<Self>>(
+        mut self,
+        circuit: &C,
+        inputs: Vec<AuthenticatedWire>,
+        channel: &mut Channel,
+    ) -> Result<Self> {
+        // Locally run the circuit to correctly construct the validation shares
+        Channel::with(std::io::empty(), {
+            |c| circuit.execute(&mut self, circuit.map(inputs), c)
+        })?;
+
+        let mut validation_bits = Vec::with_capacity(self.and_auth_shares.len());
+        // The parties then open the share c_γ
+        AuthShareGenerator::open_with_delta(
+            &self.validation_shares,
+            self.delta(),
+            &mut validation_bits,
+            channel,
+        )?;
+
+        let validation_failures: Vec<&F2> =
+            validation_bits.iter().filter(|&&x| x == F2::ONE).collect();
+        swanky_error::ensure!(
+            validation_failures.is_empty(),
+            ErrorKind::OtherError,
+            "Evaluator's authentication validation check failed"
+        );
+        Ok(self)
     }
 
     fn delta(&self) -> U8x16 {
-        self.gb.delta()
-    }
-    /// Return the garbler's state
-    pub fn garbler(self) -> GarblerOnline {
-        self.gb
+        self.delta.to_repr()
     }
 }
 
@@ -75,9 +103,9 @@ impl FancyBinary for GarblerValidator {
         _channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item> {
         // This is the share for wire label L_{γ,0}
-        let lc_share = self.gb.auth_shares.next();
+        let lc_share = self.auth_shares.next();
         // This is the and triple share for wire label L_{γ,0}
-        let lc_triple = self.gb.and_auth_shares.next();
+        let lc_triple = self.and_auth_shares.next();
 
         let lc_value = self.lc_values.next();
         // z'α := z_α + λ_α, where z_α is the actual wire value of the input
@@ -118,21 +146,20 @@ impl FancyBinary for GarblerValidator {
     }
 }
 
-impl FancyEncode for GarblerValidator {
-    fn receive_many(
-        &mut self,
-        moduli: &[u16],
-        _channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        Ok((0..moduli.len()).map(|_| self.input_wires.next()).collect())
+impl FancyOutput for GarblerValidator {
+    fn output(&mut self, x: &AuthenticatedWire, channel: &mut Channel) -> Result<Option<u16>> {
+        Ok(self
+            .outputs(core::slice::from_ref(x), channel)?
+            .map(|xs| xs[0]))
     }
 
-    fn encode_many(
+    fn outputs(
         &mut self,
-        _values: &[u16],
-        moduli: &[u16],
-        _channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        Ok((0..moduli.len()).map(|_| self.input_wires.next()).collect())
+        x: &[AuthenticatedWire],
+        channel: &mut Channel,
+    ) -> Result<Option<Vec<u16>>> {
+        let auth_shares = x.iter().map(|wire| wire.auth_share()).collect::<Vec<_>>();
+        AuthShareGenerator::open_my_shares(&auth_shares, channel)?;
+        Ok(None)
     }
 }

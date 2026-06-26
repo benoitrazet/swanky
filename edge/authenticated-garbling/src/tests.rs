@@ -5,7 +5,6 @@ use crate::ps::{PartyEvaluator, PartyGarbler};
 use crate::validator::GarblerValidator;
 use crate::{evaluator::Evaluator, preprocesser::WirePreProcessor};
 
-use fancy_garbling::Flatten;
 use fancy_garbling::circuits::binary::{
     TestBinaryAddition, TestBinaryMultiplication, TestBinarySubtraction, TestBinaryTwosComplement,
 };
@@ -17,6 +16,7 @@ use fancy_garbling::test_circuits::fancy::TestBinaryConstant;
 use fancy_garbling::{
     CircuitInputMapper, FancyEncode, circuit_analyzer::CircuitAnalyzer, dummy::Dummy,
 };
+use fancy_garbling::{FancyOutput, Flatten};
 use rand::Rng;
 use swanky_rng::SwankyRng;
 
@@ -90,7 +90,8 @@ fn test_circuit<
             let mut inputs = gb.encode_many(&inputs_gb, &vec![2; ninputs_gb], c).unwrap();
             let their = gb.receive_many(&vec![2; ninputs_ev], c).unwrap();
             inputs.extend(their);
-            gb.finalize(circuit, inputs, &outputs.flatten(), c)
+            let mut gb = gb.validate(circuit, inputs, c)?;
+            gb.outputs(&outputs.flatten(), c)
         },
         |c| {
             let mut rng = SwankyRng::new();

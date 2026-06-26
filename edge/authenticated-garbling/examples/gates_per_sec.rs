@@ -160,7 +160,10 @@ where
 
     let t = Instant::now();
     let (_, result) = swanky_channel::local::local_channel_pair(
-        |channel| gb.finalize(circuit, inputs_gb, &outputs.flatten(), channel),
+        |channel| {
+            let mut validator = gb.validate(circuit, inputs_gb, channel)?;
+            validator.outputs(&outputs.flatten(), channel)
+        },
         |channel| {
             let outputs = circuit.execute(
                 &mut ev,
