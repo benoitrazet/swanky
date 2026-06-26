@@ -1,49 +1,38 @@
-use fancy_garbling::{Fancy, FancyBinary, FancyEncode, FancyOutput};
-use rand::{CryptoRng, RngCore};
+use fancy_garbling::{Fancy, FancyBinary, FancyEncode};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use vectoreyes::U8x16;
 
-use crate::{AuthenticatedWireMod2, Garbler, ps::PartyGarbler};
+use crate::{AuthenticatedWireMod2, Garbler, ps::PartyGarbler, vec_wrapper::VecWrapper};
 
 type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 /// A struct which allows the garbler to compute the validation shares before opening them
-pub struct GarblerValidator<RNG> {
-    gb: Garbler<RNG>,
+pub struct GarblerValidator {
+    gb: Garbler,
     validation_shares: Vec<AuthShare<PartyGarbler>>,
     // A vector that stores the masked wire values received from the evaluator.
-    lc_values: Vec<F2>,
-    // The index of the current masked wire value we're using.
-    lc_values_index: usize,
-    // The index of the current authenticated share we're using.
-    auth_shares_index: usize,
-    // The index of the current AND authenticated share we're using.
-    and_auth_shares_index: usize,
+    lc_values: VecWrapper<F2>,
     // The input wires computed by the garbler in the offline phase
-    input_wires: Vec<AuthenticatedWire>,
-    // The index of the current input wire
-    input_wires_index: usize,
+    input_wires: VecWrapper<AuthenticatedWire>,
 }
 
-impl<RNG: CryptoRng + RngCore> GarblerValidator<RNG> {
+impl GarblerValidator {
     /// Create a new [`GarblerValidator`] from a reference to the [`Garbler`]
     /// and from the masked wire values received from the evaluator
     pub fn new(
-        gb: Garbler<RNG>,
+        mut gb: Garbler,
         input_wires: Vec<AuthenticatedWire>,
         lc_values: Vec<F2>,
-    ) -> GarblerValidator<RNG> {
+    ) -> GarblerValidator {
+        gb.auth_shares.set_index(input_wires.len());
+        gb.and_auth_shares.reset();
         GarblerValidator {
             gb,
             validation_shares: Vec::new(),
-            lc_values,
-            lc_values_index: 0,
-            auth_shares_index: input_wires.len(),
-            and_auth_shares_index: 0,
-            input_wires,
-            input_wires_index: 0,
+            lc_values: VecWrapper::new(lc_values),
+            input_wires: VecWrapper::new(input_wires),
         }
     }
 
@@ -51,35 +40,17 @@ impl<RNG: CryptoRng + RngCore> GarblerValidator<RNG> {
     pub fn validation_shares(&self) -> &[AuthShare<PartyGarbler>] {
         &self.validation_shares
     }
-    fn next_auth_share(&mut self) -> AuthShare<PartyGarbler> {
-        let share = self.gb.auth_share_at_index(self.auth_shares_index);
-        self.auth_shares_index += 1;
-        share
-    }
 
-    fn next_and_auth_share(&mut self) -> AuthShare<PartyGarbler> {
-        let share = self.gb.and_auth_share_at_index(self.and_auth_shares_index);
-        self.and_auth_shares_index += 1;
-        share
-    }
-
-    fn next_lc_value(&mut self) -> F2 {
-        let lc_value = self.lc_values[self.lc_values_index];
-        self.lc_values_index += 1;
-        lc_value
-    }
     fn delta(&self) -> U8x16 {
         self.gb.delta()
     }
     /// Return the garbler's state
-    pub fn garbler(self) -> Garbler<RNG> {
+    pub fn garbler(self) -> Garbler {
         self.gb
     }
 }
-impl<RNG> Fancy for GarblerValidator<RNG>
-where
-    RNG: RngCore + CryptoRng,
-{
+
+impl Fancy for GarblerValidator {
     type Item = AuthenticatedWire;
     fn constant(
         &mut self,
@@ -94,10 +65,7 @@ where
     }
 }
 
-impl<RNG> FancyBinary for GarblerValidator<RNG>
-where
-    RNG: RngCore + CryptoRng,
-{
+impl FancyBinary for GarblerValidator {
     fn and(
         &mut self,
         la0: &Self::Item,
@@ -105,11 +73,11 @@ where
         _channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item> {
         // This is the share for wire label L_{γ,0}
-        let lc_share = self.next_auth_share();
+        let lc_share = self.gb.auth_shares.next();
         // This is the and triple share for wire label L_{γ,0}
-        let lc_triple = self.next_and_auth_share();
+        let lc_triple = self.gb.and_auth_shares.next();
 
-        let lc_value = self.next_lc_value();
+        let lc_value = self.lc_values.next();
         // z'α := z_α + λ_α, where z_α is the actual wire value of the input
         // wire with label L_α and λ_α is the mask of that value
         let la_value = la0.masked_value();
@@ -148,18 +116,13 @@ where
     }
 }
 
-impl<RNG> FancyEncode for GarblerValidator<RNG>
-where
-    RNG: RngCore + CryptoRng,
-{
+impl FancyEncode for GarblerValidator {
     fn receive_many(
         &mut self,
         moduli: &[u16],
         _channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        let start = self.input_wires_index;
-        self.input_wires_index += moduli.len();
-        Ok(self.input_wires[start..moduli.len()].to_vec())
+        Ok((0..moduli.len()).map(|_| self.input_wires.next()).collect())
     }
 
     fn encode_many(
@@ -168,17 +131,6 @@ where
         moduli: &[u16],
         _channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        let start = self.input_wires_index;
-        self.input_wires_index += moduli.len();
-        Ok(self.input_wires[start..moduli.len()].to_vec())
-    }
-}
-
-impl<RNG> FancyOutput for GarblerValidator<RNG>
-where
-    RNG: RngCore + CryptoRng,
-{
-    fn output(&mut self, _: &Self::Item, _: &mut Channel) -> swanky_error::Result<Option<u16>> {
-        Ok(None)
+        Ok((0..moduli.len()).map(|_| self.input_wires.next()).collect())
     }
 }

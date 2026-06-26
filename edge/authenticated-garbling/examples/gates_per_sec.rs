@@ -54,8 +54,8 @@ where
         + CircuitInputMapper<SemiHonestEvaluator<WireMod2>>
         + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
         + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
-        + CircuitInputMapper<GarblerValidator<SwankyRng>>
-        + CircuitInputMapper<Garbler<SwankyRng>>
+        + CircuitInputMapper<GarblerValidator>
+        + CircuitInputMapper<Garbler>
         + CircuitInputMapper<Evaluator>
         + Sync,
 {

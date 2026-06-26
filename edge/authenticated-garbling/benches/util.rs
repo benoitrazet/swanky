@@ -12,10 +12,10 @@ pub fn test_circuit<
     C: CircuitInputMapper<CircuitAnalyzer>
         + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
         + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
-        + CircuitInputMapper<Garbler<SwankyRng>>
+        + CircuitInputMapper<Garbler>
         + CircuitInputMapper<Evaluator>
         + CircuitInputMapper<Dummy>
-        + CircuitInputMapper<GarblerValidator<SwankyRng>>
+        + CircuitInputMapper<GarblerValidator>
         + Sync,
 >(
     inputs_gb: &[u16],

@@ -2,6 +2,7 @@ use crate::GarblerValidator;
 use crate::preprocesser::WirePreProcessor;
 use crate::preprocesser::f_preprocessing;
 use crate::ps::PartyGarbler;
+use crate::vec_wrapper::VecWrapper;
 use crate::wire::AuthenticatedWireMod2;
 use fancy_garbling::Circuit;
 use fancy_garbling::CircuitInputMapper;
@@ -26,9 +27,7 @@ use vectoreyes::U8x16;
 type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 
 /// The authenticated garbler.
-pub struct Garbler<RNG> {
-    // The number of input wires to the circuit
-    ninputs: usize,
+pub struct Garbler {
     // The garbler's Δ.
     delta: WireMod2,
     // A random wirelabel denoting zero. Used to make negations free.
@@ -42,38 +41,33 @@ pub struct Garbler<RNG> {
     and_gate_index: usize,
     // A vector of authenticated shares, one per input wire and AND gate output.
     // Corresponds to〈r_w, s_w〉from the paper.
-    auth_shares: Vec<AuthShare<PartyGarbler>>,
-    // The index of the current authenticated share we're using.
-    auth_shares_index: usize,
+    pub(crate) auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
     // A vector of fixed authenticated shares for AND gate wires. Each share is
     // set such that it is equal to the AND of the incoming wire shares.
     // Corresponds to〈r_w^*, s_w^*〉from the paper.
-    and_auth_shares: Vec<AuthShare<PartyGarbler>>,
-    // The index of the current AND authenticated share we're using.
-    and_auth_shares_index: usize,
+    pub(crate) and_auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
     // A vector that stores the garbling gates.
     gates: Vec<(U8x16, U8x16)>,
     // A vector that stores the lsb of the 0 wire label associated with AND gates.
     gate_bits: Vec<F2>,
     // The wire material that the garbler computes offline
-    offline_wires: Vec<AuthenticatedWire>,
-    // The index of the current offline wire
-    wires_offline_index: usize,
-    rng: RNG,
+    offline_wires: VecWrapper<AuthenticatedWire>,
 }
 
-impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
+impl Garbler {
     /// Create a new garbler for a given circuit.
     pub fn new<
+        RNG: CryptoRng + RngCore,
         C: CircuitInputMapper<CircuitAnalyzer>
             + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
-            + CircuitInputMapper<GarblerValidator<RNG>>
+            + CircuitInputMapper<GarblerValidator>
             + CircuitInputMapper<Self>,
     >(
         circuit: &C,
         channel: &mut Channel,
         mut rng: RNG,
-    ) -> Result<(Self, <C as Circuit<Garbler<RNG>>>::Output)> {
+    ) -> Result<(Self, <C as Circuit<Garbler>>::Output)> {
+        let ninputs: usize = <C as CircuitInputMapper<CircuitAnalyzer>>::ninputs(circuit);
         let delta = AndTripleGenerator::<PartyGarbler>::generate_valid_delta(&mut rng);
         // The garbler pre-generates two constant wire-labels
         // - The one wire label that is used for negation and garbling constant 1 gates.
@@ -89,32 +83,38 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         let (auth_shares, known_triples) =
             f_preprocessing(circuit, &mut and_generator, channel, &mut rng)?;
         let nands = known_triples.len();
-        let ninputs: usize = <C as CircuitInputMapper<CircuitAnalyzer>>::ninputs(circuit);
+        let mut auth_shares = VecWrapper::new(auth_shares);
+        let and_auth_shares = VecWrapper::new(known_triples);
+
         channel.write(&one.to_repr())?;
         channel.write(&zero_constant.to_repr())?;
-        let garbler = Garbler {
-            ninputs,
+
+        let offline_wires = (0..ninputs)
+            .map(|_| {
+                AuthenticatedWire::new_without_mask(WireMod2::rand(&mut rng, 2), auth_shares.next())
+            })
+            .collect::<Vec<_>>();
+
+        let mut garbler = Garbler {
             delta: WireMod2::from_repr(delta, 2),
             zero,
             zero_constant,
             and_gate_index: 0,
             auth_shares,
-            auth_shares_index: 0,
-            and_auth_shares: known_triples,
-            and_auth_shares_index: 0,
+            and_auth_shares,
             gates: Vec::with_capacity(nands),
             gate_bits: Vec::with_capacity(nands),
-            offline_wires: Vec::new(),
-            wires_offline_index: 0,
-            rng,
+            offline_wires: VecWrapper::new(offline_wires.clone()),
         };
-        let mut garbler = garbler.offline()?;
-        let offline_wires = garbler.offline_wires();
-        let outputs = circuit.execute(
-            &mut garbler,
-            CircuitInputMapper::<Self>::map(circuit, offline_wires),
-            channel,
-        )?;
+
+        let outputs = Channel::with(std::io::empty(), |channel| {
+            circuit.execute(
+                &mut garbler,
+                CircuitInputMapper::<Self>::map(circuit, offline_wires),
+                channel,
+            )
+        })?;
+
         Ok((garbler, outputs))
     }
 
@@ -124,32 +124,10 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         current
     }
 
-    fn next_auth_share(&mut self) -> AuthShare<PartyGarbler> {
-        let share = self.auth_shares[self.auth_shares_index];
-        self.auth_shares_index += 1;
-        share
-    }
-    fn next_and_auth_share(&mut self) -> AuthShare<PartyGarbler> {
-        let share = self.and_auth_shares[self.and_auth_shares_index];
-        self.and_auth_shares_index += 1;
-        share
-    }
-    fn next_offline_wire(&mut self) -> AuthenticatedWire {
-        let wire = self.offline_wires[self.wires_offline_index];
-        self.wires_offline_index += 1;
-        wire
-    }
-    pub(crate) fn auth_share_at_index(&self, index: usize) -> AuthShare<PartyGarbler> {
-        self.auth_shares[index]
-    }
-
-    pub(crate) fn and_auth_share_at_index(&self, index: usize) -> AuthShare<PartyGarbler> {
-        self.and_auth_shares[index]
-    }
-
     pub(crate) fn delta(&self) -> U8x16 {
         self.delta.to_repr()
     }
+
     pub(crate) fn send_garbling_material(&self, channel: &mut Channel) -> Result<()> {
         // The garbler sends out all the gate material that they computed offline
         let bit_ser: F2BitSerializer = SequenceSerializer::new(&mut channel.as_std_io()).wrap_err(
@@ -170,26 +148,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         }
         Ok(())
     }
-    /// This function allows the garbler to encode wire labels offline prior
-    /// to receiving the evaluator's values. By doing this we greatly improve
-    /// the performance of the protocol.
-    fn offline(self) -> Result<Self> {
-        let mut gb: Garbler<RNG> = self;
-        let input_wires: Vec<AuthenticatedWire> = (0..gb.ninputs)
-            .map(|_| {
-                AuthenticatedWire::new_without_mask(
-                    WireMod2::rand(&mut gb.rng, 2),
-                    gb.next_auth_share(),
-                )
-            })
-            .collect();
-        gb.offline_wires = input_wires;
-        Ok(gb)
-    }
-    /// Returns the offline wires for the purpose for circuit execution
-    pub fn offline_wires(&self) -> Vec<AuthenticatedWire> {
-        self.offline_wires.clone()
-    }
+
     // Send the wirelabel `L_b` associated with the masked value `b` to the evaluator returning a vector of the
     // corresponding `FinalizedWire` values.
     //
@@ -223,12 +182,12 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     /// need to validate the authenticated AND gates. In the case of the garbler, this
     /// involved locally traversing the circuit in order to compute those validation bits
     /// from the wire masked values that the evaluator sends.
-    pub fn validate<C: CircuitInputMapper<GarblerValidator<RNG>>>(
+    pub fn validate<C: CircuitInputMapper<GarblerValidator>>(
         self,
         circuit: &C,
         input_wires: Vec<AuthenticatedWire>,
         channel: &mut Channel,
-    ) -> Result<Garbler<RNG>> {
+    ) -> Result<Garbler> {
         let nands = self.and_auth_shares.len();
         // Receive the masked values from the Evaluator
         let mut bit_deser: F2BitDeserializer = SequenceDeserializer::new(channel.as_std_io())
@@ -268,7 +227,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
         Ok(validator.garbler())
     }
     /// Validate the computation and reveal the outputs
-    pub fn finalize<C: CircuitInputMapper<GarblerValidator<RNG>>>(
+    pub fn finalize<C: CircuitInputMapper<GarblerValidator>>(
         self,
         circuit: &C,
         input_wires: Vec<AuthenticatedWire>,
@@ -280,10 +239,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
     }
 }
 
-impl<RNG> FancyBinary for Garbler<RNG>
-where
-    RNG: RngCore + CryptoRng,
-{
+impl FancyBinary for Garbler {
     fn and(
         &mut self,
         la0: &Self::Item,
@@ -293,9 +249,9 @@ where
         // This index is called γ in the paper
         let index = self.next_and_gate_index();
         // This is the share for wire label L_{γ,0}
-        let lc_share = self.next_auth_share();
+        let lc_share = self.auth_shares.next();
         // This is the and triple share for wire label L_{γ,0}
-        let lc_triple = self.next_and_auth_share();
+        let lc_triple = self.and_auth_shares.next();
 
         // Compute l1 from l0 for both inputs
         //
@@ -367,7 +323,7 @@ where
     }
 }
 
-impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
+impl Fancy for Garbler {
     type Item = AuthenticatedWire;
 
     fn constant(
@@ -395,7 +351,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
     }
 }
 
-impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
+impl FancyEncode for Garbler {
     fn encode_many(
         &mut self,
         values: &[u16],
@@ -407,7 +363,7 @@ impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
         self.send_garbling_material(channel)?;
 
         let offline_wires: Vec<AuthenticatedWire> = (0..moduli.len())
-            .map(|_| self.next_offline_wire())
+            .map(|_| self.offline_wires.next())
             .collect();
         let my_auth_shares: Vec<AuthShare<PartyGarbler>> =
             offline_wires.iter().map(|w| w.auth_share()).collect();
@@ -442,7 +398,7 @@ impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
 
     fn receive_many(&mut self, moduli: &[u16], channel: &mut Channel) -> Result<Vec<Self::Item>> {
         let offline_wires: Vec<AuthenticatedWire> = (0..moduli.len())
-            .map(|_| self.next_offline_wire())
+            .map(|_| self.offline_wires.next())
             .collect();
         let my_auth_shares: Vec<AuthShare<PartyGarbler>> =
             offline_wires.iter().map(|w| w.auth_share()).collect();
@@ -459,7 +415,7 @@ impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
     }
 }
 
-impl<RNG: RngCore + CryptoRng> FancyOutput for Garbler<RNG> {
+impl FancyOutput for Garbler {
     fn output(&mut self, x: &AuthenticatedWire, channel: &mut Channel) -> Result<Option<u16>> {
         Ok(self
             .outputs(core::slice::from_ref(x), channel)?

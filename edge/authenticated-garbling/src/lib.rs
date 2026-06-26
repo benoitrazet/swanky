@@ -14,6 +14,7 @@ pub use validator::GarblerValidator;
 mod tests;
 mod wire;
 pub use wire::AuthenticatedWireMod2;
+mod vec_wrapper;
 
 // Party system type aliases for the garbler and evaluator
 party_system! {
