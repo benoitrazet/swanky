@@ -7,6 +7,7 @@ mod evaluator;
 pub use evaluator::Evaluator;
 mod garbler;
 pub use garbler::GarblerOffline;
+pub use garbler::GarblerOnline;
 mod preprocesser;
 pub use preprocesser::WirePreProcessor;
 mod validator;
