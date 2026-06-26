@@ -6,7 +6,6 @@ use fancy_garbling::HasModulus;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
-use swanky_field_binary::F2;
 use swanky_field_binary::F128b;
 
 use crate::proof::ChiGenerator;
@@ -119,9 +118,10 @@ impl Fancy for VerifierTraverser {
     type Item = Wire;
 
     fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
+        assert!(value == 0 || value == 1);
         assert_eq!(modulus, 2);
-        let value = F128b::from(F2::from(value != 0));
-        Ok(Wire(value * self.verifier_key))
+        let value = if value == 0 { F128b::ZERO } else { F128b::ONE };
+        Ok(Wire(-value * self.verifier_key))
     }
 }
 
@@ -166,7 +166,7 @@ impl FancyBinary for VerifierTraverser {
     }
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        Wire(-x.0)
+        Wire(x.0 - F128b::ONE * self.verifier_key)
     }
 }
 

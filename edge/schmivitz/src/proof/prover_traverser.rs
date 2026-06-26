@@ -206,7 +206,7 @@ impl<VOLE: RandomVoleP> FancyBinary for ProverTraverser<VOLE> {
     }
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        Wire(-x.0, -x.1)
+        Wire(x.0 + F2::ONE, x.1)
     }
 }
 
