@@ -5,12 +5,14 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use vectoreyes::U8x16;
 
-use crate::{AuthenticatedWireMod2, Garbler, ps::PartyGarbler, vec_wrapper::VecWrapper};
+use crate::{
+    AuthenticatedWireMod2, garbler::GarblerOnline, ps::PartyGarbler, vec_wrapper::VecWrapper,
+};
 
 type AuthenticatedWire = AuthenticatedWireMod2<PartyGarbler>;
 /// A struct which allows the garbler to compute the validation shares before opening them
 pub struct GarblerValidator {
-    gb: Garbler,
+    gb: GarblerOnline,
     validation_shares: Vec<AuthShare<PartyGarbler>>,
     // A vector that stores the masked wire values received from the evaluator.
     lc_values: VecWrapper<F2>,
@@ -22,7 +24,7 @@ impl GarblerValidator {
     /// Create a new [`GarblerValidator`] from a reference to the [`Garbler`]
     /// and from the masked wire values received from the evaluator
     pub fn new(
-        mut gb: Garbler,
+        mut gb: GarblerOnline,
         input_wires: Vec<AuthenticatedWire>,
         lc_values: Vec<F2>,
     ) -> GarblerValidator {
@@ -45,7 +47,7 @@ impl GarblerValidator {
         self.gb.delta()
     }
     /// Return the garbler's state
-    pub fn garbler(self) -> Garbler {
+    pub fn garbler(self) -> GarblerOnline {
         self.gb
     }
 }

@@ -6,7 +6,7 @@ use fancy_garbling::{
     circuit_analyzer::CircuitAnalyzer, circuits::LinearOram, classic::GarbledCircuit,
 };
 use swanky_authenticated_garbling::{
-    Evaluator, Garbler, GarblerValidator, WirePreProcessor,
+    Evaluator, GarblerOffline, GarblerValidator, WirePreProcessor,
     ps::{PartyEvaluator, PartyGarbler},
 };
 use swanky_channel::Channel;
@@ -55,7 +55,7 @@ where
         + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
         + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
         + CircuitInputMapper<GarblerValidator>
-        + CircuitInputMapper<Garbler>
+        + CircuitInputMapper<GarblerOffline>
         + CircuitInputMapper<Evaluator>
         + Sync,
 {
@@ -145,11 +145,11 @@ where
     let ((gb, inputs_gb, outputs), (mut ev, inputs_ev)) =
         swanky_channel::local::local_channel_pair(
             |channel: &mut Channel<'_>| {
-                let (mut gb, preprocessed_outputs) =
-                    Garbler::new(circuit, channel, SwankyRng::new())?;
+                let gb = GarblerOffline::new(circuit, channel, &mut SwankyRng::new())?;
+                let (mut gb, outputs) = gb.execute(circuit)?;
 
                 let inputs = gb.encode_many(&inputs, &moduli, channel)?;
-                Ok((gb, inputs, preprocessed_outputs))
+                Ok((gb, inputs, outputs))
             },
             |channel| {
                 let mut ev = Evaluator::new(circuit, channel, &mut SwankyRng::new())?;

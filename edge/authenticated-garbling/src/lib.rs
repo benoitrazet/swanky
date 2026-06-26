@@ -6,7 +6,7 @@ use swanky_party::party_system;
 mod evaluator;
 pub use evaluator::Evaluator;
 mod garbler;
-pub use garbler::Garbler;
+pub use garbler::GarblerOffline;
 mod preprocesser;
 pub use preprocesser::WirePreProcessor;
 mod validator;

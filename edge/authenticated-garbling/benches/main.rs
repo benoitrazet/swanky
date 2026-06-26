@@ -13,7 +13,7 @@ use fancy_garbling::{
     },
 };
 use rand::Rng;
-use swanky_authenticated_garbling::{Evaluator, Garbler};
+use swanky_authenticated_garbling::{Evaluator, GarblerOffline};
 use swanky_rng::SwankyRng;
 
 use crate::util::test_circuit;
@@ -28,7 +28,7 @@ fn bench_party_construction(c: &mut Criterion) {
     c.bench_function("party-construction", move |b| {
         b.iter(|| {
             swanky_channel::local::local_channel_pair(
-                |c| Garbler::new(&circuit, c, &mut rng_gb),
+                |c| GarblerOffline::new(&circuit, c, &mut rng_gb),
                 |c| Evaluator::new(&circuit, c, &mut rng_ev),
             )
             .unwrap();
@@ -41,11 +41,13 @@ fn bench_party_encoding_receiving(c: &mut Criterion) {
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
     let circuit = TestAndGateFanN(2 * input_size);
-    let ((mut gb, _preprocessed_outputs), mut ev) = swanky_channel::local::local_channel_pair(
-        |c| Garbler::new(&circuit, c, &mut rng_gb),
+    let (gb, mut ev) = swanky_channel::local::local_channel_pair(
+        |c| GarblerOffline::new(&circuit, c, &mut rng_gb),
         |c| Evaluator::new(&circuit, c, &mut rng_ev),
     )
     .unwrap();
+
+    let (mut gb, _outputs) = gb.execute(&circuit).unwrap();
 
     c.bench_function("party-encoding-receiving-no-setup", move |b| {
         b.iter(|| {
@@ -78,7 +80,7 @@ fn bench_single_and_gate(c: &mut Criterion) {
         &format!("single-and-gate::input-sizes::({},{})", 1, 1),
         move |b| {
             b.iter(|| {
-                test_circuit(&inputs_gb, &inputs_ev, rng_gb.fork(), &mut rng_ev, &circuit);
+                test_circuit(&inputs_gb, &inputs_ev, &mut rng_gb, &mut rng_ev, &circuit);
             });
         },
     );
@@ -94,7 +96,7 @@ fn bench_constant_gates(c: &mut Criterion) {
         &format!("test_constant_gates::input-sizes::({},{})", 0, 0),
         move |b| {
             b.iter(|| {
-                test_circuit(&inputs_gb, &inputs_ev, rng_gb.fork(), &mut rng_ev, &circuit);
+                test_circuit(&inputs_gb, &inputs_ev, &mut rng_gb, &mut rng_ev, &circuit);
             });
         },
     );
@@ -112,7 +114,7 @@ fn bench_and_gate_fan_n(c: &mut Criterion) {
         &format!("and-gate-fan-n::input-sizes::({ninputs_gb},{ninputs_ev})"),
         move |b| {
             b.iter(|| {
-                test_circuit(&inputs_gb, &inputs_ev, rng_gb.fork(), &mut rng_ev, &circuit);
+                test_circuit(&inputs_gb, &inputs_ev, &mut rng_gb, &mut rng_ev, &circuit);
             });
         },
     );
@@ -130,7 +132,7 @@ fn bench_or_gate_fan_n(c: &mut Criterion) {
         &format!("or-gate-fan-n::input-sizes::({ninputs_gb},{ninputs_ev})"),
         move |b| {
             b.iter(|| {
-                test_circuit(&inputs_gb, &inputs_ev, rng_gb.fork(), &mut rng_ev, &circuit);
+                test_circuit(&inputs_gb, &inputs_ev, &mut rng_gb, &mut rng_ev, &circuit);
             });
         },
     );
@@ -149,7 +151,7 @@ fn bench_xor_gate_fan_n(c: &mut Criterion) {
         &format!("xor-gate-fan-n::input-sizes::({ninputs_gb},{ninputs_ev})"),
         move |b| {
             b.iter(|| {
-                test_circuit(&inputs_gb, &inputs_ev, rng_gb.fork(), &mut rng_ev, &circuit);
+                test_circuit(&inputs_gb, &inputs_ev, &mut rng_gb, &mut rng_ev, &circuit);
             });
         },
     );
@@ -167,7 +169,7 @@ fn bench_binary_addition(c: &mut Criterion) {
         &format!("binary-addition::input-sizes::({ninputs},{ninputs})"),
         move |b| {
             b.iter(|| {
-                test_circuit(&inputs_gb, &inputs_ev, rng_gb.fork(), &mut rng_ev, &circuit);
+                test_circuit(&inputs_gb, &inputs_ev, &mut rng_gb, &mut rng_ev, &circuit);
             });
         },
     );
@@ -185,7 +187,7 @@ fn bench_binary_subtraction(c: &mut Criterion) {
         &format!("binary-subtraction::input-sizes::({ninputs},{ninputs})"),
         move |b| {
             b.iter(|| {
-                test_circuit(&inputs_gb, &inputs_ev, rng_gb.fork(), &mut rng_ev, &circuit);
+                test_circuit(&inputs_gb, &inputs_ev, &mut rng_gb, &mut rng_ev, &circuit);
             });
         },
     );
@@ -204,7 +206,7 @@ fn bench_aes(c: &mut Criterion) {
     let circuit = AesNonExpanded::new();
     c.bench_function("aes", move |b| {
         b.iter(|| {
-            test_circuit(&inputs_gb, &inputs_ev, rng_gb.fork(), &mut rng_ev, &circuit);
+            test_circuit(&inputs_gb, &inputs_ev, &mut rng_gb, &mut rng_ev, &circuit);
         })
     });
 }
