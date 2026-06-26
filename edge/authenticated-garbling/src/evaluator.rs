@@ -183,7 +183,7 @@ impl Evaluator {
             .wrap_err(
                 ErrorKind::SerializationError,
                 "Failed to write serialized bits.",
-            );
+            )?;
 
         let mut validation_bits = Vec::with_capacity(self.validation_shares.len());
         // The parties then open the share c_γ

@@ -9,7 +9,6 @@ use fancy_garbling::FancyOutput;
 use fancy_garbling::circuit_analyzer::CircuitAnalyzer;
 use fancy_garbling::{Fancy, FancyBinary, FancyEncode, WireLabel, WireMod2};
 
-use rand::Error;
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
@@ -163,7 +162,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             .wrap_err(
                 ErrorKind::SerializationError,
                 "Failed to write serialized bits.",
-            );
+            )?;
         // Send the garbled gates
         for (g0, g1) in self.gates.iter() {
             channel.write(g0)?;

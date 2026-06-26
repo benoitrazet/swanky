@@ -52,12 +52,14 @@ impl<P: GenericParty> AuthenticatedWireMod2<P> {
     }
     /// The masked value associated with this wire.
     pub(crate) fn masked_value(&self) -> F2 {
-        self.masked_value.unwrap()
+        self.masked_value
+            .expect("There is no masked value associated with the current wire !")
     }
 
     /// The wirelabel $`L`$ associated with this wire.
     pub(crate) fn wire_label(&self) -> WireMod2 {
-        self.wire_label.unwrap()
+        self.wire_label
+            .expect("There is no wire label associated with the current wire !")
     }
 
     /// The authenticated share $`\langle \lambda \rangle`$ associated with this
