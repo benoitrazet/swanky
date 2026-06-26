@@ -21,8 +21,11 @@ pub struct GarblerOnline {
     // Corresponds to〈r_w^*, s_w^*〉from the paper.
     and_auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
     // A vector that stores the garbling gates.
+    // TODO: Remove. Only needed in offline mode.
     gates: Vec<(U8x16, U8x16)>,
-    // A vector that stores the lsb of the 0 wire label associated with AND gates.
+    // A vector that stores the lsb of the 0 wire label associated with AND
+    // gates.
+    // TODO: Remove. Only needed in offline mode.
     gate_bits: Vec<F2>,
     // The wire material that the garbler computes offline
     offline_wires: VecWrapper<AuthenticatedWire>,
@@ -76,6 +79,7 @@ impl GarblerOnline {
         Ok(result)
     }
 
+    // TODO: Move to `GarblerOffline`!
     fn send_garbling_material(&self, channel: &mut Channel) -> Result<()> {
         // The garbler sends out all the gate material that they computed offline
         let bit_ser: F2BitSerializer = SequenceSerializer::new(&mut channel.as_std_io()).wrap_err(

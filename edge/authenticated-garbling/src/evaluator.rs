@@ -22,6 +22,8 @@ use vectoreyes::U8x16;
 type AuthenticatedWire = AuthenticatedWireMod2<PartyEvaluator>;
 
 /// The authenticated evaluator.
+///
+/// TODO: Split into online and offline.
 pub struct Evaluator {
     // The evaluator's Δ, used to validate the authenticated shares and AND
     // triples.
@@ -126,6 +128,8 @@ impl Evaluator {
         self.gate_bits_index += 1;
         bit
     }
+
+    // TODO: Move to offline evaluator.
     fn receive_garbling_material(&mut self, channel: &mut Channel) -> Result<()> {
         let mut bit_ser: F2BitDeserializer = SequenceDeserializer::new(channel.as_std_io())
             .wrap_err(
