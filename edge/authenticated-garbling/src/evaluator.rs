@@ -135,7 +135,10 @@ impl Evaluator {
         let nands = self.and_auth_shares.len();
         // Receive the lsb of 0 wire label
         self.gate_bits
-            .extend(bit_ser.read_vector(channel.as_std_io(), nands)?);
+            .extend(bit_ser.read_vector(channel.as_std_io(), nands).wrap_err(
+                ErrorKind::SerializationError,
+                "Failed to read serialized bits.",
+            )?);
         // Receive the garbled gates
         for _ in 0..nands {
             let g0: U8x16 = channel.read()?;
@@ -175,7 +178,12 @@ impl Evaluator {
             ErrorKind::InitializationError,
             "Failed to initialize sequence serializer.",
         )?;
-        bit_ser.write_vector(channel.as_std_io(), &self.lc_values)?;
+        bit_ser
+            .write_vec(channel.as_std_io(), &self.lc_values)
+            .wrap_err(
+                ErrorKind::SerializationError,
+                "Failed to write serialized bits.",
+            );
 
         let mut validation_bits = Vec::with_capacity(self.validation_shares.len());
         // The parties then open the share c_γ

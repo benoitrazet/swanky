@@ -6,12 +6,12 @@
 use crypto_bigint::Uint;
 use generic_array::GenericArray;
 use rand::Rng;
+use std::io::Error;
 use std::{
     hash::Hash,
     ops::{AddAssign, MulAssign, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
-use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::{BiggerThanModulus, FiniteField, FiniteRing, PrimeFiniteField};
 use swanky_serialization::CanonicalSerialize;
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
@@ -218,21 +218,11 @@ pub struct F2BitSerializer {
 impl F2BitSerializer {
     /// A wrapper around [`F2BitSerializer::write`] and [`F2BitSerializer::finish`] which writes a vector of
     /// bits into the channel and finishes afterwards.
-    pub fn write_vector<W: std::io::Write>(
-        mut self,
-        dst: &mut W,
-        bits: &[F2],
-    ) -> swanky_error::Result<()> {
+    pub fn write_vec<W: std::io::Write>(mut self, dst: &mut W, bits: &[F2]) -> Result<(), Error> {
         for b in bits.iter() {
-            self.write(dst, *b).wrap_err(
-                ErrorKind::SerializationError,
-                "Failed to write serialized bits.",
-            )?;
+            self.write(dst, *b)?;
         }
-        self.finish(dst).wrap_err(
-            ErrorKind::SerializationError,
-            "Failed to finish bit serialization.",
-        )
+        self.finish(dst)
     }
 }
 impl SequenceSerializer<F2> for F2BitSerializer {
@@ -287,13 +277,10 @@ impl F2BitDeserializer {
         &mut self,
         src: &mut R,
         len: usize,
-    ) -> swanky_error::Result<Vec<F2>> {
+    ) -> Result<Vec<F2>, Error> {
         let mut res = Vec::new();
         for _ in 0..len {
-            res.push(self.read(src).wrap_err(
-                ErrorKind::SerializationError,
-                "Failed to read serialized bits.",
-            )?);
+            res.push(self.read(src)?);
         }
         Ok(res)
     }

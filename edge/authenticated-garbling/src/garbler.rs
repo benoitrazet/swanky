@@ -9,6 +9,7 @@ use fancy_garbling::FancyOutput;
 use fancy_garbling::circuit_analyzer::CircuitAnalyzer;
 use fancy_garbling::{Fancy, FancyBinary, FancyEncode, WireLabel, WireMod2};
 
+use rand::Error;
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
@@ -157,7 +158,12 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
             "Failed to initialize sequence serializer.",
         )?;
         // Send the lsb of 0 wire label
-        bit_ser.write_vector(channel.as_std_io(), &self.gate_bits)?;
+        bit_ser
+            .write_vec(channel.as_std_io(), &self.gate_bits)
+            .wrap_err(
+                ErrorKind::SerializationError,
+                "Failed to write serialized bits.",
+            );
         // Send the garbled gates
         for (g0, g1) in self.gates.iter() {
             channel.write(g0)?;
@@ -231,7 +237,10 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
                 ErrorKind::InitializationError,
                 "Failed to create sequence deserializer.",
             )?;
-        let lc_values = bit_deser.read_vector(channel.as_std_io(), nands)?;
+        let lc_values = bit_deser.read_vector(channel.as_std_io(), nands).wrap_err(
+            ErrorKind::SerializationError,
+            "Failed to read serialized bits.",
+        )?;
         let delta = self.delta();
         // Create a finalizer using the pre-computed wires
         let mut validator = GarblerValidator::new(self, input_wires.clone(), lc_values);
