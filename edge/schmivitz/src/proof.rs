@@ -9,14 +9,16 @@
 //!
 use fancy_garbling::Circuit as FancyCircuit;
 use merlin::Transcript;
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore, thread_rng};
 use rayon::iter::*;
+use std::time::Instant;
 use std::{iter::zip, marker::PhantomData};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b, F128b};
 
+use crate::vole::functionality::{VoleProver, VoleVerifier};
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
     parameters::SECURITY_PARAM,
@@ -360,6 +362,56 @@ impl AsSecretBytes for Vec<F2> {
     fn as_bytes(&self) -> Vec<u8> {
         self.iter().map(|b| (*b).into()).collect()
     }
+}
+
+/// Test proof generation and verification of a given [`Circuit`].
+pub fn test_sieveir(circuit: &Circuit) -> Result<()> {
+    let rng = &mut thread_rng();
+
+    let t = std::time::Instant::now();
+    let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit(
+        circuit,
+        &mut Transcript::new(b""),
+        rng,
+    );
+    log::info!("Elapsed prover: {:?}", t.elapsed());
+
+    log::info!(
+        "proof size estimate: {:?}",
+        (proof.as_ref()).unwrap().proof_size_estimate()
+    );
+
+    let t = std::time::Instant::now();
+    let verif = proof?.verify_with_circuit(circuit, &mut Transcript::new(b""));
+    assert!(verif.is_ok());
+    log::info!("Elapsed verifier: {:?}", t.elapsed());
+
+    Ok(())
+}
+
+/// Test proof generation and verification of a given [`FancyCircuit`].
+pub fn test_circuit<'a, C>(circuit: &C, private_input: &'a [F2]) -> Result<()>
+where
+    C: FancyCircuit<ProverPreparer<'a>, Input = ()>
+        + FancyCircuit<ProverTraverser<VoleProver>, Input = ()>
+        + FancyCircuit<VerifierTraverser, Input = ()>,
+{
+    let rng = &mut thread_rng();
+    let t = Instant::now();
+    let proof = Proof::<VoleProver, VoleVerifier>::prove(
+        circuit,
+        private_input,
+        None,
+        &mut Transcript::new(b""),
+        rng,
+    )?;
+    log::info!("Elapsed prover: {:?}", t.elapsed());
+    log::info!("proof size estimate: {}", proof.proof_size_estimate());
+
+    let t = Instant::now();
+    proof.verify(circuit, &mut Transcript::new(b""))?;
+    log::info!("Elapsed verifier: {:?}", t.elapsed());
+    Ok(())
 }
 
 #[cfg(test)]

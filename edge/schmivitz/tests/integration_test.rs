@@ -1,14 +1,17 @@
 mod test {
     use fancy_garbling::{
-        Circuit as FancyCircuit, FancyBinary, FancyZeroKnowledge,
-        circuits::{hmac::HmacSha256, sha::Sha256CompressionFunction},
+        BinaryBundle, Circuit as FancyCircuit, FancyBinary, FancyZeroKnowledge,
+        circuits::{
+            aes::AesNonExpanded, binary::BinaryAddition, hmac::HmacSha256,
+            sha::Sha256CompressionFunction,
+        },
     };
     use merlin::Transcript;
     use rand::thread_rng;
     use schmivitz::{
         Proof,
-        circuit::Circuit,
-        circuit::load_circuit_from_strings_prover,
+        circuit::{Circuit, load_circuit_from_strings_prover},
+        proof::{test_circuit, test_sieveir},
         vole::functionality::{VoleProver, VoleVerifier},
     };
     use std::{sync::Once, time::Instant};
@@ -184,6 +187,36 @@ mod test {
         Ok(())
     }
 
+    struct TestAssertZero;
+
+    impl<F: FancyBinary + FancyZeroKnowledge> FancyCircuit<F> for TestAssertZero {
+        type Input = ();
+        type Output = Vec<F::Item>; // TODO: should be `()`
+
+        fn execute(
+            &self,
+            backend: &mut F,
+            _: Self::Input,
+            channel: &mut Channel,
+        ) -> Result<Self::Output> {
+            let x = backend.receive(2, channel)?;
+            backend.assert_zero(&x, channel)?;
+            let y = backend.xor(&x, &x);
+            backend.assert_zero(&y, channel)?;
+            let one = backend.constant(1, 2, channel)?;
+            let y = backend.xor(&x, &one);
+            let z = backend.xor(&y, &one);
+            backend.assert_zero(&z, channel)?;
+            Ok(vec![])
+        }
+    }
+
+    #[test]
+    fn prove_circuit_assert_zero() -> Result<()> {
+        let private_input = [F2::ZERO; 1];
+        test_circuit(&TestAssertZero, &private_input)
+    }
+
     #[test]
     fn prove_sieveir_assert_zero_interleaved() -> Result<()> {
         let mini_circuit_bytes = "version 2.0.0;
@@ -311,8 +344,66 @@ mod test {
         Ok(())
     }
 
+    struct TestBinaryAddition<'a>(BinaryAddition<'a>, &'static str);
+
+    impl<'a, F: FancyBinary + FancyZeroKnowledge> FancyCircuit<F> for TestBinaryAddition<'a> {
+        type Input = ();
+        type Output = Vec<F::Item>; // TODO: should be `()`
+
+        fn execute(
+            &self,
+            backend: &mut F,
+            _: Self::Input,
+            channel: &mut Channel,
+        ) -> Result<Self::Output> {
+            let x = BinaryBundle::new(
+                (0..8)
+                    .map(|_| backend.receive(2, channel))
+                    .collect::<Result<Vec<_>>>()?,
+            );
+            let y = BinaryBundle::new(
+                (0..8)
+                    .map(|_| backend.receive(2, channel))
+                    .collect::<Result<Vec<_>>>()?,
+            );
+            let (z, carry) = self.0.execute(backend, (&x, &y), channel)?;
+            for (wire, c) in z.wires().iter().zip(self.1.chars()) {
+                match c {
+                    '0' => backend.assert_zero(wire, channel)?,
+                    '1' => {
+                        let z = backend.negate(wire);
+                        backend.assert_zero(&z, channel)?;
+                    }
+                    _ => panic!("Unexpected character in boolean string"),
+                }
+            }
+            backend.assert_zero(&carry, channel)?;
+            Ok(vec![])
+        }
+    }
+
     #[test]
-    fn prove_aes256() -> Result<()> {
+    fn prove_binary_addition_circuit() -> Result<()> {
+        let mut x = [F2::ZERO; 8];
+        let mut y = [F2::ZERO; 8];
+        // Test 1 + 1 = 2.
+        x[0] = F2::ONE;
+        y[0] = F2::ONE;
+        test_circuit(
+            &TestBinaryAddition(BinaryAddition::new(), "01000000"),
+            &[x, y].concat(),
+        )?;
+        // Test 3 + 3 = 6.
+        x[1] = F2::ONE;
+        y[1] = F2::ONE;
+        test_circuit(
+            &TestBinaryAddition(BinaryAddition::new(), "01100000"),
+            &[x, y].concat(),
+        )
+    }
+
+    #[test]
+    fn prove_aes256_sieveir() -> Result<()> {
         if DO_LOGGING {
             init_logger();
         }
@@ -324,30 +415,62 @@ mod test {
         let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
         log::info!("parsing: {:?}", t.elapsed());
 
-        let t = std::time::Instant::now();
-        let rng = &mut thread_rng();
-        let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit::<_>(
-            &circuit,
-            &mut transcript(),
-            rng,
-        );
-        log::info!("Elapsed prover   aes256: {:?}", t.elapsed());
+        test_sieveir(&circuit)
+    }
 
-        log::info!(
-            "proof size estimate: {:?}",
-            (proof.as_ref()).unwrap().proof_size_estimate()
-        );
+    struct TestAes(AesNonExpanded);
 
-        let t = std::time::Instant::now();
-        let verif = proof?.verify_with_circuit(&circuit, &mut transcript());
-        assert!(verif.is_ok());
-        log::info!("Elapsed verifier aes256: {:?}", t.elapsed());
+    impl<F: FancyBinary + FancyZeroKnowledge> FancyCircuit<F> for TestAes {
+        type Input = ();
+        type Output = Vec<F::Item>; // TODO: should be `()`
 
-        Ok(())
+        fn execute(
+            &self,
+            backend: &mut F,
+            _: Self::Input,
+            channel: &mut Channel,
+        ) -> Result<Self::Output> {
+            let key = (0..128)
+                .map(|_| backend.receive(2, channel))
+                .collect::<Result<Vec<_>>>()?
+                .try_into()
+                .unwrap();
+            let block = (0..128)
+                .map(|_| backend.receive(2, channel))
+                .collect::<Result<Vec<_>>>()?
+                .try_into()
+                .unwrap();
+            let output = self.0.execute(backend, (key, block), channel)?;
+            let expected = "01100110111010010100101111010100111011111000101000101100001110111000100001001100111110100101100111001010001101000010101100101110";
+            for (x, c) in output.iter().zip(expected.chars()) {
+                match c {
+                    '0' => backend.assert_zero(x, channel)?,
+                    '1' => {
+                        let y = backend.negate(x);
+                        backend.assert_zero(&y, channel)?;
+                    }
+                    _ => panic!("Unexpected character in boolean string"),
+                }
+            }
+            Ok(vec![])
+        }
     }
 
     #[test]
-    fn prove_sha256_sieve_ir() -> Result<()> {
+    fn prove_aes_circuit() -> Result<()> {
+        // if log-level `RUST_LOG` not already set, then set to info
+        if DO_LOGGING {
+            init_logger();
+        }
+
+        let circuit = TestAes(AesNonExpanded::new());
+
+        let private_input = (0..256).map(|_| F2::ZERO).collect::<Vec<_>>();
+        test_circuit(&circuit, &private_input)
+    }
+
+    #[test]
+    fn prove_sha256_sieveir() -> Result<()> {
         // if log-level `RUST_LOG` not already set, then set to info
         if DO_LOGGING {
             init_logger();
@@ -359,26 +482,7 @@ mod test {
         let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
         log::info!("parsing: {:?}", t.elapsed());
 
-        let t = std::time::Instant::now();
-        let rng = &mut thread_rng();
-        let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit::<_>(
-            &circuit,
-            &mut transcript(),
-            rng,
-        );
-        log::info!("Elapsed prover   sha256: {:?}", t.elapsed());
-
-        log::info!(
-            "proof size estimate: {:?}",
-            (proof.as_ref()).unwrap().proof_size_estimate()
-        );
-
-        let t = std::time::Instant::now();
-        let verif = proof?.verify_with_circuit(&circuit, &mut transcript());
-        assert!(verif.is_ok());
-        log::info!("Elapsed verifier sha256: {:?}", t.elapsed());
-
-        Ok(())
+        test_sieveir(&circuit)
     }
 
     struct TestSha256CompressionFunction(Sha256CompressionFunction);
@@ -420,25 +524,7 @@ mod test {
         log::info!("parsing: {:?}", t.elapsed());
 
         let private_input = (0..768).map(|_| F2::ZERO).collect::<Vec<_>>();
-
-        let t = Instant::now();
-        let rng = &mut thread_rng();
-        let proof = Proof::<VoleProver, VoleVerifier>::prove(
-            &circuit,
-            &private_input,
-            None,
-            &mut transcript(),
-            rng,
-        )?;
-        log::info!("Elapsed prover   sha256: {:?}", t.elapsed());
-
-        log::info!("proof size estimate: {:?}", proof.proof_size_estimate());
-
-        let t = Instant::now();
-        proof.verify(&circuit, &mut transcript())?;
-        log::info!("Elapsed verifier sha256: {:?}", t.elapsed());
-
-        Ok(())
+        test_circuit(&circuit, &private_input)
     }
 
     struct TestHmac<'a>(HmacSha256<'a>);
@@ -458,10 +544,21 @@ mod test {
                 .collect::<Result<Vec<_>>>()?
                 .try_into()
                 .unwrap();
-            let input = (0..512)
+            let input = (0..32)
                 .map(|_| backend.receive(2, channel))
                 .collect::<Result<Vec<_>>>()?;
-            let _output = self.0.execute(backend, (&key, &input), channel)?;
+            let outputs = self.0.execute(backend, (&key, &input), channel)?;
+            let expected = "0100001110110000110011101111100110010010011001011111100111100011010011000001000011101010100111010011010100000001100100100110110100100111101100111001111101010111110001101101011001110100010101100001110110001011101000100011011011100111101010000001100111111011";
+            for (x, c) in outputs.iter().zip(expected.chars()) {
+                match c {
+                    '0' => backend.assert_zero(x, channel)?,
+                    '1' => {
+                        let y = backend.negate(x);
+                        backend.assert_zero(&y, channel)?
+                    }
+                    _ => panic!("Unexpected character in boolean string"),
+                };
+            }
             Ok(vec![])
         }
     }
@@ -477,25 +574,17 @@ mod test {
         let circuit = TestHmac(HmacSha256::new());
         log::info!("parsing: {:?}", t.elapsed());
 
-        let private_input = (0..1024).map(|_| F2::ZERO).collect::<Vec<_>>();
+        let key = (0..512).map(|_| F2::ZERO).collect::<Vec<_>>();
+        let message = "01110100011001010111001101110100"
+            .chars()
+            .map(|c| match c {
+                '0' => F2::ZERO,
+                '1' => F2::ONE,
+                _ => panic!("Unexpected character in boolean string"),
+            })
+            .collect();
+        let private_input = [key, message].concat();
 
-        let t = Instant::now();
-        let rng = &mut thread_rng();
-        let proof = Proof::<VoleProver, VoleVerifier>::prove(
-            &circuit,
-            &private_input,
-            None,
-            &mut transcript(),
-            rng,
-        )?;
-        log::info!("Elapsed prover   sha256: {:?}", t.elapsed());
-
-        log::info!("proof size estimate: {:?}", proof.proof_size_estimate());
-
-        let t = Instant::now();
-        proof.verify(&circuit, &mut transcript())?;
-        log::info!("Elapsed verifier sha256: {:?}", t.elapsed());
-
-        Ok(())
+        test_circuit(&circuit, &private_input)
     }
 }
