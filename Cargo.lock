@@ -280,13 +280,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bristol-fashion"
-version = "0.6.0"
-dependencies = [
- "swanky-error",
-]
-
-[[package]]
 name = "bufstream"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

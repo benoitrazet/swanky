@@ -11,7 +11,6 @@ members = [
   "edge/authenticated-garbling",
   "edge/bit-matrix-transpose",
   "edge/block",
-  "edge/bristol-fashion",
   "edge/bytearray-utils",
   "edge/channel-legacy",
   "edge/cointoss",
@@ -80,7 +79,6 @@ type_complexity = "allow"
 [workspace.dependencies]
 # Don't remove, or modify, the below "# BEGIN OUR CRATES" line. It's used by ./swanky new-crate
 # BEGIN OUR CRATES
-bristol-fashion = { path = "edge/bristol-fashion" }
 diet-mac-and-cheese = { path = "edge/diet-mac-and-cheese" }
 fancy-garbling = { path = "edge/fancy-garbling" }
 humidor = { path = "edge/humidor" }
