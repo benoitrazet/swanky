@@ -22,7 +22,6 @@ have a lesser stability guarantee.
 - **`vectoreyes`**: Cross-platform SIMD types and functions
 
 ## Edge
-- **`bristol-fashion`**: A parser for Bristol Fashion circuits.
 - **`diet-mac-and-cheese`**: A diet version of the Mac'n'Cheese protocol
 - **`fancy-garbling`**: A library for boolean and arithmetic garbling
 - **`fancy-traits`**: Traits for writing circuits
