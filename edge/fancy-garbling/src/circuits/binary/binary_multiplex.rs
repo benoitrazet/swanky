@@ -83,10 +83,8 @@ impl<F: FancyBinary> Circuit<F> for BinaryMultiplexConstantBits {
 #[cfg(test)]
 mod test {
     use super::BinaryMultiplex;
-    use crate::{
-        circuits::binary::BinaryMultiplexConstantBits,
-        dummy::{Dummy, DummyVal},
-    };
+    use crate::{BinaryBundle, circuits::binary::BinaryMultiplexConstantBits};
+    use fancy_plaintext::{Dummy, DummyVal};
     use rand::Rng;
 
     #[test]
@@ -95,8 +93,8 @@ mod test {
         let nbits = 1 + (rng.r#gen::<usize>() % 200);
         let x = rng.r#gen::<u128>() % (nbits as u128);
         let y = rng.r#gen::<u128>() % (nbits as u128);
-        let x_inputs = DummyVal::to_binary(x, nbits);
-        let y_inputs = DummyVal::to_binary(y, nbits);
+        let x_inputs = BinaryBundle::from((x, nbits));
+        let y_inputs = BinaryBundle::from((y, nbits));
 
         for b in 0..=1 {
             let output = Dummy::eval(
@@ -104,7 +102,7 @@ mod test {
                 (DummyVal::new(b, 2), &x_inputs, &y_inputs),
             )
             .unwrap();
-            assert_eq!(DummyVal::from_binary(&output), if b == 0 { x } else { y });
+            assert_eq!(Into::<u128>::into(output), if b == 0 { x } else { y });
         }
     }
 
@@ -121,7 +119,7 @@ mod test {
                 (DummyVal::new(b, 2), x, y, nbits),
             )
             .unwrap();
-            assert_eq!(DummyVal::from_binary(&output), if b == 0 { x } else { y });
+            assert_eq!(Into::<u128>::into(output), if b == 0 { x } else { y });
         }
     }
 }

@@ -106,7 +106,7 @@ pub mod test {
 
     #[test]
     fn binary_constant() {
-        use crate::dummy::{Dummy, DummyVal};
+        use fancy_plaintext::Dummy;
         use rand::Rng;
 
         let mut rng = rand::thread_rng();
@@ -115,7 +115,7 @@ pub mod test {
             let value = rng.r#gen::<u128>() % (nbits as u128);
             let c = TestBinaryConstant(value, nbits);
             let output = Dummy::eval(&c, ()).unwrap();
-            assert_eq!(DummyVal::from_binary(&output), value);
+            assert_eq!(Into::<u128>::into(output), value);
         }
     }
 }

@@ -43,11 +43,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        circuits::arithmetic::Mask,
-        dummy::{Dummy, DummyVal},
-        util::RngExt,
-    };
+    use crate::CrtBundle;
+    use crate::{circuits::arithmetic::Mask, util::RngExt};
+    use fancy_plaintext::{Dummy, DummyVal};
     use rand::{Rng, thread_rng};
 
     #[test]
@@ -60,11 +58,11 @@ mod test {
             let x = rng.r#gen::<u128>() % q;
 
             let b_input = DummyVal::new(b as u16, 2);
-            let x_input = DummyVal::to_crt(x, q);
+            let x_input = CrtBundle::from((x, q));
 
             let circuit = Mask::new();
             let z = Dummy::eval(&circuit, (&b_input, &x_input)).unwrap();
-            let output = DummyVal::from_crt(&z, q);
+            let output = CrtBundle::from_crt(&z, q);
 
             assert_eq!(output, (b as u128) * x);
         }

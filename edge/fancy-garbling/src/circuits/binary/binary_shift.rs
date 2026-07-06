@@ -176,12 +176,13 @@ where
 #[cfg(test)]
 mod test {
     use crate::{
+        BinaryBundle,
         circuits::binary::{
             BinaryArithmeticRightShift, BinaryLeftShift, BinaryLeftShiftExtend,
             binary_shift::BinaryLogicalRightShift,
         },
-        dummy::{Dummy, DummyVal},
     };
+    use fancy_plaintext::Dummy;
     use rand::{Rng, thread_rng};
 
     #[test]
@@ -192,11 +193,11 @@ mod test {
         for _ in 0..16 {
             let shift_size = rng.r#gen::<usize>() % N;
             let x = rng.r#gen::<u64>();
-            let input = DummyVal::to_binary(x as u128, N);
+            let input = BinaryBundle::from((x as u128, N));
             let output =
                 Dummy::eval(&BinaryLeftShift::new(), (&input, shift_size as usize)).unwrap();
             assert_eq!(
-                DummyVal::from_binary(&output) as u64,
+                Into::<u128>::into(output) as u64,
                 x.wrapping_shl(shift_size as u32)
             );
         }
@@ -211,9 +212,9 @@ mod test {
         for _ in 0..16 {
             let shift_size = rng.r#gen::<usize>() % nbits;
             let x = rng.r#gen::<u128>() % q;
-            let input = DummyVal::to_binary(x, nbits);
+            let input = BinaryBundle::from((x, nbits));
             let output = Dummy::eval(&BinaryLeftShiftExtend::new(), (&input, shift_size)).unwrap();
-            assert_eq!(DummyVal::from_binary(&output), x << shift_size);
+            assert_eq!(Into::<u128>::into(output), x << shift_size);
         }
     }
 
@@ -225,13 +226,13 @@ mod test {
         for _ in 0..16 {
             let shift_size = rng.r#gen::<usize>() % N;
             let x = rng.r#gen::<u64>();
-            let input = DummyVal::to_binary(x as u128, N);
+            let input = BinaryBundle::from((x as u128, N));
             let output = Dummy::eval(
                 &BinaryLogicalRightShift::new(),
                 (&input, shift_size as usize),
             )
             .unwrap();
-            assert_eq!(DummyVal::from_binary(&output) as u64, x >> shift_size);
+            assert_eq!(Into::<u128>::into(output) as u64, x >> shift_size);
         }
     }
 
@@ -244,13 +245,10 @@ mod test {
         for _ in 0..16 {
             let x = rng.r#gen::<u128>() % Q;
             let shift_size = rng.r#gen::<usize>() % N;
-            let x_input = DummyVal::to_binary(x, N);
+            let x_input = BinaryBundle::from((x, N));
             let output =
                 Dummy::eval(&BinaryArithmeticRightShift::new(), (&x_input, shift_size)).unwrap();
-            assert_eq!(
-                DummyVal::from_binary(&output) as i64,
-                (x as i64) >> shift_size
-            );
+            assert_eq!(Into::<u128>::into(output) as i64, (x as i64) >> shift_size);
         }
     }
 }

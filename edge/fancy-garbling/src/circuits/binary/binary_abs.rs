@@ -41,10 +41,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        circuits::binary::BinaryAbs,
-        dummy::{Dummy, DummyVal},
-    };
+    use crate::{BinaryBundle, circuits::binary::BinaryAbs};
+    use fancy_plaintext::Dummy;
     use rand::{Rng, thread_rng};
 
     #[test]
@@ -55,11 +53,11 @@ mod test {
 
         for _ in 0..16 {
             let x = rng.r#gen::<u128>() % q;
-            let x_input = DummyVal::to_binary(x, nbits);
+            let x_input = BinaryBundle::from((x, nbits));
             let circuit = BinaryAbs::new();
             let output = Dummy::eval(&circuit, &x_input).unwrap();
             assert_eq!(
-                DummyVal::from_binary(&output),
+                Into::<u128>::into(output),
                 if x >> (nbits - 1) > 0 {
                     ((!x) + 1) & ((1 << nbits) - 1)
                 } else {

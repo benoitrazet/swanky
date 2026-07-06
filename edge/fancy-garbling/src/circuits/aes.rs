@@ -82,7 +82,7 @@ mod test {
 
     #[test]
     fn aes_non_expanded() {
-        use crate::dummy::{Dummy, DummyVal};
+        use fancy_plaintext::{Dummy, DummyVal};
 
         let aes = AesNonExpanded::new();
 

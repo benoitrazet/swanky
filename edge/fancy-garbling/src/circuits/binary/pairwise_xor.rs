@@ -41,7 +41,7 @@ pub mod test {
 
     #[test]
     fn pairwise_xor() {
-        use crate::dummy::{Dummy, DummyVal};
+        use fancy_plaintext::{Dummy, DummyVal};
         use rand::Rng;
 
         let mut rng = rand::thread_rng();

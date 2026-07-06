@@ -240,7 +240,7 @@ mod test {
     use crate::circuits::sha::{
         Sha256, Sha256CompressionFunction, Sha256CompressionFunctionFixedIV,
     };
-    use crate::dummy::{Dummy, DummyVal};
+    use fancy_plaintext::{Dummy, DummyVal};
 
     #[cfg(test)]
     fn string_to_bool_vec(str: &str) -> Vec<DummyVal> {

@@ -89,10 +89,11 @@ where
 #[cfg(test)]
 mod test {
     use crate::{
+        CrtBundle,
         circuits::arithmetic::Division,
-        dummy::{Dummy, DummyVal},
         util::{RngExt, product},
     };
+    use fancy_plaintext::Dummy;
     use rand::{Rng, thread_rng};
 
     #[test]
@@ -105,10 +106,10 @@ mod test {
             let q_ = product(&qs[..qs.len() - 1]);
             let x = rng.r#gen::<u128>() % q_;
             let y = rng.r#gen::<u128>() % q_;
-            let x_input = DummyVal::to_crt(x, q);
-            let y_input = DummyVal::to_crt(y, q);
+            let x_input = CrtBundle::from((x, q));
+            let y_input = CrtBundle::from((y, q));
             let z = Dummy::eval(&Division::new(), (&x_input, &y_input)).unwrap();
-            let output = DummyVal::from_crt(&z, q);
+            let output = CrtBundle::from_crt(&z, q);
             assert_eq!(output, x / y);
         }
     }

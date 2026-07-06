@@ -24,6 +24,7 @@ have a lesser stability guarantee.
 ## Edge
 - **`diet-mac-and-cheese`**: A diet version of the Mac'n'Cheese protocol
 - **`fancy-garbling`**: A library for boolean and arithmetic garbling
+- **`fancy-plaintext`**: Plaintext evaluator for `Fancy` circuits
 - **`fancy-traits`**: Traits for writing circuits
 - **`humidor`**: A test-bed for Ligero-like protocols
 - **`inferno`**: An implementation of the Limbo zero knowledge proof protocol

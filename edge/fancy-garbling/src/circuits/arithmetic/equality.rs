@@ -55,11 +55,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        circuits::arithmetic::Equality,
-        dummy::{Dummy, DummyVal},
-        util::RngExt,
-    };
+    use crate::{CrtBundle, circuits::arithmetic::Equality, util::RngExt};
+    use fancy_plaintext::Dummy;
     use rand::{Rng, thread_rng};
 
     #[test]
@@ -69,15 +66,15 @@ mod test {
 
         // Check that `x == x`.
         let x = rng.r#gen::<u128>() % q;
-        let x_input = DummyVal::to_crt(x, q);
+        let x_input = CrtBundle::from((x, q));
         let output = Dummy::eval(&Equality::new(), (&x_input, &x_input)).unwrap();
         assert_eq!(output.val(), (x == x) as u16);
 
         for _ in 0..64 {
             let x = rng.r#gen::<u128>() % q;
             let y = rng.r#gen::<u128>() % q;
-            let x_input = DummyVal::to_crt(x, q);
-            let y_input = DummyVal::to_crt(y, q);
+            let x_input = CrtBundle::from((x, q));
+            let y_input = CrtBundle::from((y, q));
             let output = Dummy::eval(&Equality::new(), (&x_input, &y_input)).unwrap();
             assert_eq!(output.val(), (x == y) as u16);
         }

@@ -2,8 +2,9 @@
 
 use crate::{
     fancy::bundle::{Bundle, BundleGadgets},
-    util,
+    util::{self, as_mixed_radix, crt_inv_factor},
 };
+use fancy_plaintext::{Dummy, DummyVal};
 use fancy_traits::{FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, Flatten, HasModulus};
 use itertools::Itertools;
 use std::ops::{Deref, DerefMut};
@@ -27,6 +28,50 @@ impl<W: Clone + HasModulus> CrtBundle<W> {
     /// Return the product of all the wires' moduli.
     pub fn composite_modulus(&self) -> u128 {
         util::product(&self.iter().map(HasModulus::modulus).collect_vec())
+    }
+}
+
+impl From<(u128, u128)> for CrtBundle<DummyVal> {
+    /// Generate a new [`CrtBundle`] for `value.0 % value.1`.
+    fn from(value: (u128, u128)) -> Self {
+        let mut dummy = Dummy::new();
+        Channel::with(std::io::empty(), |channel| {
+            dummy.crt_encode(value.0, value.1, channel)
+        })
+        .unwrap()
+    }
+}
+
+impl CrtBundle<DummyVal> {
+    /// Convert a [`Bundle`] representing a CRT value into its underlying
+    /// `u128`.
+    pub fn from_crt(crt: &Bundle<DummyVal>, modulus: u128) -> u128 {
+        let crt = crt.wires().iter().map(|w| w.val()).collect::<Vec<_>>();
+        crt_inv_factor(&crt, modulus)
+    }
+
+    /// Generate a new mixed radix form [`Bundle`] for `value` using the
+    /// provided `radii`.
+    pub fn to_mixed_radix(value: u128, radii: &[u16]) -> Self {
+        let mixed = as_mixed_radix(value, radii);
+        let mixed = mixed
+            .into_iter()
+            .zip(radii)
+            .map(|(x, q)| DummyVal::new(x, *q))
+            .collect::<Vec<_>>();
+        CrtBundle::new(mixed)
+    }
+
+    /// Convert a [`Bundle`] representing mixed radix form into its underlying
+    /// `u128`.
+    pub fn from_mixed_radix(bundle: &Self) -> u128 {
+        let mut x: u128 = 0;
+        for wire in bundle.wires().iter().rev() {
+            let (xp, overflow) = x.overflowing_mul(wire.modulus() as u128);
+            assert!(!overflow);
+            x = xp + wire.val() as u128;
+        }
+        x
     }
 }
 

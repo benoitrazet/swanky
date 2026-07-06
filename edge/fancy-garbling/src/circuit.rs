@@ -496,10 +496,10 @@ pub mod test_circuits {
 #[cfg(test)]
 mod fancy_arithmetic {
     use crate::{
-        dummy::{Dummy, DummyVal},
         test_circuits::arithmetic::{TestConstants, TestMulGate},
         util::RngExt,
     };
+    use fancy_plaintext::{Dummy, DummyVal};
     use rand::thread_rng;
 
     #[test]

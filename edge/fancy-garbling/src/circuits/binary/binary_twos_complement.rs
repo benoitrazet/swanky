@@ -81,7 +81,7 @@ pub mod test {
 
     #[test]
     fn binary_twos_complement() {
-        use crate::dummy::{Dummy, DummyVal};
+        use fancy_plaintext::Dummy;
         use rand::Rng;
 
         let mut rng = rand::thread_rng();
@@ -91,9 +91,9 @@ pub mod test {
 
         for _ in 0..16 {
             let x = rng.r#gen::<u128>() % q;
-            let x_input = DummyVal::to_binary(x, nbits);
+            let x_input = BinaryBundle::from((x, nbits));
             let output = Dummy::eval(&c, x_input).unwrap();
-            assert_eq!(DummyVal::from_binary(&output), (((!x) % q) + 1) % q);
+            assert_eq!(Into::<u128>::into(output), (((!x) % q) + 1) % q);
         }
     }
 }

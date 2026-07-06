@@ -163,6 +163,7 @@ MISNAMED_CRATES = {
     "inferno",
     "keyed_arena",
     "fancy-garbling",
+    "fancy-plaintext",
     "fancy-traits",
     "mac-n-cheese-compiler",
     "mac-n-cheese-event-log",

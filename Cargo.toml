@@ -22,6 +22,7 @@ members = [
   "edge/f-eq",
   "edge/f-rand",
   "edge/fancy-garbling",
+  "edge/fancy-plaintext",
   "edge/fancy-traits",
   "edge/field",
   "edge/field-binary",
@@ -82,6 +83,7 @@ type_complexity = "allow"
 # BEGIN OUR CRATES
 diet-mac-and-cheese = { path = "edge/diet-mac-and-cheese" }
 fancy-garbling = { path = "edge/fancy-garbling" }
+fancy-plaintext = { path = "edge/fancy-plaintext" }
 fancy-traits = { path = "edge/fancy-traits" }
 humidor = { path = "edge/humidor" }
 inferno = { path = "edge/inferno" }

@@ -48,11 +48,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        circuits::arithmetic::ConstantExponentiation,
-        dummy::{Dummy, DummyVal},
-        util::RngExt,
-    };
+    use crate::CrtBundle;
+    use crate::{circuits::arithmetic::ConstantExponentiation, util::RngExt};
+    use fancy_plaintext::Dummy;
     use rand::{Rng, thread_rng};
 
     #[test]
@@ -63,10 +61,10 @@ mod test {
         for _ in 0..16 {
             let x = rng.r#gen::<u16>() as u128 % q;
             let c = rng.gen_range(2..10);
-            let x_input = DummyVal::to_crt(x, q);
+            let x_input = CrtBundle::from((x, q));
             let circuit = ConstantExponentiation::new();
             let z = Dummy::eval(&circuit, (&x_input, c)).unwrap();
-            let output = DummyVal::from_crt(&z, q);
+            let output = CrtBundle::from_crt(&z, q);
 
             // Compute x^c mod q using modular arithmetic to avoid overflow
             let mut expected = 1u128;

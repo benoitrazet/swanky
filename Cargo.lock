@@ -819,6 +819,7 @@ name = "fancy-garbling"
 version = "0.6.0"
 dependencies = [
  "criterion",
+ "fancy-plaintext",
  "fancy-traits",
  "itertools 0.14.0",
  "rand 0.8.5",
@@ -832,6 +833,16 @@ dependencies = [
  "swanky-error",
  "swanky-rng",
  "vectoreyes",
+]
+
+[[package]]
+name = "fancy-plaintext"
+version = "0.6.0"
+dependencies = [
+ "fancy-traits",
+ "rand 0.8.5",
+ "swanky-channel",
+ "swanky-error",
 ]
 
 [[package]]
@@ -2606,6 +2617,7 @@ version = "0.6.0"
 dependencies = [
  "criterion",
  "fancy-garbling",
+ "fancy-plaintext",
  "fancy-traits",
  "proptest",
  "rand 0.8.5",
@@ -2839,6 +2851,7 @@ dependencies = [
  "clap",
  "criterion",
  "fancy-garbling",
+ "fancy-plaintext",
  "fancy-traits",
  "itertools 0.14.0",
  "ndarray",
@@ -3098,6 +3111,7 @@ dependencies = [
  "clap",
  "criterion",
  "fancy-garbling",
+ "fancy-plaintext",
  "fancy-traits",
  "itertools 0.14.0",
  "rand 0.8.5",
