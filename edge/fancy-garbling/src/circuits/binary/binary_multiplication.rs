@@ -1,6 +1,5 @@
 use crate::{
-    BinaryBundle, FancyBinary,
-    circuit::{Circuit, CircuitInputMapper},
+    BinaryBundle,
     circuits::binary::{
         BinaryAddition, BinaryAdditionNoCarry, BinaryConstant, BinaryLeftShift,
         BinaryLeftShiftExtend,
@@ -8,6 +7,7 @@ use crate::{
     util::u128_to_bits,
 };
 use core::marker::PhantomData;
+use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 

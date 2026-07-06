@@ -1,10 +1,11 @@
 use crate::{
-    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj,
-    HasModulus, WireLabel, WireMod2, check_binary,
-    fancy::{BinaryBundle, Fancy},
+    AllWire, ArithmeticWire, BinaryBundle, WireLabel, WireMod2,
     garble::binary_and::BinaryWireLabel,
     hash_wires,
     util::{RngExt, output_tweak, tweak, tweak2},
+};
+use fancy_traits::{
+    Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj, HasModulus, is_binary,
 };
 use rand::{CryptoRng, RngCore};
 #[cfg(feature = "serde")]
@@ -136,7 +137,7 @@ impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        check_binary!(x);
+        is_binary!(x);
 
         let zero = self.zero.clone();
         self.xor(&zero, x)
@@ -144,8 +145,8 @@ impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
 
     /// Xor is just addition
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        check_binary!(x);
-        check_binary!(y);
+        is_binary!(x);
+        is_binary!(y);
 
         self.add(x, y)
     }
@@ -167,8 +168,8 @@ impl<RNG: RngCore + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
             return Ok(AllWire::Mod2(C));
         }
         // If we got here, one of the wires isn't binary
-        check_binary!(x);
-        check_binary!(y);
+        is_binary!(x);
+        is_binary!(y);
 
         // Shouldn't be reachable, unless the wire has modulus 2 but is not AllWire::Mod2()
         unreachable!()

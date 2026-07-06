@@ -11,8 +11,7 @@ mod tests {
     use super::*;
     use core::marker::PhantomData;
     use fancy_garbling::{
-        AllWire, Circuit, CircuitInputMapper, CrtBundle, CrtGadgets, FancyArithmetic, FancyEncode,
-        FancyOutput, FancyProj, Flatten, WireLabel, WireMod2,
+        AllWire, CrtBundle, CrtGadgets, VecCrtBundle, WireLabel, WireMod2,
         circuit_analyzer::CircuitAnalyzer,
         circuits::{
             aes::AesNonExpanded,
@@ -20,6 +19,9 @@ mod tests {
         },
         dummy::{Dummy, DummyVal},
         test_circuits::arithmetic::TestAddition,
+    };
+    use fancy_traits::{
+        Circuit, CircuitInputMapper, FancyArithmetic, FancyEncode, FancyOutput, FancyProj, Flatten,
     };
     use rand::Rng;
     use swanky_channel::Channel;
@@ -74,7 +76,7 @@ mod tests {
         F::Item: 'a,
     {
         type Input = &'a [CrtBundle<F::Item>];
-        type Output = Vec<CrtBundle<F::Item>>;
+        type Output = VecCrtBundle<F::Item>;
 
         fn execute(
             &self,
@@ -90,7 +92,7 @@ mod tests {
                 let z = ReLU::new().execute(backend, (&y, "100%", None), channel)?;
                 outputs.push(z);
             }
-            Ok(outputs)
+            Ok(VecCrtBundle(outputs))
         }
     }
 
@@ -108,7 +110,7 @@ mod tests {
             .iter()
             .map(|x| DummyVal::to_crt(*x, q))
             .collect::<Vec<_>>();
-        let output = Dummy::eval(&TestCircuit::new(), &inputs).unwrap();
+        let VecCrtBundle(output) = Dummy::eval(&TestCircuit::new(), &inputs).unwrap();
         let expected = output
             .iter()
             .map(|x| DummyVal::from_crt(x, q))
@@ -120,7 +122,7 @@ mod tests {
                 let rng = SwankyRng::new();
                 let mut gb = Garbler::<SwankyRng, ChouOrlandiSender, AllWire>::new(channel, rng)?;
                 let xs = gb.crt_encode_many(&plaintext, q, channel)?;
-                let result = TestCircuit::new().execute(&mut gb, &xs, channel)?;
+                let VecCrtBundle(result) = TestCircuit::new().execute(&mut gb, &xs, channel)?;
                 gb.crt_outputs(&result, channel)?;
                 Ok(())
             },
@@ -129,7 +131,7 @@ mod tests {
                 let mut ev =
                     Evaluator::<SwankyRng, ChouOrlandiReceiver, AllWire>::new(channel, rng)?;
                 let xs = ev.crt_receive_many(n, q, channel)?;
-                let result = TestCircuit::new().execute(&mut ev, &xs, channel)?;
+                let VecCrtBundle(result) = TestCircuit::new().execute(&mut ev, &xs, channel)?;
                 Ok(ev.crt_outputs(&result, channel)?.unwrap())
             },
         )

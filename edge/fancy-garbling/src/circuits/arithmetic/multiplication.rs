@@ -1,5 +1,6 @@
-use crate::{CrtBundle, FancyArithmetic, circuit::Circuit, util::crt};
+use crate::{CrtBundle, util::crt};
 use core::marker::PhantomData;
+use fancy_traits::{Circuit, FancyArithmetic};
 use swanky_channel::Channel;
 use swanky_error::Result;
 

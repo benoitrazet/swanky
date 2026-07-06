@@ -1,10 +1,10 @@
 use crate::{
-    CrtBundle, FancyArithmetic, FancyProj, HasModulus,
-    circuit::Circuit,
+    CrtBundle,
     circuits::arithmetic::{ModChange, addition::AddMany},
     util::{as_mixed_radix, inv, product},
 };
 use core::marker::PhantomData;
+use fancy_traits::{Circuit, FancyArithmetic, FancyProj, HasModulus};
 use swanky_channel::Channel;
 use swanky_error::Result;
 

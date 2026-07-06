@@ -1,10 +1,7 @@
 //! SHA circuits.
 
-use crate::{
-    FancyBinary,
-    circuit::{BinaryCircuit, Circuit, CircuitInputMapper},
-    circuits::binary::BinaryConstant,
-};
+use crate::{binary::BinaryCircuit, circuits::binary::BinaryConstant};
+use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary};
 use std::io::Cursor;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -54,7 +51,7 @@ impl<F: FancyBinary> Circuit<F> for Sha256CompressionFunctionFixedIV {
 }
 
 impl<F: FancyBinary> CircuitInputMapper<F> for Sha256CompressionFunctionFixedIV {
-    fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 512);
         inputs.try_into().unwrap()
     }
@@ -116,7 +113,7 @@ impl<F: FancyBinary> Circuit<F> for Sha256CompressionFunction {
 }
 
 impl<F: FancyBinary> CircuitInputMapper<F> for Sha256CompressionFunction {
-    fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 768);
         let (block, chain) = inputs.split_at(512);
         (

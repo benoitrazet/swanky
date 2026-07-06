@@ -1,9 +1,9 @@
 use crate::{
-    BinaryBundle, FancyBinary,
-    circuit::Circuit,
+    BinaryBundle, BinaryBundleAndItem,
     circuits::binary::{BinaryAddition, BinaryTwosComplement},
 };
 use core::marker::PhantomData;
+use fancy_traits::{Circuit, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -26,7 +26,7 @@ where
     F::Item: 'a,
 {
     type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
-    type Output = (BinaryBundle<F::Item>, F::Item);
+    type Output = BinaryBundleAndItem<F::Item>;
 
     fn execute(
         &self,
@@ -43,13 +43,13 @@ where
 
 pub mod test {
     use super::*;
-    use crate::circuit::CircuitInputMapper;
+    use fancy_traits::CircuitInputMapper;
 
     /// Circuit for testing [`BinarySubtraction`].
     pub struct TestBinarySubtraction(pub usize);
     impl<F: FancyBinary> Circuit<F> for TestBinarySubtraction {
         type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
-        type Output = (BinaryBundle<F::Item>, F::Item);
+        type Output = BinaryBundleAndItem<F::Item>;
 
         fn execute(
             &self,
@@ -62,7 +62,7 @@ pub mod test {
     }
 
     impl<F: FancyBinary> CircuitInputMapper<F> for TestBinarySubtraction {
-        fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
+        fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0 * 2);
             let (x, y) = inputs.split_at(self.0);
             (BinaryBundle::new(x.to_vec()), BinaryBundle::new(y.to_vec()))

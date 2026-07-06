@@ -1,5 +1,6 @@
-use crate::{BinaryBundle, FancyBinary, circuit::Circuit, circuits::binary::AndMany};
+use crate::{BinaryBundle, circuits::binary::AndMany};
 use core::marker::PhantomData;
+use fancy_traits::{Circuit, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -48,7 +49,7 @@ where
 
 pub mod test {
     use super::*;
-    use crate::circuit::CircuitInputMapper;
+    use fancy_traits::CircuitInputMapper;
 
     /// Circuit for testing [`BinaryEquality`].
     pub struct TestBinaryEquality(pub usize);
@@ -67,7 +68,7 @@ pub mod test {
     }
 
     impl<F: FancyBinary> CircuitInputMapper<F> for TestBinaryEquality {
-        fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
+        fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0 * 2);
             let (x, y) = inputs.split_at(self.0);
             (BinaryBundle::new(x.to_vec()), BinaryBundle::new(y.to_vec()))

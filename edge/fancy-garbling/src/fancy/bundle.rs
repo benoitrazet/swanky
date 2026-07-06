@@ -1,4 +1,4 @@
-use crate::{FancyOutput, HasModulus};
+use fancy_traits::{FancyOutput, Flatten, HasModulus};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use swanky_channel::Channel;
@@ -73,6 +73,14 @@ impl<W: Clone + HasModulus> Bundle<W> {
     /// Reverse the wires
     pub(crate) fn reverse(&mut self) {
         self.0.reverse();
+    }
+}
+
+impl<T: Clone + HasModulus> Flatten for Bundle<T> {
+    type Item = T;
+
+    fn flatten(self) -> Vec<Self::Item> {
+        self.wires().to_vec()
     }
 }
 

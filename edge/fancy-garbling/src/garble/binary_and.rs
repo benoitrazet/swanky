@@ -1,9 +1,10 @@
-use crate::{HasModulus, WireLabel, WireMod2, hash_wires, util::tweak2};
+use crate::{WireLabel, WireMod2, hash_wires, util::tweak2};
+use fancy_traits::HasModulus;
 use subtle::ConditionallySelectable;
 use vectoreyes::U8x16;
 
 /// The [`BinaryWireLabel`] provides the subroutines to implement AND gates
-/// for the garbler and evaluator in [`crate::fancy::FancyBinary`].
+/// for the garbler and evaluator in [`fancy_traits::FancyBinary`].
 pub trait BinaryWireLabel: WireLabel + ConditionallySelectable {
     /// Garbles an 'and' gate given two input wires and the delta.
     ///

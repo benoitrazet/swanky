@@ -1,11 +1,12 @@
 //! Various fancy circuits
 use crate::circuit_psi::*;
 use fancy_garbling::{
-    BinaryBundle, Circuit, Fancy, FancyBinary,
+    BinaryBundle,
     circuits::binary::{
         BinaryAdditionNoCarry, BinaryConstant, BinaryEquality, BinaryMultiplex, PairwiseXor,
     },
 };
+use fancy_traits::{Circuit, Fancy, FancyBinary};
 use itertools::Itertools;
 use swanky_channel::Channel;
 

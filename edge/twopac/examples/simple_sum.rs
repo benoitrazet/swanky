@@ -2,8 +2,9 @@
 //! using fancy-garbling.
 
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryGadgets, Circuit, circuits::binary::BinaryAdditionNoCarry,
+    AllWire, BinaryBundle, BinaryGadgets, circuits::binary::BinaryAdditionNoCarry,
 };
+use fancy_traits::Circuit;
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};

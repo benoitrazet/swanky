@@ -1,7 +1,4 @@
-use crate::{
-    FancyBinary,
-    circuit::{Circuit, CircuitInputMapper},
-};
+use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 

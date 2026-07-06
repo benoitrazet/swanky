@@ -5,12 +5,13 @@ use crate::{
     util::{i64_from_bits, i64_to_twos_complement},
 };
 use fancy_garbling::{
-    BinaryBundle, BinaryGadgets, Circuit, FancyBinary,
+    BinaryBundle, BinaryGadgets,
     circuits::binary::{
         BinaryAdditionNoCarry, BinaryConstant, BinaryConstantMultiplication, BinaryMax,
         BinaryMultiplex, BinaryMultiplexConstantBits, BinaryMultiplicationLowerHalf,
     },
 };
+use fancy_traits::{Circuit, FancyBinary};
 use ndarray::Array3;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};

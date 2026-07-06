@@ -1,11 +1,11 @@
 //! [`Fancy`] instantiation for computing gate counts and multiplicative depth
 //! of a [`Fancy`] circuit.
 
-use crate::{
-    Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj, HasModulus,
-    circuit::CircuitInputMapper,
-};
 use core::cmp::max;
+use fancy_traits::{
+    CircuitInputMapper, Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj,
+    HasModulus,
+};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
 
@@ -30,7 +30,7 @@ impl HasModulus for AnalyzerItem {
 }
 
 /// A [`Fancy`] object which counts gates and depth of a
-/// [`crate::circuit::Circuit`].
+/// [`fancy_traits::Circuit`].
 ///
 /// Specifically, [`CircuitAnalyzer`] stores the number of inputs, ands, xors,
 /// negations, constants, multiplications, additions, subtractions, and

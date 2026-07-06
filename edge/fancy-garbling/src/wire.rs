@@ -5,7 +5,8 @@
 //! in garbled circuits, and represents an encoding of the value on any given
 //! wire of the circuit.
 
-use crate::{fancy::HasModulus, util};
+use crate::util;
+use fancy_traits::HasModulus;
 use rand::{CryptoRng, Rng, RngCore};
 use swanky_cr_hash::TweakableCircularCorrelationRobustHash;
 use vectoreyes::{

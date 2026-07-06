@@ -4,7 +4,7 @@ use crate::{
     utils,
 };
 
-use fancy_garbling::FancyEncode;
+use fancy_traits::FancyEncode;
 use swanky_block::{Block, Block512};
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_oprf_kmprt::Sender as KmprtSender;

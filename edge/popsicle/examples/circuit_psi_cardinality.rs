@@ -1,4 +1,4 @@
-use fancy_garbling::FancyOutput;
+use fancy_traits::FancyOutput;
 use popsicle::circuit_psi::{
     CircuitPsi, circuits::*, evaluator::OpprfPsiEvaluator, garbler::OpprfPsiGarbler, utils::*,
 };

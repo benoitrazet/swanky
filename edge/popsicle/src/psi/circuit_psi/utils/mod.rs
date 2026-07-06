@@ -1,6 +1,7 @@
 //! Various utils for PSTY
 use crate::cuckoo::CuckooItem;
-use fancy_garbling::{FancyEncode, util};
+use fancy_garbling::util;
+use fancy_traits::FancyEncode;
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use swanky_block::{Block, Block512};

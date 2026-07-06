@@ -8,11 +8,12 @@ use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
 
 use crate::{
-    BinaryBundle, BinaryGadgets, Bundle, CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary,
-    FancyEncode, FancyOutput, FancyProj, check_binary,
-    circuit::Circuit,
-    fancy::{Fancy, HasModulus},
+    BinaryBundle, BinaryGadgets, Bundle, CrtBundle, CrtGadgets,
     util::{as_mixed_radix, crt_inv_factor, u128_from_bits},
+};
+use fancy_traits::{
+    Circuit, Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj, HasModulus,
+    is_binary,
 };
 
 /// Simple struct that performs the fancy computation over `u16`.
@@ -141,8 +142,8 @@ impl Default for Dummy {
 
 impl FancyBinary for Dummy {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        check_binary!(x);
-        check_binary!(y);
+        is_binary!(x);
+        is_binary!(y);
 
         self.add(x, y)
     }
@@ -153,14 +154,14 @@ impl FancyBinary for Dummy {
         y: &Self::Item,
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item> {
-        check_binary!(x);
-        check_binary!(y);
+        is_binary!(x);
+        is_binary!(y);
 
         self.mul(x, y, channel)
     }
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        check_binary!(x);
+        is_binary!(x);
 
         self.xor(x, &DummyVal::new(1, 2))
     }

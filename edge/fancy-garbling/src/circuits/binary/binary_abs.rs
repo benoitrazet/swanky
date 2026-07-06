@@ -1,9 +1,9 @@
 use crate::{
-    BinaryBundle, FancyBinary,
-    circuit::Circuit,
+    BinaryBundle,
     circuits::binary::{BinaryMultiplex, BinaryTwosComplement},
 };
 use core::marker::PhantomData;
+use fancy_traits::{Circuit, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 

@@ -1,9 +1,9 @@
 use crate::{
-    BinaryBundle, FancyBinary,
-    circuit::Circuit,
+    BinaryBundle, BinaryBundleAndItem,
     circuits::binary::{BinarySubtraction, Mux, OrMany},
 };
 use core::marker::PhantomData;
+use fancy_traits::{Circuit, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -38,7 +38,8 @@ where
 
         // underflow indicates y != 0 && x >= y
         // requiring special care to remove the y != 0, which is what follows.
-        let (_, lhs) = BinarySubtraction::new().execute(backend, (x, y), channel)?;
+        let BinaryBundleAndItem(_, lhs) =
+            BinarySubtraction::new().execute(backend, (x, y), channel)?;
 
         // Now we build a clause equal to (y == 0 || x >= y), which we can OR with
         // lhs to remove the y==0 aspect.
@@ -118,7 +119,7 @@ where
 
 pub mod test {
     use super::*;
-    use crate::circuit::CircuitInputMapper;
+    use fancy_traits::CircuitInputMapper;
 
     /// Circuit for testing [`BinaryLessThan`].
     pub struct TestBinaryLessThan(pub usize);
@@ -137,7 +138,7 @@ pub mod test {
     }
 
     impl<F: FancyBinary> CircuitInputMapper<F> for TestBinaryLessThan {
-        fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
+        fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0 * 2);
             let (x, y) = inputs.split_at(self.0);
             (BinaryBundle::new(x.to_vec()), BinaryBundle::new(y.to_vec()))
@@ -169,7 +170,7 @@ pub mod test {
     }
 
     impl<F: FancyBinary> CircuitInputMapper<F> for TestBinaryLessThanSigned {
-        fn map(&self, inputs: Vec<<F as crate::Fancy>::Item>) -> Self::Input {
+        fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0 * 2);
             let (x, y) = inputs.split_at(self.0);
             (BinaryBundle::new(x.to_vec()), BinaryBundle::new(y.to_vec()))

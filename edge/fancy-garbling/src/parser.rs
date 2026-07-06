@@ -6,7 +6,7 @@
 //!   <https://nigelsmart.github.io/MPC-Circuits/old-circuits.html>
 //! - **Bristol Fashion**: The new format: <https://nigelsmart.github.io/MPC-Circuits>
 
-use crate::circuit::{BinaryCircuit, BinaryGate};
+use crate::binary::{BinaryCircuit, BinaryGate};
 use regex::{Captures, Regex};
 use std::{io::BufRead, str::FromStr};
 use swanky_error::{ErrorKind, Result, WrapErr, ensure, swanky_error};
@@ -290,7 +290,7 @@ impl BinaryCircuit {
 
 #[cfg(test)]
 mod tests {
-    use crate::circuit::{BinaryCircuit, BinaryGate};
+    use crate::binary::{BinaryCircuit, BinaryGate};
     use std::io::Cursor;
 
     #[test]

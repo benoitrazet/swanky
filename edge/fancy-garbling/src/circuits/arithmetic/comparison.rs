@@ -1,10 +1,10 @@
 use crate::{
-    CrtBundle, FancyArithmetic, FancyBinary, FancyProj,
-    circuit::Circuit,
+    CrtBundle,
     circuits::arithmetic::{FractionalMixedRadix, Subtraction},
     util::get_ms,
 };
 use core::marker::PhantomData;
+use fancy_traits::{Circuit, FancyArithmetic, FancyBinary, FancyProj};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
