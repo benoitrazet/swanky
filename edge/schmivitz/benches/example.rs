@@ -1,4 +1,4 @@
-use fancy_garbling::{Circuit, FancyBinary, FancyZeroKnowledge};
+use fancy_traits::{Circuit, FancyBinary, FancyZeroKnowledge};
 use swanky_channel::Channel;
 use swanky_error::Result;
 

@@ -1,4 +1,4 @@
-use fancy_garbling::{Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
+use fancy_traits::{Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
 use mac_n_cheese_sieve_parser::WireId;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};

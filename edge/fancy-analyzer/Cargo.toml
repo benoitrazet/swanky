@@ -1,0 +1,25 @@
+[package]
+name = "fancy-analyzer"
+readme = "README.md"
+description = "Circuit analyzer for `Fancy` circuits"
+categories = ["cryptography"]
+keywords = ["cryptography", "secure computation"]
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+fancy-traits.workspace = true
+swanky-channel.workspace = true
+swanky-error.workspace = true
+
+rand.workspace = true
+
+[dev-dependencies]
+fancy-circuits.workspace = true
+fancy-garbling.workspace = true

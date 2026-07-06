@@ -158,12 +158,15 @@ def workspace_members_are_defined_in_workspace(ctx: click.Context) -> LintResult
 
 
 MISNAMED_CRATES = {
-    "bristol-fashion",
     "diet-mac-and-cheese",
     "humidor",
     "inferno",
     "keyed_arena",
+    "fancy-analyzer",
+    "fancy-circuits",
     "fancy-garbling",
+    "fancy-plaintext",
+    "fancy-traits",
     "mac-n-cheese-compiler",
     "mac-n-cheese-event-log",
     "mac-n-cheese-inspector",
@@ -313,7 +316,6 @@ def cargo_deny(ctx: click.Context) -> LintResult:
 
 # As of this writing, these libraries don't require documentation.
 LIBS_NOT_YET_DOCUMENTED = {
-    "edge/bristol-fashion/src/lib.rs",
     "edge/field-fft/src/lib.rs",
     "edge/diet-mac-and-cheese/web-mac-and-cheese/wasm/src/lib.rs",
     "edge/diet-mac-and-cheese/web-mac-and-cheese/websocket/src/lib.rs",

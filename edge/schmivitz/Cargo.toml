@@ -19,7 +19,7 @@ version.workspace = true
 
 [dependencies]
 diet-mac-and-cheese.workspace = true
-fancy-garbling.workspace = true
+fancy-traits.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
 swanky-channel.workspace = true
 swanky-error.workspace = true
@@ -42,9 +42,11 @@ shake.workspace = true
 tempfile.workspace = true
 
 [dev-dependencies]
+fancy-circuits.workspace = true
+swanky-sieve-ir-codegen.workspace = true
+
 criterion.workspace = true
 proptest.workspace = true
-swanky-sieve-ir-codegen.workspace = true
 
 [lints]
 workspace = true

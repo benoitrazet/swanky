@@ -1,4 +1,4 @@
-use fancy_garbling::{Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
+use fancy_traits::{Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
@@ -134,7 +134,7 @@ impl<'a> FancyZeroKnowledge for ProverPreparer<'a> {
 mod tests {
     use crate::circuit::CircuitIngestor;
     use crate::proof::{Circuit, prover_preparer::ProverPreparer};
-    use fancy_garbling::Circuit as _;
+    use fancy_traits::Circuit as _;
     use mac_n_cheese_sieve_parser::text_parser::RelationReader;
     use rand::thread_rng;
     use std::io::Cursor;

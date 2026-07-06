@@ -6,7 +6,7 @@
 */
 use crate::parameters::FIELD_SIZE;
 use diet_mac_and_cheese::fields::SieveIrDeserialize;
-use fancy_garbling::{Circuit as FancyCircuit, FancyBinary, FancyZeroKnowledge};
+use fancy_traits::{Circuit as FancyCircuit, FancyBinary, FancyEncode, FancyZeroKnowledge};
 use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, RelationVisitor, Type, TypeId,
     TypedWireRange, ValueStreamKind, ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
@@ -328,7 +328,9 @@ pub struct CircuitInterpreter<'a> {
     max_wire_id: u64,
 }
 
-impl<'a, F: FancyBinary + FancyZeroKnowledge> FancyCircuit<F> for CircuitInterpreter<'a> {
+impl<'a, F: FancyBinary + FancyZeroKnowledge + FancyEncode> FancyCircuit<F>
+    for CircuitInterpreter<'a>
+{
     type Input = ();
     type Output = Vec<F::Item>; // TODO: This should be `()`.
 

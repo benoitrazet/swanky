@@ -12,10 +12,8 @@ pub use binary_and::BinaryWireLabel;
 mod helpers {
     use rand::{Rng, thread_rng};
 
-    use crate::{
-        CircuitInputMapper, Flatten,
-        dummy::{Dummy, DummyVal},
-    };
+    use fancy_plaintext::{Dummy, DummyVal};
+    use fancy_traits::{CircuitInputMapper, Flatten};
 
     pub(crate) fn plaintext<C: CircuitInputMapper<Dummy>>(
         circuit: &C,
@@ -51,22 +49,19 @@ mod helpers {
 
 #[cfg(test)]
 mod nonstreaming {
-    use crate::{
-        AllWire, Evaluator, Garbler, WireLabel, WireMod2,
-        circuit::{CircuitInputMapper, Flatten},
-        classic::GarbledCircuit,
-        dummy::Dummy,
-        test_circuits::{
-            arithmetic::{
-                TestAddMany, TestAddition, TestCmul, TestConstants, TestMulGate,
-                TestMulGateUnequalMods, TestSubtraction,
-            },
-            binary::TestOrGateFanN,
-            proj::{TestProj, TestProjRand},
+    use crate::{AllWire, Evaluator, Garbler, WireLabel, WireMod2, classic::GarbledCircuit};
+    use fancy_circuits::test_circuits::{
+        arithmetic::{
+            TestAddMany, TestAddition, TestCmul, TestConstants, TestMulGate,
+            TestMulGateUnequalMods, TestSubtraction,
         },
-        util::RngExt,
+        binary::TestOrGateFanN,
+        proj::{TestProj, TestProjRand},
     };
-    use rand::thread_rng;
+    use fancy_circuits::util::RngExt;
+    use fancy_plaintext::Dummy;
+    use fancy_traits::{CircuitInputMapper, Flatten};
+    use rand::{Rng, thread_rng};
     use swanky_rng::SwankyRng;
 
     // Check that non-streaming evaluation of a circuit execution equals the
@@ -123,7 +118,7 @@ mod nonstreaming {
     #[test]
     fn cmul() {
         let q = thread_rng().gen_prime();
-        let c = thread_rng().gen_u16() % q;
+        let c = thread_rng().r#gen::<u16>() % q;
         garble_test_helper::<AllWire, _>(&TestCmul(q, c));
     }
 
@@ -137,7 +132,7 @@ mod nonstreaming {
     fn proj_rand() {
         let q = thread_rng().gen_prime();
         let tab = (0..q)
-            .map(|_| thread_rng().gen_u16() % q)
+            .map(|_| thread_rng().r#gen::<u16>() % q)
             .collect::<Vec<_>>();
 
         garble_test_helper::<AllWire, _>(&TestProjRand(q, tab));
@@ -160,23 +155,25 @@ mod nonstreaming {
     #[test]
     fn constants() {
         let q = thread_rng().gen_modulus();
-        let c = thread_rng().gen_u16() % q;
+        let c = thread_rng().r#gen::<u16>() % q;
         garble_test_helper::<AllWire, _>(&TestConstants(q, c));
     }
 }
 
 #[cfg(test)]
 mod streaming {
-    use crate::circuit::{Circuit, Flatten};
-    use crate::circuits::arithmetic::{Constant, Multiplication, ReLU};
-    use crate::test_circuits::arithmetic::{TestAddition, TestCmul, TestMulGate, TestSubtraction};
-    use crate::test_circuits::proj::TestProj;
-    use crate::{
-        AllWire, Evaluator, FancyEncode, Garbler, WireLabel, circuit::CircuitInputMapper,
-        dummy::Dummy, util::RngExt,
+    use crate::{AllWire, Evaluator, Garbler, WireLabel};
+    use fancy_circuits::arithmetic::{Constant, Multiplication, ReLU};
+    use fancy_circuits::test_circuits::arithmetic::{
+        TestAddition, TestCmul, TestMulGate, TestSubtraction,
     };
-    use crate::{CrtBundle, CrtGadgets, FancyArithmetic, FancyOutput, FancyProj};
-    use rand::thread_rng;
+    use fancy_circuits::test_circuits::proj::TestProj;
+    use fancy_circuits::util::RngExt;
+    use fancy_circuits::{CrtBundle, CrtGadgets, VecCrtBundle};
+    use fancy_plaintext::Dummy;
+    use fancy_traits::{Circuit, CircuitInputMapper, Flatten};
+    use fancy_traits::{FancyArithmetic, FancyEncode, FancyOutput, FancyProj};
+    use rand::{Rng, thread_rng};
     use swanky_channel::Channel;
     use swanky_error::Result;
     use swanky_rng::SwankyRng;
@@ -257,7 +254,7 @@ mod streaming {
         let mut rng = thread_rng();
         for _ in 0..16 {
             let q = rng.gen_modulus();
-            let c = rng.gen_u16() % q;
+            let c = rng.r#gen::<u16>() % q;
             streaming_test_helper::<AllWire, _>(&TestCmul(q, c));
         }
     }
@@ -275,7 +272,7 @@ mod streaming {
     struct TestComplexGadget(pub Vec<u16>, pub usize);
     impl<F: FancyArithmetic + FancyProj + CrtGadgets> Circuit<F> for TestComplexGadget {
         type Input = Vec<CrtBundle<F::Item>>;
-        type Output = Vec<CrtBundle<F::Item>>;
+        type Output = VecCrtBundle<F::Item>;
 
         fn execute(
             &self,
@@ -292,7 +289,7 @@ mod streaming {
                 let z = ReLU::new().execute(backend, (&y, accuracy, none_option), channel)?;
                 outputs.push(z);
             }
-            Ok(outputs)
+            Ok(VecCrtBundle(outputs))
         }
     }
     impl<F: FancyArithmetic + FancyProj + CrtGadgets> CircuitInputMapper<F> for TestComplexGadget {
@@ -316,7 +313,7 @@ mod streaming {
     #[test]
     fn complex_gadget() {
         let N = 10;
-        let qs = crate::util::primes_with_width(10);
+        let qs = fancy_circuits::util::primes_with_width(10);
         for _ in 0..16 {
             streaming_test_helper::<AllWire, _>(&TestComplexGadget(qs.clone(), N));
         }

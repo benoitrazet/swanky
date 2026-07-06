@@ -4,11 +4,12 @@ use crate::{
     neural_net::FancyNeuralNet,
     util::{from_mod_q_crt, to_mod_q, to_mod_q_crt},
 };
-use fancy_garbling::{
-    Circuit, CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary, FancyProj, HasModulus,
-    circuits::arithmetic::{Addition, Constant, ConstantMultiplication, Max, ReLU, Sgn},
-    util::factor,
+use fancy_circuits::util::factor;
+use fancy_circuits::{
+    CrtBundle, CrtGadgets,
+    arithmetic::{Addition, Constant, ConstantMultiplication, Max, ReLU, Sgn},
 };
+use fancy_traits::{Circuit, FancyArithmetic, FancyBinary, FancyProj, HasModulus};
 use ndarray::Array3;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};

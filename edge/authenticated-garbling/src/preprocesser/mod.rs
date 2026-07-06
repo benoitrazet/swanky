@@ -25,7 +25,8 @@
 //! Garbling for Faster Secure Two-Party Computation".
 //! <https://eprint.iacr.org/2018/578.pdf>
 
-use fancy_garbling::{CircuitInputMapper, FancyEncode, circuit_analyzer::CircuitAnalyzer};
+use fancy_analyzer::CircuitAnalyzer;
+use fancy_traits::{CircuitInputMapper, FancyEncode};
 use rand::{CryptoRng, Rng};
 use swanky_authenticated_bits::{and_triples::AndTripleGenerator, authshares::AuthShare};
 use swanky_channel::Channel;
@@ -111,7 +112,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fancy_garbling::circuits::binary::TestBinaryAddition;
+    use fancy_circuits::binary::TestBinaryAddition;
     use swanky_party::party_system;
     use swanky_rng::SwankyRng;
 

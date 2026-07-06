@@ -1,11 +1,9 @@
 mod test {
-    use fancy_garbling::{
-        BinaryBundle, Circuit as FancyCircuit, FancyBinary, FancyZeroKnowledge,
-        circuits::{
-            aes::AesNonExpanded, binary::BinaryAddition, hmac::HmacSha256,
-            sha::Sha256CompressionFunction,
-        },
+    use fancy_circuits::{
+        BinaryBundle, BinaryBundleAndItem, aes::AesNonExpanded, binary::BinaryAddition,
+        hmac::HmacSha256, sha::Sha256CompressionFunction,
     };
+    use fancy_traits::{Circuit as FancyCircuit, FancyBinary, FancyZeroKnowledge};
     use merlin::Transcript;
     use rand::thread_rng;
     use schmivitz::{
@@ -366,7 +364,7 @@ mod test {
                     .map(|_| backend.receive(2, channel))
                     .collect::<Result<Vec<_>>>()?,
             );
-            let (z, carry) = self.0.execute(backend, (&x, &y), channel)?;
+            let BinaryBundleAndItem(z, carry) = self.0.execute(backend, (&x, &y), channel)?;
             for (wire, c) in z.wires().iter().zip(self.1.chars()) {
                 match c {
                     '0' => backend.assert_zero(wire, channel)?,

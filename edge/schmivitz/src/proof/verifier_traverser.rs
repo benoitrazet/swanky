@@ -1,8 +1,4 @@
-use fancy_garbling::Fancy;
-use fancy_garbling::FancyBinary;
-use fancy_garbling::FancyEncode;
-use fancy_garbling::FancyZeroKnowledge;
-use fancy_garbling::HasModulus;
+use fancy_traits::{Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;

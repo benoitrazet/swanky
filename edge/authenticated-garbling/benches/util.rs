@@ -1,7 +1,6 @@
-use fancy_garbling::{
-    CircuitInputMapper, FancyEncode, FancyOutput, Flatten, circuit_analyzer::CircuitAnalyzer,
-    dummy::Dummy,
-};
+use fancy_analyzer::CircuitAnalyzer;
+use fancy_plaintext::Dummy;
+use fancy_traits::{CircuitInputMapper, FancyEncode, FancyOutput, Flatten};
 use swanky_authenticated_garbling::{
     Evaluator, Garbler, WirePreProcessor,
     ps::{PartyEvaluator, PartyGarbler},

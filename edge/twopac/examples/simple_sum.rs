@@ -1,9 +1,9 @@
 //! An example that adds two secret numbers in a binary garbled circuit
 //! using fancy-garbling.
 
-use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryGadgets, Circuit, circuits::binary::BinaryAdditionNoCarry,
-};
+use fancy_circuits::{BinaryBundle, BinaryGadgets, binary::BinaryAdditionNoCarry};
+use fancy_garbling::AllWire;
+use fancy_traits::Circuit;
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};

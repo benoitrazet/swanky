@@ -1,0 +1,23 @@
+[package]
+name = "fancy-plaintext"
+readme = "README.md"
+description = "Plaintext evaluator for `Fancy` circuits"
+categories = ["cryptography"]
+keywords = ["cryptography", "secure computation"]
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+fancy-traits.workspace = true
+swanky-channel.workspace = true
+swanky-error.workspace = true
+
+rand.workspace = true
+
+[dev-dependencies]

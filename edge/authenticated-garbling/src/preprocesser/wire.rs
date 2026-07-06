@@ -1,4 +1,4 @@
-use fancy_garbling::{Fancy, FancyBinary, FancyEncode, HasModulus};
+use fancy_traits::{Fancy, FancyBinary, FancyEncode, HasModulus};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_field::FiniteRing;

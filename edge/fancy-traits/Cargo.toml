@@ -1,0 +1,21 @@
+[package]
+name = "fancy-traits"
+readme = "README.md"
+description = "Traits for writing circuits"
+categories = ["cryptography"]
+keywords = ["cryptography", "secure computation"]
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+swanky-channel.workspace = true
+swanky-error.workspace = true
+
+[dev-dependencies]
+swanky-rng.workspace = true

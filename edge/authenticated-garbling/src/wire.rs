@@ -1,6 +1,7 @@
 //! Wirelabel representation for authenticated garbling.
 
-use fancy_garbling::{HasModulus, WireMod2};
+use fancy_garbling::WireMod2;
+use fancy_traits::HasModulus;
 use swanky_authenticated_bits::authshares::AuthShare;
 use swanky_field_binary::F2;
 use swanky_party::GenericParty;

@@ -7,7 +7,7 @@
 //! Emmanuela Orsini, Lawrence Roy, and Peter Scholl. [Publicly Verifiable Zero-Knowledge and
 //! Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
 //!
-use fancy_garbling::Circuit as FancyCircuit;
+use fancy_traits::Circuit as FancyCircuit;
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore, thread_rng};
 use rayon::iter::*;

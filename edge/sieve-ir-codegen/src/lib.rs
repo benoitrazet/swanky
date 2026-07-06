@@ -1,5 +1,5 @@
 //! This crate statically parses a SIEVE IR circuit at compile time and produces
-//! a circuit using `fancy-garbling`s `Circuit` API, thereby eliminating the
+//! a circuit using `fancy-traits`s `Circuit` API, thereby eliminating the
 //! runtime overhead of dynamically parsing and interpretting the circuit.
 #![deny(missing_docs)]
 
@@ -143,7 +143,7 @@ fn codegen_impls<T: Read + Seek>(
     // JP: Hard coding F2 for now.
     let main = codegen.main;
     quote! {
-        impl<F: fancy_garbling::FancyBinary + fancy_garbling::FancyZeroKnowledge + #ty_constraints> fancy_garbling::Circuit<F> for #struct_name {
+        impl<F: fancy_traits::FancyBinary + fancy_traits::FancyZeroKnowledge + #ty_constraints> fancy_traits::Circuit<F> for #struct_name {
             type Input = ();
             type Output = Vec<F::Item>; // TODO: should be `()`.
 
