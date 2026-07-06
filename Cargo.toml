@@ -22,6 +22,7 @@ members = [
   "edge/f-eq",
   "edge/f-rand",
   "edge/fancy-analyzer",
+  "edge/fancy-circuits",
   "edge/fancy-garbling",
   "edge/fancy-plaintext",
   "edge/fancy-traits",
@@ -84,6 +85,7 @@ type_complexity = "allow"
 # BEGIN OUR CRATES
 diet-mac-and-cheese = { path = "edge/diet-mac-and-cheese" }
 fancy-analyzer = { path = "edge/fancy-analyzer" }
+fancy-circuits = { path = "edge/fancy-circuits" }
 fancy-garbling = { path = "edge/fancy-garbling" }
 fancy-plaintext = { path = "edge/fancy-plaintext" }
 fancy-traits = { path = "edge/fancy-traits" }

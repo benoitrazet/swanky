@@ -818,6 +818,7 @@ dependencies = [
 name = "fancy-analyzer"
 version = "0.6.0"
 dependencies = [
+ "fancy-circuits",
  "fancy-garbling",
  "fancy-traits",
  "rand 0.8.5",
@@ -826,10 +827,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "fancy-circuits"
+version = "0.6.0"
+dependencies = [
+ "fancy-garbling",
+ "fancy-plaintext",
+ "fancy-traits",
+ "rand 0.8.5",
+ "regex",
+ "serde",
+ "swanky-channel",
+ "swanky-error",
+ "swanky-rng",
+]
+
+[[package]]
 name = "fancy-garbling"
 version = "0.6.0"
 dependencies = [
  "criterion",
+ "fancy-circuits",
  "fancy-plaintext",
  "fancy-traits",
  "itertools 0.14.0",
@@ -1912,6 +1929,7 @@ version = "0.6.0"
 dependencies = [
  "aes-gcm",
  "criterion",
+ "fancy-circuits",
  "fancy-garbling",
  "fancy-traits",
  "itertools 0.14.0",
@@ -2628,6 +2646,7 @@ version = "0.6.0"
 dependencies = [
  "criterion",
  "fancy-analyzer",
+ "fancy-circuits",
  "fancy-garbling",
  "fancy-plaintext",
  "fancy-traits",
@@ -2863,6 +2882,7 @@ dependencies = [
  "clap",
  "criterion",
  "fancy-analyzer",
+ "fancy-circuits",
  "fancy-garbling",
  "fancy-plaintext",
  "fancy-traits",
@@ -3124,6 +3144,7 @@ dependencies = [
  "clap",
  "criterion",
  "fancy-analyzer",
+ "fancy-circuits",
  "fancy-garbling",
  "fancy-plaintext",
  "fancy-traits",

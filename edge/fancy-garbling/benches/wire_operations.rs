@@ -1,5 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{AllWire, WireLabel, util::RngExt};
+use rand::Rng;
 use std::time::Duration;
 use swanky_rng::SwankyRng;
 
@@ -53,7 +54,7 @@ fn bench_cmul(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::cmul ({})", p), move |b| {
         let rng = &mut rand::thread_rng();
         let x = AllWire::rand(rng, p);
-        let c = rng.gen_u16();
+        let c = rng.r#gen::<u16>();
         b.iter(|| {
             let z = x.clone() * c;
             std::hint::black_box(z);

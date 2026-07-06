@@ -11,14 +11,14 @@ mod tests {
     use super::*;
     use core::marker::PhantomData;
     use fancy_analyzer::CircuitAnalyzer;
-    use fancy_garbling::{
-        AllWire, CrtBundle, CrtGadgets, VecCrtBundle, WireLabel, WireMod2,
-        circuits::{
-            aes::AesNonExpanded,
-            arithmetic::{Constant, Multiplication, ReLU},
-        },
+    use fancy_circuits::{
+        CrtBundle, CrtGadgets, VecCrtBundle,
+        aes::AesNonExpanded,
+        arithmetic::{Constant, Multiplication, ReLU},
         test_circuits::arithmetic::TestAddition,
+        util::{primes_with_width, product},
     };
+    use fancy_garbling::{AllWire, WireLabel, WireMod2};
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::{
         Circuit, CircuitInputMapper, FancyArithmetic, FancyEncode, FancyOutput, FancyProj, Flatten,
@@ -100,8 +100,8 @@ mod tests {
     fn test_relu() {
         let mut rng = rand::thread_rng();
         let n = 10;
-        let ps = fancy_garbling::util::primes_with_width(10);
-        let q = fancy_garbling::util::product(&ps);
+        let ps = primes_with_width(10);
+        let q = product(&ps);
 
         let plaintext = (0..n).map(|_| rng.r#gen::<u128>() % q).collect::<Vec<_>>();
 

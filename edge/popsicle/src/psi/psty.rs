@@ -6,10 +6,11 @@ use aes_gcm::{
     Aes256Gcm, Key, Nonce,
     aead::{Aead, KeyInit},
 };
-use fancy_garbling::{
-    AllWire, BinaryBundle,
-    circuits::binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality},
+use fancy_circuits::{
+    BinaryBundle,
+    binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality},
 };
+use fancy_garbling::AllWire;
 use fancy_traits::{Circuit, FancyBinary, FancyEncode, FancyOutput};
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};

@@ -26,6 +26,7 @@ rand.workspace = true
 
 [dev-dependencies]
 fancy-analyzer.workspace = true
+fancy-circuits.workspace = true
 fancy-plaintext.workspace = true
 swanky-ot-chou-orlandi.workspace = true
 swanky-ot-alsz-kos.workspace = true
