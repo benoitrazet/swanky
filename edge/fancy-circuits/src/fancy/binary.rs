@@ -9,6 +9,7 @@ use swanky_channel::Channel;
 
 /// Bundle which is explicitly binary representation.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BinaryBundle<W>(Bundle<W>);
 
 impl<W: Clone + HasModulus> BinaryBundle<W> {
