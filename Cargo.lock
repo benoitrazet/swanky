@@ -819,6 +819,7 @@ name = "fancy-analyzer"
 version = "0.6.0"
 dependencies = [
  "fancy-garbling",
+ "fancy-plaintext",
  "fancy-traits",
  "rand 0.8.5",
  "swanky-channel",
