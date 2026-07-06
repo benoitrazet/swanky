@@ -237,7 +237,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::util::RngExt;
+    use crate::util::modulus_with_width;
     use crate::{
         CrtBundle,
         arithmetic::{
@@ -252,7 +252,7 @@ mod test {
     fn sign() {
         let mut rng = thread_rng();
         let accuracy = "100%";
-        let q = rng.gen_usable_composite_modulus();
+        let q = modulus_with_width(10);
 
         // Check that `Sign(0) == 0`.
         let x = 0;
@@ -272,7 +272,7 @@ mod test {
     fn less_than() {
         let mut rng = thread_rng();
         let accuracy = "100%";
-        let q = rng.gen_usable_composite_modulus();
+        let q = modulus_with_width(10);
 
         // Check that `x < x` works.
         let x = rng.r#gen::<u128>() % q / 2;
@@ -294,7 +294,7 @@ mod test {
     fn greater_than_or_equal() {
         let mut rng = thread_rng();
         let accuracy = "100%";
-        let q = rng.gen_usable_composite_modulus();
+        let q = modulus_with_width(10);
 
         // Check that `x >= x` works.
         let x = rng.r#gen::<u128>() % q / 2;
@@ -318,7 +318,7 @@ mod test {
     fn max() {
         let mut rng = thread_rng();
         let accuracy = "100%";
-        let q = rng.gen_usable_composite_modulus();
+        let q = modulus_with_width(10);
 
         for _ in 0..16 {
             let inputs = (0..100)
@@ -340,7 +340,7 @@ mod test {
     fn sgn() {
         let mut rng = thread_rng();
         let accuracy = "100%";
-        let q = rng.gen_usable_composite_modulus();
+        let q = modulus_with_width(10);
 
         // Check that `Sign(0) == 1`.
         let x = 0;
@@ -362,7 +362,7 @@ mod test {
     fn relu() {
         let mut rng = thread_rng();
         let accuracy = "100%";
-        let q = rng.gen_usable_composite_modulus();
+        let q = modulus_with_width(10);
 
         // Check that `Sign(0) == 1`.
         let x = 0;
