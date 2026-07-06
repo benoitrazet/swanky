@@ -4,7 +4,7 @@ use crate::garbler::Garbler;
 use crate::ps::{PartyEvaluator, PartyGarbler};
 use crate::{evaluator::Evaluator, preprocesser::WirePreProcessor};
 
-use fancy_garbling::circuit_analyzer::CircuitAnalyzer;
+use fancy_analyzer::CircuitAnalyzer;
 use fancy_garbling::circuits::binary::{
     TestBinaryAddition, TestBinaryMultiplication, TestBinarySubtraction, TestBinaryTwosComplement,
 };

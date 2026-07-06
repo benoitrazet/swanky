@@ -14,6 +14,7 @@ workspace = true
 serde = ["dep:serde"]
 
 [dependencies]
+fancy-analyzer.workspace = true
 fancy-garbling.workspace = true
 fancy-plaintext.workspace = true
 fancy-traits.workspace = true

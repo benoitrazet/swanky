@@ -815,6 +815,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fancy-analyzer"
+version = "0.6.0"
+dependencies = [
+ "fancy-garbling",
+ "fancy-traits",
+ "rand 0.8.5",
+ "swanky-channel",
+ "swanky-error",
+]
+
+[[package]]
 name = "fancy-garbling"
 version = "0.6.0"
 dependencies = [
@@ -2616,6 +2627,7 @@ name = "swanky-authenticated-garbling"
 version = "0.6.0"
 dependencies = [
  "criterion",
+ "fancy-analyzer",
  "fancy-garbling",
  "fancy-plaintext",
  "fancy-traits",
@@ -2850,6 +2862,7 @@ version = "0.6.0"
 dependencies = [
  "clap",
  "criterion",
+ "fancy-analyzer",
  "fancy-garbling",
  "fancy-plaintext",
  "fancy-traits",
@@ -3110,6 +3123,7 @@ version = "0.6.0"
 dependencies = [
  "clap",
  "criterion",
+ "fancy-analyzer",
  "fancy-garbling",
  "fancy-plaintext",
  "fancy-traits",

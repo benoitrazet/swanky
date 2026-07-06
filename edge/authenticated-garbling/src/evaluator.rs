@@ -3,7 +3,8 @@ use crate::{
     ps::PartyEvaluator,
     wire::AuthenticatedWireMod2,
 };
-use fancy_garbling::{WireLabel, WireMod2, circuit_analyzer::CircuitAnalyzer};
+use fancy_analyzer::CircuitAnalyzer;
+use fancy_garbling::{WireLabel, WireMod2};
 use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary, FancyEncode, FancyOutput};
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::{

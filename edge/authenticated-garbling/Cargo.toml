@@ -11,6 +11,7 @@ version.workspace = true
 workspace = true
 
 [dependencies]
+fancy-analyzer.workspace = true
 fancy-traits.workspace = true
 fancy-garbling.workspace = true
 swanky-authenticated-bits.workspace = true

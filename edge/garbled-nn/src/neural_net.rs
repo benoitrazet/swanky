@@ -7,9 +7,9 @@ use crate::{
     neural_net::{arithmetic::ArithmeticNeuralNet, binary::BinaryNeuralNet},
     util,
 };
+use fancy_analyzer::CircuitAnalyzer;
 use fancy_garbling::{
     AllWire, BinaryBundle, BinaryGadgets, BinaryWireLabel, CrtGadgets, WireMod2,
-    circuit_analyzer::CircuitAnalyzer,
     classic::{GarbledChannel, GarbledCircuit},
     util::output_tweak,
 };
