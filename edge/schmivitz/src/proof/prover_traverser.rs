@@ -4,6 +4,7 @@ use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
+use swanky_sieve_ir_api::FieldBackend;
 
 use crate::proof::ChiGenerator;
 use crate::vole::RandomVoleP;
@@ -149,6 +150,64 @@ pub struct Wire(F2, F128b);
 impl HasModulus for Wire {
     fn modulus(&self) -> u16 {
         2
+    }
+}
+
+// TODO: Remove! This API has been replaced with the `fancy-traits::Circuit`
+// API. We're keeping this around for now for backwards compatibility.
+impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
+    type Wire = (F2, F128b);
+
+    fn input_public(&mut self) -> Result<Self::Wire> {
+        unimplemented!("VOLE-in-the-head does not support `input_public`")
+    }
+
+    fn input_private(&mut self) -> Result<Self::Wire> {
+        let f = self.next_witness_value()?;
+        let vole = self.next_vole()?;
+        // Private input gates don't define a polynomial that would contribute to the aggregated
+        // coefficients being computed
+        Ok((f, vole))
+    }
+
+    fn add(&mut self, lhs: &Self::Wire, rhs: &Self::Wire) -> Result<Self::Wire> {
+        let res = lhs.0 + rhs.0;
+        // Compute the correct VOLE for the output wire
+        let sum_vole = lhs.1 + rhs.1;
+        // Linear gates don't contribute to the aggregated values being computed
+        Ok((res, sum_vole))
+    }
+
+    fn addc(&mut self, lhs: &Self::Wire, rhs: F2) -> Result<Self::Wire> {
+        Ok((lhs.0 + rhs, lhs.1))
+    }
+
+    fn mul(&mut self, lhs: &Self::Wire, rhs: &Self::Wire) -> Result<Self::Wire> {
+        let f = self.next_witness_value()?;
+
+        // Assign a fresh VOLE to the output wire and get the corresponding challenge
+        let vole = self.next_vole()?;
+        let challenge = self.chi_challenge.next();
+
+        // Compute coefficient values `A_i1` and `A_i0` (respectively). These are derived from the
+        // `c_i(X)` polynomial defined in the paper -- see Fig 7 and page 32-33 for details.
+        let degree_0_coeff = lhs.1 * rhs.1;
+        let degree_1_coeff = rhs.0 * lhs.1 + lhs.0 * rhs.1 - vole;
+
+        self.aggregate_degree_0 += challenge * degree_0_coeff;
+        self.aggregate_degree_1 += challenge * degree_1_coeff;
+
+        Ok((f, vole))
+    }
+
+    fn mulc(&mut self, _: &Self::Wire, _: F2) -> Result<Self::Wire> {
+        unimplemented!("VOLE-in-the-head does not support `mulc`")
+    }
+
+    fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()> {
+        let challenge = self.chi_challenge.next();
+        self.aggregate_assert_zero += challenge * wire.1;
+        Ok(())
     }
 }
 

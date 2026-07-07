@@ -12,7 +12,7 @@ use swanky_error::{ErrorKind, Result};
 /// Plaintext implementation of [`Fancy`].
 pub struct Dummy;
 
-/// Wrapper around `u16`.
+/// Plaintext wire value.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct DummyVal {
     val: u16,

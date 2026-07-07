@@ -3,6 +3,7 @@ use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
+use swanky_sieve_ir_api::FieldBackend;
 
 /// A [`ProverPreparer`] allows the prover to prepare for VOLE-in-the-head by evaluating the
 /// circuit in the clear and determining the full extended witness.
@@ -75,6 +76,49 @@ pub struct Wire(F2);
 impl HasModulus for Wire {
     fn modulus(&self) -> u16 {
         2
+    }
+}
+
+// TODO: Remove! This API has been replaced with the `fancy-traits::Circuit`
+// API. We're keeping this around for now for backwards compatibility.
+impl<'a> FieldBackend<F2> for ProverPreparer<'a> {
+    type Wire = F2;
+
+    fn input_public(&mut self) -> Result<Self::Wire> {
+        unimplemented!("VOLE-in-the-head does not support `input_public`")
+    }
+
+    fn input_private(&mut self) -> Result<Self::Wire> {
+        let f2 = self.private_input[self.priv_input_pos as usize];
+        self.priv_input_pos += 1;
+
+        // TODO: Can we push all of the input witnesses up front?
+        self.witness.push(f2);
+
+        Ok(f2)
+    }
+
+    fn add(&mut self, lhs: &Self::Wire, rhs: &Self::Wire) -> Result<Self::Wire> {
+        Ok(lhs + rhs)
+    }
+
+    fn addc(&mut self, lhs: &Self::Wire, rhs: F2) -> Result<Self::Wire> {
+        Ok(lhs + rhs)
+    }
+
+    fn mul(&mut self, lhs: &Self::Wire, rhs: &Self::Wire) -> Result<Self::Wire> {
+        let product = lhs * rhs;
+        self.witness.push(product);
+        Ok(product)
+    }
+
+    fn mulc(&mut self, _: &Self::Wire, _: F2) -> Result<Self::Wire> {
+        unimplemented!("VOLE-in-the-head does not support `mulc`")
+    }
+
+    fn assert_zero(&mut self, _: &Self::Wire) -> Result<()> {
+        self.challenge_count += 1;
+        Ok(())
     }
 }
 

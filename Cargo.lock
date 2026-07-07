@@ -2380,6 +2380,7 @@ dependencies = [
  "swanky-field-binary",
  "swanky-rng",
  "swanky-serialization",
+ "swanky-sieve-ir-api",
  "swanky-sieve-ir-codegen",
  "tempfile",
 ]
@@ -3087,6 +3088,15 @@ dependencies = [
  "proptest",
  "serde",
  "vectoreyes",
+]
+
+[[package]]
+name = "swanky-sieve-ir-api"
+version = "0.6.0"
+dependencies = [
+ "swanky-error",
+ "swanky-field-binary",
+ "swanky-field-ff-primes",
 ]
 
 [[package]]

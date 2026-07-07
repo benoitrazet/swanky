@@ -27,6 +27,9 @@ swanky-field.workspace = true
 swanky-field-binary.workspace = true
 swanky-rng.workspace = true
 swanky-serialization.workspace = true
+# TODO: Remove this crate once we've moved fully to the `Circuit` API in
+# `fancy-traits`.
+swanky-sieve-ir-api.workspace = true
 
 aes.workspace = true
 env_logger.workspace = true

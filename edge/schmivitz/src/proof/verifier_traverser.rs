@@ -2,7 +2,8 @@ use fancy_traits::{Circuit, Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge,
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
-use swanky_field_binary::F128b;
+use swanky_field_binary::{F2, F128b};
+use swanky_sieve_ir_api::FieldBackend;
 
 use crate::proof::ChiGenerator;
 
@@ -115,6 +116,58 @@ pub struct Wire(F128b);
 impl HasModulus for Wire {
     fn modulus(&self) -> u16 {
         2
+    }
+}
+
+// TODO: Remove! This API has been replaced with the `fancy-traits::Circuit`
+// API. We're keeping this around for now for backwards compatibility.
+impl FieldBackend<F2> for VerifierTraverser {
+    type Wire = F128b;
+
+    fn input_public(&mut self) -> Result<Self::Wire> {
+        unimplemented!("VOLE-in-the-head does not support `input_public`")
+    }
+
+    fn input_private(&mut self) -> Result<Self::Wire> {
+        self.next_masked_witness()
+    }
+
+    fn add(&mut self, lhs: &Self::Wire, rhs: &Self::Wire) -> Result<Self::Wire> {
+        Ok(lhs + rhs)
+    }
+
+    fn addc(&mut self, lhs: &Self::Wire, rhs: F2) -> Result<Self::Wire> {
+        // Compute the correct masked witness for the output wire
+        let t = if rhs == F2::ZERO {
+            F128b::ZERO
+        } else {
+            F128b::ONE
+        };
+        Ok(lhs - t * self.verifier_key)
+    }
+
+    fn mul(&mut self, lhs: &Self::Wire, rhs: &Self::Wire) -> Result<Self::Wire> {
+        // Assign the next masked witness to the destination wire
+        let res = self.next_masked_witness()?;
+        let challenge = self.chi_challenge.next();
+
+        // Compute the contibution to the aggregate: ci​(Δ) = q_left * ​q_right ​− q_dst * ​Δ
+        let eval = lhs * rhs - (res * self.verifier_key);
+
+        self.aggregate += challenge * eval;
+
+        Ok(res)
+    }
+
+    fn mulc(&mut self, _: &Self::Wire, _: F2) -> Result<Self::Wire> {
+        unimplemented!("VOLE-in-the-head does not support `mulc`")
+    }
+
+    fn assert_zero(&mut self, arg: &Self::Wire) -> Result<()> {
+        let challenge = self.chi_challenge.next();
+
+        self.aggregate_assert_zero += challenge * arg;
+        Ok(())
     }
 }
 

@@ -60,6 +60,7 @@ members = [
   "edge/popsicle",
   "edge/rng",
   "edge/schmivitz",
+  "edge/sieve-ir-api",
   "edge/sieve-ir-codegen",
   "edge/simple-arith-circuit",
   "edge/svole-wykw",
@@ -139,6 +140,7 @@ swanky-party = { path = "core/party" }
 swanky-polynomial = { path = "edge/polynomial" }
 swanky-rng = { path = "edge/rng" }
 swanky-serialization = { path = "core/serialization" }
+swanky-sieve-ir-api = { path = "edge/sieve-ir-api" }
 swanky-sieve-ir-codegen = { path = "edge/sieve-ir-codegen" }
 swanky-svole-wykw = { path = "edge/svole-wykw" }
 swanky-twopac = { path = "edge/twopac" }
