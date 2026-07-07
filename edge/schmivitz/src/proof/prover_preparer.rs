@@ -98,16 +98,22 @@ impl<'a> FieldBackend<F2> for ProverPreparer<'a> {
         Ok(f2)
     }
 
-    fn add(&mut self, lhs: &Self::Wire, rhs: &Self::Wire) -> Result<Self::Wire> {
-        Ok(lhs + rhs)
+    fn add(&mut self, left: &Self::Wire, right: &Self::Wire) -> Result<Self::Wire> {
+        let sum = left + right;
+
+        Ok(sum)
     }
 
-    fn addc(&mut self, lhs: &Self::Wire, rhs: F2) -> Result<Self::Wire> {
-        Ok(lhs + rhs)
+    fn addc(&mut self, left: &Self::Wire, right: F2) -> Result<Self::Wire> {
+        let sum = left + right;
+
+        Ok(sum)
     }
 
-    fn mul(&mut self, lhs: &Self::Wire, rhs: &Self::Wire) -> Result<Self::Wire> {
-        let product = lhs * rhs;
+    fn mul(&mut self, left: &Self::Wire, right: &Self::Wire) -> Result<Self::Wire> {
+        self.challenge_count += 1;
+
+        let product = left * right;
         self.witness.push(product);
         Ok(product)
     }

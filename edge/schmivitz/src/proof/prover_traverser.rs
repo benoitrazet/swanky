@@ -182,7 +182,7 @@ impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
         Ok((lhs.0 + rhs, lhs.1))
     }
 
-    fn mul(&mut self, lhs: &Self::Wire, rhs: &Self::Wire) -> Result<Self::Wire> {
+    fn mul(&mut self, left: &Self::Wire, right: &Self::Wire) -> Result<Self::Wire> {
         let f = self.next_witness_value()?;
 
         // Assign a fresh VOLE to the output wire and get the corresponding challenge
@@ -191,8 +191,8 @@ impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
 
         // Compute coefficient values `A_i1` and `A_i0` (respectively). These are derived from the
         // `c_i(X)` polynomial defined in the paper -- see Fig 7 and page 32-33 for details.
-        let degree_0_coeff = lhs.1 * rhs.1;
-        let degree_1_coeff = rhs.0 * lhs.1 + lhs.0 * rhs.1 - vole;
+        let degree_0_coeff = left.1 * right.1;
+        let degree_1_coeff = right.0 * left.1 + left.0 * right.1 - vole;
 
         self.aggregate_degree_0 += challenge * degree_0_coeff;
         self.aggregate_degree_1 += challenge * degree_1_coeff;
