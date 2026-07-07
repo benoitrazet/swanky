@@ -1,4 +1,4 @@
-use fancy_traits::{Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
+use fancy_traits::{Circuit, Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
 use mac_n_cheese_sieve_parser::WireId;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
@@ -131,6 +131,14 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
                 )
             })
             .copied()
+    }
+
+    /// Run `circuit` using [`ProverTraverser`].
+    pub(crate) fn execute<C: Circuit<Self, Input = ()>>(&mut self, circuit: &C) -> Result<()> {
+        Channel::with(std::io::empty(), |channel| {
+            circuit.execute(self, (), channel)?;
+            Ok(())
+        })
     }
 }
 

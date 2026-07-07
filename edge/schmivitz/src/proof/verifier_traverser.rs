@@ -1,4 +1,4 @@
-use fancy_traits::{Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
+use fancy_traits::{Circuit, Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
@@ -97,6 +97,14 @@ impl VerifierTraverser {
             );
         }
         Ok((self.aggregate, self.aggregate_assert_zero))
+    }
+
+    /// Run `circuit` using [`VerifierTraverser`].
+    pub(crate) fn execute<C: Circuit<Self, Input = ()>>(&mut self, circuit: &C) -> Result<()> {
+        Channel::with(std::io::empty(), |channel| {
+            circuit.execute(self, (), channel)?;
+            Ok(())
+        })
     }
 }
 

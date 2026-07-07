@@ -13,7 +13,6 @@ use rand::{CryptoRng, RngCore, thread_rng};
 use rayon::iter::*;
 use std::time::Instant;
 use std::{iter::zip, marker::PhantomData};
-use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b, F128b};
@@ -115,10 +114,7 @@ where
         // Evaluate the circuit in the clear to get the full witness and all wire values
         let t = std::time::Instant::now();
         let mut circuit_preparer = ProverPreparer::new(private_input, witness_size)?;
-        Channel::with(std::io::empty(), |channel| {
-            circuit.execute(&mut circuit_preparer, (), channel)?;
-            Ok(())
-        })?;
+        circuit_preparer.execute(circuit)?;
 
         let (witness, _challenge_count) = circuit_preparer.into_parts();
         log::info!("1: circuit preparer: {:?}", t.elapsed());
@@ -156,10 +152,7 @@ where
         // gate / polynomial (`A_i0` and `A_i1` in the paper) and start to aggregate these with
         // the challenges.
         let mut circuit_traverser = ProverTraverser::new(witness, chi_challenge, voles)?;
-        Channel::with(std::io::empty(), |channel| {
-            circuit.execute(&mut circuit_traverser, (), channel)?;
-            Ok(())
-        })?;
+        circuit_traverser.execute(circuit)?;
 
         let (degree_0_aggregation, degree_1_aggregation, assert_zero_commitment, voles) =
             circuit_traverser.into_parts()?;
@@ -296,10 +289,7 @@ where
             reconstructed_voles.verifier_key(),
             masked_witnesses,
         )?;
-        Channel::with(std::io::empty(), |channel| {
-            circuit.execute(&mut verifier_traverser, (), channel)?;
-            Ok(())
-        })?;
+        verifier_traverser.execute(circuit)?;
 
         let (validation_aggregate, aggregate_assert_zero) = verifier_traverser.into_parts()?;
         log::info!("5: circuit traverser {:?}", t.elapsed());

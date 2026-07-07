@@ -1,4 +1,4 @@
-use fancy_traits::{Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
+use fancy_traits::{Circuit, Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
@@ -57,6 +57,14 @@ impl<'a> ProverPreparer<'a> {
     /// These values will be empty if the circuit has not yet been traversed.
     pub(crate) fn into_parts(self) -> (Vec<F2>, usize) {
         (self.witness, self.challenge_count)
+    }
+
+    /// Run `circuit` using [`ProverPreparer`].
+    pub(crate) fn execute<C: Circuit<Self, Input = ()>>(&mut self, circuit: &C) -> Result<()> {
+        Channel::with(std::io::empty(), |channel| {
+            circuit.execute(self, (), channel)?;
+            Ok(())
+        })
     }
 }
 
@@ -134,11 +142,9 @@ impl<'a> FancyZeroKnowledge for ProverPreparer<'a> {
 mod tests {
     use crate::circuit::CircuitIngestor;
     use crate::proof::{Circuit, prover_preparer::ProverPreparer};
-    use fancy_traits::Circuit as _;
     use mac_n_cheese_sieve_parser::text_parser::RelationReader;
     use rand::thread_rng;
     use std::io::Cursor;
-    use swanky_channel::Channel;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
 
@@ -164,11 +170,7 @@ mod tests {
 
         let mut counter: ProverPreparer =
             ProverPreparer::new(private_input, Some(max_wire_id as usize))?;
-        Channel::with(std::io::empty(), |channel| {
-            circuit.execute(&mut counter, (), channel)?;
-            Ok(())
-        })?;
-
+        counter.execute(&circuit)?;
         Ok(counter)
     }
 
