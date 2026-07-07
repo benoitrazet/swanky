@@ -329,7 +329,8 @@ impl ArithmeticWire for AllWire {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::RngExt;
+    use crate::util::as_base_q_u128;
+    use fancy_circuits::util::RngExt;
     use itertools::Itertools;
     use rand::thread_rng;
 
@@ -348,10 +349,10 @@ mod tests {
     fn base_conversion_lookup_method() {
         let rng = &mut thread_rng();
         for _ in 0..1000 {
-            let q = 5 + (rng.gen_u16() % 110);
-            let x = rng.gen_u128();
+            let q = 5 + (rng.r#gen::<u16>() % 110);
+            let x = rng.r#gen::<u128>();
             let w = WireModQ::from_repr(U8x16::from(x), q);
-            let should_be = util::as_base_q_u128(x, q);
+            let should_be = as_base_q_u128(x, q);
             assert_eq!(w.ds, should_be, "x={} q={}", x, q);
         }
     }
@@ -360,7 +361,7 @@ mod tests {
     fn hash() {
         let mut rng = thread_rng();
         for _ in 0..100 {
-            let q = 2 + (rng.gen_u16() % 110);
+            let q = 2 + (rng.r#gen::<u16>() % 110);
             let x = AllWire::rand(&mut rng, q);
             let y = x.hashback(1u128, q);
             assert!(x != y);

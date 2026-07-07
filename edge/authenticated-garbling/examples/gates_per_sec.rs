@@ -1,6 +1,7 @@
 use fancy_analyzer::CircuitAnalyzer;
+use fancy_circuits::LinearOram;
 use fancy_garbling::{
-    Evaluator as SemiHonestEvaluator, Garbler as SemiHonestGarbler, WireMod2, circuits::LinearOram,
+    Evaluator as SemiHonestEvaluator, Garbler as SemiHonestGarbler, WireMod2,
     classic::GarbledCircuit,
 };
 use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary, FancyEncode, FancyOutput, Flatten};

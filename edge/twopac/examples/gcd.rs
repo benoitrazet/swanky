@@ -2,7 +2,8 @@
 //! using `fancy-garbling`.
 
 use core::cmp::{Ordering, max};
-use fancy_garbling::{AllWire, BinaryBundle, BinaryGadgets, circuits::Gcd};
+use fancy_circuits::{BinaryBundle, BinaryGadgets, Gcd};
+use fancy_garbling::AllWire;
 use fancy_traits::Circuit;
 use swanky_channel::Channel;
 use swanky_error::Result;

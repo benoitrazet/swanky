@@ -8,8 +8,9 @@ use crate::{
     util,
 };
 use fancy_analyzer::CircuitAnalyzer;
+use fancy_circuits::{BinaryBundle, BinaryGadgets, CrtGadgets};
 use fancy_garbling::{
-    AllWire, BinaryBundle, BinaryGadgets, BinaryWireLabel, CrtGadgets, WireMod2,
+    AllWire, BinaryWireLabel, WireMod2,
     classic::{GarbledChannel, GarbledCircuit},
     util::output_tweak,
 };
@@ -849,7 +850,12 @@ impl NeuralNet {
 
             // Construct the zero wires for the input.
             let inputs = (0..self.ninputs())
-                .map(|_| garbler.bin_encode_zero(bitwidths[0]))
+                .map(|_| {
+                    let zeros = (0..bitwidths[0])
+                        .map(|_| garbler.encode_zero(2))
+                        .collect::<Vec<_>>();
+                    BinaryBundle::new(zeros)
+                })
                 .collect::<Vec<_>>();
 
             let mut nn = BinaryNeuralNet::new(&mut garbler, bitwidths, true);

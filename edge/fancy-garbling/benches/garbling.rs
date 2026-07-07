@@ -1,9 +1,8 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use fancy_garbling::{
-    Evaluator, Garbler, WireMod2, WireModQ, circuits::LinearOram, classic::GarbledCircuit,
-    util::RngExt,
-};
+use fancy_circuits::LinearOram;
+use fancy_garbling::{Evaluator, Garbler, WireMod2, WireModQ, classic::GarbledCircuit};
 use fancy_traits::{Circuit, CircuitInputMapper, FancyArithmetic, FancyBinary, FancyProj};
+use rand::Rng;
 use std::{hint::black_box, time::Duration};
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -48,7 +47,9 @@ fn bench_eval_binary<
         let (encoder, gc, _) =
             GarbledCircuit::garble::<WireMod2, _, _>(circuit, SwankyRng::new()).unwrap();
         let inputs = (0..<C as CircuitInputMapper<Garbler<_, _>>>::ninputs(circuit))
-            .map(|i| rng.gen_u16() % <C as CircuitInputMapper<Garbler<_, _>>>::modulus(circuit, i))
+            .map(|i| {
+                rng.r#gen::<u16>() % <C as CircuitInputMapper<Garbler<_, _>>>::modulus(circuit, i)
+            })
             .collect::<Vec<u16>>();
         let xs = encoder.encode_inputs(&inputs);
         bench.iter(|| {
@@ -76,7 +77,9 @@ fn bench_eval_arith<
         let (encoder, gc, _) =
             GarbledCircuit::garble::<WireModQ, _, _>(circuit, SwankyRng::new()).unwrap();
         let inputs = (0..<C as CircuitInputMapper<Garbler<_, _>>>::ninputs(circuit))
-            .map(|i| rng.gen_u16() % <C as CircuitInputMapper<Garbler<_, _>>>::modulus(circuit, i))
+            .map(|i| {
+                rng.r#gen::<u16>() % <C as CircuitInputMapper<Garbler<_, _>>>::modulus(circuit, i)
+            })
             .collect::<Vec<u16>>();
         let xs = encoder.encode_inputs(&inputs);
         bench.iter(|| {

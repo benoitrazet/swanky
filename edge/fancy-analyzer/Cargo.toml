@@ -21,5 +21,6 @@ swanky-error.workspace = true
 rand.workspace = true
 
 [dev-dependencies]
+fancy-circuits.workspace = true
 fancy-garbling.workspace = true
 fancy-plaintext.workspace = true

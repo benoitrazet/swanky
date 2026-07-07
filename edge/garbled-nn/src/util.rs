@@ -1,13 +1,10 @@
 //! Utility functions for working with [`NeuralNet`](crate::NeuralNet)s.
 
-use fancy_garbling::util as numbers;
+use fancy_circuits::util::{crt, crt_inv_factor, factor, modulus_with_width, u128_from_bits};
 
 /// Convert a list of bitwidths to their associated moduli.
 pub fn bitwidths_to_moduli(bitwidths: &[usize]) -> Vec<u128> {
-    bitwidths
-        .iter()
-        .map(|&b| fancy_garbling::util::modulus_with_width(b as u32))
-        .collect()
+    bitwidths.iter().map(|&b| modulus_with_width(b)).collect()
 }
 
 /// The index of the max value in `xs`.
@@ -45,17 +42,23 @@ pub fn from_mod_q(x: u128, q: u128) -> i64 {
     }
 }
 
+/// Compute the CRT representation of `x` with respect to the factorization of
+/// `q`.
+fn crt_factor(x: u128, q: u128) -> Vec<u16> {
+    crt(x, &factor(q))
+}
+
 /// The value `x % q` in CRT form.
 ///
 /// # Panics
 /// Panics if the value `x` is too large/small for `q`.
 pub fn to_mod_q_crt(x: i64, q: u128) -> Vec<u16> {
-    numbers::crt_factor(to_mod_q(x, q), q)
+    crt_factor(to_mod_q(x, q), q)
 }
 
 /// The value `x % q` as a `i64`, where `x` is provided in CRT form.
 pub fn from_mod_q_crt(xs: &[u16], q: u128) -> i64 {
-    from_mod_q(numbers::crt_inv_factor(xs, q), q)
+    from_mod_q(crt_inv_factor(xs, q), q)
 }
 
 /// Negate `x` using two's complement.
@@ -86,21 +89,27 @@ pub fn i64_from_twos_complement(x: u128, nbits: usize) -> i64 {
 
 /// Convert a sequence of bits into its `i64` representation.
 pub fn i64_from_bits(bits: &[u16]) -> i64 {
-    let x = numbers::u128_from_bits(bits);
+    let x = u128_from_bits(bits);
     i64_from_twos_complement(x, bits.len())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fancy_circuits::util::{PRIMES, product};
     use rand::{Rng, thread_rng};
+
+    /// Generate a CRT modulus using the `n` smallest primes in [`PRIMES`].
+    fn modulus_with_nprimes(n: usize) -> u128 {
+        product(&PRIMES[0..n])
+    }
 
     #[test]
     fn convert_crt() {
         let mut rng = thread_rng();
         for _ in 0..1024 {
             let nprimes = 2_usize + (rng.r#gen::<usize>() % 16);
-            let q = numbers::modulus_with_nprimes(nprimes);
+            let q = modulus_with_nprimes(nprimes);
             let x = rng.r#gen::<i64>() % (q / 2) as i64;
             assert_eq!(x, from_mod_q_crt(&to_mod_q_crt(x, q), q));
         }
