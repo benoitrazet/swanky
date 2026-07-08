@@ -23,12 +23,10 @@ impl<T: Copy> VecWrapper<T> {
     pub(crate) fn len(&self) -> usize {
         self.vec.len()
     }
+}
 
-    pub(crate) fn reset(&mut self) {
-        self.index = 0;
-    }
-
-    pub(crate) fn set_index(&mut self, index: usize) {
-        self.index = index
+impl<T> From<VecWrapper<T>> for Vec<T> {
+    fn from(value: VecWrapper<T>) -> Self {
+        value.vec
     }
 }

@@ -1,5 +1,5 @@
 use fancy_garbling::{WireLabel, WireMod2};
-use fancy_traits::{Fancy, FancyBinary, FancyEncode, FancyOutput};
+use fancy_traits::{Fancy, FancyBinary, FancyEncode};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -8,7 +8,11 @@ use swanky_field_binary::{F2, F2BitSerializer, F128b};
 use swanky_serialization::SequenceSerializer;
 use vectoreyes::U8x16;
 
-use crate::{evaluator::AuthenticatedWire, ps::PartyEvaluator, vec_wrapper::VecWrapper};
+use crate::{
+    evaluator::{AuthenticatedWire, EvaluatorValidator},
+    ps::PartyEvaluator,
+    vec_wrapper::VecWrapper,
+};
 
 /// The evaluator's online portion.
 pub struct EvaluatorOnline {
@@ -86,14 +90,14 @@ impl EvaluatorOnline {
         Ok(wires)
     }
 
-    /// Validate the authenticated garbling computation before opening the output share.
+    /// Finalize the online portion of the computation.
     ///
     /// Prior to revealing the result of the computation, the garbler and evaluator
     /// need to validate the authenticated AND gates. In the case of the evaluator,
     /// the evaluator sends out the masked wire values to the garbler, then can immediately
     /// open the validation bits since they already compute their share of those bits
     /// a-priori.
-    pub fn validate(&mut self, channel: &mut Channel) -> Result<()> {
+    pub fn finalize(self, channel: &mut Channel) -> Result<EvaluatorValidator> {
         let bit_ser: F2BitSerializer = SequenceSerializer::new(&mut channel.as_std_io()).wrap_err(
             ErrorKind::InitializationError,
             "Failed to initialize sequence serializer.",
@@ -105,32 +109,24 @@ impl EvaluatorOnline {
                 "Failed to write serialized bits.",
             )?;
 
-        let mut validation_bits = Vec::with_capacity(self.validation_shares.len());
-        // The parties then open the share c_γ
-        AuthShareGenerator::open_with_delta(
-            &self.validation_shares,
-            self.delta,
-            &mut validation_bits,
-            channel,
-        )?;
-        let validation_failures: Vec<&F2> =
-            validation_bits.iter().filter(|&&x| x == F2::ONE).collect();
-        swanky_error::ensure!(
-            validation_failures.is_empty(),
-            ErrorKind::OtherError,
-            "Evaluator's authentication validation check failed"
-        );
-        Ok(())
-    }
+        Ok(EvaluatorValidator::new(self.delta, self.validation_shares))
 
-    /// Validate the computation and reveal the outputs
-    pub fn finalize(
-        &mut self,
-        output_wires: &[AuthenticatedWire],
-        channel: &mut Channel,
-    ) -> Result<Option<Vec<u16>>> {
-        self.validate(channel)?;
-        self.outputs(output_wires, channel)
+        // let mut validation_bits = Vec::with_capacity(self.validation_shares.len());
+        // // The parties then open the share c_γ
+        // AuthShareGenerator::open_with_delta(
+        //     &self.validation_shares,
+        //     self.delta,
+        //     &mut validation_bits,
+        //     channel,
+        // )?;
+        // let validation_failures: Vec<&F2> =
+        //     validation_bits.iter().filter(|&&x| x == F2::ONE).collect();
+        // swanky_error::ensure!(
+        //     validation_failures.is_empty(),
+        //     ErrorKind::OtherError,
+        //     "Evaluator's authentication validation check failed"
+        // );
+        // Ok(())
     }
 
     fn next_and_gate_index(&mut self) -> usize {
@@ -306,30 +302,5 @@ impl FancyEncode for EvaluatorOnline {
             .collect::<Result<Vec<_>>>()?;
 
         self.receive_wirelabels(masked_values, my_auth_shares, channel)
-    }
-}
-
-impl FancyOutput for EvaluatorOnline {
-    fn output(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Option<u16>> {
-        Ok(self
-            .outputs(core::slice::from_ref(x), channel)?
-            .map(|xs| xs[0]))
-    }
-
-    fn outputs(&mut self, x: &[Self::Item], channel: &mut Channel) -> Result<Option<Vec<u16>>> {
-        let auth_shares = x.iter().map(|wire| wire.auth_share()).collect::<Vec<_>>();
-        let mut masks = Vec::with_capacity(x.len());
-        AuthShareGenerator::open_their_shares_with_delta(
-            &auth_shares,
-            self.delta,
-            &mut masks,
-            channel,
-        )?;
-        let outputs = masks
-            .into_iter()
-            .zip(x)
-            .map(|(mask, out)| (mask + out.masked_value() + out.auth_share().bit()).into())
-            .collect::<Vec<_>>();
-        Ok(Some(outputs))
     }
 }

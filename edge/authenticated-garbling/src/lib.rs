@@ -4,7 +4,7 @@
 use swanky_party::party_system;
 
 mod evaluator;
-pub use evaluator::{EvaluatorOffline, EvaluatorOnline};
+pub use evaluator::{EvaluatorOffline, EvaluatorOnline, EvaluatorValidator};
 mod garbler;
 pub use garbler::{GarblerOffline, GarblerOnline, GarblerValidator};
 mod preprocesser;

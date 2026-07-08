@@ -36,7 +36,8 @@ pub fn test_circuit<
             let mut inputs = gb.encode_many(inputs_gb, &vec![2; ninputs_gb], c)?;
             let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
             inputs.extend(theirs);
-            let mut validator = gb.validate(circuit, inputs, c)?;
+            let validator = gb.finalize(&inputs, c)?;
+            let mut validator = validator.validate(circuit, inputs, c)?;
             validator.outputs(&outputs.flatten(), c)
         },
         |c| {
@@ -50,7 +51,9 @@ pub fn test_circuit<
                 <C as CircuitInputMapper<EvaluatorOnline>>::map(circuit, inputs),
                 c,
             )?;
-            ev.finalize(&outputs.flatten(), c)
+            let ev = ev.finalize(c)?;
+            let mut ev = ev.validate(c)?;
+            ev.outputs(&outputs.flatten(), c)
         },
     )
     .unwrap();

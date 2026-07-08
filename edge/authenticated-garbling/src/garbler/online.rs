@@ -2,7 +2,7 @@ use crate::{
     GarblerValidator, garbler::AuthenticatedWire, ps::PartyGarbler, vec_wrapper::VecWrapper,
 };
 use fancy_garbling::{WireLabel, WireMod2};
-use fancy_traits::{CircuitInputMapper, Fancy, FancyEncode};
+use fancy_traits::{Fancy, FancyEncode};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -10,7 +10,7 @@ use swanky_field_binary::{F2, F2BitDeserializer, F128b};
 use swanky_serialization::SequenceDeserializer;
 use vectoreyes::U8x16;
 
-/// The authenticated garbler's online phase.
+/// The garbler's online phase.
 pub struct GarblerOnline {
     // The garbler's Δ.
     delta: WireMod2,
@@ -73,17 +73,16 @@ impl GarblerOnline {
         self.delta.to_repr()
     }
 
-    /// A function that validates the authenticated garbling computation before
-    /// opening the output share.
+    /// Finalize the online portion of the computation.
     ///
-    /// Prior to revealing the result of the computation, the garbler and evaluator
-    /// need to validate the authenticated AND gates. In the case of the garbler, this
-    /// involved locally traversing the circuit in order to compute those validation bits
-    /// from the wire masked values that the evaluator sends.
-    pub fn validate<C: CircuitInputMapper<GarblerValidator>>(
+    /// Prior to revealing the result of the computation, the garbler and
+    /// evaluator need to validate the authenticated AND gates. In the case of
+    /// the garbler, this involved locally traversing the circuit in order to
+    /// compute those validation bits from the wire masked values that the
+    /// evaluator sends.
+    pub fn finalize(
         self,
-        circuit: &C,
-        input_wires: Vec<AuthenticatedWire>,
+        input_wires: &[AuthenticatedWire],
         channel: &mut Channel,
     ) -> Result<GarblerValidator> {
         let nands = self.and_auth_shares.len();
@@ -97,15 +96,14 @@ impl GarblerOnline {
             ErrorKind::SerializationError,
             "Failed to read serialized bits.",
         )?;
-        // Create a finalizer using the pre-computed wires
-        let validator = GarblerValidator::new(
+
+        let auth_shares: Vec<_> = self.auth_shares.into();
+        Ok(GarblerValidator::new(
             self.delta,
-            self.auth_shares,
-            self.and_auth_shares,
-            input_wires.len(),
+            auth_shares[input_wires.len()..].to_vec(),
+            self.and_auth_shares.into(),
             lc_values,
-        );
-        validator.validate(circuit, input_wires, channel)
+        ))
     }
 }
 
