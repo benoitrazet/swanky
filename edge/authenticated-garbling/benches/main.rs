@@ -45,7 +45,7 @@ fn bench_party_encoding_receiving(c: &mut Criterion) {
     )
     .unwrap();
 
-    let (gb, _outputs) = gb.execute(&circuit).unwrap();
+    let (_, gb) = gb.execute(&circuit).unwrap();
     let (mut gb, mut ev) =
         swanky_channel::local::local_channel_pair(|c| gb.finalize(c), |c| ev.finalize(c)).unwrap();
 

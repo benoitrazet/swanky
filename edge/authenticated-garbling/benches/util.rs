@@ -30,15 +30,15 @@ pub fn test_circuit<
         |c| {
             let gb = GarblerOffline::new(circuit, c, rng_gb)?;
 
-            let (gb, outputs) = gb.execute(circuit)?;
+            let (outputs, gb) = gb.execute(circuit)?;
             let mut gb = gb.finalize(c)?;
 
             let mut inputs = gb.encode_many(inputs_gb, &vec![2; ninputs_gb], c)?;
             let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
             inputs.extend(theirs);
-            let validator = gb.finalize(&inputs, c)?;
+            let validator = gb.finalize(c)?;
             let mut validator = validator.validate(circuit, inputs, c)?;
-            validator.outputs(&outputs.flatten(), c)
+            validator.outputs(&outputs, c)
         },
         |c| {
             let ev = EvaluatorOffline::new(circuit, c, rng_ev)?;

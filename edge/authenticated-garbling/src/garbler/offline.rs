@@ -1,12 +1,12 @@
-use crate::garbler::AuthenticatedWire;
 use crate::garbler::GarblerOnline;
 use crate::preprocesser::WirePreProcessor;
 use crate::preprocesser::f_preprocessing;
 use crate::ps::PartyGarbler;
 use crate::vec_wrapper::VecWrapper;
+use crate::wire::OfflineWire;
 use fancy_analyzer::CircuitAnalyzer;
 use fancy_garbling::{WireLabel, WireMod2};
-use fancy_traits::{Circuit, CircuitInputMapper, Fancy, FancyBinary};
+use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary, Flatten};
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
@@ -48,19 +48,8 @@ pub struct GarblerOffline {
     gates: Vec<(U8x16, U8x16)>,
     // A vector that stores the lsb of the 0 wire label associated with AND gates.
     gate_bits: Vec<F2>,
-    // The wire material that the garbler computes offline
-    wires: Vec<AuthenticatedWire>,
-}
-
-impl From<GarblerOffline> for GarblerOnline {
-    fn from(offline: GarblerOffline) -> Self {
-        Self::new(
-            offline.delta,
-            offline.auth_shares,
-            offline.and_auth_shares,
-            VecWrapper::new(offline.wires),
-        )
-    }
+    // The wire material for the inputs to the circuit.
+    inputs: Vec<OfflineWire>,
 }
 
 impl GarblerOffline {
@@ -86,19 +75,16 @@ impl GarblerOffline {
         let one = WireMod2::from_repr(zero.to_repr() ^ delta, 2);
 
         let mut and_generator = AndTripleGenerator::new_with_delta(delta, channel, rng)?;
-        let (auth_shares, known_triples) =
+        let (auth_shares, and_auth_shares) =
             f_preprocessing(circuit, &mut and_generator, channel, rng)?;
-        let nands = known_triples.len();
+        let nands = and_auth_shares.len();
         let mut auth_shares = VecWrapper::new(auth_shares);
-        let and_auth_shares = VecWrapper::new(known_triples);
 
         channel.write(&one.to_repr())?;
         channel.write(&zero_constant.to_repr())?;
 
-        let offline_wires = (0..ninputs)
-            .map(|_| {
-                AuthenticatedWire::new_without_mask(WireMod2::rand(rng, 2), auth_shares.next())
-            })
+        let inputs = (0..ninputs)
+            .map(|_| OfflineWire::new(WireMod2::rand(rng, 2), auth_shares.next()))
             .collect::<Vec<_>>();
 
         Ok(Self {
@@ -107,20 +93,19 @@ impl GarblerOffline {
             zero_constant,
             and_gate_index: 0,
             auth_shares,
-            and_auth_shares,
+            and_auth_shares: VecWrapper::new(and_auth_shares),
             gates: Vec::with_capacity(nands),
             gate_bits: Vec::with_capacity(nands),
-            wires: offline_wires.clone(),
+            inputs,
         })
     }
 
-    /// Execute a circuit in offline mode, returning the online garbler
-    /// alongside the circuit outputs.
+    /// Execute a circuit in offline mode, returning the circuit outputs.
     pub fn execute<C: CircuitInputMapper<Self>>(
         mut self,
         circuit: &C,
-    ) -> Result<(Self, <C as Circuit<GarblerOffline>>::Output)> {
-        let inputs = self.wires.clone();
+    ) -> Result<(Vec<OfflineWire>, Self)> {
+        let inputs = self.inputs.clone();
         let outputs = Channel::with(std::io::empty(), |channel| {
             circuit.execute(
                 &mut self,
@@ -128,7 +113,7 @@ impl GarblerOffline {
                 channel,
             )
         })?;
-        Ok((self, outputs))
+        Ok((outputs.flatten(), self))
     }
 
     /// Send the offline material to the evaluator and return a
@@ -139,25 +124,53 @@ impl GarblerOffline {
             ErrorKind::InitializationError,
             "Failed to initialize sequence serializer.",
         )?;
-        // Send the lsb of 0 wire label
+        // Send the LSB of the zero-wirelabels of the output wires of the AND gates.
         bit_ser
             .write_vec(channel.as_std_io(), &self.gate_bits)
             .wrap_err(
                 ErrorKind::SerializationError,
                 "Failed to write serialized bits.",
             )?;
-        // Send the garbled gates
+        // Send the garbled gates.
         for (g0, g1) in self.gates.iter() {
             channel.write(g0)?;
             channel.write(g1)?;
         }
-        Ok(self.into())
+        Ok(GarblerOnline::new(
+            self.delta,
+            self.auth_shares,
+            self.and_auth_shares,
+            VecWrapper::new(self.inputs),
+        ))
     }
 
     fn next_and_gate_index(&mut self) -> usize {
         let current = self.and_gate_index;
         self.and_gate_index += 1;
         current
+    }
+}
+
+impl Fancy for GarblerOffline {
+    type Item = OfflineWire;
+
+    fn constant(&mut self, value: u16, _: u16, _: &mut Channel) -> Result<Self::Item> {
+        let constant = F2::try_from(value).expect("constant must be boolean");
+        let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());
+        // Because the garbler is sending uncorrelated zero and one wire labels to the evaluator for constant gates and free negation,
+        // they have to be careful which zero wire label to use for each constant gate so that it correlates
+        // with the one that the evaluator is using.
+        let wirelabel = if constant == F2::ONE {
+            // If the value of the gate is 1, then the garbler needs to user the wire label
+            // associated with the constant 1 wire label that they sent out to the evaluator,
+            // i.e. the zero value that they generated for that wire and free negations.
+            self.zero
+        } else {
+            // Otherwise, the garbler needs to use the same zero wire label as the one they sent
+            // to the evaluator, i.e. the wire label specifically generated for zero constant gates.
+            self.zero_constant
+        };
+        Ok(OfflineWire::new(wirelabel, share))
     }
 }
 
@@ -173,16 +186,16 @@ impl FancyBinary for GarblerOffline {
         // Compute l1 from l0 for both inputs
         //
         // This wire label is L_{α,1} = L_{α,0} + Δ
-        let la1 = la0.wire_label() + self.delta;
+        let la1 = la0.wirelabel() + self.delta;
         // This wire label is L_{β,1} = L_{β,0} + Δ
-        let lb1 = lb0.wire_label() + self.delta;
+        let lb1 = lb0.wirelabel() + self.delta;
 
         // Hash l0 and l1 from both inputs and use the current index as a tweak
         //
         // This is H(L_{α,0}, γ) in the paper
-        let h_la0 = la0.wire_label().hash(index as u128);
+        let h_la0 = la0.wirelabel().hash(index as u128);
         // This is H(L_{β,0}, γ) in the paper
-        let h_lb0 = lb0.wire_label().hash(index as u128);
+        let h_lb0 = lb0.wirelabel().hash(index as u128);
         // This is H(L_{α,1}, γ) in the paper
         let h_la1 = la1.hash(index as u128);
         // This is H(L_{β,1}, γ) in the paper
@@ -210,7 +223,7 @@ impl FancyBinary for GarblerOffline {
         // Gate_{γ,0} = H(L_{α,0}, γ) + H(L_{α,1}, γ) + K[s_β] + Δ_rβ
         let gate0 = h_la0 ^ h_la1 ^ key_b ^ delta_bit_b;
         // Gate_{γ,1} = H(L_{β,0}, γ) + H(L_{β,1}, γ) + K[s_α] + Δ_rα + L_{α,0}
-        let gate1 = h_lb0 ^ h_lb1 ^ key_a ^ delta_bit_a ^ la0.wire_label().to_repr();
+        let gate1 = h_lb0 ^ h_lb1 ^ key_a ^ delta_bit_a ^ la0.wirelabel().to_repr();
         // L_{γ,0} = H(L_{α,0}, γ) + H(L_{β,0}, γ) + K[s_γ] + Δ_rγ + K[s*_γ] + Δ_r*γ
         let lc0 = h_la0 ^ h_lb0 ^ key_c ^ delta_bit_c ^ key_c_triple ^ delta_bit_c_triple;
         // b_γ = lsb(L_{γ,0})
@@ -219,46 +232,20 @@ impl FancyBinary for GarblerOffline {
         self.gates.push((gate0, gate1));
         self.gate_bits.push(bit_c);
 
-        Ok(AuthenticatedWire::new_without_mask(
-            WireMod2::from_repr(lc0, 2),
-            lc_share,
-        ))
+        Ok(OfflineWire::new(WireMod2::from_repr(lc0, 2), lc_share))
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        AuthenticatedWire::new_without_mask(
-            x.wire_label() + y.wire_label(),
+        OfflineWire::new(
+            x.wirelabel() + y.wirelabel(),
             x.auth_share() ^ y.auth_share(),
         )
     }
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        AuthenticatedWire::new_without_mask(
-            WireMod2::from_repr(x.wire_label().to_repr() ^ self.zero.to_repr(), 2),
+        OfflineWire::new(
+            WireMod2::from_repr(x.wirelabel().to_repr() ^ self.zero.to_repr(), 2),
             x.auth_share(),
         )
-    }
-}
-
-impl Fancy for GarblerOffline {
-    type Item = AuthenticatedWire;
-
-    fn constant(&mut self, value: u16, _: u16, _: &mut Channel) -> Result<AuthenticatedWire> {
-        let constant = F2::try_from(value).expect("constant must be boolean");
-        let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());
-        // Because the garbler is sending uncorrelated zero and one wire labels to the evaluator for constant gates and free negation,
-        // they have to be careful which zero wire label to use for each constant gate so that it correlates
-        // with the one that the evaluator is using.
-        let wire_label = if constant == F2::ONE {
-            // If the value of the gate is 1, then the garbler needs to user the wire label
-            // associated with the constant 1 wire label that they sent out to the evaluator,
-            // i.e. the zero value that they generated for that wire and free negations.
-            self.zero
-        } else {
-            // Otherwise, the garbler needs to use the same zero wire label as the one they sent
-            // to the evaluator, i.e. the wire label specifically generated for zero constant gates.
-            self.zero_constant
-        };
-        Ok(AuthenticatedWire::new(constant, wire_label, share))
     }
 }

@@ -82,15 +82,15 @@ fn test_circuit<
         |c| {
             let mut rng = SwankyRng::new();
             let gb = GarblerOffline::new(circuit, c, &mut rng)?;
-            let (gb, outputs) = gb.execute(circuit)?;
+            let (outputs, gb) = gb.execute(circuit)?;
             let mut gb = gb.finalize(c)?;
 
-            let mut inputs = gb.encode_many(&inputs_gb, &vec![2; ninputs_gb], c).unwrap();
-            let their = gb.receive_many(&vec![2; ninputs_ev], c).unwrap();
+            let mut inputs = gb.encode_many(&inputs_gb, &vec![2; ninputs_gb], c)?;
+            let their = gb.receive_many(&vec![2; ninputs_ev], c)?;
             inputs.extend(their);
-            let gb = gb.finalize(&inputs, c)?;
+            let gb = gb.finalize(c)?;
             let mut gb = gb.validate(circuit, inputs, c)?;
-            gb.outputs(&outputs.flatten(), c)
+            gb.outputs(&outputs, c)
         },
         |c| {
             let mut rng = SwankyRng::new();

@@ -1,5 +1,8 @@
 use crate::{
-    GarblerValidator, garbler::AuthenticatedWire, ps::PartyGarbler, vec_wrapper::VecWrapper,
+    GarblerValidator,
+    ps::PartyGarbler,
+    vec_wrapper::VecWrapper,
+    wire::{OfflineWire, ValidatorWire},
 };
 use fancy_garbling::{WireLabel, WireMod2};
 use fancy_traits::{Fancy, FancyEncode};
@@ -21,8 +24,8 @@ pub struct GarblerOnline {
     // set such that it is equal to the AND of the incoming wire shares.
     // Corresponds to〈r_w^*, s_w^*〉from the paper.
     and_auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
-    // The wire material that the garbler computes offline
-    offline_wires: VecWrapper<AuthenticatedWire>,
+    // The offline wire material for the inputs.
+    inputs: VecWrapper<OfflineWire>,
 }
 
 impl GarblerOnline {
@@ -30,13 +33,13 @@ impl GarblerOnline {
         delta: WireMod2,
         auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
         and_auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
-        offline_wires: VecWrapper<AuthenticatedWire>,
+        inputs: VecWrapper<OfflineWire>,
     ) -> Self {
         Self {
             delta,
             auth_shares,
             and_auth_shares,
-            offline_wires,
+            inputs,
         }
     }
 
@@ -46,25 +49,21 @@ impl GarblerOnline {
     // This corresponds to pieces of Steps 3 and 4 in Figure 3 of the paper.
     fn encode_wirelabels(
         &mut self,
-        wires: &[AuthenticatedWire],
+        wires: &[OfflineWire],
         masked_values: Vec<F2>,
         channel: &mut Channel,
-    ) -> Result<Vec<AuthenticatedWire>> {
+    ) -> Result<Vec<ValidatorWire<PartyGarbler>>> {
         let mut result = Vec::new();
         for (masked_value, wire) in masked_values.iter().zip(wires.iter()) {
             // Use masked values `x_w + λ_w` and zero wirelabels `L_0` to create
             // wirelabels `L_{x_w + λ_w}`, and send these to the evaluator.
-            let wirelabel = wire.wire_label()
+            let wirelabel = wire.wirelabel()
                 + WireMod2::from_repr(
                     U8x16::from(*masked_value * F128b::from(self.delta.to_repr())),
                     2,
                 );
             channel.write(&wirelabel.to_repr())?;
-            result.push(AuthenticatedWire::new(
-                *masked_value,
-                wirelabel,
-                wire.auth_share(),
-            ));
+            result.push(ValidatorWire::new(*masked_value, wire.auth_share()));
         }
         Ok(result)
     }
@@ -80,11 +79,7 @@ impl GarblerOnline {
     /// the garbler, this involved locally traversing the circuit in order to
     /// compute those validation bits from the wire masked values that the
     /// evaluator sends.
-    pub fn finalize(
-        self,
-        input_wires: &[AuthenticatedWire],
-        channel: &mut Channel,
-    ) -> Result<GarblerValidator> {
+    pub fn finalize(self, channel: &mut Channel) -> Result<GarblerValidator> {
         let nands = self.and_auth_shares.len();
         // Receive the masked values from the Evaluator
         let mut bit_deser: F2BitDeserializer = SequenceDeserializer::new(channel.as_std_io())
@@ -100,10 +95,22 @@ impl GarblerOnline {
         let auth_shares: Vec<_> = self.auth_shares.into();
         Ok(GarblerValidator::new(
             self.delta,
-            auth_shares[input_wires.len()..].to_vec(),
+            auth_shares[self.inputs.len()..].to_vec(),
             self.and_auth_shares.into(),
             lc_values,
         ))
+    }
+}
+
+impl Fancy for GarblerOnline {
+    type Item = ValidatorWire<PartyGarbler>;
+
+    fn constant(&mut self, _: u16, _: u16, _: &mut Channel) -> Result<Self::Item> {
+        // TODO: `constant` should _not_ be a part of `Fancy`, but maybe live in
+        // a `FancyConstant` trait?
+        unimplemented!(
+            "In the online phase, we don't do any circuit evaluation, so `constant` should never be called."
+        )
     }
 }
 
@@ -113,12 +120,12 @@ impl FancyEncode for GarblerOnline {
         values: &[u16],
         moduli: &[u16],
         channel: &mut Channel,
-    ) -> Result<Vec<<Self as Fancy>::Item>> {
+    ) -> Result<Vec<Self::Item>> {
         assert_eq!(values.len(), moduli.len());
 
-        let offline_wires: Vec<AuthenticatedWire> = (0..moduli.len())
-            .map(|_| self.offline_wires.next())
-            .collect();
+        let offline_wires = (0..moduli.len())
+            .map(|_| self.inputs.next())
+            .collect::<Vec<_>>();
         let my_auth_shares: Vec<AuthShare<PartyGarbler>> =
             offline_wires.iter().map(|w| w.auth_share()).collect();
 
@@ -151,9 +158,9 @@ impl FancyEncode for GarblerOnline {
     }
 
     fn receive_many(&mut self, moduli: &[u16], channel: &mut Channel) -> Result<Vec<Self::Item>> {
-        let offline_wires: Vec<AuthenticatedWire> = (0..moduli.len())
-            .map(|_| self.offline_wires.next())
-            .collect();
+        let offline_wires = (0..moduli.len())
+            .map(|_| self.inputs.next())
+            .collect::<Vec<_>>();
         let my_auth_shares: Vec<AuthShare<PartyGarbler>> =
             offline_wires.iter().map(|w| w.auth_share()).collect();
 
@@ -166,22 +173,5 @@ impl FancyEncode for GarblerOnline {
             .collect::<Result<Vec<_>>>()?;
 
         self.encode_wirelabels(&offline_wires, their_masked_values, channel)
-    }
-}
-
-impl Fancy for GarblerOnline {
-    type Item = AuthenticatedWire;
-
-    fn constant(
-        &mut self,
-        _value: u16,
-        _q: u16,
-        _channel: &mut Channel,
-    ) -> Result<AuthenticatedWire> {
-        // TODO: `constant` should _not_ be a part of `Fancy`, but maybe live in
-        // a `FancyConstant` trait?
-        unimplemented!(
-            "In the online phase, we don't do any circuit evaluation, so `constant` should never be called."
-        )
     }
 }

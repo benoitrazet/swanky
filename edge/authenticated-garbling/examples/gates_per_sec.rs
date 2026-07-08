@@ -149,7 +149,7 @@ where
         swanky_channel::local::local_channel_pair(
             |channel: &mut Channel<'_>| {
                 let gb = GarblerOffline::new(circuit, channel, &mut SwankyRng::new())?;
-                let (gb, outputs) = gb.execute(circuit)?;
+                let (outputs, gb) = gb.execute(circuit)?;
                 let mut gb = gb.finalize(channel)?;
 
                 let inputs = gb.encode_many(&inputs, &moduli, channel)?;
@@ -167,7 +167,7 @@ where
     let online = Instant::now();
     let (_, result) = swanky_channel::local::local_channel_pair(
         |channel| {
-            let validator = gb.finalize(&inputs_gb, channel)?;
+            let validator = gb.finalize(channel)?;
             let mut validator = validator.validate(circuit, inputs_gb, channel)?;
             validator.outputs(&outputs.flatten(), channel)
         },

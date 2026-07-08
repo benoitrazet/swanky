@@ -4,7 +4,7 @@
 mod evaluator;
 pub use evaluator::{EvaluatorOffline, EvaluatorOnline, EvaluatorValidator};
 mod garbler;
-pub use garbler::{GarblerOffline, GarblerOnline, GarblerValidator};
+pub use garbler::{GarblerOffline, GarblerOnline, GarblerOutput, GarblerValidator};
 mod preprocesser;
 pub use preprocesser::WirePreProcessor;
 mod wire;
