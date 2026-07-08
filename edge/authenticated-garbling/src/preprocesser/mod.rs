@@ -26,7 +26,7 @@
 //! <https://eprint.iacr.org/2018/578.pdf>
 
 use fancy_analyzer::CircuitAnalyzer;
-use fancy_traits::{CircuitInputMapper, FancyEncode};
+use fancy_traits::CircuitInputMapper;
 use rand::{CryptoRng, Rng};
 use swanky_authenticated_bits::{and_triples::AndTripleGenerator, authshares::AuthShare};
 use swanky_channel::Channel;
@@ -58,14 +58,11 @@ where
     let ninputs = circuit_analyzer.ninputs();
     let nconstants = circuit_analyzer.nconstants();
 
-    let mut nand_triples = nands;
-
     // If we have too few AND gates, we need to generate at
     // least 320 AND triples in order for the protocol to be secure.
-    if 0 < nands && nands < 320 {
-        nand_triples = 320;
-    }
-    // Create as many random and triples as there are AND gates
+    let nand_triples = if 0 < nands && nands < 320 { 320 } else { nands };
+
+    // Create as many random AND triples as there are AND gates.
     let mut rand_and_triples = Vec::with_capacity(nand_triples);
     // We only generate AND triples if there are any AND gates in the circuit
     // to begin with
@@ -81,22 +78,13 @@ where
         channel,
         rng,
     )?;
-    let mut wire_preprocessor = WirePreProcessor::new(auth_shares.clone(), and_generator.delta());
-    let inputs = wire_preprocessor.receive_many(
-        &vec![2; <C as CircuitInputMapper<WirePreProcessor<P>>>::ninputs(circuit)],
-        channel,
-    )?;
-    circuit.execute(
-        &mut wire_preprocessor,
-        <C as CircuitInputMapper<WirePreProcessor<P>>>::map(circuit, inputs),
-        channel,
-    )?;
+    let wire_preprocessor = WirePreProcessor::new(auth_shares, nands, and_generator.delta());
+    let (left_wires, right_wires, auth_shares) = wire_preprocessor.execute(circuit)?;
 
     // We only correlate the generated AND triples if there are any AND gates in the circuit
     // to begin with.
     let mut known_triples = Vec::with_capacity(nands);
     if nands > 0 {
-        let (left_wires, right_wires) = wire_preprocessor.into_and_gate_input_shares();
         and_generator.to_known_triple(
             &rand_and_triples[..nands],
             &left_wires,
@@ -112,28 +100,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{PartyEvaluator, PartyGarbler};
     use fancy_circuits::binary::TestBinaryAddition;
-    use swanky_party::party_system;
     use swanky_rng::SwankyRng;
-
-    party_system! {
-        mod ps {
-            PartyA,
-            PartyB,
-        }
-    }
-    use ps::{PartyA, PartyB};
-
-    /// Garbler
-    ///
-    /// This is a type-alias for [`PartyA`] and is useful to clarify the role of a
-    /// authenticated shares and and triples.
-    pub type Garbler = PartyA;
-    /// Evaluator
-    ///
-    /// This is a type-alias for [`PartyB`] and is useful to clarify the role of a
-    /// authenticated shares and and triples.
-    pub type Evaluator = PartyB;
 
     #[test]
     fn test_preprocessing() {
@@ -142,7 +111,8 @@ mod tests {
         let (_shares_gb, _shares_ev) = swanky_channel::local::local_channel_pair(
             |c| {
                 let mut rng = SwankyRng::new();
-                let mut generator_and_triples = AndTripleGenerator::<Garbler>::new(c, &mut rng)?;
+                let mut generator_and_triples =
+                    AndTripleGenerator::<PartyGarbler>::new(c, &mut rng)?;
                 Ok(f_preprocessing(
                     &circuit,
                     &mut generator_and_triples,
@@ -152,7 +122,8 @@ mod tests {
             },
             |c| {
                 let mut rng = SwankyRng::new();
-                let mut generator_and_triples = AndTripleGenerator::<Evaluator>::new(c, &mut rng)?;
+                let mut generator_and_triples =
+                    AndTripleGenerator::<PartyEvaluator>::new(c, &mut rng)?;
                 Ok(f_preprocessing(
                     &circuit,
                     &mut generator_and_triples,
