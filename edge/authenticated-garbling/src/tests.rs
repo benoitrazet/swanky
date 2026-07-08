@@ -1,8 +1,7 @@
 #![cfg(test)]
 
-use crate::garbler::GarblerOffline;
 use crate::ps::{PartyEvaluator, PartyGarbler};
-use crate::validator::GarblerValidator;
+use crate::{GarblerOffline, GarblerValidator};
 use crate::{evaluator::Evaluator, preprocesser::WirePreProcessor};
 
 use fancy_analyzer::CircuitAnalyzer;
