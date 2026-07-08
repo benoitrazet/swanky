@@ -143,6 +143,8 @@ where
     );
 
     println!("=== Authenticated Garbling ===");
+    let total = Instant::now();
+    let offline = Instant::now();
     let ((gb, inputs_gb, outputs), (mut ev, inputs_ev)) =
         swanky_channel::local::local_channel_pair(
             |channel: &mut Channel<'_>| {
@@ -160,8 +162,9 @@ where
                 Ok((ev, inputs))
             },
         )?;
+    println!("Offline: {:?}", offline.elapsed());
 
-    let t = Instant::now();
+    let online = Instant::now();
     let (_, result) = swanky_channel::local::local_channel_pair(
         |channel| {
             let validator = gb.finalize(&inputs_gb, channel)?;
@@ -180,7 +183,9 @@ where
         },
     )?;
     black_box(result);
-    let time = t.elapsed();
+    println!("Online: {:?}", online.elapsed());
+
+    let time = total.elapsed();
     println!("Total: {:?}", time);
     println!(
         "Gates per second: {:?}",
