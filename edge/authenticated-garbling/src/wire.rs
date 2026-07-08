@@ -1,13 +1,12 @@
-//! Wirelabel representation for authenticated garbling.
+//! Various wirelabel representations used in authenticated garbling.
 
+use crate::{PartyEvaluator, PartyGarbler};
 use fancy_garbling::WireMod2;
 use fancy_traits::HasModulus;
 use swanky_authenticated_bits::authshares::AuthShare;
 use swanky_field_binary::F2;
-use swanky_party::GenericParty;
 
-use crate::PartyGarbler;
-
+/// A [`fancy_traits::Fancy`] wire for the garbler's offline phase.
 #[derive(Clone, Copy)]
 pub struct OfflineWire {
     wirelabel: WireMod2,
@@ -46,14 +45,15 @@ impl core::fmt::Debug for OfflineWire {
     }
 }
 
+/// A [`fancy_traits::Fancy`] wire for the garbler's validation phase.
 #[derive(Clone, Copy)]
-pub struct ValidatorWire<P: GenericParty> {
+pub struct ValidatorWire {
     masked_value: F2,
-    auth_share: AuthShare<P>,
+    auth_share: AuthShare<PartyGarbler>,
 }
 
-impl<P: GenericParty> ValidatorWire<P> {
-    pub(crate) fn new(masked_value: F2, auth_share: AuthShare<P>) -> Self {
+impl ValidatorWire {
+    pub(crate) fn new(masked_value: F2, auth_share: AuthShare<PartyGarbler>) -> Self {
         Self {
             masked_value,
             auth_share,
@@ -64,18 +64,18 @@ impl<P: GenericParty> ValidatorWire<P> {
         self.masked_value
     }
 
-    pub(crate) fn auth_share(&self) -> AuthShare<P> {
+    pub(crate) fn auth_share(&self) -> AuthShare<PartyGarbler> {
         self.auth_share
     }
 }
 
-impl<P: GenericParty> HasModulus for ValidatorWire<P> {
+impl HasModulus for ValidatorWire {
     fn modulus(&self) -> u16 {
         2
     }
 }
 
-impl<P: GenericParty> core::fmt::Debug for ValidatorWire<P> {
+impl core::fmt::Debug for ValidatorWire {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ValidatorWire")
             .field("masked_value", &self.masked_value)
@@ -84,27 +84,31 @@ impl<P: GenericParty> core::fmt::Debug for ValidatorWire<P> {
     }
 }
 
-/// Wirelabel representation for authenticated garbling.
+/// A [`fancy_traits::Fancy`] wire for the evaluator.
 ///
 /// An authenticated garbling wirelabel is a wirelabel $`L`$ alongside (1) an
-/// [`AuthShare`] $`\lambda`$ of $`L`$s color bit, and (2) an optional value
-/// representing the masked value $`w \oplus \lambda`$, where $`w`$ is the
-/// actual bit represented by the wirelabel.
+/// [`AuthShare`] $`\lambda`$ of $`L`$s color bit, and (2)  the masked value $`w
+/// \oplus \lambda`$, where $`w`$ is the actual bit represented by the
+/// wirelabel.
 #[derive(Clone, Copy)]
-pub struct AuthenticatedWireMod2<P: GenericParty> {
+pub struct EvaluatorWire {
     /// A masked value $`w \oplus \lambda`$.
     masked_value: F2,
     /// An optional  wirelabel $`L`$.
     wire_label: WireMod2,
     /// Sharing of the color bit $`\lambda`$.
-    auth_share: AuthShare<P>,
+    auth_share: AuthShare<PartyEvaluator>,
 }
 
-impl<P: GenericParty> AuthenticatedWireMod2<P> {
+impl EvaluatorWire {
     /// Create a new `AuthenticatedWireMod2` given a masked value, the underlying wirelabel
     /// $`L`$, and its associated color bit share $`\langle \lambda \rangle`$.
-    pub(crate) fn new(masked_value: F2, wire_label: WireMod2, auth_share: AuthShare<P>) -> Self {
-        AuthenticatedWireMod2 {
+    pub(crate) fn new(
+        masked_value: F2,
+        wire_label: WireMod2,
+        auth_share: AuthShare<PartyEvaluator>,
+    ) -> Self {
+        EvaluatorWire {
             masked_value,
             wire_label,
             auth_share,
@@ -123,18 +127,18 @@ impl<P: GenericParty> AuthenticatedWireMod2<P> {
 
     /// The authenticated share $`\langle \lambda \rangle`$ associated with this
     /// wire.
-    pub(crate) fn auth_share(&self) -> AuthShare<P> {
+    pub(crate) fn auth_share(&self) -> AuthShare<PartyEvaluator> {
         self.auth_share
     }
 }
 
-impl<P: GenericParty> HasModulus for AuthenticatedWireMod2<P> {
+impl HasModulus for EvaluatorWire {
     fn modulus(&self) -> u16 {
         2
     }
 }
 
-impl<P: GenericParty> core::fmt::Debug for AuthenticatedWireMod2<P> {
+impl core::fmt::Debug for EvaluatorWire {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AuthenticatedWireMod2")
             .field("masked_value", &self.masked_value)

@@ -9,9 +9,7 @@ use swanky_serialization::SequenceSerializer;
 use vectoreyes::U8x16;
 
 use crate::{
-    evaluator::{AuthenticatedWire, EvaluatorValidator},
-    ps::PartyEvaluator,
-    vec_wrapper::VecWrapper,
+    EvaluatorWire, evaluator::EvaluatorValidator, ps::PartyEvaluator, vec_wrapper::VecWrapper,
 };
 
 /// The evaluator's online portion.
@@ -79,13 +77,13 @@ impl EvaluatorOnline {
         masked_values: Vec<F2>,
         auth_shares: Vec<AuthShare<PartyEvaluator>>,
         channel: &mut Channel,
-    ) -> Result<Vec<AuthenticatedWire>> {
-        let mut wires: Vec<AuthenticatedWire> = Vec::with_capacity(masked_values.len());
+    ) -> Result<Vec<EvaluatorWire>> {
+        let mut wires: Vec<EvaluatorWire> = Vec::with_capacity(masked_values.len());
         for (masked_value, auth_share) in masked_values.into_iter().zip(auth_shares) {
             // The Evaluator retrieves the wire labels for their own input
             let wire_label = WireMod2::from_repr(channel.read()?, 2);
             // The Evaluator constructs authenticated values for all their input wires
-            wires.push(AuthenticatedWire::new(masked_value, wire_label, auth_share));
+            wires.push(EvaluatorWire::new(masked_value, wire_label, auth_share));
         }
         Ok(wires)
     }
@@ -120,7 +118,7 @@ impl EvaluatorOnline {
 }
 
 impl Fancy for EvaluatorOnline {
-    type Item = AuthenticatedWire;
+    type Item = EvaluatorWire;
 
     fn constant(&mut self, x: u16, _: u16, _: &mut Channel) -> Result<Self::Item> {
         let constant = F2::try_from(x).expect("constant must be boolean");
@@ -132,13 +130,13 @@ impl Fancy for EvaluatorOnline {
             self.zero
         };
 
-        Ok(AuthenticatedWire::new(constant, wirelabel, share))
+        Ok(EvaluatorWire::new(constant, wirelabel, share))
     }
 }
 
 impl FancyBinary for EvaluatorOnline {
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        AuthenticatedWire::new(
+        EvaluatorWire::new(
             x.masked_value() + F2::ONE,
             x.wire_label() + self.one,
             x.auth_share(),
@@ -146,7 +144,7 @@ impl FancyBinary for EvaluatorOnline {
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        AuthenticatedWire::new(
+        EvaluatorWire::new(
             x.masked_value() + y.masked_value(),
             x.wire_label() + y.wire_label(),
             x.auth_share() ^ y.auth_share(),
@@ -224,7 +222,7 @@ impl FancyBinary for EvaluatorOnline {
             ^ lc_share;
         self.validation_shares.push(validation_share);
 
-        Ok(AuthenticatedWire::new(
+        Ok(EvaluatorWire::new(
             lc_value,
             WireMod2::from_repr(lc_label, 2),
             lc_share,

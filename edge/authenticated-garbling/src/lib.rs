@@ -2,13 +2,13 @@
 #![deny(missing_docs)]
 
 mod evaluator;
-pub use evaluator::{EvaluatorOffline, EvaluatorOnline, EvaluatorValidator};
+pub use evaluator::{EvaluatorOffline, EvaluatorOnline, EvaluatorOutput, EvaluatorValidator};
 mod garbler;
 pub use garbler::{GarblerOffline, GarblerOnline, GarblerOutput, GarblerValidator};
 mod preprocesser;
 pub use preprocesser::WirePreProcessor;
 mod wire;
-pub use wire::AuthenticatedWireMod2;
+pub use wire::EvaluatorWire;
 mod vec_wrapper;
 
 // Party system type aliases for the garbler and evaluator

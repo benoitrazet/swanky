@@ -45,7 +45,7 @@ impl GarblerValidator {
     pub fn validate<C: CircuitInputMapper<Self>>(
         mut self,
         circuit: &C,
-        inputs: Vec<ValidatorWire<PartyGarbler>>,
+        inputs: Vec<ValidatorWire>,
         channel: &mut Channel,
     ) -> Result<GarblerOutput> {
         // Locally run the circuit to correctly construct the validation shares.
@@ -78,7 +78,7 @@ impl GarblerValidator {
 }
 
 impl Fancy for GarblerValidator {
-    type Item = ValidatorWire<PartyGarbler>;
+    type Item = ValidatorWire;
 
     fn constant(&mut self, value: u16, _: u16, _: &mut Channel) -> Result<Self::Item> {
         let constant = F2::try_from(value).expect("constant must be boolean");

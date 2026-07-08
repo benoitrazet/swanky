@@ -52,7 +52,7 @@ impl GarblerOnline {
         wires: &[OfflineWire],
         masked_values: Vec<F2>,
         channel: &mut Channel,
-    ) -> Result<Vec<ValidatorWire<PartyGarbler>>> {
+    ) -> Result<Vec<ValidatorWire>> {
         let mut result = Vec::new();
         for (masked_value, wire) in masked_values.iter().zip(wires.iter()) {
             // Use masked values `x_w + λ_w` and zero wirelabels `L_0` to create
@@ -103,7 +103,7 @@ impl GarblerOnline {
 }
 
 impl Fancy for GarblerOnline {
-    type Item = ValidatorWire<PartyGarbler>;
+    type Item = ValidatorWire;
 
     fn constant(&mut self, _: u16, _: u16, _: &mut Channel) -> Result<Self::Item> {
         // TODO: `constant` should _not_ be a part of `Fancy`, but maybe live in
