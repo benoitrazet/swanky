@@ -1,6 +1,7 @@
 use crate::{
     preprocesser::{WirePreProcessor, f_preprocessing},
     ps::PartyEvaluator,
+    vec_wrapper::VecWrapper,
     wire::AuthenticatedWireMod2,
 };
 use fancy_analyzer::CircuitAnalyzer;
@@ -36,15 +37,11 @@ pub struct Evaluator {
     and_wire_index: usize,
     // A vector of authenticated shares, one per input wire and AND gate output.
     // Corresponds to〈r_w, s_w〉from the paper.
-    auth_shares: Vec<AuthShare<PartyEvaluator>>,
-    // The index of the current authenticated share we're using.
-    auth_shares_index: usize,
+    auth_shares: VecWrapper<AuthShare<PartyEvaluator>>,
     // A vector of fixed authenticated shares for AND gate wires. Each share is
     // set such that it is equal to the AND of the incoming wire shares.
     // Corresponds to〈r_w^*, s_w^*〉from the paper.
-    and_auth_shares: Vec<AuthShare<PartyEvaluator>>,
-    // The index of the current AND authenticated share we're using.
-    and_auth_shares_index: usize,
+    and_auth_shares: VecWrapper<AuthShare<PartyEvaluator>>,
     // The masked wire values are used during the
     // finalization/validation stage.
     lc_values: Vec<F2>,
@@ -84,10 +81,8 @@ impl Evaluator {
             one: WireMod2::from_repr(one, 2),
             zero: WireMod2::from_repr(zero, 2),
             and_wire_index: 0,
-            auth_shares,
-            auth_shares_index: 0,
-            and_auth_shares,
-            and_auth_shares_index: 0,
+            auth_shares: VecWrapper::new(auth_shares),
+            and_auth_shares: VecWrapper::new(and_auth_shares),
             lc_values: Vec::with_capacity(num_and_gates),
             validation_shares: Vec::with_capacity(num_and_gates),
             gates: Vec::with_capacity(num_and_gates),
@@ -102,18 +97,6 @@ impl Evaluator {
         let current = self.and_wire_index;
         self.and_wire_index += 1;
         current
-    }
-    /// The authenticated share associated with the current gate of the garbling computation.
-    fn next_auth_share(&mut self) -> AuthShare<PartyEvaluator> {
-        let share = self.auth_shares[self.auth_shares_index];
-        self.auth_shares_index += 1;
-        share
-    }
-    /// The AND authenticated share associated with the current gate of the garbling computation.
-    fn next_and_auth_share(&mut self) -> AuthShare<PartyEvaluator> {
-        let share = self.and_auth_shares[self.and_auth_shares_index];
-        self.and_auth_shares_index += 1;
-        share
     }
     /// The gate specific garbling material associated with the current AND gate
     fn next_and_gate(&mut self) -> (U8x16, U8x16) {
@@ -242,9 +225,9 @@ impl FancyBinary for Evaluator {
         // This index is called γ in the paper
         let index = self.next_and_wire_index();
         // This is the current wire's authenticated share
-        let lc_share = self.next_auth_share();
+        let lc_share = self.auth_shares.next();
         // This is the current wire's authenticated triple
-        let lc_triple = self.next_and_auth_share();
+        let lc_triple = self.and_auth_shares.next();
 
         // This is the MAC associated with the current wire's authenticated share: M[s_γ]
         let mac_share = lc_share.mac();
@@ -350,7 +333,7 @@ impl FancyEncode for Evaluator {
 
         // Grab authenticated shares for each of the inputs.
         let my_auth_shares = (0..moduli.len())
-            .map(|_| self.next_auth_share())
+            .map(|_| self.auth_shares.next())
             .collect::<Vec<_>>();
 
         // Open the garbler's shares `[r_w]`.
@@ -382,7 +365,7 @@ impl FancyEncode for Evaluator {
         self.receive_garbling_material(channel)?;
         // Grab authenticated shares for each of the inputs.
         let my_auth_shares = (0..moduli.len())
-            .map(|_i| self.next_auth_share())
+            .map(|_i| self.auth_shares.next())
             .collect::<Vec<_>>();
 
         // Open the evaluator's shares `[s_w]`.
