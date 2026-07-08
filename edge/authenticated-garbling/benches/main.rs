@@ -11,7 +11,7 @@ use fancy_circuits::{
 };
 use fancy_traits::FancyEncode;
 use rand::Rng;
-use swanky_authenticated_garbling::{Evaluator, GarblerOffline};
+use swanky_authenticated_garbling::{EvaluatorOffline, GarblerOffline};
 use swanky_rng::SwankyRng;
 
 use crate::util::test_circuit;
@@ -27,7 +27,7 @@ fn bench_party_construction(c: &mut Criterion) {
         b.iter(|| {
             swanky_channel::local::local_channel_pair(
                 |c| GarblerOffline::new(&circuit, c, &mut rng_gb),
-                |c| Evaluator::new(&circuit, c, &mut rng_ev),
+                |c| EvaluatorOffline::new(&circuit, c, &mut rng_ev),
             )
             .unwrap();
         });
@@ -39,13 +39,15 @@ fn bench_party_encoding_receiving(c: &mut Criterion) {
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
     let circuit = TestAndGateFanN(2 * input_size);
-    let (gb, mut ev) = swanky_channel::local::local_channel_pair(
+    let (gb, ev) = swanky_channel::local::local_channel_pair(
         |c| GarblerOffline::new(&circuit, c, &mut rng_gb),
-        |c| Evaluator::new(&circuit, c, &mut rng_ev),
+        |c| EvaluatorOffline::new(&circuit, c, &mut rng_ev),
     )
     .unwrap();
 
-    let (mut gb, _outputs) = gb.execute(&circuit).unwrap();
+    let (gb, _outputs) = gb.execute(&circuit).unwrap();
+    let (mut gb, mut ev) =
+        swanky_channel::local::local_channel_pair(|c| gb.finalize(c), |c| ev.finalize(c)).unwrap();
 
     c.bench_function("party-encoding-receiving-no-setup", move |b| {
         b.iter(|| {

@@ -6,8 +6,8 @@ use fancy_traits::{CircuitInputMapper, Fancy, FancyEncode};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
-use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
-use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
+use swanky_field_binary::{F2, F2BitDeserializer, F128b};
+use swanky_serialization::SequenceDeserializer;
 use vectoreyes::U8x16;
 
 /// The authenticated garbler's online phase.
@@ -21,13 +21,6 @@ pub struct GarblerOnline {
     // set such that it is equal to the AND of the incoming wire shares.
     // Corresponds to〈r_w^*, s_w^*〉from the paper.
     and_auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
-    // A vector that stores the garbling gates.
-    // TODO: Remove. Only needed in offline mode.
-    gates: Vec<(U8x16, U8x16)>,
-    // A vector that stores the lsb of the 0 wire label associated with AND
-    // gates.
-    // TODO: Remove. Only needed in offline mode.
-    gate_bits: Vec<F2>,
     // The wire material that the garbler computes offline
     offline_wires: VecWrapper<AuthenticatedWire>,
 }
@@ -37,16 +30,12 @@ impl GarblerOnline {
         delta: WireMod2,
         auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
         and_auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
-        gates: Vec<(U8x16, U8x16)>,
-        gate_bits: Vec<F2>,
         offline_wires: VecWrapper<AuthenticatedWire>,
     ) -> Self {
         Self {
             delta,
             auth_shares,
             and_auth_shares,
-            gates,
-            gate_bits,
             offline_wires,
         }
     }
@@ -78,28 +67,6 @@ impl GarblerOnline {
             ));
         }
         Ok(result)
-    }
-
-    // TODO: Move to `GarblerOffline`!
-    fn send_garbling_material(&self, channel: &mut Channel) -> Result<()> {
-        // The garbler sends out all the gate material that they computed offline
-        let bit_ser: F2BitSerializer = SequenceSerializer::new(&mut channel.as_std_io()).wrap_err(
-            ErrorKind::InitializationError,
-            "Failed to initialize sequence serializer.",
-        )?;
-        // Send the lsb of 0 wire label
-        bit_ser
-            .write_vec(channel.as_std_io(), &self.gate_bits)
-            .wrap_err(
-                ErrorKind::SerializationError,
-                "Failed to write serialized bits.",
-            )?;
-        // Send the garbled gates
-        for (g0, g1) in self.gates.iter() {
-            channel.write(g0)?;
-            channel.write(g1)?;
-        }
-        Ok(())
     }
 
     pub(crate) fn delta(&self) -> U8x16 {
@@ -150,8 +117,6 @@ impl FancyEncode for GarblerOnline {
         channel: &mut Channel,
     ) -> Result<Vec<<Self as Fancy>::Item>> {
         assert_eq!(values.len(), moduli.len());
-
-        self.send_garbling_material(channel)?;
 
         let offline_wires: Vec<AuthenticatedWire> = (0..moduli.len())
             .map(|_| self.offline_wires.next())

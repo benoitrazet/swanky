@@ -2,7 +2,7 @@ use fancy_analyzer::CircuitAnalyzer;
 use fancy_plaintext::Dummy;
 use fancy_traits::{CircuitInputMapper, FancyEncode, FancyOutput, Flatten};
 use swanky_authenticated_garbling::{
-    Evaluator, GarblerOffline, GarblerValidator, WirePreProcessor,
+    EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator, WirePreProcessor,
     ps::{PartyEvaluator, PartyGarbler},
 };
 use swanky_rng::SwankyRng;
@@ -13,7 +13,7 @@ pub fn test_circuit<
         + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
         + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
         + CircuitInputMapper<GarblerOffline>
-        + CircuitInputMapper<Evaluator>
+        + CircuitInputMapper<EvaluatorOnline>
         + CircuitInputMapper<Dummy>
         + CircuitInputMapper<GarblerValidator>
         + Sync,
@@ -30,7 +30,8 @@ pub fn test_circuit<
         |c| {
             let gb = GarblerOffline::new(circuit, c, rng_gb)?;
 
-            let (mut gb, outputs) = gb.execute(circuit)?;
+            let (gb, outputs) = gb.execute(circuit)?;
+            let mut gb = gb.finalize(c)?;
 
             let mut inputs = gb.encode_many(inputs_gb, &vec![2; ninputs_gb], c)?;
             let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
@@ -39,13 +40,14 @@ pub fn test_circuit<
             validator.outputs(&outputs.flatten(), c)
         },
         |c| {
-            let mut ev = Evaluator::new(circuit, c, rng_ev)?;
+            let ev = EvaluatorOffline::new(circuit, c, rng_ev)?;
+            let mut ev = ev.finalize(c)?;
             let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
             let mine = ev.encode_many(inputs_ev, &vec![2; ninputs_ev], c)?;
             inputs.extend(mine);
             let outputs = circuit.execute(
                 &mut ev,
-                <C as CircuitInputMapper<Evaluator>>::map(circuit, inputs),
+                <C as CircuitInputMapper<EvaluatorOnline>>::map(circuit, inputs),
                 c,
             )?;
             ev.finalize(&outputs.flatten(), c)

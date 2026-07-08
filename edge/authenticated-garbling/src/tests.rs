@@ -1,8 +1,8 @@
 #![cfg(test)]
 
+use crate::preprocesser::WirePreProcessor;
 use crate::ps::{PartyEvaluator, PartyGarbler};
-use crate::{GarblerOffline, GarblerValidator};
-use crate::{evaluator::Evaluator, preprocesser::WirePreProcessor};
+use crate::{EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator};
 
 use fancy_analyzer::CircuitAnalyzer;
 use fancy_circuits::binary::{
@@ -28,7 +28,7 @@ fn test_party_construction_passes() {
         },
         |c| {
             let mut rng = SwankyRng::new();
-            Evaluator::new(&circuit, c, &mut rng)
+            EvaluatorOffline::new(&circuit, c, &mut rng)
         },
     )
     .unwrap();
@@ -39,7 +39,7 @@ fn test_circuit<
         + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
         + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
         + CircuitInputMapper<GarblerOffline>
-        + CircuitInputMapper<Evaluator>
+        + CircuitInputMapper<EvaluatorOnline>
         + CircuitInputMapper<Dummy>
         + CircuitInputMapper<GarblerValidator>
         + Sync,
@@ -82,7 +82,8 @@ fn test_circuit<
         |c| {
             let mut rng = SwankyRng::new();
             let gb = GarblerOffline::new(circuit, c, &mut rng)?;
-            let (mut gb, outputs) = gb.execute(circuit)?;
+            let (gb, outputs) = gb.execute(circuit)?;
+            let mut gb = gb.finalize(c)?;
 
             let mut inputs = gb.encode_many(&inputs_gb, &vec![2; ninputs_gb], c).unwrap();
             let their = gb.receive_many(&vec![2; ninputs_ev], c).unwrap();
@@ -92,7 +93,8 @@ fn test_circuit<
         },
         |c| {
             let mut rng = SwankyRng::new();
-            let mut ev = Evaluator::new(circuit, c, &mut rng)?;
+            let ev = EvaluatorOffline::new(circuit, c, &mut rng)?;
+            let mut ev = ev.finalize(c)?;
 
             let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
             let mine = ev.encode_many(&inputs_ev, &vec![2; ninputs_ev], c)?;
@@ -100,7 +102,7 @@ fn test_circuit<
 
             let outputs = circuit.execute(
                 &mut ev,
-                <C as CircuitInputMapper<Evaluator>>::map(circuit, inputs),
+                <C as CircuitInputMapper<EvaluatorOnline>>::map(circuit, inputs),
                 c,
             )?;
 

@@ -7,7 +7,7 @@ use fancy_garbling::{
 use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary, FancyEncode, FancyOutput, Flatten};
 use std::{hint::black_box, time::Instant};
 use swanky_authenticated_garbling::{
-    Evaluator, GarblerOffline, GarblerValidator, WirePreProcessor,
+    EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator, WirePreProcessor,
     ps::{PartyEvaluator, PartyGarbler},
 };
 use swanky_channel::Channel;
@@ -57,7 +57,7 @@ where
         + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
         + CircuitInputMapper<GarblerValidator>
         + CircuitInputMapper<GarblerOffline>
-        + CircuitInputMapper<Evaluator>
+        + CircuitInputMapper<EvaluatorOnline>
         + Sync,
 {
     let mut analyzer = CircuitAnalyzer::new();
@@ -147,13 +147,15 @@ where
         swanky_channel::local::local_channel_pair(
             |channel: &mut Channel<'_>| {
                 let gb = GarblerOffline::new(circuit, channel, &mut SwankyRng::new())?;
-                let (mut gb, outputs) = gb.execute(circuit)?;
+                let (gb, outputs) = gb.execute(circuit)?;
+                let mut gb = gb.finalize(channel)?;
 
                 let inputs = gb.encode_many(&inputs, &moduli, channel)?;
                 Ok((gb, inputs, outputs))
             },
             |channel| {
-                let mut ev = Evaluator::new(circuit, channel, &mut SwankyRng::new())?;
+                let ev = EvaluatorOffline::new(circuit, channel, &mut SwankyRng::new())?;
+                let mut ev = ev.finalize(channel)?;
                 let inputs = ev.receive_many(&moduli, channel)?;
                 Ok((ev, inputs))
             },
@@ -168,7 +170,7 @@ where
         |channel| {
             let outputs = circuit.execute(
                 &mut ev,
-                <C as CircuitInputMapper<Evaluator>>::map(circuit, inputs_ev),
+                <C as CircuitInputMapper<EvaluatorOnline>>::map(circuit, inputs_ev),
                 channel,
             )?;
 

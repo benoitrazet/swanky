@@ -11,12 +11,20 @@ use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
+use swanky_error::ErrorKind;
 use swanky_error::Result;
+use swanky_error::WrapErr;
 use swanky_field::FiniteRing;
+use swanky_field_binary::F2BitSerializer;
 use swanky_field_binary::{F2, F128b};
+use swanky_serialization::SequenceSerializer;
 use vectoreyes::U8x16;
 
-/// The authenticated garbler's offline phase.
+/// The garbler's offline phase.
+///
+/// In the offline phase, the garbler produces the garbled gates $`G_{\gamma,
+/// 0}, G_{\gamma, 1}`$ alongside selection bits $`b_\gamma`$. These are sent
+/// when calling [`GarblerOffline::finalize`].
 pub struct GarblerOffline {
     // The garbler's Δ.
     delta: WireMod2,
@@ -50,15 +58,13 @@ impl From<GarblerOffline> for GarblerOnline {
             offline.delta,
             offline.auth_shares,
             offline.and_auth_shares,
-            offline.gates,
-            offline.gate_bits,
             VecWrapper::new(offline.wires),
         )
     }
 }
 
 impl GarblerOffline {
-    /// Create a new offline garbler for a given circuit.
+    /// Create a [`GarblerOffline`] for the given circuit.
     pub fn new<
         C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyGarbler>>,
         RNG: CryptoRng + RngCore,
@@ -113,7 +119,7 @@ impl GarblerOffline {
     pub fn execute<C: CircuitInputMapper<Self>>(
         mut self,
         circuit: &C,
-    ) -> Result<(GarblerOnline, <C as Circuit<GarblerOffline>>::Output)> {
+    ) -> Result<(Self, <C as Circuit<GarblerOffline>>::Output)> {
         let inputs = self.wires.clone();
         let outputs = Channel::with(std::io::empty(), |channel| {
             circuit.execute(
@@ -122,8 +128,30 @@ impl GarblerOffline {
                 channel,
             )
         })?;
-        let gb = self.into();
-        Ok((gb, outputs))
+        Ok((self, outputs))
+    }
+
+    /// Send the offline material to the evaluator and return a
+    /// [`GarblerOnline`] object for online processing.
+    pub fn finalize(self, channel: &mut Channel) -> Result<GarblerOnline> {
+        // The garbler sends out all the gate material that they computed offline
+        let bit_ser: F2BitSerializer = SequenceSerializer::new(&mut channel.as_std_io()).wrap_err(
+            ErrorKind::InitializationError,
+            "Failed to initialize sequence serializer.",
+        )?;
+        // Send the lsb of 0 wire label
+        bit_ser
+            .write_vec(channel.as_std_io(), &self.gate_bits)
+            .wrap_err(
+                ErrorKind::SerializationError,
+                "Failed to write serialized bits.",
+            )?;
+        // Send the garbled gates
+        for (g0, g1) in self.gates.iter() {
+            channel.write(g0)?;
+            channel.write(g1)?;
+        }
+        Ok(self.into())
     }
 
     fn next_and_gate_index(&mut self) -> usize {
@@ -134,12 +162,7 @@ impl GarblerOffline {
 }
 
 impl FancyBinary for GarblerOffline {
-    fn and(
-        &mut self,
-        la0: &Self::Item,
-        lb0: &Self::Item,
-        _channel: &mut Channel,
-    ) -> Result<Self::Item> {
+    fn and(&mut self, la0: &Self::Item, lb0: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
         // This index is called γ in the paper
         let index = self.next_and_gate_index();
         // This is the share for wire label L_{γ,0}
@@ -220,12 +243,7 @@ impl FancyBinary for GarblerOffline {
 impl Fancy for GarblerOffline {
     type Item = AuthenticatedWire;
 
-    fn constant(
-        &mut self,
-        value: u16,
-        _q: u16,
-        _channel: &mut Channel,
-    ) -> Result<AuthenticatedWire> {
+    fn constant(&mut self, value: u16, _: u16, _: &mut Channel) -> Result<AuthenticatedWire> {
         let constant = F2::try_from(value).expect("constant must be boolean");
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());
         // Because the garbler is sending uncorrelated zero and one wire labels to the evaluator for constant gates and free negation,
