@@ -60,8 +60,8 @@ impl From<GarblerOffline> for GarblerOnline {
 impl GarblerOffline {
     /// Create a new offline garbler for a given circuit.
     pub fn new<
-        RNG: CryptoRng + RngCore,
         C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyGarbler>>,
+        RNG: CryptoRng + RngCore,
     >(
         circuit: &C,
         channel: &mut Channel,
