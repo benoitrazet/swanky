@@ -1,4 +1,5 @@
-use crate::{HasModulus, WireLabel};
+use crate::WireLabel;
+use fancy_traits::HasModulus;
 use rand::{CryptoRng, Rng, RngCore};
 use subtle::ConditionallySelectable;
 use vectoreyes::{SimdBase, U8x16};

@@ -1,7 +1,8 @@
 use crate::{
     GarblerValidator, garbler::AuthenticatedWire, ps::PartyGarbler, vec_wrapper::VecWrapper,
 };
-use fancy_garbling::{CircuitInputMapper, Fancy, FancyEncode, WireLabel, WireMod2};
+use fancy_garbling::{WireLabel, WireMod2};
+use fancy_traits::{CircuitInputMapper, Fancy, FancyEncode};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};

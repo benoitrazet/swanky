@@ -1,17 +1,15 @@
 use std::time::Duration;
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use fancy_garbling::{
-    FancyEncode,
-    circuits::{
-        aes::AesNonExpanded,
-        binary::{TestBinaryAddition, TestBinarySubtraction},
-    },
+use fancy_circuits::{
+    aes::AesNonExpanded,
+    binary::{TestBinaryAddition, TestBinarySubtraction},
     test_circuits::{
         binary::{TestAndGateFanN, TestOrGateFanN, TestXorGateFanN},
         fancy::TestBinaryConstant,
     },
 };
+use fancy_traits::FancyEncode;
 use rand::Rng;
 use swanky_authenticated_garbling::{Evaluator, GarblerOffline};
 use swanky_rng::SwankyRng;

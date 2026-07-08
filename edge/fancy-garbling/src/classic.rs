@@ -2,11 +2,11 @@
 //! circuit without streaming.
 
 use crate::{
-    FancyOutput, WireLabel,
-    circuit::{Circuit, CircuitInputMapper, Flatten},
+    WireLabel,
     garble::{Evaluator, Garbler},
     util::output_tweak,
 };
+use fancy_traits::{Circuit, CircuitInputMapper, FancyOutput, Flatten};
 use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
 use swanky_channel::Channel;

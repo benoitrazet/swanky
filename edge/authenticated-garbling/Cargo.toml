@@ -11,6 +11,8 @@ version.workspace = true
 workspace = true
 
 [dependencies]
+fancy-analyzer.workspace = true
+fancy-traits.workspace = true
 fancy-garbling.workspace = true
 swanky-authenticated-bits.workspace = true
 swanky-field.workspace = true
@@ -25,6 +27,9 @@ vectoreyes.workspace = true
 rand.workspace = true
 
 [dev-dependencies]
+fancy-circuits.workspace = true
+fancy-plaintext.workspace = true
+
 criterion.workspace = true
 proptest.workspace = true
 

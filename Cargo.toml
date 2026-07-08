@@ -11,7 +11,6 @@ members = [
   "edge/authenticated-garbling",
   "edge/bit-matrix-transpose",
   "edge/block",
-  "edge/bristol-fashion",
   "edge/bytearray-utils",
   "edge/channel-legacy",
   "edge/cointoss",
@@ -22,7 +21,11 @@ members = [
   "edge/diet-mac-and-cheese/web-mac-and-cheese/websocket",
   "edge/f-eq",
   "edge/f-rand",
+  "edge/fancy-analyzer",
+  "edge/fancy-circuits",
   "edge/fancy-garbling",
+  "edge/fancy-plaintext",
+  "edge/fancy-traits",
   "edge/field",
   "edge/field-binary",
   "edge/field-f61p",
@@ -80,9 +83,12 @@ type_complexity = "allow"
 [workspace.dependencies]
 # Don't remove, or modify, the below "# BEGIN OUR CRATES" line. It's used by ./swanky new-crate
 # BEGIN OUR CRATES
-bristol-fashion = { path = "edge/bristol-fashion" }
 diet-mac-and-cheese = { path = "edge/diet-mac-and-cheese" }
+fancy-analyzer = { path = "edge/fancy-analyzer" }
+fancy-circuits = { path = "edge/fancy-circuits" }
 fancy-garbling = { path = "edge/fancy-garbling" }
+fancy-plaintext = { path = "edge/fancy-plaintext" }
+fancy-traits = { path = "edge/fancy-traits" }
 humidor = { path = "edge/humidor" }
 inferno = { path = "edge/inferno" }
 keyed_arena = { path = "edge/keyed_arena" }

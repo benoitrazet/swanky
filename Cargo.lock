@@ -280,13 +280,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bristol-fashion"
-version = "0.6.0"
-dependencies = [
- "swanky-error",
-]
-
-[[package]]
 name = "bufstream"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -822,10 +815,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "fancy-analyzer"
+version = "0.6.0"
+dependencies = [
+ "fancy-circuits",
+ "fancy-plaintext",
+ "fancy-traits",
+ "rand 0.8.5",
+ "swanky-channel",
+ "swanky-error",
+]
+
+[[package]]
+name = "fancy-circuits"
+version = "0.6.0"
+dependencies = [
+ "fancy-garbling",
+ "fancy-plaintext",
+ "fancy-traits",
+ "rand 0.8.5",
+ "regex",
+ "serde",
+ "swanky-channel",
+ "swanky-error",
+ "swanky-rng",
+]
+
+[[package]]
 name = "fancy-garbling"
 version = "0.6.0"
 dependencies = [
  "criterion",
+ "fancy-circuits",
+ "fancy-plaintext",
+ "fancy-traits",
  "itertools 0.14.0",
  "rand 0.8.5",
  "regex",
@@ -838,6 +861,25 @@ dependencies = [
  "swanky-error",
  "swanky-rng",
  "vectoreyes",
+]
+
+[[package]]
+name = "fancy-plaintext"
+version = "0.6.0"
+dependencies = [
+ "fancy-traits",
+ "rand 0.8.5",
+ "swanky-channel",
+ "swanky-error",
+]
+
+[[package]]
+name = "fancy-traits"
+version = "0.6.0"
+dependencies = [
+ "swanky-channel",
+ "swanky-error",
+ "swanky-rng",
 ]
 
 [[package]]
@@ -1887,7 +1929,9 @@ version = "0.6.0"
 dependencies = [
  "aes-gcm",
  "criterion",
+ "fancy-circuits",
  "fancy-garbling",
+ "fancy-traits",
  "itertools 0.14.0",
  "proptest",
  "rand 0.8.5",
@@ -2601,7 +2645,11 @@ name = "swanky-authenticated-garbling"
 version = "0.6.0"
 dependencies = [
  "criterion",
+ "fancy-analyzer",
+ "fancy-circuits",
  "fancy-garbling",
+ "fancy-plaintext",
+ "fancy-traits",
  "proptest",
  "rand 0.8.5",
  "swanky-authenticated-bits",
@@ -2835,7 +2883,11 @@ version = "0.6.0"
 dependencies = [
  "clap",
  "criterion",
+ "fancy-analyzer",
+ "fancy-circuits",
  "fancy-garbling",
+ "fancy-plaintext",
+ "fancy-traits",
  "itertools 0.14.0",
  "ndarray",
  "rand 0.8.5",
@@ -3093,7 +3145,11 @@ version = "0.6.0"
 dependencies = [
  "clap",
  "criterion",
+ "fancy-analyzer",
+ "fancy-circuits",
  "fancy-garbling",
+ "fancy-plaintext",
+ "fancy-traits",
  "itertools 0.14.0",
  "rand 0.8.5",
  "swanky-adversary",
