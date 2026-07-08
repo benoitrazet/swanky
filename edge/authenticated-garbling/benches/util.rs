@@ -2,8 +2,8 @@ use fancy_analyzer::CircuitAnalyzer;
 use fancy_plaintext::Dummy;
 use fancy_traits::{CircuitInputMapper, FancyEncode, FancyOutput, Flatten};
 use swanky_authenticated_garbling::{
-    EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator, WirePreProcessor,
-    ps::{PartyEvaluator, PartyGarbler},
+    EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator, PartyEvaluator,
+    PartyGarbler, WirePreProcessor,
 };
 use swanky_rng::SwankyRng;
 

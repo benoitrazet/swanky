@@ -7,8 +7,8 @@ use fancy_garbling::{
 use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary, FancyEncode, FancyOutput, Flatten};
 use std::{hint::black_box, time::Instant};
 use swanky_authenticated_garbling::{
-    EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator, WirePreProcessor,
-    ps::{PartyEvaluator, PartyGarbler},
+    EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator, PartyEvaluator,
+    PartyGarbler, WirePreProcessor,
 };
 use swanky_channel::Channel;
 use swanky_error::Result;
