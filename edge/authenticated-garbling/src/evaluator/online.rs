@@ -110,23 +110,6 @@ impl EvaluatorOnline {
             )?;
 
         Ok(EvaluatorValidator::new(self.delta, self.validation_shares))
-
-        // let mut validation_bits = Vec::with_capacity(self.validation_shares.len());
-        // // The parties then open the share c_γ
-        // AuthShareGenerator::open_with_delta(
-        //     &self.validation_shares,
-        //     self.delta,
-        //     &mut validation_bits,
-        //     channel,
-        // )?;
-        // let validation_failures: Vec<&F2> =
-        //     validation_bits.iter().filter(|&&x| x == F2::ONE).collect();
-        // swanky_error::ensure!(
-        //     validation_failures.is_empty(),
-        //     ErrorKind::OtherError,
-        //     "Evaluator's authentication validation check failed"
-        // );
-        // Ok(())
     }
 
     fn next_and_gate_index(&mut self) -> usize {
