@@ -6,6 +6,10 @@ use swanky_error::Result;
 use vectoreyes::U8x16;
 
 /// The evaluator's output phase.
+///
+/// This phase follows the [`crate::EvaluatorValidator`] phase and is used to
+/// derive the output values of the computation using the [`FancyOutput`]
+/// interface.
 pub struct EvaluatorOutput {
     delta: U8x16,
 }

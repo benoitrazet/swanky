@@ -22,9 +22,20 @@ use vectoreyes::U8x16;
 
 /// The garbler's offline phase.
 ///
-/// In the offline phase, the garbler produces the garbled gates $`G_{\gamma,
-/// 0}, G_{\gamma, 1}`$ alongside selection bits $`b_\gamma`$. These are sent
-/// when calling [`GarblerOffline::finalize`].
+/// In the offline phase, the garbler generates the necessary [`AuthShare`]s,
+/// alongside the garbled gates $`G_{\gamma, 0}, G_{\gamma, 1}`$ and selection
+/// bits $`b_\gamma`$ for each AND gate in the circuit.
+///
+/// [`GarblerOffline::initialize`] sets up the [`AuthShare`]s. This involves
+/// communication with the evaluator.
+///
+/// [`GarblerOffline::execute`] evaluates the circuit locally, producing the
+/// garbled gates and selection bits, and returning the output wires to be used
+/// in the garbler's output phase.
+///
+/// [`GarblerOffline::finalize`] sends the garbled gates and selection bits to
+/// the evaluator, and returns a [`GarblerOnline`] for the next phase of
+/// processing.
 pub struct GarblerOffline {
     // The garbler's Δ.
     delta: WireMod2,
@@ -39,11 +50,11 @@ pub struct GarblerOffline {
     and_gate_index: usize,
     // A vector of authenticated shares, one per input wire and AND gate output.
     // Corresponds to〈r_w, s_w〉from the paper.
-    pub(crate) auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
+    auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
     // A vector of fixed authenticated shares for AND gate wires. Each share is
     // set such that it is equal to the AND of the incoming wire shares.
     // Corresponds to〈r_w^*, s_w^*〉from the paper.
-    pub(crate) and_auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
+    and_auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
     // A vector that stores the garbling gates.
     gates: Vec<(U8x16, U8x16)>,
     // A vector that stores the lsb of the 0 wire label associated with AND gates.
@@ -53,8 +64,8 @@ pub struct GarblerOffline {
 }
 
 impl GarblerOffline {
-    /// Create a [`GarblerOffline`] for the given circuit.
-    pub fn new<
+    /// Initialize a [`GarblerOffline`] object for the given circuit.
+    pub fn initialize<
         C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyGarbler>>,
         RNG: CryptoRng + RngCore,
     >(

@@ -14,6 +14,11 @@ use swanky_serialization::SequenceDeserializer;
 use vectoreyes::U8x16;
 
 /// The garbler's online phase.
+///
+/// The online phase supports encoding and receiving inputs through
+/// [`FancyEncode`]. Once, inputs have been shared, [`GarblerOnline::finalize`]
+/// receives the necessary masked bits from the evaluator, and returns a
+/// [`GarblerValidator`] for the next phase of processing.
 pub struct GarblerOnline {
     // The garbler's Δ.
     delta: WireMod2,
@@ -43,42 +48,42 @@ impl GarblerOnline {
         }
     }
 
-    // Send the wirelabel `L_b` associated with the masked value `b` to the evaluator returning a vector of the
-    // corresponding `FinalizedWire` values.
-    //
-    // This corresponds to pieces of Steps 3 and 4 in Figure 3 of the paper.
+    /// Send the wirelabel $`L_b`$ associated with the masked input value $`b`$
+    /// to the evaluator and return a vector of the corresponding
+    /// [`ValidatorWire`] values.
+    ///
+    /// This corresponds to pieces of Steps 3 and 4 in Figure 3 of the paper.
     fn encode_wirelabels(
         &mut self,
         wires: &[OfflineWire],
         masked_values: Vec<F2>,
         channel: &mut Channel,
     ) -> Result<Vec<ValidatorWire>> {
-        let mut result = Vec::new();
-        for (masked_value, wire) in masked_values.iter().zip(wires.iter()) {
-            // Use masked values `x_w + λ_w` and zero wirelabels `L_0` to create
-            // wirelabels `L_{x_w + λ_w}`, and send these to the evaluator.
-            let wirelabel = wire.wirelabel()
-                + WireMod2::from_repr(
-                    U8x16::from(*masked_value * F128b::from(self.delta.to_repr())),
-                    2,
-                );
-            channel.write(&wirelabel.to_repr())?;
-            result.push(ValidatorWire::new(*masked_value, wire.auth_share()));
-        }
-        Ok(result)
+        masked_values
+            .iter()
+            .zip(wires.iter())
+            .map(|(masked_value, wire)| {
+                // Use masked values `x_w + λ_w` and zero wirelabels `L_0` to create
+                // wirelabels `L_{x_w + λ_w}`, and send these to the evaluator.
+                let wirelabel = wire.wirelabel()
+                    + WireMod2::from_repr(
+                        U8x16::from(*masked_value * F128b::from(self.delta.to_repr())),
+                        2,
+                    );
+                channel.write(&wirelabel.to_repr())?;
+                Ok(ValidatorWire::new(*masked_value, wire.auth_share()))
+            })
+            .collect()
     }
 
     pub(crate) fn delta(&self) -> U8x16 {
         self.delta.to_repr()
     }
 
-    /// Finalize the online portion of the computation.
+    /// Finalize the online phase of the computation.
     ///
-    /// Prior to revealing the result of the computation, the garbler and
-    /// evaluator need to validate the authenticated AND gates. In the case of
-    /// the garbler, this involved locally traversing the circuit in order to
-    /// compute those validation bits from the wire masked values that the
-    /// evaluator sends.
+    /// This involves receiving the masked values $`\hat{z}_w`$ from the
+    /// evaluator.
     pub fn finalize(self, channel: &mut Channel) -> Result<GarblerValidator> {
         let nands = self.and_auth_shares.len();
         // Receive the masked values from the Evaluator
@@ -95,6 +100,7 @@ impl GarblerOnline {
         let auth_shares: Vec<_> = self.auth_shares.into();
         Ok(GarblerValidator::new(
             self.delta,
+            // The validator uses the non-input `AuthShare`s.
             auth_shares[self.inputs.len()..].to_vec(),
             self.and_auth_shares.into(),
             lc_values,

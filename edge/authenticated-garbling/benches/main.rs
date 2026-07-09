@@ -26,8 +26,8 @@ fn bench_party_construction(c: &mut Criterion) {
     c.bench_function("party-construction", move |b| {
         b.iter(|| {
             swanky_channel::local::local_channel_pair(
-                |c| GarblerOffline::new(&circuit, c, &mut rng_gb),
-                |c| EvaluatorOffline::new(&circuit, c, &mut rng_ev),
+                |c| GarblerOffline::initialize(&circuit, c, &mut rng_gb),
+                |c| EvaluatorOffline::initialize(&circuit, c, &mut rng_ev),
             )
             .unwrap();
         });
@@ -40,8 +40,8 @@ fn bench_party_encoding_receiving(c: &mut Criterion) {
     let mut rng_ev = SwankyRng::new();
     let circuit = TestAndGateFanN(2 * input_size);
     let (gb, ev) = swanky_channel::local::local_channel_pair(
-        |c| GarblerOffline::new(&circuit, c, &mut rng_gb),
-        |c| EvaluatorOffline::new(&circuit, c, &mut rng_ev),
+        |c| GarblerOffline::initialize(&circuit, c, &mut rng_gb),
+        |c| EvaluatorOffline::initialize(&circuit, c, &mut rng_ev),
     )
     .unwrap();
 

@@ -1,4 +1,12 @@
 //! Authenticated garbling for maliciously secure two-party computation.
+//!
+//! This implements the authenticated garbling protocol presented by Katz et
+//! al.[^1].
+//!
+//! References:
+//! [^1]: J. Katz, S. Ranellucci, M. Rosulek, X. Wang. "Optimizing Authenticated
+//! Garbling for Faster Secure Two-Party Computation".
+//! <https://eprint.iacr.org/2018/578.pdf>
 #![deny(missing_docs)]
 
 mod evaluator;
@@ -11,7 +19,6 @@ mod wire;
 pub use wire::EvaluatorWire;
 mod vec_wrapper;
 
-// Party system type aliases for the garbler and evaluator
 swanky_party::party_system! {
     mod ps {
         /// The garbler party.

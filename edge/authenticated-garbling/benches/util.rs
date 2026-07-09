@@ -1,6 +1,6 @@
 use fancy_analyzer::CircuitAnalyzer;
 use fancy_plaintext::Dummy;
-use fancy_traits::{CircuitInputMapper, FancyEncode, FancyOutput, Flatten};
+use fancy_traits::{CircuitInputMapper, FancyEncode, FancyOutput};
 use swanky_authenticated_garbling::{
     EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator, PartyEvaluator,
     PartyGarbler, WirePreProcessor,
@@ -28,7 +28,7 @@ pub fn test_circuit<
     let ninputs_ev = inputs_ev.len();
     swanky_channel::local::local_channel_pair(
         |c| {
-            let gb = GarblerOffline::new(circuit, c, rng_gb)?;
+            let gb = GarblerOffline::initialize(circuit, c, rng_gb)?;
 
             let (outputs, gb) = gb.execute(circuit)?;
             let mut gb = gb.finalize(c)?;
@@ -41,19 +41,15 @@ pub fn test_circuit<
             validator.outputs(&outputs, c)
         },
         |c| {
-            let ev = EvaluatorOffline::new(circuit, c, rng_ev)?;
+            let ev = EvaluatorOffline::initialize(circuit, c, rng_ev)?;
             let mut ev = ev.finalize(c)?;
             let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
             let mine = ev.encode_many(inputs_ev, &vec![2; ninputs_ev], c)?;
             inputs.extend(mine);
-            let outputs = circuit.execute(
-                &mut ev,
-                <C as CircuitInputMapper<EvaluatorOnline>>::map(circuit, inputs),
-                c,
-            )?;
+            let (outputs, ev) = ev.execute(circuit, inputs)?;
             let ev = ev.finalize(c)?;
             let mut ev = ev.validate(c)?;
-            ev.outputs(&outputs.flatten(), c)
+            ev.outputs(&outputs, c)
         },
     )
     .unwrap();

@@ -5,6 +5,7 @@ use crate::ps::{PartyEvaluator, PartyGarbler};
 use crate::{EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator};
 
 use fancy_analyzer::CircuitAnalyzer;
+use fancy_circuits::aes::AesNonExpanded;
 use fancy_circuits::binary::{
     TestBinaryAddition, TestBinaryMultiplication, TestBinarySubtraction, TestBinaryTwosComplement,
 };
@@ -24,11 +25,11 @@ fn test_party_construction_passes() {
     swanky_channel::local::local_channel_pair(
         |c| {
             let mut rng = SwankyRng::new();
-            GarblerOffline::new(&circuit, c, &mut rng)
+            GarblerOffline::initialize(&circuit, c, &mut rng)
         },
         |c| {
             let mut rng = SwankyRng::new();
-            EvaluatorOffline::new(&circuit, c, &mut rng)
+            EvaluatorOffline::initialize(&circuit, c, &mut rng)
         },
     )
     .unwrap();
@@ -81,7 +82,7 @@ fn test_circuit<
     let (outputs_gb, outputs_ev) = swanky_channel::local::local_channel_pair(
         |c| {
             let mut rng = SwankyRng::new();
-            let gb = GarblerOffline::new(circuit, c, &mut rng)?;
+            let gb = GarblerOffline::initialize(circuit, c, &mut rng)?;
             let (outputs, gb) = gb.execute(circuit)?;
             let mut gb = gb.finalize(c)?;
 
@@ -94,21 +95,16 @@ fn test_circuit<
         },
         |c| {
             let mut rng = SwankyRng::new();
-            let ev = EvaluatorOffline::new(circuit, c, &mut rng)?;
+            let ev = EvaluatorOffline::initialize(circuit, c, &mut rng)?;
             let mut ev = ev.finalize(c)?;
 
             let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
             let mine = ev.encode_many(&inputs_ev, &vec![2; ninputs_ev], c)?;
             inputs.extend(mine);
-
-            let outputs = circuit.execute(
-                &mut ev,
-                <C as CircuitInputMapper<EvaluatorOnline>>::map(circuit, inputs),
-                c,
-            )?;
+            let (outputs, ev) = ev.execute(circuit, inputs)?;
             let ev = ev.finalize(c)?;
             let mut ev = ev.validate(c)?;
-            ev.outputs(&outputs.flatten(), c)
+            ev.outputs(&outputs, c)
         },
     )
     .unwrap();
@@ -208,4 +204,11 @@ fn test_binary_multiplication() {
     let circuit = TestBinaryMultiplication::new(ninputs);
 
     test_circuit(ninputs, ninputs, &circuit);
+}
+
+#[test]
+fn test_aes() {
+    let circuit = AesNonExpanded::new();
+
+    test_circuit(128, 128, &circuit);
 }

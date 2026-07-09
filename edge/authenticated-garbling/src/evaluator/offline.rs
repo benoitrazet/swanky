@@ -12,9 +12,16 @@ use vectoreyes::U8x16;
 
 /// The evaluator's offline phase.
 ///
-/// In the offline phase, the evaluator receives the garbled gates $`G_{\gamma,
-/// 0}, G_{\gamma, 1}`$ alongside selection bits $`b_\gamma`$. These are
-/// received when calling [`EvaluatorOffline::finalize`].
+/// In the offline phase, the evaluator generates the necessary [`AuthShare`]s
+/// and receives the garbled gates $`G_{\gamma, 0}, G_{\gamma, 1}`$ alongside
+/// selection bits $`b_\gamma`$.
+///
+/// [`EvaluatorOffline::initialize`] sets up the [`AuthShare`]s. This involves
+/// communication with the garbler.
+///
+/// [`EvaluatorOffline::finalize`] receives the garbled gates and selection bits
+/// from the garbler, and returns a [`EvaluatorOnline`] for the next phase of
+/// processing.
 pub struct EvaluatorOffline {
     // The evaluator's Δ, used to validate the authenticated shares and AND
     // triples.
@@ -33,8 +40,8 @@ pub struct EvaluatorOffline {
 }
 
 impl EvaluatorOffline {
-    /// Create a new [`EvaluatorOffline`] for the given circuit.
-    pub fn new<
+    /// Initialize a [`EvaluatorOffline`] object for the given circuit.
+    pub fn initialize<
         C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>,
         RNG: CryptoRng + RngCore,
     >(
@@ -62,7 +69,8 @@ impl EvaluatorOffline {
     /// [`EvaluatorOnline`] object for online processing.
     pub fn finalize(self, channel: &mut Channel) -> Result<EvaluatorOnline> {
         let nands = self.and_auth_shares.len();
-        // Receive the LSB of the zero-wirelabel of the output wire of the AND gate.
+        // Receive the LSBs of the zero-wirelabels of the output wires of the
+        // AND gates.
         let mut bit_ser: F2BitDeserializer = SequenceDeserializer::new(channel.as_std_io())
             .wrap_err(
                 ErrorKind::InitializationError,

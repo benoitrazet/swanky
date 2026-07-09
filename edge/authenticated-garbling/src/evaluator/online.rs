@@ -1,5 +1,5 @@
 use fancy_garbling::{WireLabel, WireMod2};
-use fancy_traits::{Fancy, FancyBinary, FancyEncode};
+use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary, FancyEncode, Flatten};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -12,7 +12,11 @@ use crate::{
     EvaluatorWire, evaluator::EvaluatorValidator, ps::PartyEvaluator, vec_wrapper::VecWrapper,
 };
 
-/// The evaluator's online portion.
+/// The evaluator's online phase.
+///
+/// The online phase supports encoding and receiving inputs through
+/// [`FancyEncode`] and full circuit evaluation for circuits implementing
+/// [`FancyBinary`].
 pub struct EvaluatorOnline {
     // The evaluator's Δ, used to validate the authenticated shares and AND
     // triples.
@@ -88,13 +92,22 @@ impl EvaluatorOnline {
         Ok(wires)
     }
 
-    /// Finalize the online portion of the computation.
+    /// Run the circuit on the provided inputs, returning the outputs as a flat
+    /// vector.
+    pub fn execute<C: CircuitInputMapper<EvaluatorOnline>>(
+        mut self,
+        circuit: &C,
+        inputs: Vec<EvaluatorWire>,
+    ) -> Result<(Vec<EvaluatorWire>, Self)> {
+        let output = Channel::with(std::io::empty(), |channel| {
+            circuit.execute(&mut self, circuit.map(inputs), channel)
+        })?;
+        Ok((output.flatten(), self))
+    }
+
+    /// Finalize the online phase of the computation.
     ///
-    /// Prior to revealing the result of the computation, the garbler and evaluator
-    /// need to validate the authenticated AND gates. In the case of the evaluator,
-    /// the evaluator sends out the masked wire values to the garbler, then can immediately
-    /// open the validation bits since they already compute their share of those bits
-    /// a-priori.
+    /// This involves sending the masked values $`\hat{z}_w`$ to the garbler.
     pub fn finalize(self, channel: &mut Channel) -> Result<EvaluatorValidator> {
         let bit_ser: F2BitSerializer = SequenceSerializer::new(&mut channel.as_std_io()).wrap_err(
             ErrorKind::InitializationError,

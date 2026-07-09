@@ -8,7 +8,10 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use vectoreyes::U8x16;
 
-/// A struct which allows the garbler to compute the validation shares before opening them
+/// The garbler's validation phase.
+///
+/// In the validation phase, the garbler evaluates the circuit and checks that
+/// the necessary validation bits are all zero.
 pub struct GarblerValidator {
     // The garbler's Δ.
     delta: WireMod2,
@@ -42,6 +45,9 @@ impl GarblerValidator {
     }
 
     /// Validate the computation.
+    ///
+    /// This checks that all the validation bits are zero. It outputs a
+    /// [`GarblerOutput`] for processing any output values.
     pub fn validate<C: CircuitInputMapper<Self>>(
         mut self,
         circuit: &C,

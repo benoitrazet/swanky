@@ -145,41 +145,35 @@ where
     println!("=== Authenticated Garbling ===");
     let total = Instant::now();
     let offline = Instant::now();
-    let ((gb, inputs_gb, outputs), (mut ev, inputs_ev)) =
-        swanky_channel::local::local_channel_pair(
-            |channel: &mut Channel<'_>| {
-                let gb = GarblerOffline::new(circuit, channel, &mut SwankyRng::new())?;
-                let (outputs, gb) = gb.execute(circuit)?;
-                let mut gb = gb.finalize(channel)?;
-
-                let inputs = gb.encode_many(&inputs, &moduli, channel)?;
-                Ok((gb, inputs, outputs))
-            },
-            |channel| {
-                let ev = EvaluatorOffline::new(circuit, channel, &mut SwankyRng::new())?;
-                let mut ev = ev.finalize(channel)?;
-                let inputs = ev.receive_many(&moduli, channel)?;
-                Ok((ev, inputs))
-            },
-        )?;
+    let ((mut gb, outputs), mut ev) = swanky_channel::local::local_channel_pair(
+        |channel: &mut Channel<'_>| {
+            let gb = GarblerOffline::initialize(circuit, channel, &mut SwankyRng::new())?;
+            let (outputs, gb) = gb.execute(circuit)?;
+            let gb = gb.finalize(channel)?;
+            Ok((gb, outputs))
+        },
+        |channel| {
+            let ev = EvaluatorOffline::initialize(circuit, channel, &mut SwankyRng::new())?;
+            let ev = ev.finalize(channel)?;
+            Ok(ev)
+        },
+    )?;
     println!("Offline: {:?}", offline.elapsed());
 
     let online = Instant::now();
     let (_, result) = swanky_channel::local::local_channel_pair(
         |channel| {
+            let inputs = gb.encode_many(&inputs, &moduli, channel)?;
             let validator = gb.finalize(channel)?;
-            let mut validator = validator.validate(circuit, inputs_gb, channel)?;
+            let mut validator = validator.validate(circuit, inputs, channel)?;
             validator.outputs(&outputs.flatten(), channel)
         },
         |channel| {
-            let outputs = circuit.execute(
-                &mut ev,
-                <C as CircuitInputMapper<EvaluatorOnline>>::map(circuit, inputs_ev),
-                channel,
-            )?;
+            let inputs = ev.receive_many(&moduli, channel)?;
+            let (outputs, ev) = ev.execute(circuit, inputs)?;
             let ev = ev.finalize(channel)?;
             let mut ev = ev.validate(channel)?;
-            ev.outputs(&outputs.flatten(), channel)
+            ev.outputs(&outputs, channel)
         },
     )?;
     black_box(result);

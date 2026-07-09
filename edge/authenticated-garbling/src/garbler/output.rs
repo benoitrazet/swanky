@@ -6,6 +6,10 @@ use swanky_error::Result;
 use crate::wire::OfflineWire;
 
 /// The garbler's output phase.
+///
+/// This phase follows the [`crate::GarblerValidator`] phase and is used to
+/// derive the output values of the computation using the [`FancyOutput`]
+/// interface.
 pub struct GarblerOutput {}
 
 impl GarblerOutput {
