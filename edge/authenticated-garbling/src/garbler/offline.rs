@@ -39,27 +39,26 @@ use vectoreyes::U8x16;
 pub struct GarblerOffline {
     // The garbler's Δ.
     delta: WireMod2,
-    // A random wirelabel denoting zero. Used to make negations free.
-    // The one label that can be derived out of this label is also used for
-    // constant 1 gates.
+    // A random wirelabel denoting zero. Used to make negations and constant one
+    // gates free.
     zero: WireMod2,
-    // A random wirelabel denoting zero. Used to make constants free.
+    // A random wirelabel denoting zero. Used to make constant zero gates free.
     zero_constant: WireMod2,
     // The index of the current AND gate. Used as the tweak when hashing
     // wirelabels in the AND gate garbling.
     and_gate_index: usize,
-    // A vector of authenticated shares, one per input wire and AND gate output.
-    // Corresponds to〈r_w, s_w〉from the paper.
+    // Authenticated shares, one per input wire and AND gate output. Corresponds
+    // to〈r_w, s_w〉from the paper.
     auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
-    // A vector of fixed authenticated shares for AND gate wires. Each share is
-    // set such that it is equal to the AND of the incoming wire shares.
-    // Corresponds to〈r_w^*, s_w^*〉from the paper.
+    // Authenticated shares for AND gate output wires. Each share is set such
+    // that it is equal to the AND of the incoming wire shares. Corresponds
+    // to〈r_w^*, s_w^*〉from the paper.
     and_auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
-    // A vector that stores the garbling gates.
+    // The garbled AND gates.
     gates: Vec<(U8x16, U8x16)>,
-    // A vector that stores the lsb of the 0 wire label associated with AND gates.
+    // The LSBs of the zero-wirelabels associated with AND gates output wires.
     gate_bits: Vec<F2>,
-    // The wire material for the inputs to the circuit.
+    // The input wires to the circuit.
     inputs: Vec<OfflineWire>,
 }
 
@@ -75,15 +74,15 @@ impl GarblerOffline {
     ) -> Result<Self> {
         let ninputs: usize = <C as CircuitInputMapper<CircuitAnalyzer>>::ninputs(circuit);
         let delta = AndTripleGenerator::<PartyGarbler>::generate_valid_delta(rng);
-        // The garbler pre-generates two constant wire-labels
-        // - The one wire label that is used for negation and garbling constant 1 gates.
-        // - The zero wire label used for garbling constant 0 gates.
+        // The garbler pre-generates two constant wirelabels.
+        // - The one wirelabel used for negation and garbling constant 1 gates.
+        // - The zero wirelabel used for garbling constant 0 gates.
         // These wire labels are used to make negation and constant gates free.
         // Because they are uncorrelated, the evaluator learns nothing about the garbler's
         // private delta value.
         let zero = WireMod2::rand(rng, 2);
-        let zero_constant = WireMod2::rand(rng, 2);
         let one = WireMod2::from_repr(zero.to_repr() ^ delta, 2);
+        let zero_constant = WireMod2::rand(rng, 2);
 
         let mut and_generator = AndTripleGenerator::new_with_delta(delta, channel, rng)?;
         let (auth_shares, and_auth_shares) =
