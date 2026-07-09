@@ -79,7 +79,7 @@ fn test_circuit<
         .map(|x| x.val())
         .collect::<Vec<_>>();
 
-    let (outputs_gb, outputs_ev) = swanky_channel::local::local_channel_pair(
+    let (_, outputs) = swanky_channel::local::local_channel_pair(
         |c| {
             let mut rng = SwankyRng::new();
             let gb = GarblerOffline::initialize(circuit, c, &mut rng)?;
@@ -91,7 +91,9 @@ fn test_circuit<
             inputs.extend(their);
             let gb = gb.finalize(c)?;
             let mut gb = gb.validate(circuit, inputs, c)?;
-            gb.outputs(&outputs, c)
+            let outputs = gb.outputs(&outputs, c)?;
+            assert!(outputs.is_none());
+            Ok(())
         },
         |c| {
             let mut rng = SwankyRng::new();
@@ -104,12 +106,11 @@ fn test_circuit<
             let (outputs, ev) = ev.execute(circuit, inputs)?;
             let ev = ev.finalize(c)?;
             let mut ev = ev.validate(c)?;
-            ev.outputs(&outputs, c)
+            let outputs = ev.outputs(&outputs, c)?;
+            Ok(outputs.expect("evaluator outputs should not be `None`"))
         },
     )
     .unwrap();
-    assert!(outputs_gb.is_none());
-    let outputs = outputs_ev.unwrap();
     assert_eq!(outputs, expected)
 }
 
