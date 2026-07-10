@@ -42,8 +42,6 @@ pub struct GarblerOffline {
     // A random wirelabel denoting zero. Used to make negations and constant one
     // gates free.
     zero: WireMod2,
-    // A random wirelabel denoting zero. Used to make constant zero gates free.
-    zero_constant: WireMod2,
     // The index of the current AND gate. Used as the tweak when hashing
     // wirelabels in the AND gate garbling.
     and_gate_index: usize,
@@ -74,15 +72,9 @@ impl GarblerOffline {
     ) -> Result<Self> {
         let ninputs: usize = <C as CircuitInputMapper<CircuitAnalyzer>>::ninputs(circuit);
         let delta = AndTripleGenerator::<PartyGarbler>::generate_valid_delta(rng);
-        // The garbler pre-generates two constant wirelabels.
-        // - The one wirelabel used for negation and garbling constant 1 gates.
-        // - The zero wirelabel used for garbling constant 0 gates.
-        // These wire labels are used to make negation and constant gates free.
-        // Because they are uncorrelated, the evaluator learns nothing about the garbler's
-        // private delta value.
-        let zero = WireMod2::rand(rng, 2);
-        let one = WireMod2::from_repr(zero.to_repr() ^ delta, 2);
-        let zero_constant = WireMod2::rand(rng, 2);
+        // The constant one wirelabel is set to the value `1`, and the zero
+        // wirelabel is simply the one wirelabel XORed with Δ.
+        let zero = U8x16::from(F128b::ONE) ^ delta;
 
         let mut and_generator = AndTripleGenerator::new_with_delta(delta, channel, rng)?;
         let (auth_shares, and_auth_shares) =
@@ -90,8 +82,7 @@ impl GarblerOffline {
         let nands = and_auth_shares.len();
         let mut auth_shares = VecWrapper::new(auth_shares);
 
-        channel.write(&one.to_repr())?;
-        channel.write(&zero_constant.to_repr())?;
+        // channel.write(&one.to_repr())?;
 
         let inputs = (0..ninputs)
             .map(|_| OfflineWire::new(WireMod2::rand(rng, 2), auth_shares.next()))
@@ -99,8 +90,7 @@ impl GarblerOffline {
 
         Ok(Self {
             delta: WireMod2::from_repr(delta, 2),
-            zero,
-            zero_constant,
+            zero: WireMod2::from_repr(zero, 2),
             and_gate_index: 0,
             auth_shares,
             and_auth_shares: VecWrapper::new(and_auth_shares),
@@ -167,18 +157,13 @@ impl Fancy for GarblerOffline {
     fn constant(&mut self, value: u16, _: u16, _: &mut Channel) -> Result<Self::Item> {
         let constant = F2::try_from(value).expect("constant must be boolean");
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());
-        // Because the garbler is sending uncorrelated zero and one wire labels to the evaluator for constant gates and free negation,
-        // they have to be careful which zero wire label to use for each constant gate so that it correlates
-        // with the one that the evaluator is using.
         let wirelabel = if constant == F2::ONE {
-            // If the value of the gate is 1, then the garbler needs to user the wire label
-            // associated with the constant 1 wire label that they sent out to the evaluator,
-            // i.e. the zero value that they generated for that wire and free negations.
+            // `self.zero` corresponds to the zero wirelabel associated with the
+            // "one" wirelabel set to `F128b::ONE`.
             self.zero
         } else {
-            // Otherwise, the garbler needs to use the same zero wire label as the one they sent
-            // to the evaluator, i.e. the wire label specifically generated for zero constant gates.
-            self.zero_constant
+            // Otherwise, the garbler uses the "null" wirelabel to represent zero.
+            Default::default()
         };
         Ok(OfflineWire::new(wirelabel, share))
     }

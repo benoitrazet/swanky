@@ -21,8 +21,6 @@ pub struct EvaluatorOnline {
     // The evaluator's Δ, used to validate the authenticated shares and AND
     // triples.
     delta: U8x16,
-    /// A wirelabel denoting zero. Used to make constant 0 gates free.
-    zero: WireMod2,
     /// A wirelabel denoting one. Used to make negations and constant 1 gates free.
     one: WireMod2,
     // The index of the current AND gate. Used as the tweak when hashing
@@ -50,18 +48,18 @@ pub struct EvaluatorOnline {
 impl EvaluatorOnline {
     pub(crate) fn new(
         delta: U8x16,
-        zero: WireMod2,
-        one: WireMod2,
         auth_shares: Vec<AuthShare<PartyEvaluator>>,
         and_auth_shares: Vec<AuthShare<PartyEvaluator>>,
         gates: Vec<(U8x16, U8x16)>,
         gate_bits: Vec<F2>,
     ) -> Self {
         let num_and_gates = and_auth_shares.len();
+        // The constant one wirelabel is set to the value `1`.
+        // TODO: Make `const` once `From` is const-compatible.
+        let one = WireMod2::from_repr(U8x16::from(F128b::ONE), 2);
         Self {
             delta,
             one,
-            zero,
             and_gate_index: 0,
             auth_shares: VecWrapper::new(auth_shares),
             and_auth_shares: VecWrapper::new(and_auth_shares),
@@ -140,7 +138,7 @@ impl Fancy for EvaluatorOnline {
         let wirelabel = if constant == F2::ONE {
             self.one
         } else {
-            self.zero
+            Default::default()
         };
 
         Ok(EvaluatorWire::new(constant, wirelabel, share))

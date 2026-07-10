@@ -1,6 +1,5 @@
 use crate::{EvaluatorOnline, WirePreProcessor, preprocesser::f_preprocessing, ps::PartyEvaluator};
 use fancy_analyzer::CircuitAnalyzer;
-use fancy_garbling::{WireLabel, WireMod2};
 use fancy_traits::CircuitInputMapper;
 use rand::{CryptoRng, RngCore};
 use swanky_authenticated_bits::{and_triples::AndTripleGenerator, authshares::AuthShare};
@@ -26,10 +25,6 @@ pub struct EvaluatorOffline {
     // The evaluator's Δ, used to validate the authenticated shares and AND
     // triples.
     delta: U8x16,
-    /// A wirelabel denoting zero. Used to make constant 0 gates free.
-    zero: WireMod2,
-    /// A wirelabel denoting one. Used to make negations and constant 1 gates free.
-    one: WireMod2,
     // A vector of authenticated shares, one per input wire and AND gate output.
     // Corresponds to〈r_w, s_w〉from the paper.
     auth_shares: Vec<AuthShare<PartyEvaluator>>,
@@ -54,12 +49,8 @@ impl EvaluatorOffline {
         let mut and_generator = AndTripleGenerator::new_with_delta(delta, channel, rng)?;
         let (auth_shares, and_auth_shares) =
             f_preprocessing(circuit, &mut and_generator, channel, rng)?;
-        let one = channel.read::<U8x16>()?;
-        let zero = channel.read::<U8x16>()?;
         Ok(Self {
             delta,
-            one: WireMod2::from_repr(one, 2),
-            zero: WireMod2::from_repr(zero, 2),
             auth_shares,
             and_auth_shares,
         })
@@ -91,8 +82,6 @@ impl EvaluatorOffline {
 
         Ok(EvaluatorOnline::new(
             self.delta,
-            self.zero,
-            self.one,
             self.auth_shares,
             self.and_auth_shares,
             gates,
