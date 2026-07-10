@@ -15,13 +15,13 @@
 //!
 //! ```
 //! # use fancy_traits::{FancyEncode, FancyOutput};
-//! # use rand::Rng;
+//! # use rand::RngExt;
 //! # use swanky_authenticated_garbling::{GarblerOffline, EvaluatorOffline};
 //! # fn main() -> swanky_error::Result<()> {
 //! let mut rng = swanky_rng::SwankyRng::new();
 //! let circuit = fancy_circuits::aes::AesNonExpanded::new();
-//! let key: Vec<u16> = (0..128).map(|_| rng.r#gen::<u16>() % 2).collect();
-//! let block: Vec<u16> = (0..128).map(|_| rng.r#gen::<u16>() % 2).collect();
+//! let key: Vec<u16> = (0..128).map(|_| rng.random::<u16>() % 2).collect();
+//! let block: Vec<u16> = (0..128).map(|_| rng.random::<u16>() % 2).collect();
 //! let (_, outputs) = swanky_channel::local::local_channel_pair(
 //!     |channel| {
 //!         let mut rng = swanky_rng::SwankyRng::new();
