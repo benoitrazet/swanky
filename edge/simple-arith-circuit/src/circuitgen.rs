@@ -18,7 +18,7 @@ fn rand_ix_pair(rng: &mut impl Rng, min: Index, max: Index) -> (Index, Index) {
 /// Pick an operation at random, for random test circuits.
 fn random_op<F: FiniteField>(rng: &mut impl Rng, min_wire: Index, max_wire: Index) -> Op<F> {
     assert!(max_wire - min_wire > 1);
-    let coin = Uniform::try_from(0..5).unwrap();
+    let coin = Uniform::try_from(0..5).expect("bounds finite and low < high");
     match coin.sample(rng) {
         0 => {
             let (i, j) = rand_ix_pair(rng, min_wire, max_wire);
@@ -255,7 +255,7 @@ mod tests {
         #[test]
         fn test_random_zero_circuit(seed in any_seed()) {
             let mut rng = SwankyRng::from_seed(seed);
-            let size = Uniform::try_from(3..1000).unwrap();
+            let size = Uniform::try_from(3..1000).expect("bounds finite and low < high");
             let ninputs = size.sample(&mut rng);
             let ngates = size.sample(&mut rng);
             let (circuit, witness): (Circuit<TestField>, Vec<_>) =
@@ -270,9 +270,9 @@ mod tests {
         #[test]
         fn test_random_binary_zero_circuit(seed in any_seed()) {
             let mut rng = SwankyRng::from_seed(seed);
-            let inputsize = Uniform::try_from(2..100).unwrap();
-            let outputsize = Uniform::try_from(1..100).unwrap();
-            let gatesize = Uniform::try_from(200..1000).unwrap();
+            let inputsize = Uniform::try_from(2..100).expect("bounds finite and low < high");
+            let outputsize = Uniform::try_from(1..100).expect("bounds finite and low < high");
+            let gatesize = Uniform::try_from(200..1000).expect("bounds finite and low < high");
             let ninputs = inputsize.sample(&mut rng);
             let noutputs = outputsize.sample(&mut rng);
             let ngates = gatesize.sample(&mut rng);

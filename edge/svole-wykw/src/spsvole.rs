@@ -133,7 +133,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             channel.write_serializable(&a_prime)?;
             betas.push(beta);
         }
-        let distribution = Uniform::try_from(0..n).unwrap();
+        let distribution = Uniform::try_from(0..n).expect("bounds finite and low < high");
         let mut alphas = Vec::with_capacity(t);
         let mut choices = Vec::with_capacity(t * nbits);
         for _ in 0..t {

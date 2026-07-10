@@ -31,7 +31,7 @@ fn bench_swanky_rand_int_108000(c: &mut Criterion<Measurement>) {
     const BOUND: u32 = 108000;
     c.bench_function("SwankyRng::rand 32 integers under 108000", |b| {
         let mut rng = SwankyRng::new();
-        let dist = Uniform::new(0, BOUND).unwrap();
+        let dist = Uniform::new(0, BOUND).expect("bounds finite and low < high");
         b.iter(|| {
             for _ in 0..32 {
                 black_box(dist.sample(&mut rng));
@@ -55,7 +55,7 @@ fn bench_swanky_rand_int_126(c: &mut Criterion<Measurement>) {
     const BOUND: u32 = 126;
     c.bench_function("SwankyRng::rand 32 integers under 126", |b| {
         let mut rng = SwankyRng::new();
-        let dist = Uniform::new(0, BOUND).unwrap();
+        let dist = Uniform::new(0, BOUND).expect("bounds finite and low < high");
         b.iter(|| {
             for _ in 0..32 {
                 black_box(dist.sample(&mut rng));

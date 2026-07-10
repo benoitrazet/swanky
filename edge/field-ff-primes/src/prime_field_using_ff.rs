@@ -16,7 +16,7 @@ macro_rules! random_function_helper {
             use rand::distr::{Distribution, Uniform};
             Self {
                 internal: internal::new_internal([Uniform::try_from(0..$modulus)
-                    .unwrap()
+                    .expect("bounds finite and low < high")
                     .sample(rng)]),
             }
         }

@@ -155,7 +155,7 @@ impl<T: MacTypes> VoleSender<T> {
             arena.alloc_slice_fill_with(T::VS.base_uws_size, |_| (0, T::VF::ZERO));
         let mut choices = arena.alloc_slice_fill_with(T::VS.ot_num_choices, |_| false);
         debug_assert_eq!(choices.len() % T::LPN.log2m, 0);
-        let distribution = Uniform::try_from(0..T::LPN.m()).unwrap();
+        let distribution = Uniform::try_from(0..T::LPN.m()).expect("bounds finite and low < high");
         for (((a, _), (alpha, beta)), choices) in base_voles
             .sps_base_voles()
             .iter()

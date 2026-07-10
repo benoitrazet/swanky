@@ -48,9 +48,9 @@ mod tests {
                 #[test]
                 fn $name(seed in any_seed()) {
                     let mut rng = SwankyRng::from_seed(seed);
-                    let ninputs_range = Uniform::try_from(2..100).unwrap();
-                    let noutputs_range = Uniform::try_from(2..100).unwrap();
-                    let ngates_range = Uniform::try_from(200..2000).unwrap();
+                    let ninputs_range = Uniform::try_from(2..100).expect("bounds finite and low < high");
+                    let noutputs_range = Uniform::try_from(2..100).expect("bounds finite and low < high");
+                    let ngates_range = Uniform::try_from(200..2000).expect("bounds finite and low < high");
                     let ninputs = ninputs_range.sample(&mut rng);
                     let noutputs = noutputs_range.sample(&mut rng);
                     let ngates = ngates_range.sample(&mut rng);
