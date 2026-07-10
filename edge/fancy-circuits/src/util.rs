@@ -2,7 +2,7 @@
 //!
 //! Note: all number representations are little-endian.
 
-use rand::RngExt as RandRngExt;
+use rand::RngExt as _;
 
 use crate::Bundle;
 use fancy_traits::HasModulus;

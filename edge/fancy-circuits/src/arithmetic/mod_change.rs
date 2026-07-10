@@ -32,7 +32,7 @@ impl<F: FancyProj> Circuit<F> for ModChange {
 mod test {
     use crate::{arithmetic::ModChange, util::RngExt};
     use fancy_plaintext::{Dummy, DummyVal};
-    use rand::{RngExt as RandRngExt, rng};
+    use rand::{RngExt as _, rng};
 
     #[test]
     fn mod_change() {

@@ -78,7 +78,7 @@ mod test {
     use crate::CrtBundle;
     use crate::{arithmetic::Addition, util::RngExt};
     use fancy_plaintext::Dummy;
-    use rand::{RngExt as RandRngExt, rng};
+    use rand::{RngExt as _, rng};
 
     #[test]
     fn addition() {

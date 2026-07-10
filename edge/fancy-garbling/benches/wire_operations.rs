@@ -1,6 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{AllWire, WireLabel, util::RngExt};
-use rand::RngExt as RandRngExt;
+use rand::RngExt as _;
 use std::time::Duration;
 use swanky_rng::SwankyRng;
 

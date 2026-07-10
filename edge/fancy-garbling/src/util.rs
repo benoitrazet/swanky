@@ -2,7 +2,7 @@
 //!
 //! Note: all number representations in this library are little-endian.
 
-use rand::RngExt as RandRngExt;
+use rand::RngExt as _;
 
 use fancy_circuits::util::as_mixed_radix;
 use vectoreyes::U8x16;

@@ -164,7 +164,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use rand::RngExt as RandRngExt;
+    use rand::RngExt as _;
 
     use crate::{
         CrtBundle,

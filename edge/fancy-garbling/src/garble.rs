@@ -61,7 +61,7 @@ mod nonstreaming {
     use fancy_circuits::util::RngExt;
     use fancy_plaintext::Dummy;
     use fancy_traits::{CircuitInputMapper, Flatten};
-    use rand::{RngExt as RandRngExt, rng};
+    use rand::{RngExt as _, rng};
     use swanky_rng::SwankyRng;
 
     // Check that non-streaming evaluation of a circuit execution equals the
@@ -173,7 +173,7 @@ mod streaming {
     use fancy_plaintext::Dummy;
     use fancy_traits::{Circuit, CircuitInputMapper, Flatten};
     use fancy_traits::{FancyArithmetic, FancyEncode, FancyOutput, FancyProj};
-    use rand::{RngExt as RandRngExt, rng};
+    use rand::{RngExt as _, rng};
     use swanky_channel::Channel;
     use swanky_error::Result;
     use swanky_rng::SwankyRng;

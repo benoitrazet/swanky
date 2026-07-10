@@ -46,7 +46,7 @@ mod test {
     use crate::CrtBundle;
     use crate::{arithmetic::Mask, util::RngExt};
     use fancy_plaintext::{Dummy, DummyVal};
-    use rand::{RngExt as RandRngExt, rng};
+    use rand::{RngExt as _, rng};
 
     #[test]
     fn mask() {

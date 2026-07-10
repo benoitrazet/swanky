@@ -327,7 +327,7 @@ mod tests {
     use crate::util::as_base_q_u128;
     use fancy_circuits::util::RngExt;
     use itertools::Itertools;
-    use rand::{RngExt as RandRngExt, rng};
+    use rand::{RngExt as _, rng};
 
     #[test]
     fn packing() {

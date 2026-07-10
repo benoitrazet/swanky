@@ -57,7 +57,7 @@ mod test {
         util::{RngExt, factor},
     };
     use fancy_plaintext::Dummy;
-    use rand::{RngExt as RandRngExt, rng};
+    use rand::{RngExt as _, rng};
 
     #[test]
     fn remainder() {

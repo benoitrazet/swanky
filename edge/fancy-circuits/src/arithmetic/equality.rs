@@ -57,7 +57,7 @@ where
 mod test {
     use crate::{CrtBundle, arithmetic::Equality, util::RngExt};
     use fancy_plaintext::Dummy;
-    use rand::{RngExt as RandRngExt, rng};
+    use rand::{RngExt as _, rng};
 
     #[test]
     fn equality() {
