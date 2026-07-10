@@ -71,7 +71,7 @@ nightly-test:
     - ./etc/ci/nix-cache-diagnostic.sh example.com || true
     - dig -t A @1.1.1.1 cache.nixos.org || true
     - dig -t A @8.8.8.8 cache.nixos.org || true
-    - bash -c "set -euxo pipefail; ./swanky ci nightly 2>&1 | lz4 > ./log.lz4"
+    - bash -c "set -euxo pipefail; ./swanky ci nightly 2>&1 | tee >(lz4 > ./log.lz4)"
     - tar -c ./coverage | zstd -9 -T > ./coverage.tar.zst
   artifacts:
     when: always
