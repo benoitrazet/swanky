@@ -13140,10 +13140,10 @@ impl Aes128 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_aesimc_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aesimc_si128)\n\n\n * `AESIMC xmm, xmm`\n </li>\n <li>\n\n [**`_mm_aeskeygenassist_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aeskeygenassist_si128)\n\n\n * `AESKEYGENASSIST xmm, xmm, imm8`\n </li>\n </ul>"]
     #[inline(always)]
     pub(super) fn new_with_key(key: U8x16) -> Self {
-        use aes::cipher::{generic_array::GenericArray, KeyInit};
+        use aes::cipher::{Array, KeyInit};
         let key_bytes = key.as_array();
         Aes128 {
-            key: aes::Aes128::new(&GenericArray::from(key_bytes)).into(),
+            key: aes::Aes128::new(&Array::from(key_bytes)).into(),
         }
     }
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_aesenc_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aesenc_si128)\n\n\n * `AESENC xmm, xmm`\n </li>\n <li>\n\n [**`_mm_aesenclast_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aesenclast_si128)\n\n\n * `AESENCLAST xmm, xmm`\n </li>\n </ul>"]
@@ -13152,11 +13152,11 @@ impl Aes128 {
     where
         ArrayUnrolledOps: UnrollableArraySize<N>,
     {
-        use aes::cipher::{generic_array::GenericArray, BlockEncrypt}; // TODO: support ParBlocks
+        use aes::cipher::{Array, BlockCipherEncrypt}; // TODO: support ParBlocks
         blocks.array_map(
             #[inline(always)]
             |block| {
-                let mut block = GenericArray::from(block.as_array());
+                let mut block = Array::from(block.as_array());
                 (*self.key).encrypt_block(&mut block);
                 U8x16::from(<[u8; 16]>::from(block))
             },
@@ -13170,11 +13170,11 @@ impl Aes128 {
     where
         ArrayUnrolledOps: UnrollableArraySize<N>,
     {
-        use aes::cipher::{generic_array::GenericArray, BlockDecrypt}; // TODO: support ParBlocks
+        use aes::cipher::{Array, BlockCipherDecrypt}; // TODO: support ParBlocks
         blocks.array_map(
             #[inline(always)]
             |block| {
-                let mut block = GenericArray::from(block.as_array());
+                let mut block = Array::from(block.as_array());
                 (*self.key).decrypt_block(&mut block);
                 U8x16::from(<[u8; 16]>::from(block))
             },
@@ -13202,10 +13202,10 @@ impl Aes128EncryptOnly {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_aeskeygenassist_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aeskeygenassist_si128)\n\n\n * `AESKEYGENASSIST xmm, xmm, imm8`\n </li>\n </ul>"]
     #[inline(always)]
     pub(super) fn new_with_key(key: U8x16) -> Self {
-        use aes::cipher::{generic_array::GenericArray, KeyInit};
+        use aes::cipher::{Array, KeyInit};
         let key_bytes = key.as_array();
         Aes128EncryptOnly {
-            key: aes::Aes128::new(&GenericArray::from(key_bytes)).into(),
+            key: aes::Aes128::new(&Array::from(key_bytes)).into(),
         }
     }
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_aesenc_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aesenc_si128)\n\n\n * `AESENC xmm, xmm`\n </li>\n <li>\n\n [**`_mm_aesenclast_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aesenclast_si128)\n\n\n * `AESENCLAST xmm, xmm`\n </li>\n </ul>"]
@@ -13214,11 +13214,11 @@ impl Aes128EncryptOnly {
     where
         ArrayUnrolledOps: UnrollableArraySize<N>,
     {
-        use aes::cipher::{generic_array::GenericArray, BlockEncrypt}; // TODO: support ParBlocks
+        use aes::cipher::{Array, BlockCipherEncrypt}; // TODO: support ParBlocks
         blocks.array_map(
             #[inline(always)]
             |block| {
-                let mut block = GenericArray::from(block.as_array());
+                let mut block = Array::from(block.as_array());
                 (*self.key).encrypt_block(&mut block);
                 U8x16::from(<[u8; 16]>::from(block))
             },
@@ -13260,10 +13260,10 @@ impl Aes256 {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_aesimc_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aesimc_si128)\n\n\n * `AESIMC xmm, xmm`\n </li>\n <li>\n\n [**`_mm_aeskeygenassist_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aeskeygenassist_si128)\n\n\n * `AESKEYGENASSIST xmm, xmm, imm8`\n </li>\n </ul>"]
     #[inline(always)]
     pub(super) fn new_with_key(key: U8x32) -> Self {
-        use aes::cipher::{generic_array::GenericArray, KeyInit};
+        use aes::cipher::{Array, KeyInit};
         let key_bytes = key.as_array();
         Aes256 {
-            key: aes::Aes256::new(&GenericArray::from(key_bytes)).into(),
+            key: aes::Aes256::new(&Array::from(key_bytes)).into(),
         }
     }
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_aesenc_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aesenc_si128)\n\n\n * `AESENC xmm, xmm`\n </li>\n <li>\n\n [**`_mm_aesenclast_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aesenclast_si128)\n\n\n * `AESENCLAST xmm, xmm`\n </li>\n </ul>"]
@@ -13272,11 +13272,11 @@ impl Aes256 {
     where
         ArrayUnrolledOps: UnrollableArraySize<N>,
     {
-        use aes::cipher::{generic_array::GenericArray, BlockEncrypt}; // TODO: support ParBlocks
+        use aes::cipher::{Array, BlockCipherEncrypt}; // TODO: support ParBlocks
         blocks.array_map(
             #[inline(always)]
             |block| {
-                let mut block = GenericArray::from(block.as_array());
+                let mut block = Array::from(block.as_array());
                 (*self.key).encrypt_block(&mut block);
                 U8x16::from(<[u8; 16]>::from(block))
             },
@@ -13290,11 +13290,11 @@ impl Aes256 {
     where
         ArrayUnrolledOps: UnrollableArraySize<N>,
     {
-        use aes::cipher::{generic_array::GenericArray, BlockDecrypt}; // TODO: support ParBlocks
+        use aes::cipher::{Array, BlockCipherDecrypt}; // TODO: support ParBlocks
         blocks.array_map(
             #[inline(always)]
             |block| {
-                let mut block = GenericArray::from(block.as_array());
+                let mut block = Array::from(block.as_array());
                 (*self.key).decrypt_block(&mut block);
                 U8x16::from(<[u8; 16]>::from(block))
             },
@@ -13322,10 +13322,10 @@ impl Aes256EncryptOnly {
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_aeskeygenassist_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aeskeygenassist_si128)\n\n\n * `AESKEYGENASSIST xmm, xmm, imm8`\n </li>\n </ul>"]
     #[inline(always)]
     pub(super) fn new_with_key(key: U8x32) -> Self {
-        use aes::cipher::{generic_array::GenericArray, KeyInit};
+        use aes::cipher::{Array, KeyInit};
         let key_bytes = key.as_array();
         Aes256EncryptOnly {
-            key: aes::Aes256::new(&GenericArray::from(key_bytes)).into(),
+            key: aes::Aes256::new(&Array::from(key_bytes)).into(),
         }
     }
     #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_aesenc_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aesenc_si128)\n\n\n * `AESENC xmm, xmm`\n </li>\n <li>\n\n [**`_mm_aesenclast_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_aesenclast_si128)\n\n\n * `AESENCLAST xmm, xmm`\n </li>\n </ul>"]
@@ -13334,11 +13334,11 @@ impl Aes256EncryptOnly {
     where
         ArrayUnrolledOps: UnrollableArraySize<N>,
     {
-        use aes::cipher::{generic_array::GenericArray, BlockEncrypt}; // TODO: support ParBlocks
+        use aes::cipher::{Array, BlockCipherEncrypt}; // TODO: support ParBlocks
         blocks.array_map(
             #[inline(always)]
             |block| {
-                let mut block = GenericArray::from(block.as_array());
+                let mut block = Array::from(block.as_array());
                 (*self.key).encrypt_block(&mut block);
                 U8x16::from(<[u8; 16]>::from(block))
             },

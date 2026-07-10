@@ -162,8 +162,8 @@ pub trait VectorBackend {
                 let mut out = #blocks;
                 for block in out.iter_mut() {
                     let block =
-                        aes::cipher::generic_array::GenericArray::from_mut_slice(block.as_mut());
-                    aes::cipher::BlockEncrypt::encrypt_block(#key, block);
+                        aes::cipher::Array::from_mut_slice(block.as_mut());
+                    aes::cipher::BlockModeEncrypt::encrypt_block(#key, block);
                 }
                 out
             },
@@ -188,8 +188,8 @@ pub trait VectorBackend {
                 let mut out = #blocks;
                 for block in out.iter_mut() {
                     let block =
-                        aes::cipher::generic_array::GenericArray::from_mut_slice(block.as_mut());
-                    aes::cipher::BlockDecrypt::decrypt_block(#key, block);
+                        aes::cipher::Array::from_mut_slice(block.as_mut());
+                    aes::cipher::BlockModeDecrypt::decrypt_block(#key, block);
                 }
                 out
             },
