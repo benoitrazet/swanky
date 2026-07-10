@@ -3,7 +3,7 @@ use mac_n_cheese_ir::circuit_builder::vole_supplier::VoleSupplier;
 use mac_n_cheese_ir::circuit_builder::{build_circuit, build_privates};
 use mac_n_cheese_ir::compilation_format::wire_format::Wire;
 use mac_n_cheese_ir::compilation_format::{FieldMacType, Type, WireSize};
-use rand::RngCore;
+use rand::Rng;
 
 use std::{cmp::Reverse, collections::BinaryHeap, str::FromStr};
 use swanky_field::FiniteRing;
@@ -176,7 +176,7 @@ pub fn aes_main(args: AesArgs) -> swanky_error::Result<()> {
     for _ in 0..16 {
         // Check that plaintext evaluation works.
         let mut m = [0; 16];
-        rand::thread_rng().fill_bytes(&mut m);
+        rand::rng().fill_bytes(&mut m);
         let m = U8x16::from(m);
         let mut expected = m;
         for _ in 0..aes_per_group {

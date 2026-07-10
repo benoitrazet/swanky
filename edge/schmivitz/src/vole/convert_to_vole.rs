@@ -2,7 +2,7 @@
 Convert vector commitments to VOLEs.
 */
 use crate::vole::crypto_primitives::{IV, Prg, Seed};
-use rand::Rng;
+use rand::RngExt;
 use swanky_field_binary::{F2, F8b};
 
 /// This function converts seeds to voles.
@@ -40,7 +40,7 @@ pub(crate) fn convert_to_vole(
         let mut v = [0; 8];
         for i in 0..256 {
             if i != 0 || is_prover {
-                r0[i] = prgs[i].r#gen::<u64>();
+                r0[i] = prgs[i].random::<u64>();
             }
         }
         let mut i_bound = 128;
@@ -97,7 +97,7 @@ fn convert_to_vole_prover_naive(seeds: [Seed; 256], iv: IV, l_hat: usize) -> (Ve
 
         // Generate u64 items to match the use in `convert_to_vole`.
         let randoms = (0..l_hat / 64 + 1)
-            .map(|_| prg.r#gen::<u64>())
+            .map(|_| prg.random::<u64>())
             .collect::<Vec<_>>();
         let mut v = Vec::with_capacity(l_hat);
         for block in randoms {
@@ -156,7 +156,7 @@ fn convert_to_vole_verifier_naive(seeds: [Seed; 256], iv: IV, l_hat: usize, delt
 
             // Generate u64 items to match the use in `convert_to_vole`.
             let randoms = (0..l_hat / 64 + 1)
-                .map(|_| prg.r#gen::<u64>())
+                .map(|_| prg.random::<u64>())
                 .collect::<Vec<_>>();
             let mut v = Vec::with_capacity(l_hat);
             for block in randoms {
@@ -185,15 +185,15 @@ fn convert_to_vole_verifier_naive(seeds: [Seed; 256], iv: IV, l_hat: usize, delt
 mod test {
     use super::{convert_to_vole, convert_to_vole_prover_naive, convert_to_vole_verifier_naive};
     use crate::vole::crypto_primitives::{IV, Seed};
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt, rng};
     use swanky_field_binary::F8b;
 
     #[test]
     fn test_convert_to_vole_naive() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
 
-        let seeds: [_; 256] = core::array::from_fn(|_| rng.r#gen::<Seed>());
-        let iv = rng.r#gen();
+        let seeds: [_; 256] = core::array::from_fn(|_| rng.random::<Seed>());
+        let iv = rng.random();
 
         let delta = 3u8;
         let how_many = 1027;
@@ -215,10 +215,10 @@ mod test {
 
     #[test]
     fn test_convert_to_vole() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
 
-        let seeds: [_; 256] = core::array::from_fn(|_| rng.r#gen::<Seed>());
-        let iv = rng.r#gen::<IV>();
+        let seeds: [_; 256] = core::array::from_fn(|_| rng.random::<Seed>());
+        let iv = rng.random::<IV>();
 
         let delta = 3u8;
         let how_many = 1027;

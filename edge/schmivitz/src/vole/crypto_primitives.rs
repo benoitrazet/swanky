@@ -1,7 +1,7 @@
 /*! Cryptographic primitives used for VOLE-it-HEAD */
 use crate::parameters::SECURITY_PARAM;
 use crate::vole::commit_reconstruct::{Corrections, corrections_to_bytes};
-use rand::{RngCore, SeedableRng};
+use rand::{Rng, SeedableRng, TryRng, rand_core::Infallible};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
 use shake::Shake128;
 use swanky_field_binary::F128b;
@@ -38,20 +38,18 @@ impl Prg {
     }
 }
 
-impl RngCore for Prg {
-    fn next_u32(&mut self) -> u32 {
-        self.0.next_u32()
+impl TryRng for Prg {
+    type Error = Infallible;
+
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+        Ok(self.0.next_u32())
     }
 
-    fn next_u64(&mut self) -> u64 {
-        self.0.next_u64()
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+        Ok(self.0.next_u64())
     }
 
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.0.fill_bytes(dest);
-    }
-
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Self::Error> {
         self.0.try_fill_bytes(dest)
     }
 }
@@ -59,7 +57,7 @@ impl RngCore for Prg {
 #[cfg(test)]
 mod tests {
     use super::IV;
-    use rand::Rng;
+    use rand::RngExt;
     use swanky_field_binary::F2;
     use swanky_rng::SwankyRng;
 
@@ -75,7 +73,7 @@ mod tests {
         for &l in &lengths {
             let mut rng = SwankyRng::from_seed_and_iv(seed.into(), u128::from_le_bytes(iv));
             let randoms = (0..l / 64 + 1)
-                .map(|_| rng.r#gen::<u64>())
+                .map(|_| rng.random::<u64>())
                 .collect::<Vec<_>>();
             let mut expected_bits = Vec::with_capacity(l);
             for block in randoms {
@@ -89,7 +87,7 @@ mod tests {
             // let mut stream = PRG_Stream::new(seed, iv);
             let mut stream_bits = Vec::with_capacity(l);
             while stream_bits.len() < l {
-                let block = stream.r#gen::<u64>();
+                let block = stream.random::<u64>();
                 for i in 0..64 {
                     if stream_bits.len() == l {
                         break;

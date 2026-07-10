@@ -1,6 +1,8 @@
 //! Testing the Base Psi protocol
 #[cfg(test)]
 mod tests {
+    use rand::RngExt;
+
     use crate::psi::circuit_psi::{
         base_psi::{BasePsi, receiver::OpprfReceiver, sender::OpprfSender},
         tests::{utils::*, *},
@@ -92,7 +94,7 @@ mod tests {
             let primary_keys = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (result_sender, _) =
-                psty_base_psi(&primary_keys, &payloads, rng.r#gen(), DEFAULT_SEED);
+                psty_base_psi(&primary_keys, &payloads, rng.random(), DEFAULT_SEED);
             assert!(
                 result_sender.is_ok(),
                 "PSTY's Base Psi failed on the sender side"
@@ -138,7 +140,7 @@ mod tests {
             let primary_keys = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, result_receiver) =
-                psty_base_psi(&primary_keys, &payloads, DEFAULT_SEED, rng.r#gen());
+                psty_base_psi(&primary_keys, &payloads, DEFAULT_SEED, rng.random());
             assert!(
                 result_receiver.is_ok(),
                 "PSTY's Base Psi failed on the receiver side"

@@ -16,7 +16,7 @@ use fancy_garbling::{
 };
 use fancy_traits::{FancyArithmetic, FancyBinary, FancyProj, HasModulus};
 use ndarray::Array3;
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Map, Value};
@@ -838,7 +838,7 @@ impl NeuralNet {
     }
 
     /// Output a boolean garbling of [`NeuralNet`].
-    pub fn gc_garble_boolean<W: BinaryWireLabel, RNG: CryptoRng + RngCore>(
+    pub fn gc_garble_boolean<W: BinaryWireLabel, RNG: CryptoRng + Rng>(
         &self,
         bitwidths: &[usize],
         secret_weights: bool,

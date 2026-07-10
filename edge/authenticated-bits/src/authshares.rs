@@ -58,7 +58,7 @@
 //! ```
 
 use crate::authbits::{AuthBit, AuthBitGenerator};
-use rand::{CryptoRng, Rng};
+use rand::{CryptoRng, Rng, RngExt};
 use std::{iter::Copied, slice::Iter};
 use swanky_channel::Channel;
 use swanky_field::FiniteRing;
@@ -184,7 +184,7 @@ impl<P: GenericParty> AuthShareGenerator<P> {
         channel: &mut Channel,
         mut rng: RNG,
     ) -> swanky_error::Result<Self> {
-        let delta = rng.r#gen::<U8x16>();
+        let delta = rng.random::<U8x16>();
         Self::new_with_delta(delta, channel, rng)
     }
 
@@ -232,7 +232,7 @@ impl<P: GenericParty> AuthShareGenerator<P> {
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<()> {
-        let bits: Vec<_> = (0..nshares).map(|_| rng.r#gen::<F2>()).collect();
+        let bits: Vec<_> = (0..nshares).map(|_| rng.random::<F2>()).collect();
 
         let mut party_a_auth_bits = Vec::with_capacity(nshares);
         let mut party_b_auth_bits = Vec::with_capacity(nshares);

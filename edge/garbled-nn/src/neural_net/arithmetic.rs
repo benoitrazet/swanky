@@ -123,7 +123,7 @@ impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> ArithmeticNe
             );
             acc = layer.eval(&mut backend, acc, secret_weights, channel)?;
         }
-        Ok(acc.into_raw_vec())
+        Ok(acc.into_raw_vec_and_offset().0)
     }
 }
 

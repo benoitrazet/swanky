@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
 // We use the aes_gcm library because ring doesn't have an API to provide a separate tag on decrypt
-use aes_gcm::{AeadInPlace, Aes128Gcm, KeyInit};
+use aes_gcm::{AeadInOut, Aes128Gcm, KeyInit};
 use mac_n_cheese_ir::compilation_format::TaskId;
 use mac_n_cheese_vole::party::{Party, WhichParty};
-use rand::RngCore;
+use rand::Rng;
 use swanky_error::ErrorKind;
 use vectoreyes::{Aes128, AesBlockCipher, AesBlockCipherDecrypt, U8x16};
 
@@ -81,7 +81,7 @@ impl<P: Party> Keys<P> {
     ) -> (TaskDataHeader, Aes128Gcm) {
         // We use this nonce to ensure that we don't re-use a key with AES-GCM.
         let mut nonce = [0; 16];
-        rand::thread_rng().fill_bytes(&mut nonce);
+        rand::rng().fill_bytes(&mut nonce);
         let tdh = TaskDataHeader {
             task_id,
             length,
@@ -101,7 +101,11 @@ impl<P: Party> Keys<P> {
             u32::try_from(payload.len()).unwrap(),
         );
         let tag = key
-            .encrypt_in_place_detached(&Default::default(), bytemuck::bytes_of(&tdh), payload)
+            .encrypt_inout_detached(
+                &Default::default(),
+                bytemuck::bytes_of(&tdh),
+                payload.into(),
+            )
             .unwrap();
         tdh.tag = tag.into();
         tdh
@@ -116,7 +120,12 @@ impl<P: Party> Keys<P> {
         let key = blake3::keyed_hash(&self.task_data_incoming_key, bytemuck::bytes_of(&tdh));
         let key = Aes128Gcm::new_from_slice(&key.as_bytes()[0..16]).unwrap();
         if key
-            .decrypt_in_place_detached(&Default::default(), bytemuck::bytes_of(&tdh), payload, &tag)
+            .decrypt_inout_detached(
+                &Default::default(),
+                bytemuck::bytes_of(&tdh),
+                payload.into(),
+                &tag,
+            )
             .is_err()
         {
             swanky_error::bail!(ErrorKind::OtherError, "Failed to decrypt {tdh:?}");

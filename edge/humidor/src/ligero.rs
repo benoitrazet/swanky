@@ -95,6 +95,7 @@ pub trait FieldForLigero:
     + num_traits::Num
     + num_traits::MulAdd<Output = Self>
     + ndarray::ScalarOperand
+    + sprs::MulAcc
     + std::fmt::Debug
 {
     /// Size of field, for use in parameter selection.
@@ -819,7 +820,7 @@ fn make_ra<Field: FieldForLigero>(
 ) -> Array2<Field> {
     params.fft2_inverse_rows(
         (&Pa.view().transpose_into() * ra)
-            .into_shape((params.m, params.l))
+            .into_shape_with_order((params.m, params.l))
             .unwrap()
             .view(),
     )
@@ -841,7 +842,7 @@ fn make_ra_Iml_Pa_neg<Field: FieldForLigero>(
             .cloned()
             .chain(r_dot_P)
             .collect::<Array1<Field>>()
-            .into_shape((2 * params.m, params.l))
+            .into_shape_with_order((2 * params.m, params.l))
             .unwrap()
             .view(),
     )
@@ -1251,7 +1252,7 @@ pub mod interactive {
 
     #[test]
     fn test_small() {
-        let mut rng = SwankyRng::from_entropy();
+        let mut rng = SwankyRng::from_rng(&mut rand::rng());
         let (ckt, w) = simple_arith_circuit::circuitgen::simple_test_circuit::<TestField>();
 
         let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
@@ -1623,7 +1624,7 @@ pub mod noninteractive {
 
     #[test]
     fn test_small() {
-        let mut rng = SwankyRng::from_entropy();
+        let mut rng = SwankyRng::from_rng(&mut rand::rng());
         let (ckt, w) = simple_arith_circuit::circuitgen::simple_test_circuit::<TestField>();
 
         let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);

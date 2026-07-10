@@ -35,16 +35,16 @@ macro_rules! test_circuits {
             use super::*;
             use swanky_rng::SwankyRng;
             use rand::SeedableRng;
-            use rand::distributions::{Distribution, Uniform};
+            use rand::distr::{Distribution, Uniform};
 
             proptest! {
                 #[test]
                 fn test_random_circuit(seed in any_seed()) {
                     // SimpleLogger::new().init().unwrap();
                     let mut rng = SwankyRng::from_seed(seed);
-                    let input_range = Uniform::from(2..100);
+                    let input_range = Uniform::try_from(2..100).expect("bounds finite and low < high");
                     let ninputs = input_range.sample(&mut rng);
-                    let gate_range = Uniform::from(101..200);
+                    let gate_range = Uniform::try_from(101..200).expect("bounds finite and low < high");
                     let ngates = gate_range.sample(&mut rng);
                     let (circuit, witness) =
                         simple_arith_circuit::circuitgen::random_zero_circuit::<<$field as FiniteField>::PrimeField, _>(ninputs, ngates, &mut rng)
@@ -58,9 +58,9 @@ macro_rules! test_circuits {
                 fn test_and_circuit(seed in any_seed()) {
                     // SimpleLogger::new().init().unwrap();
                     let mut rng = SwankyRng::from_seed(seed);
-                    let input_range = Uniform::from(2..100);
+                    let input_range = Uniform::try_from(2..100).expect("bounds finite and low < high");
                     let ninputs = input_range.sample(&mut rng);
-                    let gate_range = Uniform::from(101..200);
+                    let gate_range = Uniform::try_from(101..200).expect("bounds finite and low < high");
                     let ngates = gate_range.sample(&mut rng);
                     let (circuit, witness) =
                         simple_arith_circuit::circuitgen::mul_zero_circuit::<<$field as FiniteField>::PrimeField, _>(ninputs, ngates, &mut rng);

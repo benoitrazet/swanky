@@ -158,11 +158,12 @@ fn do_bench<
     let start = Instant::now();
     for _ in 0..n {
         arena.reset();
+        let mut rng = SwankyRng::from_seed(Block::from(3485));
         let svole_sender_stage2 = svole_sender
             .send(
                 &arena,
                 selector,
-                &mut sender_rng,
+                &mut rng,
                 black_box(&base_svoles_s),
                 black_box(comms_1.as_mut_slice()),
             )
@@ -196,11 +197,12 @@ fn do_bench<
     let start = Instant::now();
     for _ in 0..n {
         arena.reset();
+        let mut rng = SwankyRng::from_seed(Block::from(12359));
         let svole_receiver_stage2 = svole_receiver
             .receive(
                 &arena,
                 selector,
-                &mut receiver_rng,
+                &mut rng,
                 black_box(&base_svoles_r),
                 &mut receiver_voles,
                 black_box(comms_1.as_slice()),

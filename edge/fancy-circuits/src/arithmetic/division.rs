@@ -94,18 +94,18 @@ mod test {
         util::{RngExt, product},
     };
     use fancy_plaintext::Dummy;
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt as _, rng};
 
     #[test]
     fn division() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
 
         for _ in 0..2 {
             let qs = rng.gen_usable_factors();
             let q = product(&qs);
             let q_ = product(&qs[..qs.len() - 1]);
-            let x = rng.r#gen::<u128>() % q_;
-            let y = rng.r#gen::<u128>() % q_;
+            let x = rng.random::<u128>() % q_;
+            let y = rng.random::<u128>() % q_;
             let x_input = CrtBundle::from((x, q));
             let y_input = CrtBundle::from((y, q));
             let z = Dummy::eval(&Division::new(), (&x_input, &y_input)).unwrap();

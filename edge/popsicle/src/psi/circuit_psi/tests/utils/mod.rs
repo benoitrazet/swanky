@@ -12,6 +12,9 @@ use std::collections::HashSet;
 use proptest::{collection, strategy::Strategy};
 
 #[cfg(test)]
+use rand::RngExt;
+
+#[cfg(test)]
 /// Create a proptest strategy that creates sets of elements represented as vectors of bytes.
 /// Reminder: sets have unique elements, we ensure this by generating hashsets using proptests
 /// and turning them into vecs.
@@ -95,14 +98,14 @@ use rand::{CryptoRng, Rng};
 #[cfg(test)]
 /// Generate a random `Vec` of `n` `u128`, modulo `modulus`.
 pub fn rand_u128_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u128, rng: &mut RNG) -> Vec<u128> {
-    (0..n).map(|_| rng.r#gen::<u128>() % modulus).collect()
+    (0..n).map(|_| rng.random::<u128>() % modulus).collect()
 }
 #[cfg(test)]
 /// Generate a random `Vec` of `n` `u128`, modulo `modulus`, as little-endian
 /// `Vec`s of bytes.
 pub fn rand_u8_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u128, rng: &mut RNG) -> Vec<Vec<u8>> {
     (0..n)
-        .map(|_| (rng.r#gen::<u128>() % modulus).to_le_bytes().to_vec())
+        .map(|_| (rng.random::<u128>() % modulus).to_le_bytes().to_vec())
         .collect()
 }
 
@@ -117,7 +120,7 @@ pub fn rand_u8_vec_unique<RNG: CryptoRng + Rng>(
     let mut unique = HashSet::new();
     for _ in 0..n {
         loop {
-            let el = rng.r#gen::<u128>() % modulus;
+            let el = rng.random::<u128>() % modulus;
             if !unique.contains(&el) {
                 unique.insert(el);
                 break;

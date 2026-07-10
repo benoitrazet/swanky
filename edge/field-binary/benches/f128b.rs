@@ -1,17 +1,17 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use rand::Rng;
+use rand::RngExt;
 use std::time::Duration;
 
 use swanky_field_binary::F128b;
 use vectoreyes::U8x16;
 
 fn mul(c: &mut Criterion) {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     c.bench_function("f128b::mul", move |b| {
         b.iter_batched(
             || {
-                let x = F128b::from(rng.r#gen::<U8x16>());
-                let y = F128b::from(rng.r#gen::<U8x16>());
+                let x = F128b::from(rng.random::<U8x16>());
+                let y = F128b::from(rng.random::<U8x16>());
                 (x, y)
             },
             |(mut x, y)| {

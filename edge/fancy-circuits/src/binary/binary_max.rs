@@ -58,7 +58,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use rand::Rng;
+    use rand::RngExt;
 
     use super::BinaryMax;
     use crate::BinaryBundle;
@@ -66,13 +66,13 @@ mod test {
 
     #[test]
     fn binary_max() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let nbits = 64;
         let q = 1 << nbits;
         let nitems = 10;
 
         for _ in 0..16 {
-            let xs: Vec<u128> = (0..nitems).map(|_| rng.r#gen::<u128>() % q).collect();
+            let xs: Vec<u128> = (0..nitems).map(|_| rng.random::<u128>() % q).collect();
             let max = *xs.iter().max().unwrap();
             let xs_input: Vec<BinaryBundle<DummyVal>> =
                 xs.iter().map(|x| BinaryBundle::from((*x, nbits))).collect();

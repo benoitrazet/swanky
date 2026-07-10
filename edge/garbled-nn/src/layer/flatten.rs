@@ -44,7 +44,7 @@ impl<F: FancyNeuralNet> NeuralNetExecutor<F> for LayerFlatten {
         _: &mut Channel,
     ) -> Result<Array3<F::Item>> {
         inputs
-            .into_shape(self.output_shape)
+            .into_shape_with_order(self.output_shape)
             .wrap_err(ErrorKind::OtherError, "Invalid output shape")
     }
 }

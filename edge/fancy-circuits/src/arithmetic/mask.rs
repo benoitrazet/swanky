@@ -46,16 +46,16 @@ mod test {
     use crate::CrtBundle;
     use crate::{arithmetic::Mask, util::RngExt};
     use fancy_plaintext::{Dummy, DummyVal};
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt as _, rng};
 
     #[test]
     fn mask() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let q = rng.gen_usable_composite_modulus();
 
         for _ in 0..16 {
-            let b = rng.r#gen::<bool>();
-            let x = rng.r#gen::<u128>() % q;
+            let b = rng.random::<bool>();
+            let x = rng.random::<u128>() % q;
 
             let b_input = DummyVal::new(b as u16, 2);
             let x_input = CrtBundle::from((x, q));

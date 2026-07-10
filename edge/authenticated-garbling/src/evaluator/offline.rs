@@ -1,7 +1,7 @@
 use crate::{EvaluatorOnline, WirePreProcessor, preprocesser::f_preprocessing, ps::PartyEvaluator};
 use fancy_analyzer::CircuitAnalyzer;
 use fancy_traits::CircuitInputMapper;
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use swanky_authenticated_bits::{and_triples::AndTripleGenerator, authshares::AuthShare};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -38,7 +38,7 @@ impl EvaluatorOffline {
     /// Initialize a [`EvaluatorOffline`] object for the given circuit.
     pub fn initialize<
         C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>,
-        RNG: CryptoRng + RngCore,
+        RNG: CryptoRng + Rng,
     >(
         circuit: &C,
         channel: &mut Channel,

@@ -8,7 +8,7 @@ use std::iter::{repeat_with, zip};
 
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
 use merlin::Transcript;
-use rand::{CryptoRng, RngCore};
+use rand::CryptoRng;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b, F128b};
@@ -61,7 +61,7 @@ impl RandomVoleP for InsecureVole {
         extended_witness_length: usize,
         transcript: &mut merlin::Transcript,
         _secret: &Secret,
-        rng: &mut (impl CryptoRng + RngCore),
+        rng: &mut impl CryptoRng,
     ) -> (Self, Self::VoleChallenge) {
         // In a secure version of VOLE, we would populate the transcript with more useful
         // or relevant context about the VOLE instantiation.
@@ -271,7 +271,7 @@ impl RandomVoleV for InsecureCommitments {
 #[cfg(test)]
 mod tests {
     use merlin::Transcript;
-    use rand::thread_rng;
+    use rand::rng;
     use swanky_field_binary::F2;
 
     use crate::{
@@ -281,7 +281,7 @@ mod tests {
 
     #[test]
     fn everything_is_the_expected_size() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let transcript = &mut Transcript::new(b"testing");
         let secret: Vec<F2> = Vec::new();
 

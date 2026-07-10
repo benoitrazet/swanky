@@ -7,7 +7,7 @@ use crate::wire::OfflineWire;
 use fancy_analyzer::CircuitAnalyzer;
 use fancy_garbling::{WireLabel, WireMod2};
 use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary, Flatten};
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
@@ -64,7 +64,7 @@ impl GarblerOffline {
     /// Initialize a [`GarblerOffline`] object for the given circuit.
     pub fn initialize<
         C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyGarbler>>,
-        RNG: CryptoRng + RngCore,
+        RNG: CryptoRng + Rng,
     >(
         circuit: &C,
         channel: &mut Channel,

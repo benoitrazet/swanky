@@ -144,16 +144,16 @@ pub mod test {
     #[test]
     fn binary_addition() {
         use fancy_plaintext::Dummy;
-        use rand::Rng;
+        use rand::RngExt;
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let nbits = 64;
         let q = 1 << nbits;
         let circuit = BinaryAddition::new();
 
         for _ in 0..16 {
-            let x = rng.r#gen::<u128>() % q;
-            let y = rng.r#gen::<u128>() % q;
+            let x = rng.random::<u128>() % q;
+            let y = rng.random::<u128>() % q;
             let x_input = BinaryBundle::from((x, nbits));
             let y_input = BinaryBundle::from((y, nbits));
             let outputs = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
@@ -165,15 +165,15 @@ pub mod test {
     #[test]
     fn binary_addition_no_carry() {
         use fancy_plaintext::Dummy;
-        use rand::Rng;
+        use rand::RngExt;
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let nbits = 64;
         let q = 1 << nbits;
 
         for _ in 0..16 {
-            let x = rng.r#gen::<u128>() % q;
-            let y = rng.r#gen::<u128>() % q;
+            let x = rng.random::<u128>() % q;
+            let y = rng.random::<u128>() % q;
             let x_input = BinaryBundle::from((x, nbits));
             let y_input = BinaryBundle::from((y, nbits));
             let output = Dummy::eval(&BinaryAdditionNoCarry::new(), (&x_input, &y_input)).unwrap();

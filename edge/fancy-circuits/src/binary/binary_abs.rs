@@ -43,16 +43,16 @@ where
 mod test {
     use crate::{BinaryBundle, binary::BinaryAbs};
     use fancy_plaintext::Dummy;
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt, rng};
 
     #[test]
     fn binary_abs() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let nbits = 64;
         let q = 1 << nbits;
 
         for _ in 0..16 {
-            let x = rng.r#gen::<u128>() % q;
+            let x = rng.random::<u128>() % q;
             let x_input = BinaryBundle::from((x, nbits));
             let circuit = BinaryAbs::new();
             let output = Dummy::eval(&circuit, &x_input).unwrap();

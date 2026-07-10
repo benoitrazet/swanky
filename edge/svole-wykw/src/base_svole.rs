@@ -6,7 +6,7 @@ use super::{
     utils::Powers,
 };
 use generic_array::typenum::Unsigned;
-use rand::{CryptoRng, Rng, SeedableRng};
+use rand::{CryptoRng, Rng, RngExt, SeedableRng};
 use swanky_channel_legacy::AbstractChannel;
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
 use swanky_ocelot_error::Error;
@@ -103,7 +103,7 @@ impl<FE: FF> Receiver<FE> {
     ) -> Result<Vec<FE>, Error> {
         let r = Degree::<FE>::USIZE;
         let mut v: Vec<FE> = Vec::with_capacity(len);
-        let seed = rng.r#gen();
+        let seed = rng.random();
         let mut rng_chi = SwankyRng::from_seed(seed);
         let mut y: FE = FE::ZERO;
         for _ in 0..len {

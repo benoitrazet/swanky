@@ -85,14 +85,14 @@ mod test {
     use super::BinaryMultiplex;
     use crate::{BinaryBundle, binary::BinaryMultiplexConstantBits};
     use fancy_plaintext::{Dummy, DummyVal};
-    use rand::Rng;
+    use rand::RngExt;
 
     #[test]
     fn binary_multiplex() {
-        let mut rng = rand::thread_rng();
-        let nbits = 1 + (rng.r#gen::<usize>() % 200);
-        let x = rng.r#gen::<u128>() % (nbits as u128);
-        let y = rng.r#gen::<u128>() % (nbits as u128);
+        let mut rng = rand::rng();
+        let nbits = 1 + (rng.random_range(..200usize));
+        let x = rng.random::<u128>() % (nbits as u128);
+        let y = rng.random::<u128>() % (nbits as u128);
         let x_inputs = BinaryBundle::from((x, nbits));
         let y_inputs = BinaryBundle::from((y, nbits));
 
@@ -108,10 +108,10 @@ mod test {
 
     #[test]
     fn binary_multiplex_constant_bits() {
-        let mut rng = rand::thread_rng();
-        let nbits = 1 + (rng.r#gen::<usize>() % 200);
-        let x = rng.r#gen::<u128>() % (nbits as u128);
-        let y = rng.r#gen::<u128>() % (nbits as u128);
+        let mut rng = rand::rng();
+        let nbits = 1 + (rng.random_range(..200usize));
+        let x = rng.random::<u128>() % (nbits as u128);
+        let y = rng.random::<u128>() % (nbits as u128);
 
         for b in 0..=1 {
             let output = Dummy::eval(

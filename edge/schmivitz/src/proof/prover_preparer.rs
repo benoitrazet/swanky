@@ -106,7 +106,7 @@ impl<'a> FieldBackend<F2> for ProverPreparer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rand::thread_rng;
+    use rand::rng;
     use std::io::Cursor;
 
     use mac_n_cheese_sieve_parser::text_parser::RelationReader;
@@ -119,7 +119,7 @@ mod tests {
 
     /// Take a string description of a circuit and parse it.
     fn load_circuit(circuit: &str) -> swanky_error::Result<Circuit> {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         // Generate a private input vector with 100 random inputs
         let random_private_inputs: Vec<F2> = (0..100).map(|_| F2::random(rng)).collect();
 

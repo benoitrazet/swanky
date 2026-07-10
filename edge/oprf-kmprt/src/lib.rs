@@ -2,7 +2,7 @@
 //! Implementation of the hash-based multi-use OPPRF of Kolesnikov, Matania,
 //! Pinkas, Rosulek, and Trieu (cf. <https://eprint.iacr.org/2017/799>).
 
-use rand::{CryptoRng, Rng};
+use rand::{CryptoRng, Rng, RngExt};
 use std::collections::HashSet;
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
@@ -214,7 +214,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
 
         assert!(points.len() <= npoints);
 
-        let mut v = rng.r#gen::<Block>();
+        let mut v = rng.random::<Block>();
         let mut aes = Aes128EncryptOnly::new_with_key(v);
         let mut map = HashSet::with_capacity(points.len());
         // Store compute `y`s and `h`s for later use.
@@ -244,7 +244,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                     break;
                 }
                 // Try again.
-                v = rng.r#gen::<Block>();
+                v = rng.random::<Block>();
                 aes = Aes128EncryptOnly::new_with_key(v);
                 map.clear();
             }
@@ -264,7 +264,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         // Fill rest of table with random elements.
         for entry in table.iter_mut() {
             if *entry == Block512::default() {
-                *entry = rng.r#gen::<Block512>();
+                *entry = rng.random::<Block512>();
             }
         }
         // Send `v` and `table` to the receiver.
@@ -333,7 +333,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
 
         loop {
             let hashkeys = (0..params.h1 + params.h2)
-                .map(|_| rng.r#gen())
+                .map(|_| rng.random())
                 .collect::<Vec<Block>>();
             // Build a cuckoo hash table using `hashkeys`.
             if let Ok(table_) = cuckoo::CuckooHash::build(
@@ -363,7 +363,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
                 if let Some(item) = item {
                     item.entry
                 } else {
-                    rng.r#gen::<Block>()
+                    rng.random::<Block>()
                 }
             })
             .collect::<Vec<Block>>();
@@ -407,7 +407,7 @@ mod tests {
         assert!(npoints <= npoints_bound);
         let mut rng = SwankyRng::new();
         let points = (0..npoints)
-            .map(|_| (rng.r#gen::<Block>(), rng.r#gen()))
+            .map(|_| (rng.random::<Block>(), rng.random()))
             .collect::<Vec<(Block, Block512)>>();
         let xs = points[0..ninputs]
             .iter()

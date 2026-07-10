@@ -1,3 +1,5 @@
+use rand::RngExt;
+
 use crate::{
     circuit_psi::{base_psi::*, utils::*},
     cuckoo::CuckooHash,
@@ -60,7 +62,7 @@ impl BasePsi for OpprfSender {
         has_payload: bool,
     ) -> swanky_error::Result<Self>
     where
-        RNG: RngCore + CryptoRng + SeedableRng,
+        RNG: Rng + CryptoRng + SeedableRng,
     {
         // The key used during hashing is known to both
         // parties and allows them to hash the same inputs
@@ -95,7 +97,7 @@ impl BasePsi for OpprfSender {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: RngCore + CryptoRng + SeedableRng,
+        RNG: Rng + CryptoRng + SeedableRng,
     {
         // refresh key if cuckoo hash is full
         self.key = channel.read::<Block>()?;
@@ -110,13 +112,13 @@ impl BasePsi for OpprfSender {
         let hashes = utils::compress_and_hash_inputs(primary_keys, self.key);
 
         let mut opprf_primary_keys_in = vec![Vec::new(); nbins];
-        let opprf_primary_keys_out = (0..nbins).map(|_| rng.r#gen::<Block512>()).collect();
+        let opprf_primary_keys_out = (0..nbins).map(|_| rng.random::<Block512>()).collect();
 
         let mut opprf_payloads_in = vec![];
         let mut opprf_payloads_out = vec![];
         if payloads.is_some() {
             opprf_payloads_in = vec![Vec::new(); nbins];
-            opprf_payloads_out = (0..nbins).map(|_| rng.r#gen::<Block512>()).collect();
+            opprf_payloads_out = (0..nbins).map(|_| rng.random::<Block512>()).collect();
         }
 
         for (i, x) in hashes.iter().enumerate() {
@@ -138,9 +140,9 @@ impl BasePsi for OpprfSender {
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random primary key to
             // table2[j] & payload[j]. This avoid possible leakage
             if bins.iter().skip(1).all(|&x| x == bins[0]) {
-                opprf_primary_keys_in[bins[0]].push(rng.r#gen());
+                opprf_primary_keys_in[bins[0]].push(rng.random());
                 if payloads.is_some() {
-                    opprf_payloads_in[bins[0]].push(rng.r#gen());
+                    opprf_payloads_in[bins[0]].push(rng.random());
                 }
             }
         }
@@ -161,7 +163,7 @@ impl BasePsi for OpprfSender {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: RngCore + CryptoRng + SeedableRng,
+        RNG: Rng + CryptoRng + SeedableRng,
     {
         // The Opprf in swanky expects the programmed input and outputs
         // to be passed as pairs

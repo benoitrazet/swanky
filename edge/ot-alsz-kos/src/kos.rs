@@ -2,7 +2,7 @@
 //! protocol (cf. <https://eprint.iacr.org/2015/546>).
 
 use crate::alsz::{Receiver as AlszReceiver, Sender as AlszSender};
-use rand::{CryptoRng, Rng, RngCore, SeedableRng};
+use rand::{CryptoRng, Rng, SeedableRng};
 use std::io::ErrorKind;
 use swanky_adversary::{Malicious, SemiHonest};
 use swanky_block::Block;

@@ -2,7 +2,7 @@ use fancy_traits::FancyOutput;
 use popsicle::circuit_psi::{
     CircuitPsi, circuits::*, evaluator::OpprfPsiEvaluator, garbler::OpprfPsiGarbler, utils::*,
 };
-use rand::Rng;
+use rand::RngExt;
 use swanky_block::Block;
 use swanky_rng::SwankyRng;
 
@@ -13,7 +13,7 @@ pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {
         |channel| {
             let mut rng = SwankyRng::new();
             let mut gb_psi =
-                OpprfPsiGarbler::<SwankyRng>::new(channel, Block::from(rng.r#gen::<u128>()))
+                OpprfPsiGarbler::<SwankyRng>::new(channel, Block::from(rng.random::<u128>()))
                     .unwrap();
 
             let intersection_results = gb_psi.intersect(set_a, channel).unwrap();
@@ -29,7 +29,7 @@ pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {
         |channel| {
             let mut rng = SwankyRng::new();
             let mut ev_psi =
-                OpprfPsiEvaluator::<SwankyRng>::new(channel, Block::from(rng.r#gen::<u128>()))
+                OpprfPsiEvaluator::<SwankyRng>::new(channel, Block::from(rng.random::<u128>()))
                     .unwrap();
             let intersection_results = ev_psi.intersect(set_b, channel).unwrap();
             let res = fancy_cardinality(

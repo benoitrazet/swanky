@@ -51,16 +51,16 @@ mod test {
     use crate::CrtBundle;
     use crate::{arithmetic::ConstantExponentiation, util::RngExt};
     use fancy_plaintext::Dummy;
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt as _, rng};
 
     #[test]
     fn constant_exponentiation() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let q = rng.gen_usable_composite_modulus();
 
         for _ in 0..16 {
-            let x = rng.r#gen::<u16>() as u128 % q;
-            let c = rng.gen_range(2..10);
+            let x = rng.random::<u16>() as u128 % q;
+            let c = rng.random_range(2..10);
             let x_input = CrtBundle::from((x, q));
             let circuit = ConstantExponentiation::new();
             let z = Dummy::eval(&circuit, (&x_input, c)).unwrap();
