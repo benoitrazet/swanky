@@ -252,7 +252,7 @@ impl KosSender {
         arena: &KeyedArena,
         selector: u64,
         inputs: &[(Block, Block)],
-        rng: &mut (impl Rng + CryptoRng),
+        rng: &mut impl CryptoRng,
         mut incoming_bytes: &[u8],
         mut outgoing_bytes: &mut [u8],
     ) -> Result<KosSenderStage2, Error> {

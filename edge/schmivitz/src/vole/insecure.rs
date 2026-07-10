@@ -8,7 +8,7 @@ use std::iter::{repeat_with, zip};
 
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
 use merlin::Transcript;
-use rand::{CryptoRng, Rng};
+use rand::CryptoRng;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b, F128b};
@@ -61,7 +61,7 @@ impl RandomVoleP for InsecureVole {
         extended_witness_length: usize,
         transcript: &mut merlin::Transcript,
         _secret: &Secret,
-        rng: &mut (impl CryptoRng + Rng),
+        rng: &mut impl CryptoRng,
     ) -> (Self, Self::VoleChallenge) {
         // In a secure version of VOLE, we would populate the transcript with more useful
         // or relevant context about the VOLE instantiation.
