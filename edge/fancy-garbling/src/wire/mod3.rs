@@ -1,6 +1,6 @@
 use crate::{ArithmeticWire, WireLabel, wire::_unrank};
 use fancy_traits::HasModulus;
-use rand::{CryptoRng, Rng, RngCore};
+use rand::{CryptoRng, Rng, RngExt};
 use vectoreyes::U8x16;
 
 /// Intermediate struct to deserialize WireMod3 to
@@ -160,7 +160,7 @@ impl WireMod3 {
 }
 
 impl WireLabel for WireMod3 {
-    fn rand_delta<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
+    fn rand_delta<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self {
         if q != 3 {
             panic!("[WireMod3::rand_delta] Expected modulo 3. Got {}", q);
         }
@@ -197,13 +197,13 @@ impl WireLabel for WireMod3 {
         Self { lsb, msb }
     }
 
-    fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
+    fn rand<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self {
         if q != 3 {
             panic!("[WireMod3::rand] Expected mod 3. Got mod {}", q)
         }
         let mut lsb = 0u64;
         let mut msb = 0u64;
-        for (i, v) in (0..64).map(|_| rng.r#gen::<u8>() % 3).enumerate() {
+        for (i, v) in (0..64).map(|_| rng.random::<u8>() % 3).enumerate() {
             lsb |= ((v & 1) as u64) << i;
             msb |= (((v >> 1) & 1) as u64) << i;
         }
@@ -227,9 +227,9 @@ mod tests {
     #[test]
     fn test_serialize_good_mod3() {
         use crate::{WireLabel, WireMod3};
-        use rand::thread_rng;
+        use rand::rng;
 
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let w = WireMod3::rand(&mut rng, 3);
         let serialized = serde_json::to_string(&w).unwrap();
 
@@ -242,9 +242,9 @@ mod tests {
     #[test]
     fn test_serialize_bad_mod3() {
         use crate::{WireLabel, WireMod3};
-        use rand::thread_rng;
+        use rand::rng;
 
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let mut w = WireMod3::rand(&mut rng, 3);
 
         // lsb and msb can't both be set

@@ -432,7 +432,7 @@ mod test {
     use super::{SvoleAtomic, SvoleAtomicRoundRobin};
     use crate::party::Verifier;
     use crate::svole_trait::SvoleT;
-    use rand::Rng;
+    use rand::RngExt;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
@@ -472,18 +472,18 @@ mod test {
         const CONST_42: u32 = 42;
         const SHIFT: u32 = 100;
         let handle1 = std::thread::spawn(move || {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             for _ in 0..how_many {
-                let random_millis = rng.gen_range(0..=SLEEP_TIME);
+                let random_millis = rng.random_range(0..=SLEEP_TIME);
                 produce(&t1, CONST_42);
                 std::thread::sleep(std::time::Duration::from_millis(random_millis));
             }
         });
 
         let handle2 = std::thread::spawn(move || {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             for _ in 0..how_many {
-                let random_millis = rng.gen_range(0..=SLEEP_TIME);
+                let random_millis = rng.random_range(0..=SLEEP_TIME);
                 produce(&t2, CONST_42 + SHIFT);
                 std::thread::sleep(std::time::Duration::from_millis(random_millis));
             }
@@ -499,9 +499,9 @@ mod test {
         let mut v: Vec<u32> = vec![];
         let mut out = PartyEither::new(Witness::EQUAL_TYPES, &mut v);
         let mut i = 0;
-        let mut other_rng = rand::thread_rng();
+        let mut other_rng = rand::rng();
         for _ in 0..2 * how_many {
-            let random_millis = other_rng.gen_range(0..=SLEEP_TIME);
+            let random_millis = other_rng.random_range(0..=SLEEP_TIME);
             round_robin
                 .extend::<_>(&mut channel, &mut rng, &mut out)
                 .unwrap();

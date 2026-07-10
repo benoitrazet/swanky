@@ -246,11 +246,11 @@ mod test {
         },
     };
     use fancy_plaintext::Dummy;
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt, rng};
 
     #[test]
     fn sign() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let accuracy = "100%";
         let q = modulus_with_width(10);
 
@@ -261,7 +261,7 @@ mod test {
         assert_eq!(output.val(), if x < q / 2 { 0 } else { 1 });
 
         for _ in 0..64 {
-            let x = rng.r#gen::<u128>() % q;
+            let x = rng.random::<u128>() % q;
             let x_input = CrtBundle::from((x, q));
             let output = Dummy::eval(&Sign::new(), (&x_input, accuracy)).unwrap();
             assert_eq!(output.val(), if x < q / 2 { 0 } else { 1 });
@@ -270,19 +270,19 @@ mod test {
 
     #[test]
     fn less_than() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let accuracy = "100%";
         let q = modulus_with_width(10);
 
         // Check that `x < x` works.
-        let x = rng.r#gen::<u128>() % q / 2;
+        let x = rng.random::<u128>() % q / 2;
         let x_input = CrtBundle::from((x, q));
         let output = Dummy::eval(&LessThan::new(), (&x_input, &x_input, accuracy)).unwrap();
         assert_eq!(output.val(), (x < x) as u16);
 
         for _ in 0..64 {
-            let x = rng.r#gen::<u128>() % q / 2;
-            let y = rng.r#gen::<u128>() % q / 2;
+            let x = rng.random::<u128>() % q / 2;
+            let y = rng.random::<u128>() % q / 2;
             let x_input = CrtBundle::from((x, q));
             let y_input = CrtBundle::from((y, q));
             let output = Dummy::eval(&LessThan::new(), (&x_input, &y_input, accuracy)).unwrap();
@@ -292,20 +292,20 @@ mod test {
 
     #[test]
     fn greater_than_or_equal() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let accuracy = "100%";
         let q = modulus_with_width(10);
 
         // Check that `x >= x` works.
-        let x = rng.r#gen::<u128>() % q / 2;
+        let x = rng.random::<u128>() % q / 2;
         let x_input = CrtBundle::from((x, q));
         let output =
             Dummy::eval(&GreaterThanOrEqual::new(), (&x_input, &x_input, accuracy)).unwrap();
         assert_eq!(output.val(), (x >= x) as u16);
 
         for _ in 0..64 {
-            let x = rng.r#gen::<u128>() % q / 2;
-            let y = rng.r#gen::<u128>() % q / 2;
+            let x = rng.random::<u128>() % q / 2;
+            let y = rng.random::<u128>() % q / 2;
             let x_input = CrtBundle::from((x, q));
             let y_input = CrtBundle::from((y, q));
             let output =
@@ -316,13 +316,13 @@ mod test {
 
     #[test]
     fn max() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let accuracy = "100%";
         let q = modulus_with_width(10);
 
         for _ in 0..16 {
             let inputs = (0..100)
-                .map(|_| rng.r#gen::<u128>() % (q / 2))
+                .map(|_| rng.random::<u128>() % (q / 2))
                 .collect::<Vec<_>>();
             let expected = *inputs.iter().max().unwrap();
 
@@ -338,7 +338,7 @@ mod test {
 
     #[test]
     fn sgn() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let accuracy = "100%";
         let q = modulus_with_width(10);
 
@@ -350,7 +350,7 @@ mod test {
         assert_eq!(output, if x < q / 2 { 1 } else { q - 1 });
 
         for _ in 0..64 {
-            let x = rng.r#gen::<u128>() % q;
+            let x = rng.random::<u128>() % q;
             let x_input = CrtBundle::from((x, q));
             let z = Dummy::eval(&Sgn::new(), (&x_input, accuracy, None)).unwrap();
             let output = CrtBundle::from_crt(&z, q);
@@ -360,7 +360,7 @@ mod test {
 
     #[test]
     fn relu() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let accuracy = "100%";
         let q = modulus_with_width(10);
 
@@ -372,7 +372,7 @@ mod test {
         assert_eq!(output, if x < q / 2 { x } else { 0 });
 
         for _ in 0..64 {
-            let x = rng.r#gen::<u128>() % q;
+            let x = rng.random::<u128>() % q;
             let x_input = CrtBundle::from((x, q));
             let z = Dummy::eval(&ReLU::new(), (&x_input, accuracy, None)).unwrap();
             let output = CrtBundle::from_crt(&z, q);

@@ -46,7 +46,7 @@ use swanky_channel::Channel;
 use swanky_oprf_kmprt::{Receiver as KmprtReceiver, Sender as KmprtSender};
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 
-use rand::{CryptoRng, Rng, RngCore, SeedableRng};
+use rand::{CryptoRng, Rng, RngExt, SeedableRng};
 use std::time::SystemTime;
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
@@ -107,7 +107,7 @@ pub struct ReceiverState {
 
 impl Sender {
     /// Initialize the PSI sender.
-    pub fn init<RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn init<RNG: Rng + CryptoRng + SeedableRng>(
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
@@ -129,7 +129,7 @@ impl Sender {
 
     /// PSI with associated payloads for small to moderately sized sets without any
     /// parallelization features.
-    pub fn full_protocol<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
+    pub fn full_protocol<RNG: Rng + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         table: &[Msg],
         payloads: &[Block512],
@@ -137,7 +137,7 @@ impl Sender {
         rng: &mut RNG,
     ) -> swanky_error::Result<()> {
         let mut gb =
-            Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen())).unwrap();
+            Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.random())).unwrap();
 
         let (mut state, nbins, _, _) = self.bucketize_data(table, payloads, channel, rng)?;
 
@@ -156,7 +156,7 @@ impl Sender {
     /// on a Megabin instead of the entirety of the hashed data. The number of Megabin is pre-agreed
     /// on during the bucketization. Users have to specify the GC deltas. If the computation is run
     /// in parallel, the deltas must be synced accross threads.
-    pub fn full_protocol_large<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
+    pub fn full_protocol_large<RNG: Rng + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         table: &[Msg],
         payloads: &[Block512],
@@ -165,7 +165,7 @@ impl Sender {
         rng: &mut RNG,
     ) -> swanky_error::Result<()> {
         let mut gb =
-            Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen())).unwrap();
+            Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.random())).unwrap();
         let _ = gb.load_deltas(path_deltas);
 
         let (state, _nbins, _nmegabins, megasize) =
@@ -202,7 +202,7 @@ impl Sender {
     /// Returns a garbled output over given megabins that the user can open or join with other
     /// threads results using compute_aggregate.
     #[allow(clippy::too_many_arguments)]
-    pub fn compute_payload<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
+    pub fn compute_payload<RNG: Rng + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         ts_id: Vec<Vec<Block512>>,
         ts_payload: Vec<Vec<Block512>>,
@@ -212,7 +212,7 @@ impl Sender {
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<(CrtBundle<AllWire>, CrtBundle<AllWire>)> {
-        let mut gb = Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))?;
+        let mut gb = Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.random()))?;
         let _ = gb.load_deltas(path_deltas);
 
         let qs = &PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
@@ -253,7 +253,7 @@ impl Sender {
 
     /// Aggregates partial grabled outputs encoded as CRTs. Uses the same deltas used by partial
     /// circuits.
-    pub fn compute_aggregates<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
+    pub fn compute_aggregates<RNG: Rng + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         aggregates: Vec<Vec<AllWire>>,
         sum_of_weights: Vec<Vec<AllWire>>,
@@ -262,7 +262,7 @@ impl Sender {
         rng: &mut RNG,
     ) -> swanky_error::Result<()> {
         let mut gb =
-            Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen())).unwrap();
+            Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.random())).unwrap();
         let _ = gb.load_deltas(path_deltas);
 
         let mut acc = CrtBundle::new(aggregates[0].clone());
@@ -283,7 +283,7 @@ impl Sender {
     }
 
     /// Bucketizes data according to the number of bins specified by the Receiver
-    pub fn bucketize_data<RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn bucketize_data<RNG: Rng + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
         payloads: &[Block512],
@@ -299,8 +299,8 @@ impl Sender {
         let mut table = vec![Vec::new(); nbins];
         let mut payload = vec![Vec::new(); nbins];
 
-        let ts_id = (0..nbins).map(|_| rng.r#gen::<Block512>()).collect_vec();
-        let ts_payload = (0..nbins).map(|_| rng.r#gen::<Block512>()).collect_vec();
+        let ts_id = (0..nbins).map(|_| rng.random::<Block512>()).collect_vec();
+        let ts_payload = (0..nbins).map(|_| rng.random::<Block512>()).collect_vec();
 
         for (x, p) in hashes.iter().zip_eq(payloads.iter()) {
             let mut bins = Vec::with_capacity(NHASHES);
@@ -320,8 +320,8 @@ impl Sender {
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
             // table2[j] & payload[j]
             if bins.iter().skip(1).all(|&x| x == bins[0]) {
-                table[bins[0]].push(rng.r#gen());
-                payload[bins[0]].push(rng.r#gen());
+                table[bins[0]].push(rng.random());
+                payload[bins[0]].push(rng.random());
             }
         }
 
@@ -336,7 +336,7 @@ impl Sender {
     }
 
     /// Perform OPPRF on ID's & associated payloads
-    pub fn send_data<RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn send_data<RNG: Rng + CryptoRng + SeedableRng>(
         &mut self,
         state: &mut SenderState,
         nbins: usize,
@@ -386,7 +386,7 @@ impl SenderState {
         Vec<AllWire>,
     )>
     where
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+        RNG: Rng + CryptoRng + SeedableRng<Seed = Block>,
     {
         let my_input_bits = encode_inputs(&self.opprf_ids);
         let my_payload_bits = encode_payloads(&self.opprf_payloads);
@@ -429,7 +429,7 @@ impl SenderState {
         channel: &mut Channel,
     ) -> swanky_error::Result<(CrtBundle<AllWire>, CrtBundle<AllWire>)>
     where
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+        RNG: Rng + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (x, y, x_payload, y_payload, masks) = self.encode_circuit_inputs(gb, channel).unwrap();
         let (outs, sum_weights) =
@@ -441,11 +441,11 @@ impl SenderState {
 
 impl Receiver {
     /// Initialize the PSI receiver.
-    pub fn init<RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn init<RNG: Rng + CryptoRng + SeedableRng>(
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
-        let key = rng.r#gen();
+        let key = rng.random();
         channel.write(&key)?;
 
         let opprf = KmprtReceiver::init(channel, rng).wrap_err(
@@ -465,7 +465,7 @@ impl Receiver {
 
     /// PSI with associated payloads for small to moderately sized sets without any
     /// parallelization features.
-    pub fn full_protocol<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
+    pub fn full_protocol<RNG: Rng + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         table: &[Msg],
         payloads: &[Block512],
@@ -473,7 +473,7 @@ impl Receiver {
         rng: &mut RNG,
     ) -> swanky_error::Result<u128> {
         let mut ev =
-            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
+            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.random()))
                 .unwrap();
         let qs = &PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
 
@@ -505,7 +505,7 @@ impl Receiver {
     /// on a Megabin instead of the entirety of the hashed data. The number of Megabin is pre-agreed
     /// on during the bucketization. Users have to specify the GC deltas. If the computation is run
     /// in parallel, the deltas must be synced accross threads.
-    pub fn full_protocol_large<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
+    pub fn full_protocol_large<RNG: Rng + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         table: &[Msg],
         payloads: &[Block512],
@@ -514,7 +514,7 @@ impl Receiver {
         rng: &mut RNG,
     ) -> swanky_error::Result<u128> {
         let mut ev =
-            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
+            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.random()))
                 .unwrap();
         let qs = &PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
 
@@ -539,7 +539,7 @@ impl Receiver {
     /// were precomputed.
     /// Returns a garbled output over given megabins that the user can open or join with other
     /// threads results using compute_aggregate.
-    pub fn compute_payload<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
+    pub fn compute_payload<RNG: Rng + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         table: Vec<Vec<Block>>,
         payload: Vec<Vec<Block512>>,
@@ -547,7 +547,7 @@ impl Receiver {
         rng: &mut RNG,
     ) -> swanky_error::Result<(CrtBundle<AllWire>, CrtBundle<AllWire>)> {
         let mut ev =
-            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
+            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.random()))
                 .unwrap();
         let qs = &PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
         let q = product(qs);
@@ -586,7 +586,7 @@ impl Receiver {
 
     /// Aggregates partial grabled outputs encoded as CRTs. Uses the same deltas used by partial
     /// circuits.
-    pub fn compute_aggregates<RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>>(
+    pub fn compute_aggregates<RNG: Rng + CryptoRng + SeedableRng<Seed = Block>>(
         &mut self,
         aggregates: Vec<Vec<AllWire>>,
         sum_of_weights: Vec<Vec<AllWire>>,
@@ -594,7 +594,7 @@ impl Receiver {
         rng: &mut RNG,
     ) -> swanky_error::Result<u128> {
         let mut ev =
-            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
+            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.random()))
                 .unwrap();
 
         let qs = &PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
@@ -626,7 +626,7 @@ impl Receiver {
     }
 
     /// For small to moderate sized sets, bucketizes using Cuckoo Hashing
-    pub fn bucketize_data<RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn bucketize_data<RNG: Rng + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
         payloads: &[Block512],
@@ -647,7 +647,7 @@ impl Receiver {
             .iter()
             .map(|opt_item| match opt_item {
                 Some(item) => item.entry_with_hindex(),
-                None => rng.r#gen(),
+                None => rng.random(),
             })
             .collect::<Vec<Block>>();
 
@@ -657,7 +657,7 @@ impl Receiver {
             .iter()
             .map(|opt_item| match opt_item {
                 Some(item) => payloads[item.input_index],
-                None => rng.r#gen::<Block512>(),
+                None => rng.random::<Block512>(),
             })
             .collect::<Vec<Block512>>();
 
@@ -670,7 +670,7 @@ impl Receiver {
     ///            megabin_id =  ch_id / megabin_size;
     /// A megabin is a collection of bins, typically specified by the total number of elements that
     /// can be handled at a time (megabin_size).
-    pub fn bucketize_data_large<RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn bucketize_data_large<RNG: Rng + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
         payloads: &[Block512],
@@ -698,7 +698,7 @@ impl Receiver {
                     .iter()
                     .map(|opt_item| match opt_item {
                         Some(item) => item.entry_with_hindex(),
-                        None => rng.r#gen::<Block>(),
+                        None => rng.random::<Block>(),
                     })
                     .collect::<Vec<Block>>()
             })
@@ -711,7 +711,7 @@ impl Receiver {
                     .iter()
                     .map(|opt_item| match opt_item {
                         Some(item) => payloads[item.input_index],
-                        None => rng.r#gen::<Block512>(),
+                        None => rng.random::<Block512>(),
                     })
                     .collect::<Vec<Block512>>()
             })
@@ -721,7 +721,7 @@ impl Receiver {
     }
 
     /// Receive outputs of the OPPRF
-    pub fn receive_data<RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn receive_data<RNG: Rng + CryptoRng + SeedableRng>(
         &mut self,
         state: &mut ReceiverState,
         channel: &mut Channel,
@@ -753,7 +753,7 @@ impl ReceiverState {
         Vec<AllWire>,
     )>
     where
-        RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
     {
         let my_input_bits = encode_inputs(&self.opprf_ids);
         let my_opprf_output = encode_opprf_payload(&self.opprf_payloads);
@@ -794,7 +794,7 @@ impl ReceiverState {
         channel: &mut Channel,
     ) -> swanky_error::Result<(CrtBundle<AllWire>, CrtBundle<AllWire>)>
     where
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+        RNG: Rng + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (x, y, x_payload, y_payload, masks) = self.encode_circuit_inputs(ev, channel)?;
 
@@ -965,7 +965,7 @@ fn mask_payload_crt<RNG: rand::Rng + Sized>(x: Block512, y: Block512, rng: &mut 
         if i < res.len() {
             block[i] = res[i];
         } else {
-            block[i] = rng.r#gen::<u8>(); // TODO: mod rest of prime
+            block[i] = rng.random::<u8>(); // TODO: mod rest of prime
         }
     }
     Block512::from(block)
@@ -1027,7 +1027,7 @@ impl SemiHonest for Receiver {}
 mod tests {
     use super::*;
     use crate::utils::rand_u64_vec;
-    use rand::{prelude::SliceRandom, thread_rng};
+    use rand::{prelude::SliceRandom, rng};
     use std::collections::HashMap;
     use swanky_block::Block512;
     use swanky_rng::SwankyRng;
@@ -1036,7 +1036,7 @@ mod tests {
 
     fn enum_ids_shuffled(n: usize, id_size: usize) -> Vec<Vec<u8>> {
         let mut vec: Vec<u64> = (0..n as u64).collect();
-        vec.shuffle(&mut thread_rng());
+        vec.shuffle(&mut rng());
         let mut ids = Vec::with_capacity(n);
         for x in vec.iter().take(n) {
             let v: Vec<u8> = x.to_le_bytes().iter().take(id_size).cloned().collect();

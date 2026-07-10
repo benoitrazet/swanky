@@ -1,12 +1,12 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_garbling::{AllWire, WireLabel, util::RngExt};
-use rand::Rng;
+use rand::RngExt as RandRngExt;
 use std::time::Duration;
 use swanky_rng::SwankyRng;
 
 fn bench_unpack(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::from_block ({})", p), move |b| {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         let x = rng.gen_usable_block(p);
         b.iter(|| {
             let w = AllWire::from_repr(x, p);
@@ -17,7 +17,7 @@ fn bench_unpack(c: &mut Criterion, p: u16) {
 
 fn bench_pack(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::as_block ({})", p), move |b| {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         let w = AllWire::rand(rng, p);
         b.iter(|| {
             let x = w.to_repr();
@@ -28,7 +28,7 @@ fn bench_pack(c: &mut Criterion, p: u16) {
 
 fn bench_plus(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::plus ({})", p), move |b| {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         let x = AllWire::rand(rng, p);
         let y = AllWire::rand(rng, p);
         b.iter(|| {
@@ -40,7 +40,7 @@ fn bench_plus(c: &mut Criterion, p: u16) {
 
 fn bench_minus(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::minus ({})", p), move |b| {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         let x = AllWire::rand(rng, p);
         let y = AllWire::rand(rng, p);
         b.iter(|| {
@@ -52,9 +52,9 @@ fn bench_minus(c: &mut Criterion, p: u16) {
 
 fn bench_cmul(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::cmul ({})", p), move |b| {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         let x = AllWire::rand(rng, p);
-        let c = rng.r#gen::<u16>();
+        let c = rng.random::<u16>();
         b.iter(|| {
             let z = x.clone() * c;
             std::hint::black_box(z);
@@ -64,7 +64,7 @@ fn bench_cmul(c: &mut Criterion, p: u16) {
 
 fn bench_negate(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::negate ({})", p), move |b| {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         let x = AllWire::rand(rng, p);
         b.iter(|| {
             let z = -x.clone();
@@ -75,7 +75,7 @@ fn bench_negate(c: &mut Criterion, p: u16) {
 
 fn bench_hash(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::hash ({})", p), move |b| {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         let tweak = rand::random::<u128>();
         let x = AllWire::rand(rng, p);
         b.iter(|| {
@@ -87,7 +87,7 @@ fn bench_hash(c: &mut Criterion, p: u16) {
 
 fn bench_hashback(c: &mut Criterion, q: u16) {
     c.bench_function(&format!("wire::hashback ({})", q), move |b| {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         let tweak = rand::random::<u128>();
         let wire = AllWire::rand(rng, q);
         b.iter(|| {

@@ -164,7 +164,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use rand::Rng;
+    use rand::RngExt as RandRngExt;
 
     use crate::{
         CrtBundle,
@@ -189,12 +189,12 @@ mod test {
             ds
         }
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _ in 0..8 {
             let ps = rng.gen_usable_factors();
             let q = product(&ps);
 
-            let x = rng.r#gen::<u128>() % q;
+            let x = rng.random::<u128>() % q;
             let expected = to_pmr_pt(x, &ps);
 
             let x_input = CrtBundle::from((x, q));
@@ -206,14 +206,14 @@ mod test {
 
     #[test]
     fn pmr_less_than() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _ in 0..8 {
             let qs = rng.gen_usable_factors();
             let n = qs.len();
             let q = product(&qs);
             let q_ = product(&qs[..n - 1]);
-            let x = rng.r#gen::<u128>() % q_;
-            let y = rng.r#gen::<u128>() % q_;
+            let x = rng.random::<u128>() % q_;
+            let y = rng.random::<u128>() % q_;
 
             let x_input = CrtBundle::from((x, q));
             let y_input = CrtBundle::from((y, q));
@@ -224,14 +224,14 @@ mod test {
 
     #[test]
     fn pmr_greater_than_or_equal() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _ in 0..8 {
             let qs = rng.gen_usable_factors();
             let n = qs.len();
             let q = product(&qs);
             let q_ = product(&qs[..n - 1]);
-            let x = rng.r#gen::<u128>() % q_;
-            let y = rng.r#gen::<u128>() % q_;
+            let x = rng.random::<u128>() % q_;
+            let y = rng.random::<u128>() % q_;
 
             let x_input = CrtBundle::from((x, q));
             let y_input = CrtBundle::from((y, q));

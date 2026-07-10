@@ -1251,7 +1251,7 @@ pub mod interactive {
 
     #[test]
     fn test_small() {
-        let mut rng = SwankyRng::from_entropy();
+        let mut rng = SwankyRng::from_rng(&mut rand::rng());
         let (ckt, w) = simple_arith_circuit::circuitgen::simple_test_circuit::<TestField>();
 
         let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
@@ -1623,7 +1623,7 @@ pub mod noninteractive {
 
     #[test]
     fn test_small() {
-        let mut rng = SwankyRng::from_entropy();
+        let mut rng = SwankyRng::from_rng(&mut rand::rng());
         let (ckt, w) = simple_arith_circuit::circuitgen::simple_test_circuit::<TestField>();
 
         let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);

@@ -2,6 +2,8 @@
 //!
 //! Note: all number representations in this library are little-endian.
 
+use rand::RngExt as RandRngExt;
+
 use fancy_circuits::util::as_mixed_radix;
 use vectoreyes::U8x16;
 
@@ -79,12 +81,12 @@ pub trait RngExt: rand::Rng + Sized {
         if modulus.is_power_of_two() {
             let nbits = (modulus - 1).count_ones();
             if 128 % nbits == 0 {
-                return U8x16::from(self.r#gen::<u128>());
+                return U8x16::from(self.random::<u128>());
             }
         }
         let n = digits_per_u128(modulus);
         let max = (modulus as u128).pow(n as u32);
-        U8x16::from(self.r#gen::<u128>() % max)
+        U8x16::from(self.random::<u128>() % max)
     }
 }
 
@@ -94,11 +96,11 @@ impl<R: rand::Rng + Sized> RngExt for R {}
 mod tests {
     use super::*;
     use fancy_circuits::util::RngExt as _;
-    use rand::thread_rng;
+    use rand::rng;
 
     #[test]
     fn base_q_conversion() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         for _ in 0..1000 {
             let q = rng.gen_modulus();
             let x = u128::from(rng.gen_usable_block(q));

@@ -82,15 +82,15 @@ pub mod test {
     #[test]
     fn binary_twos_complement() {
         use fancy_plaintext::Dummy;
-        use rand::Rng;
+        use rand::RngExt;
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let nbits = 64;
         let q = 1 << nbits;
         let c = TestBinaryTwosComplement(nbits);
 
         for _ in 0..16 {
-            let x = rng.r#gen::<u128>() % q;
+            let x = rng.random::<u128>() % q;
             let x_input = BinaryBundle::from((x, nbits));
             let output = Dummy::eval(&c, x_input).unwrap();
             assert_eq!(Into::<u128>::into(output), (((!x) % q) + 1) % q);

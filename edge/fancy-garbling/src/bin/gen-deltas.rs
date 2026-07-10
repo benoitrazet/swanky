@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 fn main() {
     let mut deltas = HashMap::new();
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     for arg in std::env::args().skip(1) {
         match arg.as_str() {
             "-h" | "--help" => usage_and_exit(),

@@ -215,17 +215,17 @@ mod test {
         },
     };
     use fancy_plaintext::Dummy;
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt, rng};
 
     #[test]
     fn binary_multiplication() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let nbits = 64;
         let q = 1 << nbits;
 
         for _ in 0..16 {
-            let x = rng.r#gen::<u128>() % q;
-            let y = rng.r#gen::<u128>() % q;
+            let x = rng.random::<u128>() % q;
+            let y = rng.random::<u128>() % q;
             let x_input = BinaryBundle::from((x, nbits));
             let y_input = BinaryBundle::from((y, nbits));
             let output = Dummy::eval(&BinaryMultiplication::new(), (&x_input, &y_input)).unwrap();
@@ -235,13 +235,13 @@ mod test {
 
     #[test]
     fn binary_multiplication_lower_half() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let nbits = 64;
         let q = 1 << nbits;
 
         for _ in 0..16 {
-            let x = rng.r#gen::<u128>() % q;
-            let y = rng.r#gen::<u128>() % q;
+            let x = rng.random::<u128>() % q;
+            let y = rng.random::<u128>() % q;
             let x_input = BinaryBundle::from((x, nbits));
             let y_input = BinaryBundle::from((y, nbits));
             let output =
@@ -252,13 +252,13 @@ mod test {
 
     #[test]
     fn binary_constant_multiplication() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let nbits = 64;
         let q = 1 << nbits;
 
         for _ in 0..16 {
-            let x = rng.r#gen::<u128>() % q;
-            let c = rng.r#gen::<u128>() % q;
+            let x = rng.random::<u128>() % q;
+            let c = rng.random::<u128>() % q;
             let x_input = BinaryBundle::from((x, nbits));
             let output =
                 Dummy::eval(&BinaryConstantMultiplication::new(), (&x_input, c, nbits)).unwrap();

@@ -1,4 +1,5 @@
 use generic_array::{GenericArray, typenum::U128};
+use rand::RngExt;
 
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
@@ -102,7 +103,7 @@ impl FiniteRing for F8b {
     }
 
     fn random<R: rand::prelude::Rng + ?Sized>(rng: &mut R) -> Self {
-        let x: u8 = rng.r#gen();
+        let x: u8 = rng.random();
         Self(x)
     }
     const ZERO: Self = Self(0);

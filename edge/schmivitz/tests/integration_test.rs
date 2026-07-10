@@ -1,6 +1,6 @@
 mod test {
     use merlin::Transcript;
-    use rand::thread_rng;
+    use rand::rng;
     use schmivitz::{
         Proof,
         circuit::Circuit,
@@ -34,7 +34,7 @@ mod test {
     ) -> (Result<Proof<VoleProver, VoleVerifier>>, Circuit) {
         let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
 
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
 
         let t = std::time::Instant::now();
         let t1 = Proof::prove_with_circuit::<_>(&circuit, &mut transcript(), rng);
@@ -106,7 +106,7 @@ mod test {
         assert!(verif.is_ok());
 
         // Verify the compiled circuit with the dynamic circuit.
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let max_wire_id = 2;
         let proof = Proof::<VoleProver, VoleVerifier>::prove(
             DoesntExplode,
@@ -162,7 +162,7 @@ mod test {
         let verif = proof.verify(AssertZero, &mut transcript());
         assert!(verif.is_ok());
 
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let max_wire_id = 2;
         let proof = Proof::<VoleProver, VoleVerifier>::prove(
             AssertZero,
@@ -319,7 +319,7 @@ mod test {
         log::info!("parsing: {:?}", t.elapsed());
 
         let t = std::time::Instant::now();
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit::<_>(
             &circuit,
             &mut transcript(),
@@ -354,7 +354,7 @@ mod test {
         log::info!("parsing: {:?}", t.elapsed());
 
         let t = std::time::Instant::now();
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit::<_>(
             &circuit,
             &mut transcript(),

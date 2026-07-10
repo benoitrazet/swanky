@@ -5,7 +5,7 @@ use fancy_analyzer::CircuitAnalyzer;
 use fancy_circuits::{BinaryBundle, BinaryGadgets, LinearOram};
 use fancy_garbling::AllWire;
 use fancy_traits::{Circuit, FancyOutput};
-use rand::{CryptoRng, RngCore, SeedableRng};
+use rand::{CryptoRng, Rng, SeedableRng};
 use swanky_block::Block;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -44,7 +44,7 @@ fn ev_set_inputs<F: BinaryGadgets>(
     Ok((ram, query))
 }
 
-fn gb_linear_oram<RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>>(
+fn gb_linear_oram<RNG: CryptoRng + Rng + SeedableRng<Seed = Block>>(
     inputs: &[u128],
     channel: &mut Channel,
     rng: RNG,
@@ -62,7 +62,7 @@ fn gb_linear_oram<RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>>(
     Ok(())
 }
 
-fn ev_linear_oram<RNG: CryptoRng + RngCore>(
+fn ev_linear_oram<RNG: CryptoRng + Rng>(
     input: u128,
     channel: &mut Channel,
     rng: RNG,

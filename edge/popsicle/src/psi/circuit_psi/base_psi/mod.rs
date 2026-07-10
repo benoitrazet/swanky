@@ -2,7 +2,7 @@
 //! inputs prior to calling the circuit in the circuit psi
 use crate::circuit_psi::*;
 use fancy_traits::FancyEncode;
-use rand::{CryptoRng, RngCore, SeedableRng};
+use rand::{CryptoRng, SeedableRng};
 use swanky_channel::Channel;
 
 // The number of hash functions that will be used to attempt to
@@ -35,7 +35,7 @@ pub trait BasePsi {
     ) -> swanky_error::Result<Self>
     where
         Self: Sized,
-        RNG: RngCore + CryptoRng + SeedableRng;
+        RNG: Rng + CryptoRng + SeedableRng;
     /// Parties locally hash their inputs
     ///
     /// This allows them to agree on an ordering of their inputs.
@@ -47,7 +47,7 @@ pub trait BasePsi {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: RngCore + CryptoRng + SeedableRng;
+        RNG: Rng + CryptoRng + SeedableRng;
     /// Parties call an OPPRF on their inputs
     ///
     /// This allows them to agree on a hidden representation of
@@ -61,7 +61,7 @@ pub trait BasePsi {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: RngCore + CryptoRng + SeedableRng;
+        RNG: Rng + CryptoRng + SeedableRng;
     /// Parties turn their inputs into garbled wires
     fn encode_circuit_inputs<F>(
         &mut self,
@@ -82,7 +82,7 @@ pub trait BasePsi {
     where
         Self: Sized,
         F: FancyEncode,
-        RNG: RngCore + CryptoRng + SeedableRng,
+        RNG: Rng + CryptoRng + SeedableRng,
     {
         let has_payloads = payloads.is_some();
 

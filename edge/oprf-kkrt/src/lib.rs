@@ -8,7 +8,7 @@
 mod prc;
 
 use prc::PseudorandomCode;
-use rand::{CryptoRng, Rng, RngCore, SeedableRng};
+use rand::{CryptoRng, Rng, RngExt, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
@@ -44,7 +44,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
         let mut s_ = [0u8; 64];
         rng.fill_bytes(&mut s_);
         let s = swanky_deprecated_bitwise_utils::u8vec_to_boolvec(&s_);
-        let seeds = (0..4).map(|_| rng.r#gen()).collect::<Vec<Block>>();
+        let seeds = (0..4).map(|_| rng.random()).collect::<Vec<Block>>();
         let keys = swanky_cointoss::send(channel, &seeds)?;
         let code = PseudorandomCode::new(keys[0], keys[1], keys[2], keys[3]);
         let ks = ot.receive(channel, &s, rng)?;
@@ -140,7 +140,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let mut ot = OT::init(channel, rng)?;
-        let seeds = (0..4).map(|_| rng.r#gen()).collect::<Vec<Block>>();
+        let seeds = (0..4).map(|_| rng.random()).collect::<Vec<Block>>();
         let keys = swanky_cointoss::receive(channel, &seeds)?;
         let code = PseudorandomCode::new(keys[0], keys[1], keys[2], keys[3]);
         let mut ks = Vec::with_capacity(512);

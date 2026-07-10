@@ -54,19 +54,19 @@ where
 mod test {
     use crate::{BinaryBundle, binary::BinaryDivision};
     use fancy_plaintext::Dummy;
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt, rng};
 
     #[test]
     fn test_binary_division() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let nbits = 64;
         let q = 1 << nbits;
 
         for _ in 0..16 {
-            let x = rng.r#gen::<u128>() % q;
-            let mut y = rng.r#gen::<u128>() % q;
+            let x = rng.random::<u128>() % q;
+            let mut y = rng.random::<u128>() % q;
             while y == 0 {
-                y = rng.r#gen::<u128>() % q;
+                y = rng.random::<u128>() % q;
             }
             let x_input = BinaryBundle::from((x, nbits));
             let y_input = BinaryBundle::from((y, nbits));

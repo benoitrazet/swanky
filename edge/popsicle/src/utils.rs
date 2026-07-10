@@ -1,6 +1,6 @@
 //! Util mostly in support of cuckoo hashing.
 
-use rand::{CryptoRng, Rng};
+use rand::{CryptoRng, Rng, RngExt};
 use sha2::{Digest, Sha256};
 use swanky_block::Block;
 use swanky_cr_hash::CorrelationRobustHash;
@@ -34,7 +34,7 @@ pub fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: Block) -> Vec<Block> {
 #[allow(dead_code)]
 /// used in tests
 pub fn rand_vec<RNG: CryptoRng + Rng>(n: usize, rng: &mut RNG) -> Vec<u8> {
-    (0..n).map(|_| rng.r#gen()).collect()
+    (0..n).map(|_| rng.random()).collect()
 }
 
 #[allow(dead_code)]
@@ -46,7 +46,7 @@ pub fn rand_vec_vec<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut RNG) -> 
 #[allow(dead_code)]
 /// used in tests
 pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64> {
-    (0..n).map(|_| rng.r#gen::<u64>() % modulus).collect()
+    (0..n).map(|_| rng.random::<u64>() % modulus).collect()
 }
 
 #[cfg(test)]
@@ -57,7 +57,7 @@ mod tests {
     #[test]
     fn test_compress_and_hash_inputs() {
         let mut rng = SwankyRng::new();
-        let key = rng.r#gen::<Block>();
+        let key = rng.random::<Block>();
         let inputs = rand_vec_vec(13, 16, &mut rng);
         let _ = compress_and_hash_inputs(&inputs, key);
     }

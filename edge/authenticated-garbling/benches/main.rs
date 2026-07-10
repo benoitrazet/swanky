@@ -10,7 +10,7 @@ use fancy_circuits::{
     },
 };
 use fancy_traits::FancyEncode;
-use rand::Rng;
+use rand::RngExt;
 use swanky_authenticated_garbling::{Evaluator, Garbler};
 use swanky_rng::SwankyRng;
 
@@ -67,8 +67,12 @@ fn bench_single_and_gate(c: &mut Criterion) {
     let circuit = TestAndGateFanN(ninputs_gb + ninputs_ev);
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
-    let inputs_gb: Vec<u16> = (0..ninputs_gb).map(|_| rng_gb.r#gen::<u16>() % 2).collect();
-    let inputs_ev: Vec<u16> = (0..ninputs_ev).map(|_| rng_ev.r#gen::<u16>() % 2).collect();
+    let inputs_gb: Vec<u16> = (0..ninputs_gb)
+        .map(|_| rng_gb.random::<u16>() % 2)
+        .collect();
+    let inputs_ev: Vec<u16> = (0..ninputs_ev)
+        .map(|_| rng_ev.random::<u16>() % 2)
+        .collect();
     c.bench_function(
         &format!("single-and-gate::input-sizes::({},{})", 1, 1),
         move |b| {
@@ -83,8 +87,8 @@ fn bench_constant_gates(c: &mut Criterion) {
     let circuit = TestBinaryConstant;
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
-    let inputs_gb: Vec<u16> = (0..0).map(|_| rng_gb.r#gen::<u16>() % 2).collect();
-    let inputs_ev: Vec<u16> = (0..0).map(|_| rng_ev.r#gen::<u16>() % 2).collect();
+    let inputs_gb: Vec<u16> = (0..0).map(|_| rng_gb.random::<u16>() % 2).collect();
+    let inputs_ev: Vec<u16> = (0..0).map(|_| rng_ev.random::<u16>() % 2).collect();
     c.bench_function(
         &format!("test_constant_gates::input-sizes::({},{})", 0, 0),
         move |b| {
@@ -101,8 +105,12 @@ fn bench_and_gate_fan_n(c: &mut Criterion) {
     let circuit = TestAndGateFanN(ninputs_gb + ninputs_ev);
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
-    let inputs_gb: Vec<u16> = (0..ninputs_gb).map(|_| rng_gb.r#gen::<u16>() % 2).collect();
-    let inputs_ev: Vec<u16> = (0..ninputs_ev).map(|_| rng_ev.r#gen::<u16>() % 2).collect();
+    let inputs_gb: Vec<u16> = (0..ninputs_gb)
+        .map(|_| rng_gb.random::<u16>() % 2)
+        .collect();
+    let inputs_ev: Vec<u16> = (0..ninputs_ev)
+        .map(|_| rng_ev.random::<u16>() % 2)
+        .collect();
     c.bench_function(
         &format!("and-gate-fan-n::input-sizes::({ninputs_gb},{ninputs_ev})"),
         move |b| {
@@ -119,8 +127,12 @@ fn bench_or_gate_fan_n(c: &mut Criterion) {
     let circuit = TestOrGateFanN(ninputs_gb + ninputs_ev);
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
-    let inputs_gb: Vec<u16> = (0..ninputs_gb).map(|_| rng_gb.r#gen::<u16>() % 2).collect();
-    let inputs_ev: Vec<u16> = (0..ninputs_ev).map(|_| rng_ev.r#gen::<u16>() % 2).collect();
+    let inputs_gb: Vec<u16> = (0..ninputs_gb)
+        .map(|_| rng_gb.random::<u16>() % 2)
+        .collect();
+    let inputs_ev: Vec<u16> = (0..ninputs_ev)
+        .map(|_| rng_ev.random::<u16>() % 2)
+        .collect();
     c.bench_function(
         &format!("or-gate-fan-n::input-sizes::({ninputs_gb},{ninputs_ev})"),
         move |b| {
@@ -138,8 +150,12 @@ fn bench_xor_gate_fan_n(c: &mut Criterion) {
 
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
-    let inputs_gb: Vec<u16> = (0..ninputs_gb).map(|_| rng_gb.r#gen::<u16>() % 2).collect();
-    let inputs_ev: Vec<u16> = (0..ninputs_ev).map(|_| rng_ev.r#gen::<u16>() % 2).collect();
+    let inputs_gb: Vec<u16> = (0..ninputs_gb)
+        .map(|_| rng_gb.random::<u16>() % 2)
+        .collect();
+    let inputs_ev: Vec<u16> = (0..ninputs_ev)
+        .map(|_| rng_ev.random::<u16>() % 2)
+        .collect();
     c.bench_function(
         &format!("xor-gate-fan-n::input-sizes::({ninputs_gb},{ninputs_ev})"),
         move |b| {
@@ -156,8 +172,8 @@ fn bench_binary_addition(c: &mut Criterion) {
 
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
-    let inputs_gb: Vec<u16> = (0..ninputs).map(|_| rng_gb.r#gen::<u16>() % 2).collect();
-    let inputs_ev: Vec<u16> = (0..ninputs).map(|_| rng_ev.r#gen::<u16>() % 2).collect();
+    let inputs_gb: Vec<u16> = (0..ninputs).map(|_| rng_gb.random::<u16>() % 2).collect();
+    let inputs_ev: Vec<u16> = (0..ninputs).map(|_| rng_ev.random::<u16>() % 2).collect();
     c.bench_function(
         &format!("binary-addition::input-sizes::({ninputs},{ninputs})"),
         move |b| {
@@ -174,8 +190,8 @@ fn bench_binary_subtraction(c: &mut Criterion) {
 
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
-    let inputs_gb: Vec<u16> = (0..ninputs).map(|_| rng_gb.r#gen::<u16>() % 2).collect();
-    let inputs_ev: Vec<u16> = (0..ninputs).map(|_| rng_ev.r#gen::<u16>() % 2).collect();
+    let inputs_gb: Vec<u16> = (0..ninputs).map(|_| rng_gb.random::<u16>() % 2).collect();
+    let inputs_ev: Vec<u16> = (0..ninputs).map(|_| rng_ev.random::<u16>() % 2).collect();
     c.bench_function(
         &format!("binary-subtraction::input-sizes::({ninputs},{ninputs})"),
         move |b| {
@@ -190,10 +206,10 @@ fn bench_aes(c: &mut Criterion) {
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
     let inputs_gb = (0..128)
-        .map(|_| rng_gb.r#gen::<u16>() % 2)
+        .map(|_| rng_gb.random::<u16>() % 2)
         .collect::<Vec<_>>();
     let inputs_ev = (0..128)
-        .map(|_| rng_gb.r#gen::<u16>() % 2)
+        .map(|_| rng_gb.random::<u16>() % 2)
         .collect::<Vec<_>>();
 
     let circuit = AesNonExpanded::new();

@@ -3,7 +3,7 @@
 
 use crate::Error;
 use itertools::Itertools;
-use rand::{CryptoRng, Rng, RngCore, SeedableRng};
+use rand::{CryptoRng, Rng, RngExt, SeedableRng};
 use swanky_block::{Block, Block512};
 use swanky_channel_legacy::AbstractChannel;
 use swanky_oprf_kmprt::{Receiver as KmprtReceiver, Sender as KmprtSender};
@@ -26,7 +26,7 @@ pub struct Receiver(Party);
 
 impl Sender {
     /// Initialize a PSI sender.
-    pub fn init<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn init<C: AbstractChannel, RNG: Rng + CryptoRng + SeedableRng>(
         me: PartyId,
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
@@ -35,7 +35,7 @@ impl Sender {
     }
 
     /// Send inputs to all parties and particpate in one party receiving the output.
-    pub fn send<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn send<C: AbstractChannel, RNG: Rng + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Block],
         channels: &mut [(PartyId, C)],
@@ -55,7 +55,7 @@ impl Sender {
 
 impl Receiver {
     /// Initialize the PSI receiver.
-    pub fn init<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn init<C: AbstractChannel, RNG: Rng + CryptoRng + SeedableRng>(
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -63,7 +63,7 @@ impl Receiver {
     }
 
     /// Send inputs and receive result - only one party should call this.
-    pub fn receive<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn receive<C: AbstractChannel, RNG: Rng + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Block],
         channels: &mut [(PartyId, C)],
@@ -96,7 +96,7 @@ impl Receiver {
 }
 
 impl Party {
-    fn init<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    fn init<C: AbstractChannel, RNG: Rng + CryptoRng + SeedableRng>(
         me: PartyId,
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
@@ -124,7 +124,7 @@ impl Party {
 
     /// Share secret shares of zero using OPPRF, returning the xor of the OPPRF outputs -
     /// this phase is common to both the senders and the receiver.
-    fn conditional_secret_sharing<C: AbstractChannel, RNG: RngCore + CryptoRng + SeedableRng>(
+    fn conditional_secret_sharing<C: AbstractChannel, RNG: Rng + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Block],
         channels: &mut [(PartyId, C)],
@@ -172,7 +172,7 @@ fn secret_sharing_of_zero<R: Rng>(nparties: usize, rng: &mut R) -> Vec<Block512>
     let mut sum = Block512::default();
     let mut shares = (0..nparties - 1)
         .map(|_| {
-            let b = rng.r#gen();
+            let b = rng.random();
             sum ^= b;
             b
         })
@@ -184,7 +184,6 @@ fn secret_sharing_of_zero<R: Rng>(nparties: usize, rng: &mut R) -> Vec<Block512>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::Rng;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
@@ -195,7 +194,7 @@ mod tests {
     #[test]
     fn test_secret_sharing_of_zero() {
         let mut rng = SwankyRng::new();
-        let nparties = (rng.r#gen::<usize>() % 98) + 2;
+        let nparties = rng.random_range(..98usize) + 2;
         let shares = secret_sharing_of_zero(nparties, &mut rng);
         assert!(shares.len() == nparties);
         let mut sum = Block512::default();
@@ -212,15 +211,15 @@ mod tests {
         let mut rng = SwankyRng::new();
 
         let nparties = 3;
-        let set_size = 1 << 6;
-        let intersection_size = rng.r#gen::<usize>() % set_size;
+        let set_size: usize = 1 << 6;
+        let intersection_size = rng.random_range(..set_size);
         let intersection = (0..intersection_size)
-            .map(|_| rng.r#gen::<Block>())
+            .map(|_| rng.random::<Block>())
             .collect_vec();
         let mut set1 = intersection.clone();
         let mut set2 = intersection.clone();
-        set1.extend((intersection_size..set_size).map(|_| rng.r#gen::<Block>()));
-        set2.extend((intersection_size..set_size).map(|_| rng.r#gen::<Block>()));
+        set1.extend((intersection_size..set_size).map(|_| rng.random::<Block>()));
+        set2.extend((intersection_size..set_size).map(|_| rng.random::<Block>()));
 
         // create channels
         let mut channels = (0..nparties)

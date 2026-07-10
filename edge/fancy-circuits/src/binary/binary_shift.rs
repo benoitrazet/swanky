@@ -183,16 +183,16 @@ mod test {
         },
     };
     use fancy_plaintext::Dummy;
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt, rng};
 
     #[test]
     fn left_shift() {
         const N: usize = 64;
-        let mut rng = thread_rng();
+        let mut rng = rng();
 
         for _ in 0..16 {
-            let shift_size = rng.r#gen::<usize>() % N;
-            let x = rng.r#gen::<u64>();
+            let shift_size = rng.random_range(..N);
+            let x = rng.random::<u64>();
             let input = BinaryBundle::from((x as u128, N));
             let output =
                 Dummy::eval(&BinaryLeftShift::new(), (&input, shift_size as usize)).unwrap();
@@ -205,13 +205,13 @@ mod test {
 
     #[test]
     fn left_shift_extend() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let nbits = 64;
         let q = 1 << nbits;
 
         for _ in 0..16 {
-            let shift_size = rng.r#gen::<usize>() % nbits;
-            let x = rng.r#gen::<u128>() % q;
+            let shift_size = rng.random_range(..nbits);
+            let x = rng.random::<u128>() % q;
             let input = BinaryBundle::from((x, nbits));
             let output = Dummy::eval(&BinaryLeftShiftExtend::new(), (&input, shift_size)).unwrap();
             assert_eq!(Into::<u128>::into(output), x << shift_size);
@@ -221,11 +221,11 @@ mod test {
     #[test]
     fn logical_right_shift() {
         const N: usize = 64;
-        let mut rng = thread_rng();
+        let mut rng = rng();
 
         for _ in 0..16 {
-            let shift_size = rng.r#gen::<usize>() % N;
-            let x = rng.r#gen::<u64>();
+            let shift_size = rng.random_range(..N);
+            let x = rng.random::<u64>();
             let input = BinaryBundle::from((x as u128, N));
             let output = Dummy::eval(
                 &BinaryLogicalRightShift::new(),
@@ -240,11 +240,11 @@ mod test {
     fn arithmetic_right_shift() {
         const N: usize = 64;
         const Q: u128 = 1 << N;
-        let mut rng = thread_rng();
+        let mut rng = rng();
 
         for _ in 0..16 {
-            let x = rng.r#gen::<u128>() % Q;
-            let shift_size = rng.r#gen::<usize>() % N;
+            let x = rng.random::<u128>() % Q;
+            let shift_size = rng.random_range(..N);
             let x_input = BinaryBundle::from((x, N));
             let output =
                 Dummy::eval(&BinaryArithmeticRightShift::new(), (&x_input, shift_size)).unwrap();

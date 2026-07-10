@@ -57,22 +57,22 @@ where
 mod test {
     use crate::{CrtBundle, arithmetic::Equality, util::RngExt};
     use fancy_plaintext::Dummy;
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt as RandRngExt, rng};
 
     #[test]
     fn equality() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let q = rng.gen_usable_composite_modulus();
 
         // Check that `x == x`.
-        let x = rng.r#gen::<u128>() % q;
+        let x = rng.random::<u128>() % q;
         let x_input = CrtBundle::from((x, q));
         let output = Dummy::eval(&Equality::new(), (&x_input, &x_input)).unwrap();
         assert_eq!(output.val(), (x == x) as u16);
 
         for _ in 0..64 {
-            let x = rng.r#gen::<u128>() % q;
-            let y = rng.r#gen::<u128>() % q;
+            let x = rng.random::<u128>() % q;
+            let y = rng.random::<u128>() % q;
             let x_input = CrtBundle::from((x, q));
             let y_input = CrtBundle::from((y, q));
             let output = Dummy::eval(&Equality::new(), (&x_input, &y_input)).unwrap();

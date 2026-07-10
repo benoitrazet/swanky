@@ -34,7 +34,7 @@ pub mod serde_index {
 mod tests {
     use crate::{Circuit, circuitgen::random_circuit};
     use proptest::prelude::*;
-    use rand::{SeedableRng, distributions::Uniform, prelude::Distribution};
+    use rand::{SeedableRng, distr::Uniform, prelude::Distribution};
     use swanky_block::Block;
     use swanky_rng::SwankyRng;
 
@@ -48,9 +48,9 @@ mod tests {
                 #[test]
                 fn $name(seed in any_seed()) {
                     let mut rng = SwankyRng::from_seed(seed);
-                    let ninputs_range = Uniform::from(2..100);
-                    let noutputs_range = Uniform::from(2..100);
-                    let ngates_range = Uniform::from(200..2000);
+                    let ninputs_range = Uniform::try_from(2..100).unwrap();
+                    let noutputs_range = Uniform::try_from(2..100).unwrap();
+                    let ngates_range = Uniform::try_from(200..2000).unwrap();
                     let ninputs = ninputs_range.sample(&mut rng);
                     let noutputs = noutputs_range.sample(&mut rng);
                     let ngates = ngates_range.sample(&mut rng);

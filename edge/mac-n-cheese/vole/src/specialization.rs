@@ -417,7 +417,7 @@ fn small_binary_lpn_test<FE: SmallBinaryField>()
 where
     F2: IsSubFieldOf<FE>,
 {
-    use rand::RngCore;
+    use rand::RngExt;
     fn simple_lpn(lpn_rng: &mut SwankyRng, src_base_voles: &[u64], dst: &mut [u64]) {
         let indices_generator = std::iter::repeat_with(|| {
             IntoIterator::into_iter(lpn_indices::matrix_entries_vectorized(lpn_rng))
@@ -434,7 +434,7 @@ where
         use rand::{Rng, SeedableRng};
 
         let mut rng = SwankyRng::new();
-        let seed = rng.r#gen();
+        let seed = rng.random();
         let mut src_base_voles = Vec::with_capacity(1 << 16);
         for _ in 0..1 << 16 {
             src_base_voles.push(rng.next_u64());

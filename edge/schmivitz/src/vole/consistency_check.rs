@@ -562,7 +562,7 @@ mod test {
     use crate::vole::commit_reconstruct::l_hat;
     use crate::vole::consistency_check::VoleHasher;
     use crate::vole::crypto_primitives::CHALL1_LENGTH;
-    use rand::thread_rng;
+    use rand::rng;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
     use swanky_field_binary::F128b;
@@ -640,7 +640,7 @@ mod test {
     // Test the xor part at the end of [`vole_hash`]
     #[test]
     fn test_vole_hash_is_linear() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
 
         let seeds = [1u8; (SECURITY_PARAM * 6) / 8];
 

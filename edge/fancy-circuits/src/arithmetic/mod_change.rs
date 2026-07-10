@@ -32,16 +32,16 @@ impl<F: FancyProj> Circuit<F> for ModChange {
 mod test {
     use crate::{arithmetic::ModChange, util::RngExt};
     use fancy_plaintext::{Dummy, DummyVal};
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt as RandRngExt, rng};
 
     #[test]
     fn mod_change() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         for _ in 0..16 {
             let q = rng.gen_prime();
             let p = rng.gen_prime();
 
-            let x = rng.r#gen::<u16>() % q;
+            let x = rng.random::<u16>() % q;
             let x_input = DummyVal::new(x, q);
             let z = Dummy::eval(&ModChange, (x_input, p)).unwrap();
             assert_eq!(z.val(), x % p);

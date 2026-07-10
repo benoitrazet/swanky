@@ -2,23 +2,23 @@
 
 use crate::circuit::{Circuit, Index, Op};
 use rand::{
-    Rng,
-    distributions::{Distribution, Uniform},
+    Rng, RngExt,
+    distr::{Distribution, Uniform},
 };
 use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::F2;
 
 fn rand_ix_pair(rng: &mut impl Rng, min: Index, max: Index) -> (Index, Index) {
     let s = max - min;
-    let a = rng.gen_range(0..s);
-    let b = rng.gen_range(1..s);
+    let a = rng.random_range(0..s);
+    let b = rng.random_range(1..s);
     (min + a, min + (a + b) % s)
 }
 
 /// Pick an operation at random, for random test circuits.
 fn random_op<F: FiniteField>(rng: &mut impl Rng, min_wire: Index, max_wire: Index) -> Op<F> {
     assert!(max_wire - min_wire > 1);
-    let coin = Uniform::from(0..5);
+    let coin = Uniform::try_from(0..5).unwrap();
     match coin.sample(rng) {
         0 => {
             let (i, j) = rand_ix_pair(rng, min_wire, max_wire);
@@ -33,7 +33,7 @@ fn random_op<F: FiniteField>(rng: &mut impl Rng, min_wire: Index, max_wire: Inde
             Op::Sub(i, j)
         }
         3 => Op::Constant(F::random(rng)),
-        4 => Op::Copy(rng.gen_range(0..max_wire - min_wire)),
+        4 => Op::Copy(rng.random_range(0..max_wire - min_wire)),
         _ => unreachable!(),
     }
 }
@@ -255,7 +255,7 @@ mod tests {
         #[test]
         fn test_random_zero_circuit(seed in any_seed()) {
             let mut rng = SwankyRng::from_seed(seed);
-            let size = Uniform::from(3..1000);
+            let size = Uniform::try_from(3..1000).unwrap();
             let ninputs = size.sample(&mut rng);
             let ngates = size.sample(&mut rng);
             let (circuit, witness): (Circuit<TestField>, Vec<_>) =
@@ -270,9 +270,9 @@ mod tests {
         #[test]
         fn test_random_binary_zero_circuit(seed in any_seed()) {
             let mut rng = SwankyRng::from_seed(seed);
-            let inputsize = Uniform::from(2..100);
-            let outputsize = Uniform::from(1..100);
-            let gatesize = Uniform::from(200..1000);
+            let inputsize = Uniform::try_from(2..100).unwrap();
+            let outputsize = Uniform::try_from(1..100).unwrap();
+            let gatesize = Uniform::try_from(200..1000).unwrap();
             let ninputs = inputsize.sample(&mut rng);
             let noutputs = outputsize.sample(&mut rng);
             let ngates = gatesize.sample(&mut rng);

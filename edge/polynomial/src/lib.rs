@@ -1,7 +1,7 @@
 //! This crate defines polynomials (and their operations) over finite fields.
 
 #![deny(missing_docs)]
-use rand::RngCore;
+use rand::Rng;
 use std::{
     fmt::Debug,
     ops::{AddAssign, Index, IndexMut, MulAssign, SubAssign},
@@ -54,7 +54,7 @@ pub struct Polynomial<FE: FiniteField> {
 
 impl<FE: FiniteField> Polynomial<FE> {
     /// Construct a random polynomial of the given degree.
-    pub fn random(rng: &mut (impl RngCore + ?Sized), degree: usize) -> Self {
+    pub fn random(rng: &mut (impl Rng + ?Sized), degree: usize) -> Self {
         let constant = FE::random(rng);
         Self {
             constant,

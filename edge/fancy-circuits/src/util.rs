@@ -2,6 +2,8 @@
 //!
 //! Note: all number representations are little-endian.
 
+use rand::RngExt as RandRngExt;
+
 use crate::Bundle;
 use fancy_traits::HasModulus;
 
@@ -227,11 +229,11 @@ pub(crate) fn get_ms<W: Clone + HasModulus>(x: &Bundle<W>, accuracy: &str) -> Ve
 pub trait RngExt: rand::Rng + Sized {
     /// Randomly generate a prime (among the set of supported primes).
     fn gen_prime(&mut self) -> u16 {
-        PRIMES[self.r#gen::<usize>() % NPRIMES]
+        PRIMES[self.random_range(..NPRIMES)]
     }
     /// Randomly generate a (supported) modulus.
     fn gen_modulus(&mut self) -> u16 {
-        2 + (self.r#gen::<u16>() % 111)
+        2 + (self.random::<u16>() % 111)
     }
     /// Randomly generate a valid composite modulus.
     fn gen_usable_composite_modulus(&mut self) -> u128 {
@@ -243,7 +245,7 @@ pub trait RngExt: rand::Rng + Sized {
         PRIMES[..25]
             .iter()
             .cloned()
-            .filter(|_| self.r#gen()) // randomly take this prime
+            .filter(|_| self.random()) // randomly take this prime
             .take_while(|&q| {
                 // make sure that we don't overflow!
                 match x.checked_mul(q as u128) {
@@ -263,28 +265,28 @@ impl<R: rand::Rng + Sized> RngExt for R {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt, rng};
 
     #[test]
     fn crt_conversion() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let ps = &PRIMES[..25];
         let modulus = product(ps);
 
         for _ in 0..128 {
-            let x = rng.r#gen::<u128>() % modulus;
+            let x = rng.random::<u128>() % modulus;
             assert_eq!(crt_inv(&crt(x, ps), ps), x);
         }
     }
 
     #[test]
     fn factoring() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         for _ in 0..16 {
             let mut ps = Vec::new();
             let mut q: u128 = 1;
             for &p in PRIMES.iter() {
-                if rng.r#gen::<bool>() {
+                if rng.random::<bool>() {
                     match q.checked_mul(p as u128) {
                         None => break,
                         Some(z) => q = z,
@@ -298,9 +300,9 @@ mod tests {
 
     #[test]
     fn bits() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         for _ in 0..128 {
-            let x = rng.r#gen::<u128>();
+            let x = rng.random::<u128>();
             assert_eq!(u128_from_bits(&u128_to_bits(x, 128)), x);
         }
     }

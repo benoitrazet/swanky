@@ -253,7 +253,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt as RandRngExt, rng};
 
     use crate::{
         CrtBundle,
@@ -264,8 +264,8 @@ mod test {
 
     #[test]
     fn mixed_radix_addition_msb_only() {
-        let mut rng = thread_rng();
-        let nargs = 2 + rng.r#gen::<usize>() % 10;
+        let mut rng = rng();
+        let nargs = 2 + rng.random_range(..10usize);
         let moduli = (0..7).map(|_| rng.gen_modulus()).collect::<Vec<_>>();
         let q = product(&moduli);
 
@@ -286,7 +286,7 @@ mod test {
             let mut expected = 0;
             let mut inputs = Vec::new();
             for _ in 0..nargs {
-                let x = rng.r#gen::<u128>() % q;
+                let x = rng.random::<u128>() % q;
                 expected = (expected + x) % q;
                 inputs.push(CrtBundle::to_mixed_radix(x, &moduli));
             }
@@ -300,8 +300,8 @@ mod test {
 
     #[test]
     fn test_mixed_radix_addition() {
-        let mut rng = thread_rng();
-        let nargs = 2 + rng.r#gen::<usize>() % 100;
+        let mut rng = rng();
+        let nargs = 2 + rng.random_range(..100usize);
         let moduli = (0..7).map(|_| rng.gen_modulus()).collect::<Vec<_>>();
         let q: u128 = moduli.iter().map(|&q| q as u128).product();
 
@@ -320,7 +320,7 @@ mod test {
             let mut expected = 0;
             let mut inputs = Vec::new();
             for _ in 0..nargs {
-                let x = rng.r#gen::<u128>() % q;
+                let x = rng.random::<u128>() % q;
                 expected = (expected + x) % q;
                 inputs.push(CrtBundle::to_mixed_radix(x, &moduli));
             }

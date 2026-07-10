@@ -1,8 +1,13 @@
 //! Random number generator based on fixed-key AES.
 #![deny(missing_docs)]
 
-use rand::{CryptoRng, Error, Rng, RngCore, SeedableRng};
-use rand_core::block::{BlockRng64, BlockRngCore};
+use rand::{
+    Rng, RngExt, SeedableRng, TryCryptoRng, TryRng,
+    rand_core::{
+        Infallible,
+        block::{BlockRng, Generator},
+    },
+};
 use vectoreyes::{
     Aes128EncryptOnly, AesBlockCipher, U8x16,
     array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
@@ -16,24 +21,23 @@ pub use vectorized::UniformIntegersUnderBound;
 /// This uses AES in a counter-mode-esque way, but with the counter always
 /// starting at zero. When used as a PRNG this is okay [TODO: citation?].
 #[derive(Debug)]
-pub struct SwankyRng(BlockRng64<SwankyRngCore>);
+pub struct SwankyRng(BlockRng<SwankyRngCore>);
 
-impl RngCore for SwankyRng {
+impl TryRng for SwankyRng {
+    type Error = Infallible;
+
     #[inline]
-    fn next_u32(&mut self) -> u32 {
-        self.0.next_u32()
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+        Ok(self.0.next_word())
     }
     #[inline]
-    fn next_u64(&mut self) -> u64 {
-        self.0.next_u64()
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+        Ok(self.0.next_u64_from_u32())
     }
     #[inline]
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.0.fill_bytes(dest)
-    }
-    #[inline]
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Error> {
-        self.0.try_fill_bytes(dest)
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Self::Error> {
+        self.0.fill_bytes(dest);
+        Ok(())
     }
 }
 
@@ -42,15 +46,15 @@ impl SeedableRng for SwankyRng {
 
     #[inline]
     fn from_seed(seed: Self::Seed) -> Self {
-        SwankyRng(BlockRng64::<SwankyRngCore>::from_seed(seed))
+        SwankyRng(BlockRng::new(SwankyRngCore::from_seed(seed)))
     }
     #[inline]
-    fn from_rng<R: RngCore>(rng: R) -> Result<Self, Error> {
-        BlockRng64::<SwankyRngCore>::from_rng(rng).map(SwankyRng)
+    fn from_rng<R: Rng + ?Sized>(rng: &mut R) -> Self {
+        SwankyRng(BlockRng::new(SwankyRngCore::from_rng(rng)))
     }
 }
 
-impl CryptoRng for SwankyRng {}
+impl TryCryptoRng for SwankyRng {}
 
 impl SwankyRng {
     /// Create a new random number generator using a random seed from
@@ -63,13 +67,13 @@ impl SwankyRng {
 
     /// Create a new random number generator using a given seed and IV.
     pub fn from_seed_and_iv(seed: U8x16, iv: u128) -> Self {
-        Self(BlockRng64::new(SwankyRngCore::from_seed_and_iv(seed, iv)))
+        Self(BlockRng::new(SwankyRngCore::from_seed_and_iv(seed, iv)))
     }
 
     /// Create a new RNG using a random seed from this one.
     #[inline]
     pub fn fork(&mut self) -> Self {
-        let seed = self.r#gen::<U8x16>();
+        let seed = self.random::<U8x16>();
         SwankyRng::from_seed(seed)
     }
 
@@ -129,13 +133,12 @@ impl SwankyRngCore {
     }
 }
 
-impl BlockRngCore for SwankyRngCore {
-    type Item = u64;
-    type Results = [u64; Aes128EncryptOnly::BLOCK_COUNT_HINT * 2];
+impl Generator for SwankyRngCore {
+    type Output = [u32; Aes128EncryptOnly::BLOCK_COUNT_HINT * 4];
 
     // Compute `E(state)` eight times, where `state` is a counter.
     #[inline]
-    fn generate(&mut self, results: &mut Self::Results) {
+    fn generate(&mut self, results: &mut Self::Output) {
         *results = bytemuck::cast(self.gen_rand_bits::<{ Aes128EncryptOnly::BLOCK_COUNT_HINT }>());
     }
 }
@@ -152,25 +155,23 @@ impl SeedableRng for SwankyRngCore {
     }
 }
 
-impl CryptoRng for SwankyRngCore {}
-
 impl From<SwankyRngCore> for SwankyRng {
     #[inline]
     fn from(core: SwankyRngCore) -> Self {
-        SwankyRng(BlockRng64::new(core))
+        SwankyRng(BlockRng::new(core))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::Rng;
+    use rand::RngExt;
 
     #[test]
     fn test_generate() {
         let mut rng = SwankyRng::new();
-        let a = rng.r#gen::<[U8x16; 8]>();
-        let b = rng.r#gen::<[U8x16; 8]>();
+        let a = rng.random::<[U8x16; 8]>();
+        let b = rng.random::<[U8x16; 8]>();
         assert_ne!(a, b);
     }
 }

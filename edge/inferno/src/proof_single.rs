@@ -8,7 +8,7 @@ use crate::{
     secretsharing::{CorrectionSharing, LinearSharing, SecretSharing},
 };
 use blake3::Hash;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use serde::{Deserialize, Serialize};
 use simple_arith_circuit::Circuit;
 use swanky_block::Block;
@@ -64,7 +64,7 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
 
         // Construct RNGs for each party.
         let seeds: [u128; N] = (0..N)
-            .map(|_| rng.r#gen::<u128>())
+            .map(|_| rng.random::<u128>())
             .collect::<Vec<u128>>()
             .try_into()
             .unwrap(); // This `unwrap` will never fail.

@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn test_share_reconstruct() {
-        let mut rng = StdRng::from_entropy();
+        let mut rng = StdRng::from_rng(&mut rand::rng());
 
         let pss: PackedSecretSharingGenerator<TestField> = PackedSecretSharingGenerator {
             // Maximum number of shares that can be known without exposing the secrets

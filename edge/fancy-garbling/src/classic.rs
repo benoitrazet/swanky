@@ -7,7 +7,7 @@ use crate::{
     util::output_tweak,
 };
 use fancy_traits::{Circuit, CircuitInputMapper, FancyOutput, Flatten};
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use std::collections::HashMap;
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
@@ -45,7 +45,7 @@ impl GarbledCircuit {
     pub fn garble<
         Wire: WireLabel,
         C: CircuitInputMapper<Garbler<RNG, Wire>>,
-        RNG: CryptoRng + RngCore,
+        RNG: CryptoRng + Rng,
     >(
         circuit: &C,
         rng: RNG,

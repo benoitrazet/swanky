@@ -6,7 +6,7 @@ use crate::vole::functionality::{
     PartialDecommitment, VoleProver, create_vole_prover, create_vole_verifier,
 };
 use merlin::Transcript;
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::IsSubFieldOf;
 use swanky_field_binary::{F2, F8b, F128b};
@@ -22,7 +22,7 @@ impl RandomVoleP for VoleProver {
         extended_witness_length: usize,
         transcript: &mut Transcript,
         secret: &Secret,
-        _rng: &mut (impl CryptoRng + RngCore),
+        _rng: &mut (impl CryptoRng + Rng),
     ) -> (Self, Self::VoleChallenge) {
         log::info!("NB VOLES {:?}", extended_witness_length);
         let mut statement_sig = [0u8; SECURITY_PARAM];

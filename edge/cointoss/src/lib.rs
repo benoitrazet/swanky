@@ -4,7 +4,7 @@
 //! This can be used to generate uniformly-random bits for use in a multi-party
 //! computation.
 
-use rand_core::{RngCore, SeedableRng};
+use rand_core::{Rng, SeedableRng};
 
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;

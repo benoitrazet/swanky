@@ -90,18 +90,18 @@ impl<F: FancyBinary, const N: usize> CircuitInputMapper<F> for LinearOram<N> {
 pub mod test {
     use crate::{BinaryBundle, LinearOram};
     use fancy_plaintext::{Dummy, DummyVal};
-    use rand::Rng;
+    use rand::RngExt;
 
     #[test]
     fn linear_oram() {
         const N: usize = 128;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let ram_size = 10;
         let c = LinearOram::<N>::new(ram_size);
 
         for _ in 0..16 {
-            let ram: Vec<u128> = (0..ram_size).map(|_| rng.r#gen::<u128>()).collect();
-            let index = rng.r#gen::<usize>() % ram_size;
+            let ram: Vec<u128> = (0..ram_size).map(|_| rng.random::<u128>()).collect();
+            let index = rng.random_range(..ram_size);
 
             let ram_input: Vec<BinaryBundle<DummyVal>> = ram
                 .iter()

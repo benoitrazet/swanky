@@ -41,7 +41,7 @@ fn circuitgen<F: FiniteField>(
 }
 
 fn prover<F: FiniteField>(args: Args) {
-    let mut rng = SwankyRng::from_entropy();
+    let mut rng = SwankyRng::from_rng(&mut rand::rng());
 
     let (circuit, witness) = circuitgen::<F>(&mut rng, args.mults_only, args.ninputs, args.ngates);
 

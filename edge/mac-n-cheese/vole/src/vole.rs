@@ -3,7 +3,7 @@ use bytemuck::TransparentWrapper;
 use generic_array::{GenericArray, typenum::Unsigned};
 use keyed_arena::{AllocationKey, KeyedArena};
 use rand::prelude::Distribution;
-use rand::{CryptoRng, Rng, SeedableRng, distributions::Uniform};
+use rand::{CryptoRng, Rng, RngExt, SeedableRng, distr::Uniform};
 use std::{marker::PhantomData, ops::Deref};
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
@@ -118,7 +118,7 @@ impl<T: MacTypes> VoleSender<T> {
         rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
         let lpn_seeds = Aes128EncryptOnly::new_with_key(
-            swanky_cointoss::send(channel, &[rng.r#gen::<Block>()]).wrap_err(
+            swanky_cointoss::send(channel, &[rng.random::<Block>()]).wrap_err(
                 ErrorKind::NetworkError,
                 "Failed to send seeds to AES key scheduler.",
             )?[0],
@@ -140,7 +140,7 @@ impl<T: MacTypes> VoleSender<T> {
         &self,
         arena: &KeyedArena,
         selector: u64,
-        rng: &mut (impl Rng + CryptoRng),
+        rng: &mut impl CryptoRng,
         base_voles: &[Mac<party::Prover, T>],
         mut outgoing_bytes: &mut [u8],
     ) -> swanky_error::Result<VoleSenderStep3<T>> {
@@ -155,7 +155,7 @@ impl<T: MacTypes> VoleSender<T> {
             arena.alloc_slice_fill_with(T::VS.base_uws_size, |_| (0, T::VF::ZERO));
         let mut choices = arena.alloc_slice_fill_with(T::VS.ot_num_choices, |_| false);
         debug_assert_eq!(choices.len() % T::LPN.log2m, 0);
-        let distribution = Uniform::from(0..T::LPN.m());
+        let distribution = Uniform::try_from(0..T::LPN.m()).unwrap();
         for (((a, _), (alpha, beta)), choices) in base_voles
             .sps_base_voles()
             .iter()
@@ -197,7 +197,7 @@ impl<T: MacTypes> VoleSender<T> {
             ot_stage2,
             alphas_and_betas: alphas_and_betas.key(),
             selector,
-            seed: rng.r#gen(),
+            seed: rng.random(),
             commitment_key,
             phantom: PhantomData,
         })
@@ -381,7 +381,7 @@ impl<T: MacTypes> VoleReceiver<T> {
         delta: T::TF,
     ) -> swanky_error::Result<Self> {
         let lpn_seeds = Aes128EncryptOnly::new_with_key(
-            swanky_cointoss::receive(channel, &[rng.r#gen::<Block>()]).wrap_err(
+            swanky_cointoss::receive(channel, &[rng.random::<Block>()]).wrap_err(
                 ErrorKind::OtherError,
                 "Failed to receive seeds for AES key scheduler.",
             )?[0],
@@ -405,7 +405,7 @@ impl<T: MacTypes> VoleReceiver<T> {
         &self,
         arena: &KeyedArena,
         selector: u64,
-        rng: &mut (impl Rng + CryptoRng),
+        rng: &mut impl CryptoRng,
         base_voles: &[Mac<party::Verifier, T>],
         output_voles: &mut [Mac<party::Verifier, T>],
         mut incoming_bytes: &[u8],
@@ -458,7 +458,7 @@ impl<T: MacTypes> VoleReceiver<T> {
                 U8x16::default()
             });
         for i in 0..base_voles.sps_base_voles().len() {
-            let seed = rng.r#gen::<Block>();
+            let seed = rng.random::<Block>();
             ggm(
                 T::LPN.log2m,
                 seed,

@@ -1,6 +1,8 @@
 //! Testing the hashing phase in Base Psi
 #[cfg(test)]
 mod tests {
+    use rand::RngExt;
+
     use crate::psi::circuit_psi::{
         base_psi::{BasePsi, receiver::OpprfReceiver, sender::OpprfSender},
         tests::{utils::*, *},
@@ -120,7 +122,7 @@ mod tests {
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, _, result_hash_sender, _) =
-                psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
+                psty_up_to_hashing(&set, &payloads, rng.random(), DEFAULT_SEED);
             assert!(
                 result_hash_sender.is_ok(),
                 "PSTY Simple Hashing failed on the Sender side"
@@ -153,7 +155,7 @@ mod tests {
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, _, result_hash_sender, _) =
-                psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
+                psty_up_to_hashing(&set, &payloads, rng.random(), DEFAULT_SEED);
             assert!(
                 result_hash_sender.is_ok(),
                 "PSTY Simple Hashing failed on the Sender side"
@@ -202,7 +204,7 @@ mod tests {
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, _, _, result_hash_receiver) =
-                psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, rng.r#gen());
+                psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, rng.random());
             assert!(
                 result_hash_receiver.is_ok(),
                 "PSTY Cuckoo Hashing failed on the Receiver side"
@@ -238,7 +240,7 @@ mod tests {
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
-                psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
+                psty_up_to_hashing(&set, &payloads, rng.random(), DEFAULT_SEED);
             let (intersection_payloads_sx, _, payloads_len) =
                 psty_check_hashing_payloads(sender, receiver, payloads);
 
@@ -279,7 +281,7 @@ mod tests {
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
-                psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, rng.r#gen());
+                psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, rng.random());
             let (_, intersection_payloads_rx, payloads_len) =
                 psty_check_hashing_payloads(sender, receiver, payloads);
             assert!(
@@ -297,7 +299,7 @@ mod tests {
             let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
-            let (sender, _, _, _) = psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
+            let (sender, _, _, _) = psty_up_to_hashing(&set, &payloads, rng.random(), DEFAULT_SEED);
             assert!(
                 sender.state.opprf_payloads_in.len() == sender.state.opprf_primary_keys_in.len(),
                 "PSTY Simple Hashing: the payloads and sets hash tables have different sizes, payloads: {}, set: {}",
@@ -313,7 +315,7 @@ mod tests {
             let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
-            let (sender, _, _, _) = psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
+            let (sender, _, _, _) = psty_up_to_hashing(&set, &payloads, rng.random(), DEFAULT_SEED);
             assert!(
                 sender.state.opprf_payloads_in.len() == sender.state.opprf_payloads_out.len(),
                 "PSTY Simple Hashing: the payloads and payload mask tables have different sizes, payloads {}, masks {} ",
@@ -329,7 +331,7 @@ mod tests {
             let mut rng = SwankyRng::new();
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
-            let (sender, _, _, _) = psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
+            let (sender, _, _, _) = psty_up_to_hashing(&set, &payloads, rng.random(), DEFAULT_SEED);
             assert!(
                 sender.state.opprf_primary_keys_in.len()
                     == sender.state.opprf_primary_keys_out.len(),
@@ -347,7 +349,7 @@ mod tests {
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, receiver, _, _) =
-                psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
+                psty_up_to_hashing(&set, &payloads, rng.random(), DEFAULT_SEED);
             assert!(
                 receiver.state.opprf_payloads_in.len()
                     == receiver.state.opprf_primary_keys_in.len(),
@@ -365,7 +367,7 @@ mod tests {
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
-                psty_up_to_hashing(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
+                psty_up_to_hashing(&set, &payloads, rng.random(), DEFAULT_SEED);
             assert!(
                 sender.state.opprf_primary_keys_in.len()
                     == receiver.state.opprf_primary_keys_in.len(),

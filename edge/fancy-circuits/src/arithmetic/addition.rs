@@ -78,16 +78,16 @@ mod test {
     use crate::CrtBundle;
     use crate::{arithmetic::Addition, util::RngExt};
     use fancy_plaintext::Dummy;
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt as RandRngExt, rng};
 
     #[test]
     fn addition() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let q = rng.gen_usable_composite_modulus();
 
         for _ in 0..16 {
-            let x = rng.r#gen::<u128>() % q;
-            let y = rng.r#gen::<u128>() % q;
+            let x = rng.random::<u128>() % q;
+            let y = rng.random::<u128>() % q;
             let x_input = CrtBundle::from((x, q));
             let y_input = CrtBundle::from((y, q));
             let z = Dummy::eval(&Addition::new(), (&x_input, &y_input)).unwrap();
