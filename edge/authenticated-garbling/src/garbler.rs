@@ -5,7 +5,7 @@ use crate::wire::AuthenticatedWireMod2;
 use fancy_analyzer::CircuitAnalyzer;
 use fancy_garbling::{WireLabel, WireMod2};
 use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary, FancyEncode, FancyOutput};
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
@@ -40,7 +40,7 @@ pub struct Garbler<RNG> {
     rng: RNG,
 }
 
-impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
+impl<RNG: CryptoRng + Rng> Garbler<RNG> {
     /// Create a new garbler for a given circuit.
     pub fn new<
         C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyGarbler>>,
@@ -127,7 +127,7 @@ impl<RNG: CryptoRng + RngCore> Garbler<RNG> {
 
 impl<RNG> FancyBinary for Garbler<RNG>
 where
-    RNG: RngCore + CryptoRng,
+    RNG: Rng + CryptoRng,
 {
     fn and(
         &mut self,
@@ -264,7 +264,7 @@ where
     }
 }
 
-impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
+impl<RNG: Rng + CryptoRng> Fancy for Garbler<RNG> {
     type Item = AuthenticatedWire;
 
     fn constant(
@@ -284,7 +284,7 @@ impl<RNG: RngCore + CryptoRng> Fancy for Garbler<RNG> {
     }
 }
 
-impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
+impl<RNG: Rng + CryptoRng> FancyEncode for Garbler<RNG> {
     fn encode_many(
         &mut self,
         values: &[u16],
@@ -348,7 +348,7 @@ impl<RNG: RngCore + CryptoRng> FancyEncode for Garbler<RNG> {
     }
 }
 
-impl<RNG: RngCore + CryptoRng> FancyOutput for Garbler<RNG> {
+impl<RNG: Rng + CryptoRng> FancyOutput for Garbler<RNG> {
     fn output(
         &mut self,
         x: &AuthenticatedWire,

@@ -6,7 +6,7 @@ use crate::{
 use fancy_analyzer::CircuitAnalyzer;
 use fancy_garbling::{WireLabel, WireMod2};
 use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary, FancyEncode, FancyOutput};
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use swanky_authenticated_bits::{
     and_triples::AndTripleGenerator,
     authshares::{AuthShare, AuthShareGenerator},
@@ -46,7 +46,7 @@ impl Evaluator {
     /// Create a new evaluator for the given circuit.
     pub fn new<
         C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>,
-        RNG: CryptoRng + RngCore,
+        RNG: CryptoRng + Rng,
     >(
         circuit: &C,
         channel: &mut Channel,

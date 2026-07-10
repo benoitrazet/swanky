@@ -7,7 +7,7 @@
 
 use crate::util;
 use fancy_traits::HasModulus;
-use rand::{CryptoRng, Rng, RngCore};
+use rand::{CryptoRng, Rng};
 use swanky_cr_hash::TweakableCircularCorrelationRobustHash;
 use vectoreyes::{
     U8x16,
@@ -77,7 +77,7 @@ pub trait WireLabel:
     /// # Panics
     /// This panics if `q` does not align with the modulus supported by the
     /// [`WireLabel`].
-    fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self;
+    fn rand<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self;
 
     /// Converts a hashed block into a valid wire of the given modulus `q`.
     ///
@@ -111,12 +111,7 @@ pub trait WireLabel:
 
     /// Computes a [`WireLabel`] for `x % q`, returning both the zero
     /// [`WireLabel`] as well as the [`WireLabel`] for `x % q`.
-    fn constant<RNG: CryptoRng + RngCore>(
-        x: u16,
-        q: u16,
-        delta: &Self,
-        rng: &mut RNG,
-    ) -> (Self, Self) {
+    fn constant<RNG: CryptoRng + Rng>(x: u16, q: u16, delta: &Self, rng: &mut RNG) -> (Self, Self) {
         let zero = Self::rand(rng, q);
         let wire = zero.clone() + delta.clone() * x;
         (zero, wire)
@@ -256,7 +251,7 @@ impl WireLabel for AllWire {
         }
     }
 
-    fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
+    fn rand<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self {
         match q {
             2 => AllWire::Mod2(WireMod2::rand(rng, q)),
             3 => AllWire::Mod3(WireMod3::rand(rng, q)),
@@ -332,11 +327,11 @@ mod tests {
     use crate::util::as_base_q_u128;
     use fancy_circuits::util::RngExt;
     use itertools::Itertools;
-    use rand::thread_rng;
+    use rand::{RngExt as _, rng};
 
     #[test]
     fn packing() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         for q in 2..256 {
             for _ in 0..1000 {
                 let w = AllWire::rand(rng, q);
@@ -347,10 +342,10 @@ mod tests {
 
     #[test]
     fn base_conversion_lookup_method() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         for _ in 0..1000 {
-            let q = 5 + (rng.r#gen::<u16>() % 110);
-            let x = rng.r#gen::<u128>();
+            let q = 5 + (rng.random::<u16>() % 110);
+            let x = rng.random::<u128>();
             let w = WireModQ::from_repr(U8x16::from(x), q);
             let should_be = as_base_q_u128(x, q);
             assert_eq!(w.ds, should_be, "x={} q={}", x, q);
@@ -359,9 +354,9 @@ mod tests {
 
     #[test]
     fn hash() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         for _ in 0..100 {
-            let q = 2 + (rng.r#gen::<u16>() % 110);
+            let q = 2 + (rng.random::<u16>() % 110);
             let x = AllWire::rand(&mut rng, q);
             let y = x.hashback(1u128, q);
             assert!(x != y);
@@ -375,7 +370,7 @@ mod tests {
 
     #[test]
     fn negation() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         for _ in 0..1000 {
             let q = rng.gen_modulus();
             let x = AllWire::rand(rng, q);
@@ -391,7 +386,7 @@ mod tests {
     #[test]
     #[allow(clippy::erasing_op)]
     fn arithmetic() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         for _ in 0..1024 {
             let q = rng.gen_modulus();
             let x = AllWire::rand(&mut rng, q);
@@ -424,7 +419,7 @@ mod tests {
 
     #[test]
     fn ndigits_correct() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         for _ in 0..1024 {
             let q = rng.gen_modulus();
             let x = WireModQ::rand(&mut rng, q);
@@ -435,7 +430,7 @@ mod tests {
     #[test]
     fn parallel_hash() {
         let n = 1000;
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let q = rng.gen_modulus();
         let ws = (0..n).map(|_| AllWire::rand(&mut rng, q)).collect_vec();
 
@@ -455,7 +450,7 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn test_serialize_allwire() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         for q in 2..16 {
             let w = AllWire::rand(&mut rng, q);
             let serialized = serde_json::to_string(&w).unwrap();

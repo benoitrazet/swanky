@@ -24,7 +24,7 @@
 //! The protocol requires 1.5 rounds of communication.
 #![deny(missing_docs)]
 
-use rand::{CryptoRng, Rng, SeedableRng, distributions::Standard, prelude::Distribution};
+use rand::{CryptoRng, Rng, RngExt, SeedableRng, distr::StandardUniform, prelude::Distribution};
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
 #[cfg(test)]
@@ -50,7 +50,7 @@ pub fn random<P: GenericParty, T, RNG: CryptoRng + Rng>(
     rng: &mut RNG,
 ) -> swanky_error::Result<T>
 where
-    Standard: Distribution<T>,
+    StandardUniform: Distribution<T>,
 {
     // The protocol works as follows:
     //
@@ -58,7 +58,7 @@ where
     // 2. Use this to seed a RNG which we then use to generate a random `T`.
     let seed = random_seed::<P, _>(channel, rng)?;
     let mut rng_new = SwankyRng::from_seed(seed);
-    Ok(rng_new.r#gen::<T>())
+    Ok(rng_new.random::<T>())
 }
 
 /// Generate a random seed (that is, a 128-bit value).
@@ -75,7 +75,7 @@ pub fn random_seed<P: GenericParty, RNG: CryptoRng + Rng>(
     // 3. The sender sends `s₀` to the receiver, who checks that `H(s₀) = c`,
     //    aborting if not.
     // 4. Both parties output `s₀ ⊕ s₁`.
-    let seed_mine = rng.r#gen::<U8x16>();
+    let seed_mine = rng.random::<U8x16>();
     let seed = match P::GENERIC_WHICH {
         GenericWhichParty::Party0(_) => {
             let com = *blake3::hash(&seed_mine.to_bytes()).as_bytes();

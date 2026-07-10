@@ -350,7 +350,7 @@ macro_rules! constify_imm {
         }
     }
 
-    impl rand::distributions::Distribution<{{ty}}> for rand::distributions::Standard {
+    impl rand::distr::Distribution<{{ty}}> for rand::distr::StandardUniform {
         fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> {{ty}} {
             let mut out = {{ty}}::ZERO;
             rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));

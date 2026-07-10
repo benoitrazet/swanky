@@ -23,7 +23,7 @@ mod tests {
     use fancy_traits::{
         Circuit, CircuitInputMapper, FancyArithmetic, FancyEncode, FancyOutput, FancyProj, Flatten,
     };
-    use rand::Rng;
+    use rand::RngExt;
     use swanky_channel::Channel;
     use swanky_error::Result;
     use swanky_ot_chou_orlandi::{Receiver as ChouOrlandiReceiver, Sender as ChouOrlandiSender};
@@ -98,12 +98,12 @@ mod tests {
 
     #[test]
     fn test_relu() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let n = 10;
         let ps = primes_with_width(10);
         let q = product(&ps);
 
-        let plaintext = (0..n).map(|_| rng.r#gen::<u128>() % q).collect::<Vec<_>>();
+        let plaintext = (0..n).map(|_| rng.random::<u128>() % q).collect::<Vec<_>>();
 
         // Run dummy version.
         let inputs = plaintext

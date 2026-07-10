@@ -498,13 +498,13 @@ mod fancy_arithmetic {
         util::RngExt,
     };
     use fancy_plaintext::{Dummy, DummyVal};
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt as _, rng};
 
     #[test]
     fn constants() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let q = rng.gen_modulus();
-        let c = rng.r#gen::<u16>() % q;
+        let c = rng.random::<u16>() % q;
         let circ = TestConstants(q, c);
 
         for _ in 0..64 {
@@ -516,7 +516,7 @@ mod fancy_arithmetic {
 
     #[test]
     fn arithmetic_half_gate() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let q = rng.gen_prime();
         let c = TestMulGate(q);
 

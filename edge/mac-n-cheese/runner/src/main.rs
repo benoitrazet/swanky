@@ -127,7 +127,7 @@ fn party_main<P: Party>(
     private_data: PartyPrivateCopy<Prover, P, &Path>,
     num_connections: PartyEitherCopy<P, (), usize>,
 ) -> swanky_error::Result<()> {
-    let rng = SwankyRng::from_rng(rand::rngs::OsRng).unwrap();
+    let rng = SwankyRng::try_from_rng(&mut rand::rngs::SysRng).unwrap();
     let circuit_file = File::open(&opt.circuit)
         .wrap_err_with(ErrorKind::FilesystemError, || {
             format!("Opening circuit {:?}", opt.circuit)

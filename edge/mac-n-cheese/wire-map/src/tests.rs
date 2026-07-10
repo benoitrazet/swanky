@@ -1,6 +1,6 @@
 use std::{cell::Cell, fmt::Debug};
 
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 use crate::{DestinationRange, InsertResult, WireId, WireMap, WireNotFound};
 
@@ -186,15 +186,15 @@ fn random_tests() {
                 (u64::MAX - 127, 128, false),
             ];
             while allocations.len() < 16 {
-                let len = rng.gen_range(1..=128);
+                let len = rng.random_range(1..=128);
                 // We probably won't intersect any exising allocation. about (2^-39)
-                let start: u64 = rng.r#gen();
+                let start: u64 = rng.random();
                 allocations.push((start, len, false));
             }
             for _ in 0..500_000 {
-                if rng.gen_ratio(1, 128) {
+                if rng.random_ratio(1, 128) {
                     // Alloc or free
-                    let idx = rng.gen_range(0..allocations.len());
+                    let idx = rng.random_range(0..allocations.len());
                     let alloc = &mut allocations[idx];
                     if alloc.2 {
                         wm.free(alloc.0, alloc.1);
@@ -204,15 +204,16 @@ fn random_tests() {
                         alloc.2 = true;
                     }
                 } else {
-                    let idx: WireId = if rng.gen_ratio(1, 128) {
-                        rng.r#gen()
+                    let idx: WireId = if rng.random_ratio(1, 128) {
+                        rng.random()
                     } else {
                         // This distribution isn't weigthed by the size of each allocation.
-                        let (start, len, _alloc) = allocations[rng.gen_range(0..allocations.len())];
+                        let (start, len, _alloc) =
+                            allocations[rng.random_range(0..allocations.len())];
                         // We don't care whether it's allocated or not.
-                        rng.gen_range(start..=start + (len - 1))
+                        rng.random_range(start..=start + (len - 1))
                     };
-                    if rng.gen_ratio(1, 2) {
+                    if rng.random_ratio(1, 2) {
                         wm.insert(idx);
                     } else {
                         wm.get_mut(idx);

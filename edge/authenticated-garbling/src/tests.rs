@@ -14,7 +14,7 @@ use fancy_circuits::test_circuits::binary::{
 use fancy_circuits::test_circuits::fancy::TestBinaryConstant;
 use fancy_plaintext::{Dummy, DummyVal};
 use fancy_traits::{CircuitInputMapper, FancyEncode, FancyOutput, Flatten};
-use rand::Rng;
+use rand::RngExt;
 use swanky_rng::SwankyRng;
 
 #[test]
@@ -53,8 +53,8 @@ fn test_circuit<
     );
 
     let mut rng = SwankyRng::new();
-    let inputs_gb: Vec<u16> = (0..ninputs_gb).map(|_| rng.r#gen::<u16>() % 2).collect();
-    let inputs_ev: Vec<u16> = (0..ninputs_ev).map(|_| rng.r#gen::<u16>() % 2).collect();
+    let inputs_gb: Vec<u16> = (0..ninputs_gb).map(|_| rng.random::<u16>() % 2).collect();
+    let inputs_ev: Vec<u16> = (0..ninputs_ev).map(|_| rng.random::<u16>() % 2).collect();
 
     let dummy_inputs_gb = inputs_gb
         .iter()

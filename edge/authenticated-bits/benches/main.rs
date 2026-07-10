@@ -2,7 +2,7 @@ use std::iter::Copied;
 use std::slice::Iter;
 
 use criterion::{Criterion, criterion_group, criterion_main, measurement::WallTime};
-use rand::Rng;
+use rand::RngExt;
 use swanky_authenticated_bits::and_triples::{AndTriple, AndTripleGenerator};
 use swanky_authenticated_bits::authbits::{AuthBit, AuthBitGenerator};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
@@ -33,7 +33,7 @@ fn bench_auth_bits(c: &mut Criterion<WallTime>) {
     const COUNT: usize = 100_000;
     let mut prover_rng = swanky_rng::SwankyRng::new();
     let mut verifier_rng = swanky_rng::SwankyRng::new();
-    let bits: Vec<F2> = (0..COUNT).map(|_| prover_rng.r#gen::<F2>()).collect();
+    let bits: Vec<F2> = (0..COUNT).map(|_| prover_rng.random::<F2>()).collect();
 
     let (mut generator_a, mut generator_b) = authbit_generators(&mut prover_rng, &mut verifier_rng);
 
@@ -69,7 +69,7 @@ fn bench_auth_bits_open(c: &mut Criterion<WallTime>) {
     const COUNT: usize = 100_000;
     let mut prover_rng = swanky_rng::SwankyRng::new();
     let mut verifier_rng = swanky_rng::SwankyRng::new();
-    let bits: Vec<F2> = (0..COUNT).map(|_| prover_rng.r#gen::<F2>()).collect();
+    let bits: Vec<F2> = (0..COUNT).map(|_| prover_rng.random::<F2>()).collect();
 
     let (mut generator_a, mut generator_b) = authbit_generators(&mut prover_rng, &mut verifier_rng);
 

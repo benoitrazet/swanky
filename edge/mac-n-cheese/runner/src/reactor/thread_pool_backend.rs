@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use aes_gcm::{AeadCore, AeadInPlace, Aes128Gcm, Nonce};
+use aes_gcm::{AeadCore, AeadInOut, Aes128Gcm, Nonce};
 
 use bytemuck::Zeroable;
 use mac_n_cheese_ir::compilation_format::{
@@ -16,7 +16,7 @@ use mac_n_cheese_ir::compilation_format::{
 use mac_n_cheese_vole::party::{Party, Prover, WhichParty};
 use moka::sync::SegmentedCache;
 use parking_lot::Mutex;
-use rand::RngCore;
+use rand::Rng;
 use rustc_hash::FxHashMap;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_party::{either::PartyEither, private::PartyPrivate};
@@ -237,12 +237,13 @@ impl<P: Party> ThreadPoolReactor<P> {
                     nonce[0..8].copy_from_slice(&ctr.to_le_bytes());
                     self.keys
                         .challenges_key()
-                        .decrypt_in_place_detached(
+                        .decrypt_inout_detached(
                             &nonce,
                             &[],
-                            data,
-                            // We need to use the rustcrypto version of GenericArray
-                            aes_gcm::aead::generic_array::GenericArray::from_slice(tag),
+                            data.into(),
+                            // We need to use the rustcrypto version of Array
+                            <&mut aes_gcm::aead::common::array::Array<_, _>>::try_from(tag)
+                                .unwrap(),
                         )
                         .map_err(|_| {
                             swanky_error::swanky_error!(
@@ -282,7 +283,7 @@ impl<P: Party> ThreadPoolReactor<P> {
                     let tag = self
                         .keys
                         .challenges_key()
-                        .encrypt_in_place_detached(&nonce, &[], data)
+                        .encrypt_inout_detached(&nonce, &[], data.into())
                         .unwrap();
                     tag_dst.copy_from_slice(&tag);
                     ctr += 1;
@@ -456,7 +457,7 @@ impl<P: Party> Reactor<P> for ThreadPoolReactor<P> {
                 }
                 WhichParty::Verifier(e) => {
                     let mut challenge: Challenge = Default::default();
-                    rand::thread_rng().fill_bytes(&mut challenge);
+                    rand::rng().fill_bytes(&mut challenge);
                     self.outgoing_challenges
                         .as_ref()
                         .into_inner(e)

@@ -45,12 +45,12 @@ pub mod test {
     #[test]
     fn and_many() {
         use fancy_plaintext::{Dummy, DummyVal};
-        use rand::Rng;
+        use rand::RngExt;
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         for _ in 0..100 {
-            let n = 2 + (rng.r#gen::<usize>() % 200);
+            let n = 2 + (rng.random_range(..200usize));
             let inputs = (0..n)
                 .map(|_| DummyVal::rand_bool(&mut rng))
                 .collect::<Vec<_>>();

@@ -9,7 +9,7 @@ pub(crate) mod insecure;
 
 use crypto_primitives::Chall3;
 use merlin::Transcript;
-use rand::{CryptoRng, RngCore};
+use rand::CryptoRng;
 use swanky_error::Result;
 use swanky_field_binary::{F2, F8b, F128b};
 
@@ -93,7 +93,7 @@ where
         extended_witness_length: usize,
         transcript: &mut Transcript,
         secret: &Secret,
-        rng: &mut (impl CryptoRng + RngCore),
+        rng: &mut impl CryptoRng,
     ) -> (Self, Self::VoleChallenge);
 
     /// Get the total number of VOLE correlations supported by this random VOLE instance.

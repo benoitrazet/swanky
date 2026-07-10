@@ -952,7 +952,7 @@ proptest! {
     fn test_random_zero_codeword(p in any::<Params<TestField>>()) {
         use rand::{SeedableRng, rngs::StdRng};
 
-        let c = p.random_zero_codeword(&mut StdRng::from_entropy());
+        let c = p.random_zero_codeword(&mut StdRng::from_rng(&mut rand::rng()));
         let w = p.decode(c.view());
 
         prop_assert_eq!(w.sum(), TestField::ZERO);

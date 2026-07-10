@@ -338,7 +338,7 @@ mod test {
     use crate::parameters::SECURITY_PARAM;
     use crate::vole::crypto_primitives::CHALL2_LENGTH;
     use crate::vole::functionality::compute_chall_3;
-    use rand::thread_rng;
+    use rand::rng;
     use rayon::prelude::*;
     use sha3::digest::{ExtendableOutput, Update, XofReader};
     use shake::Shake128;
@@ -390,7 +390,7 @@ mod test {
     }
 
     fn test_vole_prover_and_verifier(how_many: usize) {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
 
         let statement_sig = vec![1u8];
         let secret = repeat_with(|| F2::random(rng))

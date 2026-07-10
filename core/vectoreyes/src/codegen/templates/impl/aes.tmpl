@@ -148,10 +148,10 @@
 
             {% call(scalar, avx2) fn("new_with_key", {"key": key_ty}, returns="Self", doc_scalar_equiv=False, pub=force_scalar_for_test and "super") %}
             {% call scalar() %}
-                use aes::cipher::{KeyInit, generic_array::GenericArray};
+                use aes::cipher::{KeyInit, Array};
                 let key_bytes = key.as_array();
                 Aes{{key_size}}{{encrypt_only}} {
-                    key: aes::Aes{{key_size}}::new(&GenericArray::from(key_bytes)).into(),
+                    key: aes::Aes{{key_size}}::new(&Array::from(key_bytes)).into(),
                 }
             {% endcall %}
             {% call(avx2i) avx2() %}
@@ -287,10 +287,10 @@
                 pub=force_scalar_for_test and "super"
             ) %}
             {% call scalar() %}
-                use aes::cipher::{BlockEncrypt, generic_array::GenericArray};
+                use aes::cipher::{BlockCipherEncrypt, Array};
                 // TODO: support ParBlocks
                 blocks.array_map(#[inline(always)] |block| {
-                    let mut block = GenericArray::from(block.as_array());
+                    let mut block = Array::from(block.as_array());
                     (*self.key).encrypt_block(&mut block);
                     U8x16::from(<[u8; 16]>::from(block))
                 })
@@ -336,10 +336,10 @@
                     where_array_unrolled_ops = ["N"],
                 ) %}
                 {% call scalar() %}
-                    use aes::cipher::{BlockDecrypt, generic_array::GenericArray};
+                    use aes::cipher::{BlockCipherDecrypt, Array};
                     // TODO: support ParBlocks
                     blocks.array_map(#[inline(always)] |block| {
-                        let mut block = GenericArray::from(block.as_array());
+                        let mut block = Array::from(block.as_array());
                         (*self.key).decrypt_block(&mut block);
                         U8x16::from(<[u8; 16]>::from(block))
                     })

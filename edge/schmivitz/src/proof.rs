@@ -9,7 +9,7 @@
 //!
 use mac_n_cheese_sieve_parser::WireId;
 use merlin::Transcript;
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use rayon::iter::*;
 use std::{iter::zip, marker::PhantomData};
 use swanky_error::{ErrorKind, Result, bail};
@@ -80,7 +80,7 @@ where
         rng: &mut R,
     ) -> Result<Self>
     where
-        R: CryptoRng + RngCore,
+        R: CryptoRng + Rng,
     {
         let (gates, private_input, max_wire_id) = circuit.to_interpreter();
         Self::prove(gates, private_input, max_wire_id, transcript, rng)
@@ -96,7 +96,7 @@ where
     ) -> Result<Self>
     // TODO: Get rid of max_wire_id
     where
-        R: CryptoRng + RngCore,
+        R: CryptoRng + Rng,
         C: CircuitExecuter<F2>, // Can't do higher order trait bounds... See https://github.com/rust-lang/rust/issues/108185#issuecomment-2819123578
     {
         let t = std::time::Instant::now();
@@ -347,7 +347,7 @@ impl AsSecretBytes for Vec<F2> {
 #[cfg(test)]
 mod tests {
     use merlin::Transcript;
-    use rand::thread_rng;
+    use rand::rng;
     use std::io::Write;
     use std::{fs::File, io::Cursor};
     use swanky_error::{ErrorKind, Result, WrapErr};
@@ -378,7 +378,7 @@ mod tests {
         writeln!(private_input, "{private_input_bytes}").unwrap();
 
         let circuit = load_circuit_prover(&mut circuit_cursor, &private_input_path)?;
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
 
         let proof = Proof::<InsecureVole, InsecureCommitments>::prove_with_circuit::<_>(
             &circuit,
@@ -530,7 +530,7 @@ mod tests {
         )?;
 
         let small_circuit = load_circuit_prover(small_circuit_text, &private_input_path)?;
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
 
         let proof = Proof::<InsecureVole, InsecureCommitments>::prove_with_circuit::<_>(
             &small_circuit,

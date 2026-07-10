@@ -6,7 +6,7 @@ use crate::party::{Party, Prover, Verifier, WhichParty};
 use crate::svole_trait::{SvoleT, field_name};
 use generic_array::typenum::Unsigned;
 use log::info;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use std::io::{BufReader, BufWriter};
 use std::net::TcpStream;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
@@ -87,7 +87,7 @@ fn generate_permutation<T: Clone>(rng: &mut SwankyRng, v: &mut [T]) {
 
     let mut i = size - 1;
     while i > 0 {
-        let idx = rng.gen_range(0..i);
+        let idx = rng.random_range(0..i);
         v.swap(idx, i);
         i -= 1;
     }
@@ -712,7 +712,7 @@ impl<
                     .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?
             }
             WhichParty::Verifier(_) => {
-                let seed = rng.r#gen::<Block>();
+                let seed = rng.random::<Block>();
                 channel
                     .write_block(&seed)
                     .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
@@ -1018,7 +1018,7 @@ impl<
                 .read_block()
                 .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?,
             WhichParty::Verifier(_) => {
-                let seed = rng.r#gen::<Block>();
+                let seed = rng.random::<Block>();
                 channel
                     .write_block(&seed)
                     .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;

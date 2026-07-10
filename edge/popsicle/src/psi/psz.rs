@@ -10,7 +10,7 @@ use crate::{
     utils,
 };
 use itertools::Itertools;
-use rand::{CryptoRng, Rng, RngCore, seq::SliceRandom};
+use rand::{CryptoRng, Rng, RngExt, seq::SliceRandom};
 use std::collections::{HashMap, HashSet};
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
@@ -31,7 +31,7 @@ pub struct Receiver {
 
 impl Sender {
     /// Initialize the PSI sender.
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -40,13 +40,13 @@ impl Sender {
     }
 
     /// Run the PSI protocol over `inputs`.
-    pub fn send<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         inputs: &[Vec<u8>],
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(), Error> {
-        let key = swanky_cointoss::send(channel, &[rng.r#gen()])?[0];
+        let key = swanky_cointoss::send(channel, &[rng.random()])?[0];
         let inputs = utils::compress_and_hash_inputs(inputs, key);
         let masksize = compute_masksize(inputs.len())?;
         let nbins = channel.read_usize()?;
@@ -77,19 +77,19 @@ impl Sender {
 
     /// Run the PSI protocol over `inputs`. Returns a random key for each input which can
     /// be used to encrypt payloads.
-    pub fn send_payloads<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn send_payloads<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         inputs: &[Vec<u8>],
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Vec<Block>, Error> {
-        let key = swanky_cointoss::send(channel, &[rng.r#gen()])?[0];
+        let key = swanky_cointoss::send(channel, &[rng.random()])?[0];
         let masksize = compute_masksize(inputs.len())?;
         let inputs = utils::compress_and_hash_inputs(inputs, key);
         let nbins = channel.read_usize()?;
         let seeds = self.oprf.send(channel, nbins, rng)?;
         let payloads = (0..inputs.len())
-            .map(|_| rng.r#gen::<Block>())
+            .map(|_| rng.random::<Block>())
             .collect_vec();
 
         // For each hash function `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x ||
@@ -126,7 +126,7 @@ impl Sender {
 
 impl Receiver {
     /// Initialize the PSI receiver.
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -135,7 +135,7 @@ impl Receiver {
     }
 
     /// Run the PSI protocol over `inputs`.
-    pub fn receive<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         inputs: &[Vec<u8>],
         channel: &mut C,
@@ -173,7 +173,7 @@ impl Receiver {
 
     /// Run the PSI protocol over `inputs`, receiving a vector of tuples consisting of
     /// the intersection items and associated payloads.
-    pub fn receive_payloads<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    pub fn receive_payloads<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         inputs: &[Vec<u8>],
         channel: &mut C,
@@ -228,7 +228,7 @@ impl Receiver {
     }
 
     // Helper to do computation common to both receive and receive_payloads
-    fn perform_oprfs<C: AbstractChannel, RNG: CryptoRng + RngCore>(
+    fn perform_oprfs<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         inputs: &[Vec<u8>],
         channel: &mut C,
@@ -240,7 +240,7 @@ impl Receiver {
         ),
         Error,
     > {
-        let key = swanky_cointoss::receive(channel, &[rng.r#gen()])?[0];
+        let key = swanky_cointoss::receive(channel, &[rng.random()])?[0];
 
         let hashed = utils::compress_and_hash_inputs(inputs, key);
 

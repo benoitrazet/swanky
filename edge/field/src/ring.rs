@@ -189,8 +189,8 @@ macro_rules! ring_ops {
             }
         }
 
-        impl $crate::__macro_export::rand::distributions::Distribution<$f>
-            for rand::distributions::Standard
+        impl $crate::__macro_export::rand::distr::Distribution<$f>
+            for rand::distr::StandardUniform
         {
             fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> $f {
                 <$f>::random(rng)

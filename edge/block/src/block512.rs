@@ -1,5 +1,6 @@
 //! 512-bit blocks of data.
 
+use rand::RngExt;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::Block;
@@ -75,13 +76,13 @@ impl std::fmt::Display for Block512 {
     }
 }
 
-impl rand::distributions::Distribution<Block512> for rand::distributions::Standard {
+impl rand::distr::Distribution<Block512> for rand::distr::StandardUniform {
     #[inline]
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Block512 {
-        let b1 = rng.r#gen::<Block>();
-        let b2 = rng.r#gen::<Block>();
-        let b3 = rng.r#gen::<Block>();
-        let b4 = rng.r#gen::<Block>();
+        let b1 = rng.random::<Block>();
+        let b2 = rng.random::<Block>();
+        let b3 = rng.random::<Block>();
+        let b4 = rng.random::<Block>();
         Block512([b1, b2, b3, b4])
     }
 }

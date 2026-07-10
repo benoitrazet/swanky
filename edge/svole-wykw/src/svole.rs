@@ -5,8 +5,8 @@ use super::{
 };
 use generic_array::typenum::Unsigned;
 use rand::{
-    Rng, SeedableRng,
-    distributions::{Distribution, Uniform},
+    RngExt, SeedableRng,
+    distr::{Distribution, Uniform},
 };
 use swanky_adversary::{Malicious, SemiHonest};
 use swanky_block::Block;
@@ -197,7 +197,7 @@ impl<T: FiniteField> Sender<T> {
         let out_len = cols - num_saved;
         output.reserve(out_len);
         assert!(rows <= 4_294_967_295); // 2^32 -1
-        let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
+        let distribution = Uniform::<u32>::try_from(0..rows.try_into().unwrap()).unwrap();
 
         let mut j = 0;
         let mut value = V::ZERO;
@@ -248,10 +248,10 @@ impl<T: FiniteField> Sender<T> {
         let base_voles_setup: Vec<(T::PrimeField, T)> = base_sender.send(
             channel,
             compute_num_saved::<T>(lpn_setup),
-            &mut SwankyRng::from_rng(&mut rng).expect("random number generation shouldn't fail"),
+            &mut SwankyRng::from_rng(&mut rng),
         )?;
         let spsvole = SpsSender::<T>::init(channel, pows, rng)?;
-        let seed = rng.r#gen::<Block>();
+        let seed = rng.random::<Block>();
         let seed = swanky_cointoss::receive(channel, &[seed])?[0];
         let lpn_rng = SwankyRng::from_seed(seed);
         let mut sender = Self {
@@ -376,7 +376,7 @@ impl<T: FiniteField> Receiver<T> {
         output.clear();
         output.reserve(cols - num_saved);
         assert!(rows <= 4_294_967_295); // 2^32 -1
-        let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
+        let distribution = Uniform::<u32>::try_from(0..rows.try_into().unwrap()).unwrap();
 
         let mut j = 0;
         let mut key = T::ZERO;
@@ -428,7 +428,7 @@ impl<T: FiniteField> Receiver<T> {
             base_receiver.receive(channel, compute_num_saved::<T>(lpn_setup), rng)?;
         let delta = base_receiver.delta();
         let spsvole = SpsReceiver::<T>::init(channel, pows, delta, rng)?;
-        let seed = rng.r#gen::<Block>();
+        let seed = rng.random::<Block>();
         let seed = swanky_cointoss::send(channel, &[seed])?[0];
         let lpn_rng = SwankyRng::from_seed(seed);
         let mut receiver = Self {
