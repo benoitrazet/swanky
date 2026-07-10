@@ -95,6 +95,7 @@ pub trait FieldForLigero:
     + num_traits::Num
     + num_traits::MulAdd<Output = Self>
     + ndarray::ScalarOperand
+    + sprs::MulAcc
     + std::fmt::Debug
 {
     /// Size of field, for use in parameter selection.
@@ -819,7 +820,7 @@ fn make_ra<Field: FieldForLigero>(
 ) -> Array2<Field> {
     params.fft2_inverse_rows(
         (&Pa.view().transpose_into() * ra)
-            .into_shape((params.m, params.l))
+            .into_shape_with_order((params.m, params.l))
             .unwrap()
             .view(),
     )
@@ -841,7 +842,7 @@ fn make_ra_Iml_Pa_neg<Field: FieldForLigero>(
             .cloned()
             .chain(r_dot_P)
             .collect::<Array1<Field>>()
-            .into_shape((2 * params.m, params.l))
+            .into_shape_with_order((2 * params.m, params.l))
             .unwrap()
             .view(),
     )
