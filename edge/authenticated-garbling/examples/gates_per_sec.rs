@@ -7,8 +7,8 @@ use fancy_garbling::{
 use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary, FancyEncode, FancyOutput, Flatten};
 use std::{hint::black_box, time::Instant};
 use swanky_authenticated_garbling::{
-    Evaluator, Garbler, WirePreProcessor,
-    ps::{PartyEvaluator, PartyGarbler},
+    EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator, PartyEvaluator,
+    PartyGarbler, WirePreProcessor,
 };
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -55,8 +55,9 @@ where
         + CircuitInputMapper<SemiHonestEvaluator<WireMod2>>
         + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
         + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
-        + CircuitInputMapper<Garbler<SwankyRng>>
-        + CircuitInputMapper<Evaluator>
+        + CircuitInputMapper<GarblerValidator>
+        + CircuitInputMapper<GarblerOffline>
+        + CircuitInputMapper<EvaluatorOnline>
         + Sync,
 {
     let mut analyzer = CircuitAnalyzer::new();
@@ -142,40 +143,43 @@ where
     );
 
     println!("=== Authenticated Garbling ===");
-    let ((mut gb, inputs_gb), (mut ev, inputs_ev)) = swanky_channel::local::local_channel_pair(
+    let total = Instant::now();
+    let offline = Instant::now();
+    let ((mut gb, outputs), mut ev) = swanky_channel::local::local_channel_pair(
         |channel: &mut Channel<'_>| {
-            let mut gb = Garbler::new(circuit, channel, SwankyRng::new())?;
-            let inputs = gb.encode_many(&inputs, &moduli, channel)?;
-            Ok((gb, inputs))
+            let gb = GarblerOffline::initialize(circuit, channel, &mut SwankyRng::new())?;
+            let (outputs, gb) = gb.execute(circuit)?;
+            let gb = gb.finalize(channel)?;
+            Ok((gb, outputs))
         },
         |channel| {
-            let mut ev = Evaluator::new(circuit, channel, &mut SwankyRng::new())?;
-            let inputs = ev.receive_many(&moduli, channel)?;
-            Ok((ev, inputs))
+            let ev = EvaluatorOffline::initialize(circuit, channel, &mut SwankyRng::new())?;
+            let ev = ev.finalize(channel)?;
+            Ok(ev)
         },
     )?;
+    println!("Offline: {:?}", offline.elapsed());
 
-    let t = Instant::now();
+    let online = Instant::now();
     let (_, result) = swanky_channel::local::local_channel_pair(
         |channel| {
-            let outputs = circuit.execute(
-                &mut gb,
-                <C as CircuitInputMapper<Garbler<_>>>::map(circuit, inputs_gb),
-                channel,
-            )?;
-            gb.outputs(&outputs.flatten(), channel)
+            let inputs = gb.encode_many(&inputs, &moduli, channel)?;
+            let validator = gb.finalize(channel)?;
+            let mut validator = validator.validate(circuit, inputs, channel)?;
+            validator.outputs(&outputs.flatten(), channel)
         },
         |channel| {
-            let outputs = circuit.execute(
-                &mut ev,
-                <C as CircuitInputMapper<Evaluator>>::map(circuit, inputs_ev),
-                channel,
-            )?;
-            ev.outputs(&outputs.flatten(), channel)
+            let inputs = ev.receive_many(&moduli, channel)?;
+            let (outputs, ev) = ev.execute(circuit, inputs)?;
+            let ev = ev.finalize(channel)?;
+            let mut ev = ev.validate(channel)?;
+            ev.outputs(&outputs, channel)
         },
     )?;
     black_box(result);
-    let time = t.elapsed();
+    println!("Online: {:?}", online.elapsed());
+
+    let time = total.elapsed();
     println!("Total: {:?}", time);
     println!(
         "Gates per second: {:?}",
@@ -185,7 +189,7 @@ where
     Ok(())
 }
 
-fn main() -> Result<()> {
+fn main() -> swanky_error::Result<()> {
     stats("AND", &And(1_000_000))?;
     stats("Linear ORAM", &LinearOram::<1024>::new(1024))?;
     Ok(())

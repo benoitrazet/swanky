@@ -6,6 +6,7 @@
 use crypto_bigint::Uint;
 use generic_array::GenericArray;
 use rand::Rng;
+use std::io::Error;
 use std::{
     hash::Hash,
     ops::{AddAssign, MulAssign, SubAssign},
@@ -213,6 +214,17 @@ pub struct F2BitSerializer {
     current_word: u64,
     num_bits: usize,
 }
+
+impl F2BitSerializer {
+    /// A wrapper around [`F2BitSerializer::write`] and [`F2BitSerializer::finish`] which writes a vector of
+    /// bits into the channel and finishes afterwards.
+    pub fn write_vec<W: std::io::Write>(mut self, dst: &mut W, bits: &[F2]) -> Result<(), Error> {
+        for b in bits.iter() {
+            self.write(dst, *b)?;
+        }
+        self.finish(dst)
+    }
+}
 impl SequenceSerializer<F2> for F2BitSerializer {
     fn serialized_size(n: usize) -> usize {
         (n / 64 + (if n.is_multiple_of(64) { 0 } else { 1 })) * 8
@@ -256,6 +268,22 @@ impl std::ops::Drop for F2BitSerializer {
 pub struct F2BitDeserializer {
     current_word: u64,
     num_bits: usize,
+}
+
+impl F2BitDeserializer {
+    /// A wrapper around [`F2BitDeserializer::read`] which reads a specific number of
+    /// bits defined by len and returns those bits
+    pub fn read_vector<R: std::io::Read>(
+        &mut self,
+        src: &mut R,
+        len: usize,
+    ) -> Result<Vec<F2>, Error> {
+        let mut res = Vec::new();
+        for _ in 0..len {
+            res.push(self.read(src)?);
+        }
+        Ok(res)
+    }
 }
 impl SequenceDeserializer<F2> for F2BitDeserializer {
     fn new<R: std::io::Read>(_dst: &mut R) -> std::io::Result<Self> {

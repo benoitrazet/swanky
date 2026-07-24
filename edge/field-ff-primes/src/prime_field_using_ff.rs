@@ -4,7 +4,7 @@
 /// method, and if a modulus is passed we use `Uniform::from` instead.
 macro_rules! random_function_helper {
     () => {
-        fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+        fn random<R: Rng + ?Sized>(rng: &mut R) -> Self {
             Self {
                 internal: Internal::random(rng),
             }
@@ -12,10 +12,12 @@ macro_rules! random_function_helper {
     };
 
     ($modulus: expr) => {
-        fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
-            use rand::distributions::{Distribution, Uniform};
+        fn random<R: Rng + ?Sized>(rng: &mut R) -> Self {
+            use rand::distr::{Distribution, Uniform};
             Self {
-                internal: internal::new_internal([Uniform::from(0..$modulus).sample(rng)]),
+                internal: internal::new_internal([Uniform::try_from(0..$modulus)
+                    .expect("bounds finite and low < high")
+                    .sample(rng)]),
             }
         }
     };
@@ -91,7 +93,7 @@ macro_rules! prime_field_using_ff {
             use swanky_serialization::{CanonicalSerialize};
             use ff::{Field, PrimeField};
             use generic_array::{typenum::Unsigned, GenericArray};
-            use rand_core::{RngCore, SeedableRng};
+            use rand_core::{Rng, SeedableRng};
             use std::hash::{Hash, Hasher};
             use std::ops::{AddAssign, MulAssign, SubAssign};
             use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, ConstantTimeLess, CtOption};

@@ -107,12 +107,12 @@ pub mod test {
     #[test]
     fn binary_constant() {
         use fancy_plaintext::Dummy;
-        use rand::Rng;
+        use rand::RngExt;
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _ in 0..16 {
-            let nbits = 1 + rng.r#gen::<usize>() % 127;
-            let value = rng.r#gen::<u128>() % (nbits as u128);
+            let nbits = 1 + rng.random_range(..127usize);
+            let value = rng.random::<u128>() % (nbits as u128);
             let c = TestBinaryConstant(value, nbits);
             let output = Dummy::eval(&c, ()).unwrap();
             assert_eq!(Into::<u128>::into(output), value);

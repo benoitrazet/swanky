@@ -6,8 +6,8 @@ use super::{
 };
 use generic_array::typenum::Unsigned;
 use rand::{
-    CryptoRng, Rng, SeedableRng,
-    distributions::{Distribution, Uniform},
+    CryptoRng, Rng, RngExt, SeedableRng,
+    distr::{Distribution, Uniform},
 };
 use swanky_adversary::Malicious;
 use swanky_block::Block;
@@ -65,7 +65,7 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng + Rng, FE: FF>(
     rng: &mut RNG,
     y: FE,
 ) -> Result<bool, Error> {
-    let seed = rng.r#gen::<[u8; 32]>();
+    let seed = rng.random::<[u8; 32]>();
     let com = blake3::keyed_hash(&seed, &y.to_bytes());
 
     channel.write_bytes(com.as_bytes())?;
@@ -90,8 +90,8 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let ot = OT::init(channel, rng)?;
-        let seed0 = rng.r#gen::<Block>();
-        let seed1 = rng.r#gen::<Block>();
+        let seed0 = rng.random::<Block>();
+        let seed1 = rng.random::<Block>();
         let seeds = swanky_cointoss::send(channel, &[seed0, seed1])?;
         let aes0 = Aes128EncryptOnly::new_with_key(seeds[0]);
         let aes1 = Aes128EncryptOnly::new_with_key(seeds[1]);
@@ -133,7 +133,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             channel.write_serializable(&a_prime)?;
             betas.push(beta);
         }
-        let distribution = Uniform::from(0..n);
+        let distribution = Uniform::try_from(0..n).expect("bounds finite and low < high");
         let mut alphas = Vec::with_capacity(t);
         let mut choices = Vec::with_capacity(t * nbits);
         for _ in 0..t {
@@ -182,7 +182,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     ) -> Result<(), Error> {
         let r = Degree::<FE>::USIZE;
         // Generate `chi`s from seed and send seed to receiver at the end.
-        let seed = rng.r#gen::<Block>();
+        let seed = rng.random::<Block>();
         let mut rng_chi = SwankyRng::from_seed(seed);
         let mut va = FE::ZERO;
         let mut x_stars = vec![FE::PrimeField::ZERO; r];
@@ -239,8 +239,8 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         mut rng: &mut RNG,
     ) -> Result<Self, Error> {
         let ot = OT::init(channel, &mut rng)?;
-        let seed0 = rng.r#gen::<Block>();
-        let seed1 = rng.r#gen::<Block>();
+        let seed0 = rng.random::<Block>();
+        let seed1 = rng.random::<Block>();
         let seeds = swanky_cointoss::receive(channel, &[seed0, seed1])?;
         let aes0 = Aes128EncryptOnly::new_with_key(seeds[0]);
         let aes1 = Aes128EncryptOnly::new_with_key(seeds[1]);
@@ -275,7 +275,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         }
         let mut keys = Vec::with_capacity(t * nbits);
         for i in 0..t {
-            let seed = rng.r#gen::<Block>();
+            let seed = rng.random::<Block>();
             self.ggm_temporary_storage
                 .resize(ggm_temporary_storage_size(nbits), U8x16::default());
             ggm(

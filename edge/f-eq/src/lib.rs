@@ -27,7 +27,7 @@
 //!    $`\mathcal{F}_{\mathsf{eq}}(0x1234 || 0x5678)`$ is the same as $`\mathcal{F}_{\mathsf{eq}}(0x12 || 0x345678)`$.
 //!    This is not a concern for our use cases.
 
-use rand::{CryptoRng, Rng};
+use rand::{CryptoRng, Rng, RngExt};
 use sha2::{Digest, Sha256};
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
@@ -50,7 +50,7 @@ impl<P: GenericParty> EqualityFunctionality<P> {
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(_e) => EqualityFunctionality {
                 hash: Sha256::new(),
-                commitment_salt: PartyPrivate::new(rng.r#gen()),
+                commitment_salt: PartyPrivate::new(rng.random()),
             },
             GenericWhichParty::Party1(e) => EqualityFunctionality {
                 hash: Sha256::new(),
@@ -119,7 +119,7 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
     use proptest::test_runner::TestRunner;
-    use rand::{Rng, SeedableRng};
+    use rand::SeedableRng;
     use swanky_party::party_system;
     use swanky_rng::SwankyRng;
 
@@ -200,7 +200,7 @@ mod tests {
         #[test]
         fn batched_same_inputs_work(ninputs in 1..10, seed in any::<u128>()) {
             let mut rng = SwankyRng::from_seed(seed.into());
-            let inputs: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.r#gen::<[u8; 32]>()).collect();
+            let inputs: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.random::<[u8; 32]>()).collect();
             let res = batched_check_equality(&inputs, &inputs);
             prop_assert!(res.is_ok());
         }
@@ -209,8 +209,8 @@ mod tests {
         #[test]
         fn batched_different_inputs_fail(ninputs in 1..10, seed in any::<u128>()) {
             let mut rng = SwankyRng::from_seed(seed.into());
-            let inputs_pr: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.r#gen::<[u8; 32]>()).collect();
-            let inputs_vr: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.r#gen::<[u8; 32]>()).collect();
+            let inputs_pr: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.random::<[u8; 32]>()).collect();
+            let inputs_vr: Vec<[u8; 32]> = (0..ninputs).map(|_| rng.random::<[u8; 32]>()).collect();
             let res = batched_check_equality(&inputs_pr, &inputs_vr);
             prop_assert!(res.is_err());
         }

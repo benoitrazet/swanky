@@ -32,7 +32,7 @@
 //! [`AuthBit`]s.
 //!
 //! ```
-//! # use rand::Rng;
+//! # use rand::RngExt;
 //! # use swanky_authenticated_bits::authbits::{AuthBit, AuthBitGenerator};
 //! # use swanky_field_binary::F2;
 //! # use swanky_party::{party_system, either::PartyEither, private::PartyPrivate, ty_eq::Witness};
@@ -50,7 +50,7 @@
 //!     |c| {
 //!         // The prover.
 //!         let mut rng = swanky_rng::SwankyRng::new();
-//!         let bits = rng.r#gen::<[F2; 10]>();
+//!         let bits = rng.random::<[F2; 10]>();
 //!         let mut authbits: Vec<AuthBit<Prover>> = vec![];
 //!         let mut generator: AuthBitGenerator<_> = AuthBitGenerator::new(c, &mut rng)?;
 //!         generator.generate(PartyEither::new(Witness::EQUAL_TYPES, bits.iter().copied()), &mut authbits, c, &mut rng)?;
@@ -79,7 +79,7 @@
 //!     Secure 2PC with Function-independent Preprocessing using LEGO".
 //!     <https://eprint.iacr.org/2016/1069.pdf>
 
-use rand::{CryptoRng, Rng};
+use rand::{CryptoRng, Rng, RngExt};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
@@ -255,7 +255,7 @@ impl<P: GenericParty> AuthBitGenerator<P> {
                 Self::new_with_delta(PartyPrivateCopy::empty(e), channel, rng)
             }
             GenericWhichParty::Party1(_e) => {
-                let delta = rng.r#gen::<U8x16>();
+                let delta = rng.random::<U8x16>();
                 Self::new_with_delta(PartyPrivateCopy::new(delta), channel, rng)
             }
         }
@@ -531,7 +531,7 @@ mod tests {
 
     use super::*;
     use proptest::prelude::*;
-    use rand::{Rng, SeedableRng};
+    use rand::SeedableRng;
     use swanky_field::FiniteRing;
     use swanky_party::{party_system, ty_eq::Witness};
     use swanky_rng::SwankyRng;
@@ -599,7 +599,7 @@ mod tests {
                         Witness::EQUAL_TYPES,
                         ProverAuthBit {
                             bit: outputs[0].bit().into_inner(Witness::EQUAL_TYPES),
-                            mac: rng_a.r#gen(),
+                            mac: rng_a.random(),
                         },
                     ));
                 }
@@ -619,7 +619,9 @@ mod tests {
                     // Tamper the key of the first `AuthBit`.
                     outputs[0] = AuthBit(PartyEitherCopy::new(
                         Witness::EQUAL_TYPES,
-                        VerifierAuthBit { key: rng_b.r#gen() },
+                        VerifierAuthBit {
+                            key: rng_b.random(),
+                        },
                     ));
                 }
                 let mut output = vec![];
@@ -827,8 +829,8 @@ mod tests {
                         seed_party_b in any::<u128>()) {
             let mut rng_a = SwankyRng::from_seed(seed_party_a.into());
             let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
-            let bits1: Vec<_> = (0..nbits).map(|_| rng_a.r#gen::<F2>()).collect();
-            let bits2: Vec<_> = (0..nbits).map(|_| rng_a.r#gen::<F2>()).collect();
+            let bits1: Vec<_> = (0..nbits).map(|_| rng_a.random::<F2>()).collect();
+            let bits2: Vec<_> = (0..nbits).map(|_| rng_a.random::<F2>()).collect();
             let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
             let (mut output_a, mut output_b) = generate(
                 &bits1,

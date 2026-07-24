@@ -143,7 +143,7 @@ impl<'a> FancyEncode for ProverPreparer<'a> {
         bail!(
             ErrorKind::OtherError,
             "Invalid input: VOLE-in-the-head prover does not support encode"
-        );
+        )
     }
 
     fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
@@ -193,14 +193,14 @@ mod tests {
     use crate::circuit::CircuitIngestor;
     use crate::proof::{Circuit, prover_preparer::ProverPreparer};
     use mac_n_cheese_sieve_parser::text_parser::RelationReader;
-    use rand::thread_rng;
+    use rand::rng;
     use std::io::Cursor;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
 
     /// Take a string description of a circuit and parse it.
     fn load_circuit(circuit: &str) -> swanky_error::Result<Circuit> {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         // Generate a private input vector with 100 random inputs
         let random_private_inputs: Vec<F2> = (0..100).map(|_| F2::random(rng)).collect();
 

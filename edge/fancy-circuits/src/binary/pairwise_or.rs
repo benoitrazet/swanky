@@ -42,11 +42,11 @@ pub mod test {
     #[test]
     fn pairwise_or() {
         use fancy_plaintext::{Dummy, DummyVal};
-        use rand::Rng;
+        use rand::RngExt;
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _ in 0..100 {
-            let n = 1 + (rng.r#gen::<usize>() % 200);
+            let n = 1 + rng.random_range(..200usize);
             let x = (0..n)
                 .map(|_| DummyVal::rand_bool(&mut rng))
                 .collect::<Vec<_>>();

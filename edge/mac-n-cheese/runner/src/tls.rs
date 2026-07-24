@@ -9,7 +9,7 @@ use std::{
 
 use bufstream::BufStream;
 use mac_n_cheese_vole::party::{Party, WhichParty};
-use rand::RngCore;
+use rand::TryRng;
 use rustls::{ClientConnection, ServerConnection, StreamOwned};
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_party::either::{PartyEither, PartyEitherCopy};
@@ -289,7 +289,7 @@ pub fn initiate_tls<P: Party>(
                     "Failed to write number of connections.",
                 )?;
             let mut base_key = [0; 32];
-            rand::rngs::OsRng.fill_bytes(&mut base_key);
+            rand::rngs::SysRng.try_fill_bytes(&mut base_key).unwrap();
             root_conn
                 .write_all(&base_key)
                 .wrap_err(ErrorKind::NetworkError, "Failed to write base key.")?;

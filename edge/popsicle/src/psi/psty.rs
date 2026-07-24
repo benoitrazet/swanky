@@ -13,7 +13,7 @@ use fancy_circuits::{
 use fancy_garbling::AllWire;
 use fancy_traits::{Circuit, FancyBinary, FancyEncode, FancyOutput};
 use itertools::Itertools;
-use rand::{CryptoRng, Rng, RngCore, SeedableRng};
+use rand::{CryptoRng, Rng, RngExt, SeedableRng};
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
 use swanky_channel::Channel;
@@ -68,7 +68,7 @@ pub struct ReceiverState {
 
 impl Sender {
     /// Initialize the PSI sender.
-    pub fn init<RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn init<RNG: Rng + CryptoRng + SeedableRng>(
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
@@ -80,7 +80,7 @@ impl Sender {
     }
 
     /// Run the PSI protocol over `inputs`.
-    pub fn send<RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn send<RNG: Rng + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
         channel: &mut Channel,
@@ -104,12 +104,12 @@ impl Sender {
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
             // table2[j].
             if bins.iter().skip(1).all(|&x| x == bins[0]) {
-                table[bins[0]].push(rng.r#gen());
+                table[bins[0]].push(rng.random());
             }
         }
 
         // select the target values
-        let ts = (0..nbins).map(|_| rng.r#gen::<Block512>()).collect_vec();
+        let ts = (0..nbins).map(|_| rng.random::<Block512>()).collect_vec();
 
         let points = table
             .into_iter()
@@ -136,13 +136,13 @@ impl SenderState {
         rng: &mut RNG,
     ) -> swanky_error::Result<(Garbler<RNG, OtSender, AllWire>, Vec<AllWire>, Vec<AllWire>)>
     where
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+        RNG: Rng + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let mut gb = Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
+        let mut gb = Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.random()))
             .wrap_err(
-            ErrorKind::InitializationError,
-            "Failed to initialize garbler during setup.",
-        )?;
+                ErrorKind::InitializationError,
+                "Failed to initialize garbler during setup.",
+            )?;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
         let mods = vec![2; my_input_bits.len()]; // all binary moduli
         let sender_inputs = gb.encode_many(&my_input_bits, &mods, channel)?;
@@ -157,7 +157,7 @@ impl SenderState {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+        RNG: Rng + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut gb, x, y) = self.compute_setup(channel, rng)?;
         let outs = fancy_compute_intersection(&mut gb, &x, &y, channel)?;
@@ -172,7 +172,7 @@ impl SenderState {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+        RNG: Rng + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut gb, x, y) = self.compute_setup(channel, rng)?;
         let result = fancy_compute_cardinality(&mut gb, &x, &y, channel)?;
@@ -188,17 +188,17 @@ impl SenderState {
     ) -> swanky_error::Result<Vec<Vec<u8>>> {
         let mut payloads = Vec::new();
         for opprf_output in self.opprf_outputs.iter() {
-            let mut nonce_bytes = vec![0u8; NONCE_SIZE];
+            let mut nonce_bytes = [0u8; NONCE_SIZE];
             let mut ciphertext = vec![0u8; payload_len + PAD_LEN + TAG_SIZE];
             channel.read_bytes(&mut nonce_bytes)?;
             channel.read_bytes(&mut ciphertext)?;
 
             let key = opprf_output.prefix(KEY_SIZE);
-            let key: &Key<Aes256Gcm> = key.into();
+            let key: &Key<Aes256Gcm> = key.try_into().unwrap();
             let cipher = Aes256Gcm::new(key);
 
-            let nonce = Nonce::from_slice(&nonce_bytes);
-            match cipher.decrypt(nonce, ciphertext.as_ref()) {
+            let nonce = Nonce::from(nonce_bytes);
+            match cipher.decrypt(&nonce, ciphertext.as_ref()) {
                 Ok(dec) => {
                     let payload = dec.to_owned().split_off(PAD_LEN);
                     payloads.push(payload)
@@ -212,7 +212,7 @@ impl SenderState {
 
 impl Receiver {
     /// Initialize the PSI receiver.
-    pub fn init<RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn init<RNG: Rng + CryptoRng + SeedableRng>(
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
@@ -224,13 +224,13 @@ impl Receiver {
     }
 
     /// Run the PSI protocol over `inputs`.
-    pub fn receive<RNG: RngCore + CryptoRng + SeedableRng>(
+    pub fn receive<RNG: Rng + CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<ReceiverState> {
-        let key = rng.r#gen();
+        let key = rng.random();
         let hashed_inputs = utils::compress_and_hash_inputs(inputs, key);
         let cuckoo = CuckooHash::new(&hashed_inputs, NHASHES).wrap_err(
             ErrorKind::InitializationError,
@@ -248,7 +248,7 @@ impl Receiver {
             .iter()
             .map(|opt_item| match opt_item {
                 Some(item) => item.entry_with_hindex(),
-                None => rng.r#gen(),
+                None => rng.random(),
             })
             .collect::<Vec<Block>>();
 
@@ -277,13 +277,13 @@ impl ReceiverState {
         Vec<AllWire>,
     )>
     where
-        RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
     {
         let nbins = self.cuckoo.nbins;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
 
         let mut ev =
-            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.r#gen()))
+            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.random()))
                 .wrap_err(
                     ErrorKind::InitializationError,
                     "Failed to initialize receiver during setup.",
@@ -302,7 +302,7 @@ impl ReceiverState {
         rng: &mut RNG,
     ) -> swanky_error::Result<Vec<Msg>>
     where
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+        RNG: Rng + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut ev, x, y) = self.compute_setup(channel, rng)?;
         let outs = fancy_compute_intersection(&mut ev, &x, &y, channel)?;
@@ -328,7 +328,7 @@ impl ReceiverState {
         rng: &mut RNG,
     ) -> swanky_error::Result<usize>
     where
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+        RNG: Rng + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut ev, x, y) = self.compute_setup(channel, rng)?;
         let result = fancy_compute_cardinality(&mut ev, &x, &y, channel)?;
@@ -352,7 +352,7 @@ impl ReceiverState {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+        RNG: Rng + CryptoRng + SeedableRng<Seed = Block>,
     {
         let payload_len = payloads[0].len();
         if !(payloads.iter().all(|p| p.len() == payload_len)) {
@@ -371,14 +371,14 @@ impl ReceiverState {
                 payload.extend_from_slice(&dummy_payload);
             };
             let key = opprf_output.prefix(KEY_SIZE);
-            let key: &Key<Aes256Gcm> = key.into();
+            let key: &Key<Aes256Gcm> = key.try_into().unwrap();
 
             let mut nonce_bytes = [0u8; NONCE_SIZE];
             rng.fill_bytes(&mut nonce_bytes);
-            let nonce = Nonce::from_slice(&nonce_bytes);
+            let nonce = Nonce::from(nonce_bytes);
 
             let cipher = Aes256Gcm::new(key);
-            let ciphertext = cipher.encrypt(nonce, payload.as_ref()).map_err(|_| {
+            let ciphertext = cipher.encrypt(&nonce, payload.as_ref()).map_err(|_| {
                 swanky_error::Error::new(
                     ErrorKind::OtherError,
                     "Failed to encrypt payload.",
@@ -386,7 +386,7 @@ impl ReceiverState {
                 )
             })?;
 
-            channel.write_bytes(nonce)?;
+            channel.write_bytes(&nonce)?;
             channel.write_bytes(&ciphertext)?;
         }
         Ok(())

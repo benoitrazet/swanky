@@ -97,7 +97,7 @@ pub fn i64_from_bits(bits: &[u16]) -> i64 {
 mod tests {
     use super::*;
     use fancy_circuits::util::{PRIMES, product};
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt, rng};
 
     /// Generate a CRT modulus using the `n` smallest primes in [`PRIMES`].
     fn modulus_with_nprimes(n: usize) -> u128 {
@@ -106,21 +106,21 @@ mod tests {
 
     #[test]
     fn convert_crt() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         for _ in 0..1024 {
-            let nprimes = 2_usize + (rng.r#gen::<usize>() % 16);
+            let nprimes = 2 + rng.random_range(..16usize);
             let q = modulus_with_nprimes(nprimes);
-            let x = rng.r#gen::<i64>() % (q / 2) as i64;
+            let x = rng.random::<i64>() % (q / 2) as i64;
             assert_eq!(x, from_mod_q_crt(&to_mod_q_crt(x, q), q));
         }
     }
 
     #[test]
     fn convert_binary() {
-        let mut rng = thread_rng();
-        let nbits = 2 + rng.r#gen::<usize>() % 120;
+        let mut rng = rng();
+        let nbits = 2 + rng.random_range(..120usize);
         for _ in 0..128 {
-            let x = rng.r#gen::<i64>() % nbits as i64;
+            let x = rng.random::<i64>() % nbits as i64;
             assert_eq!(
                 x,
                 i64_from_twos_complement(i64_to_twos_complement(x, nbits), nbits)

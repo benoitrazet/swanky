@@ -187,7 +187,7 @@ impl FancyEncode for VerifierTraverser {
         bail!(
             ErrorKind::OtherError,
             "Invalid input: VOLE-in-the-head verifier does not support encode"
-        );
+        )
     }
 
     fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {

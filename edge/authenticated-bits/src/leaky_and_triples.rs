@@ -21,7 +21,7 @@ use crate::{
     authshares::{AuthShare, AuthShareGenerator},
 };
 use itertools::Itertools;
-use rand::{CryptoRng, Rng};
+use rand::{CryptoRng, Rng, RngExt};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_f_eq::EqualityFunctionality;
@@ -75,7 +75,7 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
     /// have Δ with different least significant bits (lsb). Towards that we
     /// require that Party0's Δ has lsb == 1 and Party1's Δ has lsb == 0.
     pub(crate) fn generate_valid_delta<RNG: CryptoRng + Rng>(rng: &mut RNG) -> U8x16 {
-        let delta = rng.r#gen::<F128b>();
+        let delta = rng.random::<F128b>();
         // We require that for Party A `lsb(Δ) = 1`, and for Party
         // B `lsb(Δ) = 0`. So adjust `delta` as needed.
         let delta = match P::GENERIC_WHICH {

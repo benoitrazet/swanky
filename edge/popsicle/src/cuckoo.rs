@@ -143,7 +143,7 @@ mod tests {
     use super::*;
     use crate::utils;
     use itertools::Itertools;
-    use rand::Rng;
+    use rand::RngExt;
     use swanky_rng::SwankyRng;
 
     const NHASHES: usize = 3;
@@ -154,7 +154,7 @@ mod tests {
     fn test_build() {
         let mut rng = SwankyRng::new();
         let inputs = utils::rand_vec_vec(SETSIZE, ITEMSIZE, &mut rng);
-        let key = rng.r#gen();
+        let key = rng.random();
         let hashes = utils::compress_and_hash_inputs(&inputs, key);
         let _ = CuckooHash::new(&hashes, NHASHES).unwrap();
     }
@@ -164,7 +164,7 @@ mod tests {
         let mut rng = SwankyRng::new();
         let inputs = utils::rand_vec_vec(SETSIZE, ITEMSIZE, &mut rng);
 
-        let key = rng.r#gen();
+        let key = rng.random();
         let hashes = utils::compress_and_hash_inputs(&inputs, key);
         let cuckoo = CuckooHash::new(&hashes, NHASHES).unwrap();
 
@@ -181,7 +181,7 @@ mod tests {
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
             // table2[j].
             if bins.iter().skip(1).all(|&x| x == bins[0]) {
-                table[bins[0]].push(rng.r#gen());
+                table[bins[0]].push(rng.random());
             }
         }
 

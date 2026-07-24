@@ -1,6 +1,8 @@
 //! Testing the opprf phase in Base Psi
 #[cfg(test)]
 mod tests {
+    use rand::RngExt;
+
     use crate::psi::circuit_psi::{
         base_psi::{BasePsi, receiver::OpprfReceiver, sender::OpprfSender},
         tests::{utils::*, *},
@@ -125,7 +127,7 @@ mod tests {
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
             let (_, _, result_opprf_sender, _) =
-                psty_up_to_opprf(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
+                psty_up_to_opprf(&set, &payloads, rng.random(), DEFAULT_SEED);
             assert!(
                 result_opprf_sender.is_ok(),
                 "PSTY OPPRF failed on the sender side for arbitrary sender seeds"
@@ -168,7 +170,7 @@ mod tests {
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, _, _, result_opprf_receiver) =
-                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, rng.r#gen());
+                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, rng.random());
             assert!(
                 result_opprf_receiver.is_ok(),
                 "PSTY OPPRF failed on the receiver side for arbitrary set"
@@ -200,7 +202,7 @@ mod tests {
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
-                psty_up_to_opprf(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
+                psty_up_to_opprf(&set, &payloads, rng.random(), DEFAULT_SEED);
             let intersection = psty_check_opprf_set(sender, receiver);
 
             assert!(
@@ -274,7 +276,7 @@ mod tests {
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
-                psty_up_to_opprf(&set, &payloads, rng.r#gen(), DEFAULT_SEED);
+                psty_up_to_opprf(&set, &payloads, rng.random(), DEFAULT_SEED);
             let (intersection_sender, _, payloads_len) =
                 psty_check_opprf_payload(sender, receiver, payloads);
             assert!(
@@ -328,7 +330,7 @@ mod tests {
             let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
-                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, rng.r#gen());
+                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, rng.random());
             let (_, intersection_receiver, payloads_len) =
                 psty_check_opprf_payload(sender, receiver, payloads);
             assert!(

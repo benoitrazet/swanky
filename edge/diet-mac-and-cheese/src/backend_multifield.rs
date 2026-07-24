@@ -626,7 +626,7 @@ impl<
     fn finalize_conv(&mut self) -> Result<()> {
         // The keys must be sorted deterministically so that the prover and verifier are in sync.
         // This is the reason why the EdabitsMap is using a BTreeMap instead of a HashMap.
-        for (_key, edabits) in self.edabits_map.0.iter() {
+        for edabits in self.edabits_map.0.values() {
             // because they are periodically executed by maybe_do_conversion
             assert!(edabits.len() < 2 * CONVERSION_BATCH_SIZE);
             if edabits.len() < CONVERSION_BATCH_SIZE_SAFE {

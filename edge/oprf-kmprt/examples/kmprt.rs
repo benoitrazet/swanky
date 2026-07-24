@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand::RngExt;
 use std::time::SystemTime;
 use swanky_block::{Block, Block512};
 use swanky_channel_legacy::track_unix_channel_pair;
@@ -13,7 +13,7 @@ fn run(ninputs: usize, npoints: usize) {
     let inputs = rand_block_vec(ninputs);
     let mut rng = SwankyRng::new();
     let points = (0..npoints)
-        .map(|_| (rng.r#gen(), rng.r#gen()))
+        .map(|_| (rng.random(), rng.random()))
         .collect::<Vec<(Block, Block512)>>();
     let (mut sender, mut receiver) = track_unix_channel_pair();
     let total = SystemTime::now();

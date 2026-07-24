@@ -1,6 +1,8 @@
 //! Testing Circuit Psi on various circuits
 #[cfg(test)]
 mod tests {
+    use rand::RngExt;
+
     use crate::psi::circuit_psi::{
         evaluator::OpprfPsiEvaluator,
         garbler::OpprfPsiGarbler,
@@ -152,7 +154,8 @@ mod tests {
     fn test_psty_circuit_cardinality_same_sets() {
         let mut rng = SwankyRng::new();
         let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
-        let cardinality = psty_cardinality(&set, &set, rng.r#gen(), rng.r#gen()).unwrap() as usize;
+        let cardinality =
+            psty_cardinality(&set, &set, rng.random(), rng.random()).unwrap() as usize;
         assert!(
             cardinality == SET_SIZE,
             "The PSI Cardinality on the same primary_keysis wrong! The result was {} and should be {}",
@@ -170,7 +173,7 @@ mod tests {
         let set_b = enum_ids(SET_SIZE, 1, PRIMARY_KEY_SIZE);
 
         let cardinality =
-            psty_cardinality(&set_a, &set_b, rng.r#gen(), rng.r#gen()).unwrap() as usize;
+            psty_cardinality(&set_a, &set_b, rng.random(), rng.random()).unwrap() as usize;
         assert!(
             cardinality == (SET_SIZE - 1),
             "The PSI Cardinality on primary_keys with one different item is wrong! The result was {} and should be {}",
@@ -188,7 +191,7 @@ mod tests {
         let set_b = enum_ids(SET_SIZE, SET_SIZE as u64, PRIMARY_KEY_SIZE);
 
         let cardinality =
-            psty_cardinality(&set_a, &set_b, rng.r#gen(), rng.r#gen()).unwrap() as usize;
+            psty_cardinality(&set_a, &set_b, rng.random(), rng.random()).unwrap() as usize;
         assert!(
             cardinality == 0,
             "The PSI Cardinality on disjoint primary_keys is wrong! The result was {} and should be {}",
@@ -206,7 +209,7 @@ mod tests {
         let set_b = rand_u8_vec(SET_SIZE, 2u128.pow(PRIMARY_KEY_SIZE as u32 * 8), &mut rng);
 
         let cardinality =
-            psty_cardinality(&set_a, &set_b, rng.r#gen(), rng.r#gen()).unwrap() as usize;
+            psty_cardinality(&set_a, &set_b, rng.random(), rng.random()).unwrap() as usize;
 
         let cardinality_in_clear = cardinality_in_clear(&set_a, &set_b);
         assert!(
@@ -234,8 +237,8 @@ mod tests {
             &primary_keys,
             &int_vec_block512(payloads_a, PAYLOAD_SIZE),
             &int_vec_block512(payloads_b, PAYLOAD_SIZE),
-            rng.r#gen(),
-            rng.r#gen(),
+            rng.random(),
+            rng.random(),
         )
         .unwrap();
 
@@ -265,8 +268,8 @@ mod tests {
             &primary_keys_b,
             &int_vec_block512(payloads_a, PAYLOAD_SIZE),
             &int_vec_block512(payloads_b, PAYLOAD_SIZE),
-            rng.r#gen(),
-            rng.r#gen(),
+            rng.random(),
+            rng.random(),
         )
         .unwrap();
 

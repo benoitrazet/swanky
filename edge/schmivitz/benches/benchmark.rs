@@ -4,7 +4,7 @@ mod example;
 use criterion::{Criterion, criterion_group, criterion_main};
 
 use merlin::Transcript;
-use rand::thread_rng;
+use rand::rng as thread_rng;
 use schmivitz::{
     Proof,
     circuit::load_circuit_from_strings_prover,

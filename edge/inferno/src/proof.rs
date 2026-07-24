@@ -126,7 +126,7 @@ mod tests {
     };
 
     use super::*;
-    use rand::{Rng, SeedableRng};
+    use rand::{RngExt, SeedableRng};
     use swanky_block::Block;
     use swanky_field_binary::F64b;
 
@@ -215,7 +215,7 @@ mod tests {
         let mut hashers = Hashers::<N>::new();
         let mut commitments = Vec::with_capacity(nrounds + 2);
 
-        let seeds: [u128; N] = std::array::from_fn(|_| rng.r#gen::<u128>());
+        let seeds: [u128; N] = std::array::from_fn(|_| rng.random::<u128>());
         let mut rngs = seeds.map(|s| SwankyRng::from_seed(Block::from(s)));
 
         let ws: Vec<SecretSharing<F2, N>> = witness

@@ -8,7 +8,7 @@ use crate::vole::all_but_one_vc::{Decom, Pdecom, commit, open, reconstruct};
 use crate::vole::convert_to_vole::{convert_to_vole, convert_to_vole_verifier};
 use crate::vole::crypto_primitives::{Chall3, Com, H1, H1_LENGTH, IV, Prg, Seed};
 use generic_array::{GenericArray, arr, typenum::U16};
-use rand::Rng;
+use rand::RngExt;
 use rayon::iter::*;
 use std::{sync::mpsc::channel, thread};
 use swanky_field::{FiniteRing, IsSubFieldOf};
@@ -96,7 +96,7 @@ pub(crate) fn vole_commit(r: Seed, iv: IV, l_hat: usize) -> Commit {
 
     // With multithreading
     let handles: [_; REPETITION_PARAM] = core::array::from_fn(|_| {
-        let seed = rng.r#gen::<Seed>();
+        let seed = rng.random::<Seed>();
         thread::spawn(move || {
             // for smaller circuits the `commit/reconstruct` part is not negligeable compared to the
             // `convert_to_vole` part, therefore it is more efficient to execute both in
@@ -393,13 +393,13 @@ mod test {
     };
     use crate::vole::crypto_primitives::H1;
     use crate::vole::functionality::compute_seed_iv;
-    use rand::thread_rng;
+    use rand::rng;
     use swanky_field::{FiniteRing, IsSubFieldOf};
     use swanky_field_binary::{F2, F8b, F128b};
 
     #[test]
     fn test_vole_commit_reconstruct() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let secret = repeat_with(|| F2::random(rng))
             .take(100)
             .collect::<Vec<F2>>();

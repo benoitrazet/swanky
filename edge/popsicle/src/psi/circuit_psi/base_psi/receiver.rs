@@ -1,3 +1,5 @@
+use rand::RngExt;
+
 use crate::{
     circuit_psi::{base_psi::*, utils::*},
     cuckoo::CuckooHash,
@@ -59,12 +61,12 @@ impl BasePsi for OpprfReceiver {
         has_payload: bool,
     ) -> swanky_error::Result<Self>
     where
-        RNG: RngCore + CryptoRng + SeedableRng,
+        RNG: Rng + CryptoRng + SeedableRng,
     {
         // The key used during hashing is known to both
         // parties and allows them to hash the same inputs
         // to the same outputs.
-        let key = rng.r#gen();
+        let key = rng.random();
         channel.write(&key)?;
 
         let opprf_primary_keys = KmprtReceiver::init(channel, rng).wrap_err(
@@ -96,7 +98,7 @@ impl BasePsi for OpprfReceiver {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: RngCore + CryptoRng + SeedableRng,
+        RNG: Rng + CryptoRng + SeedableRng,
     {
         let mut hashed_inputs = compress_and_hash_inputs(primary_keys, self.key);
 
@@ -105,7 +107,7 @@ impl BasePsi for OpprfReceiver {
             match CuckooHash::new(&hashed_inputs, NHASHES) {
                 Ok(res) => break res,
                 Err(_e) => {
-                    self.key = rng.r#gen();
+                    self.key = rng.random();
                     hashed_inputs = compress_and_hash_inputs(primary_keys, self.key);
                 }
             }
@@ -135,7 +137,7 @@ impl BasePsi for OpprfReceiver {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: RngCore + CryptoRng + SeedableRng,
+        RNG: Rng + CryptoRng + SeedableRng,
     {
         // The receiver queries the opprf with their inputs if the receiver
         // and sender's inputs match, the receiver gets the same programmed

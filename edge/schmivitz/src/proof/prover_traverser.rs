@@ -226,7 +226,7 @@ impl<VOLE: RandomVoleP> FancyEncode for ProverTraverser<VOLE> {
         bail!(
             ErrorKind::OtherError,
             "Invalid input: VOLE-in-the-head does not support encode"
-        );
+        )
     }
 
     fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {

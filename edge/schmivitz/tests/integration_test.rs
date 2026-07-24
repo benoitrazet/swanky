@@ -5,7 +5,7 @@ mod test {
     };
     use fancy_traits::{Circuit as FancyCircuit, FancyBinary, FancyZeroKnowledge};
     use merlin::Transcript;
-    use rand::thread_rng;
+    use rand::rng;
     use schmivitz::{
         Proof,
         circuit::{Circuit, load_circuit_from_strings_prover},
@@ -42,7 +42,7 @@ mod test {
     ) -> (Result<Proof<VoleProver, VoleVerifier>>, Circuit) {
         let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
 
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
 
         let t = std::time::Instant::now();
         let t1 = Proof::prove_with_circuit::<_>(&circuit, &mut transcript(), rng);
@@ -114,7 +114,7 @@ mod test {
         assert!(verif.is_ok());
 
         // Verify the compiled circuit with the dynamic circuit.
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let proof = Proof::<VoleProver, VoleVerifier>::prove(
             &DoesntExplode,
             &mini_circuit.private_inputs,
@@ -170,7 +170,7 @@ mod test {
         let verif = proof.verify(&AssertZero, &mut transcript());
         assert!(verif.is_ok());
 
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let proof = Proof::<VoleProver, VoleVerifier>::prove(
             &AssertZero,
             &mini_circuit.private_inputs,

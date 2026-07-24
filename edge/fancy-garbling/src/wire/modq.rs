@@ -1,6 +1,6 @@
 use crate::{ArithmeticWire, WireLabel, util, wire::_unrank};
 use fancy_traits::HasModulus;
-use rand::{CryptoRng, Rng, RngCore};
+use rand::{CryptoRng, Rng, RngExt};
 use vectoreyes::U8x16;
 
 /// Intermediate struct to deserialize WireModQ to
@@ -154,7 +154,7 @@ impl core::ops::MulAssign<u16> for WireModQ {
 }
 
 impl WireLabel for WireModQ {
-    fn rand_delta<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
+    fn rand_delta<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self {
         if q < 2 {
             panic!(
                 "[WireModQ::rand_delta] Modulus must be at least 2. Got {}",
@@ -207,12 +207,12 @@ impl WireLabel for WireModQ {
         Self { q, ds }
     }
 
-    fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
+    fn rand<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self {
         if q < 2 {
             panic!("[WireModQ::rand] Modulus must be at least 2. Got {}", q);
         }
         let ds = (0..util::digits_per_u128(q))
-            .map(|_| rng.r#gen::<u16>() % q)
+            .map(|_| rng.random::<u16>() % q)
             .collect();
         Self { q, ds }
     }
@@ -237,19 +237,19 @@ mod tests {
     #[cfg(feature = "serde")]
     use crate::WireLabel;
     #[cfg(feature = "serde")]
-    use rand::Rng;
+    use rand::RngExt;
     #[cfg(feature = "serde")]
-    use rand::thread_rng;
+    use rand::rng;
 
     #[cfg(feature = "serde")]
     #[test]
     fn test_serialize_good_modQ() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
 
         for _ in 0..16 {
-            let mut q: u16 = rng.r#gen();
+            let mut q: u16 = rng.random();
             while q < 2 {
-                q = rng.r#gen();
+                q = rng.random();
             }
             let w = WireModQ::rand(&mut rng, q);
             let serialized = serde_json::to_string(&w).unwrap();
@@ -262,10 +262,10 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn test_serialize_bad_modQ_mod() {
-        let mut rng = thread_rng();
-        let mut q: u16 = rng.r#gen();
+        let mut rng = rng();
+        let mut q: u16 = rng.random();
         while q < 2 {
-            q = rng.r#gen();
+            q = rng.random();
         }
 
         let mut w = WireModQ::rand(&mut rng, q);

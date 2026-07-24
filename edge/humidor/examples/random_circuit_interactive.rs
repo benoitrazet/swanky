@@ -26,7 +26,7 @@ fn test_input_size(
     );
     println!("---");
 
-    let mut rng = SwankyRng::from_entropy();
+    let mut rng = SwankyRng::from_rng(&mut rand::rng());
     let (ckt, inp): (Circuit<Field>, _) =
         simple_arith_circuit::circuitgen::random_zero_circuit(input_size, circuit_size, &mut rng);
 

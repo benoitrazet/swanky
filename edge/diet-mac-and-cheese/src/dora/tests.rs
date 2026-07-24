@@ -18,7 +18,7 @@ use crate::{
     svole_trait::Svole,
 };
 use crate::{backend_trait::BackendT, circuit_ir::WireCount};
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 use super::*;
 
@@ -60,7 +60,7 @@ fn test_range_example() {
 
         // do a number of range checks
         for _ in 0..NUM_RANGE_PROOFS {
-            let wi: usize = prover.rng.r#gen::<usize>() % RANGE_SIZE;
+            let wi: usize = prover.rng.random_range(..RANGE_SIZE);
             let wf = F61p::try_from(wi as u128).unwrap();
             let v = prover.input_private(Some(wf)).unwrap();
             disj.mux(&mut prover, iter::empty(), &[v], PartyPrivateCopy::new(wi))
@@ -162,14 +162,14 @@ fn test_witness_example() {
         let mut disj = Dora::<Prover, F61p, F61p, _, Svole<_, _, F61p>>::new(disj);
 
         // select clause
-        let wi = prover.rng.r#gen::<usize>() % 256;
+        let wi = prover.rng.random_range(..256);
 
         // generate input and witness
         let mut wit_tape: Vec<F61p> = Vec::new();
         let mut input = Vec::new();
 
         for n in 0..INPUTS {
-            let v = prover.rng.r#gen::<F61p>();
+            let v = prover.rng.random::<F61p>();
             let vin = if n < wi {
                 v.inverse()
             } else {

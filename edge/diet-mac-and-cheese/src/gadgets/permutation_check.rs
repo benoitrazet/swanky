@@ -134,7 +134,7 @@ mod tests {
         os::unix::net::UnixStream,
     };
 
-    use rand::{Rng, seq::SliceRandom};
+    use rand::{RngExt, seq::SliceRandom};
     use swanky_channel_legacy::Channel;
     use swanky_field::{FiniteField, FiniteRing};
     use swanky_field_binary::{F2, F40b};
@@ -162,7 +162,7 @@ mod tests {
         values.shuffle(&mut rng);
         let mut ys: Vec<F> = values.clone().into_iter().flatten().collect();
         if !is_good {
-            let i = rng.gen_range(0..ys.len());
+            let i = rng.random_range(0..ys.len());
             ys[i] += F::ONE;
         }
 

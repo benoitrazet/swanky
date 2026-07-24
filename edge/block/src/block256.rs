@@ -1,5 +1,6 @@
 //! 256-bit blocks of data.
 
+use rand::RngExt;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::Block;
@@ -73,11 +74,11 @@ impl std::fmt::Display for Block256 {
     }
 }
 
-impl rand::distributions::Distribution<Block256> for rand::distributions::Standard {
+impl rand::distr::Distribution<Block256> for rand::distr::StandardUniform {
     #[inline]
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Block256 {
-        let b0 = rng.r#gen::<Block>();
-        let b1 = rng.r#gen::<Block>();
+        let b0 = rng.random::<Block>();
+        let b1 = rng.random::<Block>();
         Block256([b0, b1])
     }
 }

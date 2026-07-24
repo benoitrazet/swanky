@@ -1,6 +1,6 @@
 use crate::WireLabel;
 use fancy_traits::HasModulus;
-use rand::{CryptoRng, Rng, RngCore};
+use rand::{CryptoRng, Rng, RngExt};
 use subtle::ConditionallySelectable;
 use vectoreyes::{SimdBase, U8x16};
 
@@ -91,7 +91,7 @@ impl ConditionallySelectable for WireMod2 {
 }
 
 impl WireLabel for WireMod2 {
-    fn rand_delta<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
+    fn rand_delta<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self {
         if q != 2 {
             panic!("[WireMod2::rand_delta] Expected modulo 2. Got {}", q);
         }
@@ -122,12 +122,12 @@ impl WireLabel for WireMod2 {
         Self { val: inp }
     }
 
-    fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self {
+    fn rand<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self {
         if q != 2 {
             panic!("[WireMod2::rand] Expected modulo 2. Got {}", q);
         }
 
-        Self { val: rng.r#gen() }
+        Self { val: rng.random() }
     }
 
     fn hash_to_mod(hash: U8x16, q: u16) -> Self {
@@ -144,9 +144,9 @@ mod tests {
     #[test]
     fn test_serialize_mod2() {
         use crate::{WireLabel, WireMod2};
-        use rand::thread_rng;
+        use rand::rng;
 
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let w = WireMod2::rand(&mut rng, 2);
         let serialized = serde_json::to_string(&w).unwrap();
 

@@ -9,7 +9,7 @@
 //!
 use fancy_traits::Circuit as FancyCircuit;
 use merlin::Transcript;
-use rand::{CryptoRng, RngCore, thread_rng};
+use rand::{CryptoRng, Rng, rng};
 use rayon::iter::*;
 use std::time::Instant;
 use std::{iter::zip, marker::PhantomData};
@@ -81,7 +81,7 @@ where
         rng: &mut RNG,
     ) -> Result<Self>
     where
-        RNG: CryptoRng + RngCore,
+        RNG: CryptoRng + Rng,
     {
         let (gates, private_input, max_wire_id) = circuit.to_interpreter();
         Self::prove(
@@ -105,7 +105,7 @@ where
     where
         C: FancyCircuit<ProverPreparer<'a>, Input = ()>
             + FancyCircuit<ProverTraverser<VoleP>, Input = ()>,
-        RNG: CryptoRng + RngCore,
+        RNG: CryptoRng + Rng,
     {
         let t = std::time::Instant::now();
         let mut transcript = transcript::Transcript::from(transcript);
@@ -356,7 +356,7 @@ impl AsSecretBytes for Vec<F2> {
 
 /// Test proof generation and verification of a given [`Circuit`].
 pub fn test_sieveir(circuit: &Circuit) -> Result<()> {
-    let rng = &mut thread_rng();
+    let rng = &mut rng();
 
     let t = std::time::Instant::now();
     let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit(
@@ -386,7 +386,7 @@ where
         + FancyCircuit<ProverTraverser<VoleProver>, Input = ()>
         + FancyCircuit<VerifierTraverser, Input = ()>,
 {
-    let rng = &mut thread_rng();
+    let rng = &mut rng();
     let t = Instant::now();
     let proof = Proof::<VoleProver, VoleVerifier>::prove(
         circuit,
@@ -407,7 +407,7 @@ where
 #[cfg(test)]
 mod tests {
     use merlin::Transcript;
-    use rand::thread_rng;
+    use rand::rng;
     use std::io::Write;
     use std::{fs::File, io::Cursor};
     use swanky_error::{ErrorKind, Result, WrapErr};
@@ -438,7 +438,7 @@ mod tests {
         writeln!(private_input, "{private_input_bytes}").unwrap();
 
         let circuit = load_circuit_prover(&mut circuit_cursor, &private_input_path)?;
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
 
         let proof = Proof::<InsecureVole, InsecureCommitments>::prove_with_circuit(
             &circuit,
@@ -590,7 +590,7 @@ mod tests {
         )?;
 
         let small_circuit = load_circuit_prover(small_circuit_text, &private_input_path)?;
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
 
         let proof = Proof::<InsecureVole, InsecureCommitments>::prove_with_circuit::<_>(
             &small_circuit,

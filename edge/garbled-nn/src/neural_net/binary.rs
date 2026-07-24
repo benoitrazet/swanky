@@ -124,7 +124,7 @@ impl<'a, F: FancyBinary + BinaryGadgets> BinaryNeuralNet<'a, F> {
                 BinaryLayer::new(self.backend, self.bitwidths[i], self.secret_weights_owned);
             acc = layer.eval(&mut backend, acc, secret_weights, channel)?;
         }
-        Ok(acc.into_raw_vec())
+        Ok(acc.into_raw_vec_and_offset().0)
     }
 }
 

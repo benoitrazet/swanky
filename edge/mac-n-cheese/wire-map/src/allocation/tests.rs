@@ -1,4 +1,4 @@
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{RngExt, SeedableRng, rngs::StdRng};
 
 use super::Allocation;
 
@@ -92,7 +92,7 @@ mod random_tests {
         let mut alloc = Allocation::<T>::new_owned(len);
         check(&mut alloc, &canonical);
         for _ in 0..len * 2 {
-            let idx = rng.gen_range(0..len);
+            let idx = rng.random_range(0..len);
             let value = r#gen(&mut rng);
             assert_eq!(alloc.insert(idx, value.clone()), canonical[idx].is_none());
             canonical[idx] = Some(value);
@@ -106,16 +106,16 @@ mod random_tests {
             .chars()
             .collect();
         rnd_test::<String, _>(0xc001000 + trial, len, move |x| {
-            let strlen = x.gen_range(0_usize..=128_usize);
+            let strlen = x.random_range(0_usize..=128_usize);
             let mut out = String::with_capacity(strlen);
             for _ in 0..strlen {
-                out.push(alphabet[x.gen_range(0..alphabet.len())]);
+                out.push(alphabet[x.random_range(0..alphabet.len())]);
             }
             out
         });
     }
     fn test_u8(trial: u32, len: usize) {
-        rnd_test::<u8, _>(0xcafe000 + trial, len, |x| x.r#gen());
+        rnd_test::<u8, _>(0xcafe000 + trial, len, |x| x.random());
     }
     fn test_unit(trial: u32, len: usize) {
         rnd_test::<(), _>(0x7777000 + trial, len, |_| ());

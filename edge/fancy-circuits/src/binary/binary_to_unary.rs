@@ -61,16 +61,16 @@ where
 mod test {
     use crate::{BinaryBundle, binary::BinaryToUnary};
     use fancy_plaintext::Dummy;
-    use rand::{Rng, thread_rng};
+    use rand::{RngExt, rng};
 
     #[test]
     fn binary_to_unary() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let nbits = 8;
         let q = 1 << nbits;
 
         for _ in 0..16 {
-            let x = rng.r#gen::<u128>() % q;
+            let x = rng.random::<u128>() % q;
             let x_input = BinaryBundle::from((x, nbits));
             let output = Dummy::eval(&BinaryToUnary::new(), &x_input).unwrap();
             for (i, y) in output.into_iter().enumerate() {

@@ -11,7 +11,7 @@ use crate::{
 };
 use generic_array::GenericArray;
 use log::{debug, warn};
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure};
@@ -219,7 +219,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
                 SwankyRng::from_seed(seed)
             }
             WhichParty::Verifier(_) => {
-                let seed = rng.r#gen::<Block>();
+                let seed = rng.random::<Block>();
                 channel
                     .write_block(&seed)
                     .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
@@ -522,7 +522,7 @@ where
                 .read_block()
                 .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?,
             WhichParty::Verifier(_) => {
-                let seed = rng.r#gen::<Block>();
+                let seed = rng.random::<Block>();
                 channel
                     .write_block(&seed)
                     .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
