@@ -1,10 +1,11 @@
 #![cfg(test)]
 
-use crate::garbler::Garbler;
+use crate::preprocesser::WirePreProcessor;
 use crate::ps::{PartyEvaluator, PartyGarbler};
-use crate::{evaluator::Evaluator, preprocesser::WirePreProcessor};
+use crate::{EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator};
 
 use fancy_analyzer::CircuitAnalyzer;
+use fancy_circuits::aes::AesNonExpanded;
 use fancy_circuits::binary::{
     TestBinaryAddition, TestBinaryMultiplication, TestBinarySubtraction, TestBinaryTwosComplement,
 };
@@ -23,12 +24,12 @@ fn test_party_construction_passes() {
     let circuit = TestAndGateFanN(input_size);
     swanky_channel::local::local_channel_pair(
         |c| {
-            let rng = SwankyRng::new();
-            Garbler::new(&circuit, c, rng)
+            let mut rng = SwankyRng::new();
+            GarblerOffline::initialize(&circuit, c, &mut rng)
         },
         |c| {
             let mut rng = SwankyRng::new();
-            Evaluator::new(&circuit, c, &mut rng)
+            EvaluatorOffline::initialize(&circuit, c, &mut rng)
         },
     )
     .unwrap();
@@ -38,9 +39,10 @@ fn test_circuit<
     C: CircuitInputMapper<CircuitAnalyzer>
         + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
         + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
-        + CircuitInputMapper<Garbler<SwankyRng>>
-        + CircuitInputMapper<Evaluator>
+        + CircuitInputMapper<GarblerOffline>
+        + CircuitInputMapper<EvaluatorOnline>
         + CircuitInputMapper<Dummy>
+        + CircuitInputMapper<GarblerValidator>
         + Sync,
 >(
     ninputs_gb: usize,
@@ -77,37 +79,38 @@ fn test_circuit<
         .map(|x| x.val())
         .collect::<Vec<_>>();
 
-    let (outputs_gb, outputs_ev) = swanky_channel::local::local_channel_pair(
+    let (_, outputs) = swanky_channel::local::local_channel_pair(
         |c| {
-            let rng = SwankyRng::new();
-            let mut gb = Garbler::new(circuit, c, rng)?;
+            let mut rng = SwankyRng::new();
+            let gb = GarblerOffline::initialize(circuit, c, &mut rng)?;
+            let (outputs, gb) = gb.execute(circuit)?;
+            let mut gb = gb.finalize(c)?;
+
             let mut inputs = gb.encode_many(&inputs_gb, &vec![2; ninputs_gb], c)?;
-            let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
-            inputs.extend(theirs);
-            let outputs = circuit.execute(
-                &mut gb,
-                <C as CircuitInputMapper<Garbler<_>>>::map(circuit, inputs),
-                c,
-            )?;
-            gb.outputs(&outputs.flatten(), c)
+            let their = gb.receive_many(&vec![2; ninputs_ev], c)?;
+            inputs.extend(their);
+            let gb = gb.finalize(c)?;
+            let mut gb = gb.validate(circuit, inputs, c)?;
+            let outputs = gb.outputs(&outputs, c)?;
+            assert!(outputs.is_none());
+            Ok(())
         },
         |c| {
             let mut rng = SwankyRng::new();
-            let mut ev = Evaluator::new(circuit, c, &mut rng)?;
+            let ev = EvaluatorOffline::initialize(circuit, c, &mut rng)?;
+            let mut ev = ev.finalize(c)?;
+
             let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
             let mine = ev.encode_many(&inputs_ev, &vec![2; ninputs_ev], c)?;
             inputs.extend(mine);
-            let outputs = circuit.execute(
-                &mut ev,
-                <C as CircuitInputMapper<Evaluator>>::map(circuit, inputs),
-                c,
-            )?;
-            ev.outputs(&outputs.flatten(), c)
+            let (outputs, ev) = ev.execute(circuit, inputs)?;
+            let ev = ev.finalize(c)?;
+            let mut ev = ev.validate(c)?;
+            let outputs = ev.outputs(&outputs, c)?;
+            Ok(outputs.expect("evaluator outputs should not be `None`"))
         },
     )
     .unwrap();
-    assert!(outputs_gb.is_none());
-    let outputs = outputs_ev.unwrap();
     assert_eq!(outputs, expected)
 }
 
@@ -202,4 +205,11 @@ fn test_binary_multiplication() {
     let circuit = TestBinaryMultiplication::new(ninputs);
 
     test_circuit(ninputs, ninputs, &circuit);
+}
+
+#[test]
+fn test_aes() {
+    let circuit = AesNonExpanded::new();
+
+    test_circuit(128, 128, &circuit);
 }

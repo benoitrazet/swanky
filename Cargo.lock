@@ -2668,6 +2668,7 @@ dependencies = [
  "swanky-field-binary",
  "swanky-party",
  "swanky-rng",
+ "swanky-serialization",
  "vectoreyes",
 ]
 
@@ -2808,6 +2809,7 @@ dependencies = [
  "proptest",
  "rand 0.10.2",
  "subtle",
+ "swanky-error",
  "swanky-field",
  "swanky-field-test",
  "swanky-polynomial",

@@ -1,12 +1,14 @@
-use fancy_traits::{Fancy, FancyBinary, FancyEncode, HasModulus};
+use crate::vec_wrapper::VecWrapper;
+use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary, HasModulus};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
+use swanky_error::Result;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_party::GenericParty;
 use vectoreyes::U8x16;
 
-/// A thin wrapper around an [`AuthShare`] for use as a [`Fancy`] object.
+/// A thin wrapper around an [`AuthShare`] for use as a [`Fancy`] item.
 ///
 /// This is used to determine the [`AuthShare`] inputs to AND gates. This is
 /// important because one of the assumptions that KRRW18 makes and does not
@@ -15,24 +17,24 @@ use vectoreyes::U8x16;
 /// and Negation gates during pre-processing in order to correctly produce known
 /// AND gates.
 #[derive(Clone, Copy)]
-pub struct PreProcessedWire<P: GenericParty> {
+pub struct Wire<P: GenericParty> {
     auth_share: AuthShare<P>,
 }
 
-impl<P: GenericParty> PreProcessedWire<P> {
+impl<P: GenericParty> Wire<P> {
     /// Construct a new [`PreProcessedWire`] from an authenticated share.
     pub(crate) fn new(auth_share: AuthShare<P>) -> Self {
-        PreProcessedWire { auth_share }
+        Wire { auth_share }
     }
 }
 
-impl<P: GenericParty> HasModulus for PreProcessedWire<P> {
+impl<P: GenericParty> HasModulus for Wire<P> {
     fn modulus(&self) -> u16 {
         2
     }
 }
 
-impl<P: GenericParty> core::fmt::Debug for PreProcessedWire<P> {
+impl<P: GenericParty> core::fmt::Debug for Wire<P> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PreProcessedWire")
             .field("auth_share", &())
@@ -45,10 +47,8 @@ impl<P: GenericParty> core::fmt::Debug for PreProcessedWire<P> {
 /// wire of that gate. This is required in order to figure out how
 /// to turn random and triples into known ones since it allows us to
 /// figure out which pairs of wires need to be correlated together.
-#[derive(Clone)]
 pub struct WirePreProcessor<P: GenericParty> {
-    auth_shares: Vec<AuthShare<P>>,
-    auth_shares_index: usize,
+    auth_shares: VecWrapper<AuthShare<P>>,
     and_gate_left_inputs: Vec<AuthShare<P>>,
     and_gate_right_inputs: Vec<AuthShare<P>>,
     delta: U8x16,
@@ -58,46 +58,56 @@ impl<P: GenericParty> WirePreProcessor<P> {
     /// Construct a new [`WirePreProcessor`] using a vector of [`AuthShare`]s
     /// which equals the number of AND, Input, and Constant gates in the
     /// circuit.
-    pub(crate) fn new(auth_shares: Vec<AuthShare<P>>, delta: U8x16) -> WirePreProcessor<P> {
+    pub(crate) fn new(
+        auth_shares: Vec<AuthShare<P>>,
+        nands: usize,
+        delta: U8x16,
+    ) -> WirePreProcessor<P> {
         WirePreProcessor {
-            auth_shares,
-            auth_shares_index: 0,
-            and_gate_left_inputs: Vec::new(),
-            and_gate_right_inputs: Vec::new(),
+            auth_shares: VecWrapper::new(auth_shares),
+            and_gate_left_inputs: Vec::with_capacity(nands),
+            and_gate_right_inputs: Vec::with_capacity(nands),
             delta,
         }
     }
-    /// Return the [`AuthShare`]s associated with the input wires of each AND
-    /// gate, consuming itself. These shares are split according to whether they
-    /// are the left or right wires of a gate.
-    pub(crate) fn into_and_gate_input_shares(self) -> (Vec<AuthShare<P>>, Vec<AuthShare<P>>) {
-        (self.and_gate_left_inputs, self.and_gate_right_inputs)
-    }
 
-    /// Return the next [`AuthShare`] from the vector of authenticated shares.
-    fn next_auth_share(&mut self) -> AuthShare<P> {
-        let authshare = self.auth_shares[self.auth_shares_index];
-        self.auth_shares_index += 1;
-        authshare
+    /// Run a circuit on [`WirePreProcessor`] and output the input and output
+    /// [`AuthShare`]s of each AND gate. That is, denoting the AND gate input
+    /// wires `(a, b)` and the AND gate output wire `c`, return the `a` shares,
+    /// the `b` shares, and the `c` shares, in that order.
+    pub(crate) fn execute<C: CircuitInputMapper<Self>>(
+        mut self,
+        circuit: &C,
+    ) -> Result<(Vec<AuthShare<P>>, Vec<AuthShare<P>>, Vec<AuthShare<P>>)> {
+        let inputs = (0..circuit.ninputs())
+            .map(|_| Wire::new(self.auth_shares.next()))
+            .collect();
+        Channel::with(std::io::empty(), |channel| {
+            circuit.execute(
+                &mut self,
+                <C as CircuitInputMapper<WirePreProcessor<P>>>::map(circuit, inputs),
+                channel,
+            )
+        })?;
+        Ok((
+            self.and_gate_left_inputs,
+            self.and_gate_right_inputs,
+            self.auth_shares.into(),
+        ))
     }
 }
 
 impl<P: GenericParty> FancyBinary for WirePreProcessor<P> {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        PreProcessedWire::new(x.auth_share ^ y.auth_share)
+        Wire::new(x.auth_share ^ y.auth_share)
     }
 
-    fn and(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        _channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
+    fn and(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
         self.and_gate_left_inputs.push(x.auth_share);
         self.and_gate_right_inputs.push(y.auth_share);
 
-        let authshare = self.next_auth_share();
-        Ok(PreProcessedWire::new(authshare))
+        let authshare = self.auth_shares.next();
+        Ok(Wire::new(authshare))
     }
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
@@ -106,42 +116,13 @@ impl<P: GenericParty> FancyBinary for WirePreProcessor<P> {
 }
 
 impl<P: GenericParty> Fancy for WirePreProcessor<P> {
-    type Item = PreProcessedWire<P>;
+    type Item = Wire<P>;
 
-    fn constant(
-        &mut self,
-        value: u16,
-        modulus: u16,
-        _: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
+    fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
         assert!(value == 0 || value == 1);
         assert_eq!(modulus, 2);
 
         let authshare = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
-        Ok(PreProcessedWire::new(authshare))
-    }
-}
-
-impl<P: GenericParty> FancyEncode for WirePreProcessor<P> {
-    fn receive_many(
-        &mut self,
-        moduli: &[u16],
-        _: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        Ok((0..moduli.len())
-            .map(|_| {
-                let auth_share = self.next_auth_share();
-                PreProcessedWire::new(auth_share)
-            })
-            .collect())
-    }
-
-    fn encode_many(
-        &mut self,
-        _: &[u16],
-        _: &[u16],
-        _: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
-        unimplemented!("Preprocessor cannot encode values");
+        Ok(Wire::new(authshare))
     }
 }
