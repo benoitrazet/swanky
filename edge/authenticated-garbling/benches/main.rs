@@ -34,40 +34,6 @@ fn bench_party_construction(c: &mut Criterion) {
     });
 }
 
-fn bench_party_encoding_receiving(c: &mut Criterion) {
-    let input_size: usize = 400;
-    let mut rng_gb = SwankyRng::new();
-    let mut rng_ev = SwankyRng::new();
-    let circuit = TestAndGateFanN(2 * input_size);
-    let (gb, ev) = swanky_channel::local::local_channel_pair(
-        |c| GarblerOffline::initialize(&circuit, c, &mut rng_gb),
-        |c| EvaluatorOffline::initialize(&circuit, c, &mut rng_ev),
-    )
-    .unwrap();
-
-    let (_, gb) = gb.execute(&circuit).unwrap();
-    let (mut gb, mut ev) =
-        swanky_channel::local::local_channel_pair(|c| gb.finalize(c), |c| ev.finalize(c)).unwrap();
-
-    c.bench_function("party-encoding-receiving-no-setup", move |b| {
-        b.iter(|| {
-            swanky_channel::local::local_channel_pair(
-                |c| {
-                    gb.encode_many(&vec![0; input_size], &vec![2; input_size], c)?;
-                    gb.receive_many(&vec![2; input_size], c)?;
-                    Ok(())
-                },
-                |c| {
-                    ev.receive_many(&vec![2; input_size], c)?;
-                    ev.encode_many(&vec![0; input_size], &vec![2; input_size], c)?;
-                    Ok(())
-                },
-            )
-            .unwrap();
-        });
-    });
-}
-
 fn bench_single_and_gate(c: &mut Criterion) {
     let ninputs_gb = 1;
     let ninputs_ev = 1;
@@ -231,7 +197,7 @@ criterion_group! {
     name = authenticated_garbling;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
     targets = bench_party_construction,
-    bench_and_gate_fan_n, bench_binary_addition,bench_binary_subtraction,bench_party_encoding_receiving,
+    bench_and_gate_fan_n, bench_binary_addition,bench_binary_subtraction,
     bench_constant_gates,bench_or_gate_fan_n,bench_single_and_gate,bench_xor_gate_fan_n,
     bench_aes
 }
