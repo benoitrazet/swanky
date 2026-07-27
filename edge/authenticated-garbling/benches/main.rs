@@ -1,6 +1,5 @@
-use std::time::Duration;
-
 use criterion::{Criterion, criterion_group, criterion_main};
+use fancy_analyzer::CircuitAnalyzer;
 use fancy_circuits::{
     aes::AesNonExpanded,
     binary::{TestBinaryAddition, TestBinarySubtraction},
@@ -9,14 +8,60 @@ use fancy_circuits::{
         fancy::TestBinaryConstant,
     },
 };
-use fancy_traits::FancyEncode;
+use fancy_traits::{CircuitInputMapper, FancyEncode, FancyOutput};
 use rand::RngExt;
-use swanky_authenticated_garbling::{EvaluatorOffline, GarblerOffline};
+use std::time::Duration;
+use swanky_authenticated_garbling::{
+    EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator, PartyEvaluator,
+    PartyGarbler, WirePreProcessor,
+};
 use swanky_rng::SwankyRng;
 
-use crate::util::test_circuit;
+fn test_circuit<
+    C: CircuitInputMapper<CircuitAnalyzer>
+        + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
+        + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
+        + CircuitInputMapper<GarblerOffline>
+        + CircuitInputMapper<EvaluatorOnline>
+        + CircuitInputMapper<GarblerValidator>
+        + Sync,
+>(
+    inputs_gb: &[u16],
+    inputs_ev: &[u16],
+    rng_gb: &mut SwankyRng,
+    rng_ev: &mut SwankyRng,
+    circuit: &C,
+) {
+    let ninputs_gb = inputs_gb.len();
+    let ninputs_ev = inputs_ev.len();
+    swanky_channel::local::local_channel_pair(
+        |c| {
+            let gb = GarblerOffline::initialize(circuit, c, rng_gb)?;
 
-mod util;
+            let (outputs, gb) = gb.execute(circuit)?;
+            let mut gb = gb.finalize(c)?;
+
+            let mut inputs = gb.encode_many(inputs_gb, &vec![2; ninputs_gb], c)?;
+            let theirs = gb.receive_many(&vec![2; ninputs_ev], c)?;
+            inputs.extend(theirs);
+            let validator = gb.finalize(c)?;
+            let mut validator = validator.validate(circuit, inputs, c)?;
+            validator.outputs(&outputs, c)
+        },
+        |c| {
+            let ev = EvaluatorOffline::initialize(circuit, c, rng_ev)?;
+            let mut ev = ev.finalize(c)?;
+            let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
+            let mine = ev.encode_many(inputs_ev, &vec![2; ninputs_ev], c)?;
+            inputs.extend(mine);
+            let (outputs, ev) = ev.execute(circuit, inputs)?;
+            let ev = ev.finalize(c)?;
+            let mut ev = ev.validate(c)?;
+            ev.outputs(&outputs, c)
+        },
+    )
+    .unwrap();
+}
 
 fn bench_party_construction(c: &mut Criterion) {
     let input_size: usize = 1000;
@@ -28,40 +73,6 @@ fn bench_party_construction(c: &mut Criterion) {
             swanky_channel::local::local_channel_pair(
                 |c| GarblerOffline::initialize(&circuit, c, &mut rng_gb),
                 |c| EvaluatorOffline::initialize(&circuit, c, &mut rng_ev),
-            )
-            .unwrap();
-        });
-    });
-}
-
-fn bench_party_encoding_receiving(c: &mut Criterion) {
-    let input_size: usize = 400;
-    let mut rng_gb = SwankyRng::new();
-    let mut rng_ev = SwankyRng::new();
-    let circuit = TestAndGateFanN(2 * input_size);
-    let (gb, ev) = swanky_channel::local::local_channel_pair(
-        |c| GarblerOffline::initialize(&circuit, c, &mut rng_gb),
-        |c| EvaluatorOffline::initialize(&circuit, c, &mut rng_ev),
-    )
-    .unwrap();
-
-    let (_, gb) = gb.execute(&circuit).unwrap();
-    let (mut gb, mut ev) =
-        swanky_channel::local::local_channel_pair(|c| gb.finalize(c), |c| ev.finalize(c)).unwrap();
-
-    c.bench_function("party-encoding-receiving-no-setup", move |b| {
-        b.iter(|| {
-            swanky_channel::local::local_channel_pair(
-                |c| {
-                    gb.encode_many(&vec![0; input_size], &vec![2; input_size], c)?;
-                    gb.receive_many(&vec![2; input_size], c)?;
-                    Ok(())
-                },
-                |c| {
-                    ev.receive_many(&vec![2; input_size], c)?;
-                    ev.encode_many(&vec![0; input_size], &vec![2; input_size], c)?;
-                    Ok(())
-                },
             )
             .unwrap();
         });
@@ -231,8 +242,8 @@ criterion_group! {
     name = authenticated_garbling;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
     targets = bench_party_construction,
-    bench_and_gate_fan_n, bench_binary_addition,bench_binary_subtraction,bench_party_encoding_receiving,
-    bench_constant_gates,bench_or_gate_fan_n,bench_single_and_gate,bench_xor_gate_fan_n,
+    bench_and_gate_fan_n, bench_binary_addition, bench_binary_subtraction,
+    bench_constant_gates, bench_or_gate_fan_n, bench_single_and_gate, bench_xor_gate_fan_n,
     bench_aes
 }
 
