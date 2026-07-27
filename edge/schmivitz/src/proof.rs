@@ -59,7 +59,7 @@ where
     VoleP: RandomVoleP,
     VoleV: RandomVoleV<Decommitment = VoleP::Decommitment>,
 {
-    /// TODO: docstring
+    /// An estimate of the proof size, in bytes.
     pub fn proof_size_estimate(&self) -> usize {
         // This is only a part of the proof size, it does not include the partial decommitment part because this is abstracted with traits.
         let witness_commitment_bytes = self.witness_commitment.len() / 8;
