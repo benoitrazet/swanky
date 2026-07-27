@@ -1,7 +1,10 @@
 mod test {
     use fancy_circuits::{
-        BinaryBundle, BinaryBundleAndItem, aes::AesNonExpanded, binary::BinaryAddition,
-        hmac::HmacSha256, sha::Sha256CompressionFunction,
+        BinaryBundle, BinaryBundleAndItem,
+        aes::AesNonExpanded,
+        binary::BinaryAddition,
+        hmac::HmacSha256,
+        sha::{Sha256, Sha256CompressionFunction},
     };
     use fancy_traits::{Circuit as FancyCircuit, FancyBinary, FancyZeroKnowledge};
     use merlin::Transcript;
@@ -468,7 +471,7 @@ mod test {
     }
 
     #[test]
-    fn prove_sha256_sieveir() -> Result<()> {
+    fn prove_sha256_compression_fn_sieveir() -> Result<()> {
         // if log-level `RUST_LOG` not already set, then set to info
         if DO_LOGGING {
             init_logger();
@@ -511,7 +514,7 @@ mod test {
     }
 
     #[test]
-    fn prove_sha256_circuit() -> Result<()> {
+    fn prove_sha256_compression_fn_circuit() -> Result<()> {
         // if log-level `RUST_LOG` not already set, then set to info
         if DO_LOGGING {
             init_logger();
@@ -522,6 +525,41 @@ mod test {
         log::info!("parsing: {:?}", t.elapsed());
 
         let private_input = (0..768).map(|_| F2::ZERO).collect::<Vec<_>>();
+        test_circuit(&circuit, &private_input)
+    }
+
+    struct TestSha256(Sha256);
+
+    impl<F: FancyBinary + FancyZeroKnowledge> FancyCircuit<F> for TestSha256 {
+        type Input = ();
+        type Output = Vec<F::Item>; // TODO: should be `()`
+
+        fn execute(
+            &self,
+            backend: &mut F,
+            _: Self::Input,
+            channel: &mut Channel,
+        ) -> Result<Self::Output> {
+            let input = (0..512)
+                .map(|_| backend.receive(2, channel))
+                .collect::<Result<Vec<_>>>()?;
+            let _ = self.0.execute(backend, input, channel)?;
+            Ok(vec![])
+        }
+    }
+
+    #[test]
+    fn prove_sha256_circuit() -> Result<()> {
+        // if log-level `RUST_LOG` not already set, then set to info
+        if DO_LOGGING {
+            init_logger();
+        }
+
+        let t = Instant::now();
+        let circuit = TestSha256(Sha256::new());
+        log::info!("parsing: {:?}", t.elapsed());
+
+        let private_input = (0..512).map(|_| F2::ZERO).collect::<Vec<_>>();
         test_circuit(&circuit, &private_input)
     }
 
