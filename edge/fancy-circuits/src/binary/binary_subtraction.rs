@@ -1,5 +1,5 @@
 use crate::{
-    BinaryBundle, BinaryBundleAndItem,
+    BinaryBundle,
     binary::{BinaryAddition, BinaryTwosComplement},
 };
 use core::marker::PhantomData;
@@ -26,7 +26,7 @@ where
     F::Item: 'a,
 {
     type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
-    type Output = BinaryBundleAndItem<F::Item>;
+    type Output = (BinaryBundle<F::Item>, F::Item);
 
     fn execute(
         &self,
@@ -43,13 +43,13 @@ where
 
 pub mod test {
     use super::*;
-    use fancy_traits::CircuitInputMapper;
+    use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
 
     /// Circuit for testing [`BinarySubtraction`].
     pub struct TestBinarySubtraction(pub usize);
     impl<F: FancyBinary> Circuit<F> for TestBinarySubtraction {
         type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
-        type Output = BinaryBundleAndItem<F::Item>;
+        type Output = (BinaryBundle<F::Item>, F::Item);
 
         fn execute(
             &self,
@@ -74,6 +74,12 @@ pub mod test {
 
         fn modulus(&self, _: usize) -> u16 {
             2
+        }
+    }
+
+    impl<F: FancyBinary> CircuitOutputMapper<F> for TestBinarySubtraction {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            [output.0.wires().to_vec(), vec![output.1]].concat()
         }
     }
 

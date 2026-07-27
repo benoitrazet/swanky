@@ -6,7 +6,7 @@ use crate::{
     garble::{Evaluator, Garbler},
     util::output_tweak,
 };
-use fancy_traits::{Circuit, CircuitInputMapper, FancyOutput, Flatten};
+use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyOutput};
 use rand::{CryptoRng, Rng};
 use std::collections::HashMap;
 use swanky_channel::Channel;
@@ -44,7 +44,7 @@ impl GarbledCircuit {
     ///    associated underlying values.
     pub fn garble<
         Wire: WireLabel,
-        C: CircuitInputMapper<Garbler<RNG, Wire>>,
+        C: CircuitInputMapper<Garbler<RNG, Wire>> + CircuitOutputMapper<Garbler<RNG, Wire>>,
         RNG: CryptoRng + Rng,
     >(
         circuit: &C,
@@ -65,7 +65,7 @@ impl GarbledCircuit {
             // First, garble the circuit, outputting the zero wirelabels
             // associated with the output.
             let zeros = circuit.execute(&mut garbler, circuit.map(inputs.clone()), channel)?;
-            let zeros = zeros.flatten();
+            let zeros = C::flatten(zeros);
             // Next, map the zero output wirelabels to the set of valid outputs.
             // This is needed for evaluators that don't use the output
             // mapping provided as output; in that case, we need the channel to
@@ -84,14 +84,14 @@ impl GarbledCircuit {
 
     /// Evaluate the garbled circuit on the provided inputs, mapping the output
     /// wirelabels to their associated values.
-    pub fn eval<Wire: WireLabel, C: Circuit<Evaluator<Wire>>>(
+    pub fn eval<Wire: WireLabel, C: CircuitOutputMapper<Evaluator<Wire>>>(
         &self,
         circuit: &C,
         inputs: C::Input,
         output_mapping: &OutputMapping,
     ) -> swanky_error::Result<Vec<u16>> {
         let wirelabels = self.eval_to_wirelabels(circuit, inputs)?;
-        output_mapping.to_outputs(&wirelabels.flatten())
+        output_mapping.to_outputs(&C::flatten(wirelabels))
     }
 
     /// Evaluate the garbled circuit on the provided inputs, returning the

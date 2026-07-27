@@ -1,14 +1,19 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_circuits::LinearOram;
 use fancy_garbling::{Evaluator, Garbler, WireMod2, WireModQ, classic::GarbledCircuit};
-use fancy_traits::{Circuit, CircuitInputMapper, FancyArithmetic, FancyBinary, FancyProj};
+use fancy_traits::{
+    Circuit, CircuitInputMapper, CircuitOutputMapper, FancyArithmetic, FancyBinary, FancyProj,
+};
 use rand::RngExt;
 use std::{hint::black_box, time::Duration};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_rng::SwankyRng;
 
-fn bench_garble_binary<C: CircuitInputMapper<Garbler<SwankyRng, WireMod2>>>(
+fn bench_garble_binary<
+    C: CircuitInputMapper<Garbler<SwankyRng, WireMod2>>
+        + CircuitOutputMapper<Garbler<SwankyRng, WireMod2>>,
+>(
     c: &mut Criterion,
     name: &str,
     circuit: &C,
@@ -21,7 +26,10 @@ fn bench_garble_binary<C: CircuitInputMapper<Garbler<SwankyRng, WireMod2>>>(
     });
 }
 
-fn bench_garble_arith<C: CircuitInputMapper<Garbler<SwankyRng, WireModQ>>>(
+fn bench_garble_arith<
+    C: CircuitInputMapper<Garbler<SwankyRng, WireModQ>>
+        + CircuitOutputMapper<Garbler<SwankyRng, WireModQ>>,
+>(
     c: &mut Criterion,
     name: &str,
     circuit: &C,
@@ -36,7 +44,10 @@ fn bench_garble_arith<C: CircuitInputMapper<Garbler<SwankyRng, WireModQ>>>(
 }
 
 fn bench_eval_binary<
-    C: CircuitInputMapper<Garbler<SwankyRng, WireMod2>> + CircuitInputMapper<Evaluator<WireMod2>>,
+    C: CircuitInputMapper<Garbler<SwankyRng, WireMod2>>
+        + CircuitOutputMapper<Garbler<SwankyRng, WireMod2>>
+        + CircuitInputMapper<Evaluator<WireMod2>>
+        + CircuitOutputMapper<Evaluator<WireMod2>>,
 >(
     c: &mut Criterion,
     name: &str,
@@ -65,7 +76,9 @@ fn bench_eval_binary<
 }
 
 fn bench_eval_arith<
-    C: CircuitInputMapper<Garbler<SwankyRng, WireModQ>> + CircuitInputMapper<Evaluator<WireModQ>>,
+    C: CircuitInputMapper<Garbler<SwankyRng, WireModQ>>
+        + CircuitOutputMapper<Garbler<SwankyRng, WireModQ>>
+        + CircuitInputMapper<Evaluator<WireModQ>>,
 >(
     c: &mut Criterion,
     name: &str,
@@ -134,6 +147,12 @@ impl<F: FancyBinary> CircuitInputMapper<F> for MixedOp {
     }
 }
 
+impl<F: FancyBinary> CircuitOutputMapper<F> for MixedOp {
+    fn flatten(output: Self::Output) -> Vec<F::Item> {
+        vec![output]
+    }
+}
+
 struct Proj(u16, Vec<u16>);
 impl<F: FancyProj> Circuit<F> for Proj {
     type Input = F::Item;
@@ -167,6 +186,12 @@ impl<F: FancyProj> CircuitInputMapper<F> for Proj {
     }
 }
 
+impl<F: FancyProj> CircuitOutputMapper<F> for Proj {
+    fn flatten(output: Self::Output) -> Vec<F::Item> {
+        output
+    }
+}
+
 struct Mul(u16);
 impl<F: FancyArithmetic> Circuit<F> for Mul {
     type Input = F::Item;
@@ -197,6 +222,12 @@ impl<F: FancyArithmetic> CircuitInputMapper<F> for Mul {
 
     fn modulus(&self, _: usize) -> u16 {
         self.0
+    }
+}
+
+impl<F: FancyArithmetic> CircuitOutputMapper<F> for Mul {
+    fn flatten(output: Self::Output) -> Vec<F::Item> {
+        output
     }
 }
 

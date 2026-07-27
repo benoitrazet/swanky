@@ -3,7 +3,7 @@
 pub mod fancy {
     //! Circuits that test [`Fancy`].
 
-    use fancy_traits::{Circuit, CircuitInputMapper, Fancy};
+    use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, Fancy};
     use swanky_channel::Channel;
     use swanky_error::Result;
 
@@ -39,13 +39,18 @@ pub mod fancy {
             2
         }
     }
+    impl<F: Fancy> CircuitOutputMapper<F> for TestBinaryConstant {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            output
+        }
+    }
 }
 
 pub mod binary {
     //! Circuits that test [`FancyBinary`].
 
     use crate::binary::{AndMany, OrMany, XorMany};
-    use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary};
+    use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary};
     use swanky_channel::Channel;
     use swanky_error::Result;
 
@@ -78,6 +83,11 @@ pub mod binary {
             2
         }
     }
+    impl<F: FancyBinary> CircuitOutputMapper<F> for TestNegateGate {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            vec![output]
+        }
+    }
 
     /// Circuit for testing [`FancyBinary::and`].
     pub struct TestAndGate;
@@ -108,6 +118,11 @@ pub mod binary {
             2
         }
     }
+    impl<F: FancyBinary> CircuitOutputMapper<F> for TestAndGate {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            vec![output]
+        }
+    }
 
     /// Circuit for testing [`AndMany`].
     pub struct TestAndGateFanN(pub usize);
@@ -124,7 +139,6 @@ pub mod binary {
             AndMany::new().execute(backend, inputs.as_slice(), channel)
         }
     }
-
     impl<F: FancyBinary> CircuitInputMapper<F> for TestAndGateFanN {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0);
@@ -137,6 +151,11 @@ pub mod binary {
 
         fn modulus(&self, _: usize) -> u16 {
             2
+        }
+    }
+    impl<F: FancyBinary> CircuitOutputMapper<F> for TestAndGateFanN {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            vec![output]
         }
     }
 
@@ -169,6 +188,11 @@ pub mod binary {
             2
         }
     }
+    impl<F: FancyBinary> CircuitOutputMapper<F> for TestOrGateFanN {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            vec![output]
+        }
+    }
 
     /// Circuit for testing [`XorMany`].
     pub struct TestXorGateFanN(pub usize);
@@ -199,13 +223,18 @@ pub mod binary {
             2
         }
     }
+    impl<F: FancyBinary> CircuitOutputMapper<F> for TestXorGateFanN {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            vec![output]
+        }
+    }
 }
 
 pub mod arithmetic {
     //! Circuits that test [`FancyArithmetic`].
 
     use crate::arithmetic::AddMany;
-    use fancy_traits::{Circuit, CircuitInputMapper, FancyArithmetic};
+    use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyArithmetic};
     use swanky_channel::Channel;
     use swanky_error::Result;
 
@@ -238,6 +267,11 @@ pub mod arithmetic {
             self.0
         }
     }
+    impl<F: FancyArithmetic> CircuitOutputMapper<F> for TestAddition {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            vec![output]
+        }
+    }
 
     /// Circuit for testing [`AddMany`].
     pub struct TestAddMany(pub u16, pub usize);
@@ -266,6 +300,11 @@ pub mod arithmetic {
 
         fn modulus(&self, _: usize) -> u16 {
             self.0
+        }
+    }
+    impl<F: FancyArithmetic> CircuitOutputMapper<F> for TestAddMany {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            vec![output]
         }
     }
 
@@ -298,6 +337,11 @@ pub mod arithmetic {
             self.0
         }
     }
+    impl<F: FancyArithmetic> CircuitOutputMapper<F> for TestSubtraction {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            vec![output]
+        }
+    }
 
     /// Circuit for testing [`FancyArithmetic::mul`].
     pub struct TestMulGate(pub u16);
@@ -326,6 +370,11 @@ pub mod arithmetic {
 
         fn modulus(&self, _: usize) -> u16 {
             self.0
+        }
+    }
+    impl<F: FancyArithmetic> CircuitOutputMapper<F> for TestMulGate {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            vec![output]
         }
     }
 
@@ -359,6 +408,11 @@ pub mod arithmetic {
             self.0[i]
         }
     }
+    impl<F: FancyArithmetic> CircuitOutputMapper<F> for TestMulGateUnequalMods {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            vec![output]
+        }
+    }
 
     /// Circuit for testing [`FancyArithmetic::cmul`].
     pub struct TestCmul(pub u16, pub u16);
@@ -387,6 +441,11 @@ pub mod arithmetic {
 
         fn modulus(&self, _: usize) -> u16 {
             self.0
+        }
+    }
+    impl<F: FancyArithmetic> CircuitOutputMapper<F> for TestCmul {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            vec![output]
         }
     }
 
@@ -420,12 +479,17 @@ pub mod arithmetic {
             self.0
         }
     }
+    impl<F: FancyArithmetic> CircuitOutputMapper<F> for TestConstants {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            vec![output]
+        }
+    }
 }
 
 pub mod proj {
     //! Circuits that test [`FancyProj`].
 
-    use fancy_traits::{Circuit, CircuitInputMapper, FancyProj};
+    use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyProj};
     use swanky_channel::Channel;
     use swanky_error::Result;
 
@@ -459,6 +523,11 @@ pub mod proj {
             self.0
         }
     }
+    impl<F: FancyProj> CircuitOutputMapper<F> for TestProj {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            vec![output]
+        }
+    }
 
     /// Circuit for testing [`FancyProj::proj`] using a custom truth table.
     pub struct TestProjRand(pub u16, pub Vec<u16>);
@@ -487,6 +556,11 @@ pub mod proj {
 
         fn modulus(&self, _: usize) -> u16 {
             self.0
+        }
+    }
+    impl<F: FancyProj> CircuitOutputMapper<F> for TestProjRand {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            vec![output]
         }
     }
 }

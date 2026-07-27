@@ -6,7 +6,8 @@ use crate::vec_wrapper::VecWrapper;
 use crate::wire::OfflineWire;
 use fancy_analyzer::CircuitAnalyzer;
 use fancy_garbling::{WireLabel, WireMod2};
-use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary, Flatten};
+use fancy_traits::CircuitOutputMapper;
+use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary};
 use rand::{CryptoRng, Rng};
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
@@ -101,7 +102,7 @@ impl GarblerOffline {
     }
 
     /// Execute a circuit in offline mode, returning the circuit outputs.
-    pub fn execute<C: CircuitInputMapper<Self>>(
+    pub fn execute<C: CircuitInputMapper<Self> + CircuitOutputMapper<Self>>(
         mut self,
         circuit: &C,
     ) -> Result<(Vec<OfflineWire>, Self)> {
@@ -113,7 +114,7 @@ impl GarblerOffline {
                 channel,
             )
         })?;
-        Ok((outputs.flatten(), self))
+        Ok((C::flatten(outputs), self))
     }
 
     /// Send the offline material to the evaluator and return a

@@ -1,5 +1,5 @@
 use crate::{
-    BinaryBundle, BinaryBundleAndItem,
+    BinaryBundle,
     binary::{BinaryAdder, XorMany},
 };
 use core::marker::PhantomData;
@@ -26,7 +26,7 @@ where
     F::Item: 'a,
 {
     type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
-    type Output = BinaryBundleAndItem<F::Item>;
+    type Output = (BinaryBundle<F::Item>, F::Item);
 
     fn execute(
         &self,
@@ -48,7 +48,7 @@ where
             c = res.1;
             bs.push(z);
         }
-        Ok(BinaryBundleAndItem(BinaryBundle::new(bs), c))
+        Ok((BinaryBundle::new(bs), c))
     }
 }
 
@@ -106,14 +106,14 @@ where
 
 pub mod test {
     use super::*;
-    use fancy_traits::CircuitInputMapper;
+    use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
 
     /// Circuit for testing [`BinaryAddition`].
     pub struct TestBinaryAddition(pub usize);
 
     impl<F: FancyBinary> Circuit<F> for TestBinaryAddition {
         type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
-        type Output = BinaryBundleAndItem<F::Item>;
+        type Output = (BinaryBundle<F::Item>, F::Item);
 
         fn execute(
             &self,
@@ -138,6 +138,12 @@ pub mod test {
 
         fn modulus(&self, _: usize) -> u16 {
             2
+        }
+    }
+
+    impl<F: FancyBinary> CircuitOutputMapper<F> for TestBinaryAddition {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            [output.0.wires().to_vec(), vec![output.1]].concat()
         }
     }
 

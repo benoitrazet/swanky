@@ -13,9 +13,9 @@ mod helpers {
     use rand::{RngExt, rng};
 
     use fancy_plaintext::{Dummy, DummyVal};
-    use fancy_traits::{CircuitInputMapper, Flatten};
+    use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
 
-    pub(crate) fn plaintext<C: CircuitInputMapper<Dummy>>(
+    pub(crate) fn plaintext<C: CircuitInputMapper<Dummy> + CircuitOutputMapper<Dummy>>(
         circuit: &C,
     ) -> (Vec<u16>, Vec<u16>, Vec<u16>) {
         let mut rng = rng();
@@ -37,8 +37,7 @@ mod helpers {
             <C as CircuitInputMapper<Dummy>>::map(circuit, inputs),
         )
         .unwrap();
-        let expected = expected
-            .flatten()
+        let expected = C::flatten(expected)
             .iter()
             .map(|x| x.val())
             .collect::<Vec<_>>();
@@ -60,7 +59,7 @@ mod nonstreaming {
     };
     use fancy_circuits::util::RngExt;
     use fancy_plaintext::Dummy;
-    use fancy_traits::{CircuitInputMapper, Flatten};
+    use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
     use rand::{RngExt as _, rng};
     use swanky_rng::SwankyRng;
 
@@ -69,8 +68,11 @@ mod nonstreaming {
     fn garble_test_helper<
         W: WireLabel,
         Ex: CircuitInputMapper<Dummy>
+            + CircuitOutputMapper<Dummy>
             + CircuitInputMapper<Garbler<SwankyRng, W>>
-            + CircuitInputMapper<Evaluator<W>>,
+            + CircuitOutputMapper<Garbler<SwankyRng, W>>
+            + CircuitInputMapper<Evaluator<W>>
+            + CircuitOutputMapper<Evaluator<W>>,
     >(
         circuit: &Ex,
     ) {
@@ -87,7 +89,11 @@ mod nonstreaming {
                     <Ex as CircuitInputMapper<Evaluator<W>>>::map(circuit, xs),
                 )
                 .unwrap();
-            let decoded = output_mapping.to_outputs(&wirelabels.flatten()).unwrap();
+            let decoded = output_mapping
+                .to_outputs(&<Ex as CircuitOutputMapper<Evaluator<W>>>::flatten(
+                    wirelabels,
+                ))
+                .unwrap();
             assert_eq!(decoded, expected);
         }
     }
@@ -169,9 +175,9 @@ mod streaming {
     };
     use fancy_circuits::test_circuits::proj::TestProj;
     use fancy_circuits::util::RngExt;
-    use fancy_circuits::{CrtBundle, CrtGadgets, VecCrtBundle};
+    use fancy_circuits::{CrtBundle, CrtGadgets};
     use fancy_plaintext::Dummy;
-    use fancy_traits::{Circuit, CircuitInputMapper, Flatten};
+    use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper};
     use fancy_traits::{FancyArithmetic, FancyEncode, FancyOutput, FancyProj};
     use rand::{RngExt as _, rng};
     use swanky_channel::Channel;
@@ -183,8 +189,11 @@ mod streaming {
     fn streaming_test_helper<
         W: WireLabel + Send,
         Ex: CircuitInputMapper<Dummy>
+            + CircuitOutputMapper<Dummy>
             + CircuitInputMapper<Garbler<SwankyRng, W>>
+            + CircuitOutputMapper<Garbler<SwankyRng, W>>
             + CircuitInputMapper<Evaluator<W>>
+            + CircuitOutputMapper<Evaluator<W>>
             + Send
             + Sync,
     >(
@@ -203,7 +212,10 @@ mod streaming {
                     <Ex as CircuitInputMapper<Garbler<_, _>>>::map(circuit, zeros),
                     channel,
                 )?;
-                gb.outputs(&outputs.flatten(), channel)?;
+                gb.outputs(
+                    &<Ex as CircuitOutputMapper<Garbler<_, _>>>::flatten(outputs),
+                    channel,
+                )?;
                 Ok(())
             },
             |channel| {
@@ -214,7 +226,12 @@ mod streaming {
                     <Ex as CircuitInputMapper<Evaluator<_>>>::map(circuit, wires),
                     channel,
                 )?;
-                Ok(ev.outputs(&outputs.flatten(), channel)?.unwrap())
+                Ok(ev
+                    .outputs(
+                        &<Ex as CircuitOutputMapper<Evaluator<_>>>::flatten(outputs),
+                        channel,
+                    )?
+                    .unwrap())
             },
         )
         .unwrap();
@@ -272,7 +289,7 @@ mod streaming {
     struct TestComplexGadget(pub Vec<u16>, pub usize);
     impl<F: FancyArithmetic + FancyProj + CrtGadgets> Circuit<F> for TestComplexGadget {
         type Input = Vec<CrtBundle<F::Item>>;
-        type Output = VecCrtBundle<F::Item>;
+        type Output = Vec<CrtBundle<F::Item>>;
 
         fn execute(
             &self,
@@ -289,7 +306,7 @@ mod streaming {
                 let z = ReLU::new().execute(backend, (&y, accuracy, none_option), channel)?;
                 outputs.push(z);
             }
-            Ok(VecCrtBundle(outputs))
+            Ok(outputs)
         }
     }
     impl<F: FancyArithmetic + FancyProj + CrtGadgets> CircuitInputMapper<F> for TestComplexGadget {
@@ -307,6 +324,14 @@ mod streaming {
 
         fn modulus(&self, i: usize) -> u16 {
             self.0[i % self.0.len()]
+        }
+    }
+    impl<F: FancyArithmetic + FancyProj + CrtGadgets> CircuitOutputMapper<F> for TestComplexGadget {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            output
+                .iter()
+                .flat_map(|bundle| bundle.wires().to_vec())
+                .collect()
         }
     }
 

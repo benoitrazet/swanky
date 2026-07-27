@@ -12,7 +12,7 @@ mod tests {
     use core::marker::PhantomData;
     use fancy_analyzer::CircuitAnalyzer;
     use fancy_circuits::{
-        CrtBundle, CrtGadgets, VecCrtBundle,
+        CrtBundle, CrtGadgets,
         aes::AesNonExpanded,
         arithmetic::{Constant, Multiplication, ReLU},
         test_circuits::arithmetic::TestAddition,
@@ -21,7 +21,8 @@ mod tests {
     use fancy_garbling::{AllWire, WireLabel, WireMod2};
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::{
-        Circuit, CircuitInputMapper, FancyArithmetic, FancyEncode, FancyOutput, FancyProj, Flatten,
+        Circuit, CircuitInputMapper, CircuitOutputMapper, FancyArithmetic, FancyEncode,
+        FancyOutput, FancyProj,
     };
     use rand::RngExt;
     use swanky_channel::Channel;
@@ -76,7 +77,7 @@ mod tests {
         F::Item: 'a,
     {
         type Input = &'a [CrtBundle<F::Item>];
-        type Output = VecCrtBundle<F::Item>;
+        type Output = Vec<CrtBundle<F::Item>>;
 
         fn execute(
             &self,
@@ -92,7 +93,7 @@ mod tests {
                 let z = ReLU::new().execute(backend, (&y, "100%", None), channel)?;
                 outputs.push(z);
             }
-            Ok(VecCrtBundle(outputs))
+            Ok(outputs)
         }
     }
 
@@ -110,7 +111,7 @@ mod tests {
             .iter()
             .map(|x| CrtBundle::from((*x, q)))
             .collect::<Vec<_>>();
-        let VecCrtBundle(output) = Dummy::eval(&TestCircuit::new(), &inputs).unwrap();
+        let output = Dummy::eval(&TestCircuit::new(), &inputs).unwrap();
         let expected = output
             .iter()
             .map(|x| CrtBundle::from_crt(x, q))
@@ -122,7 +123,7 @@ mod tests {
                 let rng = SwankyRng::new();
                 let mut gb = Garbler::<SwankyRng, ChouOrlandiSender, AllWire>::new(channel, rng)?;
                 let xs = gb.crt_encode_many(&plaintext, q, channel)?;
-                let VecCrtBundle(result) = TestCircuit::new().execute(&mut gb, &xs, channel)?;
+                let result = TestCircuit::new().execute(&mut gb, &xs, channel)?;
                 gb.crt_outputs(&result, channel)?;
                 Ok(())
             },
@@ -131,7 +132,7 @@ mod tests {
                 let mut ev =
                     Evaluator::<SwankyRng, ChouOrlandiReceiver, AllWire>::new(channel, rng)?;
                 let xs = ev.crt_receive_many(n, q, channel)?;
-                let VecCrtBundle(result) = TestCircuit::new().execute(&mut ev, &xs, channel)?;
+                let result = TestCircuit::new().execute(&mut ev, &xs, channel)?;
                 Ok(ev.crt_outputs(&result, channel)?.unwrap())
             },
         )
@@ -145,9 +146,12 @@ mod tests {
     fn test_aes<C, Wire: WireLabel + Send>(circ: &C)
     where
         C: CircuitInputMapper<Dummy>
+            + CircuitOutputMapper<Dummy>
             + CircuitInputMapper<CircuitAnalyzer>
             + CircuitInputMapper<GB<Wire>>
+            + CircuitOutputMapper<GB<Wire>>
             + CircuitInputMapper<EV<Wire>>
+            + CircuitOutputMapper<EV<Wire>>
             + Send
             + Sync
             + 'static,
@@ -168,7 +172,10 @@ mod tests {
                     <C as CircuitInputMapper<GB<_>>>::map(circ, xs),
                     channel,
                 )?;
-                gb.outputs(&outputs.flatten(), channel)?;
+                gb.outputs(
+                    &<C as CircuitOutputMapper<GB<_>>>::flatten(outputs),
+                    channel,
+                )?;
                 Ok(())
             },
             |channel| {
@@ -182,7 +189,10 @@ mod tests {
                     <C as CircuitInputMapper<EV<_>>>::map(circ, xs),
                     channel,
                 )?;
-                let out = ev.outputs(&wirelabels.flatten(), channel)?;
+                let out = ev.outputs(
+                    &<C as CircuitOutputMapper<EV<_>>>::flatten(wirelabels),
+                    channel,
+                )?;
                 Ok(out.unwrap())
             },
         )
@@ -193,8 +203,7 @@ mod tests {
             <C as CircuitInputMapper<Dummy>>::map(circ, vec![DummyVal::new(0, 2); 256]),
         )
         .unwrap();
-        let target = target
-            .flatten()
+        let target = <C as CircuitOutputMapper<Dummy>>::flatten(target)
             .into_iter()
             .map(|x| x.val())
             .collect::<Vec<_>>();

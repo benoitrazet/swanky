@@ -1,5 +1,5 @@
 use crate::{
-    BinaryBundle, BinaryBundleAndItem,
+    BinaryBundle,
     binary::{BinarySubtraction, Mux, OrMany},
 };
 use core::marker::PhantomData;
@@ -38,8 +38,7 @@ where
 
         // underflow indicates y != 0 && x >= y
         // requiring special care to remove the y != 0, which is what follows.
-        let BinaryBundleAndItem(_, lhs) =
-            BinarySubtraction::new().execute(backend, (x, y), channel)?;
+        let (_, lhs) = BinarySubtraction::new().execute(backend, (x, y), channel)?;
 
         // Now we build a clause equal to (y == 0 || x >= y), which we can OR with
         // lhs to remove the y==0 aspect.
