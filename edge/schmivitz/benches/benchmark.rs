@@ -136,9 +136,9 @@ fn benchmark_example_10000(c: &mut Criterion) {
         b.iter(|| {
             let rng = &mut thread_rng();
             let proof = Proof::<VoleProver, VoleVerifier>::prove(
-                ExampleCircuit::<10000>,
+                &ExampleCircuit::<10000>,
                 &circuit.private_inputs,
-                circuit.max_wire_id,
+                Some(circuit.max_wire_id as usize),
                 &mut transcript(),
                 rng,
             )
@@ -149,7 +149,7 @@ fn benchmark_example_10000(c: &mut Criterion) {
 
     c.bench_function("example_verify", |b| {
         b.iter(|| {
-            let verif = proof.verify(ExampleCircuit::<10000>, &mut transcript());
+            let verif = proof.verify(&ExampleCircuit::<10000>, &mut transcript());
             assert!(verif.is_ok());
             black_box(verif.is_ok())
         })
@@ -203,9 +203,9 @@ fn benchmark_example_100000(c: &mut Criterion) {
         b.iter(|| {
             let rng = &mut thread_rng();
             let proof = Proof::<VoleProver, VoleVerifier>::prove(
-                ExampleCircuit::<100000>,
+                &ExampleCircuit::<100000>,
                 &circuit.private_inputs,
-                circuit.max_wire_id,
+                Some(circuit.max_wire_id as usize),
                 &mut transcript(),
                 rng,
             )
@@ -215,9 +215,9 @@ fn benchmark_example_100000(c: &mut Criterion) {
     });
 
     let proof = Proof::<VoleProver, VoleVerifier>::prove(
-        ExampleCircuit::<100000>,
+        &ExampleCircuit::<100000>,
         &circuit.private_inputs,
-        circuit.max_wire_id,
+        Some(circuit.max_wire_id as usize),
         &mut transcript(),
         rng,
     )
@@ -225,7 +225,7 @@ fn benchmark_example_100000(c: &mut Criterion) {
 
     c.bench_function("example_100000_verify", |b| {
         b.iter(|| {
-            let verif = proof.verify(ExampleCircuit::<100000>, &mut transcript());
+            let verif = proof.verify(&ExampleCircuit::<100000>, &mut transcript());
             assert!(verif.is_ok());
             black_box(verif.is_ok())
         })

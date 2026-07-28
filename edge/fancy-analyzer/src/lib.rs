@@ -14,7 +14,7 @@ mod wrapper;
 pub use wrapper::CircuitAnalyzerWrapper;
 
 /// An instantiation of [`Fancy::Item`] used by [`CircuitAnalyzer`].
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct AnalyzerItem {
     modulus: u16,
     depth: usize,

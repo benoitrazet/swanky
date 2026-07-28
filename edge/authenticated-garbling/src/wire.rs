@@ -7,7 +7,7 @@ use swanky_authenticated_bits::authshares::AuthShare;
 use swanky_field_binary::F2;
 
 /// A [`fancy_traits::Fancy`] wire for the garbler's offline phase.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct OfflineWire {
     wirelabel: WireMod2,
     auth_share: AuthShare<PartyGarbler>,
@@ -46,7 +46,7 @@ impl core::fmt::Debug for OfflineWire {
 }
 
 /// A [`fancy_traits::Fancy`] wire for the garbler's validation phase.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct ValidatorWire {
     masked_value: F2,
     auth_share: AuthShare<PartyGarbler>,
@@ -90,7 +90,7 @@ impl core::fmt::Debug for ValidatorWire {
 /// [`AuthShare`] $`\lambda`$ of $`L`$s color bit, and (2)  the masked value $`w
 /// \oplus \lambda`$, where $`w`$ is the actual bit represented by the
 /// wirelabel.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct EvaluatorWire {
     /// A masked value $`w \oplus \lambda`$.
     masked_value: F2,

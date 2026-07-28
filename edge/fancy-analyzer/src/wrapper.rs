@@ -6,7 +6,7 @@ use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// The [`Fancy::Item`] type for [`CircuitAnalyzerWrapper`].
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Wire<W>(W, AnalyzerItem);
 
 impl<W: HasModulus> Wire<W> {

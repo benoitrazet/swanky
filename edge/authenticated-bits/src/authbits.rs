@@ -98,7 +98,7 @@ use vectoreyes::{SimdBase, U8x16};
 ///
 /// The prover holds a bit that they wish to authenticate and receive a MAC
 /// which corresponds to that authentication.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 struct ProverAuthBit {
     /// MAC authenticating the bit.
     mac: U8x16,
@@ -109,7 +109,7 @@ struct ProverAuthBit {
 ///
 /// The verifier holds a local `key` that verifies the integrity of the prover's
 /// MAC.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 struct VerifierAuthBit {
     /// Key authenticating the prover's MAC.
     key: U8x16,
@@ -118,7 +118,7 @@ struct VerifierAuthBit {
 ///
 /// See [`crate::authbits`] for details. [`AuthBit`]s can be generated using
 /// [`AuthBitGenerator`].
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct AuthBit<P: GenericParty>(PartyEitherCopy<P, ProverAuthBit, VerifierAuthBit>);
 
 impl<P: GenericParty> AuthBit<P> {
