@@ -42,6 +42,7 @@ pub trait ArithmeticWire: Clone {}
 pub trait WireLabel:
     Clone
     + core::fmt::Debug
+    + core::default::Default
     + HasModulus
     + core::ops::Add<Output = Self>
     + core::ops::AddAssign
@@ -137,6 +138,12 @@ impl HasModulus for AllWire {
             AllWire::Mod3(x) => x.modulus(),
             AllWire::ModN(x) => x.modulus(),
         }
+    }
+}
+
+impl core::default::Default for AllWire {
+    fn default() -> Self {
+        Self::Mod2(Default::default())
     }
 }
 

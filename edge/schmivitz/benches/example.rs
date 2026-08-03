@@ -1,24 +1,33 @@
-use swanky_field_binary::F2;
-use swanky_sieve_ir_api::{CircuitExecuter, CircuitResult, FieldBackend};
+use fancy_traits::{Circuit, FancyBinary, FancyZeroKnowledge};
+use swanky_channel::Channel;
+use swanky_error::Result;
 
 pub struct ExampleCircuit<const N: usize>;
 
-impl<const N: usize> CircuitExecuter<F2> for ExampleCircuit<N> {
-    fn execute<B: FieldBackend<F2>>(&self, backend: &mut B) -> CircuitResult<()> {
-        let mut v = backend.input_private()?;
+impl<F: FancyBinary + FancyZeroKnowledge, const N: usize> Circuit<F> for ExampleCircuit<N> {
+    type Input = ();
+    type Output = Vec<F::Item>; // TODO: Should be `()`.
+
+    fn execute(
+        &self,
+        backend: &mut F,
+        _: Self::Input,
+        channel: &mut Channel,
+    ) -> Result<Self::Output> {
+        let mut v = backend.receive(2, channel)?;
 
         // N additions
         for _ in 0..N {
-            v = backend.add(&v, &v)?;
+            v = backend.xor(&v, &v);
         }
 
         // N multiplications
         for _ in 0..N {
-            v = backend.mul(&v, &v)?;
+            v = backend.and(&v, &v, channel)?;
         }
 
         // backend.assert_zero(&v2)?;
 
-        Ok(())
+        Ok(vec![])
     }
 }

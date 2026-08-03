@@ -1,7 +1,9 @@
-use mac_n_cheese_sieve_parser::WireId;
-use swanky_error::{ErrorKind, bail};
+use fancy_traits::{Circuit, Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
+use swanky_channel::Channel;
+use swanky_error::{ErrorKind, Result, bail};
+use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
-use swanky_sieve_ir_api::{CircuitResult, FieldBackend};
+use swanky_sieve_ir_api::FieldBackend;
 
 /// A [`ProverPreparer`] allows the prover to prepare for VOLE-in-the-head by evaluating the
 /// circuit in the clear and determining the full extended witness.
@@ -15,9 +17,9 @@ use swanky_sieve_ir_api::{CircuitResult, FieldBackend};
 /// if it visits a circuit where:
 /// - there are gates other than `private-input`, `add`, `addc`, or `mul`
 /// - there is more than one type ID used for any gate
-/// - any private input to the circuit is not in $`F2`$
+/// - any private input to the circuit is not in [`F2`]
 #[derive(Debug)]
-pub(crate) struct ProverPreparer<'a> {
+pub struct ProverPreparer<'a> {
     /// Private circuit inputs.
     private_input: &'a [F2],
 
@@ -32,11 +34,16 @@ pub(crate) struct ProverPreparer<'a> {
 }
 
 impl<'a> ProverPreparer<'a> {
-    pub(crate) fn new(private_input: &'a [F2], max_wire_id: WireId) -> swanky_error::Result<Self> {
+    /// Create a new [`ProverPreparer`] using the provided private input and an
+    /// optional witness size.
+    pub(crate) fn new(
+        private_input: &'a [F2],
+        witness_size: Option<usize>,
+    ) -> swanky_error::Result<Self> {
         Ok(Self {
             private_input,
             priv_input_pos: 0,
-            witness: Vec::with_capacity(max_wire_id as usize),
+            witness: Vec::with_capacity(witness_size.unwrap_or(0)),
             challenge_count: 0,
         })
     }
@@ -52,19 +59,36 @@ impl<'a> ProverPreparer<'a> {
     pub(crate) fn into_parts(self) -> (Vec<F2>, usize) {
         (self.witness, self.challenge_count)
     }
+
+    /// Run `circuit` using [`ProverPreparer`].
+    pub(crate) fn execute<C: Circuit<Self, Input = ()>>(&mut self, circuit: &C) -> Result<()> {
+        Channel::with(std::io::empty(), |channel| {
+            circuit.execute(self, (), channel)?;
+            Ok(())
+        })
+    }
 }
 
-// TODO: Generalize this for large primes.
+/// Wrapper around the [`F2`] type to make it compatible with [`Fancy::Item`].
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Wire(F2);
+
+impl HasModulus for Wire {
+    fn modulus(&self) -> u16 {
+        2
+    }
+}
+
+// TODO: Remove! This API has been replaced with the `fancy-traits::Circuit`
+// API. We're keeping this around for now for backwards compatibility.
 impl<'a> FieldBackend<F2> for ProverPreparer<'a> {
     type Wire = F2;
 
-    fn input_public(&mut self) -> CircuitResult<Self::Wire> {
-        bail!(
-            ErrorKind::OtherError,
-            "Invalid input: VOLE-in-the-head does not support gate public inputs"
-        );
+    fn input_public(&mut self) -> Result<Self::Wire> {
+        unimplemented!("VOLE-in-the-head does not support `input_public`")
     }
-    fn input_private(&mut self) -> CircuitResult<Self::Wire> {
+
+    fn input_private(&mut self) -> Result<Self::Wire> {
         let f2 = self.private_input[self.priv_input_pos as usize];
         self.priv_input_pos += 1;
 
@@ -73,32 +97,92 @@ impl<'a> FieldBackend<F2> for ProverPreparer<'a> {
 
         Ok(f2)
     }
-    fn add(&mut self, left: &Self::Wire, right: &Self::Wire) -> CircuitResult<Self::Wire> {
+
+    fn add(&mut self, left: &Self::Wire, right: &Self::Wire) -> Result<Self::Wire> {
         let sum = left + right;
 
         Ok(sum)
     }
-    fn addc(&mut self, left: &Self::Wire, right: F2) -> CircuitResult<Self::Wire> {
+
+    fn addc(&mut self, left: &Self::Wire, right: F2) -> Result<Self::Wire> {
         let sum = left + right;
 
         Ok(sum)
     }
-    fn mul(&mut self, left: &Self::Wire, right: &Self::Wire) -> CircuitResult<Self::Wire> {
+
+    fn mul(&mut self, left: &Self::Wire, right: &Self::Wire) -> Result<Self::Wire> {
         self.challenge_count += 1;
 
         let product = left * right;
-
-        // Save product to the witness.
         self.witness.push(product);
         Ok(product)
     }
-    fn mulc(&mut self, _: &Self::Wire, _: F2) -> CircuitResult<Self::Wire> {
+
+    fn mulc(&mut self, _: &Self::Wire, _: F2) -> Result<Self::Wire> {
+        unimplemented!("VOLE-in-the-head does not support `mulc`")
+    }
+
+    fn assert_zero(&mut self, _: &Self::Wire) -> Result<()> {
+        self.challenge_count += 1;
+        Ok(())
+    }
+}
+
+impl<'a> Fancy for ProverPreparer<'a> {
+    type Item = Wire;
+
+    fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
+        assert!(value == 0 || value == 1);
+        assert_eq!(modulus, 2);
+        Ok(Wire(F2::from(value != 0)))
+    }
+}
+
+impl<'a> FancyEncode for ProverPreparer<'a> {
+    fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
         bail!(
             ErrorKind::OtherError,
-            "Invalid input: VOLE-in-the-head does not support gate mulc"
-        );
+            "Invalid input: VOLE-in-the-head prover does not support encode"
+        )
     }
-    fn assert_zero(&mut self, _: &Self::Wire) -> CircuitResult<()> {
+
+    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
+        let mut output = Vec::with_capacity(moduli.len());
+        for _ in 0..moduli.len() {
+            let f2 = self.private_input[self.priv_input_pos as usize];
+            self.priv_input_pos += 1;
+
+            // TODO: Can we push all of the input witnesses up front?
+            self.witness.push(f2);
+            output.push(Wire(f2));
+        }
+        Ok(output)
+    }
+}
+
+impl<'a> FancyBinary for ProverPreparer<'a> {
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+        Wire(x.0 + y.0)
+    }
+
+    fn and(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
+        self.challenge_count += 1;
+
+        let z = x.0 * y.0;
+
+        // Save product to the witness.
+        self.witness.push(z);
+
+        Ok(Wire(z))
+    }
+
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
+        Wire(x.0 + F2::ONE)
+    }
+}
+
+impl<'a> FancyZeroKnowledge for ProverPreparer<'a> {
+    fn assert_zero(&mut self, _: &Self::Item, _: &mut Channel) -> Result<()> {
         self.challenge_count += 1;
         Ok(())
     }
@@ -106,16 +190,13 @@ impl<'a> FieldBackend<F2> for ProverPreparer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rand::rng;
-    use std::io::Cursor;
-
-    use mac_n_cheese_sieve_parser::text_parser::RelationReader;
-    use swanky_field::FiniteRing;
-    use swanky_field_binary::F2;
-    use swanky_sieve_ir_api::CircuitExecuter;
-
     use crate::circuit::CircuitIngestor;
     use crate::proof::{Circuit, prover_preparer::ProverPreparer};
+    use mac_n_cheese_sieve_parser::text_parser::RelationReader;
+    use rand::rng;
+    use std::io::Cursor;
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
 
     /// Take a string description of a circuit and parse it.
     fn load_circuit(circuit: &str) -> swanky_error::Result<Circuit> {
@@ -137,8 +218,9 @@ mod tests {
     ) -> swanky_error::Result<ProverPreparer<'a>> {
         let (circuit, private_input, max_wire_id) = circuit_loaded.to_interpreter();
 
-        let mut counter: ProverPreparer = ProverPreparer::new(private_input, max_wire_id)?;
-        circuit.execute(&mut counter)?;
+        let mut counter: ProverPreparer =
+            ProverPreparer::new(private_input, Some(max_wire_id as usize))?;
+        counter.execute(&circuit)?;
         Ok(counter)
     }
 

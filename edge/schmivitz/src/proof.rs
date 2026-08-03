@@ -7,16 +7,17 @@
 //! Emmanuela Orsini, Lawrence Roy, and Peter Scholl. [Publicly Verifiable Zero-Knowledge and
 //! Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
 //!
-use mac_n_cheese_sieve_parser::WireId;
+use fancy_traits::Circuit as FancyCircuit;
 use merlin::Transcript;
-use rand::{CryptoRng, Rng};
+use rand::{CryptoRng, Rng, rng};
 use rayon::iter::*;
+use std::time::Instant;
 use std::{iter::zip, marker::PhantomData};
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b, F128b};
-use swanky_sieve_ir_api::CircuitExecuter;
 
+use crate::vole::functionality::{VoleProver, VoleVerifier};
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
     parameters::SECURITY_PARAM,
@@ -58,7 +59,7 @@ where
     VoleP: RandomVoleP,
     VoleV: RandomVoleV<Decommitment = VoleP::Decommitment>,
 {
-    /// TODO: docstring
+    /// An estimate of the proof size, in bytes.
     pub fn proof_size_estimate(&self) -> usize {
         // This is only a part of the proof size, it does not include the partial decommitment part because this is abstracted with traits.
         let witness_commitment_bytes = self.witness_commitment.len() / 8;
@@ -74,30 +75,37 @@ where
     }
 
     /// Create a proof of knowledge of a witness that satisfies the given circuit.
-    pub fn prove_with_circuit<R>(
+    pub fn prove_with_circuit<RNG>(
         circuit: &Circuit,
         transcript: &mut Transcript,
-        rng: &mut R,
+        rng: &mut RNG,
     ) -> Result<Self>
     where
-        R: CryptoRng + Rng,
+        RNG: CryptoRng + Rng,
     {
         let (gates, private_input, max_wire_id) = circuit.to_interpreter();
-        Self::prove(gates, private_input, max_wire_id, transcript, rng)
+        Self::prove(
+            &gates,
+            private_input,
+            Some(max_wire_id as usize),
+            transcript,
+            rng,
+        )
     }
 
     /// Create a proof of knowledge of a witness that satisfies the given circuit.
-    pub fn prove<R, C>(
-        circuit: C,
-        private_input: &[F2],
-        max_wire_id: WireId,
+    pub fn prove<'a, C, RNG>(
+        circuit: &C,
+        private_input: &'a [F2],
+        witness_size: Option<usize>,
         transcript: &mut Transcript,
-        rng: &mut R,
+        rng: &mut RNG,
     ) -> Result<Self>
     // TODO: Get rid of max_wire_id
     where
-        R: CryptoRng + Rng,
-        C: CircuitExecuter<F2>, // Can't do higher order trait bounds... See https://github.com/rust-lang/rust/issues/108185#issuecomment-2819123578
+        C: FancyCircuit<ProverPreparer<'a>, Input = ()>
+            + FancyCircuit<ProverTraverser<VoleP>, Input = ()>,
+        RNG: CryptoRng + Rng,
     {
         let t = std::time::Instant::now();
         let mut transcript = transcript::Transcript::from(transcript);
@@ -105,8 +113,8 @@ where
 
         // Evaluate the circuit in the clear to get the full witness and all wire values
         let t = std::time::Instant::now();
-        let mut circuit_preparer = ProverPreparer::new(private_input, max_wire_id)?;
-        circuit.execute(&mut circuit_preparer)?;
+        let mut circuit_preparer = ProverPreparer::new(private_input, witness_size)?;
+        circuit_preparer.execute(circuit)?;
 
         let (witness, _challenge_count) = circuit_preparer.into_parts();
         log::info!("1: circuit preparer: {:?}", t.elapsed());
@@ -144,7 +152,8 @@ where
         // gate / polynomial (`A_i0` and `A_i1` in the paper) and start to aggregate these with
         // the challenges.
         let mut circuit_traverser = ProverTraverser::new(witness, chi_challenge, voles)?;
-        circuit.execute(&mut circuit_traverser)?;
+        circuit_traverser.execute(circuit)?;
+
         let (degree_0_aggregation, degree_1_aggregation, assert_zero_commitment, voles) =
             circuit_traverser.into_parts()?;
 
@@ -206,14 +215,14 @@ where
         transcript: &mut Transcript,
     ) -> Result<()> {
         let (gates, _private_input, _max_wire_id) = circuit.to_interpreter();
-        self.verify(gates, transcript)
+        self.verify(&gates, transcript)
     }
 
     /// Verify the proof.
     ///
-    pub fn verify<C>(&self, circuit: C, transcript: &mut Transcript) -> Result<()>
+    pub fn verify<C>(&self, circuit: &C, transcript: &mut Transcript) -> Result<()>
     where
-        C: CircuitExecuter<F2>, // Can't do higher order trait bounds... See https://github.com/rust-lang/rust/issues/108185#issuecomment-2819123578
+        C: FancyCircuit<VerifierTraverser, Input = ()>,
     {
         let mut transcript = transcript::Transcript::from(transcript);
         transcript.append_public_values();
@@ -280,7 +289,8 @@ where
             reconstructed_voles.verifier_key(),
             masked_witnesses,
         )?;
-        circuit.execute(&mut verifier_traverser)?;
+        verifier_traverser.execute(circuit)?;
+
         let (validation_aggregate, aggregate_assert_zero) = verifier_traverser.into_parts()?;
         log::info!("5: circuit traverser {:?}", t.elapsed());
 
@@ -344,6 +354,56 @@ impl AsSecretBytes for Vec<F2> {
     }
 }
 
+/// Test proof generation and verification of a given [`Circuit`].
+pub fn test_sieveir(circuit: &Circuit) -> Result<()> {
+    let rng = &mut rng();
+
+    let t = std::time::Instant::now();
+    let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit(
+        circuit,
+        &mut Transcript::new(b""),
+        rng,
+    );
+    log::info!("Elapsed prover: {:?}", t.elapsed());
+
+    log::info!(
+        "proof size estimate: {:?}",
+        (proof.as_ref()).unwrap().proof_size_estimate()
+    );
+
+    let t = std::time::Instant::now();
+    let verif = proof?.verify_with_circuit(circuit, &mut Transcript::new(b""));
+    assert!(verif.is_ok());
+    log::info!("Elapsed verifier: {:?}", t.elapsed());
+
+    Ok(())
+}
+
+/// Test proof generation and verification of a given [`FancyCircuit`].
+pub fn test_circuit<'a, C>(circuit: &C, private_input: &'a [F2]) -> Result<()>
+where
+    C: FancyCircuit<ProverPreparer<'a>, Input = ()>
+        + FancyCircuit<ProverTraverser<VoleProver>, Input = ()>
+        + FancyCircuit<VerifierTraverser, Input = ()>,
+{
+    let rng = &mut rng();
+    let t = Instant::now();
+    let proof = Proof::<VoleProver, VoleVerifier>::prove(
+        circuit,
+        private_input,
+        None,
+        &mut Transcript::new(b""),
+        rng,
+    )?;
+    log::info!("Elapsed prover: {:?}", t.elapsed());
+    log::info!("proof size estimate: {}", proof.proof_size_estimate());
+
+    let t = Instant::now();
+    proof.verify(circuit, &mut Transcript::new(b""))?;
+    log::info!("Elapsed verifier: {:?}", t.elapsed());
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use merlin::Transcript;
@@ -380,7 +440,7 @@ mod tests {
         let circuit = load_circuit_prover(&mut circuit_cursor, &private_input_path)?;
         let rng = &mut rng();
 
-        let proof = Proof::<InsecureVole, InsecureCommitments>::prove_with_circuit::<_>(
+        let proof = Proof::<InsecureVole, InsecureCommitments>::prove_with_circuit(
             &circuit,
             &mut transcript(),
             rng,

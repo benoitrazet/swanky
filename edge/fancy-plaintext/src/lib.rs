@@ -13,7 +13,7 @@ use swanky_error::{ErrorKind, Result};
 pub struct Dummy;
 
 /// Plaintext wire value.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct DummyVal {
     val: u16,
     modulus: u16,
