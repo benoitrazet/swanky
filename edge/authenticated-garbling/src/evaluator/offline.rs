@@ -21,7 +21,9 @@ use vectoreyes::U8x16;
 /// [`EvaluatorOffline::finalize`] receives the garbled gates and selection bits
 /// from the garbler, and returns a [`EvaluatorOnline`] for the next phase of
 /// processing.
-pub struct EvaluatorOffline {
+pub struct EvaluatorOffline<'a, C> {
+    // The circuit to evaluate.
+    circuit: &'a C,
     // The evaluator's Δ, used to validate the authenticated shares and AND
     // triples.
     delta: U8x16,
@@ -34,13 +36,13 @@ pub struct EvaluatorOffline {
     and_auth_shares: Vec<AuthShare<PartyEvaluator>>,
 }
 
-impl EvaluatorOffline {
+impl<'a, C> EvaluatorOffline<'a, C>
+where
+    C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>,
+{
     /// Initialize a [`EvaluatorOffline`] object for the given circuit.
-    pub fn initialize<
-        C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>,
-        RNG: CryptoRng + Rng,
-    >(
-        circuit: &C,
+    pub fn initialize<RNG: CryptoRng + Rng>(
+        circuit: &'a C,
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<Self> {
@@ -50,15 +52,18 @@ impl EvaluatorOffline {
         let (auth_shares, and_auth_shares) =
             f_preprocessing(circuit, &mut and_generator, channel, rng)?;
         Ok(Self {
+            circuit,
             delta,
             auth_shares,
             and_auth_shares,
         })
     }
+}
 
+impl<'a, C> EvaluatorOffline<'a, C> {
     /// Receive the offline material from the garbler and return an
     /// [`EvaluatorOnline`] object for online processing.
-    pub fn finalize(self, channel: &mut Channel) -> Result<EvaluatorOnline> {
+    pub fn finalize(self, channel: &mut Channel) -> Result<EvaluatorOnline<'a, C>> {
         let nands = self.and_auth_shares.len();
         // Receive the LSBs of the zero-wirelabels of the output wires of the
         // AND gates.
@@ -81,6 +86,7 @@ impl EvaluatorOffline {
             .collect::<Result<Vec<_>>>()?;
 
         Ok(EvaluatorOnline::new(
+            self.circuit,
             self.delta,
             self.auth_shares,
             self.and_auth_shares,

@@ -19,7 +19,9 @@ use vectoreyes::U8x16;
 /// [`FancyEncode`]. Once, inputs have been shared, [`GarblerOnline::finalize`]
 /// receives the necessary masked bits from the evaluator, and returns a
 /// [`GarblerValidator`] for the next phase of processing.
-pub struct GarblerOnline {
+pub struct GarblerOnline<'a, C> {
+    // The circuit to garble.
+    circuit: &'a C,
     // The garbler's Δ.
     delta: WireMod2,
     // A vector of authenticated shares, one per input wire and AND gate output.
@@ -33,14 +35,16 @@ pub struct GarblerOnline {
     inputs: VecWrapper<OfflineWire>,
 }
 
-impl GarblerOnline {
+impl<'a, C> GarblerOnline<'a, C> {
     pub(crate) fn new(
+        circuit: &'a C,
         delta: WireMod2,
         auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
         and_auth_shares: VecWrapper<AuthShare<PartyGarbler>>,
         inputs: VecWrapper<OfflineWire>,
     ) -> Self {
         Self {
+            circuit,
             delta,
             auth_shares,
             and_auth_shares,
@@ -84,7 +88,7 @@ impl GarblerOnline {
     ///
     /// This involves receiving the masked values $`\hat{z}_w`$ from the
     /// evaluator.
-    pub fn finalize(self, channel: &mut Channel) -> Result<GarblerValidator> {
+    pub fn finalize(self, channel: &mut Channel) -> Result<GarblerValidator<'a, C>> {
         let nands = self.and_auth_shares.len();
         // Receive the masked values from the Evaluator
         let mut bit_deser: F2BitDeserializer = SequenceDeserializer::new(channel.as_std_io())
@@ -99,6 +103,7 @@ impl GarblerOnline {
 
         let auth_shares: Vec<_> = self.auth_shares.into();
         Ok(GarblerValidator::new(
+            self.circuit,
             self.delta,
             // The validator uses the non-input `AuthShare`s.
             auth_shares[self.inputs.len()..].to_vec(),
@@ -108,7 +113,7 @@ impl GarblerOnline {
     }
 }
 
-impl Fancy for GarblerOnline {
+impl<'a, C> Fancy for GarblerOnline<'a, C> {
     type Item = ValidatorWire;
 
     fn constant(&mut self, _: u16, _: u16, _: &mut Channel) -> Result<Self::Item> {
@@ -120,7 +125,7 @@ impl Fancy for GarblerOnline {
     }
 }
 
-impl FancyEncode for GarblerOnline {
+impl<'a, C> FancyEncode for GarblerOnline<'a, C> {
     fn encode_many(
         &mut self,
         values: &[u16],

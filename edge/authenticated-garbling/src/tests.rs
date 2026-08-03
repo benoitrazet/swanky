@@ -36,21 +36,22 @@ fn test_party_construction_passes() {
 }
 
 fn test_circuit<
+    'a,
     C: CircuitInputMapper<CircuitAnalyzer>
         + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
         + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
-        + CircuitInputMapper<GarblerOffline>
-        + CircuitOutputMapper<GarblerOffline>
-        + CircuitInputMapper<EvaluatorOnline>
-        + CircuitOutputMapper<EvaluatorOnline>
+        + CircuitInputMapper<GarblerOffline<'a, C>>
+        + CircuitOutputMapper<GarblerOffline<'a, C>>
+        + CircuitInputMapper<EvaluatorOnline<'a, C>>
+        + CircuitOutputMapper<EvaluatorOnline<'a, C>>
         + CircuitInputMapper<Dummy>
         + CircuitOutputMapper<Dummy>
-        + CircuitInputMapper<GarblerValidator>
+        + CircuitInputMapper<GarblerValidator<'a, C>>
         + Sync,
 >(
     ninputs_gb: usize,
     ninputs_ev: usize,
-    circuit: &C,
+    circuit: &'a C,
 ) {
     assert_eq!(
         ninputs_gb + ninputs_ev,
@@ -85,14 +86,14 @@ fn test_circuit<
         |c| {
             let mut rng = SwankyRng::new();
             let gb = GarblerOffline::initialize(circuit, c, &mut rng)?;
-            let (outputs, gb) = gb.execute(circuit)?;
+            let (outputs, gb) = gb.execute()?;
             let mut gb = gb.finalize(c)?;
 
             let mut inputs = gb.encode_many(&inputs_gb, &vec![2; ninputs_gb], c)?;
             let their = gb.receive_many(&vec![2; ninputs_ev], c)?;
             inputs.extend(their);
             let gb = gb.finalize(c)?;
-            let mut gb = gb.validate(circuit, inputs, c)?;
+            let mut gb = gb.validate(inputs, c)?;
             let outputs = gb.outputs(&outputs, c)?;
             assert!(outputs.is_none());
             Ok(())
@@ -105,7 +106,7 @@ fn test_circuit<
             let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
             let mine = ev.encode_many(&inputs_ev, &vec![2; ninputs_ev], c)?;
             inputs.extend(mine);
-            let (outputs, ev) = ev.execute(circuit, inputs)?;
+            let (outputs, ev) = ev.execute(inputs)?;
             let ev = ev.finalize(c)?;
             let mut ev = ev.validate(c)?;
             let outputs = ev.outputs(&outputs, c)?;

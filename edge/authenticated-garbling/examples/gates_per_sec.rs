@@ -56,7 +56,7 @@ impl<F: FancyBinary> CircuitOutputMapper<F> for And {
     }
 }
 
-fn stats<C>(name: &str, circuit: &C) -> Result<()>
+fn stats<'a, C>(name: &str, circuit: &'a C) -> Result<()>
 where
     C: CircuitInputMapper<CircuitAnalyzer>
         + CircuitInputMapper<SemiHonestGarbler<SwankyRng, WireMod2>>
@@ -65,11 +65,11 @@ where
         + CircuitOutputMapper<SemiHonestEvaluator<WireMod2>>
         + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
         + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
-        + CircuitInputMapper<GarblerValidator>
-        + CircuitInputMapper<GarblerOffline>
-        + CircuitOutputMapper<GarblerOffline>
-        + CircuitInputMapper<EvaluatorOnline>
-        + CircuitOutputMapper<EvaluatorOnline>
+        + CircuitInputMapper<GarblerValidator<'a, C>>
+        + CircuitInputMapper<GarblerOffline<'a, C>>
+        + CircuitOutputMapper<GarblerOffline<'a, C>>
+        + CircuitInputMapper<EvaluatorOnline<'a, C>>
+        + CircuitOutputMapper<EvaluatorOnline<'a, C>>
         + Sync,
 {
     let mut analyzer = CircuitAnalyzer::new();
@@ -168,7 +168,7 @@ where
     let ((mut gb, outputs), mut ev) = swanky_channel::local::local_channel_pair(
         |channel: &mut Channel<'_>| {
             let gb = GarblerOffline::initialize(circuit, channel, &mut SwankyRng::new())?;
-            let (outputs, gb) = gb.execute(circuit)?;
+            let (outputs, gb) = gb.execute()?;
             let gb = gb.finalize(channel)?;
             Ok((gb, outputs))
         },
@@ -185,12 +185,12 @@ where
         |channel| {
             let inputs = gb.encode_many(&inputs, &moduli, channel)?;
             let validator = gb.finalize(channel)?;
-            let mut validator = validator.validate(circuit, inputs, channel)?;
+            let mut validator = validator.validate(inputs, channel)?;
             validator.outputs(&outputs, channel)
         },
         |channel| {
             let inputs = ev.receive_many(&moduli, channel)?;
-            let (outputs, ev) = ev.execute(circuit, inputs)?;
+            let (outputs, ev) = ev.execute(inputs)?;
             let ev = ev.finalize(channel)?;
             let mut ev = ev.validate(channel)?;
             ev.outputs(&outputs, channel)
