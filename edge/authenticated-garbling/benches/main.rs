@@ -8,7 +8,7 @@ use fancy_circuits::{
         fancy::TestBinaryConstant,
     },
 };
-use fancy_traits::{CircuitInputMapper, FancyEncode, FancyOutput};
+use fancy_traits::{CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput};
 use rand::RngExt;
 use std::time::Duration;
 use swanky_authenticated_garbling::{
@@ -22,7 +22,9 @@ fn test_circuit<
         + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
         + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
         + CircuitInputMapper<GarblerOffline>
+        + CircuitOutputMapper<GarblerOffline>
         + CircuitInputMapper<EvaluatorOnline>
+        + CircuitOutputMapper<EvaluatorOnline>
         + CircuitInputMapper<GarblerValidator>
         + Sync,
 >(

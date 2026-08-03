@@ -44,7 +44,7 @@ where
 }
 
 pub mod test {
-    use fancy_traits::CircuitInputMapper;
+    use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
 
     use super::*;
 
@@ -76,6 +76,12 @@ pub mod test {
 
         fn modulus(&self, _: usize) -> u16 {
             2
+        }
+    }
+
+    impl<F: FancyBinary> CircuitOutputMapper<F> for TestBinaryTwosComplement {
+        fn flatten(output: Self::Output) -> Vec<F::Item> {
+            output.wires().to_vec()
         }
     }
 

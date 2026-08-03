@@ -1,5 +1,5 @@
 use fancy_garbling::{WireLabel, WireMod2};
-use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary, FancyEncode, Flatten};
+use fancy_traits::{CircuitInputMapper, CircuitOutputMapper, Fancy, FancyBinary, FancyEncode};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -92,7 +92,9 @@ impl EvaluatorOnline {
 
     /// Run the circuit on the provided inputs, returning the outputs as a flat
     /// vector.
-    pub fn execute<C: CircuitInputMapper<EvaluatorOnline>>(
+    pub fn execute<
+        C: CircuitInputMapper<EvaluatorOnline> + CircuitOutputMapper<EvaluatorOnline>,
+    >(
         mut self,
         circuit: &C,
         inputs: Vec<EvaluatorWire>,
@@ -100,7 +102,7 @@ impl EvaluatorOnline {
         let output = Channel::with(std::io::empty(), |channel| {
             circuit.execute(&mut self, circuit.map(inputs), channel)
         })?;
-        Ok((output.flatten(), self))
+        Ok((C::flatten(output), self))
     }
 
     /// Finalize the online phase of the computation.

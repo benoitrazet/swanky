@@ -4,7 +4,9 @@ use fancy_garbling::{
     Evaluator as SemiHonestEvaluator, Garbler as SemiHonestGarbler, WireMod2,
     classic::GarbledCircuit,
 };
-use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary, FancyEncode, FancyOutput, Flatten};
+use fancy_traits::{
+    Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyEncode, FancyOutput,
+};
 use std::{hint::black_box, time::Instant};
 use swanky_authenticated_garbling::{
     EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator, PartyEvaluator,
@@ -48,16 +50,26 @@ impl<F: FancyBinary> CircuitInputMapper<F> for And {
     }
 }
 
+impl<F: FancyBinary> CircuitOutputMapper<F> for And {
+    fn flatten(output: Self::Output) -> Vec<F::Item> {
+        vec![output]
+    }
+}
+
 fn stats<C>(name: &str, circuit: &C) -> Result<()>
 where
     C: CircuitInputMapper<CircuitAnalyzer>
         + CircuitInputMapper<SemiHonestGarbler<SwankyRng, WireMod2>>
+        + CircuitOutputMapper<SemiHonestGarbler<SwankyRng, WireMod2>>
         + CircuitInputMapper<SemiHonestEvaluator<WireMod2>>
+        + CircuitOutputMapper<SemiHonestEvaluator<WireMod2>>
         + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
         + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
         + CircuitInputMapper<GarblerValidator>
         + CircuitInputMapper<GarblerOffline>
+        + CircuitOutputMapper<GarblerOffline>
         + CircuitInputMapper<EvaluatorOnline>
+        + CircuitOutputMapper<EvaluatorOnline>
         + Sync,
 {
     let mut analyzer = CircuitAnalyzer::new();
@@ -122,7 +134,10 @@ where
                 <C as CircuitInputMapper<SemiHonestGarbler<_, _>>>::map(circuit, zeros),
                 channel,
             )?;
-            gb.outputs(&outputs.flatten(), channel)?;
+            gb.outputs(
+                &<C as CircuitOutputMapper<SemiHonestGarbler<_, _>>>::flatten(outputs),
+                channel,
+            )?;
             Ok(())
         },
         |channel| {
@@ -131,7 +146,12 @@ where
                 <C as CircuitInputMapper<SemiHonestEvaluator<_>>>::map(circuit, wires),
                 channel,
             )?;
-            Ok(ev.outputs(&outputs.flatten(), channel)?.unwrap())
+            Ok(ev
+                .outputs(
+                    &<C as CircuitOutputMapper<SemiHonestEvaluator<_>>>::flatten(outputs),
+                    channel,
+                )?
+                .unwrap())
         },
     )?;
     black_box(result);
@@ -166,7 +186,7 @@ where
             let inputs = gb.encode_many(&inputs, &moduli, channel)?;
             let validator = gb.finalize(channel)?;
             let mut validator = validator.validate(circuit, inputs, channel)?;
-            validator.outputs(&outputs.flatten(), channel)
+            validator.outputs(&outputs, channel)
         },
         |channel| {
             let inputs = ev.receive_many(&moduli, channel)?;

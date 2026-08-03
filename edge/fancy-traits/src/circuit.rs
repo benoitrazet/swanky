@@ -1,47 +1,6 @@
-use crate::{Fancy, HasModulus};
+use crate::Fancy;
 use swanky_channel::Channel;
 use swanky_error::Result;
-
-/// Trait for flattening the output of a [`Circuit`] into a vector of wires.
-pub trait Flatten {
-    /// The type of the elements in the output vector.
-    type Item;
-
-    /// Flatten a set of wires into a single vector of wires.
-    fn flatten(self) -> Vec<Self::Item>;
-}
-
-impl<T: Clone + HasModulus> Flatten for Vec<T> {
-    type Item = T;
-
-    fn flatten(self) -> Vec<Self::Item> {
-        self
-    }
-}
-
-impl<T: Clone + HasModulus> Flatten for T {
-    type Item = T;
-
-    fn flatten(self) -> Vec<Self::Item> {
-        vec![self]
-    }
-}
-
-impl<T: Clone + HasModulus> Flatten for (T, T) {
-    type Item = T;
-
-    fn flatten(self) -> Vec<Self::Item> {
-        vec![self.0]
-    }
-}
-
-impl<T: Clone + HasModulus, const N: usize> Flatten for [T; N] {
-    type Item = T;
-
-    fn flatten(self) -> Vec<Self::Item> {
-        self.to_vec()
-    }
-}
 
 /// Trait for defining computations over [`Fancy`] objects.
 ///
@@ -52,6 +11,9 @@ impl<T: Clone + HasModulus, const N: usize> Flatten for [T; N] {
 ///
 /// For mapping arbitrary inputs into the correct `Circuit` input
 /// representation, use the [`CircuitInputMapper`] trait.
+///
+/// For mapping outputs to a flat vector representation, use the
+/// [`CircuitOutputMapper`] trait.
 ///
 /// # Example
 /// Below is a simple circuit computing an add gate. The computation is defined
@@ -82,10 +44,7 @@ pub trait Circuit<F: Fancy> {
     /// The input type of the circuit.
     type Input;
     /// The output type of the circuit.
-    ///
-    /// The [`Flatten`] trait allows the output type to be converted into a
-    /// `Vec<F::Item>`.
-    type Output: Flatten<Item = F::Item>;
+    type Output;
 
     /// Execute a circuit on a given [`Fancy`] backend using the provided inputs.
     fn execute(
@@ -162,4 +121,15 @@ pub trait CircuitInputMapper<F: Fancy>: Circuit<F> {
     fn ninputs(&self) -> usize;
     /// The modulus of the `i`th input.
     fn modulus(&self, i: usize) -> u16;
+}
+
+/// Trait for mapping circuit outputs to a flat vector.
+///
+/// This is useful when using [`crate::FancyOutput::outputs`], which outputs the
+/// values associated with a slice of wires. The
+/// [`CircuitOutputMapper::flatten`] method can thus be used to produce a vector
+/// of wires to be passed into [`crate::FancyOutput::outputs`].
+pub trait CircuitOutputMapper<F: Fancy>: Circuit<F> {
+    /// Convert [`Circuit::Output`] into a flat vector of [`Fancy::Item`]s.
+    fn flatten(output: Self::Output) -> Vec<F::Item>;
 }

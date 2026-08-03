@@ -7,7 +7,7 @@ use crate::{
     util::u128_to_bits,
 };
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary};
+use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -203,6 +203,15 @@ where
 
     fn modulus(&self, _: usize) -> u16 {
         2
+    }
+}
+
+impl<'a, F: FancyBinary> CircuitOutputMapper<F> for TestBinaryMultiplication<'a>
+where
+    F::Item: 'a,
+{
+    fn flatten(output: Self::Output) -> Vec<F::Item> {
+        output.wires().to_vec()
     }
 }
 

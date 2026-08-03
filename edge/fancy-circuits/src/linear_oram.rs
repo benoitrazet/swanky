@@ -2,7 +2,7 @@ use crate::{
     BinaryBundle,
     binary::{BinaryConstant, BinaryEquality, BinaryMultiplex, PairwiseXor},
 };
-use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary};
+use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -83,6 +83,12 @@ impl<F: FancyBinary, const N: usize> CircuitInputMapper<F> for LinearOram<N> {
 
     fn modulus(&self, _: usize) -> u16 {
         2
+    }
+}
+
+impl<F: FancyBinary, const N: usize> CircuitOutputMapper<F> for LinearOram<N> {
+    fn flatten(output: Self::Output) -> Vec<F::Item> {
+        output.wires().to_vec()
     }
 }
 

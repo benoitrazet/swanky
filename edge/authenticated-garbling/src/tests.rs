@@ -14,7 +14,7 @@ use fancy_circuits::test_circuits::binary::{
 };
 use fancy_circuits::test_circuits::fancy::TestBinaryConstant;
 use fancy_plaintext::{Dummy, DummyVal};
-use fancy_traits::{CircuitInputMapper, FancyEncode, FancyOutput, Flatten};
+use fancy_traits::{CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput};
 use rand::RngExt;
 use swanky_rng::SwankyRng;
 
@@ -40,8 +40,11 @@ fn test_circuit<
         + CircuitInputMapper<WirePreProcessor<PartyGarbler>>
         + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>
         + CircuitInputMapper<GarblerOffline>
+        + CircuitOutputMapper<GarblerOffline>
         + CircuitInputMapper<EvaluatorOnline>
+        + CircuitOutputMapper<EvaluatorOnline>
         + CircuitInputMapper<Dummy>
+        + CircuitOutputMapper<Dummy>
         + CircuitInputMapper<GarblerValidator>
         + Sync,
 >(
@@ -73,8 +76,7 @@ fn test_circuit<
         <C as CircuitInputMapper<Dummy>>::map(circuit, dummy_inputs),
     )
     .unwrap();
-    let expected = expected
-        .flatten()
+    let expected = <C as CircuitOutputMapper<Dummy>>::flatten(expected)
         .into_iter()
         .map(|x| x.val())
         .collect::<Vec<_>>();

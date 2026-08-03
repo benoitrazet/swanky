@@ -9,7 +9,7 @@ use swanky_channel::Channel;
 use swanky_error::Result;
 
 mod circuit;
-pub use circuit::{Circuit, CircuitInputMapper, Flatten};
+pub use circuit::{Circuit, CircuitInputMapper, CircuitOutputMapper};
 mod zk;
 pub use zk::FancyZeroKnowledge;
 

@@ -3,7 +3,7 @@ use crate::{
     util::{self, u128_from_bits},
 };
 use fancy_plaintext::{Dummy, DummyVal};
-use fancy_traits::{FancyBinary, FancyEncode, FancyOutput, Flatten, HasModulus};
+use fancy_traits::{FancyBinary, FancyEncode, FancyOutput, HasModulus};
 use std::ops::{Deref, DerefMut};
 use swanky_channel::Channel;
 
@@ -55,25 +55,6 @@ impl<W: Clone + HasModulus> From<Bundle<W>> for BinaryBundle<W> {
     fn from(b: Bundle<W>) -> BinaryBundle<W> {
         debug_assert!(b.moduli().iter().all(|&p| p == 2));
         BinaryBundle(b)
-    }
-}
-
-impl<T: Clone + HasModulus> Flatten for BinaryBundle<T> {
-    type Item = T;
-
-    fn flatten(self) -> Vec<T> {
-        self.wires().to_vec()
-    }
-}
-
-/// Wrapper type for `(BinaryBundle<T>, T)`.
-pub struct BinaryBundleAndItem<T>(pub BinaryBundle<T>, pub T);
-
-impl<T: Clone + HasModulus> Flatten for BinaryBundleAndItem<T> {
-    type Item = T;
-
-    fn flatten(self) -> Vec<Self::Item> {
-        [self.0.flatten(), vec![self.1]].concat()
     }
 }
 

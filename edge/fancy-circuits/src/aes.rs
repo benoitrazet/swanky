@@ -1,7 +1,7 @@
 //! AES circuits.
 
 use crate::BinaryCircuit;
-use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary};
+use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary};
 use std::io::Cursor;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -73,6 +73,12 @@ impl<F: FancyBinary> CircuitInputMapper<F> for AesNonExpanded {
 
     fn modulus(&self, _: usize) -> u16 {
         2
+    }
+}
+
+impl<F: FancyBinary> CircuitOutputMapper<F> for AesNonExpanded {
+    fn flatten(output: Self::Output) -> Vec<F::Item> {
+        output.to_vec()
     }
 }
 

@@ -1,6 +1,6 @@
 mod test {
     use fancy_circuits::{
-        BinaryBundle, BinaryBundleAndItem,
+        BinaryBundle,
         aes::AesNonExpanded,
         binary::BinaryAddition,
         hmac::HmacSha256,
@@ -367,7 +367,7 @@ mod test {
                     .map(|_| backend.receive(2, channel))
                     .collect::<Result<Vec<_>>>()?,
             );
-            let BinaryBundleAndItem(z, carry) = self.0.execute(backend, (&x, &y), channel)?;
+            let (z, carry) = self.0.execute(backend, (&x, &y), channel)?;
             for (wire, c) in z.wires().iter().zip(self.1.chars()) {
                 match c {
                     '0' => backend.assert_zero(wire, channel)?,
