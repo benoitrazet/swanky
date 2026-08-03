@@ -124,6 +124,11 @@ pub trait CircuitInputMapper<F: Fancy>: Circuit<F> {
 }
 
 /// Trait for mapping circuit outputs to a flat vector.
+///
+/// This is useful when using [`crate::FancyOutput::outputs`], which outputs the
+/// values associated with a slice of wires. The
+/// [`CircuitOutputMapper::flatten`] method can thus be used to produce a vector
+/// of wires to be passed into [`crate::FancyOutput::outputs`].
 pub trait CircuitOutputMapper<F: Fancy>: Circuit<F> {
     /// Convert [`Circuit::Output`] into a flat vector of [`Fancy::Item`]s.
     fn flatten(output: Self::Output) -> Vec<F::Item>;
