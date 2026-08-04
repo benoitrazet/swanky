@@ -37,7 +37,9 @@ use vectoreyes::U8x16;
 /// [`GarblerOffline::finalize`] sends the garbled gates and selection bits to
 /// the evaluator, and returns a [`GarblerOnline`] for the next phase of
 /// processing.
-pub struct GarblerOffline {
+pub struct GarblerOffline<'a, C> {
+    // The circuit to garble.
+    circuit: &'a C,
     // The garbler's Δ.
     delta: WireMod2,
     // A random wirelabel denoting zero. Used to make negations and constant one
@@ -61,13 +63,13 @@ pub struct GarblerOffline {
     inputs: Vec<OfflineWire>,
 }
 
-impl GarblerOffline {
+impl<'a, C> GarblerOffline<'a, C>
+where
+    C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyGarbler>>,
+{
     /// Initialize a [`GarblerOffline`] object for the given circuit.
-    pub fn initialize<
-        C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyGarbler>>,
-        RNG: CryptoRng + Rng,
-    >(
-        circuit: &C,
+    pub fn initialize<RNG: CryptoRng + Rng>(
+        circuit: &'a C,
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<Self> {
@@ -90,6 +92,7 @@ impl GarblerOffline {
             .collect::<Vec<_>>();
 
         Ok(Self {
+            circuit,
             delta: WireMod2::from_repr(delta, 2),
             zero: WireMod2::from_repr(zero, 2),
             and_gate_index: 0,
@@ -100,26 +103,24 @@ impl GarblerOffline {
             inputs,
         })
     }
+}
 
-    /// Execute a circuit in offline mode, returning the circuit outputs.
-    pub fn execute<C: CircuitInputMapper<Self> + CircuitOutputMapper<Self>>(
-        mut self,
-        circuit: &C,
-    ) -> Result<(Vec<OfflineWire>, Self)> {
-        let inputs = self.inputs.clone();
+impl<'a, C> GarblerOffline<'a, C>
+where
+    C: CircuitInputMapper<Self> + CircuitOutputMapper<Self>,
+{
+    /// Execute the circuit in offline mode, returning the circuit outputs.
+    pub fn execute(mut self) -> Result<(Vec<OfflineWire>, Self)> {
+        let inputs = CircuitInputMapper::<Self>::map(self.circuit, self.inputs.clone());
         let outputs = Channel::with(std::io::empty(), |channel| {
-            circuit.execute(
-                &mut self,
-                CircuitInputMapper::<Self>::map(circuit, inputs),
-                channel,
-            )
+            self.circuit.execute(&mut self, inputs, channel)
         })?;
         Ok((C::flatten(outputs), self))
     }
 
     /// Send the offline material to the evaluator and return a
     /// [`GarblerOnline`] object for online processing.
-    pub fn finalize(self, channel: &mut Channel) -> Result<GarblerOnline> {
+    pub fn finalize(self, channel: &mut Channel) -> Result<GarblerOnline<'a, C>> {
         // The garbler sends out all the gate material that they computed offline
         let bit_ser: F2BitSerializer = SequenceSerializer::new(&mut channel.as_std_io()).wrap_err(
             ErrorKind::InitializationError,
@@ -138,13 +139,16 @@ impl GarblerOffline {
             channel.write(g1)?;
         }
         Ok(GarblerOnline::new(
+            self.circuit,
             self.delta,
             self.auth_shares,
             self.and_auth_shares,
             VecWrapper::new(self.inputs),
         ))
     }
+}
 
+impl<'a, C> GarblerOffline<'a, C> {
     fn next_and_gate_index(&mut self) -> usize {
         let current = self.and_gate_index;
         self.and_gate_index += 1;
@@ -152,7 +156,7 @@ impl GarblerOffline {
     }
 }
 
-impl Fancy for GarblerOffline {
+impl<'a, C> Fancy for GarblerOffline<'a, C> {
     type Item = OfflineWire;
 
     fn constant(&mut self, value: u16, _: u16, _: &mut Channel) -> Result<Self::Item> {
@@ -170,7 +174,7 @@ impl Fancy for GarblerOffline {
     }
 }
 
-impl FancyBinary for GarblerOffline {
+impl<'a, C> FancyBinary for GarblerOffline<'a, C> {
     fn and(&mut self, la0: &Self::Item, lb0: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
         // This index is called γ in the paper
         let index = self.next_and_gate_index();

@@ -12,7 +12,9 @@ use vectoreyes::U8x16;
 ///
 /// In the validation phase, the garbler evaluates the circuit and checks that
 /// the necessary validation bits are all zero.
-pub struct GarblerValidator {
+pub struct GarblerValidator<'a, C> {
+    // The circuit to validate.
+    circuit: &'a C,
     // The garbler's Δ.
     delta: WireMod2,
     // A vector of authenticated shares, one per input wire and AND gate output.
@@ -27,15 +29,17 @@ pub struct GarblerValidator {
     lc_values: VecWrapper<F2>,
 }
 
-impl GarblerValidator {
+impl<'a, C> GarblerValidator<'a, C> {
     /// Create a new [`GarblerValidator`].
     pub(crate) fn new(
+        circuit: &'a C,
         delta: WireMod2,
         auth_shares: Vec<AuthShare<PartyGarbler>>,
         and_auth_shares: Vec<AuthShare<PartyGarbler>>,
         lc_values: Vec<F2>,
     ) -> Self {
         Self {
+            circuit,
             delta,
             auth_shares: VecWrapper::new(auth_shares),
             and_auth_shares: VecWrapper::new(and_auth_shares),
@@ -44,19 +48,28 @@ impl GarblerValidator {
         }
     }
 
+    fn delta(&self) -> U8x16 {
+        self.delta.to_repr()
+    }
+}
+
+impl<'a, C> GarblerValidator<'a, C>
+where
+    C: CircuitInputMapper<Self>,
+{
     /// Validate the computation.
     ///
     /// This checks that all the validation bits are zero. It outputs a
     /// [`GarblerOutput`] for processing any output values.
-    pub fn validate<C: CircuitInputMapper<Self>>(
+    pub fn validate(
         mut self,
-        circuit: &C,
         inputs: Vec<ValidatorWire>,
         channel: &mut Channel,
     ) -> Result<GarblerOutput> {
         // Locally run the circuit to correctly construct the validation shares.
+        let inputs = self.circuit.map(inputs);
         Channel::with(std::io::empty(), {
-            |c| circuit.execute(&mut self, circuit.map(inputs), c)
+            |c| self.circuit.execute(&mut self, inputs, c)
         })?;
 
         let mut validation_bits = Vec::with_capacity(self.and_auth_shares.len());
@@ -77,13 +90,9 @@ impl GarblerValidator {
         );
         Ok(GarblerOutput::new())
     }
-
-    fn delta(&self) -> U8x16 {
-        self.delta.to_repr()
-    }
 }
 
-impl Fancy for GarblerValidator {
+impl<'a, C> Fancy for GarblerValidator<'a, C> {
     type Item = ValidatorWire;
 
     fn constant(&mut self, value: u16, _: u16, _: &mut Channel) -> Result<Self::Item> {
@@ -94,7 +103,7 @@ impl Fancy for GarblerValidator {
     }
 }
 
-impl FancyBinary for GarblerValidator {
+impl<'a, C> FancyBinary for GarblerValidator<'a, C> {
     fn and(&mut self, la0: &Self::Item, lb0: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
         // This is the share for wire label L_{γ,0}
         let lc_share = self.auth_shares.next();

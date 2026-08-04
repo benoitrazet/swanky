@@ -17,7 +17,9 @@ use crate::{
 /// The online phase supports encoding and receiving inputs through
 /// [`FancyEncode`] and full circuit evaluation for circuits implementing
 /// [`FancyBinary`].
-pub struct EvaluatorOnline {
+pub struct EvaluatorOnline<'a, C> {
+    // The circuit to evaluate.
+    circuit: &'a C,
     // The evaluator's Δ, used to validate the authenticated shares and AND
     // triples.
     delta: U8x16,
@@ -45,8 +47,9 @@ pub struct EvaluatorOnline {
     gate_bits: VecWrapper<F2>,
 }
 
-impl EvaluatorOnline {
+impl<'a, C> EvaluatorOnline<'a, C> {
     pub(crate) fn new(
+        circuit: &'a C,
         delta: U8x16,
         auth_shares: Vec<AuthShare<PartyEvaluator>>,
         and_auth_shares: Vec<AuthShare<PartyEvaluator>>,
@@ -58,6 +61,7 @@ impl EvaluatorOnline {
         // TODO: Make `const` once `From` is const-compatible.
         let one = WireMod2::from_repr(U8x16::from(F128b::ONE), 2);
         Self {
+            circuit,
             delta,
             one,
             and_gate_index: 0,
@@ -90,21 +94,6 @@ impl EvaluatorOnline {
         Ok(wires)
     }
 
-    /// Run the circuit on the provided inputs, returning the outputs as a flat
-    /// vector.
-    pub fn execute<
-        C: CircuitInputMapper<EvaluatorOnline> + CircuitOutputMapper<EvaluatorOnline>,
-    >(
-        mut self,
-        circuit: &C,
-        inputs: Vec<EvaluatorWire>,
-    ) -> Result<(Vec<EvaluatorWire>, Self)> {
-        let output = Channel::with(std::io::empty(), |channel| {
-            circuit.execute(&mut self, circuit.map(inputs), channel)
-        })?;
-        Ok((C::flatten(output), self))
-    }
-
     /// Finalize the online phase of the computation.
     ///
     /// This involves sending the masked values $`\hat{z}_w`$ to the garbler.
@@ -130,7 +119,22 @@ impl EvaluatorOnline {
     }
 }
 
-impl Fancy for EvaluatorOnline {
+impl<'a, C> EvaluatorOnline<'a, C>
+where
+    C: CircuitInputMapper<Self> + CircuitOutputMapper<Self>,
+{
+    /// Run the circuit on the provided inputs, returning the outputs as a flat
+    /// vector.
+    pub fn execute(mut self, inputs: Vec<EvaluatorWire>) -> Result<(Vec<EvaluatorWire>, Self)> {
+        let inputs = self.circuit.map(inputs);
+        let output = Channel::with(std::io::empty(), |channel| {
+            self.circuit.execute(&mut self, inputs, channel)
+        })?;
+        Ok((C::flatten(output), self))
+    }
+}
+
+impl<'a, C> Fancy for EvaluatorOnline<'a, C> {
     type Item = EvaluatorWire;
 
     fn constant(&mut self, x: u16, _: u16, _: &mut Channel) -> Result<Self::Item> {
@@ -147,7 +151,7 @@ impl Fancy for EvaluatorOnline {
     }
 }
 
-impl FancyBinary for EvaluatorOnline {
+impl<'a, C> FancyBinary for EvaluatorOnline<'a, C> {
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         EvaluatorWire::new(
             x.masked_value() + F2::ONE,
@@ -243,7 +247,7 @@ impl FancyBinary for EvaluatorOnline {
     }
 }
 
-impl FancyEncode for EvaluatorOnline {
+impl<'a, C> FancyEncode for EvaluatorOnline<'a, C> {
     fn encode_many(
         &mut self,
         values: &[u16],

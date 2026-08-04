@@ -29,7 +29,7 @@
 //!         // the authenticated triples for the provided circuit.
 //!         let gb = GarblerOffline::initialize(&circuit, channel, &mut rng)?;
 //!         // Evaluate the circuit locally to produce necessary offline information.
-//!         let (outputs, gb) = gb.execute(&circuit)?;
+//!         let (outputs, gb) = gb.execute()?;
 //!         // Finalize the offline phase, returning a `GarblerOnline`.
 //!         let mut gb = gb.finalize(channel)?;
 //!         // Encode inputs as needed.
@@ -40,7 +40,7 @@
 //!         //next step is to finalize the phase, returning a `GarblerValidator`.
 //!         let gb = gb.finalize(channel)?;
 //!         // Validate the computation, returning a `GarblerOutput`.
-//!         let mut gb = gb.validate(&circuit, inputs, channel)?;
+//!         let mut gb = gb.validate(inputs, channel)?;
 //!         // Retrieve outputs as needed.
 //!         let outputs = gb.outputs(&outputs, channel)?;
 //!         assert!(outputs.is_none());
@@ -59,7 +59,7 @@
 //!         let mine = ev.encode_many(&block, &vec![2; 128], channel)?;
 //!         inputs.extend(mine);
 //!         // Evaluate the circuit locally using the offline information.
-//!         let (outputs, ev) = ev.execute(&circuit, inputs)?;
+//!         let (outputs, ev) = ev.execute(inputs)?;
 //!         // Finalize the online phase, returning an `EvaluatorValidator`.
 //!         let ev = ev.finalize(channel)?;
 //!         // Validate the computation, returning an `EvaluatorOutput`.
