@@ -9,7 +9,6 @@
 use rand_core::Infallible;
 
 mod aesrng;
-
 pub use aesrng::AesRng;
 mod vectorized;
 use rand::{SeedableRng, TryCryptoRng, TryRng};
