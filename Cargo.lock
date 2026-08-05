@@ -3082,6 +3082,7 @@ dependencies = [
 name = "swanky-rng"
 version = "0.6.0"
 dependencies = [
+ "aes",
  "bytemuck",
  "criterion",
  "proptest",
