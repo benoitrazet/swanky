@@ -82,10 +82,7 @@ impl UniformIntegersUnderBound {
     // This is an implementation of "Debiased Integer Multiplication — Lemire's Method"
     // See https://www.pcg-random.org/posts/bounded-rands.html
     #[inline(always)]
-    fn lemire_body<const N: usize, const HALF_N: usize>(
-        &self,
-        rng: &mut AesRng,
-    ) -> [U32x8; HALF_N]
+    fn lemire_body<const N: usize, const HALF_N: usize>(&self, rng: &mut AesRng) -> [U32x8; HALF_N]
     where
         ArrayUnrolledOps: UnrollableArraySize<N> + UnrollableArraySize<HALF_N>,
         [U32x8; N]: ArrayAdjacentPairs<T = U32x8, AdjacentPairs = [(U32x8, U32x8); HALF_N]>,
