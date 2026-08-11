@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/usr/bin/env bash
+
+set -e
 
 # Run install_git_hooks.sh to enable this Git hook
 
