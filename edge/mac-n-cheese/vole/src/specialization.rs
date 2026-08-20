@@ -1,6 +1,5 @@
 use generic_array::GenericArray;
 use generic_array::typenum::Unsigned;
-use std::convert::TryFrom;
 use swanky_field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, SmallBinaryField};
 use swanky_rng::AesRng;
@@ -156,7 +155,7 @@ where
         // We can just xor the sender pair (or receiver voles) since that's equivalent to XORing
         // each component pairwise.
         assert_eq!(src_base_voles.len(), 1 << 16);
-        for four_uws in dst.chunks_exact_mut(4) {
+        for four_uws in dst.as_chunks_mut::<4>().0 {
             let four_uws: [&mut u64; 4] = {
                 let (a, extra) = four_uws.split_at_mut(1);
                 let (b, extra) = extra.split_at_mut(1);
@@ -205,7 +204,7 @@ where
                     },
                 );
         }
-        let remainder = dst.chunks_exact_mut(4).into_remainder();
+        let remainder = dst.as_chunks_mut::<4>().1;
         let indices = lpn_indices::matrix_entries_vectorized(lpn_rng);
         debug_assert!(remainder.len() <= indices.len());
         for (dst, indices) in remainder.iter_mut().zip(indices.iter()) {
@@ -235,11 +234,9 @@ where
     ) -> FE {
         let mut acu = U64x2::ZERO;
         // 8 was choesn since the latency of a CLMUL on Skylake is 7 cycles
-        let chunks = spsvole_result.chunks_exact(8);
-        let remainder = chunks.remainder();
+        let (chunks, remainder) = spsvole_result.as_chunks::<8>();
         let mask = U64x2::broadcast((1 << FE::NumberOfBitsInBitDecomposition::U64) - 1);
         for chunk in chunks {
-            let chunk = <&[FE; 8]>::try_from(chunk).expect("We asked for chunks of exactly 8!");
             let chunk = chunk.pair_adjacent().array_map(
                 #[inline(always)]
                 |(a, b)| U64x2::from([FE::peel(a), FE::peel(b)]),
@@ -282,13 +279,10 @@ where
         let mut x_stars = U64x2::ZERO;
         let mut acu = U64x2::ZERO;
         // 8 was choesn since the latency of a CLMUL on Skylake is 7 cycles
-        let chunks = spsvole_result.chunks_exact(8);
-        let remainder = chunks.remainder();
+        let (chunks, remainder) = spsvole_result.as_chunks::<8>();
         let mask = U64x2::broadcast((1 << FE::NumberOfBitsInBitDecomposition::U64) - 1);
         let one = U64x2::broadcast(1);
         for chunk in chunks {
-            let chunk = <&[Self::SenderPairContents; 8]>::try_from(chunk)
-                .expect("We asked for chunks of exactly 8!");
             let chunk = chunk.pair_adjacent().array_map(
                 #[inline(always)]
                 |(a, b)| U64x2::from([a, b]),
