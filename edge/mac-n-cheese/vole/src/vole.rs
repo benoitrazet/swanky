@@ -136,6 +136,9 @@ impl<T: MacTypes> VoleSender<T> {
             phantom: PhantomData,
         })
     }
+    // Can't replace chunks_exact here as the size, while constant, is
+    // behind a generic parameter.
+    #[allow(clippy::chunks_exact_to_as_chunks)]
     pub fn send(
         &self,
         arena: &KeyedArena,
