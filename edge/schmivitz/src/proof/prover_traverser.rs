@@ -12,6 +12,20 @@ use crate::commitment_polynomial::{
 use crate::proof::ChiGenerator;
 use crate::vole::RandomVoleP;
 
+/// Values produced by a completed prover circuit traversal.
+pub(crate) struct ProverTraverserParts<Vole> {
+    /// Aggregated degree-0 coefficients.
+    pub(crate) degree_0_aggregation: F128b,
+    /// Aggregated degree-1 coefficients.
+    pub(crate) degree_1_aggregation: F128b,
+    /// Aggregated assert-zero commitment.
+    pub(crate) assert_zero_commitment: F128b,
+    /// Accumulator for the higher degree constraint polynomials.
+    pub(crate) higher_degree_accumulator: BatchProverAccumulator,
+    /// Random VOLE values supplied to the traverser.
+    pub(crate) voles: Vole,
+}
+
 /// A [`ProverTraverser`] allows the prover to execute the gate-by-gate evaluation portion of the
 /// VOLE-in-the-head protocol.
 ///
@@ -52,7 +66,7 @@ pub struct ProverTraverser<Vole> {
     /// Fig. 3 in the better-conversions paper); the masking term is added by
     /// [`BatchProverAccumulator::finish`] in [`Proof::prove()`](crate::proof::Proof::prove). See
     /// [`crate::commitment_polynomial::batch_verification`] for the accumulator's arithmetic.
-    higher_degree_aggregate: BatchProverAccumulator,
+    higher_degree_accumulator: BatchProverAccumulator,
 }
 
 impl<Vole: RandomVoleP> ProverTraverser<Vole> {
@@ -88,7 +102,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
 
             aggregate_assert_zero: F128b::ZERO,
 
-            higher_degree_aggregate: BatchProverAccumulator::new(max_higher_degree),
+            higher_degree_accumulator: BatchProverAccumulator::new(max_higher_degree),
         })
     }
 
@@ -119,7 +133,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
     /// VOLEs may contain more correlations than the witness requires; the trailing ones are
     /// reserved for masking the higher degree aggregate (see
     /// [`Proof::prove()`](crate::proof::Proof::prove)).
-    pub(crate) fn into_parts(self) -> Result<(F128b, F128b, F128b, BatchProverAccumulator, Vole)> {
+    pub(crate) fn into_parts(self) -> Result<ProverTraverserParts<Vole>> {
         if self.vole_assignment_count != self.extended_witness.len() {
             bail!(
                 ErrorKind::OtherError,
@@ -128,13 +142,13 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
                 self.vole_assignment_count
             );
         }
-        Ok((
-            self.aggregate_degree_0,
-            self.aggregate_degree_1,
-            self.aggregate_assert_zero,
-            self.higher_degree_aggregate,
-            self.voles,
-        ))
+        Ok(ProverTraverserParts {
+            degree_0_aggregation: self.aggregate_degree_0,
+            degree_1_aggregation: self.aggregate_degree_1,
+            assert_zero_commitment: self.aggregate_assert_zero,
+            higher_degree_accumulator: self.higher_degree_accumulator,
+            voles: self.voles,
+        })
     }
 
     /// Get the next extended witness value.
@@ -363,7 +377,7 @@ impl<VOLE: RandomVoleP> HigherDegreeBackend<F2, F128b> for ProverTraverser<VOLE>
         // `mul` and `assert_zero` draw from, so the challenge order across all gates is fixed),
         // then fold the challenge-scaled, degree-aligned constraint into the accumulator.
         let challenge = self.chi_challenge.next();
-        self.higher_degree_aggregate
+        self.higher_degree_accumulator
             .push_constraint(&constraint, challenge);
     }
 }
@@ -416,7 +430,10 @@ mod tests {
             b.h_add(&x01, &x23).unwrap()
         });
 
-        let (_, _, _, accumulator, _) = traverser.into_parts().unwrap();
+        let ProverTraverserParts {
+            higher_degree_accumulator: accumulator,
+            ..
+        } = traverser.into_parts().unwrap();
 
         // The aggregate is aligned to the maximum constraint degree (4), and its highest-degree
         // coefficient still commits to zero.

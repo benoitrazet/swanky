@@ -5,6 +5,16 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
 
+/// Values produced by a completed prover preparation.
+pub(crate) struct ProverPreparerParts {
+    /// Extended witness values collected during traversal.
+    pub(crate) witness: Vec<F2>,
+    /// Number of Fiat-Shamir challenges required by the circuit.
+    pub(crate) challenge_count: usize,
+    /// Maximum degree among the circuit's higher degree constraints.
+    pub(crate) max_higher_degree: usize,
+}
+
 /// A [`ProverPreparer`] allows the prover to prepare for VOLE-in-the-head by evaluating the
 /// circuit in the clear and determining the full extended witness.
 ///
@@ -59,15 +69,20 @@ impl<'a> ProverPreparer<'a> {
 
     /// Get the maximum degree among the higher degree constraint polynomials seen during
     /// traversal (0 if there were none).
+    #[cfg(test)]
     pub(crate) fn max_higher_degree(&self) -> usize {
         self.max_higher_degree
     }
 
-    /// Get the witness and number of challenges required.
+    /// Decompose the preparer into the values computed during circuit traversal.
     ///
-    /// These values will be empty if the circuit has not yet been traversed.
-    pub(crate) fn into_parts(self) -> (Vec<F2>, usize) {
-        (self.witness, self.challenge_count)
+    /// The values will be null if the circuit has not been traversed.
+    pub(crate) fn into_parts(self) -> ProverPreparerParts {
+        ProverPreparerParts {
+            witness: self.witness,
+            challenge_count: self.challenge_count,
+            max_higher_degree: self.max_higher_degree,
+        }
     }
 
     /// Run `circuit` using [`ProverPreparer`].
@@ -216,11 +231,7 @@ impl<'a> HigherDegreeBackend<F2, F128b> for ProverPreparer<'a> {
         Ok(*lhs.max(rhs))
     }
 
-    fn h_addc(
-        &self,
-        lhs: &Self::HigherDegreeWire,
-        _: F2,
-    ) -> CircuitResult<Self::HigherDegreeWire> {
+    fn h_addc(&self, lhs: &Self::HigherDegreeWire, _: F2) -> CircuitResult<Self::HigherDegreeWire> {
         Ok(*lhs)
     }
 
@@ -232,11 +243,7 @@ impl<'a> HigherDegreeBackend<F2, F128b> for ProverPreparer<'a> {
         Ok(lhs + rhs)
     }
 
-    fn h_mulc(
-        &self,
-        lhs: &Self::HigherDegreeWire,
-        _: F2,
-    ) -> CircuitResult<Self::HigherDegreeWire> {
+    fn h_mulc(&self, lhs: &Self::HigherDegreeWire, _: F2) -> CircuitResult<Self::HigherDegreeWire> {
         Ok(*lhs)
     }
 
@@ -258,7 +265,10 @@ mod tests {
     use rand::thread_rng;
 
     use crate::circuit::CircuitIngestor;
-    use crate::proof::{Circuit, prover_preparer::ProverPreparer};
+    use crate::proof::{
+        Circuit,
+        prover_preparer::{ProverPreparer, ProverPreparerParts},
+    };
     use mac_n_cheese_sieve_parser::text_parser::RelationReader;
     use rand::rng;
     use std::io::Cursor;
@@ -424,9 +434,14 @@ mod tests {
         assert_eq!(preparer.max_higher_degree(), 4);
 
         // Higher degree constraints don't add witness values, but each needs a challenge.
-        let (witness, challenge_count) = preparer.into_parts();
+        let ProverPreparerParts {
+            witness,
+            challenge_count,
+            max_higher_degree,
+        } = preparer.into_parts();
         assert!(witness.is_empty());
         assert_eq!(challenge_count, 2);
+        assert_eq!(max_higher_degree, 4);
 
         Ok(())
     }

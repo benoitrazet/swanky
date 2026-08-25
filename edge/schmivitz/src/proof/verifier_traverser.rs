@@ -8,6 +8,16 @@ use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
 use crate::commitment_polynomial::batch_verification::{BatchVerifierAccumulator, power};
 use crate::proof::ChiGenerator;
 
+/// Values produced by a completed verifier circuit traversal.
+pub(crate) struct VerifierTraverserParts {
+    /// Partial construction of the verifier's aggregated commitment.
+    pub(crate) validation_aggregate: F128b,
+    /// Aggregated assert-zero value.
+    pub(crate) aggregate_assert_zero: F128b,
+    /// Accumulator for the higher degree constraint evaluations.
+    pub(crate) higher_degree_accumulator: BatchVerifierAccumulator,
+}
+
 /// A [`VerifierTraverser`] allows the verifier to execute the gate-by-gate evaluation portion of
 /// the VOLE-in-the-head verification protocol.
 ///
@@ -51,7 +61,7 @@ pub struct VerifierTraverser {
     /// [`BatchVerifierAccumulator::finish`] in [`Proof::verify()`](crate::proof::Proof::verify)
     /// once the maximum degree $`d`$ is known. See
     /// [`crate::commitment_polynomial::batch_verification`].
-    higher_degree_aggregates: BatchVerifierAccumulator,
+    higher_degree_accumulator: BatchVerifierAccumulator,
 }
 
 impl VerifierTraverser {
@@ -68,7 +78,7 @@ impl VerifierTraverser {
             assigned_witness_count: 0,
             aggregate: F128b::ZERO,
             aggregate_assert_zero: F128b::ZERO,
-            higher_degree_aggregates: BatchVerifierAccumulator::new(),
+            higher_degree_accumulator: BatchVerifierAccumulator::new(),
         })
     }
 
@@ -102,7 +112,7 @@ impl VerifierTraverser {
     /// degree aggregates) that were built during full circuit traversal.
     ///
     /// This will fail if there were unused challenges or masked witnesses.
-    pub(crate) fn into_parts(self) -> Result<(F128b, F128b, BatchVerifierAccumulator)> {
+    pub(crate) fn into_parts(self) -> Result<VerifierTraverserParts> {
         if self.assigned_witness_count != self.masked_witnesses.len() {
             bail!(
                 ErrorKind::OtherError,
@@ -111,11 +121,11 @@ impl VerifierTraverser {
                 self.assigned_witness_count
             );
         }
-        Ok((
-            self.aggregate,
-            self.aggregate_assert_zero,
-            self.higher_degree_aggregates,
-        ))
+        Ok(VerifierTraverserParts {
+            validation_aggregate: self.aggregate,
+            aggregate_assert_zero: self.aggregate_assert_zero,
+            higher_degree_accumulator: self.higher_degree_accumulator,
+        })
     }
 
     /// Run `circuit` using [`VerifierTraverser`].
@@ -322,7 +332,7 @@ impl HigherDegreeBackend<F2, F128b> for VerifierTraverser {
         // accumulator, grouped by degree; the Delta^(d - d_i) alignment is applied once the
         // maximum degree d is known, after traversal.
         let challenge = self.chi_challenge.next();
-        self.higher_degree_aggregates
+        self.higher_degree_accumulator
             .push_constraint(gamma, degree, challenge);
     }
 }

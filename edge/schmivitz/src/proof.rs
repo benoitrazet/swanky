@@ -24,13 +24,14 @@ use crate::{
     commitment_polynomial::batch_verification::{BatchProverAccumulator, BatchVerifierAccumulator},
     parameters::SECURITY_PARAM,
     proof::{
-        prover_preparer::ProverPreparer, prover_traverser::ProverTraverser,
+        prover_preparer::{ProverPreparer, ProverPreparerParts},
+        prover_traverser::{ProverTraverser, ProverTraverserParts},
         transcript::ChiGenerator,
     },
     vole::{AsSecretBytes, RandomVoleP, RandomVoleV, combine},
 };
 
-use self::verifier_traverser::VerifierTraverser;
+use self::verifier_traverser::{VerifierTraverser, VerifierTraverserParts};
 
 mod prover_preparer;
 mod prover_traverser;
@@ -146,13 +147,17 @@ where
         let mut circuit_preparer = ProverPreparer::new(private_input, witness_size)?;
         circuit_preparer.execute(circuit)?;
 
+        let ProverPreparerParts {
+            witness,
+            challenge_count: _challenge_count,
+            max_higher_degree,
+        } = circuit_preparer.into_parts();
+
         // Batching higher degree constraints requires some full-field mask VOLEs (sigma_j in
         // Fig. 3 of the better-conversions paper); the accumulator owns how many base VOLEs that
         // is. These are provisioned after the witness VOLEs.
-        let max_higher_degree = circuit_preparer.max_higher_degree();
         let mask_vole_count = BatchProverAccumulator::mask_vole_count(max_higher_degree);
 
-        let (witness, _challenge_count) = circuit_preparer.into_parts();
         log::info!("1: circuit preparer: {:?}", t.elapsed());
 
         let t = std::time::Instant::now();
@@ -195,13 +200,13 @@ where
             ProverTraverser::new(witness, chi_challenge, voles, max_higher_degree)?;
         circuit_traverser.execute(circuit)?;
 
-        let (
+        let ProverTraverserParts {
             degree_0_aggregation,
             degree_1_aggregation,
             assert_zero_commitment,
             higher_degree_accumulator,
             voles,
-        ) = circuit_traverser.into_parts()?;
+        } = circuit_traverser.into_parts()?;
 
         log::info!("4: circuit_traverser.into_parts: {:?}", t.elapsed());
 
@@ -358,8 +363,11 @@ where
         )?;
         verifier_traverser.execute(circuit)?;
 
-        let (validation_aggregate, aggregate_assert_zero, higher_degree_aggregates) =
-            verifier_traverser.into_parts()?;
+        let VerifierTraverserParts {
+            validation_aggregate,
+            aggregate_assert_zero,
+            higher_degree_accumulator,
+        } = verifier_traverser.into_parts()?;
         log::info!("5: circuit traverser {:?}", t.elapsed());
 
         let t = std::time::Instant::now();
@@ -395,7 +403,7 @@ where
 
         // Higher degree constraint check (step 8 in Fig. 3 of the better-conversions paper):
         // check that pi has degree at most d - 1 and that pi(Delta) = q. The
-        // `higher_degree_accu` holds the challenge-weighted constraint evaluations from the
+        // `higher_degree_accumulator` holds the challenge-weighted constraint evaluations from the
         // `VerifierTraverser`, grouped by degree.
         //
         // Draw the verifier's mask VOLE tags as one flat stream; the accumulator organizes them
@@ -412,7 +420,7 @@ where
             .iter()
             .map(|q| F8b::form_superfield(&(*q).into()))
             .collect();
-        higher_degree_aggregates.finish(
+        higher_degree_accumulator.finish(
             reconstructed_voles.verifier_key(),
             &mask_tags,
             &self.higher_degree_commitment,
