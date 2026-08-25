@@ -6,8 +6,9 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
 
-use crate::batch_verification::BatchProverAccumulator;
-use crate::commitment_polynomial::CommitmentPolynomial;
+use crate::commitment_polynomial::{
+    CommitmentPolynomial, batch_verification::BatchProverAccumulator,
+};
 use crate::proof::ChiGenerator;
 use crate::vole::RandomVoleP;
 
@@ -50,7 +51,7 @@ pub struct ProverTraverser<Vole> {
     /// (the left-hand term of the $`\pi(t)`$ polynomial from the batch verification protocol,
     /// Fig. 3 in the better-conversions paper); the masking term is added by
     /// [`BatchProverAccumulator::finish`] in [`Proof::prove()`](crate::proof::Proof::prove). See
-    /// [`crate::batch_verification`] for the accumulator's arithmetic.
+    /// [`crate::commitment_polynomial::batch_verification`] for the accumulator's arithmetic.
     higher_degree_aggregate: BatchProverAccumulator,
 }
 

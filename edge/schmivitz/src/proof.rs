@@ -19,8 +19,9 @@ use swanky_field_binary::{F2, F8b, F128b};
 use swanky_sieve_ir_api::HigherDegreeCircuitExecuter;
 
 use crate::vole::functionality::{VoleProver, VoleVerifier};
+use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
-    batch_verification::{BatchProverAccumulator, BatchVerifierAccumulator},
+    commitment_polynomial::batch_verification::{BatchProverAccumulator, BatchVerifierAccumulator},
     parameters::SECURITY_PARAM,
     proof::{
         prover_preparer::ProverPreparer, prover_traverser::ProverTraverser,
@@ -28,7 +29,6 @@ use crate::{
     },
     vole::{AsSecretBytes, RandomVoleP, RandomVoleV, combine},
 };
-use crate::{circuit::Circuit, vole::DecommitmentSerde};
 
 use self::verifier_traverser::VerifierTraverser;
 

@@ -5,7 +5,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
 
-use crate::batch_verification::{BatchVerifierAccumulator, power};
+use crate::commitment_polynomial::batch_verification::{BatchVerifierAccumulator, power};
 use crate::proof::ChiGenerator;
 
 /// A [`VerifierTraverser`] allows the verifier to execute the gate-by-gate evaluation portion of
@@ -49,7 +49,8 @@ pub struct VerifierTraverser {
     /// $`i`$th higher degree constraint (Fig. 3 in the better-conversions paper). The degree
     /// alignment $`\Delta^{d - d_i}`$ and the mask tags are applied by
     /// [`BatchVerifierAccumulator::finish`] in [`Proof::verify()`](crate::proof::Proof::verify)
-    /// once the maximum degree $`d`$ is known. See [`crate::batch_verification`].
+    /// once the maximum degree $`d`$ is known. See
+    /// [`crate::commitment_polynomial::batch_verification`].
     higher_degree_aggregates: BatchVerifierAccumulator,
 }
 

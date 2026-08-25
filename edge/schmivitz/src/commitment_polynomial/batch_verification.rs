@@ -10,12 +10,13 @@
 //! [`crate::proof`] and the traversers push each constraint as it is traversed and then call
 //! `finish` to form / check the masked polynomial $`\pi(t)`$.
 
-use crate::commitment_polynomial::CommitmentPolynomial;
 use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 use crate::vole::combine;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
+
+use super::CommitmentPolynomial;
 
 /// Number of base VOLE correlations that compose into one full-field mask VOLE (the block size the
 /// flat mask streams passed to the `finish` methods are chunked into).
