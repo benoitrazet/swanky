@@ -6,6 +6,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
 
+use crate::batch_verification::BatchProverAccumulator;
 use crate::commitment_polynomial::CommitmentPolynomial;
 use crate::proof::ChiGenerator;
 use crate::vole::RandomVoleP;
@@ -42,20 +43,15 @@ pub struct ProverTraverser<Vole> {
     /// TODO: Add this to the specification and reference it.
     aggregate_assert_zero: F128b,
 
-    /// Aggregation of the higher degree constraint polynomials, batched with chi challenges.
+    /// Streamed accumulator for the higher degree constraint polynomials, batched with chi
+    /// challenges.
     ///
-    /// After traversal, this holds the coefficients (in increasing degree order) of
-    /// $$`\sum_{i \in [m]} \chi_i \cdot t^{d - d_i} \cdot \rho_i(t)`$$
-    /// where $`\rho_i(t)`$ is the commitment polynomial of the $`i`$th higher degree constraint,
-    /// $`d_i`$ is its degree, and $`d`$ is the maximum degree among them, so the vector has
-    /// length $`d + 1`$ (or 0 if there are no higher degree constraints). This is the left-hand
-    /// term of the $`\pi(t)`$ polynomial from the batch verification protocol (Fig. 3 in the
-    /// better-conversions paper); the masking term is added in
-    /// [`Proof::prove()`](crate::proof::Proof::prove).
-    ///
-    /// Note that the challenge scales the whole constraint polynomial, including its committed
-    /// (highest-degree) coefficient, so the coefficients live in the extension field.
-    higher_degree_aggregate: Vec<F128b>,
+    /// After traversal, this holds $`\sum_{i \in [m]} \chi_i \cdot t^{d - d_i} \cdot \rho_i(t)`$
+    /// (the left-hand term of the $`\pi(t)`$ polynomial from the batch verification protocol,
+    /// Fig. 3 in the better-conversions paper); the masking term is added by
+    /// [`BatchProverAccumulator::finish`] in [`Proof::prove()`](crate::proof::Proof::prove). See
+    /// [`crate::batch_verification`] for the accumulator's arithmetic.
+    higher_degree_aggregate: BatchProverAccumulator,
 }
 
 impl<Vole: RandomVoleP> ProverTraverser<Vole> {
@@ -91,13 +87,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
 
             aggregate_assert_zero: F128b::ZERO,
 
-            // A degree-d polynomial has d + 1 coefficients; stay empty if the circuit has no
-            // higher degree constraints.
-            higher_degree_aggregate: if max_higher_degree == 0 {
-                Vec::new()
-            } else {
-                vec![F128b::ZERO; max_higher_degree + 1]
-            },
+            higher_degree_aggregate: BatchProverAccumulator::new(max_higher_degree),
         })
     }
 
@@ -128,7 +118,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
     /// VOLEs may contain more correlations than the witness requires; the trailing ones are
     /// reserved for masking the higher degree aggregate (see
     /// [`Proof::prove()`](crate::proof::Proof::prove)).
-    pub(crate) fn into_parts(self) -> Result<(F128b, F128b, F128b, Vec<F128b>, Vole)> {
+    pub(crate) fn into_parts(self) -> Result<(F128b, F128b, F128b, BatchProverAccumulator, Vole)> {
         if self.vole_assignment_count != self.extended_witness.len() {
             bail!(
                 ErrorKind::OtherError,
@@ -172,15 +162,6 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
             circuit.execute(self, (), channel)?;
             Ok(())
         })
-    }
-
-    /// Get the commitment polynomials collected from higher degree constraints during traversal.
-    ///
-    /// These should be batched and proven with
-    /// [`crate::polynomial_constraint::batch_prove`] after traversal.
-    #[allow(dead_code)] // TODO: Remove once higher degree constraints are wired into the proof.
-    pub(crate) fn higher_degree_constraints(&self) -> &Vec<F128b> {
-        &self.higher_degree_aggregate
     }
 }
 
@@ -370,32 +351,19 @@ impl<VOLE: RandomVoleP> HigherDegreeBackend<F2, F128b> for ProverTraverser<VOLE>
         // ρ(t) = w + x·t and evaluate the constraint over the polynomials.
         let constraint = f(
             self,
-            std::array::from_fn(|i| {
-                CommitmentPolynomial::from_base_vole(inputs[i].0, inputs[i].1)
-            }),
+            std::array::from_fn(|i| CommitmentPolynomial::from_base_vole(inputs[i].0, inputs[i].1)),
         );
 
         // The highest-degree coefficient is the constraint evaluated on the witness values, so an
         // honest prover always commits to zero here.
         debug_assert_eq!(constraint.highest_degree(), F2::ZERO);
 
-        // Sum the challenge-scaled constraint into the aggregate, aligning the highest-degree
-        // coefficients: the constraint is shifted up by a power of t, so summing constraints one
-        // at a time builds exactly sum_i chi_i * t^(d - d_i) * rho_i(t).
-        debug_assert!(
-            constraint.degree() < self.higher_degree_aggregate.len(),
-            "Internal invariant failed: higher degree constraint of degree {} exceeds the maximum degree {} computed during preparation",
-            constraint.degree(),
-            self.higher_degree_aggregate.len().saturating_sub(1),
-        );
+        // Draw this constraint's challenge from the shared Fiat-Shamir stream (the same stream
+        // `mul` and `assert_zero` draw from, so the challenge order across all gates is fixed),
+        // then fold the challenge-scaled, degree-aligned constraint into the accumulator.
         let challenge = self.chi_challenge.next();
-        let shift = self.higher_degree_aggregate.len() - (constraint.degree() + 1);
-        for (i, coefficient) in constraint.lower_coefficients().iter().enumerate() {
-            self.higher_degree_aggregate[i + shift] += challenge * *coefficient;
-        }
-        // The committed (highest-degree) coefficient is scaled by the challenge too.
-        self.higher_degree_aggregate[shift + constraint.degree()] +=
-            constraint.highest_degree() * challenge;
+        self.higher_degree_aggregate
+            .push_constraint(&constraint, challenge);
     }
 }
 
@@ -447,12 +415,12 @@ mod tests {
             b.h_add(&x01, &x23).unwrap()
         });
 
-        let (_, _, _, aggregate, _) = traverser.into_parts().unwrap();
+        let (_, _, _, accumulator, _) = traverser.into_parts().unwrap();
 
-        // The aggregate is aligned to the maximum constraint degree (4, so 5 coefficients) and
-        // its highest-degree coefficient still commits to zero.
-        assert_eq!(aggregate.len(), 5);
-        assert_eq!(*aggregate.last().unwrap(), F128b::ZERO);
+        // The aggregate is aligned to the maximum constraint degree (4), and its highest-degree
+        // coefficient still commits to zero.
+        assert_eq!(accumulator.max_degree(), 4);
+        assert_eq!(accumulator.top_coefficient(), F128b::ZERO);
 
         // Evaluate at a random Δ and compare against the verifier's computation
         // sum_i chi_i * Δ^(d - d_i) * γ_i, with γ_i derived from the tags q_i = w_i + x_i·Δ.
@@ -463,10 +431,7 @@ mod tests {
         let sum_tags = sum_wires.map(tag);
         let gamma_sum = sum_tags[0] * sum_tags[1] + sum_tags[2] * sum_tags[3];
 
-        let evaluated = aggregate
-            .iter()
-            .rev()
-            .fold(F128b::ZERO, |acc, c| acc * delta + *c);
+        let evaluated = accumulator.evaluate_at(delta);
         let expected = chi * gamma_product + chi * chi * delta * delta * gamma_sum;
         assert_eq!(evaluated, expected);
     }

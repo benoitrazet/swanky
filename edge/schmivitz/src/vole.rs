@@ -11,9 +11,28 @@ use crypto_primitives::Chall3;
 use merlin::Transcript;
 use rand::CryptoRng;
 use swanky_error::Result;
+use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::{F2, F8b, F128b};
 
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
+
+/// Combine a block of base-field VOLE values into a single full-field [`F128b`] value.
+///
+/// Specifically, computes $`\sum_{i} v_i X^i`$, where $`X`$ is [`F128b::GENERATOR`], the
+/// generator for the field. This is the composition that turns a block of $`r\tau`$
+/// ([`REPETITION_PARAM`] $`\times`$ [`VOLE_SIZE_PARAM`]) base VOLE correlations into one
+/// correlation over the extension field.
+pub(crate) fn combine(values: &[F128b]) -> F128b {
+    // Start with `X^0 = 1`
+    let mut power = F128b::ONE;
+    let mut acc = F128b::ZERO;
+
+    for vi in values {
+        acc += *vi * power;
+        power *= F128b::GENERATOR;
+    }
+    acc
+}
 
 // Exposing these modules for benchmarking at the moment.
 pub(crate) mod all_but_one_vc;

@@ -16,11 +16,11 @@
 
 #![deny(missing_docs)]
 
+pub mod batch_verification;
 pub mod circuit;
 pub mod circuit_validator;
 pub mod commitment_polynomial;
 pub mod parameters;
-pub mod polynomial_constraint;
 pub mod proof;
 pub mod vole;
 

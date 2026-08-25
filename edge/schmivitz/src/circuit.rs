@@ -22,7 +22,7 @@ use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::{F2, F128b};
-use swanky_sieve_ir_api::{CircuitExecuter, CircuitResult, FieldBackend};
+use swanky_sieve_ir_api::{CircuitExecuter, FieldBackend};
 use tempfile::tempdir;
 
 /// Gates

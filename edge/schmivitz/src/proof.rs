@@ -14,24 +14,21 @@ use rayon::iter::*;
 use std::time::Instant;
 use std::{iter::zip, marker::PhantomData};
 use swanky_error::{ErrorKind, Result, bail};
-use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
+use swanky_field::IsSubFieldOf;
 use swanky_field_binary::{F2, F8b, F128b};
 use swanky_sieve_ir_api::HigherDegreeCircuitExecuter;
 
 use crate::vole::functionality::{VoleProver, VoleVerifier};
-use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
-    parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM},
-    polynomial_constraint::power,
+    batch_verification::{BatchProverAccumulator, BatchVerifierAccumulator},
+    parameters::SECURITY_PARAM,
     proof::{
         prover_preparer::ProverPreparer, prover_traverser::ProverTraverser,
         transcript::ChiGenerator,
     },
-    vole::{AsSecretBytes, RandomVoleP, RandomVoleV},
+    vole::{AsSecretBytes, RandomVoleP, RandomVoleV, combine},
 };
-
-/// Number of base VOLE correlations composed into one full-field VOLE over [`F128b`].
-const MASK_VOLE_SIZE: usize = REPETITION_PARAM * VOLE_SIZE_PARAM;
+use crate::{circuit::Circuit, vole::DecommitmentSerde};
 
 use self::verifier_traverser::VerifierTraverser;
 
@@ -89,6 +86,23 @@ where
             + partial_decommitment_size
     }
 
+    /// The number of base VOLE correlations the proof commits to in order to encode the circuit:
+    /// one per extended-witness value (private inputs and multiplication gate outputs), plus the
+    /// higher degree mask VOLEs (see [`BatchProverAccumulator::mask_vole_count`]) for the maximum
+    /// constraint degree.
+    ///
+    /// This excludes the fixed protocol overhead (the aggregate-commitment masks and the
+    /// [`SECURITY_PARAM`] consistency VOLEs), which is identical regardless of how the circuit is
+    /// encoded, so it isolates the cost that the higher degree gate is meant to reduce.
+    ///
+    /// The higher degree commitment has one coefficient per maximum constraint degree, so its
+    /// length is the maximum degree passed to [`BatchProverAccumulator::mask_vole_count`].
+    pub fn num_voles(&self) -> usize {
+        let mask_vole_count =
+            BatchProverAccumulator::mask_vole_count(self.higher_degree_commitment.len());
+        self.witness_commitment.len() + mask_vole_count
+    }
+
     /// Create a proof of knowledge of a witness that satisfies the given circuit.
     pub fn prove_with_circuit<RNG>(
         circuit: &Circuit,
@@ -132,11 +146,11 @@ where
         let mut circuit_preparer = ProverPreparer::new(private_input, witness_size)?;
         circuit_preparer.execute(circuit)?;
 
-        // Batching higher degree constraints of maximum degree d requires d - 1 full-field mask
-        // VOLEs (sigma_j in Fig. 3 of the better-conversions paper), each composed from
-        // `MASK_VOLE_SIZE` base VOLEs. These are provisioned after the witness VOLEs.
+        // Batching higher degree constraints requires some full-field mask VOLEs (sigma_j in
+        // Fig. 3 of the better-conversions paper); the accumulator owns how many base VOLEs that
+        // is. These are provisioned after the witness VOLEs.
         let max_higher_degree = circuit_preparer.max_higher_degree();
-        let mask_vole_count = max_higher_degree.saturating_sub(1) * MASK_VOLE_SIZE;
+        let mask_vole_count = BatchProverAccumulator::mask_vole_count(max_higher_degree);
 
         let (witness, _challenge_count) = circuit_preparer.into_parts();
         log::info!("1: circuit preparer: {:?}", t.elapsed());
@@ -185,7 +199,7 @@ where
             degree_0_aggregation,
             degree_1_aggregation,
             assert_zero_commitment,
-            higher_degree_aggregate,
+            higher_degree_accumulator,
             voles,
         ) = circuit_traverser.into_parts()?;
 
@@ -193,21 +207,26 @@ where
 
         let t = std::time::Instant::now();
         // Compute masks for the aggregated coefficients (`v*`, `u*` in the paper)
-        let degree_0_mask = combine(voles.aggregate_commitment_masks());
-        let degree_1_mask = combine(voles.aggregate_commitment_values());
+        let degree_0_mask = combine(&voles.aggregate_commitment_masks());
+        let degree_1_mask = combine(&voles.aggregate_commitment_values());
 
         // Finish computing aggregated responses (`a~`, `b~` in the paper)
         let degree_0_commitment = degree_0_aggregation + degree_0_mask;
         let degree_1_commitment = degree_1_aggregation + degree_1_mask;
 
-        // Mask the higher degree aggregate with the reserved mask VOLEs to form pi(t). The mask
-        // VOLEs start right after the witness VOLEs (there is one witness commitment per witness
-        // VOLE).
-        let higher_degree_commitment = mask_higher_degree_aggregate(
-            &higher_degree_aggregate,
-            &voles,
-            witness_commitment.len(),
-        )?;
+        // Draw the higher degree mask VOLEs as two flat streams (the VOLE values `u` and VOLE
+        // masks `v`) and let the accumulator organize, compose, and add them to form pi(t). The
+        // mask VOLEs are the contiguous block of base VOLEs right after the witness VOLEs.
+        let witness_len = witness_commitment.len();
+        let mask_values: Vec<F128b> = voles.witness_mask()
+            [witness_len..witness_len + mask_vole_count]
+            .iter()
+            .map(|u| (*u).into())
+            .collect();
+        let mask_masks: Vec<F128b> = (witness_len..witness_len + mask_vole_count)
+            .map(|i| voles.vole_mask(i))
+            .collect::<Result<Vec<_>>>()?;
+        let higher_degree_commitment = higher_degree_accumulator.finish(&mask_values, &mask_masks);
 
         // Add aggregated responses to transcript
         transcript.append_polynomial_commitments(
@@ -237,11 +256,11 @@ where
     /// This makes sure the proof is correctly formed e.g. everything is the right length.
     fn validate_proof(&self, voles: &VoleV) -> Result<()> {
         // There should be one witness commitment for every element in the extended witness, plus
-        // `MASK_VOLE_SIZE` VOLEs for each higher degree mask polynomial (the higher degree
-        // commitment has max-degree-many coefficients, which require one fewer masks).
-        // The proof and the decommitted VOLEs should agree on what this size is.
+        // the higher degree mask VOLEs (the higher degree commitment has max-degree-many
+        // coefficients; see `mask_vole_count`). The proof and the decommitted VOLEs should agree
+        // on what this size is.
         let mask_vole_count =
-            self.higher_degree_commitment.len().saturating_sub(1) * MASK_VOLE_SIZE;
+            BatchProverAccumulator::mask_vole_count(self.higher_degree_commitment.len());
         if self.witness_commitment.len() + mask_vole_count != voles.extended_witness_length() {
             bail!(
                 ErrorKind::OtherError,
@@ -329,7 +348,7 @@ where
 
         let t = std::time::Instant::now();
         // Combine mask VOLEs to get q*
-        let validation_mask = combine(reconstructed_voles.mask_voles());
+        let validation_mask = combine(&reconstructed_voles.mask_voles());
 
         // Run circuit traversal and get the aggregate value (part of c~)
         let mut verifier_traverser = VerifierTraverser::new(
@@ -375,145 +394,34 @@ where
         }
 
         // Higher degree constraint check (step 8 in Fig. 3 of the better-conversions paper):
-        // check that pi has degree at most d - 1 and that pi(Delta) = q.
-        self.verify_higher_degree_constraints(&reconstructed_voles, &higher_degree_aggregates)?;
+        // check that pi has degree at most d - 1 and that pi(Delta) = q. The
+        // `higher_degree_accu` holds the challenge-weighted constraint evaluations from the
+        // `VerifierTraverser`, grouped by degree.
+        //
+        // Draw the verifier's mask VOLE tags as one flat stream; the accumulator organizes them
+        // into per-mask blocks, composes each into nu_j = sigma_j(Delta), folds them in, enforces
+        // the degree bound on pi, and checks pi(Delta) against the expected value. The mask VOLEs
+        // are the contiguous block of tags right after the witness VOLEs; their count is fixed by
+        // the proof's committed coefficients, whose length `validate_proof` already tied to the
+        // VOLE length (so this slice is in bounds).
+        let witness_voles = reconstructed_voles.witness_voles();
+        let witness_len = self.witness_commitment.len();
+        let mask_vole_len =
+            BatchVerifierAccumulator::mask_vole_count(self.higher_degree_commitment.len());
+        let mask_tags: Vec<F128b> = witness_voles[witness_len..witness_len + mask_vole_len]
+            .iter()
+            .map(|q| F8b::form_superfield(&(*q).into()))
+            .collect();
+        higher_degree_aggregates.finish(
+            reconstructed_voles.verifier_key(),
+            &mask_tags,
+            &self.higher_degree_commitment,
+        )?;
 
         log::info!("6: last check {:?}", t.elapsed());
 
         Ok(())
     }
-
-    /// Check the batched higher degree constraints (step 8 in Fig. 3 of the better-conversions
-    /// paper).
-    ///
-    /// The `higher_degree_aggregates` are the challenge-weighted constraint evaluations from the
-    /// [`VerifierTraverser`], grouped by constraint degree. With $`d`$ the maximum constraint
-    /// degree, this computes
-    /// $$`q = \sum_{i \in [m]} \chi_i \Delta^{d - d_i} \gamma_i + \sum_{j=1}^{d-1} \Delta^{j-1} \nu_j`$$
-    /// and checks that the prover's $`\pi(t)`$ has degree at most $`d - 1`$ and that
-    /// $`\pi(\Delta) = q`$.
-    fn verify_higher_degree_constraints(
-        &self,
-        voles: &VoleV,
-        higher_degree_aggregates: &[F128b],
-    ) -> Result<()> {
-        // The degree-d coefficient of pi(t) is zero and omitted, so the prover sends exactly d
-        // coefficients. This also enforces the degree bound on pi.
-        let max_higher_degree = higher_degree_aggregates.len().saturating_sub(1);
-        if self.higher_degree_commitment.len() != max_higher_degree {
-            bail!(
-                ErrorKind::OtherError,
-                "Verification failed: expected {} higher degree commitment coefficients, got {}",
-                max_higher_degree,
-                self.higher_degree_commitment.len()
-            );
-        }
-        if max_higher_degree == 0 {
-            return Ok(());
-        }
-
-        let delta = voles.verifier_key();
-
-        // Constraint contributions: sum_i chi_i * Delta^(d - d_i) * gamma_i.
-        let mut expected = F128b::ZERO;
-        for (degree, aggregate) in higher_degree_aggregates.iter().enumerate() {
-            expected += power(delta, max_higher_degree - degree) * *aggregate;
-        }
-
-        // Mask contributions: sum_j Delta^(j-1) * nu_j, where nu_j = sigma_j(Delta) is composed
-        // from the verifier's tags for the mask VOLEs, which sit right after the witness VOLEs.
-        let witness_voles = voles.witness_voles();
-        let mut delta_power = F128b::ONE;
-        for j in 0..max_higher_degree - 1 {
-            let base = self.witness_commitment.len() + j * MASK_VOLE_SIZE;
-            let mut tags = [F128b::ZERO; MASK_VOLE_SIZE];
-            for (k, tag) in tags.iter_mut().enumerate() {
-                *tag = F8b::form_superfield(&witness_voles[base + k].into());
-            }
-            expected += delta_power * combine(tags);
-            delta_power *= delta;
-        }
-
-        // Evaluate the prover's pi(Delta) and compare.
-        let mut pi_at_delta = F128b::ZERO;
-        let mut delta_power = F128b::ONE;
-        for coefficient in &self.higher_degree_commitment {
-            pi_at_delta += *coefficient * delta_power;
-            delta_power *= delta;
-        }
-
-        if pi_at_delta != expected {
-            bail!(
-                ErrorKind::OtherError,
-                "Verification failed: Higher degree constraint check failed"
-            );
-        }
-
-        Ok(())
-    }
-}
-
-/// Mask the higher degree aggregate to form the coefficients of $`\pi(t)`$ (Fig. 3 in the
-/// better-conversions paper).
-///
-/// Computes $$`\pi(t) = \text{aggregate}(t) + \sum_{j=1}^{d-1} t^{j-1} \cdot \sigma_j(t)`$$,
-/// where each mask $`\sigma_j(t) = w_j + s_j \cdot t`$ is a full-field VOLE composed from the
-/// `MASK_VOLE_SIZE` base VOLE correlations starting at index `witness_len + (j - 1) *
-/// MASK_VOLE_SIZE`.
-///
-/// The `aggregate` contains the $`d + 1`$ coefficients of the degree-$`d`$ aggregated constraint
-/// polynomial in increasing degree order. Its degree-$`d`$ coefficient is the challenge-weighted
-/// sum of the committed constraint values, which is zero for an honest prover and omitted, so
-/// $`\pi(t)`$ has degree at most $`d - 1`$ and is returned as the $`d`$ coefficients
-/// $`[\pi_0, ..., \pi_{d-1}]`$. The result is empty if there were no higher degree constraints.
-fn mask_higher_degree_aggregate<VoleP: RandomVoleP>(
-    aggregate: &[F128b],
-    voles: &VoleP,
-    witness_len: usize,
-) -> Result<Vec<F128b>> {
-    debug_assert_eq!(
-        aggregate.last().copied().unwrap_or(F128b::ZERO),
-        F128b::ZERO
-    );
-    let degree = aggregate.len().saturating_sub(1);
-    let mut pi = aggregate[..degree].to_vec();
-
-    for j in 0..degree.saturating_sub(1) {
-        // Compose the mask sigma_j(t) = w_j + s_j * t from base VOLE correlations, the same way
-        // the degree 0 and 1 commitment masks are composed in `prove()`.
-        let base = witness_len + j * MASK_VOLE_SIZE;
-        let mut values = [F128b::ZERO; MASK_VOLE_SIZE];
-        let mut masks = [F128b::ZERO; MASK_VOLE_SIZE];
-        for k in 0..MASK_VOLE_SIZE {
-            values[k] = voles.witness_mask()[base + k].into();
-            masks[k] = voles.vole_mask(base + k)?;
-        }
-        let s_j = combine(values);
-        let w_j = combine(masks);
-
-        // Add t^(j-1) * sigma_j(t); `j` here is 0-based while the paper's is 1-based.
-        pi[j] += w_j;
-        pi[j + 1] += s_j;
-    }
-
-    Ok(pi)
-}
-
-/// Convert a list of field elements into a single 128-bit value.
-///
-/// Specifically, we compute
-/// $` \sum_{i = 0}^{128} v_i X^i`$,
-/// where $`X`$ is [`F128b::GENERATOR`], the generator for the field.
-fn combine(values: [F128b; 128]) -> F128b {
-    // Start with `X^0 = 1`
-    let mut power = F128b::ONE;
-    let mut acc = F128b::ZERO;
-
-    for vi in values {
-        acc += vi * power;
-        power *= F128b::GENERATOR;
-    }
-    acc
 }
 
 /// The secret material for the prover is the extended witness.
