@@ -48,13 +48,7 @@ pub struct Proof<Vole: RandomVoleP, VoleV: RandomVoleV> {
     degree_1_commitment: F128b,
     /// Aggregated commitment to the assert_zero gates.
     assert_zero_commitment: F128b,
-    /// Coefficients of the masked higher degree constraint polynomial ($`\pi(t)`$ in Fig. 3 of
-    /// the better-conversions paper).
-    ///
-    /// If the circuit has higher degree constraints whose maximum degree is $`d`$, this contains
-    /// the $`d`$ coefficients $`[\pi_0, ..., \pi_{d-1}]`$ (the degree-$`d`$ coefficient is zero
-    /// for an honest prover and omitted). It is empty if the circuit has no higher degree
-    /// constraints.
+    /// Coefficients of the masked higher degree constraint polynomial $`\pi(t)`$.
     higher_degree_commitment: Vec<F128b>,
     /// Challenge generated to decommit to the VOLEs after committing to the degree coefficients.
     decommitment_challenge: [u8; SECURITY_PARAM / 8],
