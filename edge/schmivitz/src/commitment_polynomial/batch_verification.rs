@@ -325,7 +325,7 @@ impl Default for BatchVerifierAccumulator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::{Rng, thread_rng};
+    use rand::{Rng, rng};
     use swanky_field::FiniteRing;
 
     fn random_f128b(rng: &mut impl Rng) -> F128b {
@@ -400,7 +400,7 @@ mod tests {
 
     #[test]
     fn test_commitment_polynomial_basic() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let delta = random_f128b(rng);
         let x = random_f128b(rng);
         let w = random_f128b(rng);
@@ -414,7 +414,7 @@ mod tests {
 
     #[test]
     fn test_addc() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let delta = random_f128b(rng);
         let x = random_f128b(rng);
         let c = random_f128b(rng);
@@ -434,7 +434,7 @@ mod tests {
 
     #[test]
     fn test_add_same_degree() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let delta = random_f128b(rng);
 
         let val_x = random_f128b(rng);
@@ -451,7 +451,7 @@ mod tests {
 
     #[test]
     fn test_add_different_degree() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let delta = random_f128b(rng);
 
         // Create a degree-1 polynomial
@@ -479,7 +479,7 @@ mod tests {
 
     #[test]
     fn test_mulc() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let delta = random_f128b(rng);
         let c = random_f128b(rng);
 
@@ -495,7 +495,7 @@ mod tests {
 
     #[test]
     fn test_mul() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let delta = random_f128b(rng);
 
         let val_x = random_f128b(rng);
@@ -513,7 +513,7 @@ mod tests {
 
     #[test]
     fn test_batch_verification_single_degree1() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let delta = random_f128b(rng);
         let xi = random_f128b(rng);
 
@@ -538,7 +538,7 @@ mod tests {
 
     #[test]
     fn test_batch_verification_degree2() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let delta = random_f128b(rng);
         let xi = random_f128b(rng);
 
@@ -567,7 +567,7 @@ mod tests {
 
     #[test]
     fn test_batch_verification_mixed_degrees() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let delta = random_f128b(rng);
         let xi = random_f128b(rng);
 
@@ -601,7 +601,7 @@ mod tests {
 
     #[test]
     fn test_batch_verification_fails_with_wrong_coefficients() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let delta = random_f128b(rng);
         let xi = random_f128b(rng);
 
@@ -630,7 +630,7 @@ mod tests {
 
     #[test]
     fn test_batch_verification_fails_with_wrong_gamma() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let delta = random_f128b(rng);
         let xi = random_f128b(rng);
 
@@ -657,7 +657,7 @@ mod tests {
     #[test]
     fn test_circuit_like_polynomial_tracking() {
         // Simulate a simple circuit: x0, x1 private inputs, x2 = x0 * x1, x3 = x2 + x0
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let delta = random_f128b(rng);
 
         let x0 = random_f128b(rng);

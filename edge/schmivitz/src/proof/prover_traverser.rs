@@ -386,14 +386,14 @@ impl<VOLE: RandomVoleP> HigherDegreeBackend<F2, F128b> for ProverTraverser<VOLE>
 mod tests {
     use super::*;
     use merlin::Transcript;
-    use rand::thread_rng;
+    use rand::rng;
 
     use crate::vole::insecure::InsecureVole;
 
     type Traverser = ProverTraverser<InsecureVole>;
 
     fn test_traverser(chi: F128b, max_higher_degree: usize) -> Traverser {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let transcript = &mut Transcript::new(b"higher degree tests");
         let secret: Vec<F2> = Vec::new();
         let (voles, _challenge) = InsecureVole::create(0, transcript, &secret, rng);
@@ -406,7 +406,7 @@ mod tests {
     /// computed homomorphically over the wire tags q_i = w_i + x_i·Δ.
     #[test]
     fn higher_degree_aggregate_matches_homomorphic_evaluation() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let chi = F128b::random(rng);
         let mut traverser = test_traverser(chi, 4);
 
@@ -457,7 +457,7 @@ mod tests {
     /// Constant operations apply the constant to the committed value.
     #[test]
     fn constant_operations_apply_to_the_committed_value() {
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
         let traverser = test_traverser(F128b::random(rng), 0);
         let poly = CommitmentPolynomial::from_base_vole(F2::ONE, F128b::random(rng));
 

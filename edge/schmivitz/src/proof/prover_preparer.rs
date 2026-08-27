@@ -262,8 +262,6 @@ impl<'a> HigherDegreeBackend<F2, F128b> for ProverPreparer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rand::thread_rng;
-
     use crate::circuit::CircuitIngestor;
     use crate::proof::{
         Circuit,
@@ -274,7 +272,7 @@ mod tests {
     use std::io::Cursor;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
-    use swanky_sieve_ir_api::{CircuitExecuter, HigherDegreeBackend};
+    use swanky_sieve_ir_api::HigherDegreeBackend;
 
     /// Take a string description of a circuit and parse it.
     fn load_circuit(circuit: &str) -> swanky_error::Result<Circuit> {
@@ -397,7 +395,7 @@ mod tests {
     #[test]
     fn higher_degree_operations_compute_correct_degrees() {
         let private_input: Vec<F2> = Vec::new();
-        let preparer = ProverPreparer::new(&private_input, 0).unwrap();
+        let preparer = ProverPreparer::new(&private_input, None).unwrap();
         let x = 3;
         let y = 2;
 
@@ -412,7 +410,7 @@ mod tests {
     #[test]
     fn higher_degree_constraints_track_max_degree() -> swanky_error::Result<()> {
         let private_input: Vec<F2> = Vec::new();
-        let mut preparer = ProverPreparer::new(&private_input, 0)?;
+        let mut preparer = ProverPreparer::new(&private_input, None)?;
         assert_eq!(preparer.max_higher_degree(), 0);
 
         // x0 * x1 * x2 * x3, a degree-4 constraint.

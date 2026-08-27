@@ -169,7 +169,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::thread_rng;
+    use rand::rng;
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F2, F8b, F128b};
 
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     fn from_base_vole_creates_degree_one() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let value = F2::random(&mut rng);
         let mask = F128b::random(&mut rng);
         let poly = CommitmentPolynomial::<F2, F128b>::from_base_vole(value, mask);
@@ -212,7 +212,7 @@ mod tests {
 
     #[test]
     fn from_parts_round_trip() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let lower = vec![F128b::random(&mut rng), F128b::random(&mut rng)];
         let highest = F2::random(&mut rng);
         let poly = CommitmentPolynomial::<F2, F128b>::from_parts(lower.clone(), highest);
@@ -223,7 +223,7 @@ mod tests {
 
     #[test]
     fn evaluate_at_point_horner() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let value = F128b::random(&mut rng);
         let mask = F128b::random(&mut rng);
         let point = F128b::random(&mut rng);
@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn evaluate_at_point_subfield() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let value = F2::random(&mut rng);
         let mask = F128b::random(&mut rng);
         let point = F128b::random(&mut rng);
@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn addc_increments_highest_degree() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let value = F128b::random(&mut rng);
         let mask = F128b::random(&mut rng);
         let c = F128b::random(&mut rng);
@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn addc_evaluation_consistency() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let value = F128b::random(&mut rng);
         let mask = F128b::random(&mut rng);
         let c = F128b::random(&mut rng);
@@ -274,7 +274,7 @@ mod tests {
 
     #[test]
     fn add_same_degree() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let val_x = F128b::random(&mut rng);
         let val_y = F128b::random(&mut rng);
         let w_x = F128b::random(&mut rng);
@@ -295,7 +295,7 @@ mod tests {
 
     #[test]
     fn add_different_degrees() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let point = F128b::random(&mut rng);
 
         let val_a = F128b::random(&mut rng);
@@ -329,7 +329,7 @@ mod tests {
 
     #[test]
     fn mulc_scales_correctly() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let val = F128b::random(&mut rng);
         let mask = F128b::random(&mut rng);
         let c = F128b::random(&mut rng);
@@ -345,7 +345,7 @@ mod tests {
 
     #[test]
     fn mul_polynomials() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let val_x = F128b::random(&mut rng);
         let val_y = F128b::random(&mut rng);
         let w_x = F128b::random(&mut rng);
@@ -364,7 +364,7 @@ mod tests {
 
     #[test]
     fn mul_subfield_polynomials() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let val_x = F2::random(&mut rng);
         let val_y = F2::random(&mut rng);
         let w_x = F128b::random(&mut rng);
@@ -383,7 +383,7 @@ mod tests {
 
     #[test]
     fn shift_increases_degree() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let val = F128b::random(&mut rng);
         let mask = F128b::random(&mut rng);
         let point = F128b::random(&mut rng);
@@ -399,7 +399,7 @@ mod tests {
 
     #[test]
     fn shift_zero_is_identity() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let val = F128b::random(&mut rng);
         let mask = F128b::random(&mut rng);
         let poly = CommitmentPolynomial::<F128b, F128b>::from_base_vole(val, mask);
@@ -411,7 +411,7 @@ mod tests {
 
     #[test]
     fn from_parts_degree_zero() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let x = F128b::random(&mut rng);
         let point = F128b::random(&mut rng);
         let poly: CommitmentPolynomial<F128b, F128b> =
@@ -424,7 +424,7 @@ mod tests {
 
     #[test]
     fn evaluate_matches_reference() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let point = F128b::random(&mut rng);
         let poly = CommitmentPolynomial::<F128b, F128b>::from_parts(
             vec![
@@ -439,7 +439,7 @@ mod tests {
 
     #[test]
     fn mul_with_constant_polynomial() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let point = F128b::random(&mut rng);
         let p = CommitmentPolynomial::<F128b, F128b>::from_base_vole(
             F128b::random(&mut rng),
@@ -459,7 +459,7 @@ mod tests {
     #[test]
     fn mul_f8b_in_f128b_subfield() {
         // Exercise a non-trivial, non-prime subfield: F8b ⊂ F128b.
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let point = F128b::random(&mut rng);
 
         let x = F8b::random(&mut rng);
