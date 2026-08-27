@@ -16,7 +16,7 @@ use std::{iter::zip, marker::PhantomData};
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::IsSubFieldOf;
 use swanky_field_binary::{F2, F8b, F128b};
-use swanky_sieve_ir_api::HigherDegreeCircuitExecuter;
+use swanky_sieve_ir_api::{HigherDegreeBackend, HigherDegreeCircuitExecuter};
 
 use crate::vole::functionality::{VoleProver, VoleVerifier};
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
@@ -37,6 +37,33 @@ mod prover_preparer;
 mod prover_traverser;
 mod transcript;
 mod verifier_traverser;
+
+/// Adapts `HigherDegreeCircuitExecuter` to the `FancyCircuit` interface used by Schmivitz's
+/// prover and verifier traversers. This lets higher-degree circuits reuse the existing proof
+/// pipeline without requiring them to implement `FancyCircuit` directly, while keeping the
+/// higher-degree entry points explicit. In the future, we should reconsider whether `Fancy`
+/// should expose higher-degree constraints itself, or whether both circuit APIs should converge
+/// on a shared execution trait that removes the need for this adapter.
+struct HigherDegreeCircuitAdapter<'a, C>(&'a C);
+
+impl<B, C> FancyCircuit<B> for HigherDegreeCircuitAdapter<'_, C>
+where
+    B: Fancy + HigherDegreeBackend<F2, F128b>,
+    C: HigherDegreeCircuitExecuter<F2, F128b>,
+{
+    type Input = ();
+    type Output = Vec<B::Item>;
+
+    fn execute(
+        &self,
+        backend: &mut B,
+        _: Self::Input,
+        _: &mut swanky_channel::Channel,
+    ) -> Result<Self::Output> {
+        <C as HigherDegreeCircuitExecuter<F2, F128b>>::execute(self.0, backend)?;
+        Ok(vec![])
+    }
+}
 
 /// Zero-knowledge proof of knowledge of a circuit.
 #[derive(Debug, Clone)]
@@ -128,8 +155,7 @@ where
     // TODO: Get rid of max_wire_id
     where
         C: FancyCircuit<ProverPreparer<'a>, Input = ()>
-            + FancyCircuit<ProverTraverser<VoleP>, Input = ()>
-            + HigherDegreeCircuitExecuter<F2, F128b>, // Can't do higher order trait bounds... See https://github.com/rust-lang/rust/issues/108185#issuecomment-2819123578
+            + FancyCircuit<ProverTraverser<VoleP>, Input = ()>,
         RNG: CryptoRng + Rng,
     {
         let t = std::time::Instant::now();
@@ -252,6 +278,27 @@ where
         })
     }
 
+    /// Create a proof for a circuit using the higher degree circuit API.
+    pub fn prove_higher_degree<'a, C, RNG>(
+        circuit: &C,
+        private_input: &'a [F2],
+        witness_size: Option<usize>,
+        transcript: &mut Transcript,
+        rng: &mut RNG,
+    ) -> Result<Self>
+    where
+        C: HigherDegreeCircuitExecuter<F2, F128b>,
+        RNG: CryptoRng + Rng,
+    {
+        Self::prove(
+            &HigherDegreeCircuitAdapter(circuit),
+            private_input,
+            witness_size,
+            transcript,
+            rng,
+        )
+    }
+
     /// This makes sure the proof is correctly formed e.g. everything is the right length.
     fn validate_proof(&self, voles: &VoleV) -> Result<()> {
         // There should be one witness commitment for every element in the extended witness, plus
@@ -288,7 +335,7 @@ where
     ///
     pub fn verify<C>(&self, circuit: &C, transcript: &mut Transcript) -> Result<()>
     where
-        C: FancyCircuit<VerifierTraverser, Input = ()> + HigherDegreeCircuitExecuter<F2, F128b>, // Can't do higher order trait bounds... See https://github.com/rust-lang/rust/issues/108185#issuecomment-2819123578
+        C: FancyCircuit<VerifierTraverser, Input = ()>,
     {
         let mut transcript = transcript::Transcript::from(transcript);
         transcript.append_public_values();
@@ -424,6 +471,14 @@ where
 
         Ok(())
     }
+
+    /// Verify a proof for a circuit using the higher degree circuit API.
+    pub fn verify_higher_degree<C>(&self, circuit: &C, transcript: &mut Transcript) -> Result<()>
+    where
+        C: HigherDegreeCircuitExecuter<F2, F128b>,
+    {
+        self.verify(&HigherDegreeCircuitAdapter(circuit), transcript)
+    }
 }
 
 /// The secret material for the prover is the extended witness.
@@ -463,8 +518,7 @@ pub fn test_circuit<'a, C>(circuit: &C, private_input: &'a [F2]) -> Result<()>
 where
     C: FancyCircuit<ProverPreparer<'a>, Input = ()>
         + FancyCircuit<ProverTraverser<VoleProver>, Input = ()>
-        + FancyCircuit<VerifierTraverser, Input = ()>
-        + HigherDegreeCircuitExecuter<F2, F128b>,
+        + FancyCircuit<VerifierTraverser, Input = ()>,
 {
     let rng = &mut rng();
     let t = Instant::now();
@@ -646,12 +700,12 @@ mod tests {
     fn higher_degree_proof_round_trips() -> Result<()> {
         // Witness satisfying x0 * x1 * x2 * x3 == 0.
         let private_input = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE];
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
 
-        let proof = Proof::<InsecureVole, InsecureCommitments>::prove(
-            HigherDegreeCircuit,
+        let proof = Proof::<InsecureVole, InsecureCommitments>::prove_higher_degree(
+            &HigherDegreeCircuit,
             &private_input,
-            4,
+            Some(4),
             &mut transcript(),
             rng,
         )?;
@@ -660,7 +714,7 @@ mod tests {
         // coefficients.
         assert_eq!(proof.higher_degree_commitment.len(), 4);
 
-        proof.verify(HigherDegreeCircuit, &mut transcript())
+        proof.verify_higher_degree(&HigherDegreeCircuit, &mut transcript())
     }
 
     /// The same shape as [`HigherDegreeCircuit`] (same witness count and constraint degree), but
@@ -682,12 +736,12 @@ mod tests {
     #[test]
     fn higher_degree_proof_fails_against_a_different_constraint() -> Result<()> {
         let private_input = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE];
-        let rng = &mut thread_rng();
+        let rng = &mut rng();
 
-        let proof = Proof::<InsecureVole, InsecureCommitments>::prove(
-            HigherDegreeCircuit,
+        let proof = Proof::<InsecureVole, InsecureCommitments>::prove_higher_degree(
+            &HigherDegreeCircuit,
             &private_input,
-            4,
+            Some(4),
             &mut transcript(),
             rng,
         )?;
@@ -696,7 +750,7 @@ mod tests {
         // constraint check (pi(Delta) = q) catches the mismatch.
         assert!(
             proof
-                .verify(WrongHigherDegreeCircuit, &mut transcript())
+                .verify_higher_degree(&WrongHigherDegreeCircuit, &mut transcript())
                 .is_err()
         );
 
