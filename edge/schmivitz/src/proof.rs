@@ -150,7 +150,7 @@ where
         private_input: &'a [F2],
         witness_size: Option<usize>,
         transcript: &mut Transcript,
-        rng: &mut RNG,
+        rng: &mut RNG, // TODO: this `rng` parameter is not used
     ) -> Result<Self>
     // TODO: Get rid of max_wire_id
     where
