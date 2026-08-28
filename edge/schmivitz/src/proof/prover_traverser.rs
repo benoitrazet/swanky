@@ -20,7 +20,7 @@ pub(crate) struct ProverTraverserParts<Vole> {
     pub(crate) degree_1_aggregation: F128b,
     /// Aggregated assert-zero commitment.
     pub(crate) assert_zero_commitment: F128b,
-    /// Accumulator for the higher degree constraint polynomials.
+    /// Accumulator for the higher-degree constraint polynomials.
     pub(crate) higher_degree_accumulator: BatchProverAccumulator,
     /// Random VOLE values supplied to the traverser.
     pub(crate) voles: Vole,
@@ -37,7 +37,7 @@ pub struct ProverTraverser<Vole> {
 
     /// Map containing the wire values for the extended witness (private inputs and multiplication gates in the circuit).
     extended_witness: Vec<F2>,
-    /// Fiat-Shamir challenges as powers of chi. There should be one for each polynomial (e.g. non-linear gate) and assert zero.
+    /// Fiat–Shamir weights drawn from the shared power stream.
     chi_challenge: ChiGenerator,
 
     /// Random VOLE values. There should be one for each extended witness value.
@@ -58,14 +58,10 @@ pub struct ProverTraverser<Vole> {
     /// TODO: Add this to the specification and reference it.
     aggregate_assert_zero: F128b,
 
-    /// Streamed accumulator for the higher degree constraint polynomials, batched with chi
-    /// challenges.
+    /// Streamed accumulator for the higher-degree constraint batch.
     ///
-    /// After traversal, this holds $`\sum_{i \in [m]} \chi_i \cdot t^{d - d_i} \cdot \rho_i(t)`$
-    /// (the left-hand term of the $`\pi(t)`$ polynomial from the batch verification protocol,
-    /// Fig. 3 in the better-conversions paper); the masking term is added by
-    /// [`BatchProverAccumulator::finish`] in [`Proof::prove()`](crate::proof::Proof::prove). See
-    /// [`crate::commitment_polynomial::batch_verification`] for the accumulator's arithmetic.
+    /// Final masking is delegated to [`BatchProverAccumulator::finish`] in
+    /// [`Proof::prove()`](crate::proof::Proof::prove).
     higher_degree_accumulator: BatchProverAccumulator,
 }
 
@@ -362,20 +358,16 @@ impl<VOLE: RandomVoleP> HigherDegreeBackend<F2, F128b> for ProverTraverser<VOLE>
         inputs: &[Self::Wire; INPUT_LEN],
         f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
     ) {
-        // Lift each input wire (value, VOLE mask) into its degree-1 commitment polynomial
-        // ρ(t) = w + x·t and evaluate the constraint over the polynomials.
+        // Build the input commitments and evaluate the constraint over them.
         let constraint = f(
             self,
             std::array::from_fn(|i| CommitmentPolynomial::from_base_vole(inputs[i].0, inputs[i].1)),
         );
 
-        // The highest-degree coefficient is the constraint evaluated on the witness values, so an
-        // honest prover always commits to zero here.
+        // A satisfied higher-degree constraint has a zero leading coefficient.
         debug_assert_eq!(constraint.highest_degree(), F2::ZERO);
 
-        // Draw this constraint's challenge from the shared Fiat-Shamir stream (the same stream
-        // `mul` and `assert_zero` draw from, so the challenge order across all gates is fixed),
-        // then fold the challenge-scaled, degree-aligned constraint into the accumulator.
+        // Consume the next shared Fiat–Shamir weight and add this constraint to the batch.
         let challenge = self.chi_challenge.next();
         self.higher_degree_accumulator
             .push_constraint(&constraint, challenge);

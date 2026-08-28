@@ -75,7 +75,7 @@ pub struct Proof<Vole: RandomVoleP, VoleV: RandomVoleV> {
     degree_1_commitment: F128b,
     /// Aggregated commitment to the assert_zero gates.
     assert_zero_commitment: F128b,
-    /// Coefficients of the masked higher degree constraint polynomial $`\pi(t)`$.
+    /// Coefficients of the masked higher-degree batch commitment.
     higher_degree_commitment: Vec<F128b>,
     /// Challenge generated to decommit to the VOLEs after committing to the degree coefficients.
     decommitment_challenge: [u8; SECURITY_PARAM / 8],
@@ -173,9 +173,7 @@ where
             max_higher_degree,
         } = circuit_preparer.into_parts();
 
-        // Batching higher degree constraints requires some full-field mask VOLEs (sigma_j in
-        // Fig. 3 of the better-conversions paper); the accumulator owns how many base VOLEs that
-        // is. These are provisioned after the witness VOLEs.
+        // Reserve the VOLEs needed to mask the higher-degree batch after the witness VOLEs.
         let mask_vole_count = BatchProverAccumulator::mask_vole_count(max_higher_degree);
 
         log::info!("1: circuit preparer: {:?}", t.elapsed());
@@ -239,9 +237,8 @@ where
         let degree_0_commitment = degree_0_aggregation + degree_0_mask;
         let degree_1_commitment = degree_1_aggregation + degree_1_mask;
 
-        // Draw the higher degree mask VOLEs as two flat streams (the VOLE values `u` and VOLE
-        // masks `v`) and let the accumulator organize, compose, and add them to form pi(t). The
-        // mask VOLEs are the contiguous block of base VOLEs right after the witness VOLEs.
+        // Finalize the higher-degree batch with the mask VOLEs that follow the witness VOLEs.
+        // The accumulator owns their organization and composition.
         let witness_len = witness_commitment.len();
         let mask_values: Vec<F128b> = voles.witness_mask()
             [witness_len..witness_len + mask_vole_count]
@@ -301,10 +298,8 @@ where
 
     /// This makes sure the proof is correctly formed e.g. everything is the right length.
     fn validate_proof(&self, voles: &VoleV) -> Result<()> {
-        // There should be one witness commitment for every element in the extended witness, plus
-        // the higher degree mask VOLEs (the higher degree commitment has max-degree-many
-        // coefficients; see `mask_vole_count`). The proof and the decommitted VOLEs should agree
-        // on what this size is.
+        // Account for both witness commitments and higher-degree masking material, and require the
+        // proof and decommitted VOLEs to agree on the resulting size.
         let mask_vole_count =
             BatchProverAccumulator::mask_vole_count(self.higher_degree_commitment.len());
         if self.witness_commitment.len() + mask_vole_count != voles.extended_witness_length() {
@@ -442,17 +437,8 @@ where
             );
         }
 
-        // Higher degree constraint check (step 8 in Fig. 3 of the better-conversions paper):
-        // check that pi has degree at most d - 1 and that pi(Delta) = q. The
-        // `higher_degree_accumulator` holds the challenge-weighted constraint evaluations from the
-        // `VerifierTraverser`, grouped by degree.
-        //
-        // Draw the verifier's mask VOLE tags as one flat stream; the accumulator organizes them
-        // into per-mask blocks, composes each into nu_j = sigma_j(Delta), folds them in, enforces
-        // the degree bound on pi, and checks pi(Delta) against the expected value. The mask VOLEs
-        // are the contiguous block of tags right after the witness VOLEs; their count is fixed by
-        // the proof's committed coefficients, whose length `validate_proof` already tied to the
-        // VOLE length (so this slice is in bounds).
+        // Verify the higher-degree batch using the mask tags that follow the witness VOLEs.
+        // The accumulator owns mask composition and the final protocol checks.
         let witness_voles = reconstructed_voles.witness_voles();
         let witness_len = self.witness_commitment.len();
         let mask_vole_len =

@@ -89,8 +89,7 @@ impl Transcript<'_> {
         );
     }
 
-    /// Adds the masked higher degree constraint polynomial ($`\pi(t)`$ in the better-conversions
-    /// paper, Fig. 3) to the transcript.
+    /// Adds the masked higher-degree batch commitment to the transcript.
     pub(crate) fn append_higher_degree_commitment(&mut self, coefficients: &[F128b]) {
         let bytes = coefficients
             .iter()
@@ -108,7 +107,7 @@ impl Transcript<'_> {
     }
 }
 
-/// Iterator that generates powers of chi challenges.
+/// Iterator that derives Fiat–Shamir weights from a challenge.
 pub(crate) struct ChiGenerator {
     chi: F128b,
     power_of_chi: F128b,

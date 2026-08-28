@@ -11,7 +11,7 @@ pub(crate) struct ProverPreparerParts {
     pub(crate) witness: Vec<F2>,
     /// Number of Fiat-Shamir challenges required by the circuit.
     pub(crate) challenge_count: usize,
-    /// Maximum degree among the circuit's higher degree constraints.
+    /// Maximum degree among the circuit's higher-degree constraints.
     pub(crate) max_higher_degree: usize,
 }
 
@@ -42,7 +42,7 @@ pub struct ProverPreparer<'a> {
     /// Number of polynomials that will need challenges.
     challenge_count: usize,
 
-    /// Maximum degree among the higher degree constraint polynomials in the circuit.
+    /// Maximum degree among the higher-degree constraint polynomials.
     max_higher_degree: usize,
 }
 
@@ -67,7 +67,7 @@ impl<'a> ProverPreparer<'a> {
         self.witness.len()
     }
 
-    /// Get the maximum degree among the higher degree constraint polynomials seen during
+    /// Get the maximum degree among the higher-degree constraint polynomials seen during
     /// traversal (0 if there were none).
     #[cfg(test)]
     pub(crate) fn max_higher_degree(&self) -> usize {
@@ -254,7 +254,7 @@ impl<'a> HigherDegreeBackend<F2, F128b> for ProverPreparer<'a> {
     ) {
         self.challenge_count += 1;
 
-        // Each input wire lifts to a degree-1 commitment polynomial during traversal.
+        // Each input wire starts at degree one during polynomial traversal.
         let degree = f(self, [1; INPUT_LEN]);
         self.max_higher_degree = self.max_higher_degree.max(degree);
     }

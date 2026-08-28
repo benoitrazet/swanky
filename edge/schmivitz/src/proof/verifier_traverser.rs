@@ -14,7 +14,7 @@ pub(crate) struct VerifierTraverserParts {
     pub(crate) validation_aggregate: F128b,
     /// Aggregated assert-zero value.
     pub(crate) aggregate_assert_zero: F128b,
-    /// Accumulator for the higher degree constraint evaluations.
+    /// Accumulator for the higher-degree constraint evaluations.
     pub(crate) higher_degree_accumulator: BatchVerifierAccumulator,
 }
 
@@ -25,10 +25,10 @@ pub(crate) struct VerifierTraverserParts {
 /// wire (either using provided witnesses from the proof or evaluating expected witnesses for
 /// linear gates) and computing the aggregate value used to verify the proof.
 pub struct VerifierTraverser {
-    /// Fiat-Shamir challenges as powers of chi. There should be one for each polynomial (e.g. non-linear gate) and assert zero.
+    /// Fiat–Shamir weights drawn from the shared power stream.
     chi_challenge: ChiGenerator,
 
-    /// Verifier's chosen random VOLE key ($`\Delta`$ in the paper).
+    /// Verifier's global VOLE key.
     verifier_key: F128b,
 
     /// The masked witness commitments ($`\bf q'`$ in the paper).
@@ -51,16 +51,10 @@ pub struct VerifierTraverser {
     /// TODO: Add this to the specification and reference it.
     aggregate_assert_zero: F128b,
 
-    /// Streamed accumulator for the higher degree constraint evaluations, grouped by constraint
-    /// degree.
+    /// Streamed accumulator for the higher-degree constraint batch, grouped by degree.
     ///
-    /// After traversal, degree $`d_i`$ holds $$`\sum_{i : \deg = d_i} \chi_i \cdot \gamma_i`$$
-    /// where $`\gamma_i = \rho_i(\Delta)`$ is the verifier's homomorphic evaluation of the
-    /// $`i`$th higher degree constraint (Fig. 3 in the better-conversions paper). The degree
-    /// alignment $`\Delta^{d - d_i}`$ and the mask tags are applied by
-    /// [`BatchVerifierAccumulator::finish`] in [`Proof::verify()`](crate::proof::Proof::verify)
-    /// once the maximum degree $`d`$ is known. See
-    /// [`crate::commitment_polynomial::batch_verification`].
+    /// Final alignment and masking are delegated to [`BatchVerifierAccumulator::finish`] in
+    /// [`Proof::verify()`](crate::proof::Proof::verify).
     higher_degree_accumulator: BatchVerifierAccumulator,
 }
 
@@ -264,16 +258,16 @@ impl FancyZeroKnowledge for VerifierTraverser {
     }
 }
 impl HigherDegreeBackend<F2, F128b> for VerifierTraverser {
-    /// The verifier's evaluation $`\rho(\Delta)`$ of the constraint commitment polynomial, along
-    /// with the polynomial's degree.
+    /// A verifier-side commitment evaluation and its polynomial degree.
     ///
     /// The degree is needed because the gate operations must mirror the degree alignment that
     /// [`CommitmentPolynomial`](crate::commitment_polynomial::CommitmentPolynomial) applies on
     /// the prover's side.
     type HigherDegreeWire = (F128b, usize);
 
-    /// Mirrors [`CommitmentPolynomial::add`](crate::commitment_polynomial::CommitmentPolynomial::add):
-    /// with $`d = \max(d_1, d_2)`$, the sum is $`t^{d - d_1} \rho_1(t) + t^{d - d_2} \rho_2(t)`$.
+    /// Mirrors
+    /// [`CommitmentPolynomial::add`](crate::commitment_polynomial::CommitmentPolynomial::add) on
+    /// verifier-side evaluations.
     fn h_add(
         &self,
         lhs: &Self::HigherDegreeWire,
@@ -288,8 +282,9 @@ impl HigherDegreeBackend<F2, F128b> for VerifierTraverser {
         Ok((eval, degree))
     }
 
-    /// Mirrors [`CommitmentPolynomial::addc`](crate::commitment_polynomial::CommitmentPolynomial::addc),
-    /// which adds $`c \cdot t^d`$.
+    /// Mirrors
+    /// [`CommitmentPolynomial::addc`](crate::commitment_polynomial::CommitmentPolynomial::addc) on
+    /// verifier-side evaluations.
     fn h_addc(
         &self,
         lhs: &Self::HigherDegreeWire,
@@ -323,14 +318,10 @@ impl HigherDegreeBackend<F2, F128b> for VerifierTraverser {
         inputs: &[Self::Wire; INPUT_LEN],
         f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
     ) {
-        // Each masked witness is the evaluation at Delta of the prover's degree-1 commitment
-        // polynomial for that wire.
+        // Treat each masked witness as a degree-one verifier-side commitment.
         let (gamma, degree) = f(self, std::array::from_fn(|i| (inputs[i], 1)));
 
-        // Draw this constraint's challenge from the shared Fiat-Shamir stream (the same stream
-        // `mul` and `assert_zero` draw from), then fold the challenge-weighted evaluation into the
-        // accumulator, grouped by degree; the Delta^(d - d_i) alignment is applied once the
-        // maximum degree d is known, after traversal.
+        // Consume the next shared Fiat–Shamir weight and add this evaluation to the batch.
         let challenge = self.chi_challenge.next();
         self.higher_degree_accumulator
             .push_constraint(gamma, degree, challenge);
