@@ -18,10 +18,11 @@ use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
 
 /// Combine a block of base-field VOLE values into a single full-field [`F128b`] value.
 ///
-/// Specifically, computes $`\sum_{i} v_i X^i`$, where $`X`$ is [`F128b::GENERATOR`], the
-/// generator for the field. This is the composition that turns a block of $`r\tau`$
-/// ([`REPETITION_PARAM`] $`\times`$ [`VOLE_SIZE_PARAM`]) base VOLE correlations into one
-/// correlation over the extension field.
+/// Specifically, computes
+/// $\operatorname{combine}(z_0,\ldots,z_{r-1})=\sum_{k=0}^{r-1}z_kX^k$, where $X$ is
+/// [`F128b::GENERATOR`]. Here
+/// $r=\mathtt{REPETITION\_PARAM}\cdot\mathtt{VOLE\_SIZE\_PARAM}=128$, matching the
+/// full-field composition used for each $\sigma_j(t)$ mask in higher-degree batching.
 pub(crate) fn combine(values: &[F128b]) -> F128b {
     // Start with `X^0 = 1`
     let mut power = F128b::ONE;

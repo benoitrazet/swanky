@@ -1,8 +1,9 @@
 //! Polynomial commitment type for VOLE-based zero-knowledge protocols.
 //!
-//! A [`CommitmentPolynomial`] represents the polynomial ρ_x(t) = ρ_0 + ρ_1·t + ··· + ρ_d·t^d
-//! where ρ_d = x is the committed value (in the base field `F`) and
-//! ρ_0, ..., ρ_{d-1} are random masking coefficients drawn from the extension field `FE`.
+//! A [`CommitmentPolynomial`] represents
+//! $\rho_x(t)=\rho_0+\rho_1t+\cdots+\rho_{d-1}t^{d-1}+xt^d$, where $x$ is the
+//! committed value (in the base field `F`) and
+//! $\rho_0,\ldots,\rho_{d-1}$ are random masking coefficients in the extension field `FE`.
 //!
 //! Gate operations allow building commitment polynomials bottom-up through a circuit:
 //! - [`CommitmentPolynomial::addc`]: add a constant
@@ -15,9 +16,9 @@ use swanky_field::{FiniteField, IsSubFieldOf};
 /// A polynomial commitment with leading coefficient in the base field `F`
 /// and lower coefficients in the extension field `FE`.
 ///
-/// Stores the polynomial ρ(t) = ρ_0 + ρ_1·t + ··· + ρ_d·t^d, where:
-/// - `lower_coefficients` = [ρ_0, ρ_1, ..., ρ_{d-1}] (each in `FE`).
-/// - `highest_degree` = ρ_d (the committed value, in `F`).
+/// Stores $\rho(t)=\rho_0+\rho_1t+\cdots+\rho_{d-1}t^{d-1}+xt^d$, where:
+/// - `lower_coefficients` = $[\rho_0,\rho_1,\ldots,\rho_{d-1}]$ (each in `FE`);
+/// - `highest_degree` = $x$ (the committed value, in `F`).
 #[derive(Clone, Debug)]
 pub struct CommitmentPolynomial<F: FiniteField, FE: FiniteField>
 where
@@ -34,7 +35,7 @@ where
     /// Create a commitment polynomial from a base VOLE.
     ///
     /// Given a value `x` in the base field and a VOLE mask `w` in the extension field,
-    /// constructs ρ(t) = w + x·t (degree 1).
+    /// constructs $\rho_x(t)=w+xt$ (degree 1).
     pub fn from_base_vole(value: F, mask: FE) -> Self {
         Self {
             lower_coefficients: vec![mask],
@@ -56,19 +57,19 @@ where
         self.lower_coefficients.len()
     }
 
-    /// Return the lower coefficients [ρ_0, ρ_1, ..., ρ_{d-1}].
+    /// Return the lower coefficients $[\rho_0,\rho_1,\ldots,\rho_{d-1}]$.
     pub fn lower_coefficients(&self) -> &[FE] {
         &self.lower_coefficients
     }
 
-    /// Return the highest-degree coefficient ρ_d (the committed value).
+    /// Return the highest-degree coefficient $x$ (the committed value).
     pub fn highest_degree(&self) -> F {
         self.highest_degree
     }
 
     /// Evaluate the polynomial at a given point using Horner's method.
     ///
-    /// This is useful for the verifier to evaluate at Δ (the global VOLE key).
+    /// This is useful for the verifier to compute $\gamma_x=\rho_x(\Delta)$.
     pub fn evaluate_at_point(&self, point: FE) -> FE {
         let mut result: FE = self.highest_degree.into();
         for c in self.lower_coefficients.iter().rev() {
@@ -77,7 +78,7 @@ where
         result
     }
 
-    /// Add a constant: ρ(t) = ρ_x(t) + c·t^d.
+    /// Add a constant: $\rho_{x+c}(t)=\rho_x(t)+ct^d$.
     ///
     /// The constant is added to the highest-degree coefficient.
     pub fn addc(&self, c: F) -> Self {
@@ -89,8 +90,9 @@ where
 
     /// Add two commitment polynomials, aligning to the maximum degree.
     ///
-    /// Given ρ_x of degree d_1 and ρ_y of degree d_2, with d = max(d_1, d_2):
-    /// ρ(t) = t^(d - d_1)·ρ_x(t) + t^(d - d_2)·ρ_y(t).
+    /// Given $\rho_x$ of degree $d_1$ and $\rho_y$ of degree $d_2$, with
+    /// $d=\max(d_1,d_2)$:
+    /// $\rho_{x+y}(t)=t^{d-d_1}\rho_x(t)+t^{d-d_2}\rho_y(t)$.
     pub fn add(&self, other: &Self) -> Self {
         let d1 = self.degree();
         let d2 = other.degree();
@@ -113,7 +115,7 @@ where
         }
     }
 
-    /// Multiply by a constant: ρ(t) = c·ρ_x(t).
+    /// Multiply by a constant: $\rho_{cx}(t)=c\rho_x(t)$.
     pub fn mulc(&self, c: F) -> Self {
         let lower = self.lower_coefficients.iter().map(|x| c * *x).collect();
         Self {
@@ -122,7 +124,7 @@ where
         }
     }
 
-    /// Multiply two commitment polynomials: ρ(t) = ρ_x(t)·ρ_y(t).
+    /// Multiply two commitment polynomials: $\rho_{xy}(t)=\rho_x(t)\rho_y(t)$.
     pub fn mul(&self, other: &Self) -> Self {
         let d1 = self.degree();
         let d2 = other.degree();
@@ -150,7 +152,7 @@ where
         }
     }
 
-    /// Multiply the polynomial by t^shift (shift all coefficients up).
+    /// Multiply the polynomial by $t^{\mathtt{shift}}$ (shift all coefficients up).
     pub fn shift(&self, shift: usize) -> Self {
         if shift == 0 {
             return self.clone();
