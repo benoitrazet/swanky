@@ -303,18 +303,12 @@ mod tests {
         let val_a = F128b::random(&mut rng);
         let val_b = F128b::random(&mut rng);
         let val_c = F128b::random(&mut rng);
-        let poly_a = CommitmentPolynomial::<F128b, F128b>::from_base_vole(
-            val_a,
-            F128b::random(&mut rng),
-        );
-        let poly_b = CommitmentPolynomial::<F128b, F128b>::from_base_vole(
-            val_b,
-            F128b::random(&mut rng),
-        );
-        let poly_c = CommitmentPolynomial::<F128b, F128b>::from_base_vole(
-            val_c,
-            F128b::random(&mut rng),
-        );
+        let poly_a =
+            CommitmentPolynomial::<F128b, F128b>::from_base_vole(val_a, F128b::random(&mut rng));
+        let poly_b =
+            CommitmentPolynomial::<F128b, F128b>::from_base_vole(val_b, F128b::random(&mut rng));
+        let poly_c =
+            CommitmentPolynomial::<F128b, F128b>::from_base_vole(val_c, F128b::random(&mut rng));
         let poly_ab = poly_a.mul(&poly_b);
         assert_eq!(poly_ab.degree(), 2);
         assert_eq!(poly_c.degree(), 1);
@@ -416,8 +410,7 @@ mod tests {
         let mut rng = rng();
         let x = F128b::random(&mut rng);
         let point = F128b::random(&mut rng);
-        let poly: CommitmentPolynomial<F128b, F128b> =
-            CommitmentPolynomial::from_parts(vec![], x);
+        let poly: CommitmentPolynomial<F128b, F128b> = CommitmentPolynomial::from_parts(vec![], x);
         assert_eq!(poly.degree(), 0);
         assert!(poly.lower_coefficients().is_empty());
         // A degree-0 polynomial evaluates to its (constant) committed value everywhere.

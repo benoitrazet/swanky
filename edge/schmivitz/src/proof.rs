@@ -7,7 +7,7 @@
 //! Emmanuela Orsini, Lawrence Roy, and Peter Scholl. [Publicly Verifiable Zero-Knowledge and
 //! Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
 //!
-use fancy_traits::{Circuit as FancyCircuit, Fancy};
+use fancy_traits::Circuit as FancyCircuit;
 use merlin::Transcript;
 use rand::{CryptoRng, Rng, rng};
 use rayon::iter::*;
@@ -16,7 +16,7 @@ use std::{iter::zip, marker::PhantomData};
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::IsSubFieldOf;
 use swanky_field_binary::{F2, F8b, F128b};
-use swanky_sieve_ir_api::{HigherDegreeBackend, HigherDegreeCircuitExecuter};
+use swanky_sieve_ir_api::HigherDegreeCircuitExecuter;
 
 use crate::vole::functionality::{VoleProver, VoleVerifier};
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
@@ -24,46 +24,20 @@ use crate::{
     commitment_polynomial::batch_verification::{BatchProverAccumulator, BatchVerifierAccumulator},
     parameters::SECURITY_PARAM,
     proof::{
+        higher_degree_circuit_adapter::HigherDegreeCircuitAdapter,
         prover_preparer::{ProverPreparer, ProverPreparerParts},
         prover_traverser::{ProverTraverser, ProverTraverserParts},
         transcript::ChiGenerator,
+        verifier_traverser::{VerifierTraverser, VerifierTraverserParts},
     },
     vole::{AsSecretBytes, RandomVoleP, RandomVoleV, combine},
 };
 
-use self::verifier_traverser::{VerifierTraverser, VerifierTraverserParts};
-
+mod higher_degree_circuit_adapter;
 mod prover_preparer;
 mod prover_traverser;
 mod transcript;
 mod verifier_traverser;
-
-/// Adapts `HigherDegreeCircuitExecuter` to the `FancyCircuit` interface used by Schmivitz's
-/// prover and verifier traversers. This lets higher-degree circuits reuse the existing proof
-/// pipeline without requiring them to implement `FancyCircuit` directly, while keeping the
-/// higher-degree entry points explicit. In the future, we should reconsider whether `Fancy`
-/// should expose higher-degree constraints itself, or whether both circuit APIs should converge
-/// on a shared execution trait that removes the need for this adapter.
-struct HigherDegreeCircuitAdapter<'a, C>(&'a C);
-
-impl<B, C> FancyCircuit<B> for HigherDegreeCircuitAdapter<'_, C>
-where
-    B: Fancy + HigherDegreeBackend<F2, F128b>,
-    C: HigherDegreeCircuitExecuter<F2, F128b>,
-{
-    type Input = ();
-    type Output = Vec<B::Item>;
-
-    fn execute(
-        &self,
-        backend: &mut B,
-        _: Self::Input,
-        _: &mut swanky_channel::Channel,
-    ) -> Result<Self::Output> {
-        <C as HigherDegreeCircuitExecuter<F2, F128b>>::execute(self.0, backend)?;
-        Ok(vec![])
-    }
-}
 
 /// Zero-knowledge proof of knowledge of a circuit.
 #[derive(Debug, Clone)]
@@ -288,7 +262,7 @@ where
         RNG: CryptoRng + Rng,
     {
         Self::prove(
-            &HigherDegreeCircuitAdapter(circuit),
+            &HigherDegreeCircuitAdapter::new(circuit),
             private_input,
             witness_size,
             transcript,
@@ -463,7 +437,7 @@ where
     where
         C: HigherDegreeCircuitExecuter<F2, F128b>,
     {
-        self.verify(&HigherDegreeCircuitAdapter(circuit), transcript)
+        self.verify(&HigherDegreeCircuitAdapter::new(circuit), transcript)
     }
 }
 
