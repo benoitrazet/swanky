@@ -188,33 +188,6 @@ pub trait HigherDegreeBackend<F, FE>: FieldBackend<F> {
         inputs: &[Self::Wire; INPUT_LEN],
         f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
     );
-    /*
-    /// Helper function to return the wire value returned by a higher degree gate.
-    /// By default, this will witness a new private input and assert that it equals the output of
-    /// the higher degree constraint.
-    fn higher_degree_gate<const INPUT_LEN: usize, T: Add + Sub + Mul>(
-        &mut self,
-        inputs: &[Self::Wire; INPUT_LEN],
-        f: impl Fn([T; INPUT_LEN]) -> T,
-    ) -> CircuitResult<Self::Wire> {
-        // Witness a new witness value.
-        let output_wire = self.input_private()?;
-
-        // Append `output` to inputs.
-        let inputs: [Self::Wire; INPUT_LEN+1] = array::from_fn(|i|
-            if i < INPUT_LEN { inputs[i] } else { output_wire }
-        );
-
-        self.assert_zero_higher_degree(inputs, |inputs| {
-            let f_inputs: &[T; INPUT_LEN] = &inputs[0..INPUT_LEN];
-            let x = f(f_inputs);
-
-            let output = inputs[INPUT_LEN];
-            x - output
-        });
-
-        output_wire
-    }*/
 }
 
 /// `HigherDegreeCircuitExecuter` abstracts over backends to execute a circuit that may contain
