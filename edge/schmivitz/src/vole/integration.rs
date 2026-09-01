@@ -22,7 +22,7 @@ impl RandomVoleP for VoleProver {
         extended_witness_length: usize,
         transcript: &mut Transcript,
         secret: &Secret,
-        _rng: &mut impl CryptoRng,
+        _rng: &mut impl CryptoRng, // TODO: remove `rng` parameter from this interface since its unused.
     ) -> (Self, Self::VoleChallenge) {
         log::info!("NB VOLES {:?}", extended_witness_length);
         let mut statement_sig = [0u8; SECURITY_PARAM];

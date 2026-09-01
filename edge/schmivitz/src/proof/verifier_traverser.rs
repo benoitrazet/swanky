@@ -3,9 +3,20 @@ use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
-use swanky_sieve_ir_api::FieldBackend;
+use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
 
+use crate::commitment_polynomial::batch_verification::{BatchVerifierAccumulator, power};
 use crate::proof::ChiGenerator;
+
+/// Values produced by a completed verifier circuit traversal.
+pub(crate) struct VerifierTraverserParts {
+    /// Partial construction of the verifier's aggregated commitment.
+    pub(crate) validation_aggregate: F128b,
+    /// Aggregated assert-zero value.
+    pub(crate) aggregate_assert_zero: F128b,
+    /// Accumulator for the higher-degree constraint evaluations.
+    pub(crate) higher_degree_accumulator: BatchVerifierAccumulator,
+}
 
 /// A [`VerifierTraverser`] allows the verifier to execute the gate-by-gate evaluation portion of
 /// the VOLE-in-the-head verification protocol.
@@ -14,10 +25,10 @@ use crate::proof::ChiGenerator;
 /// wire (either using provided witnesses from the proof or evaluating expected witnesses for
 /// linear gates) and computing the aggregate value used to verify the proof.
 pub struct VerifierTraverser {
-    /// Fiat-Shamir challenges as powers of chi. There should be one for each polynomial (e.g. non-linear gate) and assert zero.
+    /// Fiat–Shamir weights drawn from the shared power stream.
     chi_challenge: ChiGenerator,
 
-    /// Verifier's chosen random VOLE key ($`\Delta`$ in the paper).
+    /// Verifier's global VOLE key.
     verifier_key: F128b,
 
     /// The masked witness commitments ($`\bf q'`$ in the paper).
@@ -39,6 +50,12 @@ pub struct VerifierTraverser {
     /// Partial aggregation of the assert zero check.
     /// TODO: Add this to the specification and reference it.
     aggregate_assert_zero: F128b,
+
+    /// Streamed accumulator for the higher-degree constraint batch, grouped by degree.
+    ///
+    /// Final alignment and masking are delegated to [`BatchVerifierAccumulator::finish`] in
+    /// [`Proof::verify()`](crate::proof::Proof::verify).
+    higher_degree_accumulator: BatchVerifierAccumulator,
 }
 
 impl VerifierTraverser {
@@ -55,6 +72,7 @@ impl VerifierTraverser {
             assigned_witness_count: 0,
             aggregate: F128b::ZERO,
             aggregate_assert_zero: F128b::ZERO,
+            higher_degree_accumulator: BatchVerifierAccumulator::new(),
         })
     }
 
@@ -84,11 +102,11 @@ impl VerifierTraverser {
         Ok(self.masked_witnesses[next_index])
     }
 
-    /// Decomposes into the aggregate component (a partial construction of `c~`) that was built
-    /// during full circuit traversal.
+    /// Decomposes into the aggregate components (a partial construction of `c~` and the higher
+    /// degree aggregates) that were built during full circuit traversal.
     ///
     /// This will fail if there were unused challenges or masked witnesses.
-    pub(crate) fn into_parts(self) -> Result<(F128b, F128b)> {
+    pub(crate) fn into_parts(self) -> Result<VerifierTraverserParts> {
         if self.assigned_witness_count != self.masked_witnesses.len() {
             bail!(
                 ErrorKind::OtherError,
@@ -97,7 +115,11 @@ impl VerifierTraverser {
                 self.assigned_witness_count
             );
         }
-        Ok((self.aggregate, self.aggregate_assert_zero))
+        Ok(VerifierTraverserParts {
+            validation_aggregate: self.aggregate,
+            aggregate_assert_zero: self.aggregate_assert_zero,
+            higher_degree_accumulator: self.higher_degree_accumulator,
+        })
     }
 
     /// Run `circuit` using [`VerifierTraverser`].
@@ -233,5 +255,75 @@ impl FancyZeroKnowledge for VerifierTraverser {
 
         self.aggregate_assert_zero += challenge * value.0;
         Ok(())
+    }
+}
+impl HigherDegreeBackend<F2, F128b> for VerifierTraverser {
+    /// A verifier-side commitment evaluation and its polynomial degree.
+    ///
+    /// The degree is needed because the gate operations must mirror the degree alignment that
+    /// [`CommitmentPolynomial`](crate::commitment_polynomial::CommitmentPolynomial) applies on
+    /// the prover's side.
+    type HigherDegreeWire = (F128b, usize);
+
+    /// Mirrors
+    /// [`CommitmentPolynomial::add`](crate::commitment_polynomial::CommitmentPolynomial::add) on
+    /// verifier-side evaluations.
+    fn h_add(
+        &self,
+        lhs: &Self::HigherDegreeWire,
+        rhs: &Self::HigherDegreeWire,
+    ) -> CircuitResult<Self::HigherDegreeWire> {
+        let (eval_1, degree_1) = *lhs;
+        let (eval_2, degree_2) = *rhs;
+        let degree = degree_1.max(degree_2);
+
+        let eval = power(self.verifier_key, degree - degree_1) * eval_1
+            + power(self.verifier_key, degree - degree_2) * eval_2;
+        Ok((eval, degree))
+    }
+
+    /// Mirrors
+    /// [`CommitmentPolynomial::addc`](crate::commitment_polynomial::CommitmentPolynomial::addc) on
+    /// verifier-side evaluations.
+    fn h_addc(
+        &self,
+        lhs: &Self::HigherDegreeWire,
+        rhs: F2,
+    ) -> CircuitResult<Self::HigherDegreeWire> {
+        let (eval, degree) = *lhs;
+        Ok((eval + rhs * power(self.verifier_key, degree), degree))
+    }
+
+    fn h_mul(
+        &self,
+        lhs: &Self::HigherDegreeWire,
+        rhs: &Self::HigherDegreeWire,
+    ) -> CircuitResult<Self::HigherDegreeWire> {
+        let (eval_1, degree_1) = *lhs;
+        let (eval_2, degree_2) = *rhs;
+        Ok((eval_1 * eval_2, degree_1 + degree_2))
+    }
+
+    fn h_mulc(
+        &self,
+        lhs: &Self::HigherDegreeWire,
+        rhs: F2,
+    ) -> CircuitResult<Self::HigherDegreeWire> {
+        let (eval, degree) = *lhs;
+        Ok((rhs * eval, degree))
+    }
+
+    fn assert_zero_higher_degree<const INPUT_LEN: usize>(
+        &mut self,
+        inputs: &[Self::Wire; INPUT_LEN],
+        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
+    ) {
+        // Treat each masked witness as a degree-one verifier-side commitment.
+        let (gamma, degree) = f(self, std::array::from_fn(|i| (inputs[i], 1)));
+
+        // Consume the next shared Fiat–Shamir weight and add this evaluation to the batch.
+        let challenge = self.chi_challenge.next();
+        self.higher_degree_accumulator
+            .push_constraint(gamma, degree, challenge);
     }
 }
