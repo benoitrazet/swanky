@@ -16,13 +16,13 @@ The construction has two main components:
 ## Base VOLE
 
 A call to $\operatorname{VOLE}(n)$ produces $n$ correlated triples.
-For each $i \in \{1,\ldots,n\}$, the prover receives a random value $u_i$ and a mask $w_i$, and the verifier receives a global key $\delta$ and a tag $v_i$, such that
+For each $i \in \{1,\ldots,n\}$, the prover receives a random value $u_i \in \mathbb{F}_p$ and a mask $w_i \in \mathbb{F}_{p^r}$, and the verifier receives a global key $\Delta \in \mathbb{F}_{p^r}$ and a tag $v_i \in \mathbb{F}_{p^r}$, such that
 
 $$
-v_i = u_i\delta + w_i.
+v_i = u_i\Delta + w_i.
 $$
 
-The higher-degree construction uses the same correlation with extension-field values and writes the verifier's global key as $\Delta$.
+Here $u_i$ is embedded naturally from $\mathbb{F}_p$ into $\mathbb{F}_{p^r}$ in the product $u_i\Delta$.
 
 ## Commitment polynomials
 
@@ -43,11 +43,14 @@ $$
 $$
 
 Degree one recovers the base VOLE relation: $\rho_x(t)=w+xt$ and $\gamma_x=w+x\Delta$.
-Write $\llbracket x \rrbracket_d$ for a degree-$d$ commitment represented by $\rho_x$ on the prover side and $\gamma_x$ on the verifier side.
+Let $\llbracket x \rrbracket_d$ denote a degree-$d$ commitment represented by $\rho_x$ on the prover side and $\gamma_x$ on the verifier side.
 
 ## Gate-by-gate commitment propagation
 
-The gate-by-gate evaluation below is the computation performed by `VOLE-ZK.Eval` in Figure 3 of [2026-Agarwal-Baum-Braun-Scholl], using the homomorphic operations defined after Definition 2. Commitment polynomials are constructed bottom-up through circuits containing addition, addition by a constant, multiplication, and multiplication by a constant.
+The gate-by-gate evaluation below is the computation performed by `VOLE-ZK.Eval` in Figure 3 of [2026-Agarwal-Baum-Braun-Scholl],
+using the homomorphic operations defined after Definition 2.
+Commitment polynomials are constructed bottom-up through circuits containing addition,
+addition by a constant, multiplication, and multiplication by a constant.
 Every rule preserves two invariants: the output polynomial's leading coefficient is the output wire value, and the verifier's value is the output polynomial evaluated at $\Delta$.
 
 - **Addition.**
@@ -115,57 +118,113 @@ Every rule preserves two invariants: the output polynomial's leading coefficient
 
 This section follows `VOLE-ZK.BatchVer` in Figure 3 of [2026-Agarwal-Baum-Braun-Scholl], with the Schmivitz adaptations identified below.
 
+0. **Fix the batch inputs.** The subprotocol is invoked as
+
+   $$
+   \operatorname{VOLE-ZK.BatchVer}
+     \bigl(\llbracket z_1\rrbracket_{d_1},\ldots,
+           \llbracket z_m\rrbracket_{d_m}\bigr)
+   $$
+
+   on $m$ commitments. For each $i\in\{1,\ldots,m\}$, $z_i\in\mathbb{F}_p$ is the committed constraint value and $d_i$ is the degree of its commitment polynomial.
+
 1. **Fix the batch degree.** For commitment degrees $d_1,\ldots,d_m$, let
 
    $$
    d=\max\{d_1,\ldots,d_m\}.
    $$
 
+   Thus, $d$ is the maximum degree among the $m$ input commitment polynomials. Step 6 aligns every input polynomial to degree $d$ before combining them into one polynomial.
+
 2. **Generate masking commitments.** For every $j\in\{1,\ldots,d-1\}$, the paper invokes sVOLE to obtain degree-one commitments to base-field coordinates $s_{j,0},\ldots,s_{j,r-1}\in\mathbb{F}_p$.
+   For each $k\in\{0,\ldots,r-1\}$, name the three correlated values as follows:
+
+   $$
+   s_{j,k} \in \mathbb{F}_p,
+   \qquad
+   w_{j,k} \in \mathbb{F}_{p^r},
+   \qquad
+   v_{j,k} \in \mathbb{F}_{p^r}.
+   $$
+
+   The prover holds the value $s_{j,k}$ and mask $w_{j,k}$, while the verifier holds the tag $v_{j,k}$. They satisfy
+
+   $$
+   v_{j,k} = w_{j,k} + s_{j,k}\Delta.
+   $$
+
+   Equivalently, $\llbracket s_{j,k}\rrbracket_1$ is represented by the degree-one polynomial
+
+   $$
+   \sigma_{j,k}(t) = w_{j,k} + s_{j,k}t
+   $$
+
+   on the prover side and by $v_{j,k}=\sigma_{j,k}(\Delta)$ on the verifier side.
    Schmivitz obtains the equivalent masking material from its VOLE backend; the construction does not assume a fixed value of $r$.
 
-3. **Compose full-field masks.** For any chosen $\mathbb{F}_p$-basis $(b_0,\ldots,b_{r-1})$ of $\mathbb{F}_{p^r}$, combine the coordinate commitments linearly to obtain
+3. **Compose the full-field masking commitments.** Let $\alpha\in\mathbb{F}_{p^r}$ be such that $(1,\alpha,\ldots,\alpha^{r-1})$ is an $\mathbb{F}_p$-basis of $\mathbb{F}_{p^r}$. For every $j\in\{1,\ldots,d-1\}$, apply the same linear combination to the value, mask, and tag:
+
+   $$
+   s_j=\sum_{k=0}^{r-1}s_{j,k}\alpha^k,
+   \qquad
+   w_j=\sum_{k=0}^{r-1}w_{j,k}\alpha^k,
+   \qquad
+   \nu_j=\sum_{k=0}^{r-1}v_{j,k}\alpha^k.
+   $$
+
+   All three combined values belong to $\mathbb{F}_{p^r}$. On the prover side, this gives
 
    $$
    \llbracket s_j\rrbracket_1
-     =\sum_{k=0}^{r-1}b_k\llbracket s_{j,k}\rrbracket_1,
+     =\sum_{k=0}^{r-1}\llbracket s_{j,k}\rrbracket_1\alpha^k,
    \qquad
-   s_j=\sum_{k=0}^{r-1}b_k s_{j,k}.
+   \sigma_{s_j}(t)
+     =\sum_{k=0}^{r-1}\sigma_{j,k}(t)\alpha^k
+     =s_jt+w_j.
    $$
+
+   On the verifier side, the same combination preserves the VOLE equation:
+
+   $$
+   \begin{aligned}
+   \nu_j
+     &=\sum_{k=0}^{r-1}v_{j,k}\alpha^k \\
+     &=\sum_{k=0}^{r-1}
+         \bigl(s_{j,k}\Delta+w_{j,k}\bigr)\alpha^k \\
+     &=s_j\Delta+w_j \\
+     &=\sigma_{s_j}(\Delta).
+   \end{aligned}
+   $$
+
+   Thus, the prover holds the linear and constant coefficients $(s_j,w_j)$ of $\sigma_{s_j}(t)$, while the verifier holds the corresponding evaluation $\nu_j$. For $d\le 1$, there are no masking commitments and the corresponding sums below are empty.
 
 4. **Identify the constraint polynomials.** Let $\rho_i(t)=\rho_{z_i}(t)$ be the degree-at-most-$d_i$ polynomial for constraint value $z_i$, and let $\gamma_i=\rho_i(\Delta)$.
    The constraint $z_i=0$ holds exactly when $\rho_i$ has degree at most $d_i-1$.
 
-5. **Name the mask polynomials.** Let
+5. **Choose challenge weights.** The verifier sends a challenge
+   $(\chi_1,\ldots,\chi_m)\leftarrow\mathbb{F}_{p^r}^m$.
 
-   $$
-   \sigma_j(t)=w_j+s_jt,
-   \qquad
-   \nu_j=\sigma_j(\Delta).
-   $$
-
-   For $d\le 1$, there are no masking commitments and the corresponding sums below are empty.
-
-6. **Choose challenge weights.** The paper samples $(\chi_1,\ldots,\chi_m)\in\mathbb{F}_{p^r}^m$.
-   Schmivitz instead derives $\xi$ by Fiat–Shamir and consumes the global stream $\xi,\xi^2,\ldots$ shared with the other constraint gates; $\chi_i$ denotes the next weight assigned to constraint $i$.
-
-7. **Compute and send the prover polynomial.** First align and aggregate the constraints:
+6. **Compute and send the prover polynomial.** First align each of the $m$ constraint polynomials to the maximum degree $d$ and combine them into one challenge-weighted polynomial:
 
    $$
    A(t)=\sum_{i=1}^{m}\chi_i\,t^{d-d_i}\rho_i(t),
    $$
-   Its degree-$d$ coefficient is $\sum_i\chi_i z_i$ and therefore vanishes when all constraints hold.
-   Then form and send
+
+   For each $i$, multiplication by $t^{d-d_i}$ moves the coefficient $z_i$ to degree $d$. Thus, the degree-$d$ coefficient of the single aggregate $A(t)$ is $\sum_i\chi_i z_i$ and vanishes when all constraints hold. The prover then forms
 
    $$
-   \pi(t)=A(t)+\sum_{j=1}^{d-1}t^{j-1}\sigma_j(t).
+   \pi(t)=A(t)+\sum_{j=1}^{d-1}t^{j-1}\sigma_{s_j}(t).
    $$
 
-   The paper sends this polynomial with degree at most $d-1$.
-   Its degree-$d$ coefficient must therefore vanish.
-   Schmivitz omits that known-zero coefficient and sends $\pi_0,\ldots,\pi_{d-1}$.
+   The masking terms have degree at most $d-1$, so the degree-$d$ coefficient of $\pi(t)$ must also vanish. The paper has the prover send $\pi(t)$ as a degree-at-most-$(d-1)$ polynomial. Write
 
-8. **Compute and verify the verifier value.** Using the $d-1$ mask tags defined above, compute
+   $$
+   \pi(t)=\sum_{k=0}^{d-1}\pi_k t^k,
+   $$
+
+   where $\pi_k\in\mathbb{F}_{p^r}$ is the coefficient of $t^k$. Schmivitz sends the coefficient list $\pi_0,\ldots,\pi_{d-1}$ and omits the required zero coefficient at degree $d$.
+
+7. **Compute and verify the verifier value.** Using the $d-1$ mask tags defined above, compute
 
    $$
    q
