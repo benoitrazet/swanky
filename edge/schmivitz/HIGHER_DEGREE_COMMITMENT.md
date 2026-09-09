@@ -246,11 +246,15 @@ This section follows `VOLE-ZK.BatchVer` in Figure 3 of [2026-Agarwal-Baum-Braun-
 The polynomial-gate API belongs in `edge/sieve-ir-api`, and the protocol implementation belongs in `edge/schmivitz`.
 Schmivitz instantiates the construction with `F2` as the base field and `F128b` as the extension field.
 
-The `CommitmentPolynomial` interface must support all four gate rules, expose the coefficients of $\rho$ for serialization, reconstruct a polynomial from received coefficients when needed, and evaluate a polynomial at a supplied point such as $\Delta$.
-The batch-verification interface must accept commitment polynomials of different degrees, or stream them into an equivalent accumulator, and verify their single combined check.
+`edge/sieve-ir-api` defines the cross-crate circuit interface: `HigherDegreeBackend` adds the four polynomial gate operations and higher-degree zero assertion, while `HigherDegreeCircuitExecuter` lets a circuit execute against any such backend.
 
-Implementation should proceed in small stages: define the API, implement each operation, and add focused unit tests as functionality is filled in.
-Tests should independently cover polynomial construction and evaluation, each gate rule, mixed-degree alignment, mask composition, successful batch verification, and rejection after tampering.
+`src/commitment_polynomial` contains the protocol primitives: `CommitmentPolynomial` implements the commitment representation and gate algebra, and `batch_verification` implements the streamed prover and verifier accumulators for mixed-degree alignment, masking, and the final batch check.
+
+`ProverPreparer` performs the initial cleartext traversal with polynomial degrees as its higher-degree wire representation, determining the circuit's maximum constraint degree and therefore the amount of masking VOLE material to reserve.
+
+`ProverTraverser` builds and batches the prover's commitment polynomials, while `VerifierTraverser` mirrors the same gates using pairs of verifier-side evaluations and polynomial degrees and batches the resulting constraint evaluations.
+
+`src/proof.rs` orchestrates these stages: `HigherDegreeCircuitAdapter` connects the higher-degree circuit API to the existing `FancyCircuit` pipeline, the higher-degree proof entry points reserve the extra VOLEs, and proof generation and verification finalize the accumulators and bind the masked polynomial coefficients into the transcript and proof.
 
 ## Reference
 
