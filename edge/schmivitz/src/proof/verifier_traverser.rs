@@ -63,6 +63,7 @@ impl VerifierTraverser {
         chi_challenge: ChiGenerator,
         verifier_key: F128b,
         masked_witnesses: Vec<F128b>,
+        max_higher_degree: usize,
     ) -> Result<Self> {
         // TODO: Add additional asserts here?
         Ok(Self {
@@ -72,7 +73,7 @@ impl VerifierTraverser {
             assigned_witness_count: 0,
             aggregate: F128b::ZERO,
             aggregate_assert_zero: F128b::ZERO,
-            higher_degree_accumulator: BatchVerifierAccumulator::new(),
+            higher_degree_accumulator: BatchVerifierAccumulator::new(max_higher_degree),
         })
     }
 
@@ -317,13 +318,14 @@ impl HigherDegreeBackend<F2, F128b> for VerifierTraverser {
         &mut self,
         inputs: &[Self::Wire; INPUT_LEN],
         f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
-    ) {
+    ) -> CircuitResult<()> {
         // Treat each masked witness as a degree-one verifier-side commitment.
         let (gamma, degree) = f(self, std::array::from_fn(|i| (inputs[i], 1)));
 
         // Consume the next shared Fiat–Shamir weight and add this evaluation to the batch.
         let challenge = self.chi_challenge.next();
         self.higher_degree_accumulator
-            .push_constraint(gamma, degree, challenge);
+            .push_constraint(gamma, degree, challenge)?;
+        Ok(())
     }
 }

@@ -85,7 +85,7 @@
 //!         let x01 = b.h_mul(&x[0], &x[1]).unwrap();
 //!         let x23 = b.h_mul(&x[2], &x[3]).unwrap();
 //!         b.h_mul(&x01, &x23).unwrap()
-//!     });
+//!     })?;
 //!     Ok(())
 //! }
 //! ```
@@ -187,7 +187,7 @@ pub trait HigherDegreeBackend<F, FE>: FieldBackend<F> {
         &mut self,
         inputs: &[Self::Wire; INPUT_LEN],
         f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
-    );
+    ) -> CircuitResult<()>;
 }
 
 /// `HigherDegreeCircuitExecuter` abstracts over backends to execute a circuit that may contain

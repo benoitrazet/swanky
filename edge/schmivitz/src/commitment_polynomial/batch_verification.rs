@@ -111,26 +111,39 @@ impl BatchProverAccumulator {
     /// Accumulates $\chi_i t^{d-d_i}\rho_i(t)$, where $d$ is the maximum degree fixed at
     /// construction and $d_i$ is `constraint.degree()`. Summing constraints one at a time builds
     /// exactly $A(t)=\sum_i\chi_i t^{d-d_i}\rho_i(t)$.
+    ///
+    /// Returns an error if the constraint exceeds the configured maximum degree or its committed
+    /// value is nonzero.
     pub fn push_constraint(
         &mut self,
         constraint: &CommitmentPolynomial<F2, F128b>,
         challenge: F128b,
-    ) {
+    ) -> Result<()> {
         // Sum the challenge-scaled constraint into the aggregate, aligning the highest-degree
         // coefficients: the constraint is shifted up by a power of t, so summing constraints one
         // at a time builds exactly $A(t)=\sum_i\chi_i t^{d-d_i}\rho_i(t)$.
-        debug_assert!(
-            constraint.degree() < self.aggregate.len(),
-            "Internal invariant failed: higher degree constraint of degree {} exceeds the maximum degree {} computed during preparation",
-            constraint.degree(),
-            self.aggregate.len().saturating_sub(1),
-        );
-        let shift = self.aggregate.len() - (constraint.degree() + 1);
+        let max_degree = self.max_degree();
+        if max_degree == 0 || constraint.degree() > max_degree {
+            bail!(
+                ErrorKind::OtherError,
+                "Higher degree constraint has degree {}, but the accumulator is configured for maximum degree {}",
+                constraint.degree(),
+                max_degree
+            );
+        }
+        if constraint.highest_degree() != F2::ZERO {
+            bail!(
+                ErrorKind::OtherError,
+                "Higher degree constraint does not evaluate to zero"
+            );
+        }
+        let shift = max_degree - constraint.degree();
         for (i, coefficient) in constraint.lower_coefficients().iter().enumerate() {
             self.aggregate[i + shift] += challenge * *coefficient;
         }
         // The committed (highest-degree) coefficient is scaled by the challenge too.
         self.aggregate[shift + constraint.degree()] += constraint.highest_degree() * challenge;
+        Ok(())
     }
 
     /// The maximum degree among the constraints pushed so far (0 if none were pushed).
@@ -196,21 +209,26 @@ impl BatchProverAccumulator {
 ///
 /// Used by the live verifier ([`crate::proof`]), whose circuit traversal produces one evaluation
 /// per higher degree constraint. Constraints are pushed with [`Self::push_constraint`] during
-/// traversal (grouped by degree, with the $\Delta$-alignment deferred), and [`Self::finish`]
-/// applies the alignment, adds the mask tags, and checks the prover's $\pi(\Delta)$ against
+/// traversal (grouped by degree, with the $\Delta$-alignment deferred). As on the prover side, the
+/// maximum degree $d$ is fixed at construction. [`Self::finish`] applies the alignment, adds the
+/// mask tags, and checks the prover's $\pi(\Delta)$ against
 /// $q=\sum_i\chi_i\Delta^{d-d_i}\gamma_i+\sum_{j=1}^{d-1}\Delta^{j-1}\nu_j$.
 pub struct BatchVerifierAccumulator {
     /// Challenge-weighted evaluations grouped by constraint degree: index $k$ holds
     /// $\sum_{i:d_i=k}\chi_i\gamma_i$. The $\Delta^{d-k}$ alignment is
-    /// applied in [`Self::finish`], once the maximum degree is known.
+    /// applied in [`Self::finish`]. Length $d+1$, or empty if the maximum degree is 0.
     aggregates: Vec<F128b>,
 }
 
 impl BatchVerifierAccumulator {
-    /// Create an empty verifier accumulator.
-    pub fn new() -> Self {
+    /// Create a verifier accumulator for constraints whose maximum degree is `max_degree`.
+    pub fn new(max_degree: usize) -> Self {
         Self {
-            aggregates: Vec::new(),
+            aggregates: if max_degree == 0 {
+                Vec::new()
+            } else {
+                vec![F128b::ZERO; max_degree + 1]
+            },
         }
     }
 
@@ -238,16 +256,26 @@ impl BatchVerifierAccumulator {
     /// `gamma` is the verifier's homomorphic evaluation
     /// $\gamma_i=\rho_i(\Delta)$ of the constraint, and `degree` is $d_i$.
     /// The $\Delta^{d-d_i}$ alignment is deferred to [`Self::finish`].
-    pub fn push_constraint(&mut self, gamma: F128b, degree: usize, challenge: F128b) {
+    ///
+    /// Returns an error if `degree` exceeds the configured maximum degree.
+    pub fn push_constraint(&mut self, gamma: F128b, degree: usize, challenge: F128b) -> Result<()> {
         // Group the challenge-weighted evaluations by degree; the $\Delta^{d-d_i}$ alignment is
-        // applied once the maximum degree d is known, after traversal.
-        if degree >= self.aggregates.len() {
-            self.aggregates.resize(degree + 1, F128b::ZERO);
+        // applied after traversal using the maximum degree fixed at construction.
+        let max_degree = self.max_degree();
+        if max_degree == 0 || degree > max_degree {
+            bail!(
+                ErrorKind::OtherError,
+                "Higher degree constraint has degree {}, but the accumulator is configured for maximum degree {}",
+                degree,
+                max_degree
+            );
         }
+
         self.aggregates[degree] += challenge * gamma;
+        Ok(())
     }
 
-    /// The maximum degree among the constraints pushed so far (0 if none were pushed).
+    /// The maximum constraint degree fixed at construction.
     ///
     /// This is the `d` used throughout the batch verification arithmetic, e.g. to size the mask
     /// VOLE stream via [`Self::mask_vole_count`].
@@ -320,12 +348,6 @@ impl BatchVerifierAccumulator {
         }
 
         Ok(())
-    }
-}
-
-impl Default for BatchVerifierAccumulator {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -531,15 +553,15 @@ mod tests {
 
         // Prover: fold the constraint, then finish (max_degree = 1 needs 0 mask VOLEs).
         let mut prover = BatchProverAccumulator::new(1);
-        prover.push_constraint(&poly, chi[0]);
+        prover.push_constraint(&poly, chi[0]).unwrap();
         let pi = prover.finish(&[], &[]);
 
         // 1 coefficient below the top (the constant term).
         assert_eq!(pi.len(), 1);
 
         // Verifier: fold the evaluation, then check.
-        let mut verifier = BatchVerifierAccumulator::new();
-        verifier.push_constraint(gamma, 1, chi[0]);
+        let mut verifier = BatchVerifierAccumulator::new(1);
+        verifier.push_constraint(gamma, 1, chi[0]).unwrap();
         verifier.finish(delta, &[], &pi).unwrap();
     }
 
@@ -562,13 +584,13 @@ mod tests {
         let (values, masks, tags) = make_mask_blocks(rng, delta, 1);
 
         let mut prover = BatchProverAccumulator::new(2);
-        prover.push_constraint(&poly_a, chi[0]);
-        prover.push_constraint(&poly_c, chi[1]);
+        prover.push_constraint(&poly_a, chi[0]).unwrap();
+        prover.push_constraint(&poly_c, chi[1]).unwrap();
         let pi = prover.finish(&values, &masks);
 
-        let mut verifier = BatchVerifierAccumulator::new();
-        verifier.push_constraint(gamma_a, 1, chi[0]);
-        verifier.push_constraint(gamma_c, 2, chi[1]);
+        let mut verifier = BatchVerifierAccumulator::new(2);
+        verifier.push_constraint(gamma_a, 1, chi[0]).unwrap();
+        verifier.push_constraint(gamma_c, 2, chi[1]).unwrap();
         verifier.finish(delta, &tags, &pi).unwrap();
     }
 
@@ -594,16 +616,62 @@ mod tests {
         let (values, masks, tags) = make_mask_blocks(rng, delta, 2);
 
         let mut prover = BatchProverAccumulator::new(3);
-        prover.push_constraint(&poly1, chi[0]);
-        prover.push_constraint(&poly3, chi[1]);
-        prover.push_constraint(&poly5, chi[2]);
+        prover.push_constraint(&poly1, chi[0]).unwrap();
+        prover.push_constraint(&poly3, chi[1]).unwrap();
+        prover.push_constraint(&poly5, chi[2]).unwrap();
         let pi = prover.finish(&values, &masks);
 
-        let mut verifier = BatchVerifierAccumulator::new();
-        verifier.push_constraint(gamma1, 1, chi[0]);
-        verifier.push_constraint(gamma3, 2, chi[1]);
-        verifier.push_constraint(gamma5, 3, chi[2]);
+        let mut verifier = BatchVerifierAccumulator::new(3);
+        verifier.push_constraint(gamma1, 1, chi[0]).unwrap();
+        verifier.push_constraint(gamma3, 2, chi[1]).unwrap();
+        verifier.push_constraint(gamma5, 3, chi[2]).unwrap();
         verifier.finish(delta, &tags, &pi).unwrap();
+    }
+
+    #[test]
+    fn test_accumulators_use_configured_maximum_degree() {
+        let delta = F128b::ONE;
+        let challenge = F128b::ONE;
+        let max_degree = 3;
+
+        // Both sides align a degree-2 constraint to the configured degree 3 without requiring
+        // traversal to observe a degree-3 constraint.
+        let base = CommitmentPolynomial::<F2, F128b>::from_base_vole(F2::ZERO, F128b::ZERO);
+        let degree_two = base.mul(&base);
+        let mask_count = BatchProverAccumulator::mask_vole_count(max_degree);
+        let zero_masks = vec![F128b::ZERO; mask_count];
+
+        let mut prover = BatchProverAccumulator::new(max_degree);
+        prover.push_constraint(&degree_two, challenge).unwrap();
+        let pi = prover.finish(&zero_masks, &zero_masks);
+
+        let mut verifier = BatchVerifierAccumulator::new(max_degree);
+        verifier
+            .push_constraint(degree_two.evaluate_at_point(delta), 2, challenge)
+            .unwrap();
+        verifier.finish(delta, &zero_masks, &pi).unwrap();
+    }
+
+    #[test]
+    fn test_push_constraint_rejects_degree_above_configured_maximum() {
+        let base = CommitmentPolynomial::<F2, F128b>::from_base_vole(F2::ONE, F128b::ONE);
+        let degree_two = base.mul(&base);
+
+        let mut prover = BatchProverAccumulator::new(1);
+        assert!(prover.push_constraint(&degree_two, F128b::ONE).is_err());
+
+        let mut verifier = BatchVerifierAccumulator::new(1);
+        assert!(verifier.push_constraint(F128b::ONE, 2, F128b::ONE).is_err());
+    }
+
+    #[test]
+    fn test_prover_rejects_nonzero_constraint_without_mutating() {
+        let constraint = CommitmentPolynomial::<F2, F128b>::from_base_vole(F2::ONE, F128b::ONE);
+        let mut prover = BatchProverAccumulator::new(1);
+
+        assert!(prover.push_constraint(&constraint, F128b::ONE).is_err());
+        assert_eq!(prover.top_coefficient(), F128b::ZERO);
+        assert_eq!(prover.evaluate_at(F128b::ONE), F128b::ZERO);
     }
 
     #[test]
@@ -622,16 +690,16 @@ mod tests {
         let (values, masks, tags) = make_mask_blocks(rng, delta, 1);
 
         let mut prover = BatchProverAccumulator::new(2);
-        prover.push_constraint(&poly_a, chi[0]);
-        prover.push_constraint(&poly_c, chi[1]);
+        prover.push_constraint(&poly_a, chi[0]).unwrap();
+        prover.push_constraint(&poly_c, chi[1]).unwrap();
         let mut pi = prover.finish(&values, &masks);
 
         // Tamper with a coefficient: verification must reject.
         pi[0] += F128b::ONE;
 
-        let mut verifier = BatchVerifierAccumulator::new();
-        verifier.push_constraint(gamma_a, 1, chi[0]);
-        verifier.push_constraint(gamma_c, 2, chi[1]);
+        let mut verifier = BatchVerifierAccumulator::new(2);
+        verifier.push_constraint(gamma_a, 1, chi[0]).unwrap();
+        verifier.push_constraint(gamma_c, 2, chi[1]).unwrap();
         assert!(verifier.finish(delta, &tags, &pi).is_err());
     }
 
@@ -649,15 +717,15 @@ mod tests {
         let (values, masks, tags) = make_mask_blocks(rng, delta, 1);
 
         let mut prover = BatchProverAccumulator::new(2);
-        prover.push_constraint(&poly_a, chi[0]);
-        prover.push_constraint(&poly_c, chi[1]);
+        prover.push_constraint(&poly_a, chi[0]).unwrap();
+        prover.push_constraint(&poly_c, chi[1]).unwrap();
         let pi = prover.finish(&values, &masks);
 
         // The verifier folds a wrong evaluation for the degree-2 constraint: check must reject.
         let wrong_gamma = random_f128b(rng);
-        let mut verifier = BatchVerifierAccumulator::new();
-        verifier.push_constraint(gamma_a, 1, chi[0]);
-        verifier.push_constraint(wrong_gamma, 2, chi[1]);
+        let mut verifier = BatchVerifierAccumulator::new(2);
+        verifier.push_constraint(gamma_a, 1, chi[0]).unwrap();
+        verifier.push_constraint(wrong_gamma, 2, chi[1]).unwrap();
         assert!(verifier.finish(delta, &tags, &pi).is_err());
     }
 

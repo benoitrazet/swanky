@@ -366,10 +366,12 @@ where
         let validation_mask = combine(&reconstructed_voles.mask_voles());
 
         // Run circuit traversal and get the aggregate value (part of c~)
+        let max_higher_degree = self.higher_degree_commitment.len();
         let mut verifier_traverser = VerifierTraverser::new(
             chi_challenge,
             reconstructed_voles.verifier_key(),
             masked_witnesses,
+            max_higher_degree,
         )?;
         verifier_traverser.execute(circuit)?;
 
@@ -415,8 +417,7 @@ where
         // The accumulator owns mask composition and the final protocol checks.
         let witness_voles = reconstructed_voles.witness_voles();
         let witness_len = self.witness_commitment.len();
-        let mask_vole_len =
-            BatchVerifierAccumulator::mask_vole_count(self.higher_degree_commitment.len());
+        let mask_vole_len = BatchVerifierAccumulator::mask_vole_count(max_higher_degree);
         let mask_tags: Vec<F128b> = witness_voles[witness_len..witness_len + mask_vole_len]
             .iter()
             .map(|q| F8b::form_superfield(&(*q).into()))
@@ -651,7 +652,7 @@ mod tests {
                 let x01 = b.h_mul(&x[0], &x[1]).unwrap();
                 let x23 = b.h_mul(&x[2], &x[3]).unwrap();
                 b.h_mul(&x01, &x23).unwrap()
-            });
+            })?;
             Ok(())
         }
     }
@@ -688,7 +689,7 @@ mod tests {
                 let x01 = b.h_mul(&x[0], &x[1]).unwrap();
                 let x13 = b.h_mul(&x[1], &x[3]).unwrap();
                 b.h_mul(&x01, &x13).unwrap()
-            });
+            })?;
             Ok(())
         }
     }

@@ -251,12 +251,13 @@ impl<'a> HigherDegreeBackend<F2, F128b> for ProverPreparer<'a> {
         &mut self,
         _: &[Self::Wire; INPUT_LEN],
         f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
-    ) {
+    ) -> CircuitResult<()> {
         self.challenge_count += 1;
 
         // Each input wire starts at degree one during polynomial traversal.
         let degree = f(self, [1; INPUT_LEN]);
         self.max_higher_degree = self.max_higher_degree.max(degree);
+        Ok(())
     }
 }
 
@@ -419,7 +420,7 @@ mod tests {
             let x01 = b.h_mul(&x[0], &x[1]).unwrap();
             let x23 = b.h_mul(&x[2], &x[3]).unwrap();
             b.h_mul(&x01, &x23).unwrap()
-        });
+        })?;
         assert_eq!(preparer.max_higher_degree(), 4);
 
         // A subsequent lower-degree constraint (x0 * x1 + x2 * x3, degree 2) doesn't lower the
@@ -428,7 +429,7 @@ mod tests {
             let x01 = b.h_mul(&x[0], &x[1]).unwrap();
             let x23 = b.h_mul(&x[2], &x[3]).unwrap();
             b.h_add(&x01, &x23).unwrap()
-        });
+        })?;
         assert_eq!(preparer.max_higher_degree(), 4);
 
         // Higher degree constraints don't add witness values, but each needs a challenge.
