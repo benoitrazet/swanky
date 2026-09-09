@@ -53,6 +53,28 @@ fn evaluate_poly(coefficients: &[F128b], point: F128b) -> F128b {
         .fold(F128b::ZERO, |acc, c| acc * point + *c)
 }
 
+/// Coefficients of the prover polynomial whose highest-degree coefficient is implicitly zero.
+///
+/// Stores $[\pi_0,\ldots,\pi_{d-1}]$ in increasing degree order. The coefficient of $t^d$ is
+/// known to be zero and is omitted, so [`Self::max_degree`] returns $d$, the protocol's maximum
+/// constraint degree, rather than the actual degree of the stored polynomial.
+#[derive(Clone, Debug)]
+pub struct ZeroPolynomialCoefficients {
+    coefficients: Vec<F128b>,
+}
+
+impl ZeroPolynomialCoefficients {
+    /// Return the protocol's maximum constraint degree.
+    pub fn max_degree(&self) -> usize {
+        self.coefficients.len()
+    }
+
+    /// Return the transmitted coefficients in increasing degree order.
+    pub fn coefficients(&self) -> &[F128b] {
+        &self.coefficients
+    }
+}
+
 /// Prover-side accumulator for the batch verification protocol.
 ///
 /// Used by the live prover ([`crate::proof`]), whose circuit traversal produces one commitment
@@ -184,7 +206,7 @@ impl BatchProverAccumulator {
     ///
     /// Both streams must have length $(d-1)\mathtt{MASK\_VOLE\_SIZE}$. The caller (which owns the
     /// VOLE layout) is responsible for drawing the correct contiguous base-VOLE correlations.
-    pub fn finish(self, mask_values: &[F128b], mask_masks: &[F128b]) -> Vec<F128b> {
+    pub fn finish(self, mask_values: &[F128b], mask_masks: &[F128b]) -> ZeroPolynomialCoefficients {
         debug_assert_eq!(self.top_coefficient(), F128b::ZERO);
         let degree = self.max_degree();
         let mut pi = self.aggregate[..degree].to_vec();
@@ -201,7 +223,7 @@ impl BatchProverAccumulator {
             pi[j + 1] += s_j;
         }
 
-        pi
+        ZeroPolynomialCoefficients { coefficients: pi }
     }
 }
 
@@ -296,8 +318,8 @@ impl BatchVerifierAccumulator {
     ///
     /// `mask_tags` must be a flat stream of $(d-1)\mathtt{MASK\_VOLE\_SIZE}$ tags. The caller (which
     /// owns the VOLE layout) is responsible for drawing the correct contiguous base-VOLE tags;
-    /// once the degree bound holds, `prover_coefficients.len()` equals `d`, so the caller may size
-    /// that draw from `prover_coefficients.len()`.
+    /// once the degree bound holds, `prover_coefficients.max_degree()` equals `d`, so the caller
+    /// may size that draw from [`ZeroPolynomialCoefficients::max_degree`].
     ///
     /// Returns `Ok(())` if the check passes (including trivially when no higher degree constraint
     /// was pushed), or an error if the degree bound is violated or $\pi(\Delta)$ does not match the
@@ -306,17 +328,17 @@ impl BatchVerifierAccumulator {
         &self,
         delta: F128b,
         mask_tags: &[F128b],
-        prover_coefficients: &[F128b],
+        prover_coefficients: &ZeroPolynomialCoefficients,
     ) -> Result<()> {
         // The degree-$d$ coefficient of $\pi(t)$ is zero and omitted, so the prover sends exactly
         // $d$ coefficients. This also enforces the degree bound on $\pi$.
         let max_higher_degree = self.max_degree();
-        if prover_coefficients.len() != max_higher_degree {
+        if prover_coefficients.max_degree() != max_higher_degree {
             bail!(
                 ErrorKind::OtherError,
                 "Verification failed: expected {} higher degree commitment coefficients, got {}",
                 max_higher_degree,
-                prover_coefficients.len()
+                prover_coefficients.max_degree()
             );
         }
         if max_higher_degree == 0 {
@@ -338,7 +360,7 @@ impl BatchVerifierAccumulator {
         }
 
         // Evaluate the prover's $\pi(\Delta)$ and compare.
-        let pi_at_delta = evaluate_poly(prover_coefficients, delta);
+        let pi_at_delta = evaluate_poly(prover_coefficients.coefficients(), delta);
 
         if pi_at_delta != expected {
             bail!(
@@ -557,7 +579,7 @@ mod tests {
         let pi = prover.finish(&[], &[]);
 
         // 1 coefficient below the top (the constant term).
-        assert_eq!(pi.len(), 1);
+        assert_eq!(pi.max_degree(), 1);
 
         // Verifier: fold the evaluation, then check.
         let mut verifier = BatchVerifierAccumulator::new(1);
@@ -695,7 +717,7 @@ mod tests {
         let mut pi = prover.finish(&values, &masks);
 
         // Tamper with a coefficient: verification must reject.
-        pi[0] += F128b::ONE;
+        pi.coefficients[0] += F128b::ONE;
 
         let mut verifier = BatchVerifierAccumulator::new(2);
         verifier.push_constraint(gamma_a, 1, chi[0]).unwrap();

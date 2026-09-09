@@ -21,7 +21,9 @@ use swanky_sieve_ir_api::HigherDegreeCircuitExecuter;
 use crate::vole::functionality::{VoleProver, VoleVerifier};
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
-    commitment_polynomial::batch_verification::{BatchProverAccumulator, BatchVerifierAccumulator},
+    commitment_polynomial::batch_verification::{
+        BatchProverAccumulator, BatchVerifierAccumulator, ZeroPolynomialCoefficients,
+    },
     parameters::SECURITY_PARAM,
     proof::{
         higher_degree_circuit_adapter::HigherDegreeCircuitAdapter,
@@ -50,7 +52,7 @@ pub struct Proof<Vole: RandomVoleP, VoleV: RandomVoleV> {
     /// Aggregated commitment to the assert_zero gates.
     assert_zero_commitment: F128b,
     /// Coefficients of the masked higher-degree batch commitment.
-    higher_degree_commitment: Vec<F128b>,
+    higher_degree_commitment: ZeroPolynomialCoefficients,
     /// Challenge generated to decommit to the VOLEs after committing to the degree coefficients.
     decommitment_challenge: [u8; SECURITY_PARAM / 8],
     /// Partial decommitment of the VOLEs.
@@ -70,7 +72,7 @@ where
         // This is only a part of the proof size, it does not include the partial decommitment part because this is abstracted with traits.
         let witness_commitment_bytes = self.witness_commitment.len() / 8;
         let degree_1_commitment_bytes = 16;
-        let higher_degree_commitment_bytes = self.higher_degree_commitment.len() * 16;
+        let higher_degree_commitment_bytes = self.higher_degree_commitment.max_degree() * 16;
         let decommitment_challenge_bytes = SECURITY_PARAM / 8;
 
         let partial_decommitment_size = self.partial_decommitment.proof_size_estimate();
@@ -91,11 +93,11 @@ where
     /// [`SECURITY_PARAM`] consistency VOLEs), which is identical regardless of how the circuit is
     /// encoded, so it isolates the cost that the higher degree gate is meant to reduce.
     ///
-    /// The higher degree commitment has one coefficient per maximum constraint degree, so its
-    /// length is the maximum degree passed to [`BatchProverAccumulator::mask_vole_count`].
+    /// The higher degree commitment's [`ZeroPolynomialCoefficients::max_degree`] is the maximum
+    /// degree passed to [`BatchProverAccumulator::mask_vole_count`].
     pub fn num_voles(&self) -> usize {
         let mask_vole_count =
-            BatchProverAccumulator::mask_vole_count(self.higher_degree_commitment.len());
+            BatchProverAccumulator::mask_vole_count(self.higher_degree_commitment.max_degree());
         self.witness_commitment.len() + mask_vole_count
     }
 
@@ -230,7 +232,7 @@ where
             &degree_1_commitment,
             &assert_zero_commitment,
         );
-        transcript.append_higher_degree_commitment(&higher_degree_commitment);
+        transcript.append_higher_degree_commitment(higher_degree_commitment.coefficients());
         let decommitment_challenge = transcript.extract_decommitment_challenge();
 
         // Decommit the VOLEs
@@ -275,7 +277,7 @@ where
         // Account for both witness commitments and higher-degree masking material, and require the
         // proof and decommitted VOLEs to agree on the resulting size.
         let mask_vole_count =
-            BatchProverAccumulator::mask_vole_count(self.higher_degree_commitment.len());
+            BatchProverAccumulator::mask_vole_count(self.higher_degree_commitment.max_degree());
         if self.witness_commitment.len() + mask_vole_count != voles.extended_witness_length() {
             bail!(
                 ErrorKind::OtherError,
@@ -366,7 +368,7 @@ where
         let validation_mask = combine(&reconstructed_voles.mask_voles());
 
         // Run circuit traversal and get the aggregate value (part of c~)
-        let max_higher_degree = self.higher_degree_commitment.len();
+        let max_higher_degree = self.higher_degree_commitment.max_degree();
         let mut verifier_traverser = VerifierTraverser::new(
             chi_challenge,
             reconstructed_voles.verifier_key(),
@@ -394,7 +396,7 @@ where
             &self.degree_1_commitment,
             &self.assert_zero_commitment,
         );
-        transcript.append_higher_degree_commitment(&self.higher_degree_commitment);
+        transcript.append_higher_degree_commitment(self.higher_degree_commitment.coefficients());
 
         // Get the VOLE decommitment challenge and make sure it's valid
         let decommitment_challenge = transcript.extract_decommitment_challenge();
@@ -673,7 +675,7 @@ mod tests {
 
         // The maximum constraint degree is 4, so pi(t) has degree at most 3 and is sent as 4
         // coefficients.
-        assert_eq!(proof.higher_degree_commitment.len(), 4);
+        assert_eq!(proof.higher_degree_commitment.max_degree(), 4);
 
         proof.verify_higher_degree(&HigherDegreeCircuit, &mut transcript())
     }
