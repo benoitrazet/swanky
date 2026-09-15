@@ -10,29 +10,26 @@
 //! [`crate::proof`] and the traversers push each constraint as it is traversed and then call
 //! `finish` to form or check the masked polynomial $\pi(t)$.
 
-use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
-use crate::vole::combine;
+use std::marker::PhantomData;
+
 use swanky_error::{ErrorKind, Result, bail};
-use swanky_field::FiniteRing;
-use swanky_field_binary::{F2, F128b};
+use swanky_field::{FiniteField, IsSubFieldOf};
+
+use crate::vole::ExtensionFieldLifter;
 
 use super::CommitmentPolynomial;
 
-/// Number of base VOLE correlations that compose into one full-field mask VOLE (the block size the
-/// flat mask streams passed to the `finish` methods are chunked into).
-const MASK_VOLE_SIZE: usize = REPETITION_PARAM * VOLE_SIZE_PARAM;
-
 /// Compute base^exp in a finite field using repeated squaring.
-pub(crate) fn power(base: F128b, exp: usize) -> F128b {
+pub(crate) fn power<FE: FiniteField>(base: FE, exp: usize) -> FE {
     if exp == 0 {
-        return F128b::ONE;
+        return FE::ONE;
     }
-    let mut result = F128b::ONE;
+    let mut result = FE::ONE;
     let mut b = base;
     let mut e = exp;
     while e > 0 {
         if e & 1 == 1 {
-            result = result * b;
+            result *= b;
         }
         b = b * b;
         e >>= 1;
@@ -46,11 +43,11 @@ pub(crate) fn power(base: F128b, exp: usize) -> F128b {
 /// Shared by the prover ([`BatchProverAccumulator::evaluate_at`], over its own aggregate
 /// coefficients) and the verifier ([`BatchVerifierAccumulator::finish`], over the prover's
 /// committed $\pi(t)$ coefficients).
-fn evaluate_poly(coefficients: &[F128b], point: F128b) -> F128b {
+fn evaluate_poly<FE: FiniteField>(coefficients: &[FE], point: FE) -> FE {
     coefficients
         .iter()
         .rev()
-        .fold(F128b::ZERO, |acc, c| acc * point + *c)
+        .fold(FE::ZERO, |acc, c| acc * point + *c)
 }
 
 /// Coefficients of the prover polynomial whose highest-degree coefficient is implicitly zero.
@@ -59,18 +56,18 @@ fn evaluate_poly(coefficients: &[F128b], point: F128b) -> F128b {
 /// known to be zero and is omitted, so [`Self::max_degree`] returns $d$, the protocol's maximum
 /// constraint degree, rather than the actual degree of the stored polynomial.
 #[derive(Clone, Debug)]
-pub struct ZeroPolynomialCoefficients {
-    coefficients: Vec<F128b>,
+pub struct ZeroPolynomialCoefficients<FE: FiniteField> {
+    coefficients: Vec<FE>,
 }
 
-impl ZeroPolynomialCoefficients {
+impl<FE: FiniteField> ZeroPolynomialCoefficients<FE> {
     /// Return the protocol's maximum constraint degree.
     pub fn max_degree(&self) -> usize {
         self.coefficients.len()
     }
 
     /// Return the transmitted coefficients in increasing degree order.
-    pub fn coefficients(&self) -> &[F128b] {
+    pub fn coefficients(&self) -> &[FE] {
         &self.coefficients
     }
 }
@@ -87,14 +84,25 @@ impl ZeroPolynomialCoefficients {
 /// maximum degree), and [`Self::finish`] adds the masks
 /// $\sum_{j=1}^{d-1}t^{j-1}\sigma_j(t)$. The maximum degree $d$ is fixed up front (the caller
 /// knows it before traversal), so alignment shifts are relative to that fixed size.
-pub struct BatchProverAccumulator {
+pub struct BatchProverAccumulator<F, FE, L>
+where
+    F: FiniteField + IsSubFieldOf<FE>,
+    FE: FiniteField,
+    L: ExtensionFieldLifter<F, FE>,
+{
     /// Coefficients of $A(t)=\sum_i\chi_i t^{d-d_i}\rho_i(t)$ in increasing degree
     /// order; length $d+1$, or empty if the maximum degree is 0 (no higher degree
     /// constraints).
-    aggregate: Vec<F128b>,
+    aggregate: Vec<FE>,
+    phantom: PhantomData<(F, L)>,
 }
 
-impl BatchProverAccumulator {
+impl<F, FE, L> BatchProverAccumulator<F, FE, L>
+where
+    F: FiniteField + IsSubFieldOf<FE>,
+    FE: FiniteField,
+    L: ExtensionFieldLifter<F, FE>,
+{
     /// Create an accumulator for constraints whose maximum degree is `max_degree`.
     ///
     /// A degree-$d$ polynomial has $d+1$ coefficients; the accumulator stays empty if
@@ -104,8 +112,9 @@ impl BatchProverAccumulator {
             aggregate: if max_degree == 0 {
                 Vec::new()
             } else {
-                vec![F128b::ZERO; max_degree + 1]
+                vec![FE::ZERO; max_degree + 1]
             },
+            phantom: PhantomData,
         }
     }
 
@@ -113,7 +122,7 @@ impl BatchProverAccumulator {
     ///
     /// The flat mask streams passed to [`Self::finish`] are chunked into blocks of this size.
     pub fn mask_vole_size() -> usize {
-        MASK_VOLE_SIZE
+        L::BASIS_SIZE
     }
 
     /// Number of base VOLE correlations the batch masking needs for constraints whose maximum
@@ -125,7 +134,7 @@ impl BatchProverAccumulator {
     /// when `max_degree` is 0 or 1 (no masks needed). This is the amount [`crate::proof`] must
     /// provision after the witness VOLEs and later draw as the two flat streams for [`Self::finish`].
     pub fn mask_vole_count(max_degree: usize) -> usize {
-        max_degree.saturating_sub(1) * MASK_VOLE_SIZE
+        max_degree.saturating_sub(1) * Self::mask_vole_size()
     }
 
     /// Fold one challenge-scaled, degree-aligned commitment polynomial into the aggregate.
@@ -138,8 +147,8 @@ impl BatchProverAccumulator {
     /// value is nonzero.
     pub fn push_constraint(
         &mut self,
-        constraint: &CommitmentPolynomial<F2, F128b>,
-        challenge: F128b,
+        constraint: &CommitmentPolynomial<F, FE>,
+        challenge: FE,
     ) -> Result<()> {
         // Sum the challenge-scaled constraint into the aggregate, aligning the highest-degree
         // coefficients: the constraint is shifted up by a power of t, so summing constraints one
@@ -153,7 +162,7 @@ impl BatchProverAccumulator {
                 max_degree
             );
         }
-        if constraint.highest_degree() != F2::ZERO {
+        if constraint.highest_degree() != F::ZERO {
             bail!(
                 ErrorKind::OtherError,
                 "Higher degree constraint does not evaluate to zero"
@@ -168,7 +177,7 @@ impl BatchProverAccumulator {
         Ok(())
     }
 
-    /// The maximum degree among the constraints pushed so far (0 if none were pushed).
+    /// The maximum constraint degree fixed at construction.
     ///
     /// This is the `d` used throughout the batch masking arithmetic, e.g. to size the mask VOLE
     /// stream via [`Self::mask_vole_count`].
@@ -179,15 +188,16 @@ impl BatchProverAccumulator {
     /// The aggregate's degree-$d$ coefficient
     /// $A_d=\sum_i\chi_i x_i$, where $x_i$ is the value committed by $\rho_i$.
     /// An honest prover always commits zero here because every constraint evaluates to zero on
-    /// the witness. Returns [`F128b::ZERO`] if no constraint was pushed.
-    pub fn top_coefficient(&self) -> F128b {
-        self.aggregate.last().copied().unwrap_or(F128b::ZERO)
+    /// the witness. Returns `FE::ZERO` if the accumulator has no higher-degree constraints.
+    pub fn top_coefficient(&self) -> FE {
+        // TODO: revisit the default value once the proof path activates selectively the higher-degree polynomial only when needed.
+        self.aggregate.last().copied().unwrap_or(FE::ZERO)
     }
 
     /// Evaluate the pre-masking aggregate
     /// $A(t)=\sum_i\chi_i t^{d-d_i}\rho_i(t)$ at `point`.
     /// Used to check consistency with the verifier's homomorphic evaluation.
-    pub fn evaluate_at(&self, point: F128b) -> F128b {
+    pub fn evaluate_at(&self, point: FE) -> FE {
         evaluate_poly(&self.aggregate, point)
     }
 
@@ -195,35 +205,56 @@ impl BatchProverAccumulator {
     ///
     /// The mask VOLEs are supplied as two flat streams of base-VOLE correlations — `mask_values`
     /// (the $s_j$ material) and `mask_masks` (the $w_j$ material) — each a concatenation of
-    /// $d-1$ blocks of `MASK_VOLE_SIZE` elements. This organizes them into the per-mask
-    /// blocks, composes each into the full-field $\sigma_j(t)=w_j+s_jt$ via
-    /// `combine`, then computes
+    /// $d-1$ blocks of [`Self::mask_vole_size`] elements. This organizes them into the per-mask
+    /// blocks, composes each into the full-field $\sigma_j(t)=w_j+s_jt$, then computes
     /// $\pi(t)=A(t)+\sum_{j=1}^{d-1}t^{j-1}\sigma_j(t)$.
     /// The aggregate's degree-$d$ coefficient commits to zero for an honest
     /// prover and is omitted, so $\pi(t)$ has degree at most $d-1$ and is returned as the $d$
     /// coefficients $[\pi_0,\ldots,\pi_{d-1}]$. The result is empty if there were no higher degree
     /// constraints.
     ///
-    /// Both streams must have length $(d-1)\mathtt{MASK\_VOLE\_SIZE}$. The caller (which owns the
-    /// VOLE layout) is responsible for drawing the correct contiguous base-VOLE correlations.
-    pub fn finish(self, mask_values: &[F128b], mask_masks: &[F128b]) -> ZeroPolynomialCoefficients {
-        debug_assert_eq!(self.top_coefficient(), F128b::ZERO);
+    /// Both streams must have length $(d-1)\mathtt{mask\_vole\_size()}$.
+    /// The caller (which owns the VOLE layout) is responsible
+    /// for drawing the correct contiguous base-VOLE correlations.
+    pub fn finish(
+        self,
+        mask_values: &[F],
+        mask_masks: &[FE],
+    ) -> Result<ZeroPolynomialCoefficients<FE>> {
+        debug_assert_eq!(self.top_coefficient(), FE::ZERO);
         let degree = self.max_degree();
+        let expected_mask_count = Self::mask_vole_count(degree);
+        let mask_vole_size = Self::mask_vole_size();
+        if mask_vole_size == 0 {
+            bail!(
+                ErrorKind::OtherError,
+                "Extension field lifter must have a nonempty basis"
+            );
+        }
+        if mask_values.len() != expected_mask_count || mask_masks.len() != expected_mask_count {
+            bail!(
+                ErrorKind::OtherError,
+                "Expected {} higher degree mask VOLEs, got {} values and {} masks",
+                expected_mask_count,
+                mask_values.len(),
+                mask_masks.len()
+            );
+        }
         let mut pi = self.aggregate[..degree].to_vec();
 
         // Organize the flat streams into per-mask blocks and compose each into a full-field mask.
-        let values_blocks = mask_values.chunks_exact(MASK_VOLE_SIZE);
-        let masks_blocks = mask_masks.chunks_exact(MASK_VOLE_SIZE);
+        let values_blocks = mask_values.chunks_exact(mask_vole_size);
+        let masks_blocks = mask_masks.chunks_exact(mask_vole_size);
         for (j, (values, masks)) in values_blocks.zip(masks_blocks).enumerate() {
             // Compose the base-VOLE blocks into $\sigma_j(t)=w_j+s_jt$, then add
             // $t^{j-1}\sigma_j(t)$; `j` here is 0-based, corresponding to $j+1$ in the document.
-            let s_j = combine(values);
-            let w_j = combine(masks);
+            let s_j = L::combine_base(values);
+            let w_j = L::combine_extension(masks);
             pi[j] += w_j;
             pi[j + 1] += s_j;
         }
 
-        ZeroPolynomialCoefficients { coefficients: pi }
+        Ok(ZeroPolynomialCoefficients { coefficients: pi })
     }
 }
 
@@ -235,22 +266,34 @@ impl BatchProverAccumulator {
 /// maximum degree $d$ is fixed at construction. [`Self::finish`] applies the alignment, adds the
 /// mask tags, and checks the prover's $\pi(\Delta)$ against
 /// $q=\sum_i\chi_i\Delta^{d-d_i}\gamma_i+\sum_{j=1}^{d-1}\Delta^{j-1}\nu_j$.
-pub struct BatchVerifierAccumulator {
+pub struct BatchVerifierAccumulator<F, FE, L>
+where
+    F: FiniteField + IsSubFieldOf<FE>,
+    FE: FiniteField,
+    L: ExtensionFieldLifter<F, FE>,
+{
     /// Challenge-weighted evaluations grouped by constraint degree: index $k$ holds
     /// $\sum_{i:d_i=k}\chi_i\gamma_i$. The $\Delta^{d-k}$ alignment is
     /// applied in [`Self::finish`]. Length $d+1$, or empty if the maximum degree is 0.
-    aggregates: Vec<F128b>,
+    aggregates: Vec<FE>,
+    phantom: PhantomData<(F, L)>,
 }
 
-impl BatchVerifierAccumulator {
+impl<F, FE, L> BatchVerifierAccumulator<F, FE, L>
+where
+    F: FiniteField + IsSubFieldOf<FE>,
+    FE: FiniteField,
+    L: ExtensionFieldLifter<F, FE>,
+{
     /// Create a verifier accumulator for constraints whose maximum degree is `max_degree`.
     pub fn new(max_degree: usize) -> Self {
         Self {
             aggregates: if max_degree == 0 {
                 Vec::new()
             } else {
-                vec![F128b::ZERO; max_degree + 1]
+                vec![FE::ZERO; max_degree + 1]
             },
+            phantom: PhantomData,
         }
     }
 
@@ -258,7 +301,7 @@ impl BatchVerifierAccumulator {
     ///
     /// The flat mask-tag stream passed to [`Self::finish`] is chunked into blocks of this size.
     pub fn mask_vole_size() -> usize {
-        MASK_VOLE_SIZE
+        L::BASIS_SIZE
     }
 
     /// Number of base VOLE correlations the batch masking needs for constraints whose maximum
@@ -270,7 +313,7 @@ impl BatchVerifierAccumulator {
     /// $(d-1)\mathtt{mask\_vole\_size()}$ in total, or 0
     /// when `max_degree` is 0 or 1 (no masks needed).
     pub fn mask_vole_count(max_degree: usize) -> usize {
-        max_degree.saturating_sub(1) * MASK_VOLE_SIZE
+        max_degree.saturating_sub(1) * Self::mask_vole_size()
     }
 
     /// Fold one challenge-scaled constraint evaluation into the by-degree aggregate.
@@ -280,7 +323,7 @@ impl BatchVerifierAccumulator {
     /// The $\Delta^{d-d_i}$ alignment is deferred to [`Self::finish`].
     ///
     /// Returns an error if `degree` exceeds the configured maximum degree.
-    pub fn push_constraint(&mut self, gamma: F128b, degree: usize, challenge: F128b) -> Result<()> {
+    pub fn push_constraint(&mut self, gamma: FE, degree: usize, challenge: FE) -> Result<()> {
         // Group the challenge-weighted evaluations by degree; the $\Delta^{d-d_i}$ alignment is
         // applied after traversal using the maximum degree fixed at construction.
         let max_degree = self.max_degree();
@@ -312,23 +355,23 @@ impl BatchVerifierAccumulator {
     /// omitted. Then computes the expected value
     /// $q=\sum_i\chi_i\Delta^{d-d_i}\gamma_i+
     /// \sum_{j=1}^{d-1}\Delta^{j-1}\nu_j$
-    /// (each $\nu_j=\sigma_j(\Delta)$ composed via `combine` from a `MASK_VOLE_SIZE`-element
-    /// block of the flat `mask_tags` stream), evaluates the prover's $\pi(\Delta)$ from
+    /// (each $\nu_j=\sigma_j(\Delta)$ composed from a [`Self::mask_vole_size`]-element block of
+    /// the flat `mask_tags` stream), evaluates the prover's $\pi(\Delta)$ from
     /// `prover_coefficients`, and checks they match.
     ///
-    /// `mask_tags` must be a flat stream of $(d-1)\mathtt{MASK\_VOLE\_SIZE}$ tags. The caller (which
-    /// owns the VOLE layout) is responsible for drawing the correct contiguous base-VOLE tags;
-    /// once the degree bound holds, `prover_coefficients.max_degree()` equals `d`, so the caller
-    /// may size that draw from [`ZeroPolynomialCoefficients::max_degree`].
+    /// `mask_tags` must be a flat stream of $(d-1)\mathtt{mask\_vole\_size()}$ tags.
+    /// The caller (which owns the VOLE layout) is responsible for drawing the correct contiguous
+    /// base-VOLE tags; once the degree bound holds, `prover_coefficients.max_degree()` equals `d`,
+    /// so the caller may size that draw from [`ZeroPolynomialCoefficients::max_degree`].
     ///
     /// Returns `Ok(())` if the check passes (including trivially when no higher degree constraint
     /// was pushed), or an error if the degree bound is violated or $\pi(\Delta)$ does not match the
     /// expected value.
     pub fn finish(
         &self,
-        delta: F128b,
-        mask_tags: &[F128b],
-        prover_coefficients: &ZeroPolynomialCoefficients,
+        delta: FE,
+        mask_tags: &[FE],
+        prover_coefficients: &ZeroPolynomialCoefficients<FE>,
     ) -> Result<()> {
         // The degree-$d$ coefficient of $\pi(t)$ is zero and omitted, so the prover sends exactly
         // $d$ coefficients. This also enforces the degree bound on $\pi$.
@@ -341,21 +384,37 @@ impl BatchVerifierAccumulator {
                 prover_coefficients.max_degree()
             );
         }
+        let mask_vole_size = Self::mask_vole_size();
+        if mask_vole_size == 0 {
+            bail!(
+                ErrorKind::OtherError,
+                "Extension field lifter must have a nonempty basis"
+            );
+        }
+        let expected_mask_count = Self::mask_vole_count(max_higher_degree);
+        if mask_tags.len() != expected_mask_count {
+            bail!(
+                ErrorKind::OtherError,
+                "Expected {} higher degree mask VOLE tags, got {}",
+                expected_mask_count,
+                mask_tags.len()
+            );
+        }
         if max_higher_degree == 0 {
             return Ok(());
         }
 
         // Constraint contributions: $\sum_i\chi_i\Delta^{d-d_i}\gamma_i$.
-        let mut expected = F128b::ZERO;
+        let mut expected = FE::ZERO;
         for (degree, aggregate) in self.aggregates.iter().enumerate() {
             expected += power(delta, max_higher_degree - degree) * *aggregate;
         }
 
         // Mask contributions: $\sum_j\Delta^{j-1}\nu_j$, organizing the flat stream into per-mask
         // blocks and composing each into nu_j.
-        let mut delta_power = F128b::ONE;
-        for block in mask_tags.chunks_exact(MASK_VOLE_SIZE) {
-            expected += delta_power * combine(block);
+        let mut delta_power = FE::ONE;
+        for block in mask_tags.chunks_exact(mask_vole_size) {
+            expected += delta_power * L::combine_extension(block);
             delta_power *= delta;
         }
 
@@ -376,8 +435,33 @@ impl BatchVerifierAccumulator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        commitment_polynomial::{BatchProverAccumulatorF2F128b, BatchVerifierAccumulatorF2F128b},
+        parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM},
+        vole::combine,
+    };
     use rand::{Rng, rng};
     use swanky_field::FiniteRing;
+    use swanky_field_binary::{F2, F64b, F128b};
+
+    struct ExtensionFieldLifterF2F64b;
+
+    impl ExtensionFieldLifter<F2, F64b> for ExtensionFieldLifterF2F64b {
+        const BASIS_SIZE: usize = 64;
+
+        fn combine_base(values: &[F2]) -> F64b {
+            combine::<F2, F64b>(values)
+        }
+
+        fn combine_extension(values: &[F64b]) -> F64b {
+            combine::<F64b, F64b>(values)
+        }
+    }
+
+    type BatchProverAccumulatorF2F64b =
+        BatchProverAccumulator<F2, F64b, ExtensionFieldLifterF2F64b>;
+    type BatchVerifierAccumulatorF2F64b =
+        BatchVerifierAccumulator<F2, F64b, ExtensionFieldLifterF2F64b>;
 
     fn random_f128b(rng: &mut impl Rng) -> F128b {
         F128b::random(rng)
@@ -412,7 +496,7 @@ mod tests {
     /// Build `num_masks` full-field mask VOLEs as the flat base-VOLE streams the accumulators'
     /// `finish` methods consume.
     ///
-    /// Returns `(values, masks, tags)`, each `num_masks * MASK_VOLE_SIZE` long, with
+    /// Returns `(values, masks, tags)`, each `num_masks * mask_vole_size()` long, with
     /// `tags[k] = values[k] * delta + masks[k]`. Because `combine` is linear, this makes each
     /// block satisfy `combine(tags) = delta * combine(values) + combine(masks) = sigma_j(Delta)`,
     /// i.e. the verifier's tag composes to the prover's mask polynomial evaluated at Δ.
@@ -420,13 +504,13 @@ mod tests {
         rng: &mut impl Rng,
         delta: F128b,
         num_masks: usize,
-    ) -> (Vec<F128b>, Vec<F128b>, Vec<F128b>) {
-        let n = num_masks * MASK_VOLE_SIZE;
+    ) -> (Vec<F2>, Vec<F128b>, Vec<F128b>) {
+        let n = num_masks * BatchProverAccumulatorF2F128b::mask_vole_size();
         let mut values = Vec::with_capacity(n);
         let mut masks = Vec::with_capacity(n);
         let mut tags = Vec::with_capacity(n);
         for _ in 0..n {
-            let u = random_f128b(rng);
+            let u = F2::random(rng);
             let w = random_f128b(rng);
             values.push(u);
             masks.push(w);
@@ -447,6 +531,45 @@ mod tests {
         let poly = CommitmentPolynomial::<F128b, F128b>::from_base_vole(value, w);
         let gamma = poly.evaluate_at_point(delta);
         (poly, gamma)
+    }
+
+    #[test]
+    fn f2_f128b_mask_vole_size_matches_protocol_parameters() {
+        let expected = REPETITION_PARAM * VOLE_SIZE_PARAM;
+        assert_eq!(BatchProverAccumulatorF2F128b::mask_vole_size(), expected);
+        assert_eq!(BatchVerifierAccumulatorF2F128b::mask_vole_size(), expected);
+    }
+
+    #[test]
+    fn generic_batch_verification_supports_f64b_extension_field() {
+        let rng = &mut rng();
+        let delta = F64b::random(rng);
+        let challenge = F64b::random(rng);
+
+        let zero = CommitmentPolynomial::<F2, F64b>::from_base_vole(F2::ZERO, F64b::random(rng));
+        let one = CommitmentPolynomial::<F2, F64b>::from_base_vole(F2::ONE, F64b::random(rng));
+        let constraint = zero.mul(&one);
+        let gamma = constraint.evaluate_at_point(delta);
+
+        let mask_count = BatchProverAccumulatorF2F64b::mask_vole_count(2);
+        let mut values = Vec::with_capacity(mask_count);
+        let mut masks = Vec::with_capacity(mask_count);
+        let mut tags = Vec::with_capacity(mask_count);
+        for _ in 0..mask_count {
+            let value = F2::random(rng);
+            let mask = F64b::random(rng);
+            values.push(value);
+            masks.push(mask);
+            tags.push(value * delta + mask);
+        }
+
+        let mut prover = BatchProverAccumulatorF2F64b::new(2);
+        prover.push_constraint(&constraint, challenge).unwrap();
+        let coefficients = prover.finish(&values, &masks).unwrap();
+
+        let mut verifier = BatchVerifierAccumulatorF2F64b::new(2);
+        verifier.push_constraint(gamma, 2, challenge).unwrap();
+        verifier.finish(delta, &tags, &coefficients).unwrap();
     }
 
     #[test]
@@ -574,15 +697,15 @@ mod tests {
         let chi = challenge_powers(xi, 1);
 
         // Prover: fold the constraint, then finish (max_degree = 1 needs 0 mask VOLEs).
-        let mut prover = BatchProverAccumulator::new(1);
+        let mut prover = BatchProverAccumulatorF2F128b::new(1);
         prover.push_constraint(&poly, chi[0]).unwrap();
-        let pi = prover.finish(&[], &[]);
+        let pi = prover.finish(&[], &[]).unwrap();
 
         // 1 coefficient below the top (the constant term).
         assert_eq!(pi.max_degree(), 1);
 
         // Verifier: fold the evaluation, then check.
-        let mut verifier = BatchVerifierAccumulator::new(1);
+        let mut verifier = BatchVerifierAccumulatorF2F128b::new(1);
         verifier.push_constraint(gamma, 1, chi[0]).unwrap();
         verifier.finish(delta, &[], &pi).unwrap();
     }
@@ -605,12 +728,12 @@ mod tests {
         // max_degree = 2, need 1 mask VOLE.
         let (values, masks, tags) = make_mask_blocks(rng, delta, 1);
 
-        let mut prover = BatchProverAccumulator::new(2);
+        let mut prover = BatchProverAccumulatorF2F128b::new(2);
         prover.push_constraint(&poly_a, chi[0]).unwrap();
         prover.push_constraint(&poly_c, chi[1]).unwrap();
-        let pi = prover.finish(&values, &masks);
+        let pi = prover.finish(&values, &masks).unwrap();
 
-        let mut verifier = BatchVerifierAccumulator::new(2);
+        let mut verifier = BatchVerifierAccumulatorF2F128b::new(2);
         verifier.push_constraint(gamma_a, 1, chi[0]).unwrap();
         verifier.push_constraint(gamma_c, 2, chi[1]).unwrap();
         verifier.finish(delta, &tags, &pi).unwrap();
@@ -637,13 +760,13 @@ mod tests {
         // max_degree = 3, need 2 mask VOLEs.
         let (values, masks, tags) = make_mask_blocks(rng, delta, 2);
 
-        let mut prover = BatchProverAccumulator::new(3);
+        let mut prover = BatchProverAccumulatorF2F128b::new(3);
         prover.push_constraint(&poly1, chi[0]).unwrap();
         prover.push_constraint(&poly3, chi[1]).unwrap();
         prover.push_constraint(&poly5, chi[2]).unwrap();
-        let pi = prover.finish(&values, &masks);
+        let pi = prover.finish(&values, &masks).unwrap();
 
-        let mut verifier = BatchVerifierAccumulator::new(3);
+        let mut verifier = BatchVerifierAccumulatorF2F128b::new(3);
         verifier.push_constraint(gamma1, 1, chi[0]).unwrap();
         verifier.push_constraint(gamma3, 2, chi[1]).unwrap();
         verifier.push_constraint(gamma5, 3, chi[2]).unwrap();
@@ -660,14 +783,15 @@ mod tests {
         // traversal to observe a degree-3 constraint.
         let base = CommitmentPolynomial::<F2, F128b>::from_base_vole(F2::ZERO, F128b::ZERO);
         let degree_two = base.mul(&base);
-        let mask_count = BatchProverAccumulator::mask_vole_count(max_degree);
+        let mask_count = BatchProverAccumulatorF2F128b::mask_vole_count(max_degree);
+        let zero_values = vec![F2::ZERO; mask_count];
         let zero_masks = vec![F128b::ZERO; mask_count];
 
-        let mut prover = BatchProverAccumulator::new(max_degree);
+        let mut prover = BatchProverAccumulatorF2F128b::new(max_degree);
         prover.push_constraint(&degree_two, challenge).unwrap();
-        let pi = prover.finish(&zero_masks, &zero_masks);
+        let pi = prover.finish(&zero_values, &zero_masks).unwrap();
 
-        let mut verifier = BatchVerifierAccumulator::new(max_degree);
+        let mut verifier = BatchVerifierAccumulatorF2F128b::new(max_degree);
         verifier
             .push_constraint(degree_two.evaluate_at_point(delta), 2, challenge)
             .unwrap();
@@ -679,21 +803,64 @@ mod tests {
         let base = CommitmentPolynomial::<F2, F128b>::from_base_vole(F2::ONE, F128b::ONE);
         let degree_two = base.mul(&base);
 
-        let mut prover = BatchProverAccumulator::new(1);
+        let mut prover = BatchProverAccumulatorF2F128b::new(1);
         assert!(prover.push_constraint(&degree_two, F128b::ONE).is_err());
 
-        let mut verifier = BatchVerifierAccumulator::new(1);
+        let mut verifier = BatchVerifierAccumulatorF2F128b::new(1);
         assert!(verifier.push_constraint(F128b::ONE, 2, F128b::ONE).is_err());
     }
 
     #[test]
     fn test_prover_rejects_nonzero_constraint_without_mutating() {
         let constraint = CommitmentPolynomial::<F2, F128b>::from_base_vole(F2::ONE, F128b::ONE);
-        let mut prover = BatchProverAccumulator::new(1);
+        let mut prover = BatchProverAccumulatorF2F128b::new(1);
 
         assert!(prover.push_constraint(&constraint, F128b::ONE).is_err());
         assert_eq!(prover.top_coefficient(), F128b::ZERO);
         assert_eq!(prover.evaluate_at(F128b::ONE), F128b::ZERO);
+    }
+
+    #[test]
+    fn finish_rejects_malformed_mask_stream_lengths() {
+        let constraint = CommitmentPolynomial::<F2, F128b>::from_base_vole(F2::ZERO, F128b::ZERO)
+            .mul(&CommitmentPolynomial::from_base_vole(F2::ONE, F128b::ZERO));
+        let mask_count = BatchProverAccumulatorF2F128b::mask_vole_count(2);
+        assert!(mask_count > 0);
+        let values = vec![F2::ZERO; mask_count];
+        let masks = vec![F128b::ZERO; mask_count];
+
+        let mut prover = BatchProverAccumulatorF2F128b::new(2);
+        prover.push_constraint(&constraint, F128b::ONE).unwrap();
+        assert!(prover.finish(&values[..mask_count - 1], &masks).is_err());
+
+        let mut prover = BatchProverAccumulatorF2F128b::new(2);
+        prover.push_constraint(&constraint, F128b::ONE).unwrap();
+        let coefficients = prover.finish(&values, &masks).unwrap();
+
+        let mut verifier = BatchVerifierAccumulatorF2F128b::new(2);
+        verifier
+            .push_constraint(constraint.evaluate_at_point(F128b::ONE), 2, F128b::ONE)
+            .unwrap();
+        assert!(
+            verifier
+                .finish(F128b::ONE, &masks[..mask_count - 1], &coefficients)
+                .is_err()
+        );
+
+        assert!(
+            BatchProverAccumulatorF2F128b::new(0)
+                .finish(&[F2::ZERO], &[])
+                .is_err()
+        );
+        let empty_coefficients = BatchProverAccumulatorF2F128b::new(0)
+            .finish(&[], &[])
+            .unwrap();
+        let empty_verifier = BatchVerifierAccumulatorF2F128b::new(0);
+        assert!(
+            empty_verifier
+                .finish(F128b::ONE, &[F128b::ZERO], &empty_coefficients)
+                .is_err()
+        );
     }
 
     #[test]
@@ -711,15 +878,15 @@ mod tests {
 
         let (values, masks, tags) = make_mask_blocks(rng, delta, 1);
 
-        let mut prover = BatchProverAccumulator::new(2);
+        let mut prover = BatchProverAccumulatorF2F128b::new(2);
         prover.push_constraint(&poly_a, chi[0]).unwrap();
         prover.push_constraint(&poly_c, chi[1]).unwrap();
-        let mut pi = prover.finish(&values, &masks);
+        let mut pi = prover.finish(&values, &masks).unwrap();
 
         // Tamper with a coefficient: verification must reject.
         pi.coefficients[0] += F128b::ONE;
 
-        let mut verifier = BatchVerifierAccumulator::new(2);
+        let mut verifier = BatchVerifierAccumulatorF2F128b::new(2);
         verifier.push_constraint(gamma_a, 1, chi[0]).unwrap();
         verifier.push_constraint(gamma_c, 2, chi[1]).unwrap();
         assert!(verifier.finish(delta, &tags, &pi).is_err());
@@ -738,14 +905,14 @@ mod tests {
 
         let (values, masks, tags) = make_mask_blocks(rng, delta, 1);
 
-        let mut prover = BatchProverAccumulator::new(2);
+        let mut prover = BatchProverAccumulatorF2F128b::new(2);
         prover.push_constraint(&poly_a, chi[0]).unwrap();
         prover.push_constraint(&poly_c, chi[1]).unwrap();
-        let pi = prover.finish(&values, &masks);
+        let pi = prover.finish(&values, &masks).unwrap();
 
         // The verifier folds a wrong evaluation for the degree-2 constraint: check must reject.
         let wrong_gamma = random_f128b(rng);
-        let mut verifier = BatchVerifierAccumulator::new(2);
+        let mut verifier = BatchVerifierAccumulatorF2F128b::new(2);
         verifier.push_constraint(gamma_a, 1, chi[0]).unwrap();
         verifier.push_constraint(wrong_gamma, 2, chi[1]).unwrap();
         assert!(verifier.finish(delta, &tags, &pi).is_err());

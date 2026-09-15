@@ -6,9 +6,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
 
-use crate::commitment_polynomial::{
-    CommitmentPolynomial, batch_verification::BatchProverAccumulator,
-};
+use crate::commitment_polynomial::{BatchProverAccumulatorF2F128b, CommitmentPolynomial};
 use crate::proof::ChiGenerator;
 use crate::vole::RandomVoleP;
 
@@ -21,7 +19,7 @@ pub(crate) struct ProverTraverserParts<Vole> {
     /// Aggregated assert-zero commitment.
     pub(crate) assert_zero_commitment: F128b,
     /// Accumulator for the higher-degree constraint polynomials.
-    pub(crate) higher_degree_accumulator: BatchProverAccumulator,
+    pub(crate) higher_degree_accumulator: BatchProverAccumulatorF2F128b,
     /// Random VOLE values supplied to the traverser.
     pub(crate) voles: Vole,
 }
@@ -59,10 +57,7 @@ pub struct ProverTraverser<Vole> {
     aggregate_assert_zero: F128b,
 
     /// Streamed accumulator for the higher-degree constraint batch.
-    ///
-    /// Final masking is delegated to [`BatchProverAccumulator::finish`] in
-    /// [`Proof::prove()`](crate::proof::Proof::prove).
-    higher_degree_accumulator: BatchProverAccumulator,
+    higher_degree_accumulator: BatchProverAccumulatorF2F128b,
 }
 
 impl<Vole: RandomVoleP> ProverTraverser<Vole> {
@@ -98,7 +93,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
 
             aggregate_assert_zero: F128b::ZERO,
 
-            higher_degree_accumulator: BatchProverAccumulator::new(max_higher_degree),
+            higher_degree_accumulator: BatchProverAccumulatorF2F128b::new(max_higher_degree),
         })
     }
 

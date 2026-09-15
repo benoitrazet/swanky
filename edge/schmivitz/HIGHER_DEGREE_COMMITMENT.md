@@ -248,7 +248,12 @@ Schmivitz instantiates the construction with `F2` as the base field and `F128b` 
 
 `edge/sieve-ir-api` defines the cross-crate circuit interface: `HigherDegreeBackend` adds the four polynomial gate operations and higher-degree zero assertion, while `HigherDegreeCircuitExecuter` lets a circuit execute against any such backend.
 
-`src/commitment_polynomial` contains the protocol primitives: `CommitmentPolynomial` implements the commitment representation and gate algebra, and `batch_verification` implements the streamed prover and verifier accumulators for mixed-degree alignment, masking, and the final batch check.
+`src/commitment_polynomial` contains the protocol primitives: `CommitmentPolynomial` implements the
+commitment representation and gate algebra, and `batch_verification` implements generic streamed prover
+and verifier accumulators for mixed-degree alignment, masking, and the final batch check.
+The accumulators are parameterized by the base field, extension field, and an `ExtensionFieldLifter`.
+The batch protocol uses the operations provided by the `ExtensionFieldLifter` trait to compose values,
+masks, and tags.
 
 `ProverPreparer` performs the initial cleartext traversal with polynomial degrees as its higher-degree wire representation, determining the circuit's maximum constraint degree and therefore the amount of masking VOLE material to reserve.
 

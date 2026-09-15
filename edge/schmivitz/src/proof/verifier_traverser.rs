@@ -5,7 +5,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
 
-use crate::commitment_polynomial::batch_verification::{BatchVerifierAccumulator, power};
+use crate::commitment_polynomial::{BatchVerifierAccumulatorF2F128b, batch_verification::power};
 use crate::proof::ChiGenerator;
 
 /// Values produced by a completed verifier circuit traversal.
@@ -15,7 +15,7 @@ pub(crate) struct VerifierTraverserParts {
     /// Aggregated assert-zero value.
     pub(crate) aggregate_assert_zero: F128b,
     /// Accumulator for the higher-degree constraint evaluations.
-    pub(crate) higher_degree_accumulator: BatchVerifierAccumulator,
+    pub(crate) higher_degree_accumulator: BatchVerifierAccumulatorF2F128b,
 }
 
 /// A [`VerifierTraverser`] allows the verifier to execute the gate-by-gate evaluation portion of
@@ -52,10 +52,7 @@ pub struct VerifierTraverser {
     aggregate_assert_zero: F128b,
 
     /// Streamed accumulator for the higher-degree constraint batch, grouped by degree.
-    ///
-    /// Final alignment and masking are delegated to [`BatchVerifierAccumulator::finish`] in
-    /// [`Proof::verify()`](crate::proof::Proof::verify).
-    higher_degree_accumulator: BatchVerifierAccumulator,
+    higher_degree_accumulator: BatchVerifierAccumulatorF2F128b,
 }
 
 impl VerifierTraverser {
@@ -73,7 +70,7 @@ impl VerifierTraverser {
             assigned_witness_count: 0,
             aggregate: F128b::ZERO,
             aggregate_assert_zero: F128b::ZERO,
-            higher_degree_accumulator: BatchVerifierAccumulator::new(max_higher_degree),
+            higher_degree_accumulator: BatchVerifierAccumulatorF2F128b::new(max_higher_degree),
         })
     }
 

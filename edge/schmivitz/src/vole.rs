@@ -10,29 +10,72 @@ pub(crate) mod insecure;
 use crypto_primitives::Chall3;
 use merlin::Transcript;
 use rand::CryptoRng;
+use std::ops::Mul;
 use swanky_error::Result;
-use swanky_field::{FiniteField, FiniteRing};
+use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b, F128b};
 
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
 
-/// Combine a block of base-field VOLE values into a single full-field [`F128b`] value.
+/// Combine field elements using a fixed basis of an extension field.
+///
+/// Implementations choose an `F`-basis $(b_0,\ldots,b_{r-1})$ of `FE`, with
+/// $r=\mathtt{BASIS\_SIZE}$. Both methods compute $\sum_{k=0}^{r-1}z_k b_k$:
+/// [`Self::combine_base`] takes coordinates in `F`, while [`Self::combine_extension`]
+/// uses the same basis weights with coefficients in `FE`.
+///
+/// Both methods expect exactly [`Self::BASIS_SIZE`] input elements. The extension-field
+/// combination must be `FE`-linear and agree with the base-field combination on embedded
+/// inputs.
+pub trait ExtensionFieldLifter<F, FE>
+where
+    F: FiniteField + IsSubFieldOf<FE>,
+    FE: FiniteField,
+{
+    /// Number of basis elements, equal to the dimension of `FE` over `F`.
+    const BASIS_SIZE: usize;
+
+    /// Combine [`Self::BASIS_SIZE`] base-field coordinates into one extension-field value.
+    fn combine_base(values: &[F]) -> FE;
+
+    /// Combine [`Self::BASIS_SIZE`] extension-field elements using the same basis weights.
+    fn combine_extension(values: &[FE]) -> FE;
+}
+
+/// Combine field elements using successive powers of the extension field's generator.
 ///
 /// Specifically, computes
 /// $\operatorname{combine}(z_0,\ldots,z_{r-1})=\sum_{k=0}^{r-1}z_kX^k$, where $X$ is
-/// [`F128b::GENERATOR`]. Here
-/// $r=\mathtt{REPETITION\_PARAM}\cdot\mathtt{VOLE\_SIZE\_PARAM}=128$, matching the
-/// full-field composition used for each $\sigma_j(t)$ mask in higher-degree batching.
-pub(crate) fn combine(values: &[F128b]) -> F128b {
+/// the extension field's multiplicative generator.
+pub(crate) fn combine<V, FE>(values: &[V]) -> FE
+where
+    V: Copy + Mul<FE, Output = FE>,
+    FE: FiniteField,
+{
     // Start with `X^0 = 1`
-    let mut power = F128b::ONE;
-    let mut acc = F128b::ZERO;
+    let mut power = FE::ONE;
+    let mut acc = FE::ZERO;
 
     for vi in values {
         acc += *vi * power;
-        power *= F128b::GENERATOR;
+        power *= FE::GENERATOR;
     }
     acc
+}
+
+/// Power-basis lifting from `F2` to `F128b`.
+pub(crate) struct ExtensionFieldLifterF2F128b;
+
+impl ExtensionFieldLifter<F2, F128b> for ExtensionFieldLifterF2F128b {
+    const BASIS_SIZE: usize = REPETITION_PARAM * VOLE_SIZE_PARAM;
+
+    fn combine_base(values: &[F2]) -> F128b {
+        combine::<F2, F128b>(values)
+    }
+
+    fn combine_extension(values: &[F128b]) -> F128b {
+        combine::<F128b, F128b>(values)
+    }
 }
 
 // Exposing these modules for benchmarking at the moment.
@@ -143,6 +186,8 @@ where
     ///
     /// Important: the values returned from this method must not overlap with those returned by
     /// [`RandomVoleP::witness_mask()`].
+    ///
+    /// TODO: change the output type to [F2; REPETITION_PARAM * VOLE_SIZE_PARAM]
     fn aggregate_commitment_values(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
 
     /// Gets the VOLE masks ($`v_i \text{ for } i \in [\ell + 1..\ell + r\tau]`$ in the paper),

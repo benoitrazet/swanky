@@ -21,8 +21,9 @@ use swanky_sieve_ir_api::HigherDegreeCircuitExecuter;
 use crate::vole::functionality::{VoleProver, VoleVerifier};
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
-    commitment_polynomial::batch_verification::{
-        BatchProverAccumulator, BatchVerifierAccumulator, ZeroPolynomialCoefficients,
+    commitment_polynomial::{
+        BatchProverAccumulatorF2F128b, BatchVerifierAccumulatorF2F128b,
+        batch_verification::ZeroPolynomialCoefficients,
     },
     parameters::SECURITY_PARAM,
     proof::{
@@ -52,7 +53,7 @@ pub struct Proof<Vole: RandomVoleP, VoleV: RandomVoleV> {
     /// Aggregated commitment to the assert_zero gates.
     assert_zero_commitment: F128b,
     /// Coefficients of the masked higher-degree batch commitment.
-    higher_degree_commitment: ZeroPolynomialCoefficients,
+    higher_degree_commitment: ZeroPolynomialCoefficients<F128b>,
     /// Challenge generated to decommit to the VOLEs after committing to the degree coefficients.
     decommitment_challenge: [u8; SECURITY_PARAM / 8],
     /// Partial decommitment of the VOLEs.
@@ -86,18 +87,19 @@ where
 
     /// The number of base VOLE correlations the proof commits to in order to encode the circuit:
     /// one per extended-witness value (private inputs and multiplication gate outputs), plus the
-    /// higher degree mask VOLEs (see [`BatchProverAccumulator::mask_vole_count`]) for the maximum
-    /// constraint degree.
+    /// higher degree mask VOLEs (see
+    /// [`BatchProverAccumulatorF2F128b::mask_vole_count`]) for the maximum constraint degree.
     ///
     /// This excludes the fixed protocol overhead (the aggregate-commitment masks and the
     /// [`SECURITY_PARAM`] consistency VOLEs), which is identical regardless of how the circuit is
     /// encoded, so it isolates the cost that the higher degree gate is meant to reduce.
     ///
     /// The higher degree commitment's [`ZeroPolynomialCoefficients::max_degree`] is the maximum
-    /// degree passed to [`BatchProverAccumulator::mask_vole_count`].
+    /// degree passed to [`BatchProverAccumulatorF2F128b::mask_vole_count`].
     pub fn num_voles(&self) -> usize {
-        let mask_vole_count =
-            BatchProverAccumulator::mask_vole_count(self.higher_degree_commitment.max_degree());
+        let mask_vole_count = BatchProverAccumulatorF2F128b::mask_vole_count(
+            self.higher_degree_commitment.max_degree(),
+        );
         self.witness_commitment.len() + mask_vole_count
     }
 
@@ -150,7 +152,7 @@ where
         } = circuit_preparer.into_parts();
 
         // Reserve the VOLEs needed to mask the higher-degree batch after the witness VOLEs.
-        let mask_vole_count = BatchProverAccumulator::mask_vole_count(max_higher_degree);
+        let mask_vole_count = BatchProverAccumulatorF2F128b::mask_vole_count(max_higher_degree);
 
         log::info!("1: circuit preparer: {:?}", t.elapsed());
 
@@ -206,8 +208,8 @@ where
 
         let t = std::time::Instant::now();
         // Compute masks for the aggregated coefficients (`v*`, `u*` in the paper)
-        let degree_0_mask = combine(&voles.aggregate_commitment_masks());
-        let degree_1_mask = combine(&voles.aggregate_commitment_values());
+        let degree_0_mask = combine::<F128b, F128b>(&voles.aggregate_commitment_masks());
+        let degree_1_mask = combine::<F128b, F128b>(&voles.aggregate_commitment_values());
 
         // Finish computing aggregated responses (`a~`, `b~` in the paper)
         let degree_0_commitment = degree_0_aggregation + degree_0_mask;
@@ -216,15 +218,12 @@ where
         // Finalize the higher-degree batch with the mask VOLEs that follow the witness VOLEs.
         // The accumulator owns their organization and composition.
         let witness_len = witness_commitment.len();
-        let mask_values: Vec<F128b> = voles.witness_mask()
-            [witness_len..witness_len + mask_vole_count]
-            .iter()
-            .map(|u| (*u).into())
-            .collect();
+        let mask_values = &voles.witness_mask()[witness_len..witness_len + mask_vole_count];
         let mask_masks: Vec<F128b> = (witness_len..witness_len + mask_vole_count)
             .map(|i| voles.vole_mask(i))
             .collect::<Result<Vec<_>>>()?;
-        let higher_degree_commitment = higher_degree_accumulator.finish(&mask_values, &mask_masks);
+        let higher_degree_commitment =
+            higher_degree_accumulator.finish(mask_values, &mask_masks)?;
 
         // Add aggregated responses to transcript
         transcript.append_polynomial_commitments(
@@ -276,8 +275,9 @@ where
     fn validate_proof(&self, voles: &VoleV) -> Result<()> {
         // Account for both witness commitments and higher-degree masking material, and require the
         // proof and decommitted VOLEs to agree on the resulting size.
-        let mask_vole_count =
-            BatchProverAccumulator::mask_vole_count(self.higher_degree_commitment.max_degree());
+        let mask_vole_count = BatchProverAccumulatorF2F128b::mask_vole_count(
+            self.higher_degree_commitment.max_degree(),
+        );
         if self.witness_commitment.len() + mask_vole_count != voles.extended_witness_length() {
             bail!(
                 ErrorKind::OtherError,
@@ -365,7 +365,7 @@ where
 
         let t = std::time::Instant::now();
         // Combine mask VOLEs to get q*
-        let validation_mask = combine(&reconstructed_voles.mask_voles());
+        let validation_mask = combine::<F128b, F128b>(&reconstructed_voles.mask_voles());
 
         // Run circuit traversal and get the aggregate value (part of c~)
         let max_higher_degree = self.higher_degree_commitment.max_degree();
@@ -419,7 +419,7 @@ where
         // The accumulator owns mask composition and the final protocol checks.
         let witness_voles = reconstructed_voles.witness_voles();
         let witness_len = self.witness_commitment.len();
-        let mask_vole_len = BatchVerifierAccumulator::mask_vole_count(max_higher_degree);
+        let mask_vole_len = BatchVerifierAccumulatorF2F128b::mask_vole_count(max_higher_degree);
         let mask_tags: Vec<F128b> = witness_voles[witness_len..witness_len + mask_vole_len]
             .iter()
             .map(|q| F8b::form_superfield(&(*q).into()))
