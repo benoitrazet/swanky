@@ -33,9 +33,6 @@ where
     F: IsSubFieldOf<FE>,
 {
     /// Create a commitment polynomial from a base VOLE.
-    ///
-    /// Given a value `x` in the base field and a VOLE mask `w` in the extension field,
-    /// constructs $\rho_x(t)=w+xt$ (degree 1).
     pub fn from_base_vole(value: F, mask: FE) -> Self {
         Self {
             lower_coefficients: vec![mask],
@@ -45,6 +42,7 @@ where
 
     /// Create a commitment polynomial directly from its lower coefficients
     /// and the highest-degree coefficient.
+    #[cfg(test)]
     pub fn from_parts(lower_coefficients: Vec<FE>, highest_degree: F) -> Self {
         Self {
             lower_coefficients,
@@ -57,7 +55,7 @@ where
         self.lower_coefficients.len()
     }
 
-    /// Return the lower coefficients $[\rho_0,\rho_1,\ldots,\rho_{d-1}]$.
+    /// Return the lower coefficients.
     pub fn lower_coefficients(&self) -> &[FE] {
         &self.lower_coefficients
     }
@@ -68,8 +66,6 @@ where
     }
 
     /// Evaluate the polynomial at a given point using Horner's method.
-    ///
-    /// This is useful for the verifier to compute $\gamma_x=\rho_x(\Delta)$.
     pub fn evaluate_at_point(&self, point: FE) -> FE {
         let mut result: FE = self.highest_degree.into();
         for c in self.lower_coefficients.iter().rev() {
@@ -78,9 +74,7 @@ where
         result
     }
 
-    /// Add a constant: $\rho_{x+c}(t)=\rho_x(t)+ct^d$.
-    ///
-    /// The constant is added to the highest-degree coefficient.
+    /// Add a constant.
     pub fn addc(&self, c: F) -> Self {
         Self {
             lower_coefficients: self.lower_coefficients.clone(),
@@ -89,10 +83,6 @@ where
     }
 
     /// Add two commitment polynomials, aligning to the maximum degree.
-    ///
-    /// Given $\rho_x$ of degree $d_1$ and $\rho_y$ of degree $d_2$, with
-    /// $d=\max(d_1,d_2)$:
-    /// $\rho_{x+y}(t)=t^{d-d_1}\rho_x(t)+t^{d-d_2}\rho_y(t)$.
     pub fn add(&self, other: &Self) -> Self {
         let d1 = self.degree();
         let d2 = other.degree();
@@ -115,7 +105,7 @@ where
         }
     }
 
-    /// Multiply by a constant: $\rho_{cx}(t)=c\rho_x(t)$.
+    /// Multiply by a constant.
     pub fn mulc(&self, c: F) -> Self {
         let lower = self.lower_coefficients.iter().map(|x| c * *x).collect();
         Self {
@@ -124,7 +114,7 @@ where
         }
     }
 
-    /// Multiply two commitment polynomials: $\rho_{xy}(t)=\rho_x(t)\rho_y(t)$.
+    /// Multiply two commitment polynomials.
     pub fn mul(&self, other: &Self) -> Self {
         let d1 = self.degree();
         let d2 = other.degree();
@@ -151,29 +141,19 @@ where
             highest_degree: self.highest_degree * other.highest_degree,
         }
     }
-
-    /// Multiply the polynomial by $t^{\mathtt{shift}}$ (shift all coefficients up).
-    pub fn shift(&self, shift: usize) -> Self {
-        if shift == 0 {
-            return self.clone();
-        }
-        let mut lower = vec![FE::ZERO; self.degree() + shift];
-        for (i, c) in self.lower_coefficients.iter().enumerate() {
-            lower[i + shift] = *c;
-        }
-        Self {
-            lower_coefficients: lower,
-            highest_degree: self.highest_degree,
-        }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+    use proptest::test_runner::TestCaseResult;
+    use rand::SeedableRng;
     use rand::rng;
     use swanky_field::FiniteRing;
+    use swanky_field::{FiniteField, IsSubFieldOf};
     use swanky_field_binary::{F2, F8b, F128b};
+    use swanky_rng::SwankyRng;
 
     fn pow_fe<FE: FiniteField>(base: FE, exp: usize) -> FE {
         let mut result = FE::ONE;
@@ -223,55 +203,99 @@ mod tests {
         assert_eq!(poly.degree(), 2);
     }
 
-    #[test]
-    fn evaluate_at_point_horner() {
-        let mut rng = rng();
-        let value = F128b::random(&mut rng);
-        let mask = F128b::random(&mut rng);
-        let point = F128b::random(&mut rng);
-        let poly = CommitmentPolynomial::<F128b, F128b>::from_base_vole(value, mask);
+    fn evaluate_at_point_horner<F: FiniteField, FE: FiniteField>(seed: [u8; 16]) -> TestCaseResult
+    where
+        F: IsSubFieldOf<FE>,
+    {
+        let mut rng = SwankyRng::from_seed(seed.into());
+        let value = F::random(&mut rng);
+        let mask = FE::random(&mut rng);
+        let point = FE::random(&mut rng);
+        let poly = CommitmentPolynomial::<F, FE>::from_base_vole(value, mask);
         // ρ(t) = mask + value·t
-        assert_eq!(poly.evaluate_at_point(point), mask + value * point);
+        prop_assert_eq!(poly.evaluate_at_point(point), mask + value * point);
+        Ok(())
     }
 
-    #[test]
-    fn evaluate_at_point_subfield() {
-        let mut rng = rng();
-        let value = F2::random(&mut rng);
-        let mask = F128b::random(&mut rng);
-        let point = F128b::random(&mut rng);
-        let poly = CommitmentPolynomial::<F2, F128b>::from_base_vole(value, mask);
-        let value_lifted: F128b = value.into();
-        assert_eq!(poly.evaluate_at_point(point), mask + value_lifted * point);
+    proptest! {
+        #[test]
+        fn evaluate_at_point_horner_f128b(seed in any::<[u8; 16]>()) {
+            evaluate_at_point_horner::<F2, F128b>(seed)?;
+            evaluate_at_point_horner::<F8b, F128b>(seed)?;
+            evaluate_at_point_horner::<F128b, F128b>(seed)?;
+        }
     }
 
-    #[test]
-    fn addc_increments_highest_degree() {
-        let mut rng = rng();
-        let value = F128b::random(&mut rng);
-        let mask = F128b::random(&mut rng);
-        let c = F128b::random(&mut rng);
-        let poly = CommitmentPolynomial::<F128b, F128b>::from_base_vole(value, mask);
+    fn evaluate_at_point_matches_reference<F: FiniteField, FE: FiniteField>(
+        seed: [u8; 16],
+        degree: usize,
+    ) -> TestCaseResult
+    where
+        F: IsSubFieldOf<FE>,
+    {
+        let mut rng = SwankyRng::from_seed(seed.into());
+        let lower = (0..degree).map(|_| FE::random(&mut rng)).collect();
+        let highest = F::random(&mut rng);
+        let poly = CommitmentPolynomial::<F, FE>::from_parts(lower, highest);
+
+        for point in [FE::ZERO, FE::ONE, FE::random(&mut rng)] {
+            prop_assert_eq!(
+                poly.evaluate_at_point(point),
+                eval_reference(&poly, point),
+                "degree = {}, point = {:?}",
+                degree,
+                point,
+            );
+        }
+        Ok(())
+    }
+
+    proptest! {
+        #[test]
+        fn evaluate_at_point_matches_reference_f128b(
+            seed in any::<[u8; 16]>(),
+            degree in 0usize..=128,
+        ) {
+            evaluate_at_point_matches_reference::<F2, F128b>(seed, degree)?;
+            evaluate_at_point_matches_reference::<F8b, F128b>(seed, degree)?;
+            evaluate_at_point_matches_reference::<F128b, F128b>(seed, degree)?;
+        }
+    }
+
+    fn addc_correctness<F: FiniteField, FE: FiniteField>(
+        seed: [u8; 16],
+        degree: usize,
+    ) -> TestCaseResult
+    where
+        F: IsSubFieldOf<FE>,
+    {
+        let mut rng = SwankyRng::from_seed(seed.into());
+        let lower = (0..degree).map(|_| FE::random(&mut rng)).collect();
+        let highest = F::random(&mut rng);
+        let c = F::random(&mut rng);
+        let point = FE::random(&mut rng);
+        let poly = CommitmentPolynomial::<F, FE>::from_parts(lower, highest);
         let result = poly.addc(c);
-        assert_eq!(result.highest_degree(), value + c);
-        assert_eq!(result.lower_coefficients(), poly.lower_coefficients());
-    }
-
-    #[test]
-    fn addc_evaluation_consistency() {
-        let mut rng = rng();
-        let value = F128b::random(&mut rng);
-        let mask = F128b::random(&mut rng);
-        let c = F128b::random(&mut rng);
-        let point = F128b::random(&mut rng);
-        let poly = CommitmentPolynomial::<F128b, F128b>::from_base_vole(value, mask);
-        let result = poly.addc(c);
-        let d = poly.degree();
-        // Verifier: γ' = γ_x + c · Δ^d.
-        assert_eq!(
+        prop_assert_eq!(result.highest_degree(), poly.highest_degree() + c);
+        prop_assert_eq!(result.lower_coefficients(), poly.lower_coefficients());
+        prop_assert_eq!(result.degree(), degree);
+        prop_assert_eq!(
             result.evaluate_at_point(point),
-            poly.evaluate_at_point(point) + c * pow_fe(point, d),
+            poly.evaluate_at_point(point) + c * pow_fe(point, degree),
         );
+        Ok(())
+    }
+
+    proptest! {
+        #[test]
+        fn addc_increments_highest_degree_f128b(
+            seed in any::<[u8; 16]>(),
+            degree in 0usize..=128,
+        ) {
+            addc_correctness::<F2, F128b>(seed, degree)?;
+            addc_correctness::<F8b, F128b>(seed, degree)?;
+            addc_correctness::<F128b, F128b>(seed, degree)?;
+        }
     }
 
     #[test]
@@ -295,178 +319,134 @@ mod tests {
         );
     }
 
-    #[test]
-    fn add_different_degrees() {
-        let mut rng = rng();
-        let point = F128b::random(&mut rng);
+    fn add_correctness<F: FiniteField, FE: FiniteField>(
+        seed: [u8; 16],
+        degree_a: usize,
+        degree_b: usize,
+    ) -> TestCaseResult
+    where
+        F: IsSubFieldOf<FE>,
+    {
+        prop_assume!(degree_a != degree_b);
+        let mut rng = SwankyRng::from_seed(seed.into());
+        let lower_a = (0..degree_a).map(|_| FE::random(&mut rng)).collect();
+        let highest_a = F::random(&mut rng);
+        let poly_a = CommitmentPolynomial::<F, FE>::from_parts(lower_a, highest_a);
+        let lower_b = (0..degree_b).map(|_| FE::random(&mut rng)).collect();
+        let highest_b = F::random(&mut rng);
+        let poly_b = CommitmentPolynomial::<F, FE>::from_parts(lower_b, highest_b);
+        let degree = degree_a.max(degree_b);
 
-        let val_a = F128b::random(&mut rng);
-        let val_b = F128b::random(&mut rng);
-        let val_c = F128b::random(&mut rng);
-        let poly_a =
-            CommitmentPolynomial::<F128b, F128b>::from_base_vole(val_a, F128b::random(&mut rng));
-        let poly_b =
-            CommitmentPolynomial::<F128b, F128b>::from_base_vole(val_b, F128b::random(&mut rng));
-        let poly_c =
-            CommitmentPolynomial::<F128b, F128b>::from_base_vole(val_c, F128b::random(&mut rng));
-        let poly_ab = poly_a.mul(&poly_b);
-        assert_eq!(poly_ab.degree(), 2);
-        assert_eq!(poly_c.degree(), 1);
+        let points = [FE::ZERO, FE::ONE, FE::random(&mut rng)];
+        let sum = poly_a.add(&poly_b);
 
-        let sum = poly_c.add(&poly_ab);
-        assert_eq!(sum.degree(), 2);
-        assert_eq!(sum.highest_degree(), val_c + val_a * val_b);
-
-        // Verifier: γ = Δ^(d-d_1) γ_c + Δ^(d-d_2) γ_ab.
-        let gamma_c = poly_c.evaluate_at_point(point);
-        let gamma_ab = poly_ab.evaluate_at_point(point);
-        assert_eq!(sum.evaluate_at_point(point), point * gamma_c + gamma_ab);
+        for point in points {
+            // ρ_sum(t) = t^(d-d_a) ρ_a(t) + t^(d-d_b) ρ_b(t).
+            prop_assert_eq!(
+                poly_a.evaluate_at_point(point) * pow_fe(point, degree - poly_a.degree())
+                    + poly_b.evaluate_at_point(point) * pow_fe(point, degree - poly_b.degree()),
+                sum.evaluate_at_point(point),
+                "degrees = ({}, {}), point = {:?}",
+                poly_a.degree(),
+                poly_b.degree(),
+                point,
+            );
+        }
+        Ok(())
     }
 
-    #[test]
-    fn mulc_scales_correctly() {
-        let mut rng = rng();
-        let val = F128b::random(&mut rng);
-        let mask = F128b::random(&mut rng);
-        let c = F128b::random(&mut rng);
-        let point = F128b::random(&mut rng);
-        let poly = CommitmentPolynomial::<F128b, F128b>::from_base_vole(val, mask);
+    proptest! {
+        #[test]
+        fn add_different_degrees_f128b(
+            seed in any::<[u8; 16]>(),
+            degree_a in 0usize..=128,
+            degree_b in 0usize..=128,
+        ) {
+            add_correctness::<F2, F128b>(seed, degree_a, degree_b)?;
+            add_correctness::<F8b, F128b>(seed, degree_a, degree_b)?;
+            add_correctness::<F128b, F128b>(seed, degree_a, degree_b)?;
+        }
+    }
+
+    fn mulc_correctness<F: FiniteField, FE: FiniteField>(
+        seed: [u8; 16],
+        degree: usize,
+    ) -> TestCaseResult
+    where
+        F: IsSubFieldOf<FE>,
+    {
+        let mut rng = SwankyRng::from_seed(seed.into());
+        let lower = (0..degree).map(|_| FE::random(&mut rng)).collect();
+        let highest = F::random(&mut rng);
+        let c = F::random(&mut rng);
+        let poly = CommitmentPolynomial::<F, FE>::from_parts(lower, highest);
         let result = poly.mulc(c);
-        assert_eq!(result.highest_degree(), val * c);
-        assert_eq!(
-            result.evaluate_at_point(point),
-            c * poly.evaluate_at_point(point),
-        );
+
+        for point in [FE::ZERO, FE::ONE, FE::random(&mut rng)] {
+            prop_assert_eq!(
+                c * poly.evaluate_at_point(point),
+                result.evaluate_at_point(point),
+                "degree = {}, constant = {:?}, point = {:?}",
+                degree,
+                c,
+                point,
+            );
+        }
+        Ok(())
     }
 
-    #[test]
-    fn mul_polynomials() {
-        let mut rng = rng();
-        let val_x = F128b::random(&mut rng);
-        let val_y = F128b::random(&mut rng);
-        let w_x = F128b::random(&mut rng);
-        let w_y = F128b::random(&mut rng);
-        let point = F128b::random(&mut rng);
-        let poly_x = CommitmentPolynomial::<F128b, F128b>::from_base_vole(val_x, w_x);
-        let poly_y = CommitmentPolynomial::<F128b, F128b>::from_base_vole(val_y, w_y);
-        let prod = poly_x.mul(&poly_y);
-        assert_eq!(prod.degree(), 2);
-        assert_eq!(prod.highest_degree(), val_x * val_y);
-        assert_eq!(
-            prod.evaluate_at_point(point),
-            poly_x.evaluate_at_point(point) * poly_y.evaluate_at_point(point),
-        );
+    proptest! {
+        #[test]
+        fn mulc_correctness_f128b(
+            seed in any::<[u8; 16]>(),
+            degree in 0usize..=128,
+        ) {
+            mulc_correctness::<F2, F128b>(seed, degree)?;
+            mulc_correctness::<F8b, F128b>(seed, degree)?;
+            mulc_correctness::<F128b, F128b>(seed, degree)?;
+        }
     }
 
-    #[test]
-    fn mul_subfield_polynomials() {
-        let mut rng = rng();
-        let val_x = F2::random(&mut rng);
-        let val_y = F2::random(&mut rng);
-        let w_x = F128b::random(&mut rng);
-        let w_y = F128b::random(&mut rng);
-        let point = F128b::random(&mut rng);
-        let poly_x = CommitmentPolynomial::<F2, F128b>::from_base_vole(val_x, w_x);
-        let poly_y = CommitmentPolynomial::<F2, F128b>::from_base_vole(val_y, w_y);
-        let prod = poly_x.mul(&poly_y);
-        assert_eq!(prod.degree(), 2);
-        assert_eq!(prod.highest_degree(), val_x * val_y);
-        assert_eq!(
-            prod.evaluate_at_point(point),
-            poly_x.evaluate_at_point(point) * poly_y.evaluate_at_point(point),
-        );
+    fn mul_correctness<F: FiniteField, FE: FiniteField>(
+        seed: [u8; 16],
+        degree_a: usize,
+        degree_b: usize,
+    ) -> TestCaseResult
+    where
+        F: IsSubFieldOf<FE>,
+    {
+        let mut rng = SwankyRng::from_seed(seed.into());
+        let lower_a = (0..degree_a).map(|_| FE::random(&mut rng)).collect();
+        let highest_a = F::random(&mut rng);
+        let poly_a = CommitmentPolynomial::<F, FE>::from_parts(lower_a, highest_a);
+        let lower_b = (0..degree_b).map(|_| FE::random(&mut rng)).collect();
+        let highest_b = F::random(&mut rng);
+        let poly_b = CommitmentPolynomial::<F, FE>::from_parts(lower_b, highest_b);
+        let product = poly_a.mul(&poly_b);
+
+        for point in [FE::ZERO, FE::ONE, FE::random(&mut rng)] {
+            prop_assert_eq!(
+                poly_a.evaluate_at_point(point) * poly_b.evaluate_at_point(point),
+                product.evaluate_at_point(point),
+                "degrees = ({}, {}), point = {:?}",
+                degree_a,
+                degree_b,
+                point,
+            );
+        }
+        Ok(())
     }
 
-    #[test]
-    fn shift_increases_degree() {
-        let mut rng = rng();
-        let val = F128b::random(&mut rng);
-        let mask = F128b::random(&mut rng);
-        let point = F128b::random(&mut rng);
-        let poly = CommitmentPolynomial::<F128b, F128b>::from_base_vole(val, mask);
-        let shifted = poly.shift(2);
-        assert_eq!(shifted.degree(), 3);
-        assert_eq!(shifted.highest_degree(), val);
-        assert_eq!(
-            shifted.evaluate_at_point(point),
-            poly.evaluate_at_point(point) * pow_fe(point, 2),
-        );
-    }
-
-    #[test]
-    fn shift_zero_is_identity() {
-        let mut rng = rng();
-        let val = F128b::random(&mut rng);
-        let mask = F128b::random(&mut rng);
-        let poly = CommitmentPolynomial::<F128b, F128b>::from_base_vole(val, mask);
-        let shifted = poly.shift(0);
-        assert_eq!(shifted.degree(), poly.degree());
-        assert_eq!(shifted.highest_degree(), poly.highest_degree());
-        assert_eq!(shifted.lower_coefficients(), poly.lower_coefficients());
-    }
-
-    #[test]
-    fn from_parts_degree_zero() {
-        let mut rng = rng();
-        let x = F128b::random(&mut rng);
-        let point = F128b::random(&mut rng);
-        let poly: CommitmentPolynomial<F128b, F128b> = CommitmentPolynomial::from_parts(vec![], x);
-        assert_eq!(poly.degree(), 0);
-        assert!(poly.lower_coefficients().is_empty());
-        // A degree-0 polynomial evaluates to its (constant) committed value everywhere.
-        assert_eq!(poly.evaluate_at_point(point), x);
-    }
-
-    #[test]
-    fn evaluate_matches_reference() {
-        let mut rng = rng();
-        let point = F128b::random(&mut rng);
-        let poly = CommitmentPolynomial::<F128b, F128b>::from_parts(
-            vec![
-                F128b::random(&mut rng),
-                F128b::random(&mut rng),
-                F128b::random(&mut rng),
-            ],
-            F128b::random(&mut rng),
-        );
-        assert_eq!(poly.evaluate_at_point(point), eval_reference(&poly, point));
-    }
-
-    #[test]
-    fn mul_with_constant_polynomial() {
-        let mut rng = rng();
-        let point = F128b::random(&mut rng);
-        let p = CommitmentPolynomial::<F128b, F128b>::from_base_vole(
-            F128b::random(&mut rng),
-            F128b::random(&mut rng),
-        );
-        let constant: CommitmentPolynomial<F128b, F128b> =
-            CommitmentPolynomial::from_parts(vec![], F128b::random(&mut rng));
-
-        let prod = p.mul(&constant);
-        assert_eq!(prod.degree(), p.degree());
-        assert_eq!(
-            prod.evaluate_at_point(point),
-            p.evaluate_at_point(point) * constant.evaluate_at_point(point),
-        );
-    }
-
-    #[test]
-    fn mul_f8b_in_f128b_subfield() {
-        // Exercise a non-trivial, non-prime subfield: F8b ⊂ F128b.
-        let mut rng = rng();
-        let point = F128b::random(&mut rng);
-
-        let x = F8b::random(&mut rng);
-        let y = F8b::random(&mut rng);
-        let p = CommitmentPolynomial::<F8b, F128b>::from_base_vole(x, F128b::random(&mut rng));
-        let q = CommitmentPolynomial::<F8b, F128b>::from_base_vole(y, F128b::random(&mut rng));
-
-        let prod = p.mul(&q);
-        assert_eq!(prod.highest_degree(), x * y);
-        assert_eq!(
-            prod.evaluate_at_point(point),
-            p.evaluate_at_point(point) * q.evaluate_at_point(point),
-        );
+    proptest! {
+        #[test]
+        fn mul_correctness_f128b(
+            seed in any::<[u8; 16]>(),
+            degree_a in 0usize..=128,
+            degree_b in 0usize..=128,
+        ) {
+            mul_correctness::<F2, F128b>(seed, degree_a, degree_b)?;
+            mul_correctness::<F8b, F128b>(seed, degree_a, degree_b)?;
+            mul_correctness::<F128b, F128b>(seed, degree_a, degree_b)?;
+        }
     }
 }
