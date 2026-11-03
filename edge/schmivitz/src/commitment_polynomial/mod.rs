@@ -1,4 +1,4 @@
-//! Polynomial commitment primitives and batch verification.
+#![doc = include_str!("../../HIGHER_DEGREE_COMMITMENT.md")]
 
 mod commitment_polynomial;
 
