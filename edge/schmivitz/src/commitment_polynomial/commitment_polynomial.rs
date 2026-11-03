@@ -1,24 +1,13 @@
-//! Polynomial commitment type for VOLE-based zero-knowledge protocols.
+//! Polynomial commitments from the
+//! [Commitment polynomials](crate::commitment_polynomial#commitment-polynomials) protocol.
 //!
-//! A [`CommitmentPolynomial`] represents
-//! $\rho_x(t)=\rho_0+\rho_1t+\cdots+\rho_{d-1}t^{d-1}+xt^d$, where $x$ is the
-//! committed value (in the base field `F`) and
-//! $\rho_0,\ldots,\rho_{d-1}$ are random masking coefficients in the extension field `FE`.
-//!
-//! Gate operations allow building commitment polynomials bottom-up through a circuit:
-//! - [`CommitmentPolynomial::addc`]: add a constant
-//! - [`CommitmentPolynomial::add`]: add two commitments (aligning degrees)
-//! - [`CommitmentPolynomial::mulc`]: multiply by a constant
-//! - [`CommitmentPolynomial::mul`]: multiply two commitments
+//! [`CommitmentPolynomial`] implements the
+//! [gate operations](crate::commitment_polynomial#gate-by-gate-commitment-propagation).
 
 use swanky_field::{FiniteField, IsSubFieldOf};
 
-/// A polynomial commitment with leading coefficient in the base field `F`
-/// and lower coefficients in the extension field `FE`.
-///
-/// Stores $\rho(t)=\rho_0+\rho_1t+\cdots+\rho_{d-1}t^{d-1}+xt^d$, where:
-/// - `lower_coefficients` = $[\rho_0,\rho_1,\ldots,\rho_{d-1}]$ (each in `FE`);
-/// - `highest_degree` = $x$ (the committed value, in `F`).
+/// A [polynomial commitment](crate::commitment_polynomial#commitment-polynomials) to a value in `F`.
+/// The highest-degree coefficient holds that value; lower coefficients in `FE` mask it.
 #[derive(Clone, Debug)]
 pub struct CommitmentPolynomial<F: FiniteField, FE: FiniteField>
 where
@@ -50,7 +39,7 @@ where
         }
     }
 
-    /// Return the degree of the polynomial.
+    /// Return the commitment degree.
     pub fn degree(&self) -> usize {
         self.lower_coefficients.len()
     }
@@ -60,7 +49,7 @@ where
         &self.lower_coefficients
     }
 
-    /// Return the highest-degree coefficient $x$ (the committed value).
+    /// Return the highest-degree coefficient $`x`$ (the committed value).
     pub fn highest_degree(&self) -> F {
         self.highest_degree
     }
@@ -121,17 +110,14 @@ where
         let new_degree = d1 + d2;
         let mut lower = vec![FE::ZERO; new_degree];
 
-        // lower × lower (FE × FE)
         for (i, a) in self.lower_coefficients.iter().enumerate() {
             for (j, b) in other.lower_coefficients.iter().enumerate() {
                 lower[i + j] = lower[i + j] + *a * *b;
             }
         }
-        // self.highest × other.lower (F × FE)
         for (j, b) in other.lower_coefficients.iter().enumerate() {
             lower[d1 + j] = lower[d1 + j] + self.highest_degree * *b;
         }
-        // self.lower × other.highest (F × FE)
         for (i, a) in self.lower_coefficients.iter().enumerate() {
             lower[i + d2] = lower[i + d2] + other.highest_degree * *a;
         }

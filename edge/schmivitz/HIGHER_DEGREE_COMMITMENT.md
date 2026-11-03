@@ -35,7 +35,7 @@ Definition 2 ("VOLE Commitment") of [2026-Agarwal-Baum-Braun-Scholl] defines the
 \rho_0,\ldots,\rho_{d-1} \in \mathbb{F}_{p^r}.
 ```
 
-Thus, the committed value $x$ is the highest-degree coefficient, while the lower coefficients mask it.
+Thus, the committed value $`x`$ is the highest-degree coefficient, while the lower coefficients mask it.
 The verifier holds a global key $`\Delta \in \mathbb{F}_{p^r}`$ that is unknown to the prover, together with the evaluation
 
 ```math
