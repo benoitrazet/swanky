@@ -1,14 +1,8 @@
-//! Batch verification protocol for polynomial commitments in a VOLE-based zero-knowledge
-//! proof system.
+//! Batch constraint verification from the
+//! [Batched verification](crate::commitment_polynomial#batched-verification) protocol.
 //!
-//! The protocol operates on commitment polynomials of varying degrees and verifies
-//! them as a batch using random challenges and VOLE masking.
-//!
-//! It is exposed as a streamed "fold one constraint at a time" interface —
-//! [`BatchProverAccumulator`] / [`BatchVerifierAccumulator`] — matching the live prover/verifier,
-//! whose circuit traversal sees constraints one at a time rather than as a collection.
-//! [`crate::proof`] and the traversers push each constraint as it is traversed and then call
-//! `finish` to form or check the masked polynomial $\pi(t)$.
+//! [`BatchProverAccumulator`] builds the masked polynomial $`\pi(t)`$ (step 6), and
+//! [`BatchVerifierAccumulator`] checks it at $`\Delta`$ (step 7).
 
 use std::marker::PhantomData;
 
@@ -19,7 +13,7 @@ use crate::vole::ExtensionFieldLifter;
 
 use super::CommitmentPolynomial;
 
-/// Compute base^exp in a finite field using repeated squaring.
+/// Compute `base` raised to `exp` in a finite field.
 pub(crate) fn power<FE: FiniteField>(base: FE, exp: usize) -> FE {
     if exp == 0 {
         return FE::ONE;
@@ -37,12 +31,8 @@ pub(crate) fn power<FE: FiniteField>(base: FE, exp: usize) -> FE {
     result
 }
 
-/// Evaluate the polynomial with the given `coefficients` (in increasing degree order,
-/// `coefficients[k]` the coefficient of $t^k$) at `point`, via Horner's method.
-///
-/// Shared by the prover ([`BatchProverAccumulator::evaluate_at`], over its own aggregate
-/// coefficients) and the verifier ([`BatchVerifierAccumulator::finish`], over the prover's
-/// committed $\pi(t)$ coefficients).
+/// Evaluate the polynomial at `point` using Horner's method.
+/// Coefficients are ordered from constant to highest degree.
 fn evaluate_poly<FE: FiniteField>(coefficients: &[FE], point: FE) -> FE {
     coefficients
         .iter()
@@ -50,49 +40,34 @@ fn evaluate_poly<FE: FiniteField>(coefficients: &[FE], point: FE) -> FE {
         .fold(FE::ZERO, |acc, c| acc * point + *c)
 }
 
-/// Coefficients of the prover polynomial whose highest-degree coefficient is implicitly zero.
-///
-/// Stores $[\pi_0,\ldots,\pi_{d-1}]$ in increasing degree order. The coefficient of $t^d$ is
-/// known to be zero and is omitted, so [`Self::max_degree`] returns $d$, the protocol's maximum
-/// constraint degree, rather than the actual degree of the stored polynomial.
+/// The transmitted coefficients of the masked polynomial $`\pi(t)`$ (step 6).
+/// The zero coefficient at degree $d$ is omitted.
 #[derive(Clone, Debug)]
 pub struct ZeroPolynomialCoefficients<FE: FiniteField> {
     coefficients: Vec<FE>,
 }
 
 impl<FE: FiniteField> ZeroPolynomialCoefficients<FE> {
-    /// Return the protocol's maximum constraint degree.
+    /// Return the batch degree $d$, equal to the number of transmitted coefficients.
     pub fn max_degree(&self) -> usize {
         self.coefficients.len()
     }
 
-    /// Return the transmitted coefficients in increasing degree order.
+    /// Return the coefficients of $\pi(t)$ in increasing degree order.
     pub fn coefficients(&self) -> &[FE] {
         &self.coefficients
     }
 }
 
-/// Prover-side accumulator for the batch verification protocol.
-///
-/// Used by the live prover ([`crate::proof`]), whose circuit traversal produces one commitment
-/// polynomial per higher degree constraint rather than a collection. Constraints are pushed with
-/// [`Self::push_constraint`] as they are traversed; masking VOLEs are added by [`Self::finish`] to
-/// form the coefficients of $\pi(t)$.
-///
-/// [`Self::push_constraint`] accumulates
-/// $`A(t)=\sum_i\chi_i t^{d-d_i}\rho_i(t)`$ (aligning each constraint's coefficients to the
-/// maximum degree), and [`Self::finish`] adds the masks
-/// $\sum_{j=1}^{d-1}t^{j-1}\sigma_j(t)$. The maximum degree $d$ is fixed up front (the caller
-/// knows it before traversal), so alignment shifts are relative to that fixed size.
+/// Accumulate prover constraints and form the masked polynomial $`\pi(t)`$ (step 6).
+/// Constraints are aligned to the maximum degree fixed at construction.
 pub struct BatchProverAccumulator<F, FE, L>
 where
     F: FiniteField + IsSubFieldOf<FE>,
     FE: FiniteField,
     L: ExtensionFieldLifter<F, FE>,
 {
-    /// Coefficients of $A(t)=\sum_i\chi_i t^{d-d_i}\rho_i(t)$ in increasing degree
-    /// order; length $d+1$, or empty if the maximum degree is 0 (no higher degree
-    /// constraints).
+    /// Coefficients of the aggregate $`A(t)`$ in increasing degree order.
     aggregate: Vec<FE>,
     phantom: PhantomData<(F, L)>,
 }
@@ -103,10 +78,8 @@ where
     FE: FiniteField,
     L: ExtensionFieldLifter<F, FE>,
 {
-    /// Create an accumulator for constraints whose maximum degree is `max_degree`.
-    ///
-    /// A degree-$d$ polynomial has $d+1$ coefficients; the accumulator stays empty if
-    /// `max_degree` is 0 (i.e. there are no higher degree constraints).
+    /// Create a prover accumulator with `max_degree` as the batch degree $`d`$ (step 1).
+    /// A maximum degree of zero represents a batch with no higher degree constraints.
     pub fn new(max_degree: usize) -> Self {
         Self {
             aggregate: if max_degree == 0 {
@@ -118,41 +91,25 @@ where
         }
     }
 
-    /// Number of base VOLE correlations that compose into one full-field mask VOLE.
-    ///
-    /// The flat mask streams passed to [`Self::finish`] are chunked into blocks of this size.
+    /// Return the number of base VOLEs composed into one extension-field mask (step 3).
     pub fn mask_vole_size() -> usize {
         L::BASIS_SIZE
     }
 
-    /// Number of base VOLE correlations the batch masking needs for constraints whose maximum
-    /// degree is `max_degree`.
-    ///
-    /// Batching degree-$d$ constraints requires $d-1$ full-field mask VOLEs, each composed from
-    /// [`Self::mask_vole_size`] base correlations — so
-    /// $(d-1)\mathtt{mask\_vole\_size()}$ in total, or 0
-    /// when `max_degree` is 0 or 1 (no masks needed). This is the amount [`crate::proof`] must
-    /// provision after the witness VOLEs and later draw as the two flat streams for [`Self::finish`].
+    /// Return the number of base VOLEs needed to mask a batch of degree `max_degree` (steps 2–3).
+    /// No masks are needed when `max_degree` is zero or one.
     pub fn mask_vole_count(max_degree: usize) -> usize {
         max_degree.saturating_sub(1) * Self::mask_vole_size()
     }
 
-    /// Fold one challenge-scaled, degree-aligned commitment polynomial into the aggregate.
-    ///
-    /// Accumulates $\chi_i t^{d-d_i}\rho_i(t)$, where $d$ is the maximum degree fixed at
-    /// construction and $d_i$ is `constraint.degree()`. Summing constraints one at a time builds
-    /// exactly $A(t)=\sum_i\chi_i t^{d-d_i}\rho_i(t)$.
-    ///
-    /// Returns an error if the constraint exceeds the configured maximum degree or its committed
+    /// Add a constraint to $`A(t)`$, weighting it by `challenge` and aligning its degree (step 6).
+    /// Return an error if the batch degree is zero, the constraint exceeds it, or its committed
     /// value is nonzero.
     pub fn push_constraint(
         &mut self,
         constraint: &CommitmentPolynomial<F, FE>,
         challenge: FE,
     ) -> Result<()> {
-        // Sum the challenge-scaled constraint into the aggregate, aligning the highest-degree
-        // coefficients: the constraint is shifted up by a power of t, so summing constraints one
-        // at a time builds exactly $A(t)=\sum_i\chi_i t^{d-d_i}\rho_i(t)$.
         let max_degree = self.max_degree();
         if max_degree == 0 || constraint.degree() > max_degree {
             bail!(
@@ -179,45 +136,25 @@ where
         Ok(())
     }
 
-    /// The maximum constraint degree fixed at construction.
-    ///
-    /// This is the `d` used throughout the batch masking arithmetic, e.g. to size the mask VOLE
-    /// stream via [`Self::mask_vole_count`].
+    /// Return the maximum constraint degree $`d`$ fixed at construction (step 1).
     pub fn max_degree(&self) -> usize {
         self.aggregate.len().saturating_sub(1)
     }
 
-    /// The aggregate's degree-$d$ coefficient
-    /// $A_d=\sum_i\chi_i x_i$, where $x_i$ is the value committed by $\rho_i$.
-    /// An honest prover always commits zero here because every constraint evaluates to zero on
-    /// the witness. Returns `FE::ZERO` if the accumulator has no higher-degree constraints.
+    /// Return the degree-$`d`$ coefficient of $`A(t)`$, which is zero for accepted constraints (step 6).
+    /// An empty batch returns zero.
     pub fn top_coefficient(&self) -> FE {
         // TODO: revisit the default value once the proof path activates selectively the higher-degree polynomial only when needed.
         self.aggregate.last().copied().unwrap_or(FE::ZERO)
     }
 
-    /// Evaluate the pre-masking aggregate
-    /// $A(t)=\sum_i\chi_i t^{d-d_i}\rho_i(t)$ at `point`.
-    /// Used to check consistency with the verifier's homomorphic evaluation.
+    /// Evaluate the aggregate $`A(t)`$ at `point`, before adding the masks (step 6).
     pub fn evaluate_at(&self, point: FE) -> FE {
         evaluate_poly(&self.aggregate, point)
     }
 
-    /// Add the masking VOLEs to form the coefficients of $\pi(t)$.
-    ///
-    /// The mask VOLEs are supplied as two flat streams of base-VOLE correlations — `mask_values`
-    /// (the $s_j$ material) and `mask_masks` (the $w_j$ material) — each a concatenation of
-    /// $d-1$ blocks of [`Self::mask_vole_size`] elements. This organizes them into the per-mask
-    /// blocks, composes each into the full-field $\sigma_j(t)=w_j+s_jt$, then computes
-    /// $\pi(t)=A(t)+\sum_{j=1}^{d-1}t^{j-1}\sigma_j(t)$.
-    /// The aggregate's degree-$d$ coefficient commits to zero for an honest
-    /// prover and is omitted, so $\pi(t)$ has degree at most $d-1$ and is returned as the $d$
-    /// coefficients $[\pi_0,\ldots,\pi_{d-1}]$. The result is empty if there were no higher degree
-    /// constraints.
-    ///
-    /// Both streams must have length $(d-1)\mathtt{mask\_vole\_size()}$.
-    /// The caller (which owns the VOLE layout) is responsible
-    /// for drawing the correct contiguous base-VOLE correlations.
+    /// Mask the aggregate and return the transmitted coefficients of $`\pi(t)`$ (step 6).
+    /// Both input streams must have the length returned by [`Self::mask_vole_count`].
     pub fn finish(
         self,
         mask_values: &[F],
@@ -260,23 +197,15 @@ where
     }
 }
 
-/// Verifier-side accumulator for the batch verification protocol.
-///
-/// Used by the live verifier ([`crate::proof`]), whose circuit traversal produces one evaluation
-/// per higher degree constraint. Constraints are pushed with [`Self::push_constraint`] during
-/// traversal (grouped by degree, with the $\Delta$-alignment deferred). As on the prover side, the
-/// maximum degree $d$ is fixed at construction. [`Self::finish`] applies the alignment, adds the
-/// mask tags, and checks the prover's $\pi(\Delta)$ against
-/// $q=\sum_i\chi_i\Delta^{d-d_i}\gamma_i+\sum_{j=1}^{d-1}\Delta^{j-1}\nu_j$.
+/// Accumulate constraint evaluations and check $`\pi(\Delta)=q`$ (step 7).
+/// Constraints are aligned to the maximum degree fixed at construction.
 pub struct BatchVerifierAccumulator<F, FE, L>
 where
     F: FiniteField + IsSubFieldOf<FE>,
     FE: FiniteField,
     L: ExtensionFieldLifter<F, FE>,
 {
-    /// Challenge-weighted evaluations grouped by constraint degree: index $k$ holds
-    /// $\sum_{i:d_i=k}\chi_i\gamma_i$. The $\Delta^{d-k}$ alignment is
-    /// applied in [`Self::finish`]. Length $d+1$, or empty if the maximum degree is 0.
+    /// Constraint evaluations weighted by their challenges and grouped by degree.
     aggregates: Vec<FE>,
     phantom: PhantomData<(F, L)>,
 }
@@ -287,7 +216,8 @@ where
     FE: FiniteField,
     L: ExtensionFieldLifter<F, FE>,
 {
-    /// Create a verifier accumulator for constraints whose maximum degree is `max_degree`.
+    /// Create a verifier accumulator with `max_degree` as the batch degree $`d`$ (step 1).
+    /// A maximum degree of zero represents a batch with no higher degree constraints.
     pub fn new(max_degree: usize) -> Self {
         Self {
             aggregates: if max_degree == 0 {
@@ -299,32 +229,19 @@ where
         }
     }
 
-    /// Number of base VOLE correlations that compose into one full-field mask VOLE.
-    ///
-    /// The flat mask-tag stream passed to [`Self::finish`] is chunked into blocks of this size.
+    /// Return the number of base VOLEs composed into one extension-field mask (step 3).
     pub fn mask_vole_size() -> usize {
         L::BASIS_SIZE
     }
 
-    /// Number of base VOLE correlations the batch masking needs for constraints whose maximum
-    /// degree is `max_degree` (the verifier-side mirror of
-    /// [`BatchProverAccumulator::mask_vole_count`]).
-    ///
-    /// Batching degree-$d$ constraints requires $d-1$ full-field mask VOLEs, each composed from
-    /// [`Self::mask_vole_size`] base correlations — so
-    /// $(d-1)\mathtt{mask\_vole\_size()}$ in total, or 0
-    /// when `max_degree` is 0 or 1 (no masks needed).
+    /// Return the number of base VOLEs needed to mask a batch of degree `max_degree` (steps 2–3).
+    /// No masks are needed when `max_degree` is zero or one.
     pub fn mask_vole_count(max_degree: usize) -> usize {
         max_degree.saturating_sub(1) * Self::mask_vole_size()
     }
 
-    /// Fold one challenge-scaled constraint evaluation into the by-degree aggregate.
-    ///
-    /// `gamma` is the verifier's homomorphic evaluation
-    /// $\gamma_i=\rho_i(\Delta)$ of the constraint, and `degree` is $d_i$.
-    /// The $\Delta^{d-d_i}$ alignment is deferred to [`Self::finish`].
-    ///
-    /// Returns an error if `degree` exceeds the configured maximum degree.
+    /// Add a constraint evaluation `gamma`, weighted by `challenge`, for degree alignment (step 7).
+    /// Return an error if the batch degree is zero or `degree` exceeds it.
     pub fn push_constraint(&mut self, gamma: FE, degree: usize, challenge: FE) -> Result<()> {
         // Group the challenge-weighted evaluations by degree; the $\Delta^{d-d_i}$ alignment is
         // applied after traversal using the maximum degree fixed at construction.
@@ -342,33 +259,13 @@ where
         Ok(())
     }
 
-    /// The maximum constraint degree fixed at construction.
-    ///
-    /// This is the `d` used throughout the batch verification arithmetic, e.g. to size the mask
-    /// VOLE stream via [`Self::mask_vole_count`].
+    /// Return the maximum constraint degree $`d`$ fixed at construction (step 1).
     pub fn max_degree(&self) -> usize {
         self.aggregates.len().saturating_sub(1)
     }
 
-    /// Check the prover's committed $\pi(t)$ against the verifier's expected value at $\Delta$.
-    ///
-    /// First enforces the degree bound: the prover must send exactly `d` coefficients (`d` the
-    /// maximum constraint degree), since the degree-$d$ coefficient of $\pi(t)$ is zero and
-    /// omitted. Then computes the expected value
-    /// $q=\sum_i\chi_i\Delta^{d-d_i}\gamma_i+
-    /// \sum_{j=1}^{d-1}\Delta^{j-1}\nu_j$
-    /// (each $\nu_j=\sigma_j(\Delta)$ composed from a [`Self::mask_vole_size`]-element block of
-    /// the flat `mask_tags` stream), evaluates the prover's $\pi(\Delta)$ from
-    /// `prover_coefficients`, and checks they match.
-    ///
-    /// `mask_tags` must be a flat stream of $(d-1)\mathtt{mask\_vole\_size()}$ tags.
-    /// The caller (which owns the VOLE layout) is responsible for drawing the correct contiguous
-    /// base-VOLE tags; once the degree bound holds, `prover_coefficients.max_degree()` equals `d`,
-    /// so the caller may size that draw from [`ZeroPolynomialCoefficients::max_degree`].
-    ///
-    /// Returns `Ok(())` if the check passes (including trivially when no higher degree constraint
-    /// was pushed), or an error if the degree bound is violated or $\pi(\Delta)$ does not match the
-    /// expected value.
+    /// Check the coefficient count and verify $`\pi(\Delta)=q`$ using the mask tags (step 7).
+    /// Return an error if verification fails or the tag count differs from [`Self::mask_vole_count`].
     pub fn finish(
         &self,
         delta: FE,
@@ -502,6 +399,7 @@ mod tests {
         (min_degree..=20).prop_flat_map(|d| (Just(d), vec(0..=d, 0..=if d == 0 { 0 } else { 20 })))
     }
 
+    /// Generate a random polynomial committing to zero with the given `degree` (step 4).
     fn random_polynomial_constraint<F: FiniteField + IsSubFieldOf<FE>, FE: FiniteField>(
         rng: &mut SwankyRng,
         degree: usize,
@@ -509,10 +407,12 @@ mod tests {
         CommitmentPolynomial::from_parts((0..degree).map(|_| FE::random(rng)).collect(), F::ZERO)
     }
 
+    /// Compute a reference field power by repeated multiplication.
     fn spec_power<FE: FiniteField>(point: FE, degree: usize) -> FE {
         (0..degree).fold(FE::ONE, |acc, _| acc * point)
     }
 
+    /// Evaluate a polynomial directly from its coefficients for comparison with the implementation.
     fn spec_polynomial_evaluation<FE: FiniteField>(coefficients: &[FE], point: FE) -> FE {
         coefficients
             .iter()
