@@ -80,7 +80,7 @@ impl<FE: FiniteField> ZeroPolynomialCoefficients<FE> {
 /// form the coefficients of $\pi(t)$.
 ///
 /// [`Self::push_constraint`] accumulates
-/// $A(t)=\sum_i\chi_i t^{d-d_i}\rho_i(t)$ (aligning each constraint's coefficients to the
+/// $`A(t)=\sum_i\chi_i t^{d-d_i}\rho_i(t)`$ (aligning each constraint's coefficients to the
 /// maximum degree), and [`Self::finish`] adds the masks
 /// $\sum_{j=1}^{d-1}t^{j-1}\sigma_j(t)$. The maximum degree $d$ is fixed up front (the caller
 /// knows it before traversal), so alignment shifts are relative to that fixed size.
@@ -173,6 +173,8 @@ where
             self.aggregate[i + shift] += challenge * *coefficient;
         }
         // The committed (highest-degree) coefficient is scaled by the challenge too.
+        // TODO: check that shift + constraint.degree() == max_degree and replace
+        // TODO: the constraint.highest_degree is zero, so we should drop that altogether.
         self.aggregate[shift + constraint.degree()] += constraint.highest_degree() * challenge;
         Ok(())
     }
@@ -234,7 +236,7 @@ where
         if mask_values.len() != expected_mask_count || mask_masks.len() != expected_mask_count {
             bail!(
                 ErrorKind::OtherError,
-                "Expected {} higher degree mask VOLEs, got {} values and {} masks",
+                "Wrong number of higher degree mask VOLEs: Expected {}, got {} values and {} masks",
                 expected_mask_count,
                 mask_values.len(),
                 mask_masks.len()
@@ -395,7 +397,7 @@ where
         if mask_tags.len() != expected_mask_count {
             bail!(
                 ErrorKind::OtherError,
-                "Expected {} higher degree mask VOLE tags, got {}",
+                "Wrong number of higher degree mask VOLEs: Expected {}, got {}",
                 expected_mask_count,
                 mask_tags.len()
             );
@@ -435,14 +437,11 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        commitment_polynomial::{BatchProverAccumulatorF2F128b, BatchVerifierAccumulatorF2F128b},
-        parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM},
-        vole::combine,
-    };
-    use rand::{Rng, rng};
-    use swanky_field::FiniteRing;
-    use swanky_field_binary::{F2, F64b, F128b};
+    use crate::vole::{ExtensionFieldLifterF2F128b, combine};
+    use proptest::{collection::vec, prelude::*, test_runner::TestCaseResult};
+    use rand::{RngExt, SeedableRng};
+    use swanky_field_binary::{F2, F8b, F64b, F128b};
+    use swanky_rng::SwankyRng;
 
     struct ExtensionFieldLifterF2F64b;
 
@@ -458,488 +457,465 @@ mod tests {
         }
     }
 
-    type BatchProverAccumulatorF2F64b =
-        BatchProverAccumulator<F2, F64b, ExtensionFieldLifterF2F64b>;
-    type BatchVerifierAccumulatorF2F64b =
-        BatchVerifierAccumulator<F2, F64b, ExtensionFieldLifterF2F64b>;
+    struct ExtensionFieldLifterF8bF128b;
+    impl ExtensionFieldLifter<F8b, F128b> for ExtensionFieldLifterF8bF128b {
+        const BASIS_SIZE: usize = 16;
 
-    fn random_f128b(rng: &mut impl Rng) -> F128b {
-        F128b::random(rng)
-    }
-
-    /// Powers `[xi^0, xi^1, ..., xi^(n-1)]`, the per-constraint challenges used by the batch.
-    fn challenge_powers(xi: F128b, n: usize) -> Vec<F128b> {
-        let mut out = Vec::with_capacity(n);
-        let mut p = F128b::ONE;
-        for _ in 0..n {
-            out.push(p);
-            p *= xi;
+        fn combine_base(values: &[F8b]) -> F128b {
+            combine::<F8b, F128b>(values)
         }
-        out
-    }
 
-    /// A degree-1 `F2` commitment for `value`, plus its evaluation γ = ρ(Δ).
-    ///
-    /// This is the shape the accumulators consume (constraints are built over the base field
-    /// `F2`, with masking coefficients in `F128b`).
-    fn make_commitment_f2(
-        rng: &mut impl Rng,
-        delta: F128b,
-        value: F2,
-    ) -> (CommitmentPolynomial<F2, F128b>, F128b) {
-        let w = random_f128b(rng);
-        let poly = CommitmentPolynomial::<F2, F128b>::from_base_vole(value, w);
-        let gamma = poly.evaluate_at_point(delta);
-        (poly, gamma)
-    }
-
-    /// Build `num_masks` full-field mask VOLEs as the flat base-VOLE streams the accumulators'
-    /// `finish` methods consume.
-    ///
-    /// Returns `(values, masks, tags)`, each `num_masks * mask_vole_size()` long, with
-    /// `tags[k] = values[k] * delta + masks[k]`. Because `combine` is linear, this makes each
-    /// block satisfy `combine(tags) = delta * combine(values) + combine(masks) = sigma_j(Delta)`,
-    /// i.e. the verifier's tag composes to the prover's mask polynomial evaluated at Δ.
-    fn make_mask_blocks(
-        rng: &mut impl Rng,
-        delta: F128b,
-        num_masks: usize,
-    ) -> (Vec<F2>, Vec<F128b>, Vec<F128b>) {
-        let n = num_masks * BatchProverAccumulatorF2F128b::mask_vole_size();
-        let mut values = Vec::with_capacity(n);
-        let mut masks = Vec::with_capacity(n);
-        let mut tags = Vec::with_capacity(n);
-        for _ in 0..n {
-            let u = F2::random(rng);
-            let w = random_f128b(rng);
-            values.push(u);
-            masks.push(w);
-            tags.push(u * delta + w);
+        fn combine_extension(values: &[F128b]) -> F128b {
+            combine::<F128b, F128b>(values)
         }
+    }
+
+    fn vole_streams<F, FE>(
+        rng: &mut SwankyRng,
+        delta: FE,
+        count: usize,
+    ) -> (Vec<F>, Vec<FE>, Vec<FE>)
+    where
+        F: FiniteField + IsSubFieldOf<FE>,
+        FE: FiniteField,
+    {
+        let values: Vec<F> = (0..count).map(|_| F::random(rng)).collect();
+        let masks: Vec<FE> = (0..count).map(|_| FE::random(rng)).collect();
+        let tags = (0..count).map(|k| values[k] * delta + masks[k]).collect();
         (values, masks, tags)
     }
 
-    /// Create a commitment polynomial from a base VOLE for a value x.
-    /// Prover: ρ(t) = w + x·t
-    /// Verifier: γ = ρ(Δ) = w + x·Δ
-    fn make_commitment(
-        rng: &mut impl Rng,
-        delta: F128b,
-        value: F128b,
-    ) -> (CommitmentPolynomial<F128b, F128b>, F128b) {
-        let w = random_f128b(rng);
-        let poly = CommitmentPolynomial::<F128b, F128b>::from_base_vole(value, w);
-        let gamma = poly.evaluate_at_point(delta);
-        (poly, gamma)
-    }
-
-    #[test]
-    fn f2_f128b_mask_vole_size_matches_protocol_parameters() {
-        let expected = REPETITION_PARAM * VOLE_SIZE_PARAM;
-        assert_eq!(BatchProverAccumulatorF2F128b::mask_vole_size(), expected);
-        assert_eq!(BatchVerifierAccumulatorF2F128b::mask_vole_size(), expected);
-    }
-
-    #[test]
-    fn generic_batch_verification_supports_f64b_extension_field() {
-        let rng = &mut rng();
-        let delta = F64b::random(rng);
-        let challenge = F64b::random(rng);
-
-        let zero = CommitmentPolynomial::<F2, F64b>::from_base_vole(F2::ZERO, F64b::random(rng));
-        let one = CommitmentPolynomial::<F2, F64b>::from_base_vole(F2::ONE, F64b::random(rng));
-        let constraint = zero.mul(&one);
-        let gamma = constraint.evaluate_at_point(delta);
-
-        let mask_count = BatchProverAccumulatorF2F64b::mask_vole_count(2);
-        let mut values = Vec::with_capacity(mask_count);
-        let mut masks = Vec::with_capacity(mask_count);
-        let mut tags = Vec::with_capacity(mask_count);
-        for _ in 0..mask_count {
-            let value = F2::random(rng);
-            let mask = F64b::random(rng);
-            values.push(value);
-            masks.push(mask);
-            tags.push(value * delta + mask);
+    struct IdentityLifter;
+    impl ExtensionFieldLifter<F128b, F128b> for IdentityLifter {
+        const BASIS_SIZE: usize = 1;
+        fn combine_base(values: &[F128b]) -> F128b {
+            values[0]
         }
-
-        let mut prover = BatchProverAccumulatorF2F64b::new(2);
-        prover.push_constraint(&constraint, challenge).unwrap();
-        let coefficients = prover.finish(&values, &masks).unwrap();
-
-        let mut verifier = BatchVerifierAccumulatorF2F64b::new(2);
-        verifier.push_constraint(gamma, 2, challenge).unwrap();
-        verifier.finish(delta, &tags, &coefficients).unwrap();
+        fn combine_extension(values: &[F128b]) -> F128b {
+            values[0]
+        }
     }
 
-    #[test]
-    fn test_commitment_polynomial_basic() {
-        let rng = &mut rng();
-        let delta = random_f128b(rng);
-        let x = random_f128b(rng);
-        let w = random_f128b(rng);
-
-        let poly = CommitmentPolynomial::<F128b, F128b>::from_base_vole(x, w);
-        assert_eq!(poly.degree(), 1);
-        assert_eq!(poly.lower_coefficients(), &[w]);
-        assert_eq!(poly.highest_degree(), x);
-        assert_eq!(poly.evaluate_at_point(delta), w + x * delta);
+    // Strategy to generate pairs `(d, degrees)` where `d` is a maximum degree
+    // and `degrees` is a vector of polynomial degrees less than or equal to `d`.
+    fn strategy_degrees(min_degree: usize) -> impl Strategy<Value = (usize, Vec<usize>)> {
+        (min_degree..=20).prop_flat_map(|d| (Just(d), vec(0..=d, 0..=if d == 0 { 0 } else { 20 })))
     }
 
-    #[test]
-    fn test_addc() {
-        let rng = &mut rng();
-        let delta = random_f128b(rng);
-        let x = random_f128b(rng);
-        let c = random_f128b(rng);
-        let w = random_f128b(rng);
-
-        let poly_x = CommitmentPolynomial::<F128b, F128b>::from_base_vole(x, w);
-        let gamma_x = poly_x.evaluate_at_point(delta);
-
-        let poly_sum = poly_x.addc(c);
-        let gamma_sum = poly_sum.evaluate_at_point(delta);
-
-        // Verifier: γ = γ_x + c·Δ^d
-        let d = poly_x.degree();
-        let expected_gamma = gamma_x + c * power(delta, d);
-        assert_eq!(gamma_sum, expected_gamma);
+    fn random_polynomial_constraint<F: FiniteField + IsSubFieldOf<FE>, FE: FiniteField>(
+        rng: &mut SwankyRng,
+        degree: usize,
+    ) -> CommitmentPolynomial<F, FE> {
+        CommitmentPolynomial::from_parts((0..degree).map(|_| FE::random(rng)).collect(), F::ZERO)
     }
 
-    #[test]
-    fn test_add_same_degree() {
-        let rng = &mut rng();
-        let delta = random_f128b(rng);
-
-        let val_x = random_f128b(rng);
-        let val_y = random_f128b(rng);
-        let (poly_x, gamma_x) = make_commitment(rng, delta, val_x);
-        let (poly_y, gamma_y) = make_commitment(rng, delta, val_y);
-
-        let poly_sum = poly_x.add(&poly_y);
-        let gamma_sum = poly_sum.evaluate_at_point(delta);
-
-        // Both degree 1, d = 1, shifts are 0
-        assert_eq!(gamma_sum, gamma_x + gamma_y);
+    fn spec_power<FE: FiniteField>(point: FE, degree: usize) -> FE {
+        (0..degree).fold(FE::ONE, |acc, _| acc * point)
     }
 
-    #[test]
-    fn test_add_different_degree() {
-        let rng = &mut rng();
-        let delta = random_f128b(rng);
-
-        // Create a degree-1 polynomial
-        let val_x = random_f128b(rng);
-        let (poly_x, gamma_x) = make_commitment(rng, delta, val_x);
-        // Create a degree-2 polynomial by multiplying two degree-1 polynomials
-        let val_a = random_f128b(rng);
-        let val_b = random_f128b(rng);
-        let (poly_a, gamma_a) = make_commitment(rng, delta, val_a);
-        let (poly_b, gamma_b) = make_commitment(rng, delta, val_b);
-        let poly_y = poly_a.mul(&poly_b);
-        let gamma_y = gamma_a * gamma_b;
-
-        assert_eq!(poly_x.degree(), 1);
-        assert_eq!(poly_y.degree(), 2);
-
-        let poly_sum = poly_x.add(&poly_y);
-        let gamma_sum = poly_sum.evaluate_at_point(delta);
-
-        // d = max(1, 2) = 2, shift1 = 1, shift2 = 0
-        // Verifier: γ = Δ^1·γ_x + Δ^0·γ_y
-        let expected = delta * gamma_x + gamma_y;
-        assert_eq!(gamma_sum, expected);
+    fn spec_polynomial_evaluation<FE: FiniteField>(coefficients: &[FE], point: FE) -> FE {
+        coefficients
+            .iter()
+            .enumerate()
+            .map(|(k, c)| *c * spec_power(point, k))
+            .sum()
     }
 
-    #[test]
-    fn test_mulc() {
-        let rng = &mut rng();
-        let delta = random_f128b(rng);
-        let c = random_f128b(rng);
-
-        let val_x = random_f128b(rng);
-        let (poly_x, gamma_x) = make_commitment(rng, delta, val_x);
-
-        let poly_prod = poly_x.mulc(c);
-        let gamma_prod = poly_prod.evaluate_at_point(delta);
-
-        // Verifier: γ = c·γ_x
-        assert_eq!(gamma_prod, c * gamma_x);
-    }
-
-    #[test]
-    fn test_mul() {
-        let rng = &mut rng();
-        let delta = random_f128b(rng);
-
-        let val_x = random_f128b(rng);
-        let val_y = random_f128b(rng);
-        let (poly_x, gamma_x) = make_commitment(rng, delta, val_x);
-        let (poly_y, gamma_y) = make_commitment(rng, delta, val_y);
-
-        let poly_prod = poly_x.mul(&poly_y);
-        let gamma_prod = poly_prod.evaluate_at_point(delta);
-
-        // Verifier: γ = γ_x·γ_y
-        assert_eq!(gamma_prod, gamma_x * gamma_y);
-        assert_eq!(poly_prod.degree(), 2);
-    }
-
-    #[test]
-    fn test_batch_verification_single_degree1() {
-        let rng = &mut rng();
-        let delta = random_f128b(rng);
-        let xi = random_f128b(rng);
-
-        // A single degree-1 constraint. In the assert-zero regime its committed (top) value must
-        // be zero, so the aggregate's top coefficient is zero and pi has degree at most 0.
-        let (poly, gamma) = make_commitment_f2(rng, delta, F2::ZERO);
-        let chi = challenge_powers(xi, 1);
-
-        // Prover: fold the constraint, then finish (max_degree = 1 needs 0 mask VOLEs).
-        let mut prover = BatchProverAccumulatorF2F128b::new(1);
-        prover.push_constraint(&poly, chi[0]).unwrap();
-        let pi = prover.finish(&[], &[]).unwrap();
-
-        // 1 coefficient below the top (the constant term).
-        assert_eq!(pi.max_degree(), 1);
-
-        // Verifier: fold the evaluation, then check.
-        let mut verifier = BatchVerifierAccumulatorF2F128b::new(1);
-        verifier.push_constraint(gamma, 1, chi[0]).unwrap();
-        verifier.finish(delta, &[], &pi).unwrap();
-    }
-
-    #[test]
-    fn test_batch_verification_degree2() {
-        let rng = &mut rng();
-        let delta = random_f128b(rng);
-        let xi = random_f128b(rng);
-
-        // A degree-1 constraint (committing zero) and a degree-2 constraint (a product that
-        // commits zero because one factor does): [poly_a(deg 1, =0), poly_c = a*b(deg 2, =0)].
-        // Both have a zero top coefficient, as the assert-zero regime requires.
-        let (poly_a, gamma_a) = make_commitment_f2(rng, delta, F2::ZERO);
-        let (poly_b, gamma_b) = make_commitment_f2(rng, delta, F2::ONE);
-        let poly_c = poly_a.mul(&poly_b); // committed value a*b = 0
-        let gamma_c = gamma_a * gamma_b;
-        let chi = challenge_powers(xi, 2);
-
-        // max_degree = 2, need 1 mask VOLE.
-        let (values, masks, tags) = make_mask_blocks(rng, delta, 1);
-
-        let mut prover = BatchProverAccumulatorF2F128b::new(2);
-        prover.push_constraint(&poly_a, chi[0]).unwrap();
-        prover.push_constraint(&poly_c, chi[1]).unwrap();
+    // test1: Degree bounds and coefficient count.
+    // Both accumulators accept constraints within the configured maximum degree and reject larger ones.
+    // The prover sends exactly max_degree coefficients, and the verifier accepts the resulting proof.
+    fn degree_bounds_and_coefficient_count<F, FE, L>(
+        seed: [u8; 16],
+        d: usize,
+        num_polynomials: usize,
+        excess: usize,
+    ) -> TestCaseResult
+    where
+        F: FiniteField + IsSubFieldOf<FE>,
+        FE: FiniteField,
+        L: ExtensionFieldLifter<F, FE>,
+    {
+        let rng = &mut SwankyRng::from_seed(seed.into());
+        let delta = FE::random(rng);
+        let mut prover = BatchProverAccumulator::<F, FE, L>::new(d);
+        let mut verifier = BatchVerifierAccumulator::<F, FE, L>::new(d);
+        for _ in 0..num_polynomials {
+            let degree = rng.random_range(0..=d);
+            let poly = random_polynomial_constraint::<F, FE>(rng, degree);
+            let chi = FE::random(rng);
+            let gamma = poly.evaluate_at_point(delta);
+            prop_assert!(prover.push_constraint(&poly, chi).is_ok());
+            prop_assert!(verifier.push_constraint(gamma, degree, chi).is_ok());
+        }
+        let bad = random_polynomial_constraint::<F, FE>(rng, d + excess);
+        let chi = FE::random(rng);
+        let err_prover = prover.push_constraint(&bad, chi).unwrap_err();
+        let err_verifier = verifier
+            .push_constraint(bad.evaluate_at_point(delta), bad.degree(), chi)
+            .unwrap_err();
+        prop_assert!(
+            err_prover
+                .to_string()
+                .contains("but the accumulator is configured for maximum degree")
+        );
+        prop_assert!(
+            err_verifier
+                .to_string()
+                .contains("but the accumulator is configured for maximum degree")
+        );
+        let (values, masks, tags) =
+            vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BASIS_SIZE);
         let pi = prover.finish(&values, &masks).unwrap();
-
-        let mut verifier = BatchVerifierAccumulatorF2F128b::new(2);
-        verifier.push_constraint(gamma_a, 1, chi[0]).unwrap();
-        verifier.push_constraint(gamma_c, 2, chi[1]).unwrap();
-        verifier.finish(delta, &tags, &pi).unwrap();
+        prop_assert_eq!(pi.coefficients().len(), d);
+        prop_assert_eq!(pi.max_degree(), d);
+        prop_assert!(verifier.finish(delta, &tags, &pi).is_ok());
+        Ok(())
     }
 
-    #[test]
-    fn test_batch_verification_mixed_degrees() {
-        let rng = &mut rng();
-        let delta = random_f128b(rng);
-        let xi = random_f128b(rng);
-
-        // Constraints of degrees 1, 2, 3. Committing val1 = 0 makes every product below commit
-        // zero too, so all three constraints have a zero top coefficient (assert-zero regime)
-        // while still exercising the degree-1/2/3 alignment.
-        let (poly1, gamma1) = make_commitment_f2(rng, delta, F2::ZERO);
-        let (poly2, gamma2) = make_commitment_f2(rng, delta, F2::ONE);
-        let poly3 = poly1.mul(&poly2); // deg 2, committed value 0
-        let gamma3 = gamma1 * gamma2;
-        let (poly4, gamma4) = make_commitment_f2(rng, delta, F2::ONE);
-        let poly5 = poly3.mul(&poly4); // deg 3, committed value 0
-        let gamma5 = gamma3 * gamma4;
-        let chi = challenge_powers(xi, 3);
-
-        // max_degree = 3, need 2 mask VOLEs.
-        let (values, masks, tags) = make_mask_blocks(rng, delta, 2);
-
-        let mut prover = BatchProverAccumulatorF2F128b::new(3);
-        prover.push_constraint(&poly1, chi[0]).unwrap();
-        prover.push_constraint(&poly3, chi[1]).unwrap();
-        prover.push_constraint(&poly5, chi[2]).unwrap();
-        let pi = prover.finish(&values, &masks).unwrap();
-
-        let mut verifier = BatchVerifierAccumulatorF2F128b::new(3);
-        verifier.push_constraint(gamma1, 1, chi[0]).unwrap();
-        verifier.push_constraint(gamma3, 2, chi[1]).unwrap();
-        verifier.push_constraint(gamma5, 3, chi[2]).unwrap();
-        verifier.finish(delta, &tags, &pi).unwrap();
+    proptest! {
+        #[test]
+        fn test1_degree_bounds_and_coefficient_count(
+            seed in any::<[u8; 16]>(),
+            d in 1usize..=20,
+            num_polynomials in 0usize..=20,
+            excess in 1usize..=4,
+        ) {
+            degree_bounds_and_coefficient_count::<F2, F128b, ExtensionFieldLifterF2F128b>(
+                seed, d, num_polynomials, excess,
+            )?;
+            degree_bounds_and_coefficient_count::<F2, F64b, ExtensionFieldLifterF2F64b>(
+                seed, d, num_polynomials, excess,
+            )?;
+            degree_bounds_and_coefficient_count::<F8b, F128b, ExtensionFieldLifterF8bF128b>(
+                seed, d, num_polynomials, excess,
+            )?;
+            degree_bounds_and_coefficient_count::<F128b, F128b, IdentityLifter>(
+                seed, d, num_polynomials, excess,
+            )?;
+        }
     }
 
-    #[test]
-    fn test_accumulators_use_configured_maximum_degree() {
-        let delta = F128b::ONE;
-        let challenge = F128b::ONE;
-        let max_degree = 3;
-
-        // Both sides align a degree-2 constraint to the configured degree 3 without requiring
-        // traversal to observe a degree-3 constraint.
-        let base = CommitmentPolynomial::<F2, F128b>::from_base_vole(F2::ZERO, F128b::ZERO);
-        let degree_two = base.mul(&base);
-        let mask_count = BatchProverAccumulatorF2F128b::mask_vole_count(max_degree);
-        let zero_values = vec![F2::ZERO; mask_count];
-        let zero_masks = vec![F128b::ZERO; mask_count];
-
-        let mut prover = BatchProverAccumulatorF2F128b::new(max_degree);
-        prover.push_constraint(&degree_two, challenge).unwrap();
-        let pi = prover.finish(&zero_values, &zero_masks).unwrap();
-
-        let mut verifier = BatchVerifierAccumulatorF2F128b::new(max_degree);
-        verifier
-            .push_constraint(degree_two.evaluate_at_point(delta), 2, challenge)
-            .unwrap();
-        verifier.finish(delta, &zero_masks, &pi).unwrap();
+    // test2: Incremental aggregation.
+    // After each constraint is pushed, the prover’s aggregate evaluation matches an independent reference
+    // sum with challenge scaling and degree alignment.
+    // The verifier is checked against that reference too, using delta = 0, 1, and a random value.
+    fn incremental_aggregation_matches_reference<F, FE, L>(
+        seed: [u8; 16],
+        d: usize,
+        degrees: &[usize],
+    ) -> TestCaseResult
+    where
+        F: FiniteField + IsSubFieldOf<FE>,
+        FE: FiniteField,
+        L: ExtensionFieldLifter<F, FE>,
+    {
+        let rng = &mut SwankyRng::from_seed(seed.into());
+        for delta in [FE::ZERO, FE::ONE, FE::random(rng)] {
+            let mut prover = BatchProverAccumulator::<F, FE, L>::new(d);
+            let mut verifier = BatchVerifierAccumulator::<F, FE, L>::new(d);
+            let (_, _, tags) =
+                vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BASIS_SIZE);
+            let mask: FE = tags
+                .chunks_exact(L::BASIS_SIZE)
+                .enumerate()
+                .map(|(j, block)| spec_power(delta, j) * L::combine_extension(block))
+                .sum();
+            let mut oracle = ZeroPolynomialCoefficients {
+                coefficients: vec![FE::ZERO; d],
+            };
+            if d > 0 {
+                oracle.coefficients[0] = mask;
+            }
+            let mut expected = FE::ZERO;
+            prop_assert_eq!(prover.evaluate_at(delta), expected);
+            prop_assert!(verifier.finish(delta, &tags, &oracle).is_ok());
+            for (i, &degree) in degrees.iter().enumerate() {
+                let rho = random_polynomial_constraint::<F, FE>(rng, degree);
+                let chi = [FE::ONE, FE::ZERO, FE::random(rng)][i % 3];
+                expected += chi
+                    * spec_power(delta, d - degree)
+                    * spec_polynomial_evaluation(rho.lower_coefficients(), delta);
+                prover.push_constraint(&rho, chi).unwrap();
+                verifier
+                    .push_constraint(rho.evaluate_at_point(delta), degree, chi)
+                    .unwrap();
+                prop_assert_eq!(prover.evaluate_at(delta), expected);
+                // A constant proof checks the verifier against the independent scalar reference.
+                oracle.coefficients[0] = expected + mask;
+                prop_assert!(verifier.finish(delta, &tags, &oracle).is_ok());
+            }
+        }
+        Ok(())
     }
 
-    #[test]
-    fn test_push_constraint_rejects_degree_above_configured_maximum() {
-        let base = CommitmentPolynomial::<F2, F128b>::from_base_vole(F2::ONE, F128b::ONE);
-        let degree_two = base.mul(&base);
-
-        let mut prover = BatchProverAccumulatorF2F128b::new(1);
-        assert!(prover.push_constraint(&degree_two, F128b::ONE).is_err());
-
-        let mut verifier = BatchVerifierAccumulatorF2F128b::new(1);
-        assert!(verifier.push_constraint(F128b::ONE, 2, F128b::ONE).is_err());
+    proptest! {
+        #[test]
+        fn test2_incremental_aggregation_matches_reference(
+            seed in any::<[u8; 16]>(),
+            (d, degrees) in strategy_degrees(0),
+        ) {
+            incremental_aggregation_matches_reference::<F2, F128b, ExtensionFieldLifterF2F128b>(
+                seed, d, &degrees,
+            )?;
+            incremental_aggregation_matches_reference::<F2, F64b, ExtensionFieldLifterF2F64b>(
+                seed, d, &degrees,
+            )?;
+            incremental_aggregation_matches_reference::<F8b, F128b, ExtensionFieldLifterF8bF128b>(
+                seed, d, &degrees,
+            )?;
+            incremental_aggregation_matches_reference::<F128b, F128b, IdentityLifter>(
+                seed, d, &degrees,
+            )?;
+        }
     }
 
-    #[test]
-    fn test_prover_rejects_nonzero_constraint_without_mutating() {
-        let constraint = CommitmentPolynomial::<F2, F128b>::from_base_vole(F2::ONE, F128b::ONE);
-        let mut prover = BatchProverAccumulatorF2F128b::new(1);
-
-        assert!(prover.push_constraint(&constraint, F128b::ONE).is_err());
-        assert_eq!(prover.top_coefficient(), F128b::ZERO);
-        assert_eq!(prover.evaluate_at(F128b::ONE), F128b::ZERO);
-    }
-
-    #[test]
-    fn finish_rejects_malformed_mask_stream_lengths() {
-        let constraint = CommitmentPolynomial::<F2, F128b>::from_base_vole(F2::ZERO, F128b::ZERO)
-            .mul(&CommitmentPolynomial::from_base_vole(F2::ONE, F128b::ZERO));
-        let mask_count = BatchProverAccumulatorF2F128b::mask_vole_count(2);
-        assert!(mask_count > 0);
-        let values = vec![F2::ZERO; mask_count];
-        let masks = vec![F128b::ZERO; mask_count];
-
-        let mut prover = BatchProverAccumulatorF2F128b::new(2);
-        prover.push_constraint(&constraint, F128b::ONE).unwrap();
-        assert!(prover.finish(&values[..mask_count - 1], &masks).is_err());
-
-        let mut prover = BatchProverAccumulatorF2F128b::new(2);
-        prover.push_constraint(&constraint, F128b::ONE).unwrap();
-        let coefficients = prover.finish(&values, &masks).unwrap();
-
-        let mut verifier = BatchVerifierAccumulatorF2F128b::new(2);
-        verifier
-            .push_constraint(constraint.evaluate_at_point(F128b::ONE), 2, F128b::ONE)
-            .unwrap();
-        assert!(
+    // test3: Coefficient tampering.
+    // An honest proof passes. Changing one transmitted coefficient by a nonzero amount causes rejection.
+    // A nonzero delta ensures the change affects the evaluation.
+    fn tampering_coefficient<F, FE, L>(
+        seed: [u8; 16],
+        d: usize,
+        degrees: &[usize],
+        coefficient: usize,
+    ) -> TestCaseResult
+    where
+        F: FiniteField + IsSubFieldOf<FE>,
+        FE: FiniteField,
+        L: ExtensionFieldLifter<F, FE>,
+    {
+        let rng = &mut SwankyRng::from_seed(seed.into());
+        let delta = FE::random_nonzero(rng);
+        let mut prover = BatchProverAccumulator::<F, FE, L>::new(d);
+        let mut verifier = BatchVerifierAccumulator::<F, FE, L>::new(d);
+        for &degree in degrees {
+            let rho = random_polynomial_constraint::<F, FE>(rng, degree);
+            let chi = FE::random(rng);
+            prover.push_constraint(&rho, chi).unwrap();
             verifier
-                .finish(F128b::ONE, &masks[..mask_count - 1], &coefficients)
-                .is_err()
-        );
-
-        assert!(
-            BatchProverAccumulatorF2F128b::new(0)
-                .finish(&[F2::ZERO], &[])
-                .is_err()
-        );
-        let empty_coefficients = BatchProverAccumulatorF2F128b::new(0)
-            .finish(&[], &[])
-            .unwrap();
-        let empty_verifier = BatchVerifierAccumulatorF2F128b::new(0);
-        assert!(
-            empty_verifier
-                .finish(F128b::ONE, &[F128b::ZERO], &empty_coefficients)
-                .is_err()
-        );
-    }
-
-    #[test]
-    fn test_batch_verification_fails_with_wrong_coefficients() {
-        let rng = &mut rng();
-        let delta = random_f128b(rng);
-        let xi = random_f128b(rng);
-
-        // Same degree-1 + degree-2 batch as `test_batch_verification_degree2`.
-        let (poly_a, gamma_a) = make_commitment_f2(rng, delta, F2::ZERO);
-        let (poly_b, gamma_b) = make_commitment_f2(rng, delta, F2::ONE);
-        let poly_c = poly_a.mul(&poly_b);
-        let gamma_c = gamma_a * gamma_b;
-        let chi = challenge_powers(xi, 2);
-
-        let (values, masks, tags) = make_mask_blocks(rng, delta, 1);
-
-        let mut prover = BatchProverAccumulatorF2F128b::new(2);
-        prover.push_constraint(&poly_a, chi[0]).unwrap();
-        prover.push_constraint(&poly_c, chi[1]).unwrap();
+                .push_constraint(rho.evaluate_at_point(delta), degree, chi)
+                .unwrap();
+        }
+        let (values, masks, tags) =
+            vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BASIS_SIZE);
         let mut pi = prover.finish(&values, &masks).unwrap();
+        prop_assert!(verifier.finish(delta, &tags, &pi).is_ok());
+        pi.coefficients[coefficient % d] += FE::random_nonzero(rng);
+        let err = verifier.finish(delta, &tags, &pi).unwrap_err();
 
-        // Tamper with a coefficient: verification must reject.
-        pi.coefficients[0] += F128b::ONE;
-
-        let mut verifier = BatchVerifierAccumulatorF2F128b::new(2);
-        verifier.push_constraint(gamma_a, 1, chi[0]).unwrap();
-        verifier.push_constraint(gamma_c, 2, chi[1]).unwrap();
-        assert!(verifier.finish(delta, &tags, &pi).is_err());
+        prop_assert!(
+            err.to_string()
+                .contains("Verification failed: Higher degree constraint check failed")
+        );
+        Ok(())
     }
 
-    #[test]
-    fn test_batch_verification_fails_with_wrong_gamma() {
-        let rng = &mut rng();
-        let delta = random_f128b(rng);
-        let xi = random_f128b(rng);
-
-        let (poly_a, gamma_a) = make_commitment_f2(rng, delta, F2::ZERO);
-        let (poly_b, _gamma_b) = make_commitment_f2(rng, delta, F2::ONE);
-        let poly_c = poly_a.mul(&poly_b);
-        let chi = challenge_powers(xi, 2);
-
-        let (values, masks, tags) = make_mask_blocks(rng, delta, 1);
-
-        let mut prover = BatchProverAccumulatorF2F128b::new(2);
-        prover.push_constraint(&poly_a, chi[0]).unwrap();
-        prover.push_constraint(&poly_c, chi[1]).unwrap();
-        let pi = prover.finish(&values, &masks).unwrap();
-
-        // The verifier folds a wrong evaluation for the degree-2 constraint: check must reject.
-        let wrong_gamma = random_f128b(rng);
-        let mut verifier = BatchVerifierAccumulatorF2F128b::new(2);
-        verifier.push_constraint(gamma_a, 1, chi[0]).unwrap();
-        verifier.push_constraint(wrong_gamma, 2, chi[1]).unwrap();
-        assert!(verifier.finish(delta, &tags, &pi).is_err());
+    proptest! {
+        #[test]
+        fn test3_tampering_coefficient(
+            seed in any::<[u8; 16]>(),
+            (d, degrees) in strategy_degrees(1),
+            coefficient in 0usize..20,
+        ) {
+            tampering_coefficient::<F2, F128b, ExtensionFieldLifterF2F128b>(
+                seed, d, &degrees, coefficient,
+            )?;
+            tampering_coefficient::<F2, F64b, ExtensionFieldLifterF2F64b>(
+                seed, d, &degrees, coefficient,
+            )?;
+            tampering_coefficient::<F8b, F128b, ExtensionFieldLifterF8bF128b>(
+                seed, d, &degrees, coefficient,
+            )?;
+            tampering_coefficient::<F128b, F128b, IdentityLifter>(
+                seed, d, &degrees, coefficient,
+            )?;
+        }
     }
 
-    #[test]
-    fn test_circuit_like_polynomial_tracking() {
-        // Simulate a simple circuit: x0, x1 private inputs, x2 = x0 * x1, x3 = x2 + x0
-        let rng = &mut rng();
-        let delta = random_f128b(rng);
+    // test4: Nonzero committed values.
+    // The prover rejects a constraint whose highest coefficient is non-zero (the committed value),
+    // including when its challenge is zero.
+    fn nonzero_committed_value_is_rejected<F, FE, L>(
+        seed: [u8; 16],
+        d: usize,
+        degree: usize,
+    ) -> TestCaseResult
+    where
+        F: FiniteField + IsSubFieldOf<FE>,
+        FE: FiniteField,
+        L: ExtensionFieldLifter<F, FE>,
+    {
+        let rng = &mut SwankyRng::from_seed(seed.into());
+        let rho = random_polynomial_constraint::<F, FE>(rng, degree % (d + 1))
+            .addc(F::random_nonzero(rng));
+        for chi in [FE::ZERO, FE::ONE, FE::random(rng)] {
+            let mut prover = BatchProverAccumulator::<F, FE, L>::new(d);
 
-        let x0 = random_f128b(rng);
-        let x1 = random_f128b(rng);
+            let err = prover.push_constraint(&rho, chi).unwrap_err();
+            prop_assert!(
+                err.to_string()
+                    .contains("Higher degree constraint does not evaluate to zero")
+            );
+        }
+        Ok(())
+    }
 
-        // Input gates: degree-1 commitments from base VOLEs
-        let (poly_x0, gamma_x0) = make_commitment(rng, delta, x0);
-        let (poly_x1, gamma_x1) = make_commitment(rng, delta, x1);
+    proptest! {
+        #[test]
+        fn test4_nonzero_committed_value_is_rejected(
+            seed in any::<[u8; 16]>(),
+            d in 1usize..=20,
+            degree in 0usize..=20,
+        ) {
+            nonzero_committed_value_is_rejected::<F2, F128b, ExtensionFieldLifterF2F128b>(
+                seed, d, degree,
+            )?;
+            nonzero_committed_value_is_rejected::<F2, F64b, ExtensionFieldLifterF2F64b>(
+                seed, d, degree,
+            )?;
+            nonzero_committed_value_is_rejected::<F8b, F128b, ExtensionFieldLifterF8bF128b>(
+                seed, d, degree,
+            )?;
+            nonzero_committed_value_is_rejected::<F128b, F128b, IdentityLifter>(seed, d, degree)?;
+        }
+    }
 
-        // Mul gate: x2 = x0 * x1
-        let poly_x2 = poly_x0.mul(&poly_x1);
-        let gamma_x2 = gamma_x0 * gamma_x1;
+    // test5: Mask stream lengths.
+    // Both sides accept correctly sized mask streams and reject streams that are too short or too long.
+    // This includes degrees zero and one, which require no masks.
+    fn malformed_mask_streams_are_rejected<F, FE, L>(d: usize) -> TestCaseResult
+    where
+        F: FiniteField + IsSubFieldOf<FE>,
+        FE: FiniteField,
+        L: ExtensionFieldLifter<F, FE>,
+    {
+        for d in [0, 1, d] {
+            let n = d.saturating_sub(1) * L::BASIS_SIZE;
+            let values = vec![F::ZERO; n + 1];
+            let masks = vec![FE::ZERO; n + 1];
+            let pi = ZeroPolynomialCoefficients {
+                coefficients: vec![FE::ZERO; d],
+            };
+            let prover = || BatchProverAccumulator::<F, FE, L>::new(d);
+            let verifier = || BatchVerifierAccumulator::<F, FE, L>::new(d);
+            prop_assert!(prover().finish(&values[..n], &masks[..n]).is_ok());
+            prop_assert!(verifier().finish(FE::ONE, &masks[..n], &pi).is_ok());
+            for length in [n.saturating_sub(1), n + 1] {
+                if length == n {
+                    continue;
+                }
+                let prover_err1 = prover().finish(&values[..length], &masks[..n]).unwrap_err();
+                prop_assert!(
+                    prover_err1
+                        .to_string()
+                        .contains("Wrong number of higher degree mask VOLEs")
+                );
+                let prover_err2 = prover().finish(&values[..n], &masks[..length]).unwrap_err();
+                prop_assert!(
+                    prover_err2
+                        .to_string()
+                        .contains("Wrong number of higher degree mask VOLEs")
+                );
+                let verifier_err = verifier()
+                    .finish(FE::ONE, &masks[..length], &pi)
+                    .unwrap_err();
+                prop_assert!(
+                    verifier_err
+                        .to_string()
+                        .contains("Wrong number of higher degree mask VOLEs")
+                );
+            }
+        }
+        Ok(())
+    }
 
-        // Add gate: x3 = x2 + x0 (degree alignment)
-        let poly_x3 = poly_x2.add(&poly_x0);
-        let gamma_x3 = gamma_x2 + delta * gamma_x0; // shift x0 by Δ^(2-1)
+    proptest! {
+        #[test]
+        fn test5_malformed_mask_streams_are_rejected(d in 0usize..=20) {
+            malformed_mask_streams_are_rejected::<F2, F128b, ExtensionFieldLifterF2F128b>(d)?;
+            malformed_mask_streams_are_rejected::<F2, F64b, ExtensionFieldLifterF2F64b>(d)?;
+            malformed_mask_streams_are_rejected::<F8b, F128b, ExtensionFieldLifterF8bF128b>(d)?;
+            malformed_mask_streams_are_rejected::<F128b, F128b, IdentityLifter>(d)?;
+        }
+    }
 
-        // Verify the polynomial evaluation matches
-        assert_eq!(poly_x3.evaluate_at_point(delta), gamma_x3);
+    // 6. test6: Masking arithmetic.
+    // The finished polynomial’s evaluation matches an independent reference combining aligned constraints
+    // and shifted VOLE masks.
+    // It checks a random evaluation point, checks delta = 0, 1, and a random value, verifies
+    // the lifted VOLE correlation, and confirms verifier acceptance.
+    fn masking_arithmetic_matches_reference<F, FE, L>(
+        seed: [u8; 16],
+        d: usize,
+        degrees: &[usize],
+    ) -> TestCaseResult
+    where
+        F: FiniteField + IsSubFieldOf<FE>,
+        FE: FiniteField,
+        L: ExtensionFieldLifter<F, FE>,
+    {
+        let rng = &mut SwankyRng::from_seed(seed.into());
+        for delta in [FE::ZERO, FE::ONE, FE::random(rng)] {
+            let point = FE::random(rng);
+            let mut prover = BatchProverAccumulator::<F, FE, L>::new(d);
+            let mut verifier = BatchVerifierAccumulator::<F, FE, L>::new(d);
+            let (mut expected, mut expected_delta) = (FE::ZERO, FE::ZERO);
+            for &degree in degrees {
+                let rho = random_polynomial_constraint::<F, FE>(rng, degree);
+                let chi = FE::random(rng);
+                prover.push_constraint(&rho, chi).unwrap();
+                verifier
+                    .push_constraint(rho.evaluate_at_point(delta), degree, chi)
+                    .unwrap();
+                expected += chi
+                    * spec_power(point, d - degree)
+                    * spec_polynomial_evaluation(rho.lower_coefficients(), point);
+                expected_delta += chi
+                    * spec_power(delta, d - degree)
+                    * spec_polynomial_evaluation(rho.lower_coefficients(), delta);
+            }
+            let (values, masks, tags) =
+                vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BASIS_SIZE);
+            for j in 0..d.saturating_sub(1) {
+                let block = j * L::BASIS_SIZE..(j + 1) * L::BASIS_SIZE;
+                let s = L::combine_base(&values[block.clone()]);
+                let w = L::combine_extension(&masks[block.clone()]);
+                prop_assert_eq!(L::combine_extension(&tags[block]), w + s * delta);
+                expected += spec_power(point, j) * (w + s * point);
+                expected_delta += spec_power(delta, j) * (w + s * delta);
+            }
+            let pi = prover.finish(&values, &masks).unwrap();
+            prop_assert_eq!(
+                spec_polynomial_evaluation(pi.coefficients(), point),
+                expected
+            );
+            prop_assert_eq!(
+                spec_polynomial_evaluation(pi.coefficients(), delta),
+                expected_delta
+            );
+            prop_assert!(verifier.finish(delta, &tags, &pi).is_ok());
+        }
+        Ok(())
+    }
+
+    proptest! {
+        #[test]
+        fn test6_masked_polynomial_matches_reference(
+            seed in any::<[u8; 16]>(),
+            (d, degrees) in strategy_degrees(0),
+        ) {
+            masking_arithmetic_matches_reference::<F2, F128b, ExtensionFieldLifterF2F128b>(
+                seed, d, &degrees,
+            )?;
+            masking_arithmetic_matches_reference::<F2, F64b, ExtensionFieldLifterF2F64b>(
+                seed, d, &degrees,
+            )?;
+            masking_arithmetic_matches_reference::<F8b, F128b, ExtensionFieldLifterF8bF128b>(
+                seed, d, &degrees,
+            )?;
+            masking_arithmetic_matches_reference::<F128b, F128b, IdentityLifter>(seed, d, &degrees)?;
+        }
     }
 }
+
+#[cfg(test)]
+mod alt_tests;
