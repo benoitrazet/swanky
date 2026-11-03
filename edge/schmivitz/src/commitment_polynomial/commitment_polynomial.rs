@@ -1,15 +1,19 @@
 //! Polynomial commitments from the
 //! [Commitment polynomials](crate::commitment_polynomial#commitment-polynomials) protocol.
 //!
-//! [`CommitmentPolynomial`] implements the
+//! [`CommitmentPolynomialProver`] and [`CommitmentPolynomialVerifier`] implement the
 //! [gate operations](crate::commitment_polynomial#gate-by-gate-commitment-propagation).
+
+use std::marker::PhantomData;
 
 use swanky_field::{FiniteField, IsSubFieldOf};
 
-/// A [polynomial commitment](crate::commitment_polynomial#commitment-polynomials) to a value in `F`.
+use super::power;
+
+/// The prover's [polynomial commitment](crate::commitment_polynomial#commitment-polynomials) to a value in `F`.
 /// The highest-degree coefficient holds that value; lower coefficients in `FE` mask it.
 #[derive(Clone, Debug)]
-pub struct CommitmentPolynomial<F: FiniteField, FE: FiniteField>
+pub struct CommitmentPolynomialProver<F: FiniteField, FE: FiniteField>
 where
     F: IsSubFieldOf<FE>,
 {
@@ -17,7 +21,7 @@ where
     highest_degree: F,
 }
 
-impl<F: FiniteField, FE: FiniteField> CommitmentPolynomial<F, FE>
+impl<F: FiniteField, FE: FiniteField> CommitmentPolynomialProver<F, FE>
 where
     F: IsSubFieldOf<FE>,
 {
@@ -129,16 +133,100 @@ where
     }
 }
 
+/// The verifier's [polynomial commitment](crate::commitment_polynomial#commitment-polynomials).
+/// Stores the evaluation at the verifier's key and the commitment degree.
+#[derive(Clone, Copy, Debug)]
+pub struct CommitmentPolynomialVerifier<F: FiniteField, FE: FiniteField>
+where
+    F: IsSubFieldOf<FE>,
+{
+    evaluation: FE,
+    degree: usize,
+    phantom: PhantomData<F>,
+}
+
+impl<F: FiniteField, FE: FiniteField> CommitmentPolynomialVerifier<F, FE>
+where
+    F: IsSubFieldOf<FE>,
+{
+    /// Create a degree-one commitment from a [base VOLE](crate::commitment_polynomial#base-vole) tag.
+    pub fn from_base_vole(tag: FE) -> Self {
+        Self {
+            evaluation: tag,
+            degree: 1,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Create a commitment directly from its evaluation and commitment degree.
+    #[cfg(test)]
+    pub fn from_parts(evaluation: FE, degree: usize) -> Self {
+        Self {
+            evaluation,
+            degree,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Return the commitment degree.
+    pub fn degree(&self) -> usize {
+        self.degree
+    }
+
+    /// Return the commitment's evaluation at the verifier's key.
+    pub fn evaluation(&self) -> FE {
+        self.evaluation
+    }
+
+    /// Add a constant, using `delta` to update the committed value's contribution.
+    /// See the [gate operations](crate::commitment_polynomial#gate-by-gate-commitment-propagation).
+    pub fn addc(&self, c: F, delta: FE) -> Self {
+        Self {
+            evaluation: self.evaluation + c * power(delta, self.degree),
+            ..*self
+        }
+    }
+
+    /// Add two commitment evaluations, aligning to the maximum degree using `delta`.
+    /// See the [gate operations](crate::commitment_polynomial#gate-by-gate-commitment-propagation).
+    pub fn add(&self, other: &Self, delta: FE) -> Self {
+        let degree = self.degree.max(other.degree);
+        Self {
+            evaluation: power(delta, degree - self.degree) * self.evaluation
+                + power(delta, degree - other.degree) * other.evaluation,
+            degree,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Multiply by a constant, preserving the commitment degree.
+    pub fn mulc(&self, c: F) -> Self {
+        Self {
+            evaluation: c * self.evaluation,
+            ..*self
+        }
+    }
+
+    /// Multiply two commitment evaluations, adding their commitment degrees.
+    pub fn mul(&self, other: &Self) -> Self {
+        Self {
+            evaluation: self.evaluation * other.evaluation,
+            degree: self.degree + other.degree,
+            phantom: PhantomData,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::prelude::*;
     use proptest::test_runner::TestCaseResult;
+    use proptest::{collection::vec, prelude::*};
     use rand::SeedableRng;
     use rand::rng;
     use swanky_field::FiniteRing;
     use swanky_field::{FiniteField, IsSubFieldOf};
-    use swanky_field_binary::{F2, F8b, F128b};
+    use swanky_field_binary::{F2, F8b, F64b, F128b};
     use swanky_rng::SwankyRng;
 
     fn pow_fe<FE: FiniteField>(base: FE, exp: usize) -> FE {
@@ -152,7 +240,7 @@ mod tests {
     /// Reference polynomial evaluation independent of `evaluate_at_point`'s Horner
     /// implementation: cross-checks correctness by recomputing the sum directly.
     fn eval_reference<F: FiniteField, FE: FiniteField>(
-        poly: &CommitmentPolynomial<F, FE>,
+        poly: &CommitmentPolynomialProver<F, FE>,
         point: FE,
     ) -> FE
     where
@@ -172,10 +260,15 @@ mod tests {
         let mut rng = rng();
         let value = F2::random(&mut rng);
         let mask = F128b::random(&mut rng);
-        let poly = CommitmentPolynomial::<F2, F128b>::from_base_vole(value, mask);
+        let delta = F128b::random(&mut rng);
+        let poly = CommitmentPolynomialProver::<F2, F128b>::from_base_vole(value, mask);
+        let verifier =
+            CommitmentPolynomialVerifier::<F2, F128b>::from_base_vole(mask + value * delta);
         assert_eq!(poly.degree(), 1);
         assert_eq!(poly.lower_coefficients(), &[mask]);
         assert_eq!(poly.highest_degree(), value);
+        assert_eq!(verifier.degree(), poly.degree());
+        assert_eq!(verifier.evaluation(), poly.evaluate_at_point(delta));
     }
 
     #[test]
@@ -183,7 +276,7 @@ mod tests {
         let mut rng = rng();
         let lower = vec![F128b::random(&mut rng), F128b::random(&mut rng)];
         let highest = F2::random(&mut rng);
-        let poly = CommitmentPolynomial::<F2, F128b>::from_parts(lower.clone(), highest);
+        let poly = CommitmentPolynomialProver::<F2, F128b>::from_parts(lower.clone(), highest);
         assert_eq!(poly.lower_coefficients(), &lower[..]);
         assert_eq!(poly.highest_degree(), highest);
         assert_eq!(poly.degree(), 2);
@@ -197,9 +290,12 @@ mod tests {
         let value = F::random(&mut rng);
         let mask = FE::random(&mut rng);
         let point = FE::random(&mut rng);
-        let poly = CommitmentPolynomial::<F, FE>::from_base_vole(value, mask);
+        let poly = CommitmentPolynomialProver::<F, FE>::from_base_vole(value, mask);
+        let verifier = CommitmentPolynomialVerifier::<F, FE>::from_base_vole(mask + value * point);
         // ρ(t) = mask + value·t
         prop_assert_eq!(poly.evaluate_at_point(point), mask + value * point);
+        prop_assert_eq!(verifier.degree(), poly.degree());
+        prop_assert_eq!(verifier.evaluation(), poly.evaluate_at_point(point));
         Ok(())
     }
 
@@ -222,7 +318,7 @@ mod tests {
         let mut rng = SwankyRng::from_seed(seed.into());
         let lower = (0..degree).map(|_| FE::random(&mut rng)).collect();
         let highest = F::random(&mut rng);
-        let poly = CommitmentPolynomial::<F, FE>::from_parts(lower, highest);
+        let poly = CommitmentPolynomialProver::<F, FE>::from_parts(lower, highest);
 
         for point in [FE::ZERO, FE::ONE, FE::random(&mut rng)] {
             prop_assert_eq!(
@@ -260,7 +356,7 @@ mod tests {
         let highest = F::random(&mut rng);
         let c = F::random(&mut rng);
         let point = FE::random(&mut rng);
-        let poly = CommitmentPolynomial::<F, FE>::from_parts(lower, highest);
+        let poly = CommitmentPolynomialProver::<F, FE>::from_parts(lower, highest);
         let result = poly.addc(c);
         prop_assert_eq!(result.highest_degree(), poly.highest_degree() + c);
         prop_assert_eq!(result.lower_coefficients(), poly.lower_coefficients());
@@ -269,6 +365,13 @@ mod tests {
             result.evaluate_at_point(point),
             poly.evaluate_at_point(point) + c * pow_fe(point, degree),
         );
+        let verifier = CommitmentPolynomialVerifier::<F, FE>::from_parts(
+            poly.evaluate_at_point(point),
+            degree,
+        )
+        .addc(c, point);
+        prop_assert_eq!(verifier.degree(), result.degree());
+        prop_assert_eq!(verifier.evaluation(), result.evaluate_at_point(point));
         Ok(())
     }
 
@@ -293,12 +396,19 @@ mod tests {
         let w_y = F128b::random(&mut rng);
         let point = F128b::random(&mut rng);
 
-        let poly_x = CommitmentPolynomial::<F128b, F128b>::from_base_vole(val_x, w_x);
-        let poly_y = CommitmentPolynomial::<F128b, F128b>::from_base_vole(val_y, w_y);
+        let poly_x = CommitmentPolynomialProver::<F128b, F128b>::from_base_vole(val_x, w_x);
+        let poly_y = CommitmentPolynomialProver::<F128b, F128b>::from_base_vole(val_y, w_y);
 
         let sum = poly_x.add(&poly_y);
+        let verifier_x =
+            CommitmentPolynomialVerifier::<F128b, F128b>::from_base_vole(w_x + val_x * point);
+        let verifier_y =
+            CommitmentPolynomialVerifier::<F128b, F128b>::from_base_vole(w_y + val_y * point);
+        let verifier_sum = verifier_x.add(&verifier_y, point);
         assert_eq!(sum.degree(), 1);
         assert_eq!(sum.highest_degree(), val_x + val_y);
+        assert_eq!(verifier_sum.degree(), sum.degree());
+        assert_eq!(verifier_sum.evaluation(), sum.evaluate_at_point(point));
         assert_eq!(
             sum.evaluate_at_point(point),
             poly_x.evaluate_at_point(point) + poly_y.evaluate_at_point(point),
@@ -317,16 +427,25 @@ mod tests {
         let mut rng = SwankyRng::from_seed(seed.into());
         let lower_a = (0..degree_a).map(|_| FE::random(&mut rng)).collect();
         let highest_a = F::random(&mut rng);
-        let poly_a = CommitmentPolynomial::<F, FE>::from_parts(lower_a, highest_a);
+        let poly_a = CommitmentPolynomialProver::<F, FE>::from_parts(lower_a, highest_a);
         let lower_b = (0..degree_b).map(|_| FE::random(&mut rng)).collect();
         let highest_b = F::random(&mut rng);
-        let poly_b = CommitmentPolynomial::<F, FE>::from_parts(lower_b, highest_b);
+        let poly_b = CommitmentPolynomialProver::<F, FE>::from_parts(lower_b, highest_b);
         let degree = degree_a.max(degree_b);
 
         let points = [FE::ZERO, FE::ONE, FE::random(&mut rng)];
         let sum = poly_a.add(&poly_b);
 
         for point in points {
+            let verifier_a = CommitmentPolynomialVerifier::<F, FE>::from_parts(
+                poly_a.evaluate_at_point(point),
+                degree_a,
+            );
+            let verifier_b = CommitmentPolynomialVerifier::<F, FE>::from_parts(
+                poly_b.evaluate_at_point(point),
+                degree_b,
+            );
+            let verifier_sum = verifier_a.add(&verifier_b, point);
             // ρ_sum(t) = t^(d-d_a) ρ_a(t) + t^(d-d_b) ρ_b(t).
             prop_assert_eq!(
                 poly_a.evaluate_at_point(point) * pow_fe(point, degree - poly_a.degree())
@@ -337,6 +456,8 @@ mod tests {
                 poly_b.degree(),
                 point,
             );
+            prop_assert_eq!(verifier_sum.degree(), sum.degree());
+            prop_assert_eq!(verifier_sum.evaluation(), sum.evaluate_at_point(point));
         }
         Ok(())
     }
@@ -364,19 +485,28 @@ mod tests {
         let mut rng = SwankyRng::from_seed(seed.into());
         let lower = (0..degree).map(|_| FE::random(&mut rng)).collect();
         let highest = F::random(&mut rng);
-        let c = F::random(&mut rng);
-        let poly = CommitmentPolynomial::<F, FE>::from_parts(lower, highest);
-        let result = poly.mulc(c);
-
-        for point in [FE::ZERO, FE::ONE, FE::random(&mut rng)] {
-            prop_assert_eq!(
-                c * poly.evaluate_at_point(point),
-                result.evaluate_at_point(point),
-                "degree = {}, constant = {:?}, point = {:?}",
-                degree,
-                c,
-                point,
-            );
+        let poly = CommitmentPolynomialProver::<F, FE>::from_parts(lower, highest);
+        let points = [FE::ZERO, FE::ONE, FE::random(&mut rng)];
+        for c in [F::ZERO, F::ONE, F::random(&mut rng)] {
+            let result = poly.mulc(c);
+            prop_assert_eq!(result.degree(), degree);
+            for point in points {
+                let verifier = CommitmentPolynomialVerifier::<F, FE>::from_parts(
+                    poly.evaluate_at_point(point),
+                    degree,
+                )
+                .mulc(c);
+                prop_assert_eq!(
+                    c * poly.evaluate_at_point(point),
+                    result.evaluate_at_point(point),
+                    "degree = {}, constant = {:?}, point = {:?}",
+                    degree,
+                    c,
+                    point,
+                );
+                prop_assert_eq!(verifier.degree(), result.degree());
+                prop_assert_eq!(verifier.evaluation(), result.evaluate_at_point(point));
+            }
         }
         Ok(())
     }
@@ -404,13 +534,23 @@ mod tests {
         let mut rng = SwankyRng::from_seed(seed.into());
         let lower_a = (0..degree_a).map(|_| FE::random(&mut rng)).collect();
         let highest_a = F::random(&mut rng);
-        let poly_a = CommitmentPolynomial::<F, FE>::from_parts(lower_a, highest_a);
+        let poly_a = CommitmentPolynomialProver::<F, FE>::from_parts(lower_a, highest_a);
         let lower_b = (0..degree_b).map(|_| FE::random(&mut rng)).collect();
         let highest_b = F::random(&mut rng);
-        let poly_b = CommitmentPolynomial::<F, FE>::from_parts(lower_b, highest_b);
+        let poly_b = CommitmentPolynomialProver::<F, FE>::from_parts(lower_b, highest_b);
         let product = poly_a.mul(&poly_b);
+        prop_assert_eq!(product.degree(), degree_a + degree_b);
 
         for point in [FE::ZERO, FE::ONE, FE::random(&mut rng)] {
+            let verifier_a = CommitmentPolynomialVerifier::<F, FE>::from_parts(
+                poly_a.evaluate_at_point(point),
+                degree_a,
+            );
+            let verifier_b = CommitmentPolynomialVerifier::<F, FE>::from_parts(
+                poly_b.evaluate_at_point(point),
+                degree_b,
+            );
+            let verifier_product = verifier_a.mul(&verifier_b);
             prop_assert_eq!(
                 poly_a.evaluate_at_point(point) * poly_b.evaluate_at_point(point),
                 product.evaluate_at_point(point),
@@ -418,6 +558,11 @@ mod tests {
                 degree_a,
                 degree_b,
                 point,
+            );
+            prop_assert_eq!(verifier_product.degree(), product.degree());
+            prop_assert_eq!(
+                verifier_product.evaluation(),
+                product.evaluate_at_point(point)
             );
         }
         Ok(())

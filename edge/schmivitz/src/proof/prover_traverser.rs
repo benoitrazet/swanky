@@ -6,7 +6,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
 
-use crate::commitment_polynomial::{BatchProverAccumulatorF2F128b, CommitmentPolynomial};
+use crate::commitment_polynomial::{BatchProverAccumulatorF2F128b, CommitmentPolynomialProver};
 use crate::proof::ChiGenerator;
 use crate::vole::RandomVoleP;
 
@@ -314,7 +314,7 @@ impl<VOLE: RandomVoleP> FancyZeroKnowledge for ProverTraverser<VOLE> {
 }
 
 impl<VOLE: RandomVoleP> HigherDegreeBackend<F2, F128b> for ProverTraverser<VOLE> {
-    type HigherDegreeWire = CommitmentPolynomial<F2, F128b>;
+    type HigherDegreeWire = CommitmentPolynomialProver<F2, F128b>;
 
     fn h_add(
         &self,
@@ -356,7 +356,9 @@ impl<VOLE: RandomVoleP> HigherDegreeBackend<F2, F128b> for ProverTraverser<VOLE>
         // Build the input commitments and evaluate the constraint over them.
         let constraint = f(
             self,
-            std::array::from_fn(|i| CommitmentPolynomial::from_base_vole(inputs[i].0, inputs[i].1)),
+            std::array::from_fn(|i| {
+                CommitmentPolynomialProver::from_base_vole(inputs[i].0, inputs[i].1)
+            }),
         );
 
         // Consume the next shared Fiat–Shamir weight and add this constraint to the batch.
@@ -448,7 +450,7 @@ mod tests {
     fn constant_operations_apply_to_the_committed_value() {
         let rng = &mut rng();
         let traverser = test_traverser(F128b::random(rng), 0);
-        let poly = CommitmentPolynomial::from_base_vole(F2::ONE, F128b::random(rng));
+        let poly = CommitmentPolynomialProver::from_base_vole(F2::ONE, F128b::random(rng));
 
         let sum = traverser.h_addc(&poly, F2::ONE).unwrap();
         assert_eq!(sum.highest_degree(), F2::ZERO);

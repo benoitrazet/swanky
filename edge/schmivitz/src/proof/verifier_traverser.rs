@@ -5,7 +5,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
 
-use crate::commitment_polynomial::{BatchVerifierAccumulatorF2F128b, batch_verification::power};
+use crate::commitment_polynomial::{BatchVerifierAccumulatorF2F128b, CommitmentPolynomialVerifier};
 use crate::proof::ChiGenerator;
 
 /// Values produced by a completed verifier circuit traversal.
@@ -256,40 +256,27 @@ impl FancyZeroKnowledge for VerifierTraverser {
     }
 }
 impl HigherDegreeBackend<F2, F128b> for VerifierTraverser {
-    /// A verifier-side commitment evaluation and its polynomial degree.
-    ///
-    /// The degree is needed because the gate operations must mirror the degree alignment that
-    /// [`CommitmentPolynomial`](crate::commitment_polynomial::CommitmentPolynomial) applies on
-    /// the prover's side.
-    type HigherDegreeWire = (F128b, usize);
+    /// A verifier commitment carrying its evaluation and degree.
+    type HigherDegreeWire = CommitmentPolynomialVerifier<F2, F128b>;
 
     /// Mirrors
-    /// [`CommitmentPolynomial::add`](crate::commitment_polynomial::CommitmentPolynomial::add) on
-    /// verifier-side evaluations.
+    /// [`CommitmentPolynomialVerifier::add`] on verifier commitments.
     fn h_add(
         &self,
         lhs: &Self::HigherDegreeWire,
         rhs: &Self::HigherDegreeWire,
     ) -> CircuitResult<Self::HigherDegreeWire> {
-        let (eval_1, degree_1) = *lhs;
-        let (eval_2, degree_2) = *rhs;
-        let degree = degree_1.max(degree_2);
-
-        let eval = power(self.verifier_key, degree - degree_1) * eval_1
-            + power(self.verifier_key, degree - degree_2) * eval_2;
-        Ok((eval, degree))
+        Ok(lhs.add(rhs, self.verifier_key))
     }
 
     /// Mirrors
-    /// [`CommitmentPolynomial::addc`](crate::commitment_polynomial::CommitmentPolynomial::addc) on
-    /// verifier-side evaluations.
+    /// [`CommitmentPolynomialVerifier::addc`] on verifier commitments.
     fn h_addc(
         &self,
         lhs: &Self::HigherDegreeWire,
         rhs: F2,
     ) -> CircuitResult<Self::HigherDegreeWire> {
-        let (eval, degree) = *lhs;
-        Ok((eval + rhs * power(self.verifier_key, degree), degree))
+        Ok(lhs.addc(rhs, self.verifier_key))
     }
 
     fn h_mul(
@@ -297,9 +284,7 @@ impl HigherDegreeBackend<F2, F128b> for VerifierTraverser {
         lhs: &Self::HigherDegreeWire,
         rhs: &Self::HigherDegreeWire,
     ) -> CircuitResult<Self::HigherDegreeWire> {
-        let (eval_1, degree_1) = *lhs;
-        let (eval_2, degree_2) = *rhs;
-        Ok((eval_1 * eval_2, degree_1 + degree_2))
+        Ok(lhs.mul(rhs))
     }
 
     fn h_mulc(
@@ -307,8 +292,7 @@ impl HigherDegreeBackend<F2, F128b> for VerifierTraverser {
         lhs: &Self::HigherDegreeWire,
         rhs: F2,
     ) -> CircuitResult<Self::HigherDegreeWire> {
-        let (eval, degree) = *lhs;
-        Ok((rhs * eval, degree))
+        Ok(lhs.mulc(rhs))
     }
 
     fn assert_zero_higher_degree<const INPUT_LEN: usize>(
@@ -317,12 +301,15 @@ impl HigherDegreeBackend<F2, F128b> for VerifierTraverser {
         f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
     ) -> CircuitResult<()> {
         // Treat each masked witness as a degree-one verifier-side commitment.
-        let (gamma, degree) = f(self, std::array::from_fn(|i| (inputs[i], 1)));
+        let constraint = f(
+            self,
+            std::array::from_fn(|i| CommitmentPolynomialVerifier::from_base_vole(inputs[i])),
+        );
 
         // Consume the next shared Fiat–Shamir weight and add this evaluation to the batch.
         let challenge = self.chi_challenge.next();
         self.higher_degree_accumulator
-            .push_constraint(gamma, degree, challenge)?;
+            .push_constraint(&constraint, challenge)?;
         Ok(())
     }
 }

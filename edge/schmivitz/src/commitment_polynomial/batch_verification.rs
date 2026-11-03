@@ -11,25 +11,7 @@ use swanky_field::{FiniteField, IsSubFieldOf};
 
 use crate::vole::ExtensionFieldLifter;
 
-use super::CommitmentPolynomial;
-
-/// Compute `base` raised to `exp` in a finite field.
-pub(crate) fn power<FE: FiniteField>(base: FE, exp: usize) -> FE {
-    if exp == 0 {
-        return FE::ONE;
-    }
-    let mut result = FE::ONE;
-    let mut b = base;
-    let mut e = exp;
-    while e > 0 {
-        if e & 1 == 1 {
-            result *= b;
-        }
-        b = b * b;
-        e >>= 1;
-    }
-    result
-}
+use super::{CommitmentPolynomialProver, CommitmentPolynomialVerifier, power};
 
 /// Evaluate the polynomial at `point` using Horner's method.
 /// Coefficients are ordered from constant to highest degree.
@@ -107,7 +89,7 @@ where
     /// value is nonzero.
     pub fn push_constraint(
         &mut self,
-        constraint: &CommitmentPolynomial<F, FE>,
+        constraint: &CommitmentPolynomialProver<F, FE>,
         challenge: FE,
     ) -> Result<()> {
         let max_degree = self.max_degree();
@@ -240,12 +222,17 @@ where
         max_degree.saturating_sub(1) * Self::mask_vole_size()
     }
 
-    /// Add a constraint evaluation `gamma`, weighted by `challenge`, for degree alignment (step 7).
-    /// Return an error if the batch degree is zero or `degree` exceeds it.
-    pub fn push_constraint(&mut self, gamma: FE, degree: usize, challenge: FE) -> Result<()> {
+    /// Add a verifier commitment, weighted by `challenge`, for degree alignment (step 7).
+    /// Return an error if the batch degree is zero or the commitment exceeds it.
+    pub fn push_constraint(
+        &mut self,
+        constraint: &CommitmentPolynomialVerifier<F, FE>,
+        challenge: FE,
+    ) -> Result<()> {
         // Group the challenge-weighted evaluations by degree; the $\Delta^{d-d_i}$ alignment is
         // applied after traversal using the maximum degree fixed at construction.
         let max_degree = self.max_degree();
+        let degree = constraint.degree();
         if max_degree == 0 || degree > max_degree {
             bail!(
                 ErrorKind::OtherError,
@@ -255,7 +242,7 @@ where
             );
         }
 
-        self.aggregates[degree] += challenge * gamma;
+        self.aggregates[degree] += challenge * constraint.evaluation();
         Ok(())
     }
 
@@ -403,8 +390,11 @@ mod tests {
     fn random_polynomial_constraint<F: FiniteField + IsSubFieldOf<FE>, FE: FiniteField>(
         rng: &mut SwankyRng,
         degree: usize,
-    ) -> CommitmentPolynomial<F, FE> {
-        CommitmentPolynomial::from_parts((0..degree).map(|_| FE::random(rng)).collect(), F::ZERO)
+    ) -> CommitmentPolynomialProver<F, FE> {
+        CommitmentPolynomialProver::from_parts(
+            (0..degree).map(|_| FE::random(rng)).collect(),
+            F::ZERO,
+        )
     }
 
     /// Compute a reference field power by repeated multiplication.
@@ -445,14 +435,15 @@ mod tests {
             let chi = FE::random(rng);
             let gamma = poly.evaluate_at_point(delta);
             prop_assert!(prover.push_constraint(&poly, chi).is_ok());
-            prop_assert!(verifier.push_constraint(gamma, degree, chi).is_ok());
+            let commitment = CommitmentPolynomialVerifier::from_parts(gamma, degree);
+            prop_assert!(verifier.push_constraint(&commitment, chi).is_ok());
         }
         let bad = random_polynomial_constraint::<F, FE>(rng, d + excess);
         let chi = FE::random(rng);
         let err_prover = prover.push_constraint(&bad, chi).unwrap_err();
-        let err_verifier = verifier
-            .push_constraint(bad.evaluate_at_point(delta), bad.degree(), chi)
-            .unwrap_err();
+        let bad_verifier =
+            CommitmentPolynomialVerifier::from_parts(bad.evaluate_at_point(delta), bad.degree());
+        let err_verifier = verifier.push_constraint(&bad_verifier, chi).unwrap_err();
         prop_assert!(
             err_prover
                 .to_string()
@@ -536,9 +527,9 @@ mod tests {
                     * spec_power(delta, d - degree)
                     * spec_polynomial_evaluation(rho.lower_coefficients(), delta);
                 prover.push_constraint(&rho, chi).unwrap();
-                verifier
-                    .push_constraint(rho.evaluate_at_point(delta), degree, chi)
-                    .unwrap();
+                let commitment =
+                    CommitmentPolynomialVerifier::from_parts(rho.evaluate_at_point(delta), degree);
+                verifier.push_constraint(&commitment, chi).unwrap();
                 prop_assert_eq!(prover.evaluate_at(delta), expected);
                 // A constant proof checks the verifier against the independent scalar reference.
                 oracle.coefficients[0] = expected + mask;
@@ -591,9 +582,9 @@ mod tests {
             let rho = random_polynomial_constraint::<F, FE>(rng, degree);
             let chi = FE::random(rng);
             prover.push_constraint(&rho, chi).unwrap();
-            verifier
-                .push_constraint(rho.evaluate_at_point(delta), degree, chi)
-                .unwrap();
+            let commitment =
+                CommitmentPolynomialVerifier::from_parts(rho.evaluate_at_point(delta), degree);
+            verifier.push_constraint(&commitment, chi).unwrap();
         }
         let (values, masks, tags) =
             vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BASIS_SIZE);
@@ -763,9 +754,9 @@ mod tests {
                 let rho = random_polynomial_constraint::<F, FE>(rng, degree);
                 let chi = FE::random(rng);
                 prover.push_constraint(&rho, chi).unwrap();
-                verifier
-                    .push_constraint(rho.evaluate_at_point(delta), degree, chi)
-                    .unwrap();
+                let commitment =
+                    CommitmentPolynomialVerifier::from_parts(rho.evaluate_at_point(delta), degree);
+                verifier.push_constraint(&commitment, chi).unwrap();
                 expected += chi
                     * spec_power(point, d - degree)
                     * spec_polynomial_evaluation(rho.lower_coefficients(), point);
