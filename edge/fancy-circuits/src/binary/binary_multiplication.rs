@@ -7,9 +7,11 @@ use crate::{
     util::u128_to_bits,
 };
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary};
+use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 
 /// For [`BinaryBundle`] inputs `x` and `y`, output `x * y`.
 #[derive(Default)]
@@ -22,7 +24,7 @@ impl<'a> BinaryMultiplication<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryMultiplication<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryMultiplication<'a>
 where
     F::Item: 'a,
 {
@@ -36,12 +38,12 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (xs, ys) = inputs;
-        assert_eq!(xs.moduli(), ys.moduli());
+        assert_eq!(xs.len(), ys.len());
 
         let xwires = xs.wires();
         let ywires = ys.wires();
 
-        let zero = backend.constant(0, 2, channel)?;
+        let zero = backend.constant(F2::ZERO);
 
         let mut sum = xwires
             .iter()
@@ -49,7 +51,7 @@ where
             .collect::<Result<_>>()
             .map(BinaryBundle::new)?;
 
-        sum.pad(&zero, 1);
+        sum.push(zero);
 
         for (i, ywire) in ywires.iter().enumerate().take(xwires.len()).skip(1) {
             let mul = xwires
@@ -79,7 +81,7 @@ impl<'a> BinaryMultiplicationLowerHalf<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryMultiplicationLowerHalf<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryMultiplicationLowerHalf<'a>
 where
     F::Item: 'a,
 {
@@ -93,7 +95,7 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (xs, ys) = inputs;
-        assert_eq!(xs.moduli(), ys.moduli());
+        assert_eq!(xs.len(), ys.len());
 
         let xwires = xs.wires();
         let ywires = ys.wires();
@@ -129,7 +131,7 @@ impl<'a> BinaryConstantMultiplication<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryConstantMultiplication<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryConstantMultiplication<'a>
 where
     F::Item: 'a,
 {
@@ -147,7 +149,7 @@ where
         u128_to_bits(c, nbits)
             .into_iter()
             .enumerate()
-            .filter_map(|(i, b)| if b > 0 { Some(i) } else { None })
+            .filter_map(|(i, b)| if b == F2::ONE { Some(i) } else { None })
             .try_fold(zero, |z, shift_amt| {
                 let s = BinaryLeftShift::new().execute(backend, (x, shift_amt), channel)?;
                 BinaryAdditionNoCarry::new().execute(backend, (&z, &s), channel)
@@ -165,7 +167,7 @@ impl<'a> TestBinaryMultiplication<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for TestBinaryMultiplication<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for TestBinaryMultiplication<'a>
 where
     F::Item: 'a,
 {
@@ -182,7 +184,7 @@ where
     }
 }
 
-impl<'a, F: FancyBinary> CircuitInputMapper<F> for TestBinaryMultiplication<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> CircuitInputMapper<F> for TestBinaryMultiplication<'a>
 where
     F::Item: 'a,
 {
@@ -200,13 +202,9 @@ where
     fn ninputs(&self) -> usize {
         self.0 * 2
     }
-
-    fn modulus(&self, _: usize) -> u16 {
-        2
-    }
 }
 
-impl<'a, F: FancyBinary> CircuitOutputMapper<F> for TestBinaryMultiplication<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> CircuitOutputMapper<F> for TestBinaryMultiplication<'a>
 where
     F::Item: 'a,
 {

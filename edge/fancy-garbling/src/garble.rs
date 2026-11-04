@@ -1,34 +1,25 @@
 //! Structs and functions for creating, streaming, and evaluating garbled circuits.
 
-mod binary_and;
 mod evaluator;
 mod garbler;
-mod security_warning;
 
 pub use crate::garble::{evaluator::Evaluator, garbler::Garbler};
-pub use binary_and::BinaryWireLabel;
 
 #[cfg(test)]
 mod helpers {
-    use rand::{RngExt, rng};
+    use rand::rng;
 
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
+    use swanky_field_binary::F2;
 
     pub(crate) fn plaintext<C: CircuitInputMapper<Dummy> + CircuitOutputMapper<Dummy>>(
         circuit: &C,
-    ) -> (Vec<u16>, Vec<u16>, Vec<u16>) {
+    ) -> (Vec<F2>, Vec<F2>) {
         let mut rng = rng();
 
-        let moduli = (0..<C as CircuitInputMapper<Dummy>>::ninputs(circuit))
-            .map(|i| <C as CircuitInputMapper<Dummy>>::modulus(circuit, i))
-            .collect::<Vec<_>>();
-        let inputs = moduli
-            .iter()
-            .map(|q| {
-                let x = rng.random::<u16>() % q;
-                DummyVal::new(x, *q)
-            })
+        let inputs = (0..<C as CircuitInputMapper<Dummy>>::ninputs(circuit))
+            .map(|_| DummyVal::rand(&mut rng))
             .collect::<Vec<_>>();
         let plaintext = inputs.iter().map(|x| x.val()).collect::<Vec<_>>();
 
@@ -42,31 +33,23 @@ mod helpers {
             .map(|x| x.val())
             .collect::<Vec<_>>();
 
-        (plaintext, moduli, expected)
+        (plaintext, expected)
     }
 }
 
 #[cfg(test)]
 mod nonstreaming {
-    use crate::{AllWire, Evaluator, Garbler, WireLabel, WireMod2, classic::GarbledCircuit};
-    use fancy_circuits::test_circuits::{
-        arithmetic::{
-            TestAddMany, TestAddition, TestCmul, TestConstants, TestMulGate,
-            TestMulGateUnequalMods, TestSubtraction,
-        },
-        binary::TestOrGateFanN,
-        proj::{TestProj, TestProjRand},
-    };
-    use fancy_circuits::util::RngExt;
+    use crate::{Evaluator, Garbler, WireLabel, WireMod2, classic::GarbledCircuit};
+    use fancy_circuits::test_circuits::binary::TestOrGateFanN;
     use fancy_plaintext::Dummy;
     use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
-    use rand::{RngExt as _, rng};
+    use swanky_field_binary::F2;
     use swanky_rng::SwankyRng;
 
     // Check that non-streaming evaluation of a circuit execution equals the
     // dummy evaluation of the same function.
     fn garble_test_helper<
-        W: WireLabel,
+        W: WireLabel<F2>,
         Ex: CircuitInputMapper<Dummy>
             + CircuitOutputMapper<Dummy>
             + CircuitInputMapper<Garbler<SwankyRng, W>>
@@ -77,7 +60,7 @@ mod nonstreaming {
         circuit: &Ex,
     ) {
         for _ in 0..16 {
-            let (inputs, _, expected) = super::helpers::plaintext(circuit);
+            let (inputs, expected) = super::helpers::plaintext(circuit);
 
             let (en, ev, output_mapping) =
                 GarbledCircuit::garble::<W, _, _>(circuit, SwankyRng::new()).unwrap();
@@ -99,95 +82,25 @@ mod nonstreaming {
     }
 
     #[test]
-    fn add() {
-        let q = rng().gen_prime();
-        garble_test_helper::<AllWire, _>(&TestAddition(q));
-    }
-
-    #[test]
-    fn add_many() {
-        let q = rng().gen_prime();
-        garble_test_helper::<AllWire, _>(&TestAddMany(q, 16));
-    }
-
-    #[test]
     fn or_many() {
         garble_test_helper::<WireMod2, _>(&TestOrGateFanN(16));
-    }
-
-    #[test]
-    fn sub() {
-        let q = rng().gen_prime();
-        garble_test_helper::<AllWire, _>(&TestSubtraction(q));
-    }
-
-    #[test]
-    fn cmul() {
-        let q = rng().gen_prime();
-        let c = rng().random::<u16>() % q;
-        garble_test_helper::<AllWire, _>(&TestCmul(q, c));
-    }
-
-    #[test]
-    fn proj() {
-        let q = rng().gen_prime();
-        garble_test_helper::<AllWire, _>(&TestProj(q));
-    }
-
-    #[test]
-    fn proj_rand() {
-        let q = rng().gen_prime();
-        let tab = (0..q)
-            .map(|_| rng().random::<u16>() % q)
-            .collect::<Vec<_>>();
-
-        garble_test_helper::<AllWire, _>(&TestProjRand(q, tab));
-    }
-
-    #[test]
-    fn arithmetic_half_gate() {
-        let q = rng().gen_prime();
-        garble_test_helper::<AllWire, _>(&TestMulGate(q));
-    }
-
-    #[test]
-    fn half_gate_unequal_mods() {
-        let q = rng().gen_prime();
-        // Lower modulus is capped at 8.
-        let p = 2 + rng().gen_prime() % 6;
-        garble_test_helper::<AllWire, _>(&TestMulGateUnequalMods([q, p]));
-    }
-
-    #[test]
-    fn constants() {
-        let q = rng().gen_modulus();
-        let c = rng().random::<u16>() % q;
-        garble_test_helper::<AllWire, _>(&TestConstants(q, c));
     }
 }
 
 #[cfg(test)]
 mod streaming {
-    use crate::{AllWire, Evaluator, Garbler, WireLabel};
-    use fancy_circuits::arithmetic::{Constant, Multiplication, ReLU};
-    use fancy_circuits::test_circuits::arithmetic::{
-        TestAddition, TestCmul, TestMulGate, TestSubtraction,
-    };
-    use fancy_circuits::test_circuits::proj::TestProj;
-    use fancy_circuits::util::RngExt;
-    use fancy_circuits::{CrtBundle, CrtGadgets};
+    use crate::{Evaluator, Garbler, WireLabel, WireMod2};
+    use fancy_circuits::test_circuits::binary::TestOrGateFanN;
     use fancy_plaintext::Dummy;
-    use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper};
-    use fancy_traits::{FancyArithmetic, FancyEncode, FancyOutput, FancyProj};
-    use rand::{RngExt as _, rng};
-    use swanky_channel::Channel;
-    use swanky_error::Result;
+    use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
+    use fancy_traits::{FancyEncode, FancyOutput};
+    use swanky_field_binary::F2;
     use swanky_rng::SwankyRng;
 
     // Check that streaming evaluation of a circuit execution equals the dummy
     // evaluation of the same function.
     fn streaming_test_helper<
-        W: WireLabel + Send,
+        W: WireLabel<F2> + Send,
         Ex: CircuitInputMapper<Dummy>
             + CircuitOutputMapper<Dummy>
             + CircuitInputMapper<Garbler<SwankyRng, W>>
@@ -201,12 +114,13 @@ mod streaming {
     ) {
         let rng = SwankyRng::new();
 
-        let (inputs, moduli, expected) = super::helpers::plaintext(circuit);
+        let (inputs, expected) = super::helpers::plaintext(circuit);
 
+        let mut gb = Garbler::new(rng);
+        let mut ev = Evaluator::new();
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let mut gb = Garbler::new(rng, channel)?;
-                let zeros = gb.encode_many(&inputs, &moduli, channel)?;
+                let zeros = gb.encode_many(&inputs, channel)?;
                 let outputs = circuit.execute(
                     &mut gb,
                     <Ex as CircuitInputMapper<Garbler<_, _>>>::map(circuit, zeros),
@@ -219,8 +133,7 @@ mod streaming {
                 Ok(())
             },
             |channel| {
-                let mut ev = Evaluator::new(channel)?;
-                let wires = ev.receive_many(&moduli, channel)?;
+                let wires = ev.receive_many(inputs.len(), channel)?;
                 let outputs = circuit.execute(
                     &mut ev,
                     <Ex as CircuitInputMapper<Evaluator<_>>>::map(circuit, wires),
@@ -240,107 +153,7 @@ mod streaming {
     }
 
     #[test]
-    fn addition() {
-        let mut rng = rng();
-        for _ in 0..16 {
-            let q = rng.gen_modulus();
-            streaming_test_helper::<AllWire, _>(&TestAddition(q));
-        }
-    }
-
-    #[test]
-    fn subtraction() {
-        let mut rng = rng();
-        for _ in 0..16 {
-            let q = rng.gen_modulus();
-            streaming_test_helper::<AllWire, _>(&TestSubtraction(q));
-        }
-    }
-
-    #[test]
-    fn multiplication() {
-        let mut rng = rng();
-        for _ in 0..16 {
-            let q = rng.gen_modulus();
-            streaming_test_helper::<AllWire, _>(&TestMulGate(q));
-        }
-    }
-
-    #[test]
-    fn cmul() {
-        let mut rng = rng();
-        for _ in 0..16 {
-            let q = rng.gen_modulus();
-            let c = rng.random::<u16>() % q;
-            streaming_test_helper::<AllWire, _>(&TestCmul(q, c));
-        }
-    }
-
-    #[test]
-    fn proj() {
-        let mut rng = rng();
-        for _ in 0..16 {
-            let q = rng.gen_modulus();
-            streaming_test_helper::<AllWire, _>(&TestProj(q));
-        }
-    }
-
-    /// Circuit for testing multiple CRT operations.
-    struct TestComplexGadget(pub Vec<u16>, pub usize);
-    impl<F: FancyArithmetic + FancyProj + CrtGadgets> Circuit<F> for TestComplexGadget {
-        type Input = Vec<CrtBundle<F::Item>>;
-        type Output = Vec<CrtBundle<F::Item>>;
-
-        fn execute(
-            &self,
-            backend: &mut F,
-            inputs: Self::Input,
-            channel: &mut Channel,
-        ) -> Result<Self::Output> {
-            let mut outputs = Vec::with_capacity(inputs.len());
-            for x in inputs.iter() {
-                let c = Constant::new(1, x.composite_modulus()).execute(backend, (), channel)?;
-                let y = Multiplication::new().execute(backend, (x, &c), channel)?;
-                let accuracy = "100%";
-                let none_option: Option<&[u16]> = None;
-                let z = ReLU::new().execute(backend, (&y, accuracy, none_option), channel)?;
-                outputs.push(z);
-            }
-            Ok(outputs)
-        }
-    }
-    impl<F: FancyArithmetic + FancyProj + CrtGadgets> CircuitInputMapper<F> for TestComplexGadget {
-        fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-            assert_eq!(inputs.len(), self.0.len() * self.1);
-            inputs
-                .chunks_exact(self.0.len())
-                .map(|x| CrtBundle::new(x.to_vec()))
-                .collect()
-        }
-
-        fn ninputs(&self) -> usize {
-            self.0.len() * self.1
-        }
-
-        fn modulus(&self, i: usize) -> u16 {
-            self.0[i % self.0.len()]
-        }
-    }
-    impl<F: FancyArithmetic + FancyProj + CrtGadgets> CircuitOutputMapper<F> for TestComplexGadget {
-        fn flatten(output: Self::Output) -> Vec<F::Item> {
-            output
-                .iter()
-                .flat_map(|bundle| bundle.wires().to_vec())
-                .collect()
-        }
-    }
-
-    #[test]
-    fn complex_gadget() {
-        let N = 10;
-        let qs = fancy_circuits::util::primes_with_width(10);
-        for _ in 0..16 {
-            streaming_test_helper::<AllWire, _>(&TestComplexGadget(qs.clone(), N));
-        }
+    fn or_many() {
+        streaming_test_helper::<WireMod2, _>(&TestOrGateFanN(16));
     }
 }

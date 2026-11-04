@@ -39,7 +39,7 @@ use crate::{
     leaky_and_triples::{LeakyAndTriple, LeakyAndTripleGenerator},
 };
 use bytemuck::TransparentWrapper;
-use rand::{CryptoRng, Rng, SeedableRng, seq::SliceRandom};
+use rand::{CryptoRng, SeedableRng, seq::SliceRandom};
 use std::io::{Cursor, Seek};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
@@ -94,10 +94,7 @@ pub struct AndTripleGenerator<P: GenericParty> {
 
 impl<P: GenericParty> AndTripleGenerator<P> {
     /// Create a new [`AndTripleGenerator`].
-    pub fn new<RNG: CryptoRng + Rng>(
-        channel: &mut Channel,
-        rng: &mut RNG,
-    ) -> swanky_error::Result<Self> {
+    pub fn new<RNG: CryptoRng>(channel: &mut Channel, rng: &mut RNG) -> swanky_error::Result<Self> {
         let leaky_generator = LeakyAndTripleGenerator::new(channel, rng)?;
         Ok(Self { leaky_generator })
     }
@@ -106,7 +103,7 @@ impl<P: GenericParty> AndTripleGenerator<P> {
     /// The AND and Leaky AND triple generation protocols require that parties
     /// have Δ with different least significant bits (lsb). Towards that we
     /// require that Party0's Δ has lsb == 1 and Party1's Δ has lsb == 0.
-    pub fn generate_valid_delta<RNG: CryptoRng + Rng>(rng: &mut RNG) -> U8x16 {
+    pub fn generate_valid_delta<RNG: CryptoRng>(rng: &mut RNG) -> U8x16 {
         LeakyAndTripleGenerator::<P>::generate_valid_delta(rng)
     }
 
@@ -115,7 +112,7 @@ impl<P: GenericParty> AndTripleGenerator<P> {
     /// # Panics
     /// This panics if $`\mathsf{lsb}(\Delta_\mathsf{A}) \neq 1`$ or if
     /// $`\mathsf{lsb}(\Delta_\mathsf{B}) \neq 0`$.
-    pub fn new_with_delta<RNG: CryptoRng + Rng>(
+    pub fn new_with_delta<RNG: CryptoRng>(
         delta: U8x16,
         channel: &mut Channel,
         rng: &mut RNG,
@@ -133,7 +130,7 @@ impl<P: GenericParty> AndTripleGenerator<P> {
     /// # Panics
     /// This panics if `ntriples < 320`, as 320 is the minimum number of triples
     /// that can be generated.
-    pub fn generate<RNG: CryptoRng + Rng>(
+    pub fn generate<RNG: CryptoRng>(
         &mut self,
         ntriples: usize,
         out: &mut Vec<AndTriple<P>>,
@@ -164,8 +161,7 @@ impl<P: GenericParty> AndTripleGenerator<P> {
         leaky_ands.shuffle(&mut shuffle_rng);
         // Bucket the leaky AND triples and combine them into (non-leaky) AND triples.
         self.leaky_generator
-            .combine(&leaky_ands, out, bucket_size, channel)?;
-        Ok(())
+            .combine(&leaky_ands, out, bucket_size, channel)
     }
 
     /// Open the AND triples in `triples`.
@@ -490,7 +486,7 @@ mod tests {
         swanky_channel::local::local_channel_pair(
             |c| {
                 let mut shares: Vec<AuthShare<PartyA>> = vec![];
-                generator_a.auth_share_generator_mut().generate(
+                generator_a.leaky_generator.auth_share_generator.generate(
                     nshares,
                     &mut shares,
                     c,
@@ -500,7 +496,7 @@ mod tests {
             },
             |c| {
                 let mut shares: Vec<AuthShare<PartyB>> = vec![];
-                generator_b.auth_share_generator_mut().generate(
+                generator_b.leaky_generator.auth_share_generator.generate(
                     nshares,
                     &mut shares,
                     c,

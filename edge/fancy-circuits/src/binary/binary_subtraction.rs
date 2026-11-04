@@ -3,9 +3,10 @@ use crate::{
     binary::{BinaryAddition, BinaryTwosComplement},
 };
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary};
+use fancy_traits::{Circuit, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field_binary::F2;
 
 /// Binary subtract.
 ///
@@ -21,7 +22,7 @@ impl<'a> BinarySubtraction<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinarySubtraction<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinarySubtraction<'a>
 where
     F::Item: 'a,
 {
@@ -35,7 +36,8 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
-        assert_eq!(x.moduli(), y.moduli());
+        assert_eq!(x.len(), y.len());
+
         let neg_y = BinaryTwosComplement::new().execute(backend, y, channel)?;
         BinaryAddition::new().execute(backend, (x, &neg_y), channel)
     }
@@ -44,10 +46,11 @@ where
 pub mod test {
     use super::*;
     use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
+    use swanky_field_binary::F2;
 
     /// Circuit for testing [`BinarySubtraction`].
     pub struct TestBinarySubtraction(pub usize);
-    impl<F: FancyBinary> Circuit<F> for TestBinarySubtraction {
+    impl<F: FancyBinary + FancyConstant<F2>> Circuit<F> for TestBinarySubtraction {
         type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
         type Output = (BinaryBundle<F::Item>, F::Item);
 
@@ -61,7 +64,7 @@ pub mod test {
         }
     }
 
-    impl<F: FancyBinary> CircuitInputMapper<F> for TestBinarySubtraction {
+    impl<F: FancyBinary + FancyConstant<F2>> CircuitInputMapper<F> for TestBinarySubtraction {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0 * 2);
             let (x, y) = inputs.split_at(self.0);
@@ -71,13 +74,9 @@ pub mod test {
         fn ninputs(&self) -> usize {
             self.0 * 2
         }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
     }
 
-    impl<F: FancyBinary> CircuitOutputMapper<F> for TestBinarySubtraction {
+    impl<F: FancyBinary + FancyConstant<F2>> CircuitOutputMapper<F> for TestBinarySubtraction {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
             [output.0.wires().to_vec(), vec![output.1]].concat()
         }
@@ -100,7 +99,7 @@ pub mod test {
             let y_input = BinaryBundle::from((y, nbits));
             let outputs = Dummy::eval(&c, (x_input, y_input)).unwrap();
             assert_eq!(Into::<u128>::into(outputs.0), x.overflowing_sub(y).0 % q);
-            assert_eq!(outputs.1.val(), (y != 0 && x >= y) as u16);
+            assert_eq!(outputs.1.val(), F2::from(y != 0 && x >= y));
         }
     }
 }

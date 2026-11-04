@@ -4,14 +4,10 @@
  * This module provides a `Circuit` data-structure with functionalities to parse from SIEVE-IR.
  * The evaluation of a circuit requires a memory that is implemented with `CircuitMemory`.
 */
-use crate::parameters::FIELD_SIZE;
+use crate::parameters::FieldSize;
 use diet_mac_and_cheese::fields::SieveIrDeserialize;
-use fancy_traits::{Circuit as FancyCircuit, FancyBinary, FancyEncode, FancyZeroKnowledge};
-use mac_n_cheese_sieve_parser::{
-    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, RelationVisitor, Type, TypeId,
-    TypedWireRange, ValueStreamKind, ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
-    text_parser::RelationReader, text_parser::ValueStreamReader,
-};
+use fancy_traits::{Circuit as FancyCircuit, FancyBinary, FancyConstant, FancyZeroKnowledge};
+use hybrid_array::typenum::Unsigned;
 use std::{
     cmp::max,
     fs::File,
@@ -23,6 +19,11 @@ use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::{F2, F128b};
 use swanky_sieve_ir_api::{CircuitExecuter, FieldBackend};
+use swanky_sieve_ir_parser::{
+    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, RelationVisitor, Type, TypeId,
+    TypedWireRange, ValueStreamKind, ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
+    text_parser::RelationReader, text_parser::ValueStreamReader,
+};
 use tempfile::tempdir;
 
 /// Gates
@@ -274,8 +275,8 @@ impl RelationVisitor for CircuitIngestor {
     fn define_function<BodyCb>(
         &mut self,
         _name: Identifier,
-        _outputs: &[mac_n_cheese_sieve_parser::TypedCount],
-        _inputs: &[mac_n_cheese_sieve_parser::TypedCount],
+        _outputs: &[swanky_sieve_ir_parser::TypedCount],
+        _inputs: &[swanky_sieve_ir_parser::TypedCount],
         _body: BodyCb,
     ) -> swanky_error::Result<()>
     where
@@ -290,9 +291,9 @@ impl RelationVisitor for CircuitIngestor {
     fn define_plugin_function(
         &mut self,
         _name: Identifier,
-        _outputs: &[mac_n_cheese_sieve_parser::TypedCount],
-        _inputs: &[mac_n_cheese_sieve_parser::TypedCount],
-        _body: mac_n_cheese_sieve_parser::PluginBinding,
+        _outputs: &[swanky_sieve_ir_parser::TypedCount],
+        _inputs: &[swanky_sieve_ir_parser::TypedCount],
+        _body: swanky_sieve_ir_parser::PluginBinding,
     ) -> swanky_error::Result<()> {
         bail!(
             ErrorKind::UnsupportedError,
@@ -390,7 +391,7 @@ impl<'a> CircuitExecuter<F2> for CircuitInterpreter<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyZeroKnowledge + FancyEncode> FancyCircuit<F>
+impl<'a, F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge<F2>> FancyCircuit<F>
     for CircuitInterpreter<'a>
 {
     type Input = ();
@@ -440,7 +441,7 @@ impl<'a, F: FancyBinary + FancyZeroKnowledge + FancyEncode> FancyCircuit<F>
 
                     let left = memory.get(left);
                     let right = F2::from_number(right)?;
-                    let right = backend.constant(right.into(), 2, channel)?;
+                    let right = backend.constant(right);
 
                     let res = backend.xor(&left, &right);
 
@@ -451,7 +452,7 @@ impl<'a, F: FancyBinary + FancyZeroKnowledge + FancyEncode> FancyCircuit<F>
                     assert_eq!(*ty, 0);
 
                     for wid in dst.start..=dst.end {
-                        let res = backend.receive(2, channel)?;
+                        let res = backend.witness(channel)?;
 
                         memory.insert(wid, res);
                     }
@@ -497,7 +498,7 @@ fn validate_circuit_header<T: Read + Seek>(
         )
     }
 
-    let expected_modulus = Number::from(FIELD_SIZE as u64);
+    let expected_modulus = Number::from(<FieldSize as Unsigned>::U64);
     match header.types[..] {
         [Type::Field { modulus }] if modulus == expected_modulus => {}
         _ => bail!(
@@ -596,8 +597,8 @@ impl<F: Default + Clone> CircuitMemory<F> {
 
 #[cfg(test)]
 mod tests {
-    use mac_n_cheese_sieve_parser::text_parser::RelationReader;
     use std::io::Cursor;
+    use swanky_sieve_ir_parser::text_parser::RelationReader;
 
     #[test]
     fn header_cannot_include_plugins() {

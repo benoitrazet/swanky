@@ -4,7 +4,7 @@
 //! TODO: this might not be constant-time in all cases.
 
 use crypto_bigint::Uint;
-use generic_array::GenericArray;
+use hybrid_array::Array;
 use rand::Rng;
 use std::io::Error;
 use std::{
@@ -73,15 +73,15 @@ impl FiniteRing for F2 {
 impl CanonicalSerialize for F2 {
     type Serializer = F2BitSerializer;
     type Deserializer = F2BitDeserializer;
-    type ByteReprLen = generic_array::typenum::U1;
+    type ByteReprLen = hybrid_array::typenum::U1;
     type FromBytesError = BiggerThanModulus;
 
-    fn from_bytes(buf: &GenericArray<u8, Self::ByteReprLen>) -> Result<Self, BiggerThanModulus> {
+    fn from_bytes(buf: &Array<u8, Self::ByteReprLen>) -> Result<Self, BiggerThanModulus> {
         F2::try_from(u8::from_le_bytes(*buf.as_ref()))
     }
 
     /// Return the canonical byte representation (byte representation of the reduced field element).
-    fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
+    fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
         u8::from(*self).to_le_bytes().into()
     }
 }
@@ -91,9 +91,9 @@ impl FiniteField for F2 {
 
     const GENERATOR: Self = F2(1);
 
-    type NumberOfBitsInBitDecomposition = generic_array::typenum::U1;
+    type NumberOfBitsInBitDecomposition = hybrid_array::typenum::U1;
 
-    fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
+    fn bit_decomposition(&self) -> Array<bool, Self::NumberOfBitsInBitDecomposition> {
         [self.0 != 0].into()
     }
 
@@ -218,9 +218,13 @@ pub struct F2BitSerializer {
 impl F2BitSerializer {
     /// A wrapper around [`F2BitSerializer::write`] and [`F2BitSerializer::finish`] which writes a vector of
     /// bits into the channel and finishes afterwards.
-    pub fn write_vec<W: std::io::Write>(mut self, dst: &mut W, bits: &[F2]) -> Result<(), Error> {
-        for b in bits.iter() {
-            self.write(dst, *b)?;
+    pub fn write_vec<W: std::io::Write>(
+        mut self,
+        dst: &mut W,
+        bits: impl Iterator<Item = F2>,
+    ) -> Result<(), Error> {
+        for b in bits {
+            self.write(dst, b)?;
         }
         self.finish(dst)
     }
@@ -273,7 +277,7 @@ pub struct F2BitDeserializer {
 impl F2BitDeserializer {
     /// A wrapper around [`F2BitDeserializer::read`] which reads a specific number of
     /// bits defined by len and returns those bits
-    pub fn read_vector<R: std::io::Read>(
+    pub fn read_vec<R: std::io::Read>(
         &mut self,
         src: &mut R,
         len: usize,

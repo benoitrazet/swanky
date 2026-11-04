@@ -8,4 +8,6 @@ mod garble;
 pub mod util;
 mod wire;
 
-pub use crate::{garble::*, wire::*};
+pub use crate::garble::{Evaluator, Garbler};
+pub use crate::wire::WireMod2;
+pub use crate::wire::{BinaryWireLabel, WireLabel};

@@ -5,16 +5,16 @@
 
 extern crate proc_macro;
 
-use mac_n_cheese_sieve_parser::{
-    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
-    TypeId, TypedCount, TypedWireRange, WireId, WireRange, text_parser::RelationReader,
-};
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote;
 use std::io::{Read, Seek};
 use std::path::PathBuf;
 use swanky_field::PrimeFiniteField;
 use swanky_serialization::CanonicalSerialize;
+use swanky_sieve_ir_parser::{
+    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
+    TypeId, TypedCount, TypedWireRange, WireId, WireRange, text_parser::RelationReader,
+};
 use syn::{
     LitStr, Token,
     parse::{Parse, ParseStream},
@@ -143,9 +143,9 @@ fn codegen_impls<T: Read + Seek>(
     // JP: Hard coding F2 for now.
     let main = codegen.main;
     quote! {
-        impl<F: fancy_traits::FancyBinary + fancy_traits::FancyZeroKnowledge + #ty_constraints> fancy_traits::Circuit<F> for #struct_name {
+        impl<F: fancy_traits::FancyBinary + fancy_traits::FancyZeroKnowledge<F2> + #ty_constraints> fancy_traits::Circuit<F> for #struct_name {
             type Input = ();
-            type Output = Vec<F::Item>; // TODO: should be `()`.
+            type Output = ();
 
             fn execute(
                 &self,
@@ -155,16 +155,16 @@ fn codegen_impls<T: Read + Seek>(
             ) -> swanky_error::Result<Self::Output> {
                 use swanky_serialization::CanonicalSerialize;
                 #main
-                Ok(vec![])
+                Ok(())
             }
         }
     }
 }
 
-type SIEVEType = mac_n_cheese_sieve_parser::Type;
+type SIEVEType = swanky_sieve_ir_parser::Type;
 
 fn modulus_to_type_var(modulus: &Number) -> TokenStream {
-    if *modulus == mac_n_cheese_sieve_parser::Number::from_u64(2) {
+    if *modulus == swanky_sieve_ir_parser::Number::from_u64(2) {
         // TODO: Is there a way to reify types?
         quote! {swanky_field_binary::F2}
     } else {
@@ -234,7 +234,7 @@ impl Codegen {
         let ty = &self.types[tid as usize];
         match ty {
             SIEVEType::Field { modulus } => {
-                if modulus == &mac_n_cheese_sieve_parser::Number::from_u64(2) {
+                if modulus == &swanky_sieve_ir_parser::Number::from_u64(2) {
                     let f = swanky_field_binary::F2::try_from_int(number)
                         .expect("Invalid constant for field");
                     let bytes = f.to_bytes();
@@ -243,7 +243,7 @@ impl Codegen {
                         .map(Literal::u8_suffixed)
                         .collect::<Vec<_>>();
                     quote! {
-                        swanky_field_binary::F2::from_bytes(&generic_array::GenericArray::<u8, <swanky_field_binary::F2 as CanonicalSerialize>::ByteReprLen>::from_array([#(#arr,)*])).unwrap()
+                        swanky_field_binary::F2::from_bytes(&hybrid_array::Array::<u8, <swanky_field_binary::F2 as CanonicalSerialize>::ByteReprLen>([#(#arr,)*])).unwrap()
                     }
                 } else {
                     panic!(
@@ -344,7 +344,7 @@ impl FunctionBodyVisitor for Codegen {
             .map(|wid| {
                 let var = self.to_wire_ident(wid);
                 quote! {
-                    let #var = backend.receive(2, channel)?;
+                    let #var = backend.witness(channel)?;
                 }
             })
             .collect::<Vec<_>>();

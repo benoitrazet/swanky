@@ -3,9 +3,10 @@ use crate::{
     binary::{BinaryAdditionNoCarry, BinaryConstant},
 };
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary};
+use fancy_traits::{Circuit, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field_binary::F2;
 
 /// Binary two's complement.
 #[derive(Default)]
@@ -18,7 +19,7 @@ impl<'a> BinaryTwosComplement<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryTwosComplement<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryTwosComplement<'a>
 where
     F::Item: 'a,
 {
@@ -38,7 +39,7 @@ where
                 .map(|x| backend.negate(x))
                 .collect::<Vec<_>>(),
         );
-        let one = BinaryConstant::new(1, input.size()).execute(backend, (), channel)?;
+        let one = BinaryConstant::new(1, input.len()).execute(backend, (), channel)?;
         BinaryAdditionNoCarry::new().execute(backend, (&not_xs, &one), channel)
     }
 }
@@ -50,7 +51,7 @@ pub mod test {
 
     /// Circuit for testing [`BinaryTwosComplement`].
     pub struct TestBinaryTwosComplement(pub usize);
-    impl<F: FancyBinary> Circuit<F> for TestBinaryTwosComplement {
+    impl<F: FancyBinary + FancyConstant<F2>> Circuit<F> for TestBinaryTwosComplement {
         type Input = BinaryBundle<F::Item>;
         type Output = BinaryBundle<F::Item>;
 
@@ -64,7 +65,7 @@ pub mod test {
         }
     }
 
-    impl<F: FancyBinary> CircuitInputMapper<F> for TestBinaryTwosComplement {
+    impl<F: FancyBinary + FancyConstant<F2>> CircuitInputMapper<F> for TestBinaryTwosComplement {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0);
             BinaryBundle::new(inputs)
@@ -73,13 +74,9 @@ pub mod test {
         fn ninputs(&self) -> usize {
             self.0
         }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
     }
 
-    impl<F: FancyBinary> CircuitOutputMapper<F> for TestBinaryTwosComplement {
+    impl<F: FancyBinary + FancyConstant<F2>> CircuitOutputMapper<F> for TestBinaryTwosComplement {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
             output.wires().to_vec()
         }

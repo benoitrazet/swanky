@@ -3,23 +3,24 @@ use crate::{
     util::{self, u128_from_bits},
 };
 use fancy_plaintext::{Dummy, DummyVal};
-use fancy_traits::{FancyBinary, FancyEncode, FancyOutput, HasModulus};
+use fancy_traits::{FancyBinary, FancyEncode, FancyOutput};
 use std::ops::{Deref, DerefMut};
 use swanky_channel::Channel;
+use swanky_field_binary::F2;
 
 /// Bundle which is explicitly binary representation.
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BinaryBundle<W>(Bundle<W>);
 
-impl<W: Clone + HasModulus> BinaryBundle<W> {
+impl<W> BinaryBundle<W> {
     /// Create a new binary bundle from a vector of wires.
     pub fn new(ws: Vec<W>) -> BinaryBundle<W> {
         BinaryBundle(Bundle::new(ws))
     }
 }
 
-impl From<(u128, usize)> for BinaryBundle<DummyVal> {
+impl From<(u128, usize)> for BinaryBundle<DummyVal<F2>> {
     /// Generate a new [`BinaryBundle`] of `value.0` containing `value.1` bits.
     fn from(value: (u128, usize)) -> Self {
         let mut dummy = Dummy::new();
@@ -30,14 +31,14 @@ impl From<(u128, usize)> for BinaryBundle<DummyVal> {
     }
 }
 
-impl From<BinaryBundle<DummyVal>> for u128 {
-    fn from(value: BinaryBundle<DummyVal>) -> Self {
+impl From<BinaryBundle<DummyVal<F2>>> for u128 {
+    fn from(value: BinaryBundle<DummyVal<F2>>) -> Self {
         let bin = value.wires().iter().map(|w| w.val()).collect::<Vec<_>>();
         u128_from_bits(&bin)
     }
 }
 
-impl<W: Clone + HasModulus> Deref for BinaryBundle<W> {
+impl<W> Deref for BinaryBundle<W> {
     type Target = Bundle<W>;
 
     fn deref(&self) -> &Bundle<W> {
@@ -45,23 +46,16 @@ impl<W: Clone + HasModulus> Deref for BinaryBundle<W> {
     }
 }
 
-impl<W: Clone + HasModulus> DerefMut for BinaryBundle<W> {
+impl<W> DerefMut for BinaryBundle<W> {
     fn deref_mut(&mut self) -> &mut Bundle<W> {
         &mut self.0
     }
 }
 
-impl<W: Clone + HasModulus> From<Bundle<W>> for BinaryBundle<W> {
-    fn from(b: Bundle<W>) -> BinaryBundle<W> {
-        debug_assert!(b.moduli().iter().all(|&p| p == 2));
-        BinaryBundle(b)
-    }
-}
-
-impl<F: FancyBinary + FancyEncode + FancyOutput> BinaryGadgets for F {}
+impl<F: FancyBinary + FancyEncode<F2> + FancyOutput<F2>> BinaryGadgets for F {}
 
 /// Extension trait for `Fancy` providing gadgets that operate over bundles of mod2 wires.
-pub trait BinaryGadgets: BundleGadgets + FancyEncode {
+pub trait BinaryGadgets: BundleGadgets + FancyEncode<F2> {
     /// Encode a binary input bundle.
     fn bin_encode(
         &mut self,
@@ -70,8 +64,7 @@ pub trait BinaryGadgets: BundleGadgets + FancyEncode {
         channel: &mut Channel,
     ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
         let xs = util::u128_to_bits(value, nbits);
-        self.encode_many(&xs, &vec![2; nbits], channel)
-            .map(BinaryBundle::new)
+        self.encode_many(&xs, channel).map(BinaryBundle::new)
     }
 
     /// Receive an binary input bundle.
@@ -80,8 +73,7 @@ pub trait BinaryGadgets: BundleGadgets + FancyEncode {
         nbits: usize,
         channel: &mut Channel,
     ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
-        self.receive_many(&vec![2; nbits], channel)
-            .map(BinaryBundle::new)
+        self.receive_many(nbits, channel).map(BinaryBundle::new)
     }
 
     /// Encode many binary input bundles.
@@ -95,7 +87,7 @@ pub trait BinaryGadgets: BundleGadgets + FancyEncode {
             .iter()
             .flat_map(|x| util::u128_to_bits(*x, nbits))
             .collect::<Vec<_>>();
-        let mut wires = self.encode_many(&xs, &vec![2; values.len() * nbits], channel)?;
+        let mut wires = self.encode_many(&xs, channel)?;
         let buns = (0..values.len())
             .map(|_| {
                 let ws = wires.drain(0..nbits).collect::<Vec<_>>();
@@ -112,7 +104,7 @@ pub trait BinaryGadgets: BundleGadgets + FancyEncode {
         nbits: usize,
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<BinaryBundle<Self::Item>>> {
-        let mut wires = self.receive_many(&vec![2; ninputs * nbits], channel)?;
+        let mut wires = self.receive_many(ninputs * nbits, channel)?;
         let buns = (0..ninputs)
             .map(|_| {
                 let ws = wires.drain(0..nbits).collect::<Vec<_>>();

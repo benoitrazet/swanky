@@ -79,16 +79,17 @@
 //!     Secure 2PC with Function-independent Preprocessing using LEGO".
 //!     <https://eprint.iacr.org/2016/1069.pdf>
 
-use rand::{CryptoRng, Rng, RngExt};
+use rand::{CryptoRng, RngExt};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
-use swanky_ot_alsz_kos::kos;
-use swanky_ot_traits::{CorrelatedReceiver, CorrelatedSender, Receiver, Sender};
+use swanky_ot_kos_new::KOS;
+use swanky_ot_traits_new::{OTCorrelated, OTInit, Receiver, Sender};
 use swanky_party::{
     GenericParty, GenericWhichParty, Party0, Party1,
     either::{PartyEither, PartyEitherCopy},
+    party_map::{PartyMap, map_evidence_party0, map_evidence_party1},
     private::{PartyPrivate, PartyPrivateCopy},
 };
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
@@ -239,7 +240,7 @@ pub struct AuthBitGenerator<P: GenericParty> {
     /// The verifier's global $`\Delta`$.
     delta: PartyPrivateCopy<Party1<P>, P, U8x16>,
     /// The party-specific correlated OT instantiation.
-    ot: PartyEither<P, kos::Receiver, kos::Sender>,
+    ot: KOS<PartyMap<P, Receiver, Sender>>,
 }
 
 impl<P: GenericParty> AuthBitGenerator<P> {
@@ -248,17 +249,13 @@ impl<P: GenericParty> AuthBitGenerator<P> {
     /// The verifier's $`\Delta`$ value is randomly generated using `rng`.
     pub fn new<RNG>(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self>
     where
-        RNG: CryptoRng + Rng,
+        RNG: CryptoRng,
     {
-        match P::GENERIC_WHICH {
-            GenericWhichParty::Party0(e) => {
-                Self::new_with_delta(PartyPrivateCopy::empty(e), channel, rng)
-            }
-            GenericWhichParty::Party1(_e) => {
-                let delta = rng.random::<U8x16>();
-                Self::new_with_delta(PartyPrivateCopy::new(delta), channel, rng)
-            }
-        }
+        Self::new_with_delta(
+            PartyPrivateCopy::new_with(|| rng.random::<U8x16>()),
+            channel,
+            rng,
+        )
     }
 
     /// Create a new [`AuthBitGenerator`] with a supplied $`\Delta`$ value.
@@ -268,31 +265,12 @@ impl<P: GenericParty> AuthBitGenerator<P> {
         mut rng: RNG,
     ) -> swanky_error::Result<Self>
     where
-        RNG: CryptoRng + Rng,
+        RNG: CryptoRng,
     {
-        let result = match P::GENERIC_WHICH {
-            GenericWhichParty::Party0(e) => AuthBitGenerator {
-                delta: PartyPrivateCopy::empty(e),
-                ot: PartyEither::new(
-                    e,
-                    kos::Receiver::init(channel, &mut rng).wrap_err(
-                        ErrorKind::InitializationError,
-                        "Failed to initialize KOS receiver.",
-                    )?,
-                ),
-            },
-            GenericWhichParty::Party1(e) => AuthBitGenerator {
-                delta: PartyPrivateCopy::new(delta.into_inner(e)),
-                ot: PartyEither::new(
-                    e,
-                    kos::Sender::init(channel, &mut rng).wrap_err(
-                        ErrorKind::InitializationError,
-                        "Failed to initialize KOS sender.",
-                    )?,
-                ),
-            },
-        };
-        Ok(result)
+        Ok(Self {
+            delta,
+            ot: KOS::init(channel, &mut rng)?,
+        })
     }
 
     /// Generate a vector of authenticated bits.
@@ -300,55 +278,76 @@ impl<P: GenericParty> AuthBitGenerator<P> {
     /// `Party0` supplies the bits to authenticate, and `Party1` specifies
     /// the number of bits. The resulting authenticated bits are
     /// [`Vec::extend`]ed into `out`.
-    pub fn generate<RNG: CryptoRng + Rng, I: Iterator<Item = F2>>(
+    pub fn generate<RNG: CryptoRng, I: Iterator<Item = F2>>(
         &mut self,
         bits_in: PartyEither<P, I, usize>,
         out: &mut Vec<AuthBit<P>>,
-        mut channel: &mut Channel,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<()> {
-        match P::GENERIC_WHICH {
-            GenericWhichParty::Party0(e) => {
-                let bits = bits_in.into_inner(e);
-                // TODO: Once OT uses F2 instead of bool this line won't be necessary.
-                let bits = bits.map(bool::from).collect::<Vec<bool>>();
-                let macs = self
-                    .ot
-                    .as_mut()
-                    .into_inner(e)
-                    .receive_correlated(&mut channel, &bits, rng)
-                    .wrap_err(
-                        ErrorKind::NetworkError,
-                        "Failed to receive correlated data.",
-                    )?;
+        let inputs: PartyEither<PartyMap<P, Receiver, Sender>, _, _> = match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(ev) => PartyEither::new(
+                map_evidence_party0::<P, _, _>(ev),
+                bits_in.into_inner(ev).collect::<Vec<_>>(),
+            ),
+            GenericWhichParty::Party1(ev) => {
+                PartyEither::new(map_evidence_party1::<P, _, _>(ev), bits_in.into_inner(ev))
+            }
+        };
 
-                out.extend(bits.into_iter().zip(macs).map(|(bit, mac)| {
+        let delta: PartyPrivate<Sender, PartyMap<P, Receiver, Sender>, _> = match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(ev) => {
+                PartyPrivate::empty(map_evidence_party0::<P, _, _>(ev).sym())
+            }
+            GenericWhichParty::Party1(ev) => PartyPrivate::new(self.delta.into_inner(ev)),
+        };
+
+        let mut outputs: Vec<PartyEither<PartyMap<P, Receiver, Sender>, _, _>> = Vec::with_capacity(
+            inputs
+                .as_ref()
+                .map(|&sz| sz, |bits| bits.len())
+                .into_inner_same(),
+        );
+
+        self.ot.ot_correlated(
+            inputs.as_ref().map(|&s| s, |bits| &bits[..]),
+            delta,
+            &mut outputs,
+            channel,
+            rng,
+        )?;
+
+        match P::GENERIC_WHICH {
+            GenericWhichParty::Party0(ev) => {
+                out.extend(
+                    inputs
+                        .into_inner(map_evidence_party0::<P, _, _>(ev))
+                        .into_iter()
+                        .zip(outputs)
+                        .map(|(bit, mac)| {
+                            AuthBit(PartyEitherCopy::new(
+                                ev,
+                                ProverAuthBit {
+                                    bit,
+                                    mac: mac.into_inner(map_evidence_party0::<P, _, _>(ev)),
+                                },
+                            ))
+                        }),
+                );
+            }
+            GenericWhichParty::Party1(ev) => {
+                out.extend(outputs.into_iter().map(|key| {
                     AuthBit(PartyEitherCopy::new(
-                        e,
-                        ProverAuthBit {
-                            bit: bit.into(),
-                            mac,
+                        ev,
+                        VerifierAuthBit {
+                            key: key.into_inner(map_evidence_party1::<P, _, _>(ev)),
                         },
                     ))
                 }));
-                Ok(())
-            }
-            GenericWhichParty::Party1(e) => {
-                let delta = self.delta().into_inner(e);
-                let keys = self
-                    .ot
-                    .as_mut()
-                    .into_inner(e)
-                    .send_correlated(&mut channel, bits_in.into_inner(e), delta, rng)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to send correlated data.")?;
-                out.extend(
-                    keys.into_iter()
-                        .map(|key| AuthBit(PartyEitherCopy::new(e, VerifierAuthBit { key }))),
-                );
-
-                Ok(())
             }
         }
+
+        Ok(())
     }
 
     /// Open the authenticated bits in `authbits`.

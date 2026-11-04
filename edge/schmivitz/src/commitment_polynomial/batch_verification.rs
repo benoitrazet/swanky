@@ -321,7 +321,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vole::{ExtensionFieldLifterF2F128b, combine};
+    use crate::{
+        parameters::Binary128Bit,
+        vole::{ExtensionFieldLifterF2FLambda, combine},
+    };
     use proptest::{collection::vec, prelude::*, test_runner::TestCaseResult};
     use rand::{RngExt, SeedableRng};
     use swanky_field_binary::{F2, F8b, F64b, F128b};
@@ -471,7 +474,7 @@ mod tests {
             num_polynomials in 0usize..=20,
             excess in 1usize..=4,
         ) {
-            degree_bounds_and_coefficient_count::<F2, F128b, ExtensionFieldLifterF2F128b>(
+            degree_bounds_and_coefficient_count::<F2, F128b, ExtensionFieldLifterF2FLambda<Binary128Bit>>(
                 seed, d, num_polynomials, excess,
             )?;
             degree_bounds_and_coefficient_count::<F2, F64b, ExtensionFieldLifterF2F64b>(
@@ -545,7 +548,7 @@ mod tests {
             seed in any::<[u8; 16]>(),
             (d, degrees) in strategy_degrees(0),
         ) {
-            incremental_aggregation_matches_reference::<F2, F128b, ExtensionFieldLifterF2F128b>(
+            incremental_aggregation_matches_reference::<F2, F128b, ExtensionFieldLifterF2FLambda<Binary128Bit>>(
                 seed, d, &degrees,
             )?;
             incremental_aggregation_matches_reference::<F2, F64b, ExtensionFieldLifterF2F64b>(
@@ -607,7 +610,7 @@ mod tests {
             (d, degrees) in strategy_degrees(1),
             coefficient in 0usize..20,
         ) {
-            tampering_coefficient::<F2, F128b, ExtensionFieldLifterF2F128b>(
+            tampering_coefficient::<F2, F128b, ExtensionFieldLifterF2FLambda<Binary128Bit>>(
                 seed, d, &degrees, coefficient,
             )?;
             tampering_coefficient::<F2, F64b, ExtensionFieldLifterF2F64b>(
@@ -657,7 +660,7 @@ mod tests {
             d in 1usize..=20,
             degree in 0usize..=20,
         ) {
-            nonzero_committed_value_is_rejected::<F2, F128b, ExtensionFieldLifterF2F128b>(
+            nonzero_committed_value_is_rejected::<F2, F128b, ExtensionFieldLifterF2FLambda<Binary128Bit>>(
                 seed, d, degree,
             )?;
             nonzero_committed_value_is_rejected::<F2, F64b, ExtensionFieldLifterF2F64b>(
@@ -722,7 +725,7 @@ mod tests {
     proptest! {
         #[test]
         fn test5_malformed_mask_streams_are_rejected(d in 0usize..=20) {
-            malformed_mask_streams_are_rejected::<F2, F128b, ExtensionFieldLifterF2F128b>(d)?;
+            malformed_mask_streams_are_rejected::<F2, F128b, ExtensionFieldLifterF2FLambda<Binary128Bit>>(d)?;
             malformed_mask_streams_are_rejected::<F2, F64b, ExtensionFieldLifterF2F64b>(d)?;
             malformed_mask_streams_are_rejected::<F8b, F128b, ExtensionFieldLifterF8bF128b>(d)?;
             malformed_mask_streams_are_rejected::<F128b, F128b, IdentityLifter>(d)?;
@@ -794,7 +797,7 @@ mod tests {
             seed in any::<[u8; 16]>(),
             (d, degrees) in strategy_degrees(0),
         ) {
-            masking_arithmetic_matches_reference::<F2, F128b, ExtensionFieldLifterF2F128b>(
+            masking_arithmetic_matches_reference::<F2, F128b, ExtensionFieldLifterF2FLambda<Binary128Bit>>(
                 seed, d, &degrees,
             )?;
             masking_arithmetic_matches_reference::<F2, F64b, ExtensionFieldLifterF2F64b>(
@@ -807,6 +810,3 @@ mod tests {
         }
     }
 }
-
-#[cfg(test)]
-mod alt_tests;

@@ -1,8 +1,8 @@
-use fancy_traits::{Circuit, Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
+use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyZeroKnowledge};
 use swanky_channel::Channel;
-use swanky_error::{ErrorKind, Result, bail};
+use swanky_error::Result;
 use swanky_field::FiniteRing;
-use swanky_field_binary::{F2, F128b};
+use swanky_field_binary::F2;
 use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
 
 /// Values produced by a completed prover preparation.
@@ -98,12 +98,6 @@ impl<'a> ProverPreparer<'a> {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Wire(F2);
 
-impl HasModulus for Wire {
-    fn modulus(&self) -> u16 {
-        2
-    }
-}
-
 // TODO: Remove! This API has been replaced with the `fancy-traits::Circuit`
 // API. We're keeping this around for now for backwards compatibility.
 impl<'a> FieldBackend<F2> for ProverPreparer<'a> {
@@ -155,33 +149,11 @@ impl<'a> FieldBackend<F2> for ProverPreparer<'a> {
 
 impl<'a> Fancy for ProverPreparer<'a> {
     type Item = Wire;
-
-    fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
-        assert!(value == 0 || value == 1);
-        assert_eq!(modulus, 2);
-        Ok(Wire(F2::from(value != 0)))
-    }
 }
 
-impl<'a> FancyEncode for ProverPreparer<'a> {
-    fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        bail!(
-            ErrorKind::OtherError,
-            "Invalid input: VOLE-in-the-head prover does not support encode"
-        )
-    }
-
-    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        let mut output = Vec::with_capacity(moduli.len());
-        for _ in 0..moduli.len() {
-            let f2 = self.private_input[self.priv_input_pos as usize];
-            self.priv_input_pos += 1;
-
-            // TODO: Can we push all of the input witnesses up front?
-            self.witness.push(f2);
-            output.push(Wire(f2));
-        }
-        Ok(output)
+impl<'a> FancyConstant<F2> for ProverPreparer<'a> {
+    fn constant(&mut self, constant: F2) -> Self::Item {
+        Wire(constant)
     }
 }
 
@@ -206,14 +178,23 @@ impl<'a> FancyBinary for ProverPreparer<'a> {
     }
 }
 
-impl<'a> FancyZeroKnowledge for ProverPreparer<'a> {
+impl<'a> FancyZeroKnowledge<F2> for ProverPreparer<'a> {
+    fn witness(&mut self, _: &mut Channel) -> Result<Self::Item> {
+        let f2 = self.private_input[self.priv_input_pos as usize];
+        self.priv_input_pos += 1;
+
+        // TODO: Can we push all of the input witnesses up front?
+        self.witness.push(f2);
+        Ok(Wire(f2))
+    }
+
     fn assert_zero(&mut self, _: &Self::Item, _: &mut Channel) -> Result<()> {
         self.challenge_count += 1;
         Ok(())
     }
 }
 
-impl<'a> HigherDegreeBackend<F2, F128b> for ProverPreparer<'a> {
+impl<'a, FE> HigherDegreeBackend<F2, FE> for ProverPreparer<'a> {
     /// The degree of the commitment polynomial that the
     /// [`ProverTraverser`](crate::proof::prover_traverser::ProverTraverser) will build for the
     /// wire.
@@ -268,12 +249,12 @@ mod tests {
         Circuit,
         prover_preparer::{ProverPreparer, ProverPreparerParts},
     };
-    use mac_n_cheese_sieve_parser::text_parser::RelationReader;
     use rand::rng;
     use std::io::Cursor;
     use swanky_field::FiniteRing;
-    use swanky_field_binary::F2;
+    use swanky_field_binary::{F2, F128b};
     use swanky_sieve_ir_api::HigherDegreeBackend;
+    use swanky_sieve_ir_parser::text_parser::RelationReader;
 
     /// Take a string description of a circuit and parse it.
     fn load_circuit(circuit: &str) -> swanky_error::Result<Circuit> {
@@ -393,10 +374,11 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn higher_degree_operations_compute_correct_degrees() {
-        let private_input: Vec<F2> = Vec::new();
-        let preparer = ProverPreparer::new(&private_input, None).unwrap();
+    // NOTE: breaking down the test with this helper to avoid having to qualify
+    // every function called from HigherDegreeBackend.
+    fn higher_degree_operations_compute_correct_degrees_helper(
+        preparer: &impl HigherDegreeBackend<F2, F128b, HigherDegreeWire = usize>,
+    ) {
         let x = 3;
         let y = 2;
 
@@ -409,35 +391,63 @@ mod tests {
     }
 
     #[test]
-    fn higher_degree_constraints_track_max_degree() -> swanky_error::Result<()> {
+    fn higher_degree_operations_compute_correct_degrees() {
         let private_input: Vec<F2> = Vec::new();
-        let mut preparer = ProverPreparer::new(&private_input, None)?;
-        assert_eq!(preparer.max_higher_degree(), 0);
+        let preparer = ProverPreparer::new(&private_input, None).unwrap();
+
+        higher_degree_operations_compute_correct_degrees_helper(&preparer);
+    }
+
+    fn add_degree_four_constraint(
+        preparer: &mut impl HigherDegreeBackend<F2, F128b, Wire = F2, HigherDegreeWire = usize>,
+    ) -> swanky_error::Result<()> {
+        let wires = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE];
 
         // x0 * x1 * x2 * x3, a degree-4 constraint.
-        let wires = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE];
         preparer.assert_zero_higher_degree(&wires, |b, x| {
             let x01 = b.h_mul(&x[0], &x[1]).unwrap();
             let x23 = b.h_mul(&x[2], &x[3]).unwrap();
             b.h_mul(&x01, &x23).unwrap()
         })?;
-        assert_eq!(preparer.max_higher_degree(), 4);
 
-        // A subsequent lower-degree constraint (x0 * x1 + x2 * x3, degree 2) doesn't lower the
-        // maximum.
+        Ok(())
+    }
+
+    fn add_degree_two_constraint(
+        preparer: &mut impl HigherDegreeBackend<F2, F128b, Wire = F2, HigherDegreeWire = usize>,
+    ) -> swanky_error::Result<()> {
+        let wires = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE];
+
+        // x0 * x1 + x2 * x3, a degree-2 constraint.
         preparer.assert_zero_higher_degree(&wires, |b, x| {
             let x01 = b.h_mul(&x[0], &x[1]).unwrap();
             let x23 = b.h_mul(&x[2], &x[3]).unwrap();
             b.h_add(&x01, &x23).unwrap()
         })?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn higher_degree_constraints_track_max_degree() -> swanky_error::Result<()> {
+        let private_input: Vec<F2> = Vec::new();
+        let mut preparer = ProverPreparer::new(&private_input, None)?;
+
+        assert_eq!(preparer.max_higher_degree(), 0);
+
+        add_degree_four_constraint(&mut preparer)?;
         assert_eq!(preparer.max_higher_degree(), 4);
 
-        // Higher degree constraints don't add witness values, but each needs a challenge.
+        // A lower-degree constraint does not lower the maximum.
+        add_degree_two_constraint(&mut preparer)?;
+        assert_eq!(preparer.max_higher_degree(), 4);
+
         let ProverPreparerParts {
             witness,
             challenge_count,
             max_higher_degree,
         } = preparer.into_parts();
+
         assert!(witness.is_empty());
         assert_eq!(challenge_count, 2);
         assert_eq!(max_higher_degree, 4);

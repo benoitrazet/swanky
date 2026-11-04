@@ -5,9 +5,9 @@ mod commitment_polynomial;
 pub mod batch_verification;
 
 use swanky_field::FiniteField;
-use swanky_field_binary::{F2, F128b};
+use swanky_field_binary::F2;
 
-use crate::vole::ExtensionFieldLifterF2F128b;
+use crate::{parameters::FLambda, vole::ExtensionFieldLifterF2FLambda};
 
 use batch_verification::{BatchProverAccumulator, BatchVerifierAccumulator};
 
@@ -28,10 +28,10 @@ fn power<FE: FiniteField>(base: FE, exp: usize) -> FE {
     result
 }
 
-/// Prover accumulator specialized to `F2`/`F128b` with power-basis lifting.
-pub(crate) type BatchProverAccumulatorF2F128b =
-    BatchProverAccumulator<F2, F128b, ExtensionFieldLifterF2F128b>;
+/// Prover accumulator specialized to `F2`/`P::FLambda` with power-basis lifting.
+pub(crate) type BatchProverAccumulatorF2FLambda<P> =
+    BatchProverAccumulator<F2, FLambda<P>, ExtensionFieldLifterF2FLambda<P>>;
 
-/// Verifier accumulator specialized to `F2`/`F128b` with power-basis lifting.
-pub(crate) type BatchVerifierAccumulatorF2F128b =
-    BatchVerifierAccumulator<F2, F128b, ExtensionFieldLifterF2F128b>;
+/// Verifier accumulator specialized to `F2`/`P::FLambda` with power-basis lifting.
+pub(crate) type BatchVerifierAccumulatorF2FLambda<P> =
+    BatchVerifierAccumulator<F2, FLambda<P>, ExtensionFieldLifterF2FLambda<P>>;

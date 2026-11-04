@@ -3,17 +3,15 @@
 //! Note: all number representations are little-endian.
 
 use rand::RngExt as _;
-
-use crate::Bundle;
-use fancy_traits::HasModulus;
+use swanky_field_binary::F2;
 
 /// Convert a `u128` into a vector of bits.
-pub(crate) fn u128_to_bits(x: u128, nbits: usize) -> Vec<u16> {
+pub(crate) fn u128_to_bits(x: u128, nbits: usize) -> Vec<F2> {
     let mut bits = Vec::with_capacity(nbits);
     let mut y = x;
     for _ in 0..nbits {
         let b = y & 1;
-        bits.push(b as u16);
+        bits.push((b != 0).into());
         y -= b;
         y /= 2;
     }
@@ -24,34 +22,14 @@ pub(crate) fn u128_to_bits(x: u128, nbits: usize) -> Vec<u16> {
 ///
 /// # Panics
 /// This panics if any element in the vector is non-binary.
-pub fn u128_from_bits(bs: &[u16]) -> u128 {
+pub fn u128_from_bits(bs: &[F2]) -> u128 {
     let mut x = 0;
     for &b in bs.iter().skip(1).rev() {
-        assert!(b == 0 || b == 1);
-        x += b as u128;
+        x += (u16::from(b)) as u128;
         x *= 2;
     }
-    x += bs[0] as u128;
+    x += u16::from(bs[0]) as u128;
     x
-}
-
-/// Convert `x` into mixed radix form using the provided `radii`.
-pub fn as_mixed_radix(x: u128, radii: &[u16]) -> Vec<u16> {
-    let mut x = x;
-    radii
-        .iter()
-        .map(|&m| {
-            if x >= m as u128 {
-                let d = x % m as u128;
-                x = (x - d) / m as u128;
-                d as u16
-            } else {
-                let d = x as u16;
-                x = 0;
-                d
-            }
-        })
-        .collect()
 }
 
 const NPRIMES: usize = 29;
@@ -166,63 +144,6 @@ fn base_primes_with_width(nbits: usize, primes: &[u16]) -> Vec<u16> {
     }
     assert!((res >> nbits) > 0, "not enough primes!");
     ps
-}
-
-/// Compute the `ms` needed for the number of CRT primes in `x`, with accuracy
-/// `accuracy`.
-///
-/// Supported accuracy: ["100%", "99.9%", "99%"]
-pub(crate) fn get_ms<W: Clone + HasModulus>(x: &Bundle<W>, accuracy: &str) -> Vec<u16> {
-    match accuracy {
-        "100%" => match x.moduli().len() {
-            3 => vec![2; 5],
-            4 => vec![3, 26],
-            5 => vec![3, 4, 54],
-            6 => vec![5, 5, 5, 60],
-            7 => vec![5, 6, 6, 7, 86],
-            8 => vec![5, 7, 8, 8, 9, 98],
-            9 => vec![5, 5, 7, 7, 7, 7, 7, 76],
-            10 => vec![5, 5, 6, 6, 6, 6, 11, 11, 202],
-            11 => vec![5, 5, 5, 5, 5, 6, 6, 6, 7, 7, 8, 150],
-            n => panic!("unknown exact Ms for {} primes!", n),
-        },
-        "99.999%" => match x.moduli().len() {
-            8 => vec![5, 5, 6, 7, 102],
-            9 => vec![5, 5, 6, 7, 114],
-            10 => vec![5, 6, 6, 7, 102],
-            11 => vec![5, 5, 6, 7, 130],
-            n => panic!("unknown 99.999% accurate Ms for {} primes!", n),
-        },
-        "99.99%" => match x.moduli().len() {
-            6 => vec![5, 5, 5, 42],
-            7 => vec![4, 5, 6, 88],
-            8 => vec![4, 5, 7, 78],
-            9 => vec![5, 5, 6, 84],
-            10 => vec![4, 5, 6, 112],
-            11 => vec![7, 11, 174],
-            n => panic!("unknown 99.99% accurate Ms for {} primes!", n),
-        },
-        "99.9%" => match x.moduli().len() {
-            5 => vec![3, 5, 30],
-            6 => vec![4, 5, 48],
-            7 => vec![4, 5, 60],
-            8 => vec![3, 5, 78],
-            9 => vec![9, 140],
-            10 => vec![7, 190],
-            n => panic!("unknown 99.9% accurate Ms for {} primes!", n),
-        },
-        "99%" => match x.moduli().len() {
-            4 => vec![3, 18],
-            5 => vec![3, 36],
-            6 => vec![3, 40],
-            7 => vec![3, 40],
-            8 => vec![126],
-            9 => vec![138],
-            10 => vec![140],
-            n => panic!("unknown 99% accurate Ms for {} primes!", n),
-        },
-        _ => panic!("get_ms: unsupported accuracy {}", accuracy),
-    }
 }
 
 /// Extra [`rand::Rng`] functionality, useful for testing.

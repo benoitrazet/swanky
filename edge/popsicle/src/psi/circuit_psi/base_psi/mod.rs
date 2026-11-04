@@ -4,6 +4,7 @@ use crate::circuit_psi::*;
 use fancy_traits::FancyEncode;
 use rand::{CryptoRng, SeedableRng};
 use swanky_channel::Channel;
+use swanky_field_binary::F2;
 
 // The number of hash functions that will be used to attempt to
 // place any item in a cuckoo bin
@@ -35,7 +36,7 @@ pub trait BasePsi {
     ) -> swanky_error::Result<Self>
     where
         Self: Sized,
-        RNG: Rng + CryptoRng + SeedableRng;
+        RNG: CryptoRng + SeedableRng;
     /// Parties locally hash their inputs
     ///
     /// This allows them to agree on an ordering of their inputs.
@@ -47,7 +48,7 @@ pub trait BasePsi {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: Rng + CryptoRng + SeedableRng;
+        RNG: CryptoRng + SeedableRng;
     /// Parties call an OPPRF on their inputs
     ///
     /// This allows them to agree on a hidden representation of
@@ -61,7 +62,7 @@ pub trait BasePsi {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: Rng + CryptoRng + SeedableRng;
+        RNG: CryptoRng + SeedableRng;
     /// Parties turn their inputs into garbled wires
     fn encode_circuit_inputs<F>(
         &mut self,
@@ -69,7 +70,7 @@ pub trait BasePsi {
         channel: &mut Channel,
     ) -> swanky_error::Result<CircuitInputs<F::Item>>
     where
-        F: FancyEncode;
+        F: FancyEncode<F2>;
     /// A wrapper that calls the different pieces of the BasePsi in order
     /// to the necessary hidden inputs that the CircuitPsi can operate on.
     fn base_psi<F, RNG>(
@@ -81,8 +82,8 @@ pub trait BasePsi {
     ) -> swanky_error::Result<CircuitInputs<F::Item>>
     where
         Self: Sized,
-        F: FancyEncode,
-        RNG: Rng + CryptoRng + SeedableRng,
+        F: FancyEncode<F2>,
+        RNG: CryptoRng + SeedableRng,
     {
         let has_payloads = payloads.is_some();
 

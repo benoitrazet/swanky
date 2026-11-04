@@ -61,7 +61,7 @@ impl BasePsi for OpprfReceiver {
         has_payload: bool,
     ) -> swanky_error::Result<Self>
     where
-        RNG: Rng + CryptoRng + SeedableRng,
+        RNG: CryptoRng + SeedableRng,
     {
         // The key used during hashing is known to both
         // parties and allows them to hash the same inputs
@@ -98,7 +98,7 @@ impl BasePsi for OpprfReceiver {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: Rng + CryptoRng + SeedableRng,
+        RNG: CryptoRng + SeedableRng,
     {
         let mut hashed_inputs = compress_and_hash_inputs(primary_keys, self.key);
 
@@ -137,7 +137,7 @@ impl BasePsi for OpprfReceiver {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: Rng + CryptoRng + SeedableRng,
+        RNG: CryptoRng + SeedableRng,
     {
         // The receiver queries the opprf with their inputs if the receiver
         // and sender's inputs match, the receiver gets the same programmed
@@ -168,7 +168,7 @@ impl BasePsi for OpprfReceiver {
         channel: &mut Channel,
     ) -> swanky_error::Result<CircuitInputs<F::Item>>
     where
-        F: FancyEncode,
+        F: FancyEncode<F2>,
     {
         // We compute the number of wires that the receivers should
         // expect from the sender by taking the size of an element in

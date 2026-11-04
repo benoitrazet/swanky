@@ -1,5 +1,5 @@
 use crate::vec_wrapper::VecWrapper;
-use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary, HasModulus};
+use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary, FancyConstant};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -25,12 +25,6 @@ impl<P: GenericParty> Wire<P> {
     /// Construct a new [`PreProcessedWire`] from an authenticated share.
     pub(crate) fn new(auth_share: AuthShare<P>) -> Self {
         Wire { auth_share }
-    }
-}
-
-impl<P: GenericParty> HasModulus for Wire<P> {
-    fn modulus(&self) -> u16 {
-        2
     }
 }
 
@@ -117,12 +111,11 @@ impl<P: GenericParty> FancyBinary for WirePreProcessor<P> {
 
 impl<P: GenericParty> Fancy for WirePreProcessor<P> {
     type Item = Wire<P>;
+}
 
-    fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
-        assert!(value == 0 || value == 1);
-        assert_eq!(modulus, 2);
-
+impl<P: GenericParty> FancyConstant<F2> for WirePreProcessor<P> {
+    fn constant(&mut self, _: F2) -> Self::Item {
         let authshare = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
-        Ok(Wire::new(authshare))
+        Wire::new(authshare)
     }
 }

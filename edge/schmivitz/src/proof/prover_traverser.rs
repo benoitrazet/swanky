@@ -1,25 +1,30 @@
-use fancy_traits::{Circuit, Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
-use mac_n_cheese_sieve_parser::WireId;
+use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyZeroKnowledge};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
-use swanky_field::FiniteRing;
-use swanky_field_binary::{F2, F128b};
+use swanky_field::{FiniteRing, IsSubFieldOf};
+use swanky_field_binary::F2;
 use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
 
-use crate::commitment_polynomial::{BatchProverAccumulatorF2F128b, CommitmentPolynomialProver};
+use crate::commitment_polynomial::{BatchProverAccumulatorF2FLambda, CommitmentPolynomialProver};
+use swanky_sieve_ir_parser::WireId;
+
+use crate::parameters::{FLambda, Params};
 use crate::proof::ChiGenerator;
 use crate::vole::RandomVoleP;
 
 /// Values produced by a completed prover circuit traversal.
-pub(crate) struct ProverTraverserParts<Vole> {
+pub(crate) struct ProverTraverserParts<Vole, P: Params>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     /// Aggregated degree-0 coefficients.
-    pub(crate) degree_0_aggregation: F128b,
+    pub(crate) degree_0_aggregation: FLambda<P>,
     /// Aggregated degree-1 coefficients.
-    pub(crate) degree_1_aggregation: F128b,
+    pub(crate) degree_1_aggregation: FLambda<P>,
     /// Aggregated assert-zero commitment.
-    pub(crate) assert_zero_commitment: F128b,
+    pub(crate) assert_zero_commitment: FLambda<P>,
     /// Accumulator for the higher-degree constraint polynomials.
-    pub(crate) higher_degree_accumulator: BatchProverAccumulatorF2F128b,
+    pub(crate) higher_degree_accumulator: BatchProverAccumulatorF2FLambda<P>,
     /// Random VOLE values supplied to the traverser.
     pub(crate) voles: Vole,
 }
@@ -29,14 +34,18 @@ pub(crate) struct ProverTraverserParts<Vole> {
 ///
 /// The primary steps in circuit traversal include assigning VOLEs to each wire and
 /// computing the two aggregated values used in the proof.
-pub struct ProverTraverser<Vole> {
+pub struct ProverTraverser<Vole, P: Params>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     /// Current position for a fresh extended witness value.
     wire_values_pos: WireId,
 
     /// Map containing the wire values for the extended witness (private inputs and multiplication gates in the circuit).
     extended_witness: Vec<F2>,
-    /// Fiat–Shamir weights drawn from the shared power stream.
-    chi_challenge: ChiGenerator,
+
+    /// Fiat-Shamir challenges as powers of chi. There should be one for each polynomial (e.g. non-linear gate) and assert zero.
+    chi_challenge: ChiGenerator<P>,
 
     /// Random VOLE values. There should be one for each extended witness value.
     voles: Vole,
@@ -46,21 +55,24 @@ pub struct ProverTraverser<Vole> {
     /// Partial aggregation of the value $`\tilde a`$ from the protocol.
     ///
     /// After traversal, this should have the value $$`\sum_{i \in [t]} \chi_i \cdot A_{i,1}`$$.
-    aggregate_degree_0: F128b,
+    aggregate_degree_0: FLambda<P>,
     /// Partial aggregation of the value $`\tilde b`$ from the protocol.
     ///
     /// After traversal, this should have the value $$`\sum_{i \in [t]} \chi_i \cdot A_{i,0}`$$.
-    aggregate_degree_1: F128b,
+    aggregate_degree_1: FLambda<P>,
 
     /// Partial aggregation of the assert zero check.
     /// TODO: Add this to the specification and reference it.
-    aggregate_assert_zero: F128b,
+    aggregate_assert_zero: FLambda<P>,
 
     /// Streamed accumulator for the higher-degree constraint batch.
-    higher_degree_accumulator: BatchProverAccumulatorF2F128b,
+    higher_degree_accumulator: BatchProverAccumulatorF2FLambda<P>,
 }
 
-impl<Vole: RandomVoleP> ProverTraverser<Vole> {
+impl<Vole: RandomVoleP<Params = P>, P: Params> ProverTraverser<Vole, P>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     /// Create a new circuit traverser.
     ///
     /// Requirements on inputs:
@@ -75,7 +87,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
     ///   [`ProverPreparer::max_higher_degree()`](crate::proof::prover_preparer::ProverPreparer::max_higher_degree).
     pub(crate) fn new(
         extended_witness: Vec<F2>,
-        chi_challenge: ChiGenerator,
+        chi_challenge: ChiGenerator<P>,
         voles: Vole,
         max_higher_degree: usize,
     ) -> Result<Self> {
@@ -88,16 +100,16 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
             voles,
             vole_assignment_count: 0,
 
-            aggregate_degree_0: F128b::ZERO,
-            aggregate_degree_1: F128b::ZERO,
+            aggregate_degree_0: FLambda::<P>::ZERO,
+            aggregate_degree_1: FLambda::<P>::ZERO,
 
-            aggregate_assert_zero: F128b::ZERO,
+            aggregate_assert_zero: FLambda::<P>::ZERO,
 
-            higher_degree_accumulator: BatchProverAccumulatorF2F128b::new(max_higher_degree),
+            higher_degree_accumulator: BatchProverAccumulatorF2FLambda::new(max_higher_degree),
         })
     }
 
-    fn next_vole(&mut self) -> Result<F128b> {
+    fn next_vole(&mut self) -> Result<FLambda<P>> {
         let next_index = self.vole_assignment_count;
         self.vole_assignment_count += 1;
 
@@ -124,8 +136,8 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
     /// VOLEs may contain more correlations than the witness requires; the trailing ones are
     /// reserved for masking the higher degree aggregate (see
     /// [`Proof::prove()`](crate::proof::Proof::prove)).
-    pub(crate) fn into_parts(self) -> Result<ProverTraverserParts<Vole>> {
-        if self.vole_assignment_count != self.extended_witness.len() {
+    pub(crate) fn into_parts(self) -> Result<ProverTraverserParts<Vole, P>> {
+        if self.vole_assignment_count != self.voles.extended_witness_length() {
             bail!(
                 ErrorKind::OtherError,
                 "Traversal did not use exactly one VOLE per extended witness value! Had {}, used {}",
@@ -173,18 +185,15 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
 
 /// An [`F2`] element alongside its associated VOLE tag.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct Wire(F2, F128b);
-
-impl HasModulus for Wire {
-    fn modulus(&self) -> u16 {
-        2
-    }
-}
+pub struct Wire<P: Params>(F2, FLambda<P>);
 
 // TODO: Remove! This API has been replaced with the `fancy-traits::Circuit`
 // API. We're keeping this around for now for backwards compatibility.
-impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
-    type Wire = (F2, F128b);
+impl<VOLE: RandomVoleP<Params = P>, P: Params> FieldBackend<F2> for ProverTraverser<VOLE, P>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
+    type Wire = (F2, FLambda<P>);
 
     fn input_public(&mut self) -> Result<Self::Wire> {
         unimplemented!("VOLE-in-the-head does not support `input_public`")
@@ -220,7 +229,7 @@ impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
         // Compute coefficient values `A_i1` and `A_i0` (respectively). These are derived from the
         // `c_i(X)` polynomial defined in the paper -- see Fig 7 and page 32-33 for details.
         let degree_0_coeff = left.1 * right.1;
-        let degree_1_coeff = right.0 * left.1 + left.0 * right.1 - vole;
+        let degree_1_coeff = P::f2_scale(right.0, left.1) + P::f2_scale(left.0, right.1) - vole;
 
         self.aggregate_degree_0 += challenge * degree_0_coeff;
         self.aggregate_degree_1 += challenge * degree_1_coeff;
@@ -239,39 +248,26 @@ impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
     }
 }
 
-impl<VOLE: RandomVoleP> Fancy for ProverTraverser<VOLE> {
-    type Item = Wire;
+impl<VOLE: RandomVoleP<Params = P>, P: Params> Fancy for ProverTraverser<VOLE, P>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
+    type Item = Wire<P>;
+}
 
-    fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
-        assert!(value == 0 || value == 1);
-        assert_eq!(modulus, 2);
-        Ok(Wire(F2::from(value != 0), F128b::ZERO))
+impl<VOLE: RandomVoleP<Params = P>, P: Params> FancyConstant<F2> for ProverTraverser<VOLE, P>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
+    fn constant(&mut self, constant: F2) -> Self::Item {
+        Wire(constant, FLambda::<P>::ZERO)
     }
 }
 
-impl<VOLE: RandomVoleP> FancyEncode for ProverTraverser<VOLE> {
-    fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        bail!(
-            ErrorKind::OtherError,
-            "Invalid input: VOLE-in-the-head does not support encode"
-        )
-    }
-
-    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        let mut output = Vec::with_capacity(moduli.len());
-        for _ in 0..moduli.len() {
-            let f = self.next_witness_value()?;
-            let vole = self.next_vole()?;
-
-            // Private input gates don't define a polynomial that would contribute to the aggregated
-            // coefficients being computed
-            output.push(Wire(f, vole));
-        }
-        Ok(output)
-    }
-}
-
-impl<VOLE: RandomVoleP> FancyBinary for ProverTraverser<VOLE> {
+impl<VOLE: RandomVoleP<Params = P>, P: Params> FancyBinary for ProverTraverser<VOLE, P>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         let res = x.0 + y.0;
 
@@ -292,7 +288,7 @@ impl<VOLE: RandomVoleP> FancyBinary for ProverTraverser<VOLE> {
         // Compute coefficient values `A_i1` and `A_i0` (respectively). These are derived from the
         // `c_i(X)` polynomial defined in the paper -- see Fig 7 and page 32-33 for details.
         let degree_0_coeff = x.1 * y.1;
-        let degree_1_coeff = y.0 * x.1 + x.0 * y.1 - vole;
+        let degree_1_coeff = P::f2_scale(y.0, x.1) + P::f2_scale(x.0, y.1) - vole;
 
         self.aggregate_degree_0 += challenge * degree_0_coeff;
         self.aggregate_degree_1 += challenge * degree_1_coeff;
@@ -305,7 +301,19 @@ impl<VOLE: RandomVoleP> FancyBinary for ProverTraverser<VOLE> {
     }
 }
 
-impl<VOLE: RandomVoleP> FancyZeroKnowledge for ProverTraverser<VOLE> {
+impl<VOLE: RandomVoleP<Params = P>, P: Params> FancyZeroKnowledge<F2> for ProverTraverser<VOLE, P>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
+    fn witness(&mut self, _: &mut Channel) -> Result<Self::Item> {
+        let f = self.next_witness_value()?;
+        let vole = self.next_vole()?;
+
+        // Private input gates don't define a polynomial that would contribute to the aggregated
+        // coefficients being computed
+        Ok(Wire(f, vole))
+    }
+
     fn assert_zero(&mut self, value: &Self::Item, _: &mut Channel) -> Result<()> {
         let challenge = self.chi_challenge.next();
         self.aggregate_assert_zero += challenge * value.1;
@@ -313,8 +321,12 @@ impl<VOLE: RandomVoleP> FancyZeroKnowledge for ProverTraverser<VOLE> {
     }
 }
 
-impl<VOLE: RandomVoleP> HigherDegreeBackend<F2, F128b> for ProverTraverser<VOLE> {
-    type HigherDegreeWire = CommitmentPolynomialProver<F2, F128b>;
+impl<Vole: RandomVoleP<Params = P>, P: Params> HigherDegreeBackend<F2, P::FLambda>
+    for ProverTraverser<Vole, P>
+where
+    F2: IsSubFieldOf<P::FLambda>,
+{
+    type HigherDegreeWire = CommitmentPolynomialProver<F2, P::FLambda>;
 
     fn h_add(
         &self,
@@ -372,12 +384,14 @@ impl<VOLE: RandomVoleP> HigherDegreeBackend<F2, F128b> for ProverTraverser<VOLE>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parameters::Binary128Bit;
     use merlin::Transcript;
     use rand::rng;
 
     use crate::vole::insecure::InsecureVole;
+    use swanky_field_binary::F128b;
 
-    type Traverser = ProverTraverser<InsecureVole>;
+    type Traverser = ProverTraverser<InsecureVole<Binary128Bit>, Binary128Bit>;
 
     fn test_traverser(chi: F128b, max_higher_degree: usize) -> Traverser {
         let rng = &mut rng();

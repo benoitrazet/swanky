@@ -4,12 +4,13 @@ use swanky_error::Result;
 use swanky_sieve_ir_api::{
     CircuitExecuter, CircuitResult, FieldBackend, HigherDegreeBackend, HigherDegreeCircuitExecuter,
 };
+use swanky_field_binary::F2;
 
 pub struct ExampleCircuit<const N: usize>;
 
-impl<F: FancyBinary + FancyZeroKnowledge, const N: usize> Circuit<F> for ExampleCircuit<N> {
+impl<F: FancyBinary + FancyZeroKnowledge<F2>, const N: usize> Circuit<F> for ExampleCircuit<N> {
     type Input = ();
-    type Output = Vec<F::Item>; // TODO: Should be `()`.
+    type Output = ();
 
     fn execute(
         &self,
@@ -45,6 +46,7 @@ impl<const N: usize> HigherDegreeCircuitExecuter<F2, F128b> for ExampleCircuit<N
 impl<const N: usize> CircuitExecuter<F2> for ExampleCircuit<N> {
     fn execute<B: FieldBackend<F2>>(&self, backend: &mut B) -> CircuitResult<()> {
         let mut v = backend.input_private()?;
+        let mut v = backend.witness(channel)?;
 
         // N additions
         for _ in 0..N {
@@ -58,6 +60,6 @@ impl<const N: usize> CircuitExecuter<F2> for ExampleCircuit<N> {
 
         // backend.assert_zero(&v2)?;
 
-        Ok(vec![])
+        Ok(())
     }
 }

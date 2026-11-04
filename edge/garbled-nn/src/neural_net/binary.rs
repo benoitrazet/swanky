@@ -11,10 +11,11 @@ use fancy_circuits::{
         BinaryMultiplex, BinaryMultiplexConstantBits, BinaryMultiplicationLowerHalf,
     },
 };
-use fancy_traits::{Circuit, FancyBinary};
+use fancy_traits::{Circuit, FancyBinary, FancyConstant};
 use ndarray::Array3;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
+use swanky_field_binary::F2;
 
 /// [`NeuralNet`] evaluator for binary circuit representations of the neural
 /// network.
@@ -24,7 +25,7 @@ pub(crate) struct BinaryNeuralNet<'a, F> {
     secret_weights_owned: bool,
 }
 
-impl<'a, F: FancyBinary + BinaryGadgets> BinaryNeuralNet<'a, F> {
+impl<'a, F: FancyBinary + FancyConstant<F2> + BinaryGadgets> BinaryNeuralNet<'a, F> {
     /// Create a new `BinaryNeuralNet` for the provided backend and using the
     /// specified bitwidths for each layer of the neural net.
     ///
@@ -79,6 +80,7 @@ impl<'a, F: FancyBinary + BinaryGadgets> BinaryNeuralNet<'a, F> {
         let mut result = Vec::with_capacity(output.len());
         for out in output.iter() {
             let vals = out
+                .wires()
                 .iter()
                 .map(|v| self.backend.output(v, channel))
                 .collect::<Result<Vec<_>>>()?;
@@ -151,7 +153,7 @@ impl<'a, F: BinaryGadgets> BinaryLayer<'a, F> {
     }
 }
 
-impl<'a, F: FancyBinary + BinaryGadgets> FancyNeuralNet for BinaryLayer<'a, F> {
+impl<'a, F: FancyBinary + FancyConstant<F2> + BinaryGadgets> FancyNeuralNet for BinaryLayer<'a, F> {
     type Item = BinaryBundle<F::Item>;
 
     fn nn_encode(&mut self, value: i64, channel: &mut Channel) -> Result<BinaryBundle<F::Item>> {

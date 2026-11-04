@@ -58,7 +58,7 @@
 //! ```
 
 use crate::authbits::{AuthBit, AuthBitGenerator};
-use rand::{CryptoRng, Rng, RngExt};
+use rand::{CryptoRng, RngExt};
 use std::{iter::Copied, slice::Iter};
 use swanky_channel::Channel;
 use swanky_field::FiniteRing;
@@ -180,16 +180,13 @@ pub struct AuthShareGenerator<P: GenericParty> {
 
 impl<P: GenericParty> AuthShareGenerator<P> {
     /// Create a new [`AuthShareGenerator`].
-    pub fn new<RNG: CryptoRng + Rng>(
-        channel: &mut Channel,
-        mut rng: RNG,
-    ) -> swanky_error::Result<Self> {
+    pub fn new<RNG: CryptoRng>(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self> {
         let delta = rng.random::<U8x16>();
         Self::new_with_delta(delta, channel, rng)
     }
 
     /// Create a new [`AuthShareGenerator`] with a supplied $`\Delta`$ value.
-    pub fn new_with_delta<RNG: CryptoRng + Rng>(
+    pub fn new_with_delta<RNG: CryptoRng>(
         delta: U8x16,
         channel: &mut Channel,
         mut rng: RNG,
@@ -225,7 +222,7 @@ impl<P: GenericParty> AuthShareGenerator<P> {
     /// Generate a vector of authenticated shares.
     ///
     /// The `nshares` generated shares are [`Vec::extend`]ed into `shares`.
-    pub fn generate<RNG: CryptoRng + Rng>(
+    pub fn generate<RNG: CryptoRng>(
         &mut self,
         nshares: usize,
         shares: &mut Vec<AuthShare<P>>,
@@ -573,11 +570,16 @@ mod tests {
         let mut output_a: Vec<AuthShare<PartyA>> = vec![];
         let mut output_b: Vec<AuthShare<PartyB>> = vec![];
         swanky_channel::local::local_channel_pair(
-            |c| generator_a.generate(nshares, &mut output_a, c, &mut rng_a),
-            |c| generator_b.generate(nshares, &mut output_b, c, &mut rng_b),
+            |c| {
+                generator_a.generate(nshares, &mut output_a, c, &mut rng_a)?;
+                Ok(output_a)
+            },
+            |c| {
+                generator_b.generate(nshares, &mut output_b, c, &mut rng_b)?;
+                Ok(output_b)
+            },
         )
-        .unwrap();
-        (output_a, output_b)
+        .unwrap()
     }
 
     /// Open vectors of `AuthShare`s using their associated generators.
