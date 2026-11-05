@@ -19,6 +19,7 @@ use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::{F2, F8b};
 use swanky_sieve_ir_api::HigherDegreeCircuitExecuter;
 
+use crate::vole::commit_reconstruct::l_hat;
 use crate::vole::functionality::{VoleProver, VoleVerifier};
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
@@ -91,22 +92,18 @@ where
             + partial_decommitment_size
     }
 
-    /// The number of base VOLE correlations the proof commits to in order to encode the circuit:
-    /// one per extended-witness value (private inputs and multiplication gate outputs), plus the
-    /// higher degree mask VOLEs (see
-    /// [`BatchProverAccumulatorF2F128b::mask_vole_count`]) for the maximum constraint degree.
+    /// Number of VOLE correlations.
     ///
-    /// This excludes the fixed protocol overhead (the aggregate-commitment masks and the
-    /// [`SECURITY_PARAM`] consistency VOLEs), which is identical regardless of how the circuit is
-    /// encoded, so it isolates the cost that the higher degree gate is meant to reduce.
-    ///
-    /// The higher degree commitment's [`ZeroPolynomialCoefficients::max_degree`] is the maximum
-    /// degree passed to [`BatchProverAccumulatorF2F128b::mask_vole_count`].
+    /// It counts for the extended witness (private inputs and multiplication gate outputs),
+    /// higher degree masks determined by the maximum constraint degree,
+    /// aggregate commitment masks, and consistency-check padding.
     pub fn num_voles(&self) -> usize {
         let mask_vole_count = BatchProverAccumulatorF2FLambda::<VoleP::Params>::mask_vole_count(
             self.higher_degree_commitment.max_degree(),
         );
-        self.witness_commitment.len() + mask_vole_count
+        let extended_witness_length = self.witness_commitment.len() + mask_vole_count;
+        // get the aggregate commitment masks, and consistency-check padding with `l_hat`
+        l_hat::<P>(extended_witness_length)
     }
 
     /// Create a proof of knowledge of a witness that satisfies the given circuit.
