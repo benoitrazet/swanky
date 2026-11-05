@@ -8,7 +8,6 @@ use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
 use crate::commitment_polynomial::{
     BatchVerifierAccumulatorF2FLambda, CommitmentPolynomialVerifier,
 };
-
 use crate::parameters::{FLambda, Params};
 use crate::proof::ChiGenerator;
 

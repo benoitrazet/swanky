@@ -4,10 +4,9 @@ use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F2;
 use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
-
-use crate::commitment_polynomial::{BatchProverAccumulatorF2FLambda, CommitmentPolynomialProver};
 use swanky_sieve_ir_parser::WireId;
 
+use crate::commitment_polynomial::{BatchProverAccumulatorF2FLambda, CommitmentPolynomialProver};
 use crate::parameters::{FLambda, Params};
 use crate::proof::ChiGenerator;
 use crate::vole::RandomVoleP;
