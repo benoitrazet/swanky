@@ -1,6 +1,6 @@
-# Higher-Degree Polynomial Commitments
+# Higher-Degree VOLE Commitments
 
-Below is a description of the VOLE-based polynomial commitments and batched constraint check used for higher-degree gates in Schmivitz, following [2026-Agarwal-Baum-Braun-Scholl].
+Below is a description of the VOLE commitments and batched constraint check used for higher-degree gates in Schmivitz, following [2026-Agarwal-Baum-Braun-Scholl].
 
 ## Protocol setting
 
@@ -248,7 +248,7 @@ Schmivitz instantiates the construction with `F2` as the base field and `F128b` 
 
 `edge/sieve-ir-api` defines the cross-crate circuit interface: `HigherDegreeBackend` adds the four polynomial gate operations and higher-degree zero assertion, while `HigherDegreeCircuitExecuter` lets a circuit execute against any such backend.
 
-`src/commitment_polynomial` contains the protocol primitives: `CommitmentPolynomialProver` stores the
+`src/higher_degree_commitment` contains the protocol primitives: `CommitmentPolynomialProver` stores the
 prover's coefficients, while `CommitmentPolynomialVerifier` stores the verifier's evaluation and
 commitment degree. Both types implement the gate algebra.
 `batch_verification` implements generic streamed prover and verifier accumulators for mixed-degree

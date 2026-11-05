@@ -1,8 +1,8 @@
-//! Polynomial commitments from the
-//! [Commitment polynomials](crate::commitment_polynomial#commitment-polynomials) protocol.
+//! Commitment polynomials from the
+//! [Commitment polynomials](crate::higher_degree_commitment#commitment-polynomials) protocol.
 //!
 //! [`CommitmentPolynomialProver`] and [`CommitmentPolynomialVerifier`] implement the
-//! [gate operations](crate::commitment_polynomial#gate-by-gate-commitment-propagation).
+//! [gate operations](crate::higher_degree_commitment#gate-by-gate-commitment-propagation).
 
 use std::marker::PhantomData;
 
@@ -10,7 +10,7 @@ use swanky_field::{FiniteField, IsSubFieldOf};
 
 use super::power;
 
-/// The prover's [polynomial commitment](crate::commitment_polynomial#commitment-polynomials) to a value in `F`.
+/// The prover's [VOLE commitment](crate::higher_degree_commitment#commitment-polynomials) to a value in `F`.
 /// The highest-degree coefficient holds that value; lower coefficients in `FE` mask it.
 #[derive(Clone, Debug)]
 pub struct CommitmentPolynomialProver<F: FiniteField, FE: FiniteField>
@@ -85,11 +85,11 @@ where
 
         let shift1 = d - d1;
         for (i, c) in self.lower_coefficients.iter().enumerate() {
-            lower[i + shift1] = lower[i + shift1] + *c;
+            lower[i + shift1] += *c;
         }
         let shift2 = d - d2;
         for (i, c) in other.lower_coefficients.iter().enumerate() {
-            lower[i + shift2] = lower[i + shift2] + *c;
+            lower[i + shift2] += *c;
         }
 
         Self {
@@ -116,14 +116,14 @@ where
 
         for (i, a) in self.lower_coefficients.iter().enumerate() {
             for (j, b) in other.lower_coefficients.iter().enumerate() {
-                lower[i + j] = lower[i + j] + *a * *b;
+                lower[i + j] += *a * *b;
             }
         }
         for (j, b) in other.lower_coefficients.iter().enumerate() {
-            lower[d1 + j] = lower[d1 + j] + self.highest_degree * *b;
+            lower[d1 + j] += self.highest_degree * *b;
         }
         for (i, a) in self.lower_coefficients.iter().enumerate() {
-            lower[i + d2] = lower[i + d2] + other.highest_degree * *a;
+            lower[i + d2] += other.highest_degree * *a;
         }
 
         Self {
@@ -133,7 +133,7 @@ where
     }
 }
 
-/// The verifier's [polynomial commitment](crate::commitment_polynomial#commitment-polynomials).
+/// The verifier's [VOLE commitment](crate::higher_degree_commitment#commitment-polynomials).
 /// Stores the evaluation at the verifier's key and the commitment degree.
 #[derive(Clone, Copy, Debug)]
 pub struct CommitmentPolynomialVerifier<F: FiniteField, FE: FiniteField>
@@ -149,7 +149,7 @@ impl<F: FiniteField, FE: FiniteField> CommitmentPolynomialVerifier<F, FE>
 where
     F: IsSubFieldOf<FE>,
 {
-    /// Create a degree-one commitment from a [base VOLE](crate::commitment_polynomial#base-vole) tag.
+    /// Create a degree-one commitment from a [base VOLE](crate::higher_degree_commitment#base-vole) tag.
     pub fn from_base_vole(tag: FE) -> Self {
         Self {
             evaluation: tag,
@@ -179,7 +179,7 @@ where
     }
 
     /// Add a constant, using `delta` to update the committed value's contribution.
-    /// See the [gate operations](crate::commitment_polynomial#gate-by-gate-commitment-propagation).
+    /// See the [gate operations](crate::higher_degree_commitment#gate-by-gate-commitment-propagation).
     pub fn addc(&self, c: F, delta: FE) -> Self {
         Self {
             evaluation: self.evaluation + c * power(delta, self.degree),
@@ -188,7 +188,7 @@ where
     }
 
     /// Add two commitment evaluations, aligning to the maximum degree using `delta`.
-    /// See the [gate operations](crate::commitment_polynomial#gate-by-gate-commitment-propagation).
+    /// See the [gate operations](crate::higher_degree_commitment#gate-by-gate-commitment-propagation).
     pub fn add(&self, other: &Self, delta: FE) -> Self {
         let degree = self.degree.max(other.degree);
         Self {
@@ -220,8 +220,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::test_runner::TestCaseResult;
     use proptest::prelude::*;
+    use proptest::test_runner::TestCaseResult;
     use rand::SeedableRng;
     use rand::rng;
     use swanky_field::FiniteRing;
@@ -232,25 +232,22 @@ mod tests {
     fn pow_fe<FE: FiniteField>(base: FE, exp: usize) -> FE {
         let mut result = FE::ONE;
         for _ in 0..exp {
-            result = result * base;
+            result *= base;
         }
         result
     }
 
     /// Reference polynomial evaluation independent of `evaluate_at_point`'s Horner
     /// implementation: cross-checks correctness by recomputing the sum directly.
-    fn eval_reference<F: FiniteField, FE: FiniteField>(
-        poly: &CommitmentPolynomialProver<F, FE>,
-        point: FE,
-    ) -> FE
+    fn eval_reference<F, FE: FiniteField>(poly: &CommitmentPolynomialProver<F, FE>, point: FE) -> FE
     where
-        F: IsSubFieldOf<FE>,
+        F: FiniteField + IsSubFieldOf<FE>,
     {
         let mut acc = FE::ZERO;
         let mut p = FE::ONE;
         for c in poly.lower_coefficients() {
-            acc = acc + *c * p;
-            p = p * point;
+            acc += *c * p;
+            p *= point;
         }
         acc + Into::<FE>::into(poly.highest_degree()) * p
     }
@@ -282,9 +279,9 @@ mod tests {
         assert_eq!(poly.degree(), 2);
     }
 
-    fn evaluate_at_point_horner<F: FiniteField, FE: FiniteField>(seed: [u8; 16]) -> TestCaseResult
+    fn evaluate_at_point_horner<F, FE: FiniteField>(seed: [u8; 16]) -> TestCaseResult
     where
-        F: IsSubFieldOf<FE>,
+        F: FiniteField + IsSubFieldOf<FE>,
     {
         let mut rng = SwankyRng::from_seed(seed.into());
         let value = F::random(&mut rng);
@@ -308,12 +305,12 @@ mod tests {
         }
     }
 
-    fn evaluate_at_point_matches_reference<F: FiniteField, FE: FiniteField>(
+    fn evaluate_at_point_matches_reference<F, FE: FiniteField>(
         seed: [u8; 16],
         degree: usize,
     ) -> TestCaseResult
     where
-        F: IsSubFieldOf<FE>,
+        F: FiniteField + IsSubFieldOf<FE>,
     {
         let mut rng = SwankyRng::from_seed(seed.into());
         let lower = (0..degree).map(|_| FE::random(&mut rng)).collect();
@@ -344,12 +341,9 @@ mod tests {
         }
     }
 
-    fn addc_correctness<F: FiniteField, FE: FiniteField>(
-        seed: [u8; 16],
-        degree: usize,
-    ) -> TestCaseResult
+    fn addc_correctness<F, FE: FiniteField>(seed: [u8; 16], degree: usize) -> TestCaseResult
     where
-        F: IsSubFieldOf<FE>,
+        F: FiniteField + IsSubFieldOf<FE>,
     {
         let mut rng = SwankyRng::from_seed(seed.into());
         let lower = (0..degree).map(|_| FE::random(&mut rng)).collect();
@@ -415,13 +409,13 @@ mod tests {
         );
     }
 
-    fn add_correctness<F: FiniteField, FE: FiniteField>(
+    fn add_correctness<F, FE: FiniteField>(
         seed: [u8; 16],
         degree_a: usize,
         degree_b: usize,
     ) -> TestCaseResult
     where
-        F: IsSubFieldOf<FE>,
+        F: FiniteField + IsSubFieldOf<FE>,
     {
         prop_assume!(degree_a != degree_b);
         let mut rng = SwankyRng::from_seed(seed.into());
@@ -475,12 +469,9 @@ mod tests {
         }
     }
 
-    fn mulc_correctness<F: FiniteField, FE: FiniteField>(
-        seed: [u8; 16],
-        degree: usize,
-    ) -> TestCaseResult
+    fn mulc_correctness<F, FE: FiniteField>(seed: [u8; 16], degree: usize) -> TestCaseResult
     where
-        F: IsSubFieldOf<FE>,
+        F: FiniteField + IsSubFieldOf<FE>,
     {
         let mut rng = SwankyRng::from_seed(seed.into());
         let lower = (0..degree).map(|_| FE::random(&mut rng)).collect();
@@ -523,13 +514,13 @@ mod tests {
         }
     }
 
-    fn mul_correctness<F: FiniteField, FE: FiniteField>(
+    fn mul_correctness<F, FE: FiniteField>(
         seed: [u8; 16],
         degree_a: usize,
         degree_b: usize,
     ) -> TestCaseResult
     where
-        F: IsSubFieldOf<FE>,
+        F: FiniteField + IsSubFieldOf<FE>,
     {
         let mut rng = SwankyRng::from_seed(seed.into());
         let lower_a = (0..degree_a).map(|_| FE::random(&mut rng)).collect();

@@ -6,7 +6,9 @@ use swanky_field_binary::F2;
 use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
 use swanky_sieve_ir_parser::WireId;
 
-use crate::commitment_polynomial::{BatchProverAccumulatorF2FLambda, CommitmentPolynomialProver};
+use crate::higher_degree_commitment::{
+    BatchProverAccumulatorF2FLambda, CommitmentPolynomialProver,
+};
 use crate::parameters::{FLambda, Params};
 use crate::proof::ChiGenerator;
 use crate::vole::RandomVoleP;

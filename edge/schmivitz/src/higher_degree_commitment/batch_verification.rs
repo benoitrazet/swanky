@@ -1,5 +1,5 @@
 //! Batch constraint verification from the
-//! [Batched verification](crate::commitment_polynomial#batched-verification) protocol.
+//! [Batched verification](crate::higher_degree_commitment#batched-verification) protocol.
 //!
 //! [`BatchProverAccumulator`] builds the masked polynomial $`\pi(t)`$ (step 6), and
 //! [`BatchVerifierAccumulator`] checks it at $`\Delta`$ (step 7).

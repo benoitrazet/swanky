@@ -22,7 +22,7 @@ use crate::vole::commit_reconstruct::l_hat;
 use crate::vole::functionality::{VoleProver, VoleVerifier};
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
-    commitment_polynomial::{
+    higher_degree_commitment::{
         BatchProverAccumulatorF2FLambda, BatchVerifierAccumulatorF2FLambda,
         batch_verification::ZeroPolynomialCoefficients,
     },
@@ -261,9 +261,9 @@ where
     }
 
     /// Create a proof for a circuit using the higher degree circuit API.
-    pub fn prove_higher_degree<'a, C, RNG>(
+    pub fn prove_higher_degree<C, RNG>(
         circuit: &C,
-        private_input: &'a [F2],
+        private_input: &[F2],
         witness_size: Option<usize>,
         transcript: &mut Transcript,
         rng: &mut RNG,

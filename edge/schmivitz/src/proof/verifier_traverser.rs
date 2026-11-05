@@ -5,7 +5,7 @@ use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F2;
 use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
 
-use crate::commitment_polynomial::{
+use crate::higher_degree_commitment::{
     BatchVerifierAccumulatorF2FLambda, CommitmentPolynomialVerifier,
 };
 use crate::parameters::{FLambda, Params};

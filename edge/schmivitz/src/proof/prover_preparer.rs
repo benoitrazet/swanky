@@ -199,7 +199,7 @@ impl<'a, FE> HigherDegreeBackend<F2, FE> for ProverPreparer<'a> {
     /// [`ProverTraverser`](crate::proof::prover_traverser::ProverTraverser) will build for the
     /// wire.
     ///
-    /// The degree rules mirror [`crate::commitment_polynomial::CommitmentPolynomialProver`]: input
+    /// The degree rules mirror [`crate::higher_degree_commitment::CommitmentPolynomialProver`]: input
     /// wires have degree 1, addition aligns to the larger degree, and multiplication sums the
     /// degrees.
     type HigherDegreeWire = usize;
