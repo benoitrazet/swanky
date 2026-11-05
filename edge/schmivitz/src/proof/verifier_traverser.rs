@@ -313,13 +313,13 @@ where
     fn assert_zero_higher_degree<const INPUT_LEN: usize>(
         &mut self,
         inputs: &[Self::Wire; INPUT_LEN],
-        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
+        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> CircuitResult<Self::HigherDegreeWire>,
     ) -> CircuitResult<()> {
         // Treat each masked witness as a degree-one verifier-side commitment.
         let constraint = f(
             self,
             std::array::from_fn(|i| CommitmentPolynomialVerifier::from_base_vole(inputs[i])),
-        );
+        )?;
 
         // Consume the next shared Fiat–Shamir weight and add this evaluation to the batch.
         let challenge = self.chi_challenge.next();

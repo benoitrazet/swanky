@@ -537,6 +537,7 @@ mod tests {
 
     use crate::{
         circuit::load_circuit_prover,
+        vole::functionality::{VoleProver, VoleVerifier},
         vole::insecure::{InsecureCommitments, InsecureVole},
     };
 
@@ -678,7 +679,7 @@ mod tests {
         Ok(())
     }
 
-    /// A hand-written circuit with a degree-4 constraint x0 * x1 * x2 * x3 == 0.
+    /// Ordinary gates interleaved with higher-degree constraints of degrees 1, 2, and 4.
     struct HigherDegreeCircuit<P>(PhantomData<P>);
 
     impl<P: Params> HigherDegreeCircuitExecuter<F2, FLambda<P>> for HigherDegreeCircuit<P> {
@@ -688,10 +689,14 @@ mod tests {
         ) -> CircuitResult<()> {
             let inputs = backend.inputs_private::<4>()?;
             backend.assert_zero_higher_degree(&inputs, |b, x| {
-                let x01 = b.h_mul(&x[0], &x[1]).unwrap();
-                let x23 = b.h_mul(&x[2], &x[3]).unwrap();
-                b.h_mul(&x01, &x23).unwrap()
+                let x01 = b.h_mul(&x[0], &x[1])?;
+                let x23 = b.h_mul(&x[2], &x[3])?;
+                b.h_mul(&x01, &x23)
             })?;
+            let product = backend.mul(&inputs[0], &inputs[2])?;
+            backend.assert_zero(&product)?;
+            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mul(&x[0], &x[2]))?;
+            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mulc(&x[2], F2::ONE))?;
             Ok(())
         }
     }
@@ -707,10 +712,10 @@ mod tests {
 
         let circuit = HigherDegreeCircuit::<P>(PhantomData);
 
-        let proof = Proof::<InsecureVole<P>, InsecureCommitments<P>>::prove_higher_degree(
+        let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove_higher_degree(
             &circuit,
             &private_input,
-            Some(4),
+            Some(5),
             &mut transcript(),
             rng,
         )?;
@@ -733,10 +738,14 @@ mod tests {
         ) -> CircuitResult<()> {
             let inputs = backend.inputs_private::<4>()?;
             backend.assert_zero_higher_degree(&inputs, |b, x| {
-                let x01 = b.h_mul(&x[0], &x[1]).unwrap();
-                let x13 = b.h_mul(&x[1], &x[3]).unwrap();
-                b.h_mul(&x01, &x13).unwrap()
+                let x01 = b.h_mul(&x[0], &x[1])?;
+                let x13 = b.h_mul(&x[1], &x[3])?;
+                b.h_mul(&x01, &x13)
             })?;
+            let product = backend.mul(&inputs[0], &inputs[2])?;
+            backend.assert_zero(&product)?;
+            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mul(&x[0], &x[2]))?;
+            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mulc(&x[2], F2::ONE))?;
             Ok(())
         }
     }
@@ -749,10 +758,10 @@ mod tests {
         let rng = &mut rng();
 
         let circuit = HigherDegreeCircuit::<P>(PhantomData);
-        let proof = Proof::<InsecureVole<P>, InsecureCommitments<P>>::prove_higher_degree(
+        let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove_higher_degree(
             &circuit,
             &private_input,
-            Some(4),
+            Some(5),
             &mut transcript(),
             rng,
         )?;

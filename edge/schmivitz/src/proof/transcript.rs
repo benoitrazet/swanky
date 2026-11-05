@@ -123,7 +123,8 @@ impl Transcript<'_> {
     }
 }
 
-/// Iterator that derives Fiat–Shamir weights from a challenge.
+/// Derives successive powers of one Fiat–Shamir challenge, shared across constraint checks.
+/// These weights are correlated; the independent-weight batching bound does not apply unchanged.
 pub(crate) struct ChiGenerator<P: Params> {
     chi: FLambda<P>,
     power_of_chi: FLambda<P>,

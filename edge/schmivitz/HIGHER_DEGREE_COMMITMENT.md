@@ -248,6 +248,9 @@ Schmivitz instantiates the construction with `F2` as the base field and `F128b` 
 
 `edge/sieve-ir-api` defines the cross-crate circuit interface: `HigherDegreeBackend` adds the four polynomial gate operations and higher-degree zero assertion, while `HigherDegreeCircuitExecuter` lets a circuit execute against any such backend.
 
+Unlike step 5, Schmivitz uses successive powers of one Fiat–Shamir challenge, shared across ordinary and higher-degree checks.
+The paper's independent-weight batching bound therefore needs a separate justification for this adaptation.
+
 `src/higher_degree_commitment` contains the protocol primitives: `CommitmentPolynomialProver` stores the
 prover's coefficients, while `CommitmentPolynomialVerifier` stores the verifier's evaluation and
 commitment degree. Both types implement the gate algebra.

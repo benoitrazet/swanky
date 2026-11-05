@@ -82,9 +82,9 @@
 //!
 //!     let inps = backend.inputs_private::<4>()?;
 //!     backend.assert_zero_higher_degree(&inps, |b, x| {
-//!         let x01 = b.h_mul(&x[0], &x[1]).unwrap();
-//!         let x23 = b.h_mul(&x[2], &x[3]).unwrap();
-//!         b.h_mul(&x01, &x23).unwrap()
+//!         let x01 = b.h_mul(&x[0], &x[1])?;
+//!         let x23 = b.h_mul(&x[2], &x[3])?;
+//!         b.h_mul(&x01, &x23)
 //!     })?;
 //!     Ok(())
 //! }
@@ -181,12 +181,12 @@ pub trait HigherDegreeBackend<F, FE>: FieldBackend<F> {
 
     /// Assert that a higher degree constraint equals 0.
     ///
-    /// The constraint `f` receives a reference to the backend so it can apply the higher degree
-    /// gate operations to its wires.
+    /// The callback uses the higher degree gate operations and must describe the same
+    /// constraint for each backend; errors are propagated to the caller.
     fn assert_zero_higher_degree<const INPUT_LEN: usize>(
         &mut self,
         inputs: &[Self::Wire; INPUT_LEN],
-        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
+        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> CircuitResult<Self::HigherDegreeWire>,
     ) -> CircuitResult<()>;
 }
 

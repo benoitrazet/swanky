@@ -364,7 +364,7 @@ where
     fn assert_zero_higher_degree<const INPUT_LEN: usize>(
         &mut self,
         inputs: &[Self::Wire; INPUT_LEN],
-        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
+        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> CircuitResult<Self::HigherDegreeWire>,
     ) -> CircuitResult<()> {
         // Build the input commitments and evaluate the constraint over them.
         let constraint = f(
@@ -372,7 +372,7 @@ where
             std::array::from_fn(|i| {
                 CommitmentPolynomialProver::from_base_vole(inputs[i].0, inputs[i].1)
             }),
-        );
+        )?;
 
         // Consume the next shared Fiat–Shamir weight and add this constraint to the batch.
         let challenge = self.chi_challenge.next();
@@ -418,9 +418,9 @@ mod tests {
             std::array::from_fn(|i| (product_values[i], F128b::random(rng)));
         traverser
             .assert_zero_higher_degree(&product_wires, |b, x| {
-                let x01 = b.h_mul(&x[0], &x[1]).unwrap();
-                let x23 = b.h_mul(&x[2], &x[3]).unwrap();
-                b.h_mul(&x01, &x23).unwrap()
+                let x01 = b.h_mul(&x[0], &x[1])?;
+                let x23 = b.h_mul(&x[2], &x[3])?;
+                b.h_mul(&x01, &x23)
             })
             .unwrap();
 
@@ -430,9 +430,9 @@ mod tests {
             std::array::from_fn(|i| (sum_values[i], F128b::random(rng)));
         traverser
             .assert_zero_higher_degree(&sum_wires, |b, x| {
-                let x01 = b.h_mul(&x[0], &x[1]).unwrap();
-                let x23 = b.h_mul(&x[2], &x[3]).unwrap();
-                b.h_add(&x01, &x23).unwrap()
+                let x01 = b.h_mul(&x[0], &x[1])?;
+                let x23 = b.h_mul(&x[2], &x[3])?;
+                b.h_add(&x01, &x23)
             })
             .unwrap();
 

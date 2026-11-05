@@ -231,12 +231,11 @@ impl<'a, FE> HigherDegreeBackend<F2, FE> for ProverPreparer<'a> {
     fn assert_zero_higher_degree<const INPUT_LEN: usize>(
         &mut self,
         _: &[Self::Wire; INPUT_LEN],
-        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
+        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> CircuitResult<Self::HigherDegreeWire>,
     ) -> CircuitResult<()> {
-        self.challenge_count += 1;
-
         // Each input wire starts at degree one during polynomial traversal.
-        let degree = f(self, [1; INPUT_LEN]);
+        let degree = f(self, [1; INPUT_LEN])?;
+        self.challenge_count += 1;
         self.max_higher_degree = self.max_higher_degree.max(degree);
         Ok(())
     }
@@ -405,9 +404,9 @@ mod tests {
 
         // x0 * x1 * x2 * x3, a degree-4 constraint.
         preparer.assert_zero_higher_degree(&wires, |b, x| {
-            let x01 = b.h_mul(&x[0], &x[1]).unwrap();
-            let x23 = b.h_mul(&x[2], &x[3]).unwrap();
-            b.h_mul(&x01, &x23).unwrap()
+            let x01 = b.h_mul(&x[0], &x[1])?;
+            let x23 = b.h_mul(&x[2], &x[3])?;
+            b.h_mul(&x01, &x23)
         })?;
 
         Ok(())
@@ -420,9 +419,9 @@ mod tests {
 
         // x0 * x1 + x2 * x3, a degree-2 constraint.
         preparer.assert_zero_higher_degree(&wires, |b, x| {
-            let x01 = b.h_mul(&x[0], &x[1]).unwrap();
-            let x23 = b.h_mul(&x[2], &x[3]).unwrap();
-            b.h_add(&x01, &x23).unwrap()
+            let x01 = b.h_mul(&x[0], &x[1])?;
+            let x23 = b.h_mul(&x[2], &x[3])?;
+            b.h_add(&x01, &x23)
         })?;
 
         Ok(())
