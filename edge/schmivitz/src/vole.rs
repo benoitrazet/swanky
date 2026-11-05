@@ -19,22 +19,14 @@ use swanky_field_binary::{F2, F8b};
 
 use crate::parameters::{FLambda, MaskLength, Params, RepetitionParam, SecurityParamBytes};
 
-/// Combine field elements using a fixed basis of an extension field.
-///
-/// Implementations choose an `F`-basis $(b_0,\ldots,b_{r-1})$ of `FE`, with
-/// $r$ specified by [`Self::BasisSize`]. Both methods compute $\sum_{k=0}^{r-1}z_k b_k$:
-/// [`Self::combine_base`] takes coordinates in `F`, while [`Self::combine_extension`]
-/// uses the same basis weights with coefficients in `FE`.
-///
-/// Both methods require arrays of size [`Self::BasisSize`]. The extension-field
-/// combination must be `FE`-linear and agree with the base-field combination on embedded
-/// inputs.
+/// Combine field elements using a fixed `F`-basis of `FE`.
+/// Both methods use the same basis weights; `combine_extension` must be `FE`-linear.
 pub trait ExtensionFieldLifter<F, FE>
 where
     F: FiniteField + IsSubFieldOf<FE>,
     FE: FiniteField,
 {
-    /// Array size equal to the dimension of `FE` over `F`.
+    /// Basis size, equal to the dimension of `FE` over `F`.
     type BasisSize: ArraySize;
 
     /// Combine [`Self::BasisSize`] base-field coordinates into one extension-field value.
