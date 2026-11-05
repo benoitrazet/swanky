@@ -1,22 +1,42 @@
-use crate::{
-    fancy::bundle::{Bundle, BundleGadgets},
-    util::{self, u128_from_bits},
-};
+use crate::util::{self, u128_from_bits};
 use fancy_plaintext::{Dummy, DummyVal};
-use fancy_traits::{FancyBinary, FancyEncode, FancyOutput};
-use std::ops::{Deref, DerefMut};
+use fancy_traits::{FancyEncode, FancyOutput, FancyReceive};
 use swanky_channel::Channel;
+use swanky_error::Result;
 use swanky_field_binary::F2;
 
 /// Bundle which is explicitly binary representation.
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct BinaryBundle<W>(Bundle<W>);
+pub struct BinaryBundle<W>(Vec<W>);
 
 impl<W> BinaryBundle<W> {
     /// Create a new binary bundle from a vector of wires.
     pub fn new(ws: Vec<W>) -> BinaryBundle<W> {
-        BinaryBundle(Bundle::new(ws))
+        BinaryBundle(ws)
+    }
+
+    /// The internal vector of wires contained in the [`BinaryBundle`].
+    pub fn wires(&self) -> &[W] {
+        &self.0
+    }
+
+    /// Returns the number of wires in the [`BinaryBundle`].
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Returns `true` if the [`BinaryBundle`] contains no wires.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub(crate) fn reverse(&mut self) {
+        self.0.reverse();
+    }
+
+    pub(crate) fn push(&mut self, value: W) {
+        self.0.push(value)
     }
 }
 
@@ -33,47 +53,26 @@ impl From<(u128, usize)> for BinaryBundle<DummyVal<F2>> {
 
 impl From<BinaryBundle<DummyVal<F2>>> for u128 {
     fn from(value: BinaryBundle<DummyVal<F2>>) -> Self {
-        let bin = value.wires().iter().map(|w| w.val()).collect::<Vec<_>>();
+        let bin = value.0.iter().map(|w| w.val()).collect::<Vec<_>>();
         u128_from_bits(&bin)
     }
 }
 
-impl<W> Deref for BinaryBundle<W> {
-    type Target = Bundle<W>;
+impl<F: FancyEncode<F2>> BinaryEncode for F {}
+impl<F: FancyReceive<F2>> BinaryReceive for F {}
+impl<F: FancyOutput<F2>> BinaryOutput for F {}
 
-    fn deref(&self) -> &Bundle<W> {
-        &self.0
-    }
-}
-
-impl<W> DerefMut for BinaryBundle<W> {
-    fn deref_mut(&mut self) -> &mut Bundle<W> {
-        &mut self.0
-    }
-}
-
-impl<F: FancyBinary + FancyEncode<F2> + FancyOutput<F2>> BinaryGadgets for F {}
-
-/// Extension trait for `Fancy` providing gadgets that operate over bundles of mod2 wires.
-pub trait BinaryGadgets: BundleGadgets + FancyEncode<F2> {
+/// Extension trait for `Fancy` providing encode gadgets over bundles of wires.
+pub trait BinaryEncode: FancyEncode<F2> {
     /// Encode a binary input bundle.
     fn bin_encode(
         &mut self,
         value: u128,
         nbits: usize,
         channel: &mut Channel,
-    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
+    ) -> Result<BinaryBundle<Self::Item>> {
         let xs = util::u128_to_bits(value, nbits);
         self.encode_many(&xs, channel).map(BinaryBundle::new)
-    }
-
-    /// Receive an binary input bundle.
-    fn bin_receive(
-        &mut self,
-        nbits: usize,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
-        self.receive_many(nbits, channel).map(BinaryBundle::new)
     }
 
     /// Encode many binary input bundles.
@@ -82,7 +81,7 @@ pub trait BinaryGadgets: BundleGadgets + FancyEncode<F2> {
         values: &[u128],
         nbits: usize,
         channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<BinaryBundle<Self::Item>>> {
+    ) -> Result<Vec<BinaryBundle<Self::Item>>> {
         let xs = values
             .iter()
             .flat_map(|x| util::u128_to_bits(*x, nbits))
@@ -96,6 +95,18 @@ pub trait BinaryGadgets: BundleGadgets + FancyEncode<F2> {
             .collect::<Vec<_>>();
         Ok(buns)
     }
+}
+
+/// Extension trait for `Fancy` providing receive gadgets over bundles of wires.
+pub trait BinaryReceive: FancyReceive<F2> {
+    /// Receive an binary input bundle.
+    fn bin_receive(
+        &mut self,
+        nbits: usize,
+        channel: &mut Channel,
+    ) -> Result<BinaryBundle<Self::Item>> {
+        self.receive_many(nbits, channel).map(BinaryBundle::new)
+    }
 
     /// Receive many binary input bundles.
     fn bin_receive_many(
@@ -103,7 +114,7 @@ pub trait BinaryGadgets: BundleGadgets + FancyEncode<F2> {
         ninputs: usize,
         nbits: usize,
         channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<BinaryBundle<Self::Item>>> {
+    ) -> Result<Vec<BinaryBundle<Self::Item>>> {
         let mut wires = self.receive_many(ninputs * nbits, channel)?;
         let buns = (0..ninputs)
             .map(|_| {
@@ -113,16 +124,21 @@ pub trait BinaryGadgets: BundleGadgets + FancyEncode<F2> {
             .collect::<Vec<_>>();
         Ok(buns)
     }
+}
 
+/// Extension trait for `Fancy` providing output gadgets over bundles of wires.
+pub trait BinaryOutput: FancyOutput<F2> {
     /// Output a binary bundle and interpret the result as a `u128`.
     fn bin_output(
         &mut self,
         x: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
-    ) -> swanky_error::Result<Option<u128>> {
-        Ok(self
-            .output_bundle(x, channel)?
-            .map(|bs| util::u128_from_bits(&bs)))
+    ) -> Result<Option<u128>> {
+        let bits =
+            x.0.iter()
+                .map(|wire| self.output(wire, channel))
+                .collect::<Result<Option<Vec<_>>>>()?;
+        Ok(bits.map(|bits| util::u128_from_bits(&bits)))
     }
 
     /// Output a slice of binary bundles and interpret the results as a `u128`.
@@ -130,7 +146,7 @@ pub trait BinaryGadgets: BundleGadgets + FancyEncode<F2> {
         &mut self,
         xs: &[BinaryBundle<Self::Item>],
         channel: &mut Channel,
-    ) -> swanky_error::Result<Option<Vec<u128>>> {
+    ) -> Result<Option<Vec<u128>>> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             let z = self.bin_output(x, channel)?;

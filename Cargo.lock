@@ -2231,6 +2231,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-channel-tracking"
+version = "0.6.0"
+dependencies = [
+ "swanky-channel",
+ "swanky-error",
+]
+
+[[package]]
 name = "swanky-cointoss"
 version = "0.6.0"
 dependencies = [
@@ -2385,32 +2393,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-garbled-nn"
-version = "0.6.0"
-dependencies = [
- "clap",
- "criterion",
- "fancy-analyzer",
- "fancy-circuits",
- "fancy-garbling",
- "fancy-plaintext",
- "fancy-traits",
- "itertools 0.15.0",
- "ndarray",
- "rand",
- "serde",
- "serde_json",
- "swanky-channel",
- "swanky-error",
- "swanky-field-binary",
- "swanky-ot-iknp",
- "swanky-ot-traits-new",
- "swanky-rng",
- "swanky-twopac",
- "vectoreyes",
-]
-
-[[package]]
 name = "swanky-malicious-hooks"
 version = "0.6.0"
 
@@ -2422,13 +2404,15 @@ dependencies = [
  "swanky-adversary",
  "swanky-bit-matrix-transpose",
  "swanky-block",
- "swanky-channel-legacy",
+ "swanky-channel",
+ "swanky-channel-tracking",
  "swanky-cointoss",
  "swanky-error",
  "swanky-field-binary",
  "swanky-oprf-traits",
- "swanky-ot-alsz-kos",
- "swanky-ot-traits",
+ "swanky-ot-iknp",
+ "swanky-ot-traits-new",
+ "swanky-party",
  "swanky-rng",
  "swanky-serialization",
  "vectoreyes",
@@ -2442,7 +2426,8 @@ dependencies = [
  "rand",
  "swanky-adversary",
  "swanky-block",
- "swanky-channel-legacy",
+ "swanky-channel",
+ "swanky-channel-tracking",
  "swanky-error",
  "swanky-oprf-kkrt",
  "swanky-oprf-traits",
@@ -2455,7 +2440,7 @@ name = "swanky-oprf-traits"
 version = "0.6.0"
 dependencies = [
  "rand",
- "swanky-channel-legacy",
+ "swanky-channel",
  "swanky-error",
 ]
 
