@@ -6,6 +6,8 @@
 
 use std::marker::PhantomData;
 
+use hybrid_array::Array;
+use hybrid_array::typenum::Unsigned;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{FiniteField, IsSubFieldOf};
 
@@ -75,7 +77,7 @@ where
 
     /// Return the number of base VOLEs composed into one extension-field mask (step 3).
     pub fn mask_vole_size() -> usize {
-        L::BASIS_SIZE
+        L::BasisSize::USIZE
     }
 
     /// Return the number of base VOLEs needed to mask a batch of degree `max_degree` (steps 2–3).
@@ -164,9 +166,9 @@ where
         let mut pi = self.aggregate[..degree].to_vec();
 
         // Organize the flat streams into per-mask blocks and compose each into a full-field mask.
-        let values_blocks = mask_values.chunks_exact(mask_vole_size);
-        let masks_blocks = mask_masks.chunks_exact(mask_vole_size);
-        for (j, (values, masks)) in values_blocks.zip(masks_blocks).enumerate() {
+        let (values_blocks, _) = Array::<F, L::BasisSize>::slice_as_chunks(mask_values);
+        let (masks_blocks, _) = Array::<FE, L::BasisSize>::slice_as_chunks(mask_masks);
+        for (j, (values, masks)) in values_blocks.iter().zip(masks_blocks).enumerate() {
             // Compose the base-VOLE blocks into $\sigma_j(t)=w_j+s_jt$, then add
             // $t^{j-1}\sigma_j(t)$; `j` here is 0-based, corresponding to $j+1$ in the document.
             let s_j = L::combine_base(values);
@@ -213,7 +215,7 @@ where
 
     /// Return the number of base VOLEs composed into one extension-field mask (step 3).
     pub fn mask_vole_size() -> usize {
-        L::BASIS_SIZE
+        L::BasisSize::USIZE
     }
 
     /// Return the number of base VOLEs needed to mask a batch of degree `max_degree` (steps 2–3).
@@ -299,7 +301,8 @@ where
         // Mask contributions: $\sum_j\Delta^{j-1}\nu_j$, organizing the flat stream into per-mask
         // blocks and composing each into nu_j.
         let mut delta_power = FE::ONE;
-        for block in mask_tags.chunks_exact(mask_vole_size) {
+        let (tag_blocks, _) = Array::<FE, L::BasisSize>::slice_as_chunks(mask_tags);
+        for block in tag_blocks {
             expected += delta_power * L::combine_extension(block);
             delta_power *= delta;
         }
@@ -325,6 +328,7 @@ mod tests {
         parameters::Binary128Bit,
         vole::{ExtensionFieldLifterF2FLambda, combine},
     };
+    use hybrid_array::typenum::{U1, U16, U64};
     use proptest::{collection::vec, prelude::*, test_runner::TestCaseResult};
     use rand::{RngExt, SeedableRng};
     use swanky_field_binary::{F2, F8b, F64b, F128b};
@@ -333,26 +337,26 @@ mod tests {
     struct ExtensionFieldLifterF2F64b;
 
     impl ExtensionFieldLifter<F2, F64b> for ExtensionFieldLifterF2F64b {
-        const BASIS_SIZE: usize = 64;
+        type BasisSize = U64;
 
-        fn combine_base(values: &[F2]) -> F64b {
+        fn combine_base(values: &Array<F2, Self::BasisSize>) -> F64b {
             combine::<F2, F64b>(values)
         }
 
-        fn combine_extension(values: &[F64b]) -> F64b {
+        fn combine_extension(values: &Array<F64b, Self::BasisSize>) -> F64b {
             combine::<F64b, F64b>(values)
         }
     }
 
     struct ExtensionFieldLifterF8bF128b;
     impl ExtensionFieldLifter<F8b, F128b> for ExtensionFieldLifterF8bF128b {
-        const BASIS_SIZE: usize = 16;
+        type BasisSize = U16;
 
-        fn combine_base(values: &[F8b]) -> F128b {
+        fn combine_base(values: &Array<F8b, Self::BasisSize>) -> F128b {
             combine::<F8b, F128b>(values)
         }
 
-        fn combine_extension(values: &[F128b]) -> F128b {
+        fn combine_extension(values: &Array<F128b, Self::BasisSize>) -> F128b {
             combine::<F128b, F128b>(values)
         }
     }
@@ -374,11 +378,11 @@ mod tests {
 
     struct IdentityLifter;
     impl ExtensionFieldLifter<F128b, F128b> for IdentityLifter {
-        const BASIS_SIZE: usize = 1;
-        fn combine_base(values: &[F128b]) -> F128b {
+        type BasisSize = U1;
+        fn combine_base(values: &Array<F128b, Self::BasisSize>) -> F128b {
             values[0]
         }
-        fn combine_extension(values: &[F128b]) -> F128b {
+        fn combine_extension(values: &Array<F128b, Self::BasisSize>) -> F128b {
             values[0]
         }
     }
@@ -458,7 +462,7 @@ mod tests {
                 .contains("but the accumulator is configured for maximum degree")
         );
         let (values, masks, tags) =
-            vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BASIS_SIZE);
+            vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BasisSize::USIZE);
         let pi = prover.finish(&values, &masks).unwrap();
         prop_assert_eq!(pi.coefficients().len(), d);
         prop_assert_eq!(pi.max_degree(), d);
@@ -508,9 +512,10 @@ mod tests {
             let mut prover = BatchProverAccumulator::<F, FE, L>::new(d);
             let mut verifier = BatchVerifierAccumulator::<F, FE, L>::new(d);
             let (_, _, tags) =
-                vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BASIS_SIZE);
-            let mask: FE = tags
-                .chunks_exact(L::BASIS_SIZE)
+                vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BasisSize::USIZE);
+            let (tag_blocks, _) = Array::<FE, L::BasisSize>::slice_as_chunks(&tags);
+            let mask: FE = tag_blocks
+                .iter()
                 .enumerate()
                 .map(|(j, block)| spec_power(delta, j) * L::combine_extension(block))
                 .sum();
@@ -590,7 +595,7 @@ mod tests {
             verifier.push_constraint(&commitment, chi).unwrap();
         }
         let (values, masks, tags) =
-            vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BASIS_SIZE);
+            vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BasisSize::USIZE);
         let mut pi = prover.finish(&values, &masks).unwrap();
         prop_assert!(verifier.finish(delta, &tags, &pi).is_ok());
         pi.coefficients[coefficient % d] += FE::random_nonzero(rng);
@@ -683,7 +688,7 @@ mod tests {
         L: ExtensionFieldLifter<F, FE>,
     {
         for d in [0, 1, d] {
-            let n = d.saturating_sub(1) * L::BASIS_SIZE;
+            let n = d.saturating_sub(1) * L::BasisSize::USIZE;
             let values = vec![F::ZERO; n + 1];
             let masks = vec![FE::ZERO; n + 1];
             let pi = ZeroPolynomialCoefficients {
@@ -768,12 +773,15 @@ mod tests {
                     * spec_polynomial_evaluation(rho.lower_coefficients(), delta);
             }
             let (values, masks, tags) =
-                vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BASIS_SIZE);
+                vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BasisSize::USIZE);
             for j in 0..d.saturating_sub(1) {
-                let block = j * L::BASIS_SIZE..(j + 1) * L::BASIS_SIZE;
-                let s = L::combine_base(&values[block.clone()]);
-                let w = L::combine_extension(&masks[block.clone()]);
-                prop_assert_eq!(L::combine_extension(&tags[block]), w + s * delta);
+                let block = j * L::BasisSize::USIZE..(j + 1) * L::BasisSize::USIZE;
+                let s = L::combine_base((&values[block.clone()]).try_into().unwrap());
+                let w = L::combine_extension((&masks[block.clone()]).try_into().unwrap());
+                prop_assert_eq!(
+                    L::combine_extension((&tags[block]).try_into().unwrap()),
+                    w + s * delta
+                );
                 expected += spec_power(point, j) * (w + s * point);
                 expected_delta += spec_power(delta, j) * (w + s * delta);
             }

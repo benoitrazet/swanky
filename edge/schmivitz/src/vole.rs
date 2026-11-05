@@ -8,8 +8,7 @@
 pub(crate) mod insecure;
 
 use crypto_primitives::Chall3;
-use hybrid_array::Array;
-use hybrid_array::typenum::Unsigned;
+use hybrid_array::{Array, ArraySize};
 use merlin::Transcript;
 use rand::CryptoRng;
 use std::marker::PhantomData;
@@ -23,11 +22,11 @@ use crate::parameters::{FLambda, MaskLength, Params, RepetitionParam, SecurityPa
 /// Combine field elements using a fixed basis of an extension field.
 ///
 /// Implementations choose an `F`-basis $(b_0,\ldots,b_{r-1})$ of `FE`, with
-/// $r=\mathtt{BASIS\_SIZE}$. Both methods compute $\sum_{k=0}^{r-1}z_k b_k$:
+/// $r$ specified by [`Self::BasisSize`]. Both methods compute $\sum_{k=0}^{r-1}z_k b_k$:
 /// [`Self::combine_base`] takes coordinates in `F`, while [`Self::combine_extension`]
 /// uses the same basis weights with coefficients in `FE`.
 ///
-/// Both methods expect exactly [`Self::BASIS_SIZE`] input elements. The extension-field
+/// Both methods require arrays of size [`Self::BasisSize`]. The extension-field
 /// combination must be `FE`-linear and agree with the base-field combination on embedded
 /// inputs.
 pub trait ExtensionFieldLifter<F, FE>
@@ -35,14 +34,14 @@ where
     F: FiniteField + IsSubFieldOf<FE>,
     FE: FiniteField,
 {
-    /// Number of basis elements, equal to the dimension of `FE` over `F`.
-    const BASIS_SIZE: usize;
+    /// Array size equal to the dimension of `FE` over `F`.
+    type BasisSize: ArraySize;
 
-    /// Combine [`Self::BASIS_SIZE`] base-field coordinates into one extension-field value.
-    fn combine_base(values: &[F]) -> FE;
+    /// Combine [`Self::BasisSize`] base-field coordinates into one extension-field value.
+    fn combine_base(values: &Array<F, Self::BasisSize>) -> FE;
 
-    /// Combine [`Self::BASIS_SIZE`] extension-field elements using the same basis weights.
-    fn combine_extension(values: &[FE]) -> FE;
+    /// Combine [`Self::BasisSize`] extension-field elements using the same basis weights.
+    fn combine_extension(values: &Array<FE, Self::BasisSize>) -> FE;
 }
 
 /// Combine field elements using successive powers of the extension field's generator.
@@ -66,7 +65,7 @@ where
     acc
 }
 
-/// Power-basis lifting from `F2` to `F128b`.
+/// Power-basis lifting from `F2` to `P::FLambda`.
 pub(crate) struct ExtensionFieldLifterF2FLambda<P> {
     _phatom: PhantomData<P>,
 }
@@ -75,13 +74,13 @@ impl<P: Params> ExtensionFieldLifter<F2, P::FLambda> for ExtensionFieldLifterF2F
 where
     F2: IsSubFieldOf<P::FLambda>,
 {
-    const BASIS_SIZE: usize = MaskLength::<P>::USIZE;
+    type BasisSize = MaskLength<P>;
 
-    fn combine_base(values: &[F2]) -> P::FLambda {
+    fn combine_base(values: &Array<F2, Self::BasisSize>) -> P::FLambda {
         combine::<F2, P::FLambda>(values)
     }
 
-    fn combine_extension(values: &[P::FLambda]) -> P::FLambda {
+    fn combine_extension(values: &Array<P::FLambda, Self::BasisSize>) -> P::FLambda {
         combine::<P::FLambda, P::FLambda>(values)
     }
 }

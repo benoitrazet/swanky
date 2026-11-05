@@ -15,7 +15,6 @@ use std::time::Instant;
 use std::{iter::zip, marker::PhantomData};
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::IsSubFieldOf;
-use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::{F2, F8b};
 use swanky_sieve_ir_api::HigherDegreeCircuitExecuter;
 
@@ -27,7 +26,7 @@ use crate::{
         BatchProverAccumulatorF2FLambda, BatchVerifierAccumulatorF2FLambda,
         batch_verification::ZeroPolynomialCoefficients,
     },
-    parameters::{FLambda, MaskLength, Params, RepetitionParam, SecurityParamBytes},
+    parameters::{FLambda, Params, RepetitionParam, SecurityParamBytes},
     proof::{
         higher_degree_circuit_adapter::HigherDegreeCircuitAdapter,
         prover_preparer::{ProverPreparer, ProverPreparerParts},
@@ -35,7 +34,10 @@ use crate::{
         transcript::ChiGenerator,
         verifier_traverser::{VerifierTraverser, VerifierTraverserParts},
     },
-    vole::{AsSecretBytes, RandomVoleP, RandomVoleV},
+    vole::{
+        AsSecretBytes, ExtensionFieldLifter, ExtensionFieldLifterF2FLambda, RandomVoleP,
+        RandomVoleV,
+    },
 };
 use hybrid_array::Array;
 use hybrid_array::typenum::Unsigned;
@@ -212,8 +214,12 @@ where
 
         let t = std::time::Instant::now();
         // Compute masks for the aggregated coefficients (`v*`, `u*` in the paper)
-        let degree_0_mask = combine::<P>(voles.aggregate_commitment_masks());
-        let degree_1_mask = combine::<P>(voles.aggregate_commitment_values());
+        let degree_0_mask = ExtensionFieldLifterF2FLambda::<P>::combine_extension(
+            &voles.aggregate_commitment_masks(),
+        );
+        let degree_1_mask = ExtensionFieldLifterF2FLambda::<P>::combine_extension(
+            &voles.aggregate_commitment_values(),
+        );
 
         // Finish computing aggregated responses (`a~`, `b~` in the paper)
         let degree_0_commitment = degree_0_aggregation + degree_0_mask;
@@ -370,7 +376,9 @@ where
 
         let t = std::time::Instant::now();
         // Combine mask VOLEs to get q*
-        let validation_mask = combine::<P>(reconstructed_voles.mask_voles());
+        let validation_mask = ExtensionFieldLifterF2FLambda::<P>::combine_extension(
+            &reconstructed_voles.mask_voles(),
+        );
 
         // Run circuit traversal and get the aggregate value (part of c~)
         let max_higher_degree = self.higher_degree_commitment.max_degree();
@@ -449,23 +457,6 @@ where
     {
         self.verify(&HigherDegreeCircuitAdapter::new(circuit), transcript)
     }
-}
-
-/// Convert a list of field elements into a single 128-bit value.
-///
-/// Specifically, we compute
-/// $` \sum_{i = 0}^{128} v_i X^i`$,
-/// where $`X`$ is the generator for the field.
-fn combine<P: Params>(values: Array<FLambda<P>, MaskLength<P>>) -> FLambda<P> {
-    // Start with `X^0 = 1`
-    let mut power = FLambda::<P>::ONE;
-    let mut acc = FLambda::<P>::ZERO;
-
-    for vi in values {
-        acc += vi * power;
-        power *= FLambda::<P>::GENERATOR;
-    }
-    acc
 }
 
 /// The secret material for the prover is the extended witness.
