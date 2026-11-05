@@ -543,7 +543,7 @@ mod tests {
     use std::{fs::File, io::Cursor};
     use swanky_error::{ErrorKind, Result, WrapErr};
     use swanky_field::{FiniteRing, IsSubFieldOf};
-    use swanky_field_binary::{F2, F128b};
+    use swanky_field_binary::F2;
     use swanky_sieve_ir_api::{CircuitResult, HigherDegreeBackend, HigherDegreeCircuitExecuter};
     use tempfile::tempdir;
 
@@ -865,6 +865,16 @@ mod tests {
                 #[test]
                 fn proof_requires_exact_number_of_challenges() -> Result<()> {
                     super::proof_requires_exact_number_of_challenges::<$params>()
+                }
+
+                #[test]
+                fn higher_degree_proof_round_trips() -> Result<()> {
+                    super::higher_degree_proof_round_trips::<$params>()
+                }
+
+                #[test]
+                fn higher_degree_proof_fails_against_a_different_constraint() -> Result<()> {
+                    super::higher_degree_proof_fails_against_a_different_constraint::<$params>()
                 }
             }
         };

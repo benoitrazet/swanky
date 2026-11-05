@@ -137,7 +137,7 @@ where
     /// reserved for masking the higher degree aggregate (see
     /// [`Proof::prove()`](crate::proof::Proof::prove)).
     pub(crate) fn into_parts(self) -> Result<ProverTraverserParts<Vole, P>> {
-        if self.vole_assignment_count != self.voles.extended_witness_length() {
+        if self.vole_assignment_count != self.extended_witness.len() {
             bail!(
                 ErrorKind::OtherError,
                 "Traversal did not use exactly one VOLE per extended witness value! Had {}, used {}",

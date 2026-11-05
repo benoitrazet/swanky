@@ -221,12 +221,12 @@ where
 mod tests {
     use super::*;
     use proptest::test_runner::TestCaseResult;
-    use proptest::{collection::vec, prelude::*};
+    use proptest::prelude::*;
     use rand::SeedableRng;
     use rand::rng;
     use swanky_field::FiniteRing;
     use swanky_field::{FiniteField, IsSubFieldOf};
-    use swanky_field_binary::{F2, F8b, F64b, F128b};
+    use swanky_field_binary::{F2, F8b, F128b};
     use swanky_rng::SwankyRng;
 
     fn pow_fe<FE: FiniteField>(base: FE, exp: usize) -> FE {
